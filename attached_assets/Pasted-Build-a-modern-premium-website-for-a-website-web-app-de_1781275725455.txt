@@ -1,0 +1,234 @@
+Build a modern, premium website for a website/web app development business.
+
+Business goal:
+Create a clear, high-converting website that sells website creation, web application development, SEO support, blog/content support, and ongoing business growth services.
+
+Brand style:
+Modern, clean, professional, Apple-style layout.
+Use neutral luxury colors: white, soft gray, black, beige, muted gold or soft blue accent.
+Tone should feel trustworthy, smart, helpful, and business-focused — not too techy.
+
+Website pages:
+1. Home
+2. Services
+3. Pricing
+4. Portfolio / Case Studies
+5. About
+6. Contact / Book a Call
+
+Homepage sections:
+- Hero section with headline:
+  “Websites and Web Apps Built to Help Your Business Grow”
+- Subheadline:
+  “We create clean, professional websites, custom web applications, SEO foundations, blog systems, and automation tools that help businesses look credible and operate smarter.”
+- CTA buttons:
+  “Book a Free Consultation”
+  “View Services”
+- Trust/value section:
+  Fast turnaround, mobile-friendly design, SEO-ready structure, business automation, ongoing support
+- Services preview
+- Pricing preview
+- Process section:
+  Discover → Design → Build → Launch → Optimize
+- FAQ
+- Final CTA
+
+Create clear service categories:
+
+1. Website Design & Development
+For business websites, service pages, landing pages, portfolio sites, nonprofit sites, and local business websites.
+Includes:
+- Mobile responsive design
+- Homepage and service pages
+- Contact forms
+- Branding/layout guidance
+- Basic SEO setup
+- Analytics connection
+- Launch support
+
+2. Web Application Development
+For businesses that need more than a website.
+Includes:
+- Client portals
+- Booking systems
+- CRM dashboards
+- Internal tools
+- Admin panels
+- User login systems
+- Database integration
+- Automation workflows
+
+3. SEO Foundation
+Separate this from website building.
+Includes:
+- Keyword structure
+- Page titles and meta descriptions
+- SEO-friendly headings
+- Local SEO setup guidance
+- Google Search Console setup
+- Sitemap and indexing support
+- Technical SEO basics
+
+4. Blog & Content Support
+Separate this from SEO.
+Includes:
+- Blog setup
+- Blog category structure
+- Monthly blog planning
+- SEO blog outlines
+- AI-assisted content drafts
+- Content upload support
+- Internal linking guidance
+
+5. Ongoing Website Care
+Includes:
+- Small edits
+- Page updates
+- Bug fixes
+- Performance checks
+- Monthly improvements
+- Content updates
+- Support requests
+
+6. Business Automation Add-ons
+Includes:
+- Lead capture forms
+- Email notifications
+- CRM connection
+- Google Sheets/Airtable connection
+- Appointment booking
+- AI chatbot or assistant
+- Workflow automation
+
+Pricing page:
+Create product tiers that clearly separate website, web app, SEO, blog, and support.
+
+Tier 1: Starter Website
+Best for new businesses that need a simple online presence.
+Includes:
+- 1–3 page website
+- Mobile responsive design
+- Contact form
+- Basic SEO setup
+- Launch support
+
+Tier 2: Growth Website
+Best for service businesses that want a stronger, more complete website.
+Includes:
+- 5–8 pages
+- Service pages
+- Lead capture forms
+- SEO foundation
+- Blog setup
+- Analytics setup
+- Basic copy guidance
+
+Tier 3: Premium Business Website
+Best for businesses that want a polished website built for credibility and conversion.
+Includes:
+- 8–12 pages
+- Custom sections
+- Advanced service pages
+- Blog system
+- Local SEO foundation
+- Conversion-focused layout
+- CRM or email integration
+- 30 days post-launch support
+
+Separate Web App Packages:
+
+Web App Starter
+For small internal tools or simple client portals.
+Includes:
+- Login system
+- Dashboard
+- Database setup
+- Admin controls
+- Basic workflows
+
+Custom Business Web App
+For advanced business systems.
+Includes:
+- Custom user roles
+- CRM-style dashboards
+- Booking or scheduling system
+- Notifications
+- Database management
+- Automation integrations
+- Admin panel
+- Scalable architecture
+
+SEO Add-On Packages:
+
+SEO Foundation
+- Technical SEO setup
+- Metadata
+- Headings
+- Sitemap
+- Search Console guidance
+
+Local SEO Boost
+- Local keyword structure
+- City/service pages
+- Google Business Profile guidance
+- Local landing pages
+
+Monthly SEO Support
+- Monthly keyword planning
+- SEO blog outlines
+- Site improvements
+- Ranking/content recommendations
+
+Blog Support Packages:
+
+Blog Starter
+- Blog setup
+- Categories
+- 3 blog outlines
+
+Monthly Blog Support
+- 4 blog outlines per month
+- AI-assisted drafts
+- Upload formatting
+- Internal linking suggestions
+
+Ongoing Support Packages:
+
+Basic Care
+- Small monthly edits
+- Bug fixes
+- Website health check
+
+Growth Care
+- Monthly updates
+- Blog upload support
+- SEO improvements
+- Analytics review
+
+Priority Care
+- Faster support
+- Landing page updates
+- Automation updates
+- Strategy recommendations
+
+Design requirements:
+- Use cards for pricing tiers
+- Use icons for services
+- Make pricing easy to compare
+- Add “Starting at” pricing placeholders instead of fixed prices
+- Add “Book a Consultation” buttons on every pricing card
+- Include FAQ section explaining the difference between a website and a web app
+- Include a contact form with name, email, phone, business type, service needed, budget range, and message
+
+Important copy direction:
+Make the business sound like it helps owners not just “get a website,” but build a digital system that attracts leads, builds trust, and supports daily operations.
+
+Add strong CTA language:
+- “Let’s build your business online”
+- “Start with a website. Grow with systems.”
+- “Turn your website into a business tool.”
+
+Make the website fully responsive for desktop and mobile.
+Use clean reusable components.
+Use modern animations subtly, not too flashy.
+Include placeholder portfolio projects and testimonials.
