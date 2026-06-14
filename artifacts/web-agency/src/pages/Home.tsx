@@ -123,12 +123,17 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { title: "Starter Website", price: "2,500", desc: "Perfect for local businesses needing a professional foundation." },
-              { title: "Growth Website", price: "5,000", desc: "For established businesses ready to scale their organic lead generation." },
-              { title: "Premium Business", price: "8,500", desc: "Comprehensive digital presence with advanced integrations." }
+              { title: "Essential Presence", price: "2,995", desc: "For new businesses, local service providers, and professional services that need a credible online home." },
+              { title: "Lead Generation Website", price: "5,995", desc: "For service businesses ready to convert visitors into leads with a conversion-focused digital presence.", popular: true },
+              { title: "Growth Platform", price: "9,995", desc: "For established businesses that need a complete digital system with automation, CRM, and advanced SEO." }
             ].map((tier, i) => (
-              <Card key={i} className="border-border">
-                <CardHeader>
+              <Card key={i} className={`relative border-border ${(tier as any).popular ? "border-primary shadow-lg" : ""}`}>
+                {(tier as any).popular && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
+                    Best Seller
+                  </div>
+                )}
+                <CardHeader className="pt-8">
                   <CardTitle className="font-serif text-2xl">{tier.title}</CardTitle>
                   <CardDescription>{tier.desc}</CardDescription>
                 </CardHeader>
@@ -138,7 +143,7 @@ export default function Home() {
                 </CardContent>
                 <CardFooter>
                   <Link href="/pricing" className="w-full">
-                    <Button variant="secondary" className="w-full">View Details</Button>
+                    <Button variant={(tier as any).popular ? "default" : "secondary"} className="w-full">View Details</Button>
                   </Link>
                 </CardFooter>
               </Card>
