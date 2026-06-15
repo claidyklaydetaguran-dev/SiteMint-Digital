@@ -139,7 +139,7 @@ const services = [
       "New page builds or redesigns (quoted separately)",
       "SEO campaigns or content production",
     ],
-    note: "Care plans range from $99 to $299/mo depending on support level and response time needed.",
+    note: "Care plans range from $99 to $599/mo depending on support level and response time needed.",
   },
   {
     id: "automation",

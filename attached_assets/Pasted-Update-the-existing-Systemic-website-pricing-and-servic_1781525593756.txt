@@ -1,0 +1,386 @@
+Update the existing Systemic website pricing and services strategy.
+
+Goal:
+Refine the website so it feels more strategic, realistic, and market-aware. The pricing should position us between freelancers and traditional agencies: more premium than cheap template builders, but faster and more affordable than large agencies.
+
+Important positioning:
+We are not just selling websites. We are selling business websites, web applications, SEO foundations, blog/content systems, and automation tools that help businesses generate leads, build trust, and reduce manual work.
+
+Update the Pricing page structure.
+
+Create these main pricing sections:
+
+1. Website Packages
+2. Web Application Packages
+3. SEO Add-Ons
+4. Blog & Content Support
+5. Ongoing Website Care
+6. Automation Add-Ons
+
+WEBSITE PACKAGES
+
+Replace current website tiers with:
+
+Tier 1: Essential Presence
+Starting at $2,995
+
+Best for:
+New businesses, local service providers, nonprofits, solo professionals, and small businesses that need a clean and credible website.
+
+Includes:
+
+* Up to 15 pages
+* Mobile responsive design
+* Contact form
+* Google Maps integration
+* Social media links
+* Basic SEO setup
+* Google Analytics setup
+* Google Search Console setup
+* Speed optimization basics
+* Blog capability
+* Launch support
+
+Add note:
+Best for businesses that need a professional online foundation.
+
+Tier 2: Lead Generation Website
+Starting at $5,995
+
+Mark this as “Most Popular.”
+
+Best for:
+Service businesses that want a stronger website designed to capture leads and support marketing.
+
+Includes:
+
+* Up to 24 pages
+* Conversion-focused layout
+* Service landing pages
+* Lead capture forms
+* Blog system
+* Basic CRM or email integration
+* Local SEO foundation
+* Analytics dashboard setup
+* Content migration support
+* One training session
+* 30 days post-launch support
+
+Add note:
+Best for businesses ready to turn website traffic into inquiries.
+
+Tier 3: Growth Platform
+Starting at $9,995
+
+Best for:
+Established businesses that need a larger website, stronger content structure, and business growth systems.
+
+Includes:
+
+* 25+ pages
+* Advanced website architecture
+* Multi-service or multi-location structure
+* Advanced blog/content hub
+* Multiple lead funnels
+* CRM or email marketing integration
+* Appointment booking integration
+* Reporting dashboard setup
+* Marketing automation setup
+* Strategy session
+* 45 days post-launch support
+
+Add note:
+Best for businesses that need their website to function like a growth system.
+
+Important:
+Do not make the website packages sound like custom software. Keep websites separate from web applications.
+
+WEB APPLICATION PACKAGES
+
+Update this section to clearly explain:
+Web applications are for businesses that need custom tools, portals, dashboards, databases, booking systems, or internal systems — not just a public website.
+
+Tier 1: Internal Tool
+Starting at $12,500
+
+Best for:
+Businesses that need a simple custom tool to manage operations.
+
+Includes:
+
+* Secure login system
+* User dashboard
+* Admin dashboard
+* Database setup
+* User roles
+* Basic reporting
+* Workflow automation
+* Deployment support
+
+Examples:
+
+* Client portal
+* Booking dashboard
+* Inventory tracker
+* Simple CRM
+* Internal request system
+
+Timeline note:
+Typical timeline: 4–8 weeks depending on scope.
+
+Tier 2: Custom Business Platform
+Starting at $25,000
+
+Best for:
+Businesses that need a more advanced custom web application.
+
+Includes:
+
+* Custom user roles and permissions
+* Advanced dashboards
+* Database management
+* Booking or scheduling system
+* Notifications
+* Payment or form integrations when applicable
+* Admin controls
+* Scalable architecture planning
+* Testing and launch support
+
+Examples:
+
+* CRM platform
+* Marketplace MVP
+* Membership platform
+* SaaS MVP
+* Multi-user business portal
+
+Add note:
+Final pricing depends on discovery, features, integrations, and complexity.
+
+SEO ADD-ONS
+
+Create a separate SEO pricing section.
+
+SEO Foundation
+Starting at $750
+
+Includes:
+
+* Keyword structure
+* Page titles and meta descriptions
+* SEO-friendly headings
+* Sitemap setup
+* Google Search Console guidance
+* Indexing support
+* Technical SEO basics
+
+Local SEO Boost
+Starting at $1,500
+
+Includes:
+
+* Local keyword planning
+* City/service page structure
+* Google Business Profile guidance
+* Local landing page recommendations
+* Location-based content strategy
+
+Monthly SEO Support
+Starting at $500/month
+
+Includes:
+
+* Monthly keyword recommendations
+* SEO improvement checklist
+* Blog/topic planning
+* Search performance review
+* Content optimization suggestions
+
+BLOG & CONTENT SUPPORT
+
+Blog Setup
+Starting at $500
+
+Includes:
+
+* Blog page setup
+* Blog category structure
+* Blog post template
+* Featured post layout
+* Internal linking structure
+
+Monthly Blog Support
+Starting at $750/month
+
+Includes:
+
+* 4 blog topic ideas per month
+* SEO blog outlines
+* AI-assisted draft support
+* Upload formatting
+* Internal linking suggestions
+* Monthly content planning
+
+ONGOING WEBSITE CARE
+
+Basic Care
+Starting at $99/month
+
+Includes:
+
+* Small monthly edits
+* Bug fixes
+* Website health check
+* Basic support
+
+Growth Care
+Starting at $299/month
+
+Includes:
+
+* Monthly updates
+* Blog upload support
+* SEO improvement support
+* Analytics review
+* Priority response
+
+Priority Care
+Starting at $599/month
+
+Includes:
+
+* Faster support
+* Landing page updates
+* Automation updates
+* Conversion improvement suggestions
+* Monthly strategy recommendations
+
+AUTOMATION ADD-ONS
+
+Create a section called Automation Add-Ons.
+
+Starting at $500
+
+Examples:
+
+* Lead capture automation
+* CRM connection
+* Email notification workflow
+* Google Sheets or Airtable connection
+* Appointment booking automation
+* AI chatbot or assistant
+* Follow-up workflow
+* Contact form routing
+
+Add note:
+Automation pricing depends on tools, integrations, and workflow complexity.
+
+ADD A MARKET POSITIONING SECTION
+
+Add a clean visual section on the pricing page or homepage titled:
+
+“Where We Fit In The Market”
+
+Content:
+We are positioned between low-cost freelancers and traditional agencies. That means you get a more strategic, modern, and business-focused website without the slow timelines and high overhead of a large agency.
+
+Create comparison cards:
+
+DIY Builders
+Typical range: $20–$300/month
+Best for: very simple websites
+Limitations: limited strategy, customization, and support
+
+Freelancers
+Typical range: $1,500–$5,000
+Best for: basic websites
+Limitations: quality and support can vary
+
+Systemic
+Typical range: $2,995–$15,000+
+Best for: business websites, lead generation sites, web apps, SEO foundations, automations, and growth systems
+Advantage: faster build, strategic structure, modern tools, and practical support
+
+Traditional Agencies
+Typical range: $10,000–$50,000+
+Best for: larger marketing campaigns and enterprise work
+Limitations: higher cost and longer timeline
+
+ADD A SWOT SECTION
+
+Add a section titled:
+“Why Businesses Choose Us”
+
+Use four cards:
+
+Strengths:
+
+* Faster development process
+* Lower overhead than large agencies
+* Website, app, SEO, blog, and automation support in one place
+* Strong fit for small businesses, nonprofits, real estate, consultants, and service providers
+
+Weaknesses:
+
+* Not ideal for enterprise-level software
+* Complex apps require deeper discovery
+* Some advanced integrations may need custom planning
+* Scope must be clearly defined
+
+Opportunities:
+
+* Many small businesses need better websites
+* AI and automation are becoming more important
+* Local SEO and content can help businesses compete
+* Businesses want systems, not just pages
+
+Threats:
+
+* Cheap freelancers
+* DIY website builders
+* AI website generators
+* Agencies with larger teams
+
+Make this section positive and strategic, not negative or scary.
+
+ADD IMPORTANT DISCLAIMERS
+
+Add a small note under pricing:
+All prices are starting prices. Final pricing depends on scope, page count, content readiness, integrations, revisions, and timeline.
+
+Add another note:
+Website packages do not include advanced custom software unless stated. Web applications are quoted separately based on functionality and complexity.
+
+DESIGN DIRECTION
+
+Keep the existing elegant look:
+
+* Clean white background
+* Navy accents
+* Luxury serif headings
+* Minimal layout
+* Large spacing
+* Premium but approachable
+
+Improve pricing cards:
+
+* Make cards equal height
+* Add “Best For” label
+* Add “Starting At” label
+* Add clear feature lists
+* Add CTA button: “Book a Consultation”
+* Use one highlighted recommended card only
+
+Make the page mobile responsive.
+
+Update copy throughout the site to emphasize:
+
+* Credibility
+* Lead generation
+* Business systems
+* Fast build process
+* Practical support
+* Long-term growth
+
+Important:
+Do not overpromise enterprise-grade SaaS, banking systems, HIPAA medical systems, large-scale marketplaces, or apps supporting thousands of concurrent users. Keep expectations realistic and aligned with what we can confidently deliver using Replit and modern web development tools.
