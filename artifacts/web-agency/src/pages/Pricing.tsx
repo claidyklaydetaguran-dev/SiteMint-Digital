@@ -125,8 +125,10 @@ export default function Pricing() {
   return (
     <div className="w-full pb-24">
       {/* Header */}
-      <section className="pt-20 pb-16 bg-accent/30">
-        <div className="container mx-auto px-4 md:px-6 text-center">
+      <section className="pt-20 pb-16 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/60 via-background/30 to-background pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -218,8 +220,10 @@ export default function Pricing() {
       </section>
 
       {/* Web App Packages */}
-      <section className="py-20 bg-accent/30 border-y border-border/40">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="py-20 border-y border-border/40 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-60" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
+        <div className="absolute inset-0 bg-background/50 pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-4">
               <h2 className="text-3xl font-serif font-bold mb-4">Web Applications</h2>

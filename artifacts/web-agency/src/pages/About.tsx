@@ -24,8 +24,10 @@ export default function About() {
   return (
     <div className="w-full pb-24">
       {/* Hero Section */}
-      <section className="pt-20 pb-16 bg-accent/30">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="pt-20 pb-16 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/65 via-background/35 to-background pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -78,8 +80,10 @@ export default function About() {
       </section>
 
       {/* Team Section */}
-      <section className="py-20 bg-accent/30 border-y border-border/40">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="py-20 border-y border-border/40 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-50" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
+        <div className="absolute inset-0 bg-background/40 pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-16 max-w-2xl mx-auto">
             <h2 className="text-3xl font-serif font-bold mb-4">Leadership Team</h2>
             <p className="text-muted-foreground">Experienced engineers and designers dedicated to your growth.</p>

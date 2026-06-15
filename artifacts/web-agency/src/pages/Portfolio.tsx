@@ -63,16 +63,18 @@ export default function Portfolio() {
 
   return (
     <div className="w-full pb-24">
-      <section className="pt-20 pb-16 bg-accent/30">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="pt-20 pb-16 relative overflow-hidden bg-foreground text-background">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-40" style={{ backgroundImage: "url('/dark-section-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-foreground/80 via-foreground/60 to-foreground pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="max-w-3xl"
           >
-            <h1 className="text-5xl font-serif font-bold text-foreground mb-6">Case Studies</h1>
-            <p className="text-xl text-muted-foreground leading-relaxed">
+            <h1 className="text-5xl font-serif font-bold text-background mb-6">Case Studies</h1>
+            <p className="text-xl text-background/70 leading-relaxed">
               Explore how we've helped businesses transform their online presence and streamline their operations with custom digital systems.
             </p>
           </motion.div>

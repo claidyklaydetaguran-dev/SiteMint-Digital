@@ -169,8 +169,10 @@ export default function Services() {
   return (
     <div className="w-full pb-24">
       {/* Header */}
-      <section className="pt-20 pb-16 bg-accent/30">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="pt-20 pb-16 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/70 via-background/40 to-background pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -267,10 +269,11 @@ export default function Services() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="py-24 bg-card/50 border-t border-border/40">
-        <div className="container mx-auto px-4 md:px-6 text-center">
-          <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">Not sure where to start?</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
+      <section className="py-24 bg-foreground text-background relative overflow-hidden border-t border-border/40">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-40 pointer-events-none" style={{ backgroundImage: "url('/dark-section-bg.png')" }} />
+        <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
+          <h2 className="text-4xl md:text-5xl font-serif font-bold text-background mb-6">Not sure where to start?</h2>
+          <p className="text-lg text-background/70 max-w-2xl mx-auto mb-10">
             Book a free consultation. We'll ask the right questions, understand your business goals, and recommend exactly what to build first — and what to save for later.
           </p>
           <Link href="/contact" data-testid="link-services-bottom-cta">
