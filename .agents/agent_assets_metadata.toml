@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "XINJsXn2ZSNYx6aqhs7U6"
+uri = "file://artifacts/web-agency/public/hero-bg.png"
+type = "image"
+title = "hero background"
+
+[[generated]]
+id = "NaNo57W52Po8xcxsLbFwQ"
+uri = "file://artifacts/web-agency/public/dark-section-bg.png"
+type = "image"
+title = "dark section background"
+
+[[generated]]
+id = "lzDstWvuYztPcdB0XsMKc"
+uri = "file://artifacts/web-agency/public/warm-accent-bg.png"
+type = "image"
+title = "warm accent background"

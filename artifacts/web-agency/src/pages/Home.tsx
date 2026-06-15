@@ -23,8 +23,9 @@ export default function Home() {
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative pt-20 pb-32 md:pt-32 md:pb-48 overflow-hidden bg-background">
-        <div className="absolute inset-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
+      <section className="relative pt-20 pb-32 md:pt-32 md:pb-48 overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/60 via-background/30 to-background pointer-events-none" />
         
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="max-w-4xl">
@@ -62,7 +63,7 @@ export default function Home() {
       </section>
 
       {/* Trust Bar */}
-      <section className="border-y border-border/40 bg-card/50 py-8">
+      <section className="border-y border-border/40 bg-card/50 py-8 relative" style={{ backgroundImage: "url('/warm-accent-bg.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-wrap justify-center md:justify-between items-center gap-8 md:gap-4 text-sm font-medium text-muted-foreground">
             <div className="flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Fast Turnaround</div>
@@ -109,7 +110,9 @@ export default function Home() {
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-24 bg-card/50 border-y border-border/40">
+      <section className="py-24 border-y border-border/40 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-background/50 pointer-events-none" />
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
             <div className="max-w-2xl">
@@ -153,8 +156,9 @@ export default function Home() {
       </section>
 
       {/* Process Timeline */}
-      <section className="py-24">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-30" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6">How We Work</h2>
             <p className="text-lg text-muted-foreground">A proven process for delivering results on time.</p>
@@ -178,8 +182,9 @@ export default function Home() {
       </section>
 
       {/* Portfolio & Testimonials */}
-      <section className="py-24 bg-foreground text-background">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="py-24 bg-foreground text-background relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-40 pointer-events-none" style={{ backgroundImage: "url('/dark-section-bg.png')" }} />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
             <div className="max-w-2xl">
               <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6">Recent Work</h2>
@@ -224,8 +229,9 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section className="py-24">
-        <div className="container mx-auto px-4 md:px-6 max-w-3xl">
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-20" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
+        <div className="container mx-auto px-4 md:px-6 max-w-3xl relative z-10">
           <h2 className="text-3xl md:text-5xl font-serif font-bold mb-10 text-center">Common Questions</h2>
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="item-1">
@@ -251,7 +257,9 @@ export default function Home() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 bg-card/50 border-t border-border/40">
+      <section className="py-24 border-t border-border/40 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
+        <div className="absolute inset-0 w-full h-full bg-background/50 pointer-events-none" />
         <div className="container mx-auto px-4 md:px-6 text-center">
           <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">Let's build your business online.</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">

@@ -114,31 +114,31 @@
   --sidebar: 40 20% 98%;
   --sidebar-foreground: 220 10% 10%;
   --sidebar-border: 40 10% 85%;
-  --sidebar-primary: 222 47% 25%;
+  --sidebar-primary: 38 48% 48%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 40 20% 94%;
+  --sidebar-accent: 38 30% 94%;
   --sidebar-accent-foreground: 220 10% 10%;
-  --sidebar-ring: 222 47% 25%;
+  --sidebar-ring: 38 48% 48%;
 
   --popover: 0 0% 100%;
   --popover-foreground: 220 10% 10%;
   --popover-border: 40 10% 90%;
 
-  --primary: 222 47% 25%;
+  --primary: 38 48% 48%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 40 20% 94%;
+  --secondary: 40 25% 94%;
   --secondary-foreground: 220 10% 10%;
-  --muted: 40 10% 94%;
+  --muted: 40 12% 94%;
   --muted-foreground: 220 5% 40%;
-  --accent: 40 30% 90%;
+  --accent: 38 30% 92%;
   --accent-foreground: 220 10% 10%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
   --input: 40 10% 85%;
-  --ring: 222 47% 25%;
-  --chart-1: 222 47% 25%;
-  --chart-2: 40 30% 90%;
+  --ring: 38 48% 48%;
+  --chart-1: 38 48% 48%;
+  --chart-2: 38 30% 90%;
   --chart-3: 220 10% 10%;
   --chart-4: 40 20% 94%;
   --chart-5: 40 10% 85%;
@@ -191,30 +191,30 @@
   --sidebar: 220 10% 10%;
   --sidebar-foreground: 40 20% 98%;
   --sidebar-border: 220 10% 20%;
-  --sidebar-primary: 222 47% 45%;
-  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary: 38 40% 55%;
+  --sidebar-primary-foreground: 220 10% 10%;
   --sidebar-accent: 220 10% 15%;
   --sidebar-accent-foreground: 40 20% 98%;
-  --sidebar-ring: 222 47% 45%;
+  --sidebar-ring: 38 40% 55%;
 
   --popover: 220 10% 12%;
   --popover-foreground: 40 20% 98%;
   --popover-border: 220 10% 20%;
 
-  --primary: 40 20% 98%;
+  --primary: 38 40% 55%;
   --primary-foreground: 220 10% 10%;
   --secondary: 220 10% 15%;
   --secondary-foreground: 40 20% 98%;
   --muted: 220 10% 15%;
   --muted-foreground: 40 10% 70%;
-  --accent: 222 47% 25%;
+  --accent: 38 20% 18%;
   --accent-foreground: 40 20% 98%;
   --destructive: 0 62% 30%;
   --destructive-foreground: 40 20% 98%;
 
   --input: 220 10% 20%;
-  --ring: 222 47% 45%;
-  --chart-1: 222 47% 45%;
+  --ring: 38 40% 55%;
+  --chart-1: 38 40% 55%;
   --chart-2: 40 20% 98%;
   --chart-3: 40 10% 70%;
   --chart-4: 220 10% 15%;
