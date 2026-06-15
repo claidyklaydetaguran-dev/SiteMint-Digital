@@ -42,7 +42,7 @@ export function Navbar() {
             S
           </div>
           <span className="font-serif font-semibold text-xl tracking-tight text-foreground">
-            Systemic
+            SiteMint Digital
           </span>
         </Link>
 

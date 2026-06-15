@@ -12,7 +12,7 @@ export function Footer() {
                 S
               </div>
               <span className="font-serif font-semibold text-xl tracking-tight text-background">
-                Systemic
+                SiteMint Digital
               </span>
             </Link>
             <p className="text-muted/80 text-sm leading-relaxed mb-6 max-w-sm">
@@ -88,7 +88,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted/60">
-          <p>© {new Date().getFullYear()} Systemic Agency. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} SiteMint Digital. All rights reserved.</p>
           <div className="flex gap-6">
             <span className="cursor-pointer hover:text-background transition-colors">Privacy Policy</span>
             <span className="cursor-pointer hover:text-background transition-colors">Terms of Service</span>

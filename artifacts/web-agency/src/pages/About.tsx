@@ -48,7 +48,7 @@ export default function About() {
               <h2 className="text-3xl font-serif font-bold mb-6">Our Story</h2>
               <div className="prose prose-lg prose-gray dark:prose-invert">
                 <p>
-                  Founded in 2020, Systemic was born out of frustration. We saw too many excellent local businesses struggling online because they were sold broken WordPress templates by fly-by-night freelancers, or locked into restrictive, expensive platforms.
+                  Founded in 2020, SiteMint Digital was born out of frustration. We saw too many excellent local businesses struggling online because they were sold broken WordPress templates by fly-by-night freelancers, or locked into restrictive, expensive platforms.
                 </p>
                 <p>
                   We realized that business owners didn't just want "a website." They wanted a digital system that worked—something that reliably captured leads, represented their brand professionally, and automated the manual tasks eating up their week.
