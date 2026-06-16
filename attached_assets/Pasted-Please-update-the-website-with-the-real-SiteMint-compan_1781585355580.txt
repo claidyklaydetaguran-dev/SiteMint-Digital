@@ -1,0 +1,213 @@
+Please update the website with the real SiteMint company information, leadership team, past clients, and contact details.
+
+## 1. Update Leadership Team Section
+
+Replace the current placeholder leadership/team members with the following real team:
+
+### Claidy Taguran
+
+**Technical Director**
+
+Description:
+Leads technical strategy, website development, application development, CRM systems, AI integrations, database architecture, and deployment. Oversees the technical quality of every SiteMint project from planning to launch.
+
+### Shasta Green
+
+**Head of Strategy**
+
+Description:
+Leads business strategy, client growth planning, digital positioning, website messaging, CRM workflow strategy, and automation planning. Helps clients turn their website into a real business growth system.
+
+### Saisa Lorraigne
+
+**Project and Admin Manager**
+
+Description:
+Manages project coordination, client communication, onboarding, timelines, documentation, quality control, and administrative operations to keep every project organized and moving forward.
+
+Design instructions:
+
+* Remove all dummy names, titles, and descriptions.
+* Keep the premium, clean, modern style of the current Leadership Team section.
+* Use circular initials or professional placeholder profile images.
+* Make cards responsive on desktop, tablet, and mobile.
+* Add subtle hover effects.
+* Ensure spelling is exactly:
+
+  * Claidy Taguran
+  * Shasta Green
+  * Saisa Lorraigne
+
+## 2. Add Past Clients / Portfolio Section
+
+Create a new section titled:
+
+**Past Clients & Featured Projects**
+
+Subtitle:
+Real websites and digital projects created for entrepreneurs, nonprofits, professionals, and technical portfolios.
+
+Add these project cards:
+
+### Shasta Greene Real Estate
+
+Website:
+https://shastagreene.com
+
+Category:
+Real Estate
+
+Description:
+A professional real estate website designed to build trust, showcase services, support lead generation, and strengthen online presence.
+
+Button:
+Visit Website
+
+### OneFilAm Community
+
+Website:
+https://onefilamcommunity.org
+
+Category:
+Nonprofit Organization
+
+Description:
+A nonprofit community website supporting Filipino-American outreach, events, programs, community engagement, and organizational credibility.
+
+Button:
+Visit Website
+
+### Herlinda Valdovinos
+
+Website:
+https://herlindavaldovinos.com
+
+Category:
+Professional Services
+
+Description:
+A professional website created to establish online credibility, present services clearly, and help generate client inquiries.
+
+Button:
+Visit Website
+
+### Claidy Taguran Portfolio
+
+Website:
+https://ClaidyTaguranPorfolio.replit.app
+
+Category:
+Developer Portfolio
+
+Description:
+A technical portfolio showcasing development projects, web applications, software skills, UI/UX work, and modern web development experience.
+
+Button:
+Visit Website
+
+Portfolio design instructions:
+
+* Use modern project cards.
+* Add website preview placeholders or screenshots if available.
+* Each card should include project name, category, short description, and Visit Website button.
+* All website buttons should open in a new tab.
+* Use a clean responsive grid layout.
+* Add subtle hover animation.
+* Make this section feel credible and polished.
+
+## 3. Update Contact Information
+
+Replace all old or placeholder contact information across the entire website with:
+
+Phone:
+949-880-6515
+
+Email:
+[info.sitemint@gmail.com](mailto:info.sitemint@gmail.com)
+
+Apply this update to:
+
+* Header
+* Footer
+* Contact page
+* CTA sections
+* Mobile menu
+* Contact forms
+* SEO metadata
+* Schema markup, if included
+
+Make phone clickable:
+tel:9498806515
+
+Make email clickable:
+mailto:info[.sitemint@gmail.com](mailto:.sitemint@gmail.com)
+
+## 4. Add Trust / Credibility Section
+
+Add a section before the contact section titled:
+
+**Why Businesses Choose SiteMint**
+
+Include these cards:
+
+### Custom Website Design
+
+Websites built around each client’s brand, goals, and audience.
+
+### Business Strategy First
+
+We do not just build pages. We help structure websites to support leads, trust, and growth.
+
+### CRM & Automation Ready
+
+We help connect websites with lead forms, customer tracking, follow-up workflows, and automation tools.
+
+### Mobile Responsive
+
+Every website should look clean and professional on desktop, tablet, and mobile.
+
+### SEO Foundation
+
+Build each site with basic SEO structure, clean content hierarchy, metadata, and performance in mind.
+
+### Ongoing Support
+
+Provide support for updates, improvements, and future website growth.
+
+## 5. Update SEO Metadata
+
+Update the website SEO details:
+
+Title:
+SiteMint | Professional Websites, CRM Systems & Business Automation
+
+Meta Description:
+SiteMint helps businesses grow with professional websites, CRM systems, automation, SEO foundations, and digital strategy for entrepreneurs, nonprofits, and growing organizations.
+
+Keywords:
+website design, business website, CRM systems, business automation, SEO website, nonprofit website, real estate website, custom web development, SiteMint
+
+Organization Name:
+SiteMint
+
+Phone:
+949-880-6515
+
+Email:
+[info.sitemint@gmail.com](mailto:info.sitemint@gmail.com)
+
+## 6. Final Quality Check
+
+Before finishing, please check that:
+
+* No placeholder names remain.
+* No old dummy contact information remains.
+* All portfolio links work.
+* All portfolio links open in a new tab.
+* The layout is responsive on mobile.
+* The leadership section looks balanced.
+* The contact details are consistent everywhere.
+* The website still feels clean, modern, premium, and trustworthy.
+
+Goal:
+Make SiteMint look like a real professional website and app development company with a strong leadership team, real past clients, clear contact information, and stronger credibility.
