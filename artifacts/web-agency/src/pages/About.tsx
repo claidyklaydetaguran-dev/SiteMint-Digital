@@ -15,7 +15,7 @@ const team = [
       "Leads technical strategy, website development, application development, CRM systems, AI integrations, database architecture, and deployment. Oversees the technical quality of every SiteMint project from planning to launch.",
   },
   {
-    name: "Shasta Green",
+    name: "Shasta Greene",
     title: "Head of Strategy",
     photo: "/team-shasta.jpg",
     description:
