@@ -7,7 +7,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
@@ -217,7 +217,7 @@ export default function Contact() {
                     <Mail className="w-6 h-6 text-primary shrink-0" />
                     <div>
                       <div className="font-semibold text-foreground mb-1">Email Us</div>
-                      <a href="mailto:hello@systemic.agency" className="hover:text-primary transition-colors">hello@systemic.agency</a>
+                      <a href="mailto:info.sitemint@gmail.com" className="hover:text-primary transition-colors">info.sitemint@gmail.com</a>
                     </div>
                   </div>
                   
@@ -225,19 +225,7 @@ export default function Contact() {
                     <Phone className="w-6 h-6 text-primary shrink-0" />
                     <div>
                       <div className="font-semibold text-foreground mb-1">Call Us</div>
-                      <a href="tel:+15551234567" className="hover:text-primary transition-colors">+1 (555) 123-4567</a>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4 text-muted-foreground">
-                    <MapPin className="w-6 h-6 text-primary shrink-0" />
-                    <div>
-                      <div className="font-semibold text-foreground mb-1">Office</div>
-                      <div>
-                        100 Innovation Drive<br />
-                        Suite 400<br />
-                        San Francisco, CA 94105
-                      </div>
+                      <a href="tel:9498806515" className="hover:text-primary transition-colors">949-880-6515</a>
                     </div>
                   </div>
                 </div>

@@ -75,9 +75,8 @@ export function Footer() {
           <div>
             <h4 className="font-serif font-semibold text-lg mb-6">Contact</h4>
             <ul className="flex flex-col gap-4">
-              <li className="text-muted/80 text-sm">hello@systemic.agency</li>
-              <li className="text-muted/80 text-sm">+1 (555) 123-4567</li>
-              <li className="text-muted/80 text-sm">San Francisco, CA</li>
+              <li><a href="mailto:info.sitemint@gmail.com" className="text-muted/80 text-sm hover:text-background transition-colors">info.sitemint@gmail.com</a></li>
+              <li><a href="tel:9498806515" className="text-muted/80 text-sm hover:text-background transition-colors">949-880-6515</a></li>
               <li className="mt-4">
                 <Link href="/contact" className="inline-block text-background border-b border-background/30 hover:border-background transition-colors pb-1 text-sm font-medium">
                   Start a project

@@ -1,26 +1,88 @@
 import { motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Monitor, TrendingUp, Zap, Smartphone, Search, HeadphonesIcon } from "lucide-react";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i: number) => ({ opacity: 1, y: 0, transition: { duration: 0.5, delay: i * 0.1 } }),
+};
+
+const team = [
+  {
+    name: "Claidy Taguran",
+    title: "Technical Director",
+    photo: "/team-claidy.png",
+    description:
+      "Leads technical strategy, website development, application development, CRM systems, AI integrations, database architecture, and deployment. Oversees the technical quality of every SiteMint project from planning to launch.",
+  },
+  {
+    name: "Shasta Green",
+    title: "Head of Strategy",
+    photo: "/team-shasta.jpg",
+    description:
+      "Leads business strategy, client growth planning, digital positioning, website messaging, CRM workflow strategy, and automation planning. Helps clients turn their website into a real business growth system.",
+  },
+  {
+    name: "Saisa Lorraigne",
+    title: "Project and Admin Manager",
+    photo: "/team-saisa.jpg",
+    description:
+      "Manages project coordination, client communication, onboarding, timelines, documentation, quality control, and administrative operations to keep every project organized and moving forward.",
+  },
+];
+
+const values = [
+  {
+    title: "Trustworthy",
+    description: "We do what we say we're going to do. No disappearing acts, no surprise invoices, and no holding your domain hostage."
+  },
+  {
+    title: "Results-Focused",
+    description: "We don't build art projects. We build business tools. Every design decision is filtered through the lens of generating leads and revenue."
+  },
+  {
+    title: "Communicative",
+    description: "We speak plainly. We explain the 'why' behind the technical details without burying you in jargon."
+  },
+  {
+    title: "Long-Term Thinking",
+    description: "We architect systems meant to scale with your business for years, not cheap templates that break after the next update."
+  }
+];
+
+const trustCards = [
+  {
+    icon: Monitor,
+    title: "Custom Website Design",
+    description: "Websites built around each client's brand, goals, and audience — not templated shortcuts.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Business Strategy First",
+    description: "We don't just build pages. We help structure websites to support leads, trust, and long-term growth.",
+  },
+  {
+    icon: Zap,
+    title: "CRM & Automation Ready",
+    description: "We help connect websites with lead forms, customer tracking, follow-up workflows, and automation tools.",
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile Responsive",
+    description: "Every website looks clean and professional on desktop, tablet, and mobile — without compromise.",
+  },
+  {
+    icon: Search,
+    title: "SEO Foundation",
+    description: "Every site is built with clean content hierarchy, metadata, performance, and search visibility in mind.",
+  },
+  {
+    icon: HeadphonesIcon,
+    title: "Ongoing Support",
+    description: "We provide support for updates, improvements, and future website growth long after launch.",
+  },
+];
 
 export default function About() {
-  const values = [
-    {
-      title: "Trustworthy",
-      description: "We do what we say we're going to do. No disappearing acts, no surprise invoices, and no holding your domain hostage."
-    },
-    {
-      title: "Results-Focused",
-      description: "We don't build art projects. We build business tools. Every design decision is filtered through the lens of generating leads and revenue."
-    },
-    {
-      title: "Communicative",
-      description: "We speak plainly. We explain the 'why' behind the technical details without burying you in jargon."
-    },
-    {
-      title: "Long-Term Thinking",
-      description: "We architect systems meant to scale with your business for years, not cheap templates that break after the next update."
-    }
-  ];
-
   return (
     <div className="w-full pb-24">
       {/* Hero Section */}
@@ -41,7 +103,7 @@ export default function About() {
           </motion.div>
         </div>
       </section>
-      
+
       {/* Story Section */}
       <section className="py-20">
         <div className="container mx-auto px-4 md:px-6">
@@ -50,17 +112,17 @@ export default function About() {
               <h2 className="text-3xl font-serif font-bold mb-6">Our Story</h2>
               <div className="prose prose-lg prose-gray dark:prose-invert">
                 <p>
-                  Founded in 2020, SiteMint Digital was born out of frustration. We saw too many excellent local businesses struggling online because they were sold broken WordPress templates by fly-by-night freelancers, or locked into restrictive, expensive platforms.
+                  SiteMint was built out of a simple observation: most small and medium businesses are underserved when it comes to real digital strategy. They either get cheap templates from freelancers, or pay too much for slow, overcomplicated agencies.
                 </p>
                 <p>
-                  We realized that business owners didn't just want "a website." They wanted a digital system that worked—something that reliably captured leads, represented their brand professionally, and automated the manual tasks eating up their week.
+                  We set out to change that. SiteMint is a focused team of builders and strategists who care about one thing: helping businesses grow through better websites, smarter systems, and practical automation.
                 </p>
                 <p>
-                  So we built an agency focused purely on <strong>engineering business outcomes</strong>. We brought enterprise-grade development practices—clean code, scalable architecture, and rigorous design—to the small and medium business market.
+                  Every project we take on is treated like a business system — not just a design exercise. We build things that work, and we stick around to make sure they keep working.
                 </p>
               </div>
             </div>
-            
+
             <div className="bg-card border border-border p-8 md:p-12 rounded-lg shadow-sm">
               <h3 className="text-2xl font-serif font-bold mb-8 text-center">Our Core Values</h3>
               <div className="space-y-6">
@@ -86,45 +148,66 @@ export default function About() {
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-16 max-w-2xl mx-auto">
             <h2 className="text-3xl font-serif font-bold mb-4">Leadership Team</h2>
-            <p className="text-muted-foreground">Experienced engineers and designers dedicated to your growth.</p>
+            <p className="text-muted-foreground">The people behind every SiteMint project — strategy, engineering, and operations.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-10 max-w-5xl mx-auto">
-            {/* Team Member 1 */}
-            <div className="text-center group">
-              <div className="w-48 h-48 mx-auto bg-card border border-border rounded-full mb-6 overflow-hidden relative">
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30 font-serif text-6xl">
-                  JD
+            {team.map((member, i) => (
+              <motion.div
+                key={i}
+                custom={i}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+                className="text-center group"
+              >
+                <div className="w-48 h-48 mx-auto rounded-full mb-6 overflow-hidden border-2 border-border shadow-md group-hover:shadow-lg group-hover:border-primary/40 transition-all duration-300">
+                  <img
+                    src={member.photo}
+                    alt={member.name}
+                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                  />
                 </div>
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-1">James Davies</h3>
-              <div className="text-primary font-medium text-sm mb-4 uppercase tracking-wider">Technical Director & Founder</div>
-              <p className="text-sm text-muted-foreground">Former enterprise software engineer who traded corporate infrastructure for helping local businesses scale.</p>
-            </div>
+                <h3 className="text-xl font-bold text-foreground mb-1">{member.name}</h3>
+                <div className="text-primary font-medium text-sm mb-4 uppercase tracking-wider">{member.title}</div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{member.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Team Member 2 */}
-            <div className="text-center group">
-              <div className="w-48 h-48 mx-auto bg-card border border-border rounded-full mb-6 overflow-hidden relative">
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30 font-serif text-6xl">
-                  SR
-                </div>
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-1">Sarah Rossi</h3>
-              <div className="text-primary font-medium text-sm mb-4 uppercase tracking-wider">Design Director</div>
-              <p className="text-sm text-muted-foreground">Obsessed with conversion-focused UX and creating digital experiences that build immediate trust.</p>
-            </div>
+      {/* Why Businesses Choose SiteMint */}
+      <section className="py-20 relative overflow-hidden">
+        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-20" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-serif font-bold mb-4">Why Businesses Choose SiteMint</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              We focus on what actually moves the needle for growing businesses.
+            </p>
+          </div>
 
-            {/* Team Member 3 */}
-            <div className="text-center group">
-              <div className="w-48 h-48 mx-auto bg-card border border-border rounded-full mb-6 overflow-hidden relative">
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30 font-serif text-6xl">
-                  MW
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {trustCards.map((card, i) => (
+              <motion.div
+                key={i}
+                custom={i}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+              >
+                <div className="bg-card border border-border rounded-xl p-6 h-full hover:border-primary/40 hover:shadow-md transition-all duration-300 group">
+                  <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary/10 transition-colors">
+                    <card.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="font-serif font-bold text-lg text-foreground mb-2">{card.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{card.description}</p>
                 </div>
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-1">Marcus Wright</h3>
-              <div className="text-primary font-medium text-sm mb-4 uppercase tracking-wider">Head of Strategy</div>
-              <p className="text-sm text-muted-foreground">Bridges the gap between technical execution and your bottom-line business goals.</p>
-            </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
