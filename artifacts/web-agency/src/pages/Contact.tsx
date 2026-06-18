@@ -201,7 +201,7 @@ export default function Contact() {
                     />
                     
                     <Button type="submit" size="lg" className="w-full h-14 text-base" data-testid="button-submit-contact">
-                      Book a Free Consultation
+                      Send Message
                     </Button>
                   </form>
                 </Form>

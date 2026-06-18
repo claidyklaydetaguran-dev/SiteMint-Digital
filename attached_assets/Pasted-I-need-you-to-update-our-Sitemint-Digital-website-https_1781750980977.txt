@@ -1,0 +1,636 @@
+I need you to update our Sitemint Digital website: https://SiteMintDigital.replit.app
+
+Goal:
+Replace the current “Book a Call” flow entirely with a full Discovery Intake Form and create an internal backend portal that can automatically generate a Scope of Work and Project Proposal based on the client’s submitted answers.
+
+Do not remove the rest of the website unless needed. Keep the Sitemint branding clean, modern, professional, and conversion-focused.
+
+Company Information:
+Sitemint Digital Solutions
+Phone: 949-880-6515
+Email: [info.sitemint@gmail.com](mailto:info.sitemint@gmail.com)
+Technical Director: Claidy Taguran
+Head of Strategy: Shasta Greene
+Project & Admin Manager: Saisa Lorraigne
+
+Main Requirements:
+
+1. Replace “Book a Call”
+
+* Remove or replace all “Book a Call” buttons, links, CTAs, and sections.
+* Change them to:
+
+  * “Start Your Discovery Form”
+  * “Get My Project Proposal”
+  * “Start My Website Project”
+* These CTAs should open or navigate to the new Discovery Intake Form.
+
+2. Create a Discovery Intake Form Page
+   Create a new page called:
+
+/discovery
+
+This page should have a multi-section intake form with progress indicator and clean UI.
+
+Form sections:
+
+Section 1: Business Information
+
+* Company Name
+* Contact Name
+* Email Address
+* Phone Number
+* Website URL
+* Industry dropdown:
+
+  * Real Estate
+  * Nonprofit
+  * Medical
+  * Restaurant
+  * Contractor
+  * E-commerce
+  * Professional Services
+  * Other
+* Business Location
+* Years in Business
+
+Section 2: Project Type
+
+* What service are you interested in?
+
+  * New Website
+  * Website Redesign
+  * Web Application
+  * CRM Development
+  * SEO Services
+  * Blog Content
+  * Maintenance & Support
+  * AI Automation
+  * Consultation
+
+* Primary project goal:
+
+  * Generate Leads
+  * Increase Sales
+  * Build Brand Awareness
+  * Improve User Experience
+  * Automate Processes
+  * Accept Online Payments
+  * Book Appointments
+  * Improve SEO Rankings
+  * Launch New Product/Service
+
+Section 3: Current Situation
+
+* Do you currently have a website?
+* What do you like about your current website?
+* What frustrates you about your current website?
+* What do you believe is missing?
+* How are customers currently finding you?
+
+  * Google Search
+  * Referrals
+  * Facebook
+  * Instagram
+  * LinkedIn
+  * Networking
+  * Paid Ads
+  * Other
+
+Section 4: Business Goals
+
+* Top 3 business goals over the next 12 months
+* How will you measure success?
+* If this project is successful, what does that look like?
+
+Section 5: Emotional Drivers
+Add this section to make the discovery form more strategic and sales-focused.
+
+Questions:
+
+* Why is solving this problem important to you right now?
+* What happens if nothing changes over the next 6–12 months?
+
+  * Lost revenue
+  * Lost opportunities
+  * Falling behind competitors
+  * Wasted time
+  * Poor customer experience
+  * Team inefficiencies
+  * Other
+* What is your biggest frustration today?
+* How does that frustration affect your day-to-day operations?
+* If we solved this problem perfectly, what would that allow you to do?
+* What would success feel like personally?
+
+  * Relief
+  * Confidence
+  * Peace of mind
+  * Pride
+  * Excitement
+  * Freedom
+* What would make this project a “home run” for you?
+* Is there a specific business milestone you are trying to reach?
+
+Section 6: Target Audience
+
+* Who is your ideal customer?
+* What problem do they have that you solve?
+* Why do customers choose you over competitors?
+* Who are your biggest competitors?
+* List 3 websites you like
+* What do you like about those websites?
+
+Section 7: Features & Functionality
+Checkbox groups:
+
+Marketing:
+
+* Lead Capture Forms
+* Contact Forms
+* Newsletter Signup
+* Landing Pages
+* Blog
+
+Sales:
+
+* Online Payments
+* Product Catalog
+* CRM Integration
+* Appointment Scheduling
+
+Membership:
+
+* User Login
+* Member Dashboard
+* Subscription Plans
+
+Automation:
+
+* Email Automation
+* AI Chatbot
+* Workflow Automation
+
+Other:
+
+* Custom Functionality
+
+Integrations needed:
+
+* Google Calendar
+* Stripe
+* PayPal
+* Mailchimp
+* Follow Up Boss
+* Salesforce
+* HubSpot
+* ActiveCampaign
+* Other
+
+Section 8: Content & Branding
+Ask if they already have:
+
+* Logo
+* Brand Guidelines
+* Photos
+* Videos
+* Website Content
+
+Ask:
+
+* Will you provide content or would you like Sitemint to assist?
+
+  * I will provide everything
+  * Need some assistance
+  * Need full content creation
+
+Section 9: Timeline
+
+* When would you like this project completed?
+
+  * ASAP
+  * Within 30 Days
+  * Within 60 Days
+  * Within 90 Days
+  * Flexible
+* Is there a launch date we should know about?
+
+Section 10: Budget & Decision Making
+
+* Estimated budget:
+
+  * Under $1,000
+  * $1,000-$2,500
+  * $2,500-$5,000
+  * $5,000-$10,000
+  * $10,000+
+* Who is involved in the decision?
+
+  * Just Me
+  * Business Partner
+  * Board of Directors
+  * Marketing Team
+  * Other
+* Have you worked with a website or software company before?
+* What was your experience like?
+
+Section 11: Final Questions
+
+* Why are you looking to start this project now?
+* What concerns do you have about hiring a website or software company?
+* Is there anything else we should know?
+
+3. Form Submission Behavior
+   When the form is submitted:
+
+* Save the submission to the backend/database.
+* Show a thank-you confirmation screen.
+* Confirmation message:
+  “Thank you for completing the Sitemint Discovery Form. Our team will review your answers and prepare a recommended scope of work and project proposal.”
+
+4. Internal Backend Portal
+   Create a secure admin/backend portal at:
+
+/admin
+
+The backend portal should include:
+
+* Login page for Sitemint team
+* Dashboard showing all submitted discovery forms
+* Lead list with:
+
+  * Client Name
+  * Company
+  * Industry
+  * Project Type
+  * Budget
+  * Timeline
+  * Lead Score
+  * Status
+  * Date Submitted
+
+Statuses:
+
+* New
+* Reviewed
+* Proposal Generated
+* Follow-Up Needed
+* Closed Won
+* Closed Lost
+
+5. Lead Scoring System
+   Automatically calculate a Lead Quality Score from 1–10.
+
+Scoring rules:
+Budget:
+
+* $10,000+ = +3
+* $5,000-$10,000 = +3
+* $2,500-$5,000 = +2
+* $1,000-$2,500 = +1
+* Under $1,000 = +1
+
+Urgency:
+
+* ASAP = +3
+* Within 30 Days = +2
+* Within 60 Days = +1
+* Within 90 Days = +1
+* Flexible = +0
+
+Decision Maker:
+
+* Just Me = +3
+* Business Partner = +2
+* Marketing Team = +2
+* Board of Directors = +1
+* Other = +1
+
+Need/Pain:
+If they mention frustration, urgency, lost revenue, wasted time, poor customer experience, or operational inefficiency, add +2.
+
+Normalize the total score to 1–10.
+
+6. CRM Tags
+   Automatically assign tags based on answers:
+
+* Website Lead
+* Web App Lead
+* CRM Lead
+* SEO Lead
+* Nonprofit
+* Real Estate
+* High Budget
+* Hot Lead
+* Warm Lead
+* Cold Lead
+* AI Automation Lead
+* Maintenance Lead
+* Mission Driven
+* Growth Focused
+* Cost Conscious
+* Urgent Project
+
+7. Proposal Generator
+   Inside each submission detail page, add a button:
+
+“Generate Proposal”
+
+When clicked, the system should automatically generate a project proposal using the client’s form answers.
+
+The proposal should follow this format:
+
+# SITEMINT PROJECT PROPOSAL
+
+Prepared For:
+Client Name: [Client Name]
+Company: [Company Name]
+Date: [Current Date]
+
+Prepared by:
+Sitemint Digital Solutions
+Technical Director: Claidy Taguran
+Head of Strategy: Shasta Greene
+Project & Admin Manager: Saisa Lorraigne
+
+Executive Summary:
+Generate a personalized summary based on the client’s goals, frustrations, emotional drivers, project type, and desired outcome.
+
+Current Challenges:
+Generate 3 challenges based on the intake answers.
+
+Potential impact:
+
+* Lost leads
+* Reduced visibility
+* Lower conversion rates
+* Operational inefficiencies
+* Poor user experience
+
+Recommended Solution:
+Create recommended phases based on selected services and features.
+
+Phase 1 – Foundation:
+
+* Website Design
+* Mobile Optimization
+* Conversion-Focused Layout
+* Contact Forms
+* SEO Foundation
+
+Phase 2 – Growth Features:
+
+* Lead Capture System
+* CRM Integration
+* Appointment Scheduling
+* Analytics Setup
+
+Phase 3 – Future Expansion:
+
+* Automation
+* AI Features
+* Membership Portal
+* Custom Development
+
+Project Scope:
+Generate included pages and features based on the form answers.
+
+Website Pages:
+
+* Home
+* About
+* Services
+* Contact
+* Blog if selected
+* Custom Landing Pages if selected
+* Member Dashboard if selected
+* Product Catalog if selected
+
+Features:
+Design:
+
+* Modern Responsive Design
+* Mobile Optimization
+* Fast Loading Performance
+
+Marketing:
+
+* SEO Setup
+* Lead Forms
+* Call-to-Action Optimization
+
+Integrations:
+Include only integrations selected by the client.
+
+Security:
+
+* SSL Configuration
+* Security Best Practices
+
+Deliverables:
+Generate deliverables based on the project type and selected features.
+
+Timeline:
+Recommend timeline based on complexity:
+
+* Basic website: 2–4 weeks
+* Website with SEO/blog/content: 4–6 weeks
+* Web app/CRM/custom system: 6–12 weeks
+* AI automation/custom integrations: 8–14 weeks
+
+Investment:
+Recommend one of three packages:
+
+Option A – Essential
+Best for simple websites and basic online presence.
+Includes:
+
+* Website Development
+* Mobile Optimization
+* Contact Forms
+* Basic SEO
+
+Option B – Growth
+Best for businesses needing lead generation and marketing.
+Includes everything in Essential plus:
+
+* Blog Setup
+* Advanced SEO
+* CRM Integration
+* Lead Automation
+
+Option C – Premium
+Best for advanced websites, apps, automation, or custom systems.
+Includes everything in Growth plus:
+
+* AI Features
+* Custom Integrations
+* Strategy Consulting
+* Ongoing Optimization
+
+Payment Schedule:
+
+* 50% Deposit to Begin
+* 25% Upon Design Approval
+* 25% Upon Project Completion
+
+Why Sitemint:
+Generate this section:
+Sitemint focuses on business outcomes, not just website design. Every project is built to support lead generation, conversion optimization, search visibility, customer engagement, and long-term growth.
+
+Optional Add-On Services:
+
+* Monthly Website Maintenance
+* SEO Management
+* Content Creation
+* Blog Writing
+* Website Updates
+* AI Automation Support
+
+Next Steps:
+
+1. Review Proposal
+2. Select Preferred Package
+3. Sign Agreement
+4. Submit Initial Deposit
+5. Schedule Project Kickoff
+
+Acceptance:
+Client Name: _______________________
+Signature: _______________________
+Date: _______________________
+
+Sitemint Digital Solutions
+Building websites, applications, and digital systems that help organizations grow.
+
+8. Scope of Work Generator
+   Also add a separate button:
+
+“Generate Scope of Work”
+
+The Scope of Work should include:
+
+* Project Overview
+* Client Goals
+* Included Services
+* Pages Included
+* Features Included
+* Integrations Included
+* Client Responsibilities
+* Sitemint Responsibilities
+* Revision Terms
+* Timeline
+* Payment Schedule
+* Exclusions
+* Optional Add-Ons
+
+9. Export Options
+   For both proposal and scope of work, add:
+
+* Preview inside admin portal
+* Copy to clipboard
+* Download as PDF
+* Download as DOCX if possible
+* Save generated proposal to client record
+
+10. Admin Submission Detail Page
+    Each lead should have a detail page showing:
+
+* Full discovery form answers
+* Lead score
+* Tags
+* Emotional drivers
+* Recommended package
+* Generated proposal
+* Generated scope of work
+* Internal notes
+* Status dropdown
+
+11. Recommended Package Logic
+    Use this logic:
+
+Essential:
+
+* Budget under $2,500
+* Needs basic website, contact forms, mobile optimization, basic SEO
+
+Growth:
+
+* Budget $2,500-$5,000 or $5,000-$10,000
+* Needs lead generation, SEO, blog, CRM, appointment scheduling, online payments
+
+Premium:
+
+* Budget $5,000+
+* Needs web app, CRM development, AI automation, membership dashboard, custom integrations, subscriptions, or workflow automation
+
+12. Design Requirements
+    Frontend:
+
+* Modern, clean, trust-building design
+* Multi-step form
+* Mobile responsive
+* Friendly copywriting
+* Progress bar
+* Clear section titles
+* Save form data properly
+* Required fields validation
+* Success confirmation page
+
+Admin:
+
+* Clean dashboard UI
+* Cards for stats
+* Table for leads
+* Search and filter
+* Status management
+* Proposal preview
+* Scope of work preview
+
+13. Suggested Dashboard Stats
+    Show:
+
+* Total Leads
+* Hot Leads
+* Proposals Generated
+* Average Budget Range
+* Most Requested Service
+* New Leads This Week
+
+14. Important Copywriting
+    Add this intro copy to the Discovery page:
+
+“Tell us about your business, your goals, and what you want your website or digital system to do for you. This form helps our team understand not just what you need built, but why it matters—so we can recommend the right scope, timeline, and investment for your project.”
+
+Button text:
+“Submit My Discovery Form”
+
+15. Technical Requirements
+
+* Use the existing tech stack already in the Replit project.
+* Do not rebuild the entire app from scratch unless necessary.
+* Keep existing branding and improve where needed.
+* Make sure all routes work.
+* Make sure form submissions persist.
+* Make sure proposal generation works from saved submissions.
+* Make sure no broken links remain from the old Book a Call flow.
+* Add error handling and loading states.
+* Add form validation.
+* Make admin access protected.
+
+16. Final Testing
+    After implementation, test:
+
+* All old Book a Call buttons now go to /discovery
+* Discovery form works on desktop and mobile
+* Required fields validate correctly
+* Form submission saves properly
+* Admin dashboard shows new submissions
+* Lead score calculates correctly
+* Tags are assigned correctly
+* Proposal generator works
+* Scope of work generator works
+* PDF download works
+* Status updates save correctly
+* No console errors
+* No broken routes

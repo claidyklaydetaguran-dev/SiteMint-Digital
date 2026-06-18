@@ -46,9 +46,9 @@ export default function Home() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/contact">
+                <Link href="/discovery">
                   <Button size="lg" className="h-14 px-8 text-base w-full sm:w-auto" data-testid="button-hero-primary">
-                    Book a Free Consultation <ArrowRight className="ml-2 w-5 h-5" />
+                    Start Your Discovery Form <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
                 <Link href="/services">
@@ -265,9 +265,9 @@ export default function Home() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
             Start with a website. Grow with systems. Turn your online presence into a real business tool.
           </p>
-          <Link href="/contact">
+          <Link href="/discovery">
             <Button size="lg" className="h-14 px-8 text-base" data-testid="button-final-cta">
-              Book a Free Consultation <ArrowRight className="ml-2 w-5 h-5" />
+              Start Your Discovery Form <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
         </div>

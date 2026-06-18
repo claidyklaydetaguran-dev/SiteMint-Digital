@@ -1,0 +1,1 @@
+- [SiteMint Discovery Portal](sitemint-discovery-portal.md) — Admin auth uses session token in memory; password via ADMIN_PASSWORD env var (default: sitemint2024); proposal/SOW generated as full HTML, stored in DB.

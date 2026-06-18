@@ -10,22 +10,39 @@ import Pricing from "@/pages/Pricing";
 import Portfolio from "@/pages/Portfolio";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
+import Discovery from "@/pages/Discovery";
+import AdminLogin from "@/pages/AdminLogin";
+import AdminDashboard from "@/pages/AdminDashboard";
+import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
 
 const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/services" component={Services} />
-        <Route path="/pricing" component={Pricing} />
-        <Route path="/portfolio" component={Portfolio} />
-        <Route path="/about" component={About} />
-        <Route path="/contact" component={Contact} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      {/* Admin routes — no main layout */}
+      <Route path="/admin" component={AdminLogin} />
+      <Route path="/admin/dashboard" component={AdminDashboard} />
+      <Route path="/admin/submissions/:id" component={AdminSubmissionDetail} />
+
+      {/* Discovery form — no main layout */}
+      <Route path="/discovery" component={Discovery} />
+
+      {/* Public site — with main layout */}
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/services" component={Services} />
+            <Route path="/pricing" component={Pricing} />
+            <Route path="/portfolio" component={Portfolio} />
+            <Route path="/about" component={About} />
+            <Route path="/contact" component={Contact} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

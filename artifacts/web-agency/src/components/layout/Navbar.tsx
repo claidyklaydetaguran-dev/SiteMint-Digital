@@ -59,8 +59,8 @@ export function Navbar() {
               {link.name}
             </Link>
           ))}
-          <Link href="/contact">
-            <Button data-testid="button-nav-contact">Book a Call</Button>
+          <Link href="/discovery">
+            <Button data-testid="button-nav-contact">Start Your Project</Button>
           </Link>
         </nav>
 
@@ -88,9 +88,9 @@ export function Navbar() {
               {link.name}
             </Link>
           ))}
-          <Link href="/contact" className="mt-2">
+          <Link href="/discovery" className="mt-2">
             <Button className="w-full" size="lg" data-testid="button-mobile-nav-contact">
-              Book a Call
+              Start Your Project
             </Button>
           </Link>
         </div>

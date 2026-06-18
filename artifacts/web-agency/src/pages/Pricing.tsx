@@ -351,13 +351,13 @@ export default function Pricing() {
                     </div>
 
                     <div className="mt-auto pt-6">
-                      <Link href="/contact" className="w-full" data-testid={`link-pricing-website-${i}`}>
+                      <Link href="/discovery" className="w-full" data-testid={`link-pricing-website-${i}`}>
                         <Button
                           className="w-full h-12 text-base"
                           variant={tier.popular ? "default" : "outline"}
                           data-testid={`button-pricing-website-cta-${i}`}
                         >
-                          Book a Consultation
+                          Get My Proposal
                         </Button>
                       </Link>
                     </div>
@@ -554,9 +554,9 @@ export default function Pricing() {
           </div>
 
           <div className="text-center mt-16">
-            <Link href="/contact" data-testid="link-pricing-addons-cta">
+            <Link href="/discovery" data-testid="link-pricing-addons-cta">
               <Button size="lg" className="h-14 px-10 text-base" data-testid="button-pricing-addons-cta">
-                Book a Free Consultation <ArrowRight className="ml-2 w-5 h-5" />
+                Start Your Discovery Form <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
           </div>
@@ -657,9 +657,9 @@ export default function Pricing() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
             Book a free consultation. We'll help you figure out exactly what to build, what to skip, and what it will realistically cost.
           </p>
-          <Link href="/contact" data-testid="link-pricing-bottom-cta">
+          <Link href="/discovery" data-testid="link-pricing-bottom-cta">
             <Button size="lg" className="h-14 px-10 text-base" data-testid="button-pricing-bottom-cta">
-              Book a Free Consultation <ArrowRight className="ml-2 w-5 h-5" />
+              Start Your Discovery Form <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
         </div>

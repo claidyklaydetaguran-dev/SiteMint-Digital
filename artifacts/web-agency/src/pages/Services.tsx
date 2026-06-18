@@ -250,13 +250,13 @@ export default function Services() {
                     )}
 
                     <div className="mt-auto pt-2">
-                      <Link href={`/contact?service=${service.id}`}>
+                      <Link href="/discovery">
                         <Button
                           variant="outline"
                           className="w-full"
                           data-testid={`button-service-inquire-${service.id}`}
                         >
-                          Inquire about this service
+                          Start My Project
                         </Button>
                       </Link>
                     </div>
@@ -276,9 +276,9 @@ export default function Services() {
           <p className="text-lg text-background/70 max-w-2xl mx-auto mb-10">
             Book a free consultation. We'll ask the right questions, understand your business goals, and recommend exactly what to build first — and what to save for later.
           </p>
-          <Link href="/contact" data-testid="link-services-bottom-cta">
+          <Link href="/discovery" data-testid="link-services-bottom-cta">
             <Button size="lg" className="h-14 px-8 text-base" data-testid="button-services-bottom-cta">
-              Book a Free Consultation <ArrowRight className="ml-2 w-5 h-5" />
+              Start Your Discovery Form <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
         </div>
