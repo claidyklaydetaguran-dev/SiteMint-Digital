@@ -12,7 +12,7 @@ function getResend(): Resend {
 }
 
 const TEAM_EMAIL = "info.sitemint@gmail.com";
-const FROM_ADDRESS = "Sitemint Digital Solutions <onboarding@resend.dev>";
+const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "Sitemint Digital Solutions <noreply@sitemintdigital.com>";
 
 export interface FormSubmissionData {
   formName: string;
