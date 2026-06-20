@@ -46,3 +46,24 @@ description: Architecture decisions for the discovery form, admin portal, lead s
 - Wouter Switch: admin + discovery routes render without Navbar/Footer
 
 **How to apply:** When adding new admin or standalone pages, add their Routes before the final `<Route>` catch-all that wraps the Layout.
+
+### Email Service
+- Uses Resend SDK (`resend` package in api-server)
+- `RESEND_API_KEY` stored as a Replit secret
+- From address: `onboarding@resend.dev` (Resend's shared domain — works without a custom domain)
+- Team notification goes to `info.sitemint@gmail.com`
+- All email logic in `artifacts/api-server/src/lib/email.ts` — call `sendFormEmails(FormSubmissionData)` which returns `{teamSent, clientSent, errors}`
+- Every form submission is also written to `form_submissions` table with `emailTeamSent`/`emailClientSent` status columns
+- If email fails, submission is still saved to DB (non-blocking)
+
+**Why:** Resend was chosen over SendGrid for simpler API key setup with no domain verification required on the shared domain.
+
+### Thank You Page
+- Route: `/thank-you` — outside Layout, no Navbar/Footer
+- Accepts query params: `?form=<label>&email=<address>`
+- Auto-redirects to `/` after 8 seconds
+- Both Contact form and Discovery form redirect here on success
+
+### CSV Export
+- `GET /api/admin/submissions/export/csv` — requires admin Bearer token
+- Returns all discovery submissions as downloadable CSV

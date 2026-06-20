@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -571,6 +571,8 @@ export default function Discovery() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const [, navigate] = useLocation();
+
   const handleSubmit = async () => {
     if (!validate()) return;
     setSubmitting(true);
@@ -582,11 +584,9 @@ export default function Discovery() {
         body: JSON.stringify(formData),
       });
       if (!res.ok) throw new Error("Submission failed");
-      setDone(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      navigate(`/thank-you?form=your+discovery+form&email=${encodeURIComponent(formData.email)}`);
     } catch {
       setSubmitError("Something went wrong. Please try again or email us at info.sitemint@gmail.com.");
-    } finally {
       setSubmitting(false);
     }
   };

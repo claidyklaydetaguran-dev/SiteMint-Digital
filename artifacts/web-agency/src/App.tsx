@@ -11,6 +11,7 @@ import Portfolio from "@/pages/Portfolio";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import Discovery from "@/pages/Discovery";
+import ThankYou from "@/pages/ThankYou";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
@@ -27,6 +28,9 @@ function Router() {
 
       {/* Discovery form — no main layout */}
       <Route path="/discovery" component={Discovery} />
+
+      {/* Thank You — no main layout */}
+      <Route path="/thank-you" component={ThankYou} />
 
       {/* Public site — with main layout */}
       <Route>
