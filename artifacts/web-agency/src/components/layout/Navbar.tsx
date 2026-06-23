@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 
 const navLinks = [
   { name: "Home", href: "/" },
@@ -17,9 +18,7 @@ export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -37,13 +36,8 @@ export function Navbar() {
       }`}
     >
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 bg-primary text-primary-foreground rounded-sm flex items-center justify-center font-serif font-bold text-xl transition-transform group-hover:scale-105">
-            S
-          </div>
-          <span className="font-serif font-semibold text-xl tracking-tight text-foreground">
-            SiteMint Digital
-          </span>
+        <Link href="/" className="group">
+          <SiteMintLogo variant="dark" iconSize={34} />
         </Link>
 
         {/* Desktop Nav */}

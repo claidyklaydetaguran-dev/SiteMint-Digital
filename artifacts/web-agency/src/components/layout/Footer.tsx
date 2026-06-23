@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { ArrowUpRight } from "lucide-react";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 
 export function Footer() {
   return (
@@ -7,68 +8,39 @@ export function Footer() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           <div className="lg:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-6 group inline-flex">
-              <div className="w-8 h-8 bg-background text-foreground rounded-sm flex items-center justify-center font-serif font-bold text-xl">
-                S
-              </div>
-              <span className="font-serif font-semibold text-xl tracking-tight text-background">
-                SiteMint Digital
-              </span>
+            <Link href="/" className="inline-flex mb-6">
+              <SiteMintLogo variant="light" iconSize={34} />
             </Link>
             <p className="text-muted/80 text-sm leading-relaxed mb-6 max-w-sm">
               We build digital systems that help businesses attract leads, build trust, and operate smarter.
             </p>
-            <div className="flex gap-4">
-              {/* Social placeholders */}
-              <div className="w-10 h-10 rounded-full border border-muted/20 flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer">
-                In
-              </div>
-              <div className="w-10 h-10 rounded-full border border-muted/20 flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer">
-                X
-              </div>
-            </div>
           </div>
 
           <div>
             <h4 className="font-serif font-semibold text-lg mb-6">Navigation</h4>
             <ul className="flex flex-col gap-4">
-              <li>
-                <Link href="/" className="text-muted/80 hover:text-background transition-colors text-sm flex items-center gap-1">
-                  Home <ArrowUpRight size={12} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-                </Link>
-              </li>
-              <li>
-                <Link href="/services" className="text-muted/80 hover:text-background transition-colors text-sm flex items-center gap-1 group">
-                  Services <ArrowUpRight size={12} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-muted/80 hover:text-background transition-colors text-sm flex items-center gap-1 group">
-                  Pricing <ArrowUpRight size={12} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-                </Link>
-              </li>
-              <li>
-                <Link href="/portfolio" className="text-muted/80 hover:text-background transition-colors text-sm flex items-center gap-1 group">
-                  Portfolio <ArrowUpRight size={12} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="text-muted/80 hover:text-background transition-colors text-sm flex items-center gap-1 group">
-                  About <ArrowUpRight size={12} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-                </Link>
-              </li>
+              {[
+                { name: "Home", href: "/" },
+                { name: "Services", href: "/services" },
+                { name: "Pricing", href: "/pricing" },
+                { name: "Portfolio", href: "/portfolio" },
+                { name: "About", href: "/about" },
+              ].map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-muted/80 hover:text-background transition-colors text-sm flex items-center gap-1 group">
+                    {link.name} <ArrowUpRight size={12} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div>
             <h4 className="font-serif font-semibold text-lg mb-6">Services</h4>
             <ul className="flex flex-col gap-4">
-              <li className="text-muted/80 text-sm">Website Design</li>
-              <li className="text-muted/80 text-sm">Web Applications</li>
-              <li className="text-muted/80 text-sm">SEO Foundation</li>
-              <li className="text-muted/80 text-sm">Blog Support</li>
-              <li className="text-muted/80 text-sm">Ongoing Care</li>
-              <li className="text-muted/80 text-sm">Business Automation</li>
+              {["Website Design", "Web Applications", "CRM Systems", "SEO Foundation", "Ongoing Care", "Business Automation"].map((s) => (
+                <li key={s} className="text-muted/80 text-sm">{s}</li>
+              ))}
             </ul>
           </div>
 
@@ -78,8 +50,8 @@ export function Footer() {
               <li><a href="mailto:info.sitemint@gmail.com" className="text-muted/80 text-sm hover:text-background transition-colors">info.sitemint@gmail.com</a></li>
               <li><a href="tel:9498806515" className="text-muted/80 text-sm hover:text-background transition-colors">949-880-6515</a></li>
               <li className="mt-4">
-                <Link href="/contact" className="inline-block text-background border-b border-background/30 hover:border-background transition-colors pb-1 text-sm font-medium">
-                  Start a project
+                <Link href="/discovery" className="inline-block text-background border-b border-background/30 hover:border-background transition-colors pb-1 text-sm font-medium">
+                  Start a project →
                 </Link>
               </li>
             </ul>
@@ -87,7 +59,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted/60">
-          <p>© {new Date().getFullYear()} SiteMint Digital. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} SiteMint Digital Solutions. All rights reserved.</p>
           <div className="flex gap-6">
             <span className="cursor-pointer hover:text-background transition-colors">Privacy Policy</span>
             <span className="cursor-pointer hover:text-background transition-colors">Terms of Service</span>
