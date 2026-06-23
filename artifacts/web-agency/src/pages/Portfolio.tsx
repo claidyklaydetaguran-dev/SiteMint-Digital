@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ExternalLink, Home, Users, Briefcase, Code2, ArrowRight } from "lucide-react";
+import { ExternalLink, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
@@ -15,10 +15,7 @@ const projects = [
     domain: "shastagreene.com",
     category: "Real Estate",
     categoryColor: "bg-blue-50 text-blue-700 border-blue-200",
-    Icon: Home,
-    gradient: "from-blue-600 via-indigo-600 to-blue-800",
-    accentColor: "#93c5fd",
-    dotColors: ["#bfdbfe", "#818cf8", "#c7d2fe"],
+    image: "/portfolio-shasta.png",
     description:
       "A professional real estate website designed to build trust, showcase services, support lead generation, and strengthen online presence.",
     outcomes: ["Professional online presence", "Lead capture ready", "Clear service presentation"],
@@ -29,10 +26,7 @@ const projects = [
     domain: "onefilamcommunity.org",
     category: "Nonprofit Organization",
     categoryColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    Icon: Users,
-    gradient: "from-emerald-600 via-teal-600 to-emerald-800",
-    accentColor: "#6ee7b7",
-    dotColors: ["#a7f3d0", "#34d399", "#6ee7b7"],
+    image: "/portfolio-onefilam.png",
     description:
       "A nonprofit community website supporting Filipino-American outreach, events, programs, community engagement, and organizational credibility.",
     outcomes: ["Community-focused platform", "Improved credibility", "Events & programs ready"],
@@ -43,10 +37,7 @@ const projects = [
     domain: "herlindavaldovinos.com",
     category: "Professional Services",
     categoryColor: "bg-purple-50 text-purple-700 border-purple-200",
-    Icon: Briefcase,
-    gradient: "from-violet-600 via-purple-600 to-violet-800",
-    accentColor: "#c4b5fd",
-    dotColors: ["#ddd6fe", "#a78bfa", "#c4b5fd"],
+    image: "/portfolio-herlinda.png",
     description:
       "A professional website created to establish online credibility, present services clearly, and help generate client inquiries.",
     outcomes: ["Polished professional presence", "Clear service layout", "Portfolio showcase"],
@@ -57,72 +48,12 @@ const projects = [
     domain: "claidytaguranportfolio.replit.app",
     category: "Developer Portfolio",
     categoryColor: "bg-slate-100 text-slate-700 border-slate-200",
-    Icon: Code2,
-    gradient: "from-slate-700 via-slate-800 to-slate-900",
-    accentColor: "#94a3b8",
-    dotColors: ["#cbd5e1", "#94a3b8", "#64748b"],
+    image: "/portfolio-claidy.png",
     description:
       "A technical portfolio showcasing development projects, web applications, software skills, UI/UX work, and modern web development experience.",
     outcomes: ["Project showcase", "Skills presentation", "Recruiter-ready layout"],
   },
 ];
-
-function GradientCard({ project }: { project: typeof projects[0] }) {
-  return (
-    <div
-      className={`w-full h-full bg-gradient-to-br ${project.gradient} relative overflow-hidden`}
-    >
-      {/* Decorative background elements */}
-      <div className="absolute inset-0">
-        {/* Large circle top-right */}
-        <div
-          className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10"
-          style={{ background: project.accentColor }}
-        />
-        {/* Small circle bottom-left */}
-        <div
-          className="absolute -bottom-4 -left-4 w-24 h-24 rounded-full opacity-10"
-          style={{ background: project.accentColor }}
-        />
-        {/* Grid lines */}
-        <svg className="absolute inset-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id={`grid-${project.domain}`} width="24" height="24" patternUnits="userSpaceOnUse">
-              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="white" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill={`url(#grid-${project.domain})`} />
-        </svg>
-      </div>
-
-      {/* Content */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
-        {/* Icon circle */}
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-          style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
-        >
-          <project.Icon className="w-7 h-7 text-white" />
-        </div>
-
-        {/* Decorative dots */}
-        <div className="flex gap-2">
-          {project.dotColors.map((color, i) => (
-            <div key={i} className="w-2 h-2 rounded-full" style={{ background: color, opacity: 0.8 }} />
-          ))}
-        </div>
-
-        {/* Domain pill */}
-        <div
-          className="px-4 py-1.5 rounded-full text-xs font-mono text-white/90 shadow-sm"
-          style={{ background: "rgba(0,0,0,0.30)", backdropFilter: "blur(4px)" }}
-        >
-          {project.domain}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ProjectCard({ project, index }: { project: typeof projects[0]; index: number }) {
   return (
@@ -135,10 +66,21 @@ function ProjectCard({ project, index }: { project: typeof projects[0]; index: n
       className="h-full"
     >
       <div className="group bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 hover:shadow-xl transition-all duration-300 flex flex-col h-full">
-        {/* Gradient visual */}
-        <div className="aspect-[16/9] relative overflow-hidden border-b border-border/50">
-          <GradientCard project={project} />
-          <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500" />
+        {/* AI mockup image */}
+        <div className="aspect-[16/9] relative overflow-hidden border-b border-border/50 bg-accent">
+          <img
+            src={project.image}
+            alt={`${project.name} website preview`}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          {/* Hover overlay with domain */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-mono text-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap"
+            style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+          >
+            {project.domain}
+          </div>
         </div>
 
         {/* Content */}

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, ArrowRight, ArrowLeft, ClipboardList } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -607,9 +608,8 @@ export default function Discovery() {
       {/* Top bar */}
       <div className="bg-foreground text-background sticky top-0 z-50 shadow-lg">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 bg-background text-foreground rounded-sm flex items-center justify-center font-serif font-bold text-lg">S</div>
-            <span className="font-serif font-semibold text-base text-background hidden sm:block">SiteMint Digital</span>
+          <Link href="/" className="shrink-0">
+            <SiteMintLogo variant="light" iconSize={28} />
           </Link>
           <div className="flex-1 max-w-md">
             <div className="flex items-center justify-between mb-1">

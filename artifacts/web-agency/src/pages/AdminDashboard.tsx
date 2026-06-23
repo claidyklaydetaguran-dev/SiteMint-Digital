@@ -5,6 +5,7 @@ import {
   Users, TrendingUp, FileText, Star, LogOut, ExternalLink,
   Search, RefreshCw, ChevronRight
 } from "lucide-react";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 
 interface Submission {
   id: number;
@@ -113,11 +114,8 @@ export default function AdminDashboard() {
       {/* Navbar */}
       <header className="bg-foreground text-background px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-background text-foreground rounded-sm flex items-center justify-center font-serif font-bold text-lg">S</div>
-          <div>
-            <span className="font-serif font-semibold text-base">SiteMint Admin</span>
-            <span className="text-background/50 text-xs ml-2 hidden sm:inline">Discovery Portal</span>
-          </div>
+          <SiteMintLogo variant="light" iconSize={30} />
+          <span className="text-background/50 text-xs ml-1 hidden sm:inline border-l border-background/20 pl-3">Discovery Portal</span>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={load} className="text-background/70 hover:text-background hover:bg-white/10 gap-1">

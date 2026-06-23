@@ -18,3 +18,27 @@ id = "lzDstWvuYztPcdB0XsMKc"
 uri = "file://artifacts/web-agency/public/warm-accent-bg.png"
 type = "image"
 title = "soft navy beige section"
+
+[[generated]]
+id = "Tq8HcwrFmdN28heYtKPux"
+uri = "file://artifacts/web-agency/public/portfolio-shasta.png"
+type = "image"
+title = "shasta greene real estate website mockup"
+
+[[generated]]
+id = "wgWzXwDwrFz9-baMfEDO8"
+uri = "file://artifacts/web-agency/public/portfolio-onefilam.png"
+type = "image"
+title = "onefilam community nonprofit website mockup"
+
+[[generated]]
+id = "krIDm6xRXtT65Pw8UWpcq"
+uri = "file://artifacts/web-agency/public/portfolio-herlinda.png"
+type = "image"
+title = "herlinda professional services website mockup"
+
+[[generated]]
+id = "MZ_jNA13rQ9RcCeYxMczD"
+uri = "file://artifacts/web-agency/public/portfolio-claidy.png"
+type = "image"
+title = "claidy developer portfolio website mockup"

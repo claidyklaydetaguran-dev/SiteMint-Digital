@@ -1,2 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+
+Sitemap: https://sitemintdigital.com/sitemap.xml

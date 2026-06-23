@@ -12,7 +12,7 @@ function getResend(): Resend {
 }
 
 const TEAM_EMAIL = "info.sitemint@gmail.com";
-const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "Sitemint Digital Solutions <noreply@sitemintdigital.com>";
+const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>";
 
 export interface FormSubmissionData {
   formName: string;
@@ -52,11 +52,17 @@ function buildTeamEmailHtml(data: FormSubmissionData): string {
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
   <div style="max-width:680px;margin:32px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
     <div style="background:#1e293b;padding:28px 32px;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="background:#ffffff;color:#1e293b;font-weight:900;font-size:18px;width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;">S</div>
-        <span style="color:#ffffff;font-size:20px;font-weight:700;">SiteMint Digital</span>
+      <div style="display:inline-flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="9" fill="#1e293b"/>
+          <rect width="40" height="40" rx="9" fill="white" fill-opacity="0.08"/>
+          <path d="M20 11L29 20L20 29L11 20Z" fill="#34d399" opacity="0.90"/>
+          <path d="M20 16L24 20L20 24L16 20Z" fill="#1e293b"/>
+          <circle cx="20" cy="13" r="2.5" fill="#34d399"/>
+        </svg>
+        <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Georgia,serif;">SiteMint <span style="color:#94a3b8;">Digital</span></span>
       </div>
-      <h1 style="color:#ffffff;margin:20px 0 4px;font-size:22px;">New Website Inquiry</h1>
+      <h1 style="color:#ffffff;margin:0 0 4px;font-size:22px;">New Website Inquiry</h1>
       <p style="color:#94a3b8;margin:0;font-size:15px;">${data.formName}</p>
     </div>
     <div style="padding:28px 32px;">
@@ -91,9 +97,15 @@ function buildClientEmailHtml(firstName: string): string {
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
   <div style="max-width:620px;margin:32px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
     <div style="background:#1e293b;padding:28px 32px;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="background:#ffffff;color:#1e293b;font-weight:900;font-size:18px;width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;">S</div>
-        <span style="color:#ffffff;font-size:20px;font-weight:700;">SiteMint Digital</span>
+      <div style="display:inline-flex;align-items:center;gap:10px;">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="9" fill="#1e293b"/>
+          <rect width="40" height="40" rx="9" fill="white" fill-opacity="0.08"/>
+          <path d="M20 11L29 20L20 29L11 20Z" fill="#34d399" opacity="0.90"/>
+          <path d="M20 16L24 20L20 24L16 20Z" fill="#1e293b"/>
+          <circle cx="20" cy="13" r="2.5" fill="#34d399"/>
+        </svg>
+        <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Georgia,serif;">SiteMint <span style="color:#94a3b8;">Digital</span></span>
       </div>
     </div>
     <div style="padding:36px 32px;">
@@ -121,12 +133,12 @@ function buildClientEmailHtml(firstName: string): string {
       <p style="color:#374151;margin:0 0 4px;"><strong>Phone:</strong> 949-880-6515</p>
       <p style="color:#374151;margin:0 0 28px;"><strong>Email:</strong> <a href="mailto:info.sitemint@gmail.com" style="color:#3b82f6;">info.sitemint@gmail.com</a></p>
 
-      <p style="color:#374151;line-height:1.7;margin:0 0 32px;">Thank you for considering Sitemint Digital.</p>
+      <p style="color:#374151;line-height:1.7;margin:0 0 32px;">Thank you for considering SiteMint Digital.</p>
 
       <hr style="border:none;border-top:1px solid #e5e7eb;margin-bottom:24px;"/>
 
       <p style="color:#374151;margin:0 0 4px;font-weight:700;">Best Regards,</p>
-      <p style="color:#374151;margin:0 0 2px;">Sitemint Digital Solutions</p>
+      <p style="color:#374151;margin:0 0 2px;">SiteMint Digital Solutions</p>
       <br/>
       <p style="color:#374151;margin:0 0 2px;"><strong>Technical Director</strong> — Claidy Taguran</p>
       <p style="color:#374151;margin:0 0 2px;"><strong>Head of Strategy</strong> — Shasta Greene</p>
@@ -170,7 +182,7 @@ export async function sendFormEmails(data: FormSubmissionData): Promise<EmailRes
     await resend.emails.send({
       from: FROM_ADDRESS,
       to: [data.email],
-      subject: "Thank You for Contacting Sitemint Digital",
+      subject: "Thank You for Contacting SiteMint Digital",
       html: buildClientEmailHtml(firstName),
     });
     clientSent = true;

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock } from "lucide-react";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 
 export default function AdminLogin() {
   const [, navigate] = useLocation();
@@ -39,9 +40,8 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-foreground flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-10">
-          <div className="w-10 h-10 bg-background text-foreground rounded-sm flex items-center justify-center font-serif font-bold text-2xl">S</div>
-          <span className="font-serif font-semibold text-xl text-background">SiteMint Admin</span>
+        <div className="flex justify-center mb-10">
+          <SiteMintLogo variant="light" iconSize={36} />
         </div>
 
         <div className="bg-background rounded-xl p-8 shadow-2xl border border-white/10">

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { CheckCircle2, Mail, Phone, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 
 interface ThankYouProps {
   formName?: string;
@@ -90,9 +91,8 @@ export default function ThankYou({ formName, email }: ThankYouProps) {
       </motion.div>
 
       <div className="absolute bottom-6 left-0 right-0 text-center">
-        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-          <div className="w-6 h-6 bg-foreground text-background text-xs font-bold rounded flex items-center justify-center">S</div>
-          <span className="text-sm font-semibold">SiteMint Digital Solutions</span>
+        <div className="flex justify-center">
+          <SiteMintLogo variant="dark" iconSize={24} />
         </div>
       </div>
     </div>

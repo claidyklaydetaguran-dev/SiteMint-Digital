@@ -13,13 +13,8 @@ import {
   Code,
   LayoutTemplate,
   BarChart3,
-  Workflow,
-  Home as HomeIcon,
-  Users,
-  Briefcase,
   Code2,
   ExternalLink,
-  CheckCircle2,
 } from "lucide-react";
 
 const recentWork = [
@@ -28,9 +23,7 @@ const recentWork = [
     url: "https://shastagreene.com",
     domain: "shastagreene.com",
     category: "Real Estate",
-    Icon: HomeIcon,
-    gradient: "from-blue-600 via-indigo-600 to-blue-800",
-    accentColor: "#93c5fd",
+    image: "/portfolio-shasta.png",
     outcomes: ["Professional online presence", "Lead capture ready"],
   },
   {
@@ -38,9 +31,7 @@ const recentWork = [
     url: "https://onefilamcommunity.org",
     domain: "onefilamcommunity.org",
     category: "Nonprofit",
-    Icon: Users,
-    gradient: "from-emerald-600 via-teal-600 to-emerald-800",
-    accentColor: "#6ee7b7",
+    image: "/portfolio-onefilam.png",
     outcomes: ["Community-focused platform", "Improved credibility"],
   },
   {
@@ -48,9 +39,7 @@ const recentWork = [
     url: "https://herlindavaldovinos.com",
     domain: "herlindavaldovinos.com",
     category: "Professional Services",
-    Icon: Briefcase,
-    gradient: "from-violet-600 via-purple-600 to-violet-800",
-    accentColor: "#c4b5fd",
+    image: "/portfolio-herlinda.png",
     outcomes: ["Polished professional presence", "Clear service layout"],
   },
 ];
@@ -59,29 +48,20 @@ function WorkCard({ item }: { item: typeof recentWork[0] }) {
   return (
     <a href={item.url} target="_blank" rel="noopener noreferrer" className="group block">
       <div className="rounded-xl overflow-hidden border border-background/10 hover:border-background/30 transition-all duration-300">
-        {/* Gradient preview */}
-        <div className={`aspect-[4/3] bg-gradient-to-br ${item.gradient} relative overflow-hidden`}>
-          <div className="absolute inset-0">
-            <svg className="absolute inset-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id={`g-${item.domain}`} width="24" height="24" patternUnits="userSpaceOnUse">
-                  <path d="M 24 0 L 0 0 0 24" fill="none" stroke="white" strokeWidth="0.5" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill={`url(#g-${item.domain})`} />
-            </svg>
-            <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full opacity-10" style={{ background: item.accentColor }} />
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full opacity-10" style={{ background: item.accentColor }} />
+        {/* AI mockup image */}
+        <div className="aspect-[4/3] relative overflow-hidden bg-background/5">
+          <img
+            src={item.image}
+            alt={`${item.name} website`}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-mono text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap"
+            style={{ background: "rgba(0,0,0,0.50)", backdropFilter: "blur(4px)" }}
+          >
+            {item.domain}
           </div>
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
-              <item.Icon className="w-6 h-6 text-white" />
-            </div>
-            <div className="px-3 py-1 rounded-full text-xs font-mono text-white/90" style={{ background: "rgba(0,0,0,0.25)" }}>
-              {item.domain}
-            </div>
-          </div>
-          <div className="absolute inset-0 bg-primary/0 group-hover:bg-white/5 transition-colors duration-500" />
         </div>
 
         <div className="p-5">
