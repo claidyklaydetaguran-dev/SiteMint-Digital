@@ -44,8 +44,8 @@ const projects = [
   },
   {
     name: "Claidy Taguran Portfolio",
-    url: "https://ClaidyTaguranPortfolio.replit.app",
-    domain: "claidytaguranportfolio.replit.app",
+    url: "https://ClaidyTaguranPorfolio.replit.app",
+    domain: "claidytaguranporfolio.replit.app",
     category: "Developer Portfolio",
     categoryColor: "bg-slate-100 text-slate-700 border-slate-200",
     image: "/portfolio-claidy.png",
