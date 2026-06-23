@@ -1,0 +1,288 @@
+I want you to audit, test, and improve the existing SiteMint Digital web/app: https://sitemintdigital.com/
+
+Use PLAN MODE first. Do not start coding yet. Inspect the existing codebase, then give me a step-by-step improvement plan before making changes.
+
+GOALS:
+1. Fix design issues
+2. Improve conversion
+3. Make the website feel more premium and trustworthy
+4. Add a better SiteMint Digital logo
+5. Improve portfolio/recent work visuals
+6. Test all website/app functionality
+7. Fix bugs, broken links, layout issues, and mobile issues
+
+STEP 1 — AUDIT FIRST
+Review:
+- Homepage
+- Services page
+- Pricing page
+- Portfolio page
+- About page
+- Start Your Project / Discovery form
+- Admin/backend portal if it exists
+- Forms and email automations
+- Navigation
+- Mobile responsiveness
+- SEO tags
+- Console errors
+- Broken links
+- Loading speed
+- Visual consistency
+
+Then give me a clear audit report with:
+- What is working
+- What looks unfinished
+- What needs fixing
+- What should be improved first
+- Any risky changes before editing
+
+STEP 2 — LOGO IMPROVEMENT
+Create a more professional logo for SiteMint Digital.
+
+Logo direction:
+- Clean
+- Premium
+- Modern
+- Trustworthy
+- Tech + business growth feel
+- Navy, white, soft green/mint accent
+- Should work on light and dark backgrounds
+
+Replace the current “S” square logo with the new logo across:
+- Header
+- Footer
+- Favicon
+- Any loading screen or branding area
+
+Keep the brand name:
+SiteMint Digital
+
+STEP 3 — PORTFOLIO / RECENT WORK FIXES
+The Recent Work cards currently look unfinished because the image areas are empty/dark blocks.
+
+Fix this by adding clean background visuals for each project card.
+
+Use relevant, professional, non-copyrighted placeholder-style visuals:
+- Real estate website mockup for Shasta Greene Real Estate
+- Nonprofit/community website visual for OneFilAm Community
+- Professional services website visual for Herlinda Valdovinos
+- Developer portfolio / coding dashboard visual for Claidy Taguran Portfolio
+- Restaurant website visual if Local Restaurant remains
+- Law firm website visual if Law Firm remains
+
+Each portfolio card should include:
+- Background image or mockup
+- Project category
+- Project name
+- Short result/impact
+- Website URL
+- “Visit Website” button
+- “View Case Study” button if possible
+
+Make sure images are optimized and responsive.
+
+STEP 4 — IMPROVE RECENT WORK SECTION
+Update Recent Work so it feels real and credible.
+
+Recommended structure:
+Headline:
+“Recent Work That Helps Businesses Look Better, Work Smarter, and Grow Faster”
+
+Subheadline:
+“From real estate websites to nonprofit platforms and custom business systems, SiteMint Digital builds practical digital tools that support growth.”
+
+Replace generic examples if needed with real projects:
+- Shasta Greene Real Estate
+- OneFilAm Community
+- Herlinda Valdovinos
+- Claidy Taguran Portfolio
+
+Do not show fake results like “150% more leads” unless clearly marked as sample/demo. Use honest wording such as:
+- “Professional online presence”
+- “Improved credibility”
+- “Clear service presentation”
+- “Lead capture ready”
+- “Community-focused platform”
+- “Portfolio showcase”
+
+STEP 5 — WEBSITE COPY IMPROVEMENTS
+Improve the website copy so SiteMint Digital is positioned as more than a website builder.
+
+Main positioning:
+“AI-Powered Websites & Business Systems That Help You Get More Customers”
+
+Support message:
+“We build growth-focused websites, CRM systems, automation workflows, client portals, and custom business applications for service businesses, nonprofits, real estate professionals, and growing organizations.”
+
+Make copy clear, human, and easy to understand.
+
+Avoid vague agency phrases like:
+- Stunning websites
+- Digital experiences
+- Innovative solutions
+
+Use practical language:
+- Get more leads
+- Organize follow-up
+- Automate admin work
+- Improve credibility
+- Launch faster
+- Scale operations
+
+STEP 6 — CTA IMPROVEMENTS
+Make all CTAs consistent.
+
+Primary CTA:
+“Start Your Project”
+
+Secondary CTA:
+“View Our Work”
+
+Discovery CTA:
+“Get My Free Business Growth Assessment”
+
+Make sure buttons go to the correct pages/forms.
+
+STEP 7 — SERVICES IMPROVEMENT
+Make the services clearer and outcome-based.
+
+Services should include:
+1. Growth Websites
+2. CRM Systems
+3. Business Automation
+4. Client Portals
+5. AI-Assisted Tools
+6. SEO Foundations
+7. Custom Web Apps
+
+Each service card should explain:
+- What it is
+- Who it is for
+- What problem it solves
+- CTA
+
+STEP 8 — PRICING IMPROVEMENT
+Make pricing feel strategic, not random.
+
+Suggested packages:
+1. Starter Website System
+2. Growth Website + CRM System
+3. Automation & Business OS
+4. Custom Enterprise Build
+
+Each package should include:
+- Best for
+- Starting price or “Custom Quote”
+- Inclusions
+- Timeline estimate
+- CTA
+
+STEP 9 — DISCOVERY FORM / START PROJECT FLOW
+Audit and improve the Start Your Project form.
+
+The form should collect:
+- Name
+- Email
+- Phone
+- Company
+- Website URL
+- Industry
+- Project type
+- Main challenge
+- Budget range
+- Timeline
+- Notes
+
+After submit:
+- Save the lead
+- Send client confirmation email
+- Send internal notification to info.sitemint@gmail.com
+- Show thank-you page/message
+- Prevent spam/double submission
+
+STEP 10 — SEO IMPROVEMENTS
+Add or improve:
+- Page titles
+- Meta descriptions
+- Open Graph tags
+- Favicon
+- Alt text
+- Sitemap
+- Robots.txt
+- Internal links
+- Proper heading structure
+
+Target keywords:
+- AI website development
+- business automation services
+- CRM website system
+- custom business web app
+- website developer for service businesses
+- real estate website CRM
+- nonprofit website development
+- law firm website automation
+
+STEP 11 — TRUST ELEMENTS
+Add or improve:
+- Team section
+- Past client logos/cards
+- Case studies
+- Testimonials
+- Clear contact info
+- Process section
+- FAQ section
+
+Team:
+- Claidy Taguran — Technical Director
+- Shasta Greene — Head of Strategy
+- Saisa Lorraigne — Project & Admin Manager
+
+Contact:
+Phone: 949-880-6515
+Email: info.sitemint@gmail.com
+
+STEP 12 — DESIGN SYSTEM CLEANUP
+Make the design consistent:
+- Typography
+- Button styles
+- Card styles
+- Spacing
+- Colors
+- Header behavior
+- Footer layout
+- Mobile menu
+- Form styling
+
+Preferred brand feel:
+- Navy
+- White
+- Soft mint green
+- Clean neutral backgrounds
+- Premium but approachable
+
+STEP 13 — TESTING
+After changes, test:
+- Desktop layout
+- Tablet layout
+- Mobile layout
+- Navigation
+- Portfolio buttons
+- Start Project button
+- Discovery form submission
+- Email acknowledgement
+- Internal lead notification
+- Admin lead view if available
+- Proposal generator if available
+- SEO metadata
+- Broken links
+- Console errors
+
+STEP 14 — DELIVERABLE
+Before coding, give me:
+1. Audit findings
+2. Recommended improvements
+3. Priority order
+4. Files you plan to edit
+5. Any questions or risks
+
+After I approve the plan, then implement the fixes carefully.
