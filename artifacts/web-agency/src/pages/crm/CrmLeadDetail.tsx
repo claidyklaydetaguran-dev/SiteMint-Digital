@@ -3,7 +3,7 @@ import { useLocation, useParams, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft, Mail, Phone, Globe, Building, Calendar, Tag,
+  ArrowLeft, Mail, Phone, MessageSquare, Globe, Building, Calendar, Tag,
   Plus, Check, Trash2, ChevronDown, Send, X, Clock,
 } from "lucide-react";
 
@@ -203,9 +203,16 @@ export default function CrmLeadDetail() {
                 <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                   <Mail className="w-3.5 h-3.5 shrink-0" /> {lead.email}
                 </a>
-                {lead.phone && <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                  <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
-                </a>}
+                {lead.phone && (
+                  <div className="flex items-center gap-3">
+                    <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                      <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
+                    </a>
+                    <a href={`sms:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-emerald-600 transition-colors" title="Send text message">
+                      <MessageSquare className="w-3.5 h-3.5" /> Text
+                    </a>
+                  </div>
+                )}
                 {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                   <Globe className="w-3.5 h-3.5 shrink-0" /> {lead.website}
                 </a>}
@@ -229,14 +236,14 @@ export default function CrmLeadDetail() {
                 <a href={`mailto:${lead.email}`}>
                   <Button size="sm" variant="outline" className="gap-1.5"><Mail className="w-3.5 h-3.5" />Email</Button>
                 </a>
-                {lead.phone && <a href={`tel:${lead.phone}`}>
-                  <Button size="sm" variant="outline" className="gap-1.5"><Phone className="w-3.5 h-3.5" />Call</Button>
-                </a>}
-                <Button size="sm" variant="outline" className="gap-1.5 text-muted-foreground" onClick={() => {
-                  alert("SMS is not connected yet. Connect Twilio or Telnyx to enable texting.");
-                }}>
-                  <span className="text-xs">📱</span> Text
-                </Button>
+                {lead.phone && <>
+                  <a href={`tel:${lead.phone}`}>
+                    <Button size="sm" variant="outline" className="gap-1.5"><Phone className="w-3.5 h-3.5" />Call</Button>
+                  </a>
+                  <a href={`sms:${lead.phone}`}>
+                    <Button size="sm" variant="outline" className="gap-1.5"><MessageSquare className="w-3.5 h-3.5" />Text</Button>
+                  </a>
+                </>}
                 <Button size="sm" className="gap-1.5 ml-auto" onClick={() => setActiveTab("email")}>
                   <Send className="w-3.5 h-3.5" /> Send Email via CRM
                 </Button>

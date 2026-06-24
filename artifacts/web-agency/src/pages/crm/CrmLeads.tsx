@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import {
-  Search, Plus, ChevronRight, RefreshCw, Download, Users,
+  Search, Plus, ChevronRight, RefreshCw, Download, Users, Phone, MessageSquare,
 } from "lucide-react";
 
 const token = () => localStorage.getItem("adminToken") || "";
@@ -197,8 +197,17 @@ export default function CrmLeads() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-muted-foreground text-xs">{lead.email}</div>
-                        {lead.phone && <div className="text-muted-foreground text-xs">{lead.phone}</div>}
+                        <a href={`mailto:${lead.email}`} className="text-muted-foreground text-xs hover:text-primary transition-colors block">{lead.email}</a>
+                        {lead.phone && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <a href={`tel:${lead.phone}`} className="text-muted-foreground text-xs hover:text-primary transition-colors flex items-center gap-1" title="Call">
+                              <Phone className="w-3 h-3" />{lead.phone}
+                            </a>
+                            <a href={`sms:${lead.phone}`} className="text-muted-foreground hover:text-emerald-600 transition-colors" title="Send text">
+                              <MessageSquare className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
