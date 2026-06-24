@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
@@ -482,18 +483,19 @@ function NewPersonModal({ leads, onClose, onCreated }: {
 }
 
 /* ─── Bell / Notifications ─── */
-const NOTIF_ICONS: Record<string, React.ReactNode> = {
-  overdue_task:  <AlertTriangle className="w-4 h-4 text-red-500" />,
-  due_today:     <Clock className="w-4 h-4 text-yellow-500" />,
-  new_lead:      <UserCheck className="w-4 h-4 text-blue-500" />,
-  followup_due:  <Bell className="w-4 h-4 text-orange-500" />,
-};
 const NOTIF_BG: Record<string, string> = {
   overdue_task: "bg-red-50",
   due_today:    "bg-yellow-50",
   new_lead:     "bg-blue-50",
   followup_due: "bg-orange-50",
 };
+
+function NotifIcon({ type }: { type: string }) {
+  if (type === "overdue_task") return <AlertTriangle className="w-4 h-4 text-red-500" />;
+  if (type === "due_today")    return <Clock className="w-4 h-4 text-yellow-500" />;
+  if (type === "new_lead")     return <UserCheck className="w-4 h-4 text-blue-500" />;
+  return <Bell className="w-4 h-4 text-orange-500" />;
+}
 
 function BellDropdown({ notifications, onClose }: { notifications: Notification[]; onClose: () => void }) {
   const [, navigate] = useLocation();
@@ -536,8 +538,8 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
           {[...urgent, ...normal].map(n => (
             <button key={n.id} onClick={() => { navigate(n.href); onClose(); }}
               className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left ${n.urgent ? "border-l-2 border-red-400" : ""}`}>
-              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type]} flex items-center justify-center shrink-0 mt-0.5`}>
-                {NOTIF_ICONS[n.type]}
+              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type] ?? "bg-gray-50"} flex items-center justify-center shrink-0 mt-0.5`}>
+                <NotifIcon type={n.type} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium leading-snug ${n.urgent ? "text-red-700" : "text-foreground"}`}>{n.title}</p>
@@ -848,7 +850,9 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
       {/* Page content */}
       <main className="flex-1 overflow-auto">
-        {children}
+        <CrmErrorBoundary>
+          {children}
+        </CrmErrorBoundary>
       </main>
     </div>
   );

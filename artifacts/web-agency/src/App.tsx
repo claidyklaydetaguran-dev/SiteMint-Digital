@@ -28,6 +28,7 @@ import CrmCalendar from "@/pages/crm/CrmCalendar";
 import CrmDeals from "@/pages/crm/CrmDeals";
 import CrmReporting from "@/pages/crm/CrmReporting";
 import CrmAdminSettings from "@/pages/crm/CrmAdminSettings";
+import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -39,10 +40,10 @@ function Router() {
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/admin/submissions/:id" component={AdminSubmissionDetail} />
 
-      {/* CRM routes — no main layout */}
+      {/* CRM routes — ErrorBoundary is inside CrmLayout */}
       <Route path="/admin/crm" component={CrmDashboard} />
-      <Route path="/admin/crm/leads" component={CrmLeads} />
       <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
+      <Route path="/admin/crm/leads" component={CrmLeads} />
       <Route path="/admin/crm/inbox" component={CrmInbox} />
       <Route path="/admin/crm/tasks" component={CrmTasks} />
       <Route path="/admin/crm/calendar" component={CrmCalendar} />

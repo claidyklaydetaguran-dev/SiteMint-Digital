@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal, List } from "lucide-react";
+import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal, List, Mail } from "lucide-react";
 
 const token = () => localStorage.getItem("adminToken") || "";
 

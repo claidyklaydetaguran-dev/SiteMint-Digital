@@ -1,0 +1,101 @@
+The CRM is crashing and showing a blank white screen at:
+
+https://sitemintdigital.com/admin/crm/tasks
+
+Do a full emergency debug, audit, and repair of the CRM.
+
+Priority:
+Do not add new features first. Fix the blank screen/crash and stabilize the CRM.
+
+Steps:
+
+1. Inspect browser console errors, server logs, build logs, and route errors.
+2. Check all CRM routes:
+
+* /admin/crm
+* /admin/crm/dashboard
+* /admin/crm/leads
+* /admin/crm/inbox
+* /admin/crm/tasks
+* /admin/crm/calendar
+* /admin/crm/deals
+* /admin/crm/reporting
+* /admin/crm/admin
+* /admin/crm/import
+* lead detail pages
+
+3. Identify what is causing the blank screen:
+
+* React runtime error
+* undefined/null data
+* broken import
+* missing component
+* bad route path
+* auth redirect issue
+* database query failure
+* environment variable issue
+* hydration/client-side error
+* incompatible icon/component package
+* infinite loop
+* failed API request
+
+4. Add safe fallback states everywhere:
+
+* Loading state
+* Empty state
+* Error state
+* No CRM data state
+* Auth-required state
+* Permission-denied state
+
+5. Add defensive checks:
+
+* Never map over undefined arrays
+* Never access nested properties without optional chaining
+* Handle missing leads, tasks, deals, emails, tags, users, activities
+* Handle missing dates
+* Handle missing assigned user
+* Handle empty database
+
+6. Fix the Tasks page specifically:
+
+* Today’s Tasks tab loads
+* Overdue tab loads
+* Future tab loads
+* Create task works
+* Complete task works
+* Edit task works
+* Delete task works
+* Task linked to lead works
+* No tasks should show a clean empty state, not a blank screen
+
+7. Fix CRM navigation:
+
+* Top nav links work
+* Active page state works
+* Search does not crash
+* Quick action buttons do not crash
+* Profile menu does not crash
+
+8. Test the CRM after fixing:
+
+* Refresh each CRM route directly from the browser
+* Click between CRM pages
+* Log out and log back in
+* Test with empty database
+* Test with imported leads
+* Test on desktop and mobile width
+
+9. Add temporary developer error display only in development mode:
+   If a CRM page crashes in development, show the error message instead of a blank page.
+   Do not show technical errors in production.
+
+10. Final report:
+    After fixing, give me:
+
+* Exact error found
+* Files changed
+* What caused the blank screen
+* What was fixed
+* Remaining risks
+* How to test it myself
