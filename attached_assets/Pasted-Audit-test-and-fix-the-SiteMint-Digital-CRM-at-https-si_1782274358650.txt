@@ -1,0 +1,185 @@
+Audit, test, and fix the SiteMint Digital CRM at https://sitemintdigital.com/ admin/backend.
+
+Goal:
+Run a full functionality audit of the CRM that was just built. Do not add major new features first. Test every CRM page, button, modal, form, dropdown, search, filter, quick action, email action, SMS placeholder, call button, task action, calendar action, deal action, reporting card, and admin setting. Fix anything broken, incomplete, fake, or not connected.
+
+Important:
+Use the attached screenshots as the expected behavior reference, especially:
+
+1. Top quick action buttons for email, call, SMS/chat, add person, notifications, profile
+2. Email compose modal
+3. “New Person” dropdown/search behavior
+4. SMS/Texting Integration setup card
+
+Audit these pages:
+
+* /admin/crm/dashboard
+* /admin/crm/leads
+* /admin/crm/inbox
+* /admin/crm/tasks
+* /admin/crm/calendar
+* /admin/crm/deals
+* /admin/crm/reporting
+* /admin/crm/admin
+* /admin/crm/import
+* Any lead detail/profile pages
+
+Test and fix:
+
+1. Top Navigation Buttons
+   Make sure these function correctly:
+
+* Email icon opens email compose modal
+* Phone icon opens call action/search dropdown or tel: link workflow
+* SMS/chat icon opens text lead dropdown or SMS compose placeholder
+* Add person icon opens New Person form/search dropdown
+* Bell icon opens notifications dropdown
+* Profile avatar opens profile/settings/sign out dropdown
+* Global search searches people/leads/tasks/deals
+
+2. Email Compose Modal
+   Make sure:
+
+* “To” field searches CRM leads by name/email/phone
+* Selecting a person fills the recipient
+* CC/BCC buttons expand fields
+* Subject is editable
+* Body editor works
+* Templates button inserts email templates
+* Attachments button is either functional or clearly disabled with message
+* Send Email uses Resend
+* Test mode prevents accidental sends unless intentionally disabled
+* Sent email logs to the lead activity timeline
+* Errors show clearly
+
+3. New Person Button
+   Make sure:
+
+* Clicking “New Person” opens a modal
+* Required fields: name, phone, email, company, source, status, priority, assigned user, notes
+* Save creates the lead
+* Duplicate detection checks email/phone
+* New lead appears in People table, dashboard stats, and activity timeline
+
+4. People Page
+   Test:
+
+* Smart lists counts
+* Priority lists counts
+* Filters
+* Column selector
+* Assigned-to filter
+* Search
+* Bulk actions
+* Row click opens lead profile
+* Call, email, and text icons on each lead row
+* Pagination or scroll behavior
+* Mobile responsiveness
+
+5. Inbox Page
+   Test:
+
+* Conversation list loads
+* Clicking a conversation updates center thread and right profile panel
+* Note tab saves internal notes
+* Email tab sends/logs email
+* Quick templates insert text
+* Lead stage can be updated
+* Recent activity updates correctly
+
+6. Tasks Page
+   Test:
+
+* Create task
+* Complete task
+* Edit task
+* Delete task
+* Today, Overdue, and Future tabs
+* Linked lead profile
+* Task count updates dashboard
+
+7. Calendar Page
+   Test:
+
+* Day/Week/Month toggle
+* Add appointment/task
+* Calendar event links to lead
+* Mini calendar changes selected date
+* Follow-up dates appear correctly
+
+8. Deals Page
+   Test:
+
+* Add deal
+* Edit deal
+* Move deal between stages
+* Buyer/Seller pipelines
+* Won/Lost status
+* Deal value and commission calculations
+* Closed deals reporting updates
+
+9. Reporting Page
+   Test:
+
+* Every report card is clickable
+* If a report is not built yet, show a professional “Coming Soon” or “No data yet” state
+* KPI cards use live CRM data
+* No dead buttons
+
+10. Admin Page
+    Test:
+
+* Action Plans
+* Automations
+* Email Templates
+* Text Templates
+* Import
+* API Keys
+* Website Forms
+* Resend Email
+* SMS Provider
+* Tags
+* Stages
+* Lead Sources
+* Users/Roles
+
+If a section is not fully functional, either build the basic function or show a clean “Coming Soon” state instead of leaving a broken button.
+
+11. SMS / Call Integration
+    Do not fake texting.
+    Create a real integration-ready setup:
+
+* SMS provider dropdown: Twilio, Telnyx, Not Configured
+* Environment variable names:
+
+  * SMS_PROVIDER
+  * SMS_ACCOUNT_SID
+  * SMS_AUTH_TOKEN
+  * SMS_FROM_NUMBER
+* If SMS is not configured, Text Lead button should open a modal saying:
+  “SMS is not connected yet. Connect Twilio or Telnyx in Admin > Integrations to enable texting.”
+* If SMS is configured, Text Lead should send SMS and log it to the activity timeline.
+* For calling, use tel: links by default so clicking call opens the user’s phone/computer dialer.
+* Add optional future call provider structure, but do not fake call logs.
+
+12. Security Audit
+    Check:
+
+* CRM routes require authentication
+* API keys are never exposed in frontend
+* Only backend/server actions access secrets
+* CSV upload is sanitized
+* Inputs are validated
+* Error handling is clean
+* No private CRM data is visible publicly
+
+13. Final Output
+    After testing and fixing, give me a clear report with:
+
+* What was tested
+* What was broken
+* What was fixed
+* What still needs real API credentials
+* How to configure SMS
+* How to configure calling
+* Any remaining recommended improvements

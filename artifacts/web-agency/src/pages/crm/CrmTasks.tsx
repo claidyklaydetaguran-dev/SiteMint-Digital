@@ -12,8 +12,15 @@ interface Task {
   leadName?:string; leadCompany?:string;
 }
 
-const tabFilters = ["all","due-today","upcoming","overdue","completed"] as const;
+const tabFilters = ["due-today","overdue","upcoming","completed"] as const;
 type TabFilter = typeof tabFilters[number];
+
+const tabLabels: Record<TabFilter, string> = {
+  "due-today": "Today's Tasks",
+  "overdue": "Overdue",
+  "upcoming": "Future",
+  "completed": "Completed",
+};
 
 const taskTypeIcon: Record<string,string> = {
   Call:"📞",Email:"📧","Send Proposal":"📄","Follow Up":"🔔",
@@ -24,7 +31,7 @@ export default function CrmTasks() {
   const [, navigate] = useLocation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabFilter>("all");
+  const [tab, setTab] = useState<TabFilter>("due-today");
 
   const load = useCallback(async () => {
     if (!token()) { navigate("/admin"); return; }
@@ -99,7 +106,7 @@ export default function CrmTasks() {
                 tab === f ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {f === "due-today" ? "Due Today" : f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+              {tabLabels[f]}
               {counts[f] > 0 && (
                 <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
                   f === "overdue" ? "bg-red-100 text-red-700" : f === "due-today" ? "bg-yellow-100 text-yellow-700" : "bg-gray-200 text-gray-600"

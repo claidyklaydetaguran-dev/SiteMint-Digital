@@ -1,10 +1,14 @@
 import { Link, useLocation } from "wouter";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
   Search, Mail, Phone, MessageSquare, Bell, LogOut,
-  ChevronDown, LayoutDashboard,
+  ChevronDown, LayoutDashboard, X, UserPlus, Send,
+  AlertCircle, ChevronRight, Check, Plus,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const tok = () => localStorage.getItem("adminToken") || "";
 
 const NAV_ITEMS = [
   { href: "/admin/crm", label: "Dashboard", exact: true },
@@ -17,26 +21,550 @@ const NAV_ITEMS = [
   { href: "/admin/crm/admin", label: "Admin" },
 ];
 
+interface CrmLead { id: number; name: string; email: string; phone?: string; company?: string; }
+interface Template { id: number; name: string; subject: string; body: string; }
+
+const AVATAR_COLORS = [
+  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
+  "bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500","bg-red-400","bg-yellow-500",
+];
+function av(name: string) {
+  const i = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[i];
+}
+function ini(name: string) {
+  return name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase();
+}
+
+/* ─── Email Compose Modal ─── */
+function EmailComposeModal({ leads, templates, onClose }: {
+  leads: CrmLead[]; templates: Template[]; onClose: () => void;
+}) {
+  const [toSearch, setToSearch] = useState("");
+  const [toLead, setToLead] = useState<CrmLead | null>(null);
+  const [ccOpen, setCcOpen] = useState(false);
+  const [bccOpen, setBccOpen] = useState(false);
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+  const [tplOpen, setTplOpen] = useState(false);
+
+  const toResults = toSearch.length > 0 && !toLead
+    ? leads.filter(l =>
+        l.name.toLowerCase().includes(toSearch.toLowerCase()) ||
+        l.email.toLowerCase().includes(toSearch.toLowerCase()) ||
+        (l.phone || "").includes(toSearch)
+      ).slice(0, 6)
+    : [];
+
+  const applyTemplate = (t: Template) => {
+    setSubject(t.subject);
+    setBody(t.body.replace(/\{\{name\}\}/g, toLead?.name.split(" ")[0] || "there"));
+    setTplOpen(false);
+  };
+
+  const send = async () => {
+    if (!toLead) { setError("Please select a recipient."); return; }
+    if (!subject.trim()) { setError("Subject is required."); return; }
+    if (!body.trim()) { setError("Body is required."); return; }
+    setError("");
+    setSending(true);
+    const r = await fetch(`/api/crm/leads/${toLead.id}/email`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, body, cc, bcc }),
+    });
+    setSending(false);
+    if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
+    else { const d = await r.json().catch(() => ({})); setError((d as {error?: string}).error || "Failed to send email."); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <h2 className="font-semibold text-foreground">New Email</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+              <Check className="w-6 h-6 text-green-600" />
+            </div>
+            <p className="font-semibold text-foreground">Email sent!</p>
+            <p className="text-xs text-muted-foreground">Logged to {toLead?.name}'s activity timeline.</p>
+          </div>
+        ) : (
+          <>
+            {/* Fields */}
+            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+              {/* To */}
+              <div className="px-5 py-2.5 relative">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">To:</span>
+                  {toLead ? (
+                    <div className="flex items-center gap-2 bg-blue-50 rounded-full px-2 py-0.5">
+                      <div className={`w-5 h-5 rounded-full ${av(toLead.name)} flex items-center justify-center`}>
+                        <span className="text-white text-[9px] font-bold">{ini(toLead.name)}</span>
+                      </div>
+                      <span className="text-xs text-blue-700 font-medium">{toLead.name}</span>
+                      <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-blue-400 hover:text-blue-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      autoFocus
+                      className="flex-1 text-sm focus:outline-none placeholder-gray-400"
+                      placeholder="Enter name or phone number"
+                      value={toSearch}
+                      onChange={e => setToSearch(e.target.value)}
+                    />
+                  )}
+                  <div className="ml-auto flex gap-2 text-xs text-blue-500">
+                    <button onClick={() => setCcOpen(o => !o)}>CC</button>
+                    <button onClick={() => setBccOpen(o => !o)}>BCC</button>
+                  </div>
+                </div>
+                {/* To dropdown */}
+                {toResults.length > 0 && (
+                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
+                    {toResults.map(l => (
+                      <button key={l.id} onClick={() => { setToLead(l); setToSearch(""); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        <div className={`w-8 h-8 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
+                          <span className="text-white text-xs font-bold">{ini(l.name)}</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">{l.name}</p>
+                          {l.phone && <p className="text-xs text-muted-foreground">{l.phone}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {ccOpen && (
+                <div className="px-5 py-2.5 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">CC:</span>
+                  <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="CC email addresses"
+                    value={cc} onChange={e => setCc(e.target.value)} />
+                </div>
+              )}
+              {bccOpen && (
+                <div className="px-5 py-2.5 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">BCC:</span>
+                  <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="BCC email addresses"
+                    value={bcc} onChange={e => setBcc(e.target.value)} />
+                </div>
+              )}
+
+              {/* Subject */}
+              <div className="px-5 py-2.5 flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">Subject:</span>
+                <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="Subject"
+                  value={subject} onChange={e => setSubject(e.target.value)} />
+              </div>
+
+              {/* Body */}
+              <div className="px-5 py-2.5">
+                <textarea className="w-full text-sm focus:outline-none resize-none placeholder-gray-400 min-h-[180px]"
+                  placeholder="Write your message…"
+                  value={body} onChange={e => setBody(e.target.value)} />
+                {/* Signature */}
+                <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-muted-foreground">
+                  <p>Best,</p>
+                  <p className="font-medium text-foreground">SiteMint Digital Solutions</p>
+                  <p className="text-muted-foreground/70">sitemintdigital.com</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mx-5 mb-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
+              {/* Attachments */}
+              <button className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">
+                📎 Attachments
+              </button>
+
+              {/* Templates */}
+              <div className="relative">
+                <button onClick={() => setTplOpen(o => !o)}
+                  className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">
+                  📋 Templates
+                </button>
+                {tplOpen && templates.length > 0 && (
+                  <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-10 overflow-hidden">
+                    {templates.map(t => (
+                      <button key={t.id} onClick={() => applyTemplate(t)}
+                        className="w-full text-left px-4 py-2.5 text-xs hover:bg-gray-50 transition-colors">
+                        <p className="font-medium text-foreground">{t.name}</p>
+                        <p className="text-muted-foreground truncate">{t.subject}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {tplOpen && templates.length === 0 && (
+                  <div className="absolute bottom-full mb-1 left-0 w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-10 p-3 text-xs text-muted-foreground">
+                    No templates yet. Create them in Admin → Email Templates.
+                  </div>
+                )}
+              </div>
+
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+                <Button size="sm" onClick={send} disabled={sending || !toLead}
+                  className="gap-1.5 bg-blue-600 hover:bg-blue-700">
+                  <Send className="w-3.5 h-3.5" />
+                  {sending ? "Sending…" : "Send Email"}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Phone Call Dropdown ─── */
+function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => void; }) {
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  const results = q.length > 0
+    ? leads.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
+    : leads.filter(l => l.phone).slice(0, 6);
+
+  return (
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200]">
+      <div className="p-3 border-b border-gray-100">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <input autoFocus className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            placeholder="Search name or phone…"
+            value={q} onChange={e => setQ(e.target.value)} />
+        </div>
+      </div>
+      <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+        {results.length === 0 ? (
+          <p className="p-4 text-xs text-muted-foreground text-center">No leads with phone found</p>
+        ) : results.map(l => (
+          <a key={l.id} href={`tel:${l.phone}`} onClick={onClose}
+            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+            <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
+              <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">{l.name}</p>
+              <p className="text-xs text-muted-foreground">{l.phone || "No phone"}</p>
+            </div>
+            <div className="ml-auto w-7 h-7 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+              <Phone className="w-3.5 h-3.5 text-white" />
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── SMS Not Connected Modal ─── */
+function SmsModal({ onClose }: { onClose: () => void; }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
+        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <MessageSquare className="w-6 h-6 text-blue-600" />
+        </div>
+        <h2 className="font-semibold text-foreground text-lg mb-2">SMS not connected yet</h2>
+        <p className="text-sm text-muted-foreground mb-5">
+          Connect Twilio or Telnyx to enable two-way text messaging with your leads. No real SMS will be sent until a provider is configured.
+        </p>
+        <div className="bg-gray-50 rounded-xl p-4 text-left text-xs text-muted-foreground space-y-1.5 mb-5">
+          <p className="font-semibold text-foreground">To enable texting:</p>
+          <p>1. Sign up for <strong>Twilio</strong> or <strong>Telnyx</strong></p>
+          <p>2. Purchase a phone number</p>
+          <p>3. Add <code className="bg-gray-200 px-1 rounded">SMS_PROVIDER</code>, <code className="bg-gray-200 px-1 rounded">SMS_API_KEY</code>, <code className="bg-gray-200 px-1 rounded">SMS_FROM_NUMBER</code> to your environment secrets</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">
+            Dismiss
+          </button>
+          <Link href="/admin/crm/settings">
+            <button onClick={onClose} className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors">
+              Go to Settings
+            </button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── New Person Modal ─── */
+function NewPersonModal({ leads, onClose, onCreated }: {
+  leads: CrmLead[]; onClose: () => void; onCreated: () => void;
+}) {
+  const [step, setStep] = useState<"search" | "form">("search");
+  const [q, setQ] = useState("");
+  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New", priority:"Medium", assignedTo:"", notes:"" });
+  const [saving, setSaving] = useState(false);
+  const [dupWarning, setDupWarning] = useState("");
+
+  const searchResults = q.length > 1
+    ? leads.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || l.email.toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
+    : [];
+
+  const checkDup = (email: string, phone: string) => {
+    const byEmail = email && leads.find(l => l.email.toLowerCase() === email.toLowerCase());
+    const byPhone = phone && leads.find(l => l.phone === phone);
+    if (byEmail) setDupWarning(`Duplicate: ${byEmail.name} has this email.`);
+    else if (byPhone) setDupWarning(`Duplicate: ${byPhone.name} has this phone.`);
+    else setDupWarning("");
+  };
+
+  const save = async () => {
+    if (!form.name || !form.email) return;
+    setSaving(true);
+    const r = await fetch("/api/crm/leads", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setSaving(false);
+    if (r.ok) { onCreated(); onClose(); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <h2 className="font-semibold text-foreground">New Person</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+
+        {step === "search" ? (
+          <div className="p-5">
+            <p className="text-sm text-muted-foreground mb-3">Search for an existing contact first to avoid duplicates.</p>
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <input autoFocus className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                placeholder="Enter name or phone number" value={q} onChange={e => setQ(e.target.value)} />
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden mb-3 divide-y divide-gray-50">
+                {searchResults.map(l => (
+                  <Link key={l.id} href={`/admin/crm/leads/${l.id}`}>
+                    <div onClick={onClose} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
+                      <div className={`w-8 h-8 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
+                        <span className="text-white text-xs font-bold">{ini(l.name)}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{l.name}</p>
+                        <p className="text-xs text-muted-foreground">{l.phone || l.email}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            <button onClick={() => { setForm(f => ({ ...f, name: q })); setStep("form"); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-muted-foreground hover:border-blue-300 hover:text-blue-600 transition-colors">
+              <Plus className="w-4 h-4" /> Create new person
+            </button>
+          </div>
+        ) : (
+          <div className="p-5 space-y-3">
+            {dupWarning && (
+              <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {dupWarning}
+              </div>
+            )}
+            {[
+              { label: "Name *", key: "name", type: "text", ph: "Full name" },
+              { label: "Email *", key: "email", type: "email", ph: "email@example.com" },
+              { label: "Phone", key: "phone", type: "tel", ph: "(555) 000-0000" },
+              { label: "Company", key: "company", type: "text", ph: "Company name" },
+            ].map(({ label, key, type, ph }) => (
+              <div key={key}>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
+                <input type={type} placeholder={ph}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  value={(form as Record<string, string>)[key]}
+                  onChange={e => {
+                    const v = e.target.value;
+                    setForm(f => ({ ...f, [key]: v }));
+                    if (key === "email") checkDup(v, form.phone);
+                    if (key === "phone") checkDup(form.email, v);
+                  }} />
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
+                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                  {["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Priority</label>
+                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                  {["High","Medium","Low"].map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+              <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
+                <option value="">Unassigned</option>
+                <option>Claidy Taguran</option>
+                <option>Shasta Greene</option>
+                <option>Saisa Lorraigne</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>
+              <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none resize-none" rows={2}
+                value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setStep("search")} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">Back</button>
+              <Button className="flex-1" onClick={save} disabled={saving || !form.name || !form.email}>
+                {saving ? "Saving…" : "Create Person"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Bell / Notifications ─── */
+function BellDropdown({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200]">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <span className="font-semibold text-sm text-foreground">Notifications</span>
+        <span className="text-xs text-muted-foreground">Mark all read</span>
+      </div>
+      <div className="p-6 text-center">
+        <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground">No new notifications</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Task reminders and lead alerts will appear here.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Global Search Results ─── */
+function GlobalSearchDropdown({ q, leads, onClose }: { q: string; leads: CrmLead[]; onClose: () => void }) {
+  const [, navigate] = useLocation();
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  const results = leads.filter(l =>
+    l.name.toLowerCase().includes(q.toLowerCase()) ||
+    l.email.toLowerCase().includes(q.toLowerCase()) ||
+    (l.phone || "").includes(q) ||
+    (l.company || "").toLowerCase().includes(q.toLowerCase())
+  ).slice(0, 8);
+
+  return (
+    <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
+      {results.length === 0 ? (
+        <div className="p-4 text-xs text-muted-foreground text-center">No results for "{q}"</div>
+      ) : results.map(l => (
+        <button key={l.id} onClick={() => { navigate(`/admin/crm/leads/${l.id}`); onClose(); }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
+          <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
+            <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">{l.name}</p>
+            <p className="text-xs text-muted-foreground">{l.company ? `${l.company} · ` : ""}{l.email}</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Main CrmLayout ─── */
 export function CrmLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [modal, setModal] = useState<"email" | "phone" | "sms" | "person" | "bell" | "profile" | null>(null);
+  const [allLeads, setAllLeads] = useState<CrmLead[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const phoneRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  const loadLeads = useCallback(() => {
+    const t = tok();
+    if (!t) return;
+    fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${t}` } })
+      .then(r => r.json()).then(d => setAllLeads(d.leads || [])).catch(() => {});
+    fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${t}` } })
+      .then(r => r.json()).then(d => setTemplates(d.templates || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setProfileOpen(false);
+        if (modal === "profile") setModal(null);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [modal]);
 
-  const logout = () => {
-    localStorage.removeItem("adminToken");
-    navigate("/admin");
-  };
+  const logout = () => { localStorage.removeItem("adminToken"); navigate("/admin"); };
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact || href === "/admin/crm") return location === href;
@@ -45,89 +573,120 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#f1f3f5" }}>
+      {/* Modals */}
+      {modal === "email" && (
+        <EmailComposeModal leads={allLeads} templates={templates} onClose={() => setModal(null)} />
+      )}
+      {modal === "sms" && <SmsModal onClose={() => setModal(null)} />}
+      {modal === "person" && (
+        <NewPersonModal leads={allLeads} onClose={() => setModal(null)} onCreated={loadLeads} />
+      )}
+
       {/* Dark top nav */}
       <nav className="bg-[#1e293b] h-12 flex items-center px-3 shrink-0 z-50 relative gap-1">
         {/* Logo */}
-        <div className="flex items-center shrink-0 mr-3">
-          <SiteMintLogo variant="light" iconSize={20} />
+        <div className="flex items-center shrink-0 mr-2">
+          <Link href="/admin/crm">
+            <div className="cursor-pointer"><SiteMintLogo variant="light" iconSize={20} /></div>
+          </Link>
         </div>
 
         {/* Nav items */}
         <div className="flex items-center h-full overflow-x-auto no-scrollbar">
           {NAV_ITEMS.map(({ href, label, exact }) => (
             <Link key={href} href={href}>
-              <button
-                className={`h-12 px-3 text-[13px] font-medium whitespace-nowrap transition-colors relative shrink-0 ${
-                  isActive(href, exact)
-                    ? "text-white after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-blue-400 after:rounded-full"
-                    : "text-white/55 hover:text-white/90"
-                }`}
-              >
+              <button className={`h-12 px-3 text-[13px] font-medium whitespace-nowrap transition-colors relative shrink-0 ${
+                isActive(href, exact)
+                  ? "text-white after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-blue-400 after:rounded-full"
+                  : "text-white/55 hover:text-white/90"
+              }`}>
                 {label}
               </button>
             </Link>
           ))}
         </div>
 
-        {/* Search */}
-        <div className="flex-1 max-w-xs mx-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/35" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search people, deals…"
-              className="w-full bg-white/10 text-white text-xs placeholder-white/35 pl-8 pr-3 py-1.5 rounded-md border border-white/10 focus:outline-none focus:border-white/30 focus:bg-white/15"
-            />
-          </div>
+        {/* Global Search */}
+        <div className="flex-1 max-w-xs mx-3 relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/35 z-10" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+            placeholder="Search people, deals…"
+            className="w-full bg-white/10 text-white text-xs placeholder-white/35 pl-8 pr-3 py-1.5 rounded-md border border-white/10 focus:outline-none focus:border-white/30 focus:bg-white/15"
+          />
+          {searchFocused && search.length > 1 && (
+            <GlobalSearchDropdown q={search} leads={allLeads} onClose={() => { setSearch(""); setSearchFocused(false); }} />
+          )}
         </div>
 
-        {/* Right icons */}
+        {/* Right action icons */}
         <div className="flex items-center gap-1.5 ml-auto shrink-0">
-          <a href="mailto:" title="Send email"
-             className="w-7 h-7 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors">
+          {/* Email compose */}
+          <button onClick={() => setModal("email")} title="Compose email"
+            className="w-7 h-7 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors">
             <Mail className="w-3.5 h-3.5 text-white" />
-          </a>
-          <a href="tel:" title="Call"
-             className="w-7 h-7 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors">
-            <Phone className="w-3.5 h-3.5 text-white" />
-          </a>
-          <button title="SMS — Connect provider in Admin > Integrations"
-             className="w-7 h-7 bg-sky-600 hover:bg-sky-700 rounded-full flex items-center justify-center transition-colors">
-            <MessageSquare className="w-3.5 h-3.5 text-white" />
-          </button>
-          <button title="Notifications"
-             className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
-            <Bell className="w-3.5 h-3.5 text-white/70" />
           </button>
 
-          {/* Avatar dropdown */}
+          {/* Call */}
+          <div className="relative" ref={phoneRef}>
+            <button onClick={() => setModal(m => m === "phone" ? null : "phone")} title="Call a contact"
+              className="w-7 h-7 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors">
+              <Phone className="w-3.5 h-3.5 text-white" />
+            </button>
+            {modal === "phone" && (
+              <PhoneDropdown leads={allLeads} onClose={() => setModal(null)} />
+            )}
+          </div>
+
+          {/* SMS */}
+          <button onClick={() => setModal("sms")} title="SMS — Connect provider in Admin > Settings"
+            className="w-7 h-7 bg-sky-600 hover:bg-sky-700 rounded-full flex items-center justify-center transition-colors">
+            <MessageSquare className="w-3.5 h-3.5 text-white" />
+          </button>
+
+          {/* New Person */}
+          <button onClick={() => setModal("person")} title="Add new person"
+            className="w-7 h-7 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center transition-colors">
+            <UserPlus className="w-3.5 h-3.5 text-white" />
+          </button>
+
+          {/* Bell */}
+          <div className="relative" ref={bellRef}>
+            <button onClick={() => setModal(m => m === "bell" ? null : "bell")} title="Notifications"
+              className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+              <Bell className="w-3.5 h-3.5 text-white/70" />
+            </button>
+            {modal === "bell" && <BellDropdown onClose={() => setModal(null)} />}
+          </div>
+
+          {/* Avatar/Profile */}
           <div className="relative ml-1" ref={profileRef}>
-            <button
-              onClick={() => setProfileOpen(o => !o)}
-              className="flex items-center gap-1 focus:outline-none"
-            >
+            <button onClick={() => setModal(m => m === "profile" ? null : "profile")}
+              className="flex items-center gap-1 focus:outline-none">
               <div className="w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-[11px] font-bold">SM</span>
               </div>
-              <ChevronDown className={`w-3 h-3 text-white/50 transition-transform ${profileOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-3 h-3 text-white/50 transition-transform ${modal === "profile" ? "rotate-180" : ""}`} />
             </button>
-
-            {profileOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden py-1">
+            {modal === "profile" && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden py-1">
                 <div className="px-4 py-2.5 border-b border-gray-100">
                   <p className="text-xs font-semibold text-foreground">SiteMint Digital</p>
                   <p className="text-xs text-muted-foreground">Admin</p>
                 </div>
+                <Link href="/admin/crm/settings">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors">Settings</button>
+                </Link>
                 <Link href="/admin/dashboard">
-                  <button className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors flex items-center gap-2">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors flex items-center gap-2">
                     <LayoutDashboard className="w-3.5 h-3.5 text-muted-foreground" /> Submissions
                   </button>
                 </Link>
-                <button
-                  onClick={logout}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
-                >
+                <button onClick={logout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2">
                   <LogOut className="w-3.5 h-3.5" /> Sign out
                 </button>
               </div>

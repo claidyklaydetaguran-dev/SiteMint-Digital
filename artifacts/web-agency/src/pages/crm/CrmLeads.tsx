@@ -255,7 +255,7 @@ export default function CrmLeads() {
                 {importingDiscovery ? "Importing…" : "Import"}
               </Button>
               <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => setShowCreate(true)}>
-                <Plus className="w-3.5 h-3.5" /> + New List
+                <Plus className="w-3.5 h-3.5" /> + New Lead
               </Button>
             </div>
           </div>
