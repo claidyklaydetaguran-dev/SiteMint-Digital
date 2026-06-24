@@ -304,34 +304,160 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
   );
 }
 
-/* ─── SMS Not Connected Modal ─── */
-function SmsModal({ onClose }: { onClose: () => void; }) {
+/* ─── SMS Compose Modal ─── */
+function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void; }) {
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [toSearch, setToSearch] = useState("");
+  const [toLead, setToLead] = useState<CrmLead | null>(null);
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/crm/phone/status", { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.json())
+      .then(d => setConfigured((d as { configured: boolean }).configured))
+      .catch(() => setConfigured(false));
+  }, []);
+
+  const toResults = toSearch.length > 0 && !toLead
+    ? leads.filter(l => l.name.toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
+    : [];
+
+  const send = async () => {
+    if (!toLead) { setError("Please select a recipient."); return; }
+    if (!body.trim()) { setError("Message body is required."); return; }
+    setError("");
+    setSending(true);
+    const r = await fetch(`/api/crm/leads/${toLead.id}/sms`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ body: body.trim() }),
+    });
+    setSending(false);
+    if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
+    else { const d = await r.json().catch(() => ({})); setError((d as { error?: string }).error || "Failed to send SMS."); }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
-        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <MessageSquare className="w-6 h-6 text-blue-600" />
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-sky-500" /> New SMS
+          </h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
-        <h2 className="font-semibold text-foreground text-lg mb-2">SMS not connected yet</h2>
-        <p className="text-sm text-muted-foreground mb-5">
-          Connect Twilio or Telnyx to enable two-way text messaging with your leads. No real SMS will be sent until a provider is configured.
-        </p>
-        <div className="bg-gray-50 rounded-xl p-4 text-left text-xs text-muted-foreground space-y-1.5 mb-5">
-          <p className="font-semibold text-foreground">To enable texting:</p>
-          <p>1. Sign up for <strong>Twilio</strong> or <strong>Telnyx</strong></p>
-          <p>2. Purchase a phone number</p>
-          <p>3. Add <code className="bg-gray-200 px-1 rounded">SMS_PROVIDER</code>, <code className="bg-gray-200 px-1 rounded">SMS_API_KEY</code>, <code className="bg-gray-200 px-1 rounded">SMS_FROM_NUMBER</code> to your environment secrets</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">
-            Dismiss
-          </button>
-          <Link href="/admin/crm/settings">
-            <button onClick={onClose} className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors">
-              Go to Settings
-            </button>
-          </Link>
-        </div>
+
+        {sent ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+              <Check className="w-6 h-6 text-green-600" />
+            </div>
+            <p className="font-semibold text-foreground">SMS sent!</p>
+            <p className="text-xs text-muted-foreground">Logged to {toLead?.name}'s timeline.</p>
+          </div>
+        ) : configured === null ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+          </div>
+        ) : !configured ? (
+          <div className="p-6 text-center space-y-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+              <MessageSquare className="w-6 h-6 text-blue-600" />
+            </div>
+            <h3 className="font-semibold text-foreground">SMS not configured yet</h3>
+            <p className="text-sm text-muted-foreground">Add Twilio credentials to your environment secrets to enable two-way texting.</p>
+            <div className="bg-gray-50 rounded-xl p-4 text-left text-xs space-y-1 text-muted-foreground">
+              <p className="font-semibold text-foreground">Required env vars:</p>
+              {["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"].map(k => (
+                <p key={k}><code className="bg-gray-200 px-1 rounded">{k}</code></p>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">Dismiss</button>
+              <Link href="/admin/crm/settings">
+                <button onClick={onClose} className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors">Go to Settings</button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+              {/* To */}
+              <div className="px-5 py-2.5 relative">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground w-8 shrink-0">To:</span>
+                  {toLead ? (
+                    <div className="flex items-center gap-2 bg-sky-50 rounded-full px-2 py-0.5">
+                      <div className={`w-5 h-5 rounded-full ${av(toLead.name)} flex items-center justify-center`}>
+                        <span className="text-white text-[9px] font-bold">{ini(toLead.name)}</span>
+                      </div>
+                      <span className="text-xs text-sky-700 font-medium">{toLead.name}</span>
+                      {toLead.phone && <span className="text-xs text-sky-500 font-mono">{toLead.phone}</span>}
+                      <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-sky-400 hover:text-sky-600"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <input
+                      autoFocus
+                      className="flex-1 text-sm focus:outline-none placeholder-gray-400"
+                      placeholder="Search lead by name or phone…"
+                      value={toSearch}
+                      onChange={e => setToSearch(e.target.value)}
+                    />
+                  )}
+                </div>
+                {toResults.length > 0 && (
+                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
+                    {toResults.map(l => (
+                      <button key={l.id} onClick={() => { setToLead(l); setToSearch(""); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
+                          <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">{l.name}</p>
+                          <p className="text-xs text-muted-foreground">{l.phone || "No phone"}</p>
+                        </div>
+                        {!l.phone && <span className="ml-auto text-xs text-red-400">No phone</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Message body */}
+              <div className="px-5 py-3">
+                <textarea
+                  className="w-full text-sm focus:outline-none resize-none placeholder-gray-400 min-h-[160px]"
+                  placeholder="Write your SMS message… (160 chars per segment)"
+                  value={body}
+                  onChange={e => setBody(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); }}
+                />
+                <p className="text-xs text-muted-foreground text-right mt-1">{body.length} chars · {Math.ceil(body.length / 160) || 1} segment{Math.ceil(body.length / 160) !== 1 ? "s" : ""}</p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mx-5 mb-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+              </div>
+            )}
+
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">⌘+Enter to send</p>
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+                <Button size="sm" onClick={send} disabled={sending || !toLead || !body.trim()} className="gap-1.5 bg-sky-600 hover:bg-sky-700">
+                  <Send className="w-3.5 h-3.5" />
+                  {sending ? "Sending…" : "Send SMS"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -725,7 +851,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
       {modal === "email" && (
         <EmailComposeModal leads={allLeads} templates={templates} onClose={() => setModal(null)} />
       )}
-      {modal === "sms" && <SmsModal onClose={() => setModal(null)} />}
+      {modal === "sms" && <SmsModal leads={allLeads} onClose={() => setModal(null)} />}
       {modal === "person" && (
         <NewPersonModal leads={allLeads} onClose={() => setModal(null)} onCreated={loadLeads} />
       )}

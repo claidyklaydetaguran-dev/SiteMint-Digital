@@ -4,3 +4,4 @@ export * from "./crmLeads";
 export * from "./crmActivities";
 export * from "./crmTasks";
 export * from "./crmEmailTemplates";
+export * from "./crmMessages";

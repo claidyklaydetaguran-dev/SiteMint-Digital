@@ -1,0 +1,110 @@
+Build a real CRM phone and texting integration plan for SiteMint Digital CRM.
+
+Goal:
+I want the CRM to work like Follow Up Boss phone/text communication:
+
+* I can call directly from the CRM
+* I can text directly from the CRM
+* Incoming calls appear in the CRM
+* Incoming texts appear in the CRM
+* My actual phone still rings when leads call
+* All calls/texts are logged under the correct lead profile
+* If the caller/texting number matches an existing lead, attach it to that lead
+* If it does not match, create or suggest a new lead
+
+Important:
+Do not pretend my personal cellular number can be fully controlled by the CRM unless the carrier/provider supports it. Build this correctly using a provider like Twilio, Telnyx, OpenPhone, Aircall, JustCall, or another business phone system with API/webhooks.
+
+Recommended practical setup:
+Use a dedicated business number for the CRM. Then forward calls from that number to my personal cell phone. This allows:
+
+* CRM call tracking
+* Incoming call logs
+* Incoming text logs
+* Call forwarding to my cell
+* Outbound calling from CRM
+* SMS sending/receiving from CRM
+* Webhook-based logging
+
+Build the CRM integration-ready structure with Twilio first unless another provider is easier in the current stack.
+
+Required environment variables:
+
+* PHONE_PROVIDER=twilio
+* TWILIO_ACCOUNT_SID
+* TWILIO_AUTH_TOKEN
+* TWILIO_PHONE_NUMBER
+* FORWARD_TO_PHONE_NUMBER
+* CRM_BASE_URL
+
+Backend requirements:
+
+1. Outbound SMS endpoint
+
+* Send SMS from lead profile
+* Save message to conversation timeline
+* Handle delivery status if available
+
+2. Incoming SMS webhook
+
+* Receive incoming SMS from Twilio
+* Match sender phone number to lead
+* Save message to inbox/conversation timeline
+* If no matching lead, create unassigned new lead or add to “Unknown Contacts”
+* Show unread badge in CRM Inbox
+
+3. Outbound call endpoint
+
+* Add “Call Lead” button
+* Option A: click-to-call using Twilio Client/browser calling if supported
+* Option B: initiate bridge call where Twilio calls my cell first, then connects to the lead
+* Log call attempt in lead timeline
+
+4. Incoming call webhook
+
+* When someone calls the Twilio business number, log the incoming call in CRM
+* Match phone number to lead
+* Forward/ring the call to FORWARD_TO_PHONE_NUMBER
+* Save missed/answered status if possible
+
+5. Call status webhook
+
+* Log answered, missed, completed, duration
+* Attach recording only if legally compliant and enabled
+* Do not enable recording by default
+
+6. Inbox integration
+
+* Incoming texts appear in CRM Inbox
+* Incoming calls appear in Recent Activity
+* Lead profile shows full call/text history
+
+7. Admin integration page
+   Add setup UI:
+
+* Provider: Twilio / Telnyx / Not Configured
+* Business phone number
+* Forward-to phone number
+* Webhook URL display
+* Connection status
+* Test SMS button
+* Test inbound webhook status
+
+8. Safety and compliance:
+
+* API keys only in backend secrets
+* Do not expose tokens in frontend
+* Add SMS opt-out handling: STOP, UNSUBSCRIBE, CANCEL
+* Add consent field on lead profile
+* Add call recording warning if recording is ever enabled
+* Add rate limits to messaging endpoints
+
+Important explanation in the UI:
+If using my current personal cell number:
+
+* Full CRM control may require porting the number to Twilio/OpenPhone/etc.
+* Otherwise, use a CRM business number and forward calls to my cell.
+* This is the safest and most realistic way to make my phone ring while logging everything in the CRM.
+
+Final deliverable:
+Create the backend routes, database fields, admin settings, webhooks, UI buttons, inbox logging, and clear setup instructions for Twilio-powered CRM calling/texting.

@@ -71,7 +71,7 @@ export default function CrmInbox() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [loadingActivities, setLoadingActivities] = useState(false);
-  const [tab, setTab] = useState<"note" | "email">("note");
+  const [tab, setTab] = useState<"note" | "email" | "sms">("note");
   const [message, setMessage] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [sending, setSending] = useState(false);
@@ -120,6 +120,12 @@ export default function CrmInbox() {
         method: "POST",
         headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ note: message }),
+      });
+    } else if (tab === "sms") {
+      await fetch(`/api/crm/leads/${selected.id}/sms`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ body: message }),
       });
     } else {
       await fetch(`/api/crm/leads/${selected.id}/email`, {
@@ -282,6 +288,14 @@ export default function CrmInbox() {
                     }`}>
                     <Mail className="w-3 h-3" /> Email
                   </button>
+                  {selected?.phone && (
+                    <button onClick={() => setTab("sms")}
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                        tab === "sms" ? "bg-sky-100 text-sky-800" : "text-muted-foreground hover:bg-gray-100"
+                      }`}>
+                      <MessageSquare className="w-3 h-3" /> SMS
+                    </button>
+                  )}
                   {message && (
                     <button onClick={() => setMessage("")} className="ml-auto text-xs text-muted-foreground hover:text-red-500 transition-colors">
                       <X className="w-3 h-3" />

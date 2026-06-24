@@ -4,6 +4,7 @@ import discoveryRouter from "./discovery";
 import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
+import phoneRouter from "./phone";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(discoveryRouter);
 router.use(adminRouter);
 router.use(contactRouter);
 router.use(crmRouter);
+router.use(phoneRouter);
 
 export default router;

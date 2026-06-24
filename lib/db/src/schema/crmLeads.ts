@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, decimal, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -52,6 +52,10 @@ export const crmLeads = pgTable("crm_leads", {
 
   // Link to discovery submission if converted
   discoverySubmissionId: integer("discovery_submission_id"),
+
+  // SMS / Phone
+  smsConsent: boolean("sms_consent").default(false).notNull(),
+  smsOptOut: boolean("sms_opt_out").default(false).notNull(),
 });
 
 export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
