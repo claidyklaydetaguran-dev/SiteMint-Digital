@@ -1,0 +1,215 @@
+Update the CRM backend/admin area for https://sitemintdigital.com/ to closely follow the workflow and interface structure shown in the attached Follow Up Boss reference screenshots, while creating our own original SiteMint Digital CRM design.
+
+Important:
+Do not copy Follow Up Boss branding, logos, proprietary code, or exact protected assets. Use the screenshots only as workflow and layout inspiration. Build a clean, original SiteMint Digital version with similar CRM usability.
+
+Goal:
+Make the CRM feel like a professional sales command center with these main sections:
+
+Top Navigation:
+
+* People
+* Inbox
+* Tasks
+* Calendar
+* Deals
+* Reporting
+* Admin
+* Global Search
+* Quick action icons for email, call, text, notifications, and profile/settings
+
+People Page:
+Create an “All People” page similar to the screenshot:
+
+* Left sidebar with lists/collections
+* Main table view of leads
+* Columns: Name, Last Communication, Last Email, Created, Updated, Last Activity, Tags, Phone, Email, Stage, Assigned
+* Search, filters, columns selector, assigned-to filter
+* Bulk actions: email, call, assign, tag, delete/export
+* Smart lists such as:
+
+  * New Lead - Needs Contact
+  * Met/Appointment Set
+  * Active Clients
+  * Active Leads
+  * Website Leads
+  * Hot Leads
+  * Warm Leads
+  * Cold Leads
+  * Past Clients
+
+Inbox Page:
+Build a split-screen communication inbox:
+
+* Left side: conversation list
+* Center: active conversation thread
+* Right side: lead profile summary
+* Show contact name, phone, email, relationships, details, stage, agent/assigned user, recent conversations, activity, and lead source
+* Add quick reply buttons/templates:
+
+  * Introduction
+  * Follow Up
+  * Still Interested
+  * Nurture Lead
+  * Custom
+* Connect email sending through the existing Resend setup
+* Add SMS placeholder if texting is not connected yet
+* Do not send real texts unless SMS provider is configured
+
+Tasks Page:
+Create a task system with tabs:
+
+* Today’s Tasks
+* Overdue
+* Future
+  Each task should show:
+* Lead name
+* Task note
+* Due date
+* Assigned user
+* Completion checkbox
+* Linked lead profile
+* Filters
+
+Calendar Page:
+Create a calendar view with:
+
+* Day / Week / Month toggle
+* Left mini calendar
+* Schedule list
+* Appointments and tasks displayed on calendar
+* Add new appointment/task button
+* Link calendar events to leads
+
+Deals Page:
+Create a Kanban-style deals pipeline similar to the screenshot:
+Buyer pipeline:
+
+* Buyer Contract
+* Offer
+* Pending
+* Closed
+
+Seller pipeline:
+
+* Seller Agreement
+* Coming Soon
+* Active Listing
+* Under Contract
+* Closed
+
+Deal cards should include:
+
+* Client name
+* Property address
+* Price
+* Commission
+* Close date
+* Assigned agent/user
+* Deal stage
+* Buyer or seller
+* Linked lead/contact
+
+Reporting Page:
+Create a reporting dashboard with card-style report links:
+Agent Reports:
+
+* Agent Activity
+* Calls
+* Call Logs
+* Texts
+* Appointments
+* Deals
+* Agent Leaderboard
+* Deal Leaderboard
+* Agent Goals
+
+Lead Source Reports:
+
+* Source Report
+* Speed to Lead
+* Contact Attempts
+* Closed Deals by Source
+
+Marketing Reports:
+
+* Batch Emails
+* Properties
+* Email opens/clicks if possible
+* Lead conversion by source
+
+Admin Page:
+Create admin settings sections:
+Follow Up:
+
+* Action Plans
+* Automations
+* Email Templates
+* Text Templates
+
+Account:
+
+* Import
+
+Integrations:
+
+* API Keys & Lead Email
+* Pixel
+* Website Forms
+* Resend Email
+* SMS Provider
+* All Integrations
+
+Customize:
+
+* Tags
+* Stages
+* Lead Sources
+* Users/Roles
+
+Dashboard/Home:
+Create KPI cards similar to the reference:
+
+* New Leads
+* Unactioned Leads
+* Average Contact Attempts
+* Speed to Action
+* Appointments Next 30 Days
+* Deals Next 30 Days
+* Revenue/Closed Deals
+* Recent Activity table
+
+Design Requirements:
+
+* Use a dark top navigation bar
+* Light gray CRM background
+* Clean white cards and tables
+* Blue accent color similar to modern CRM tools, but customized for SiteMint Digital
+* Rounded cards, clean spacing, readable fonts
+* Responsive layout where possible
+* Use icons consistently
+* Keep the interface polished and professional
+
+Functional Requirements:
+
+* All pages should connect to the same CRM database
+* Leads should be linked to conversations, tasks, deals, appointments, notes, tags, and activity
+* Every action should log to the activity timeline
+* CSV lead import should still work
+* Duplicate detection by email and phone
+* Add filters and sorting
+* Add mock/demo data only if database is empty
+* Protect CRM behind admin authentication
+* Do not expose CRM publicly
+
+Email + Texting:
+
+* Use the existing Resend integration for email
+* Add email templates and send-from-lead-profile functionality
+* Track sent emails in the lead timeline
+* Add SMS-ready structure for Twilio or Telnyx
+* Add “Text Lead” button, but if no SMS provider is connected, show:
+  “SMS is not connected yet. Connect Twilio or Telnyx in Admin > Integrations.”
+
+Final Instruction:
+Before coding, inspect the existing CRM work already built. Do not rebuild from scratch unless necessary. Improve the existing CRM into this full professional CRM interface and workflow based on the attached screenshots.

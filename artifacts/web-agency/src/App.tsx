@@ -23,6 +23,11 @@ import CrmTasks from "@/pages/crm/CrmTasks";
 import CrmEmailTemplates from "@/pages/crm/CrmEmailTemplates";
 import CrmImport from "@/pages/crm/CrmImport";
 import CrmSettings from "@/pages/crm/CrmSettings";
+import CrmInbox from "@/pages/crm/CrmInbox";
+import CrmCalendar from "@/pages/crm/CrmCalendar";
+import CrmDeals from "@/pages/crm/CrmDeals";
+import CrmReporting from "@/pages/crm/CrmReporting";
+import CrmAdminSettings from "@/pages/crm/CrmAdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -38,8 +43,13 @@ function Router() {
       <Route path="/admin/crm" component={CrmDashboard} />
       <Route path="/admin/crm/leads" component={CrmLeads} />
       <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
-      <Route path="/admin/crm/pipeline" component={CrmPipeline} />
+      <Route path="/admin/crm/inbox" component={CrmInbox} />
       <Route path="/admin/crm/tasks" component={CrmTasks} />
+      <Route path="/admin/crm/calendar" component={CrmCalendar} />
+      <Route path="/admin/crm/deals" component={CrmDeals} />
+      <Route path="/admin/crm/pipeline" component={CrmPipeline} />
+      <Route path="/admin/crm/reporting" component={CrmReporting} />
+      <Route path="/admin/crm/admin" component={CrmAdminSettings} />
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
