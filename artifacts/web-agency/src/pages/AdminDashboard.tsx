@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Users, TrendingUp, FileText, Star, LogOut, ExternalLink,
-  Search, RefreshCw, ChevronRight
+  Search, RefreshCw, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 
@@ -117,7 +117,12 @@ export default function AdminDashboard() {
           <SiteMintLogo variant="light" iconSize={30} />
           <span className="text-background/50 text-xs ml-1 hidden sm:inline border-l border-background/20 pl-3">Discovery Portal</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Link href="/admin/crm">
+            <Button size="sm" className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 gap-1.5">
+              <LayoutDashboard className="w-3.5 h-3.5" /> CRM
+            </Button>
+          </Link>
           <Button variant="ghost" size="sm" onClick={load} className="text-background/70 hover:text-background hover:bg-white/10 gap-1">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </Button>

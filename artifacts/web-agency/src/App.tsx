@@ -15,6 +15,14 @@ import ThankYou from "@/pages/ThankYou";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
+import CrmDashboard from "@/pages/crm/CrmDashboard";
+import CrmLeads from "@/pages/crm/CrmLeads";
+import CrmLeadDetail from "@/pages/crm/CrmLeadDetail";
+import CrmPipeline from "@/pages/crm/CrmPipeline";
+import CrmTasks from "@/pages/crm/CrmTasks";
+import CrmEmailTemplates from "@/pages/crm/CrmEmailTemplates";
+import CrmImport from "@/pages/crm/CrmImport";
+import CrmSettings from "@/pages/crm/CrmSettings";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +33,16 @@ function Router() {
       <Route path="/admin" component={AdminLogin} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/admin/submissions/:id" component={AdminSubmissionDetail} />
+
+      {/* CRM routes — no main layout */}
+      <Route path="/admin/crm" component={CrmDashboard} />
+      <Route path="/admin/crm/leads" component={CrmLeads} />
+      <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
+      <Route path="/admin/crm/pipeline" component={CrmPipeline} />
+      <Route path="/admin/crm/tasks" component={CrmTasks} />
+      <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
+      <Route path="/admin/crm/import" component={CrmImport} />
+      <Route path="/admin/crm/settings" component={CrmSettings} />
 
       {/* Discovery form — no main layout */}
       <Route path="/discovery" component={Discovery} />

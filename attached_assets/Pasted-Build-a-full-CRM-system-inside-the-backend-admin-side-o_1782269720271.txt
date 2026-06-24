@@ -1,0 +1,213 @@
+Build a full CRM system inside the backend/admin side of our website: https://sitemintdigital.com/
+
+Goal:
+Create a custom CRM for SiteMint Digital that can manage leads, follow-ups, client communication, pipeline stages, notes, tasks, email follow-ups, and future texting integration. This should feel inspired by Follow Up Boss in terms of layout, workflow, and core CRM functions, but do not copy their branding, proprietary code, or exact UI. Build our own clean SiteMint Digital version.
+
+Before coding:
+
+1. Inspect the current codebase, framework, routing, database setup, backend structure, authentication, and existing Resend email integration.
+2. Identify the safest place to add a private backend/admin CRM.
+3. Make sure the CRM is protected and not publicly accessible.
+4. Match the current website design style, but make the CRM dashboard clean, modern, and professional.
+
+Core CRM Features:
+
+1. CRM Dashboard
+
+* Total leads
+* New leads
+* Hot leads
+* Follow-ups due today
+* Overdue follow-ups
+* Won clients
+* Lost leads
+* Recent activity feed
+
+2. Lead Management
+   Create a leads table with:
+
+* Name
+* Company
+* Phone
+* Email
+* Website
+* Source
+* Service interest
+* Status
+* Priority score
+* Assigned team member
+* Last contacted date
+* Next follow-up date
+* Notes
+* Tags
+* Created date
+
+Lead statuses:
+
+* New
+* Contacted
+* Follow-up
+* Proposal Sent
+* Negotiating
+* Won
+* Lost
+* Nurture
+
+3. Lead List Upload
+   Add CSV upload/import functionality so we can upload prospect lists.
+   The upload should:
+
+* Map CSV columns to CRM fields
+* Skip duplicates based on email or phone number
+* Show import summary
+* Allow manual editing after import
+
+4. Lead Profile Page
+   Each lead should have its own detail page with:
+
+* Contact info
+* Timeline/activity history
+* Notes
+* Tasks
+* Emails sent
+* Follow-up reminders
+* Pipeline stage
+* Proposal/scope status
+* Quick actions: email, call, text placeholder, update status
+
+5. Pipeline View
+   Create a Kanban-style sales pipeline:
+
+* New
+* Contacted
+* Follow-up
+* Proposal Sent
+* Negotiating
+* Won
+* Lost
+
+Allow drag-and-drop or simple status update to move leads between stages.
+
+6. Follow-Up System
+   Add follow-up reminders:
+
+* Due today
+* Upcoming
+* Overdue
+* Completed
+  Allow users to create tasks like:
+* Call lead
+* Send email
+* Send proposal
+* Follow up after meeting
+* Check website
+* Ask for decision
+
+7. Email Integration Using Resend
+   Since Resend is already connected, use the existing Resend setup if available.
+   Add CRM email functions:
+
+* Send email from lead profile
+* Save email history in activity timeline
+* Add email templates
+* Send acknowledgement/follow-up emails
+* Add test mode so emails are not accidentally sent while testing
+
+Email templates:
+
+* Initial outreach
+* Follow-up
+* Discovery call reminder
+* Proposal sent
+* Checking in
+* Thank you
+
+8. Texting Integration Plan
+   Add a texting placeholder/module for now.
+   Do not fake SMS if there is no real provider connected.
+   Create a clean integration-ready structure for SMS using providers like Twilio or Telnyx.
+   Add fields/settings for:
+
+* SMS provider
+* API key placeholder
+* Sender phone number
+* Recipient phone number
+* Message templates
+
+Also add a “Text Lead” button, but if SMS is not configured, show:
+“SMS is not connected yet. Connect Twilio or Telnyx to enable texting.”
+
+Research/implement the best practical option to connect texting to my phone number safely. Prefer a real SMS provider like Twilio, Telnyx, or another reliable option. Do not expose API keys in frontend code.
+
+9. Activity Timeline
+   Track every action:
+
+* Lead created
+* Status changed
+* Note added
+* Email sent
+* Task created
+* Task completed
+* Follow-up date changed
+* SMS attempted/configured
+
+10. Proposal/Scope Connection
+    Prepare the CRM so it can eventually connect to our discovery questionnaire and proposal generator.
+    Each lead should have:
+
+* Discovery form status
+* Proposal status
+* Scope of work status
+* Estimated project value
+* Package/service type
+
+11. Admin/Team Access
+    Create simple user roles if auth exists:
+
+* Admin
+* Sales
+* Project/Admin Manager
+
+If auth does not exist yet, build the CRM behind a secure admin route and recommend the safest authentication approach before exposing it.
+
+12. UI Requirements
+    Inspired by Follow Up Boss workflow:
+
+* Left sidebar navigation
+* Lead inbox
+* Pipeline
+* Tasks
+* Email templates
+* Settings
+* Lead profile pages
+* Search and filters
+* Clean table view
+* Mobile-responsive where possible
+
+Do not use Follow Up Boss logos, exact branding, or proprietary assets. Build an original SiteMint Digital CRM.
+
+13. Testing
+    After building, test:
+
+* Creating a lead
+* Editing a lead
+* Uploading CSV
+* Duplicate detection
+* Status changes
+* Follow-up task creation
+* Email sending through Resend test mode
+* Activity logging
+* CRM route protection
+* Mobile responsiveness
+
+14. Safety
+
+* Do not expose API keys.
+* Do not send real emails during testing unless test mode is turned off intentionally.
+* Do not expose the CRM publicly.
+* Validate all form inputs.
+* Sanitize CSV uploads.
+* Add error handling and loading states.
+
+Final deliverable:
+Build the CRM into the backend/admin area of sitemintdigital.com with clean navigation, working lead management, CSV import, Resend email functionality, follow-up tasks, activity tracking, and SMS integration placeholder ready for Twilio/Telnyx connection.
