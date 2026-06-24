@@ -4,7 +4,7 @@ import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
   Search, Mail, Phone, MessageSquare, Bell, LogOut,
   ChevronDown, LayoutDashboard, X, UserPlus, Send,
-  AlertCircle, ChevronRight, Check, Plus,
+  AlertCircle, ChevronRight, Check, Plus, Clock, AlertTriangle, UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,8 +21,20 @@ const NAV_ITEMS = [
   { href: "/admin/crm/admin", label: "Admin" },
 ];
 
-interface CrmLead { id: number; name: string; email: string; phone?: string; company?: string; }
+interface CrmLead {
+  id: number; name: string; email: string; phone?: string; company?: string;
+  status?: string; priority?: string; source?: string;
+  createdAt?: string; nextFollowUpAt?: string;
+}
 interface Template { id: number; name: string; subject: string; body: string; }
+interface NavTask {
+  id: number; title: string; type: string; dueDate?: string;
+  status: string; leadId?: number; leadName?: string;
+}
+interface Notification {
+  id: string; type: "overdue_task" | "due_today" | "new_lead" | "followup_due";
+  title: string; sub: string; href: string; urgent: boolean;
+}
 
 const AVATAR_COLORS = [
   "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
@@ -470,7 +482,21 @@ function NewPersonModal({ leads, onClose, onCreated }: {
 }
 
 /* ─── Bell / Notifications ─── */
-function BellDropdown({ onClose }: { onClose: () => void }) {
+const NOTIF_ICONS: Record<string, React.ReactNode> = {
+  overdue_task:  <AlertTriangle className="w-4 h-4 text-red-500" />,
+  due_today:     <Clock className="w-4 h-4 text-yellow-500" />,
+  new_lead:      <UserCheck className="w-4 h-4 text-blue-500" />,
+  followup_due:  <Bell className="w-4 h-4 text-orange-500" />,
+};
+const NOTIF_BG: Record<string, string> = {
+  overdue_task: "bg-red-50",
+  due_today:    "bg-yellow-50",
+  new_lead:     "bg-blue-50",
+  followup_due: "bg-orange-50",
+};
+
+function BellDropdown({ notifications, onClose }: { notifications: Notification[]; onClose: () => void }) {
+  const [, navigate] = useLocation();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
@@ -478,17 +504,60 @@ function BellDropdown({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener("mousedown", h);
   }, [onClose]);
 
+  const urgent = notifications.filter(n => n.urgent);
+  const normal = notifications.filter(n => !n.urgent);
+
   return (
-    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200]">
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <span className="font-semibold text-sm text-foreground">Notifications</span>
-        <span className="text-xs text-muted-foreground">Mark all read</span>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm text-foreground">Notifications</span>
+          {notifications.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-tight">
+              {notifications.length}
+            </span>
+          )}
+        </div>
+        <Link href="/admin/crm/tasks">
+          <button onClick={onClose} className="text-xs text-primary hover:underline">View Tasks →</button>
+        </Link>
       </div>
-      <div className="p-6 text-center">
-        <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">No new notifications</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">Task reminders and lead alerts will appear here.</p>
-      </div>
+
+      {notifications.length === 0 ? (
+        <div className="p-8 text-center">
+          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Bell className="w-5 h-5 text-gray-300" />
+          </div>
+          <p className="text-sm font-medium text-foreground">All caught up!</p>
+          <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
+        </div>
+      ) : (
+        <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+          {[...urgent, ...normal].map(n => (
+            <button key={n.id} onClick={() => { navigate(n.href); onClose(); }}
+              className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left ${n.urgent ? "border-l-2 border-red-400" : ""}`}>
+              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type]} flex items-center justify-center shrink-0 mt-0.5`}>
+                {NOTIF_ICONS[n.type]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium leading-snug ${n.urgent ? "text-red-700" : "text-foreground"}`}>{n.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.sub}</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-1" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {notifications.length > 0 && (
+        <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
+          <Link href="/admin/crm/tasks">
+            <button onClick={onClose} className="text-xs text-primary font-medium hover:underline w-full text-center">
+              Go to Tasks page
+            </button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -537,20 +606,97 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<"email" | "phone" | "sms" | "person" | "bell" | "profile" | null>(null);
   const [allLeads, setAllLeads] = useState<CrmLead[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
 
+  const buildNotifications = useCallback((leads: CrmLead[], tasks: NavTask[]) => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
+    const yesterday = new Date(now.getTime() - 86400000);
+    const notifs: Notification[] = [];
+
+    tasks.filter(t => t.status !== "completed").forEach(t => {
+      if (!t.dueDate) return;
+      const due = new Date(t.dueDate);
+      if (due < todayStart) {
+        notifs.push({
+          id: `task-overdue-${t.id}`,
+          type: "overdue_task",
+          title: t.title,
+          sub: t.leadName ? `Overdue task for ${t.leadName}` : `Overdue ${t.type} task`,
+          href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks",
+          urgent: true,
+        });
+      } else if (due >= todayStart && due < todayEnd) {
+        notifs.push({
+          id: `task-today-${t.id}`,
+          type: "due_today",
+          title: t.title,
+          sub: t.leadName ? `Due today — ${t.leadName}` : `Due today · ${t.type}`,
+          href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks",
+          urgent: false,
+        });
+      }
+    });
+
+    leads.forEach(l => {
+      if (l.nextFollowUpAt) {
+        const fu = new Date(l.nextFollowUpAt);
+        if (fu < todayStart) {
+          notifs.push({
+            id: `followup-overdue-${l.id}`,
+            type: "followup_due",
+            title: `Follow-up overdue: ${l.name}`,
+            sub: `${l.status || "Lead"} · was due ${fu.toLocaleDateString()}`,
+            href: `/admin/crm/leads/${l.id}`,
+            urgent: true,
+          });
+        } else if (fu >= todayStart && fu < todayEnd) {
+          notifs.push({
+            id: `followup-today-${l.id}`,
+            type: "followup_due",
+            title: `Follow-up today: ${l.name}`,
+            sub: `${l.status || "Lead"}${l.company ? ` · ${l.company}` : ""}`,
+            href: `/admin/crm/leads/${l.id}`,
+            urgent: false,
+          });
+        }
+      }
+      if (l.status === "New" && l.createdAt && new Date(l.createdAt) > yesterday) {
+        notifs.push({
+          id: `new-lead-${l.id}`,
+          type: "new_lead",
+          title: `New lead: ${l.name}`,
+          sub: `${l.source || "Uncontacted"}${l.company ? ` · ${l.company}` : ""}`,
+          href: `/admin/crm/leads/${l.id}`,
+          urgent: false,
+        });
+      }
+    });
+
+    setNotifications(notifs);
+  }, []);
+
   const loadLeads = useCallback(() => {
     const t = tok();
     if (!t) return;
-    fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${t}` } })
-      .then(r => r.json()).then(d => setAllLeads(d.leads || [])).catch(() => {});
-    fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${t}` } })
-      .then(r => r.json()).then(d => setTemplates(d.templates || [])).catch(() => {});
-  }, []);
+    Promise.all([
+      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
+      fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
+      fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
+    ]).then(([ld, td, tmpl]) => {
+      const leads: CrmLead[] = ld.leads || [];
+      const tasks: NavTask[] = td.tasks || [];
+      setAllLeads(leads);
+      setTemplates(tmpl.templates || []);
+      buildNotifications(leads, tasks);
+    }).catch(() => {});
+  }, [buildNotifications]);
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
@@ -658,8 +804,13 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             <button onClick={() => setModal(m => m === "bell" ? null : "bell")} title="Notifications"
               className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
               <Bell className="w-3.5 h-3.5 text-white/70" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
+                  {notifications.length > 9 ? "9+" : notifications.length}
+                </span>
+              )}
             </button>
-            {modal === "bell" && <BellDropdown onClose={() => setModal(null)} />}
+            {modal === "bell" && <BellDropdown notifications={notifications} onClose={() => setModal(null)} />}
           </div>
 
           {/* Avatar/Profile */}
