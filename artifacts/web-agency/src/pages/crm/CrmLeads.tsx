@@ -2,35 +2,42 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
-import {
-  Search, Plus, ChevronRight, RefreshCw, Download, Users, Phone, MessageSquare,
-} from "lucide-react";
+import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal } from "lucide-react";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
 const STATUSES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
 const PRIORITIES = ["Low","Medium","High"];
 
-const statusColor: Record<string, string> = {
-  New: "bg-blue-100 text-blue-700",
-  Contacted: "bg-indigo-100 text-indigo-700",
-  "Follow-up": "bg-yellow-100 text-yellow-700",
-  "Proposal Sent": "bg-purple-100 text-purple-700",
-  Negotiating: "bg-orange-100 text-orange-700",
-  Won: "bg-green-100 text-green-700",
-  Lost: "bg-red-100 text-red-700",
-  Nurture: "bg-gray-100 text-gray-600",
-};
-
-const priorityDot: Record<string, string> = {
-  High: "bg-red-500", Medium: "bg-yellow-500", Low: "bg-gray-400",
-};
+const AVATAR_COLORS = [
+  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
+  "bg-red-400","bg-orange-400","bg-yellow-500","bg-teal-500","bg-cyan-500","bg-emerald-500",
+];
+function initials(name: string) {
+  return name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase();
+}
+function avatarColor(name: string) {
+  const i = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[i];
+}
+function timeAgo(d: string) {
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const days = Math.floor(h / 24);
+  if (days === 1) return "a day ago";
+  if (days < 30) return `${days} days ago`;
+  return new Date(d).toLocaleDateString();
+}
 
 interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
   status: string; priority: string; source: string; serviceInterest?: string;
   assignedTo?: string; nextFollowUpAt?: string; lastContactedAt?: string;
-  createdAt: string; tags: string[];
+  createdAt: string; updatedAt: string; tags: string[];
 }
 
 interface NewLeadForm {
@@ -43,6 +50,12 @@ const emptyForm: NewLeadForm = {
   name:"", email:"", company:"", phone:"", website:"",
   source:"Manual Entry", serviceInterest:"", status:"New", priority:"Medium",
   assignedTo:"", notes:"",
+};
+
+const priorityBadge: Record<string, string> = {
+  High: "bg-red-100 text-red-700",
+  Medium: "bg-yellow-100 text-yellow-700",
+  Low: "bg-gray-100 text-gray-600",
 };
 
 export default function CrmLeads() {
@@ -102,56 +115,60 @@ export default function CrmLeads() {
   return (
     <CrmLayout>
       <div className="p-6 max-w-7xl mx-auto">
+
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-2xl font-serif font-bold text-foreground">Leads</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">{leads.length} leads total</p>
+            <h1 className="text-xl font-bold text-foreground">People</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">{leads.length} leads</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             {importMsg && (
-              <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg self-center">
+              <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg">
                 {importMsg}
               </span>
             )}
-            <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs">
               <Download className="w-3.5 h-3.5" />
               {importingDiscovery ? "Importing…" : "Import from Discovery"}
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={() => setShowCreate(true)}>
+            <Button size="sm" className="gap-1.5 text-xs" onClick={() => setShowCreate(true)}>
               <Plus className="w-3.5 h-3.5" /> Add Lead
             </Button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 p-3 flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-48">
+        {/* Filter bar */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 p-2.5 flex flex-wrap gap-2 items-center">
+          <div className="relative flex-1 min-w-44">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
-              placeholder="Search by name, email, company…"
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              placeholder="Search name, email, company…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
           <select
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
           >
-            <option value="">All Statuses</option>
+            <option value="">All Stages</option>
             {STATUSES.map(s => <option key={s}>{s}</option>)}
           </select>
           <select
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
             value={filterPriority}
             onChange={e => setFilterPriority(e.target.value)}
           >
             <option value="">All Priorities</option>
             {PRIORITIES.map(p => <option key={p}>{p}</option>)}
           </select>
-          <Button variant="ghost" size="sm" onClick={load} className="gap-1.5">
+          <button className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-muted-foreground">
+            <SlidersHorizontal className="w-3 h-3" /> More Filters
+          </button>
+          <Button variant="ghost" size="sm" onClick={load} className="px-2">
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>
         </div>
@@ -166,70 +183,104 @@ export default function CrmLeads() {
             <div className="py-16 text-center">
               <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
               <p className="text-muted-foreground font-medium">No leads found</p>
-              <p className="text-sm text-muted-foreground/70 mt-1">Add a lead or import from your Discovery form submissions.</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">Add a lead or import from your Discovery form.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lead</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Priority</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Follow-up</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source</th>
-                    <th className="px-4 py-3"></th>
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Email</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Phone</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Last Activity</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Time</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Stage</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Priority</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Assigned</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-50">
                   {leads.map(lead => (
-                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{lead.name}</div>
-                        {lead.company && <div className="text-xs text-muted-foreground">{lead.company}</div>}
-                        {lead.tags?.length > 0 && (
-                          <div className="flex gap-1 mt-1">
-                            {lead.tags.slice(0, 2).map(t => (
-                              <span key={t} className="px-1.5 py-0.5 text-xs bg-foreground/8 rounded text-muted-foreground">{t}</span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <a href={`mailto:${lead.email}`} className="text-muted-foreground text-xs hover:text-primary transition-colors block">{lead.email}</a>
-                        {lead.phone && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <a href={`tel:${lead.phone}`} className="text-muted-foreground text-xs hover:text-primary transition-colors flex items-center gap-1" title="Call">
-                              <Phone className="w-3 h-3" />{lead.phone}
-                            </a>
-                            <a href={`sms:${lead.phone}`} className="text-muted-foreground hover:text-emerald-600 transition-colors" title="Send text">
-                              <MessageSquare className="w-3 h-3" />
-                            </a>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
-                          {lead.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full ${priorityDot[lead.priority] || "bg-gray-400"}`} />
-                          <span className="text-xs text-muted-foreground">{lead.priority}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {lead.nextFollowUpAt ? new Date(lead.nextFollowUpAt).toLocaleDateString() : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{lead.source}</td>
+                    <tr key={lead.id} className="hover:bg-gray-50/70 transition-colors">
+                      {/* Name + avatar */}
                       <td className="px-4 py-3">
                         <Link href={`/admin/crm/leads/${lead.id}`}>
-                          <Button variant="ghost" size="sm" className="gap-1">
-                            View <ChevronRight className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-2.5 cursor-pointer group">
+                            <div className={`w-8 h-8 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
+                              <span className="text-white text-xs font-semibold">{initials(lead.name)}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium text-blue-600 group-hover:text-blue-800 transition-colors">
+                                {lead.name}
+                              </span>
+                              {lead.company && (
+                                <div className="text-xs text-muted-foreground">{lead.company}</div>
+                              )}
+                            </div>
+                          </div>
                         </Link>
+                      </td>
+                      {/* Email */}
+                      <td className="px-4 py-3">
+                        <a href={`mailto:${lead.email}`} className="text-xs text-muted-foreground hover:text-primary transition-colors truncate block max-w-[180px]">
+                          {lead.email}
+                        </a>
+                      </td>
+                      {/* Phone — green circle buttons */}
+                      <td className="px-4 py-3">
+                        {lead.phone ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground mr-0.5 whitespace-nowrap">{lead.phone}</span>
+                            <a href={`tel:${lead.phone}`} title="Call"
+                               className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors shrink-0">
+                              <Phone className="w-3 h-3 text-white" />
+                            </a>
+                            <a href={`sms:${lead.phone}`} title="Text"
+                               className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors shrink-0">
+                              <MessageSquare className="w-3 h-3 text-white" />
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td>
+                      {/* Last Activity */}
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-muted-foreground">
+                          {lead.lastContactedAt
+                            ? `Last contacted · ${lead.serviceInterest || lead.status}`
+                            : lead.status === "New" ? "New lead added" : `Stage · ${lead.status}`}
+                        </span>
+                      </td>
+                      {/* Time */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-xs text-muted-foreground">
+                          {timeAgo(lead.lastContactedAt || lead.updatedAt)}
+                        </span>
+                      </td>
+                      {/* Stage */}
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-foreground">{lead.status}</span>
+                      </td>
+                      {/* Priority */}
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priorityBadge[lead.priority] || "bg-gray-100 text-gray-600"}`}>
+                          {lead.priority}
+                        </span>
+                      </td>
+                      {/* Assigned */}
+                      <td className="px-4 py-3">
+                        {lead.assignedTo ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full ${avatarColor(lead.assignedTo)} flex items-center justify-center shrink-0`}>
+                              <span className="text-white text-[9px] font-semibold">{initials(lead.assignedTo)}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate max-w-[80px]">{lead.assignedTo.split(" ")[0]}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -245,14 +296,14 @@ export default function CrmLeads() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-gray-100">
-              <h2 className="font-serif font-bold text-lg text-foreground">Add New Lead</h2>
+              <h2 className="font-semibold text-lg text-foreground">Add New Lead</h2>
             </div>
             <div className="p-5 space-y-3">
               {[
                 { label: "Name *", key: "name", type: "text", placeholder: "Full name" },
                 { label: "Email *", key: "email", type: "email", placeholder: "email@example.com" },
                 { label: "Company", key: "company", type: "text", placeholder: "Company name" },
-                { label: "Phone", key: "phone", type: "tel", placeholder: "Phone number" },
+                { label: "Phone", key: "phone", type: "tel", placeholder: "(555) 000-0000" },
                 { label: "Website", key: "website", type: "url", placeholder: "https://..." },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
@@ -274,7 +325,7 @@ export default function CrmLeads() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Status</label>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
                   <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
                     {STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select>
