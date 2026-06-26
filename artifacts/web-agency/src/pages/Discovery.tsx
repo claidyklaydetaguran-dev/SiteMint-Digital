@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, ArrowRight, ArrowLeft, ClipboardList } from "lucide-react";
+import { CheckCircle2, ArrowRight, ArrowLeft, ClipboardList, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 
@@ -620,9 +620,17 @@ export default function Discovery() {
               <div className="bg-background rounded-full h-1.5 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <ClipboardList className="w-4 h-4 text-background/60" />
-            <span className="text-xs text-background/60">{Math.round(progress)}%</span>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5">
+              <ClipboardList className="w-3.5 h-3.5 text-background/50" />
+              <span className="text-xs text-background/50">{Math.round(progress)}%</span>
+            </div>
+            <Link href="/admin/crm/dashboard">
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-background/20 bg-background/10 hover:bg-background/20 hover:border-background/35 transition-all text-background/70 hover:text-background group">
+                <Lock className="w-3 h-3 group-hover:text-emerald-400 transition-colors" />
+                <span className="text-xs font-semibold tracking-wide">CRM</span>
+              </button>
+            </Link>
           </div>
         </div>
       </div>

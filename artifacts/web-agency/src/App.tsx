@@ -57,7 +57,8 @@ function Router() {
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
 
-      {/* Discovery form — no main layout */}
+      {/* Discovery form — landing page + /discovery alias — no main layout */}
+      <Route path="/" component={Discovery} />
       <Route path="/discovery" component={Discovery} />
 
       {/* Thank You — no main layout */}
@@ -67,7 +68,7 @@ function Router() {
       <Route>
         <Layout>
           <Switch>
-            <Route path="/" component={Home} />
+            <Route path="/home" component={Home} />
             <Route path="/services" component={Services} />
             <Route path="/pricing" component={Pricing} />
             <Route path="/portfolio" component={Portfolio} />
