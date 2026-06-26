@@ -1,0 +1,221 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Upgrade CRM Reporting into a real data-driven reporting page.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/inbox is now wired to real crm_messages data.
+* /admin/crm/reporting currently has placeholder/static cards.
+* Existing APIs already provide most reporting data.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Do NOT break the Discovery Portal.
+Do NOT remove working dashboard/deals/leads features.
+Use existing APIs where possible.
+
+Known existing endpoints:
+
+* GET /api/crm/stats
+* GET /api/crm/leads
+* GET /api/crm/pipeline
+* GET /api/crm/deals/stats
+* GET /api/crm/tasks
+* GET /api/crm/conversations
+
+Goal:
+Replace /admin/crm/reporting placeholder content with a real analytics dashboard using live CRM data.
+
+TASK 1 — INSPECT CURRENT REPORTING PAGE
+
+Before coding, inspect:
+
+1. CrmReporting.tsx
+2. Existing chart components/libraries
+3. Existing usage of Recharts in CrmExecutiveDashboard
+4. Existing API response shapes for:
+
+   * /api/crm/stats
+   * /api/crm/leads
+   * /api/crm/pipeline
+   * /api/crm/deals/stats
+   * /api/crm/tasks
+   * /api/crm/conversations
+
+Report what data can be reused before changing code.
+
+TASK 2 — BUILD TOP KPI GRID
+
+Create a polished KPI grid at the top of /admin/crm/reporting.
+
+Show:
+
+* Total Leads
+* New Leads This Week
+* Hot Leads
+* Open Deals
+* Won Revenue
+* Win Rate
+* Overdue Tasks
+* Messages / Conversations
+
+Use live data from existing endpoints.
+
+Include:
+
+* loading skeletons
+* error state
+* empty state if no data exists
+* small supporting labels
+
+TASK 3 — BUILD CHARTS USING RECHARTS
+
+Add real charts:
+
+1. Lead Funnel / Pipeline Chart
+   Source:
+
+* /api/crm/pipeline
+
+Show lead count by CRM status/stage.
+
+2. Lead Source Breakdown
+   Source:
+
+* /api/crm/leads
+
+Group leads by source.
+Use a pie chart or bar chart.
+
+3. Deal Revenue Trend
+   Source:
+
+* /api/crm/deals/stats
+
+Use existing monthly revenue data if available.
+Display as line chart or area chart.
+
+4. Deal Stage Distribution
+   Source:
+
+* /api/crm/deals/stats
+
+Show deal value or count by stage.
+
+5. Task Completion Overview
+   Source:
+
+* /api/crm/tasks
+
+Show:
+
+* pending
+* completed
+* overdue
+* due today
+
+Use a bar chart or compact stat card.
+
+6. Communication Activity Summary
+   Source:
+
+* /api/crm/conversations
+
+Show:
+
+* total conversations
+* inbound messages
+* outbound messages
+* SMS count
+* call count
+
+TASK 4 — ADD REPORT FILTERS
+
+Add lightweight filters at the top:
+
+* Time range: 7 days, 30 days, 90 days, All time
+* Source filter if easy
+* Status filter if easy
+
+Important:
+If APIs do not support server-side date filtering yet, apply filters client-side safely.
+Do not add new database columns.
+
+TASK 5 — ADD INSIGHT CARDS
+
+Add simple rule-based insight cards.
+
+Examples:
+
+* “Most leads are currently in [stage].”
+* “Top lead source is [source].”
+* “You have [X] overdue tasks.”
+* “Won revenue this period is [$X].”
+* “Inbox has [X] inbound messages that may need review.”
+
+Do not call this AI unless it is truly AI-powered.
+Label it as:
+“CRM Insights”
+
+TASK 6 — DESIGN REQUIREMENTS
+
+The page should feel like a premium SaaS analytics dashboard.
+
+Use:
+
+* shadcn/ui cards
+* clean Tailwind layout
+* responsive grid
+* Recharts
+* subtle borders
+* clear titles
+* readable chart labels
+* empty states
+* loading states
+
+Avoid:
+
+* clutter
+* tiny unreadable text
+* fake data
+* hardcoded placeholder stats
+* broken charts when arrays are empty
+
+TASK 7 — TESTING
+
+Test:
+
+1. /admin/crm/reporting loads.
+2. Charts render with real data.
+3. Page works with empty data.
+4. Page works with many leads/messages/tasks.
+5. Filters do not crash.
+6. Stats match API responses.
+7. No console errors.
+8. No TypeScript errors, except any pre-existing known unrelated issue.
+9. /admin/dashboard still works.
+10. /admin/crm/dashboard still works.
+11. /admin/crm/inbox still works.
+12. No database migrations created.
+13. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. APIs used
+4. KPI cards completed
+5. Charts completed
+6. Filter behavior
+7. Insight logic
+8. Tests performed
+9. Confirmation no schema/database changes were made
+10. Known limitations
+11. Recommended next prompt
