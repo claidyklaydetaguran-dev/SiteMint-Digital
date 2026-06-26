@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
-import { Phone, MessageSquare, SlidersHorizontal } from "lucide-react";
+import { Phone, MessageSquare, SlidersHorizontal, AlertTriangle, TrendingUp, Zap } from "lucide-react";
+import { scoreLeadFromFields } from "@/lib/leadScore";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -13,8 +14,12 @@ interface Stats {
 interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
   status: string; priority: string; assignedTo?: string;
-  lastContactedAt?: string; updatedAt: string; createdAt: string;
+  lastContactedAt?: string | null; updatedAt: string; createdAt: string;
   serviceInterest?: string;
+  estimatedValue?: string | null;
+  nextFollowUpAt?: string | null;
+  proposalStatus?: string;
+  smsConsent?: boolean;
 }
 
 const AVATAR_COLORS = [
@@ -68,10 +73,12 @@ function Sparkline({ seed, color = "#34d399" }: { seed: number; color?: string }
   );
 }
 
+const DAY = 86_400_000;
+
 export default function CrmDashboard() {
   const [, navigate] = useLocation();
   const [stats, setStats] = useState<Stats | null>(null);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStage, setFilterStage] = useState("");
 
@@ -82,22 +89,143 @@ export default function CrmDashboard() {
       fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),
     ]).then(([sd, ld]) => {
       setStats(sd.stats);
-      setLeads((ld.leads || []).slice().sort(
+      setAllLeads((ld.leads || []).slice().sort(
         (a: Lead, b: Lead) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       ));
     }).catch(() => {}).finally(() => setLoading(false));
   }, [navigate]);
 
+  // ── Health Scores (memoized — computed once per allLeads change) ───────────
+  const scoreMap = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof scoreLeadFromFields>>();
+    for (const l of allLeads) map.set(l.id, scoreLeadFromFields(l));
+    return map;
+  }, [allLeads]);
+
+  // ── Intelligence Insights (dynamic, data-driven alerts) ───────────────────
+  const insights = useMemo(() => {
+    const now = Date.now();
+    const today = new Date().toDateString();
+    const active = allLeads.filter(l => !["Won", "Lost"].includes(l.status));
+
+    const noContact = active.filter(l =>
+      !l.lastContactedAt || (now - new Date(l.lastContactedAt).getTime()) > 14 * DAY
+    );
+    const overdue = active.filter(l =>
+      l.nextFollowUpAt && new Date(l.nextFollowUpAt) < new Date()
+    );
+    const followUpToday = active.filter(l =>
+      l.nextFollowUpAt && new Date(l.nextFollowUpAt).toDateString() === today
+    );
+    const proposalWaiting = active.filter(l => l.status === "Proposal Sent");
+    const coldLeads = active.filter(l => (scoreMap.get(l.id)?.score ?? 50) < 40);
+    const hotLeads  = active.filter(l => (scoreMap.get(l.id)?.score ?? 0) >= 80);
+
+    const items: { type: "error"|"warning"|"success"|"info"; icon: string; text: string; count: number; href: string }[] = [];
+
+    if (overdue.length > 0) items.push({
+      type: "error", icon: "🚨",
+      text: `${overdue.length} follow-up${overdue.length !== 1 ? "s" : ""} ${overdue.length !== 1 ? "are" : "is"} overdue — contact now.`,
+      count: overdue.length, href: "/admin/crm/leads",
+    });
+    if (noContact.length > 0) items.push({
+      type: "warning", icon: "📞",
+      text: `${noContact.length} lead${noContact.length !== 1 ? "s" : ""} haven't been contacted in over two weeks.`,
+      count: noContact.length, href: "/admin/crm/leads",
+    });
+    if (followUpToday.length > 0) items.push({
+      type: "info", icon: "⏰",
+      text: `${followUpToday.length} follow-up${followUpToday.length !== 1 ? "s" : ""} due today.`,
+      count: followUpToday.length, href: "/admin/crm/leads",
+    });
+    if (proposalWaiting.length > 0) items.push({
+      type: "info", icon: "📄",
+      text: `${proposalWaiting.length} proposal${proposalWaiting.length !== 1 ? "s are" : " is"} waiting for response.`,
+      count: proposalWaiting.length, href: "/admin/crm/leads",
+    });
+    if (coldLeads.length > 0) items.push({
+      type: "warning", icon: "🧊",
+      text: `${coldLeads.length} lead${coldLeads.length !== 1 ? "s are" : " is"} becoming cold.`,
+      count: coldLeads.length, href: "/admin/crm/leads",
+    });
+    if (hotLeads.length > 0) items.push({
+      type: "success", icon: "🔥",
+      text: `${hotLeads.length} hot lead${hotLeads.length !== 1 ? "s are" : " is"} ready to close.`,
+      count: hotLeads.length, href: "/admin/crm/leads",
+    });
+
+    return items;
+  }, [allLeads, scoreMap]);
+
+  // ── Smart CRM Lists (7 intelligence-based lists) ──────────────────────────
+  const smartLists = useMemo(() => {
+    const now = Date.now();
+    const today = new Date().toDateString();
+    const active = allLeads.filter(l => !["Won", "Lost"].includes(l.status));
+
+    return [
+      {
+        emoji: "🔥", label: "Hot Leads",
+        desc: "Health score ≥ 80",
+        color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200",
+        count: active.filter(l => (scoreMap.get(l.id)?.score ?? 0) >= 80).length,
+        href: "/admin/crm/leads",
+      },
+      {
+        emoji: "⚠️", label: "Follow-up Today",
+        desc: "Due today",
+        color: "text-yellow-700", bg: "bg-yellow-50", border: "border-yellow-200",
+        count: allLeads.filter(l => l.nextFollowUpAt && new Date(l.nextFollowUpAt).toDateString() === today).length,
+        href: "/admin/crm/leads",
+      },
+      {
+        emoji: "🚨", label: "Overdue Follow-ups",
+        desc: "Missed deadline",
+        color: "text-red-700", bg: "bg-red-50", border: "border-red-200",
+        count: active.filter(l => l.nextFollowUpAt && new Date(l.nextFollowUpAt) < new Date()).length,
+        href: "/admin/crm/leads",
+      },
+      {
+        emoji: "💰", label: "High Value",
+        desc: "Est. value > $10K",
+        color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200",
+        count: allLeads.filter(l => parseFloat(l.estimatedValue ?? "0") > 10_000).length,
+        href: "/admin/crm/leads",
+      },
+      {
+        emoji: "📞", label: "No Contact 14 Days",
+        desc: "Needs outreach",
+        color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200",
+        count: active.filter(l => !l.lastContactedAt || (now - new Date(l.lastContactedAt).getTime()) > 14 * DAY).length,
+        href: "/admin/crm/leads",
+      },
+      {
+        emoji: "📩", label: "Waiting for Reply",
+        desc: "Proposal sent",
+        color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-200",
+        count: active.filter(l => l.status === "Proposal Sent").length,
+        href: "/admin/crm/leads",
+      },
+      {
+        emoji: "🧊", label: "Cold Leads",
+        desc: "Health score < 40",
+        color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200",
+        count: active.filter(l => (scoreMap.get(l.id)?.score ?? 50) < 40).length,
+        href: "/admin/crm/leads",
+      },
+    ];
+  }, [allLeads, scoreMap]);
+
   const statCards = stats ? [
-    { label: "NEW LEADS", value: stats.newLeads, sub: `${stats.total} total`, color: "#6366f1", seed: 1 },
-    { label: "HOT LEADS", value: stats.hotLeads, sub: "High priority", color: "#f97316", seed: 2 },
-    { label: "FOLLOW-UPS TODAY", value: stats.followUpToday, sub: "Due today", color: "#0ea5e9", seed: 3 },
-    { label: "OVERDUE", value: stats.overdue, sub: "Need attention", color: "#ef4444", seed: 4 },
-    { label: "WON", value: stats.won, sub: "Closed deals", color: "#34d399", seed: 5 },
+    { label: "NEW LEADS",        value: stats.newLeads,      sub: `${stats.total} total`,  color: "#6366f1", seed: 1 },
+    { label: "HOT LEADS",        value: stats.hotLeads,      sub: "High priority",          color: "#f97316", seed: 2 },
+    { label: "FOLLOW-UPS TODAY", value: stats.followUpToday, sub: "Due today",              color: "#0ea5e9", seed: 3 },
+    { label: "OVERDUE",          value: stats.overdue,       sub: "Need attention",         color: "#ef4444", seed: 4 },
+    { label: "WON",              value: stats.won,           sub: "Closed deals",           color: "#34d399", seed: 5 },
   ] : [];
 
   const STAGES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
-  const filtered = filterStage ? leads.filter(l => l.status === filterStage) : leads;
+  const filtered = filterStage ? allLeads.filter(l => l.status === filterStage) : allLeads;
 
   if (loading) return (
     <CrmLayout>
@@ -111,43 +239,86 @@ export default function CrmDashboard() {
             </div>
           ))}
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <div className="h-3 w-32 bg-gray-200 rounded" />
-          </div>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-5 py-3 border-b border-gray-50">
-              <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
-              <div className="h-3 w-28 bg-gray-200 rounded flex-1" />
-              <div className="h-3 w-36 bg-gray-100 rounded" />
-              <div className="h-3 w-16 bg-gray-100 rounded" />
-              <div className="h-5 w-16 bg-gray-100 rounded-full" />
-            </div>
-          ))}
-        </div>
       </div>
     </CrmLayout>
   );
 
   return (
     <CrmLayout>
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+        {/* ── Stat cards ───────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
           {statCards.map(({ label, value, sub, color, seed }) => (
             <div key={label} className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-4 pb-0 overflow-hidden">
               <p className="text-[10px] font-semibold tracking-widest text-muted-foreground mb-1">{label}</p>
               <p className="text-3xl font-bold text-foreground leading-tight">{value}</p>
               <p className="text-xs text-muted-foreground mt-0.5 mb-2">{sub}</p>
-              <div className="-mx-4">
-                <Sparkline seed={seed + value} color={color} />
-              </div>
+              <div className="-mx-4"><Sparkline seed={seed + value} color={color} /></div>
             </div>
           ))}
         </div>
 
-        {/* Recent Activity table */}
+        {/* ── Intelligence Insights ─────────────────────────────────────────── */}
+        {insights.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Intelligence Insights</h2>
+              <span className="ml-auto text-[10px] text-muted-foreground">Based on real CRM data · rule-based</span>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {insights.map((item, i) => {
+                const alertStyles = {
+                  error:   "border-l-red-500   bg-red-50/40",
+                  warning: "border-l-amber-500  bg-amber-50/40",
+                  success: "border-l-emerald-500 bg-emerald-50/40",
+                  info:    "border-l-blue-500   bg-blue-50/30",
+                };
+                const iconBg = {
+                  error:   "bg-red-100   text-red-600",
+                  warning: "bg-amber-100  text-amber-700",
+                  success: "bg-emerald-100 text-emerald-700",
+                  info:    "bg-blue-100   text-blue-700",
+                };
+                return (
+                  <Link href={item.href} key={i}>
+                    <div className={`flex items-center gap-3 px-5 py-3.5 border-l-4 hover:brightness-95 transition-all cursor-pointer ${alertStyles[item.type]}`}>
+                      <span className={`text-lg w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconBg[item.type]}`}>
+                        {item.icon}
+                      </span>
+                      <p className="text-sm text-foreground flex-1">{item.text}</p>
+                      <span className="text-xs text-muted-foreground shrink-0">View →</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Smart CRM Lists ───────────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Smart CRM Lists</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— automatically computed from lead data</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            {smartLists.map(list => (
+              <Link href={list.href} key={list.label}>
+                <div className={`rounded-xl border ${list.border} ${list.bg} p-3.5 hover:shadow-sm transition-all cursor-pointer group h-full`}>
+                  <div className="text-2xl mb-2">{list.emoji}</div>
+                  <p className="text-3xl font-bold text-foreground mb-0.5">{list.count}</p>
+                  <p className={`text-xs font-semibold ${list.color} mb-1`}>{list.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{list.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Recent Activity table with Health Score ───────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Recent Activity</h2>
@@ -161,7 +332,7 @@ export default function CrmDashboard() {
                 {STAGES.map(s => <option key={s}>{s}</option>)}
               </select>
               <button className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-foreground">
-                <SlidersHorizontal className="w-3 h-3" /> Filter Activity
+                <SlidersHorizontal className="w-3 h-3" /> Filter
               </button>
             </div>
           </div>
@@ -175,73 +346,107 @@ export default function CrmDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["Name","Email","Phone","Last Activity","Time","Stage","Assigned"].map(h => (
+                    {["Name","Health","Email","Phone","Last Activity","Time","Stage","Assigned"].map(h => (
                       <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filtered.map(lead => (
-                    <tr key={lead.id} className="hover:bg-gray-50/70 transition-colors group">
-                      {/* Name + avatar */}
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/crm/leads/${lead.id}`}>
-                          <div className="flex items-center gap-2.5 cursor-pointer">
-                            <div className={`w-8 h-8 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
-                              <span className="text-white text-xs font-semibold">{initials(lead.name)}</span>
+                  {filtered.map(lead => {
+                    const health = scoreMap.get(lead.id);
+                    return (
+                      <tr key={lead.id} className="hover:bg-gray-50/70 transition-colors group">
+                        {/* Name + avatar */}
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/crm/leads/${lead.id}`}>
+                            <div className="flex items-center gap-2.5 cursor-pointer">
+                              <div className={`w-8 h-8 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
+                                <span className="text-white text-xs font-semibold">{initials(lead.name)}</span>
+                              </div>
+                              <span className="font-medium text-blue-600 hover:text-blue-800 transition-colors truncate max-w-[120px]">
+                                {lead.name}
+                              </span>
                             </div>
-                            <span className="font-medium text-blue-600 hover:text-blue-800 transition-colors truncate max-w-[120px]">
-                              {lead.name}
-                            </span>
-                          </div>
-                        </Link>
-                      </td>
-                      {/* Email */}
-                      <td className="px-4 py-3">
-                        <a href={`mailto:${lead.email}`} className="text-xs text-muted-foreground hover:text-primary transition-colors truncate block max-w-[160px]">
-                          {lead.email}
-                        </a>
-                      </td>
-                      {/* Phone — green circle buttons */}
-                      <td className="px-4 py-3">
-                        {lead.phone ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground mr-1">{lead.phone}</span>
-                            <a href={`tel:${lead.phone}`} title="Call"
-                               className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors shrink-0">
-                              <Phone className="w-3 h-3 text-white" />
-                            </a>
-                            <a href={`sms:${lead.phone}`} title="Text"
-                               className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors shrink-0">
-                              <MessageSquare className="w-3 h-3 text-white" />
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
-                      </td>
-                      {/* Last activity */}
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-muted-foreground">{lastActivityLabel(lead)}</span>
-                      </td>
-                      {/* Time */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-xs text-muted-foreground">{timeAgo(lead.lastContactedAt || lead.updatedAt)}</span>
-                      </td>
-                      {/* Stage */}
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-foreground">{lead.status}</span>
-                      </td>
-                      {/* Assigned */}
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-muted-foreground">{lead.assignedTo || "—"}</span>
-                      </td>
-                    </tr>
-                  ))}
+                          </Link>
+                        </td>
+                        {/* Health Score */}
+                        <td className="px-4 py-3">
+                          {health ? (
+                            <Link href={`/admin/crm/leads/${lead.id}`}>
+                              <div className="flex items-center gap-1.5 cursor-pointer group/h">
+                                <span className={`text-sm font-bold ${health.color}`}>{health.score}</span>
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${health.bgColor} ${health.color} ${health.borderColor}`}>
+                                  {health.badge}
+                                </span>
+                              </div>
+                            </Link>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        {/* Email */}
+                        <td className="px-4 py-3">
+                          <a href={`mailto:${lead.email}`} className="text-xs text-muted-foreground hover:text-primary transition-colors truncate block max-w-[160px]">
+                            {lead.email}
+                          </a>
+                        </td>
+                        {/* Phone */}
+                        <td className="px-4 py-3">
+                          {lead.phone ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground mr-1">{lead.phone}</span>
+                              <a href={`tel:${lead.phone}`} title="Call"
+                                 className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors shrink-0">
+                                <Phone className="w-3 h-3 text-white" />
+                              </a>
+                              <a href={`sms:${lead.phone}`} title="Text"
+                                 className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors shrink-0">
+                                <MessageSquare className="w-3 h-3 text-white" />
+                              </a>
+                            </div>
+                          ) : <span className="text-xs text-gray-300">—</span>}
+                        </td>
+                        {/* Last activity */}
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-muted-foreground">{lastActivityLabel(lead)}</span>
+                        </td>
+                        {/* Time */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-xs text-muted-foreground">{timeAgo(lead.lastContactedAt || lead.updatedAt)}</span>
+                        </td>
+                        {/* Stage */}
+                        <td className="px-4 py-3">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            lead.status === "Won"           ? "bg-green-100 text-green-700" :
+                            lead.status === "Lost"          ? "bg-red-100 text-red-600" :
+                            lead.status === "Proposal Sent" ? "bg-purple-100 text-purple-700" :
+                            lead.status === "Negotiating"   ? "bg-orange-100 text-orange-700" :
+                            lead.status === "New"           ? "bg-blue-100 text-blue-700" :
+                            lead.status === "Contacted"     ? "bg-indigo-100 text-indigo-700" :
+                            lead.status === "Follow-up"     ? "bg-yellow-100 text-yellow-700" :
+                            "bg-gray-100 text-gray-600"
+                          }`}>{lead.status}</span>
+                        </td>
+                        {/* Assigned */}
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-muted-foreground">{lead.assignedTo || "—"}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+
+        {/* ── Intelligence note ─────────────────────────────────────────────── */}
+        <div className="flex items-start gap-2 text-xs text-muted-foreground bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
+          <span>
+            <strong>How scores work:</strong> Health scores are rule-based and transparent. Points are
+            awarded for high priority, estimated value, recent activity, and upcoming follow-ups.
+            Points are deducted for no contact, overdue tasks, and low activity. View any lead to see
+            the full breakdown.
+          </span>
         </div>
       </div>
     </CrmLayout>

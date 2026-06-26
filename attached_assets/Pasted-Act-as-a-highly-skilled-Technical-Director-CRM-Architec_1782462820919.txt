@@ -1,0 +1,331 @@
+Act as a highly skilled Technical Director, CRM Architect, and Senior Software Engineer.
+
+We have completed the CRM Core Engine.
+
+The CRM is now stable.
+
+Current completed modules include:
+
+✓ Discovery Portal
+✓ Discovery → CRM conversion
+✓ CRM Dashboard
+✓ Leads
+✓ Lead Detail Command Center
+✓ Lead Pipeline
+✓ Deals Kanban
+✓ Inbox
+✓ Reporting
+✓ Import Leads
+✓ Global Search
+✓ Tasks
+✓ Activities
+✓ SMS
+✓ Email
+✓ Calls
+✓ Live Inbox Polling
+
+We are now entering PHASE 2.
+
+======================================================
+PHASE 2
+LEAD INTELLIGENCE ENGINE
+========================
+
+IMPORTANT
+
+Do NOT rebuild anything.
+
+Do NOT modify database schema unless absolutely necessary.
+
+Do NOT break Twilio.
+
+Do NOT remove existing scoring.
+
+Build on top of the existing CRM.
+
+======================================================
+GOAL
+====
+
+Every lead should automatically receive a dynamic Health Score.
+
+This is NOT AI.
+
+This is transparent rule-based scoring.
+
+Everything must be explainable.
+
+======================================================
+TASK 1
+
+Inspect current CRM lead model.
+
+Find existing fields including:
+
+status
+
+priority
+
+estimatedValue
+
+lastContactedAt
+
+nextFollowUpAt
+
+activities
+
+tasks
+
+messages
+
+calls
+
+emails
+
+deal stage
+
+service interest
+
+source
+
+======================================================
+TASK 2
+
+Create a Lead Health Score (0–100)
+
+Example weighting:
+
++20
+Priority = High
+
++15
+Estimated Value > $10,000
+
++15
+Activity within last 3 days
+
++10
+Upcoming follow-up scheduled
+
++10
+Has open deal
+
++5
+Recent inbound SMS
+
++5
+Recent inbound email
+
+-15
+No contact in 14 days
+
+-20
+Follow-up overdue
+
+-15
+Lost status
+
+-25
+No activity in 30 days
+
+Score should always clamp between:
+
+0
+and
+
+100
+
+======================================================
+TASK 3
+
+Create Lead Health Badge
+
+Display:
+
+95-100
+Excellent
+
+80-94
+Hot
+
+60-79
+Warm
+
+40-59
+Needs Attention
+
+0-39
+Cold
+
+Color-code everything.
+
+======================================================
+TASK 4
+
+Every score must be explainable.
+
+Example:
+
+Health Score
+82
+
+Reasons
+
+✓ High priority
+
+✓ Recent SMS
+
+✓ Open deal
+
+⚠ Follow-up due tomorrow
+
+No black-box logic.
+
+======================================================
+TASK 5
+
+Add Lead Health to
+
+Lead List
+
+Lead Detail
+
+Dashboard
+
+Pipeline Cards
+
+Deals Sidebar
+
+Search Results
+
+======================================================
+TASK 6
+
+Create Smart CRM Lists
+
+Automatically generate:
+
+🔥 Hot Leads
+
+⚠ Follow-up Today
+
+🚨 Overdue Follow-ups
+
+💰 High Value
+
+📞 No Contact 14 Days
+
+📩 Waiting for Reply
+
+🧊 Cold Leads
+
+Each card should navigate directly to filtered CRM results.
+
+======================================================
+TASK 7
+
+Dashboard Intelligence
+
+Replace today's static widgets with dynamic intelligence.
+
+Examples:
+
+"3 leads haven't been contacted in over two weeks."
+
+"2 proposals are waiting for response."
+
+"5 leads are becoming cold."
+
+"1 deal is likely to close this week."
+
+Everything must be based on real CRM data.
+
+======================================================
+TASK 8
+
+Lead Detail
+
+Display
+
+Health Score
+
+Health Badge
+
+Why this score?
+
+Recommended Next Action
+
+Examples:
+
+Call today
+
+Send follow-up email
+
+Schedule meeting
+
+Prepare proposal
+
+Wait for reply
+
+======================================================
+TASK 9
+
+Testing
+
+Verify:
+
+Scores update immediately after:
+
+SMS
+
+Call
+
+Email
+
+Task
+
+Note
+
+Status change
+
+Deal stage movement
+
+Pipeline movement
+
+Import
+
+Discovery conversion
+
+======================================================
+TASK 10
+
+Performance
+
+Do not perform expensive recalculations on every render.
+
+Memoize computations.
+
+Reuse existing API responses.
+
+Avoid unnecessary network requests.
+
+======================================================
+FINAL REPORT
+
+Return:
+
+Files changed
+
+Scoring algorithm
+
+Widgets added
+
+Lists created
+
+Performance considerations
+
+Tests
+
+Known limitations
+
+Recommended Prompt 11

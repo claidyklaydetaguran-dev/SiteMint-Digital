@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
+import { scoreLeadFromFields } from "@/lib/leadScore";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -90,7 +91,14 @@ export default function CrmPipeline() {
                     {leads.length === 0 && (
                       <div className="py-6 text-center text-xs text-muted-foreground/50">No leads</div>
                     )}
-                    {leads.map(lead => (
+                    {leads.map(lead => {
+                      const h = scoreLeadFromFields({
+                        priority: lead.priority,
+                        estimatedValue: lead.estimatedValue,
+                        nextFollowUpAt: lead.nextFollowUpAt,
+                        status: stage,
+                      });
+                      return (
                       <div key={lead.id} className={`bg-white rounded-lg border border-gray-200 p-2.5 hover:shadow-sm transition-shadow ${movingId===lead.id?"opacity-50":""}`}>
                         <div className="flex items-start justify-between gap-1">
                           <p className="text-xs font-semibold text-foreground leading-tight">{lead.name}</p>
@@ -103,6 +111,13 @@ export default function CrmPipeline() {
                             Follow-up: {new Date(lead.nextFollowUpAt).toLocaleDateString()}
                           </p>
                         )}
+
+                        {/* Health score badge */}
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${h.barColor}`} />
+                          <span className={`text-[10px] font-bold ${h.color}`}>{h.score}</span>
+                          <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full border ${h.bgColor} ${h.color} ${h.borderColor}`}>{h.badge}</span>
+                        </div>
 
                         <div className="flex items-center gap-1 mt-2">
                           <Link href={`/admin/crm/leads/${lead.id}`}>
@@ -122,7 +137,8 @@ export default function CrmPipeline() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );

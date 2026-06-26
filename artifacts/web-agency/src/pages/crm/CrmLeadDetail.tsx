@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import {
   Plus, Check, Trash2, Send, X, Clock, PhoneCall, AlertCircle,
   FileText, CheckCircle2, XCircle, RefreshCw,
 } from "lucide-react";
+import { scoreLeadFromFields } from "@/lib/leadScore";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -106,6 +107,11 @@ export default function CrmLeadDetail() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const health = useMemo(
+    () => (lead ? scoreLeadFromFields(lead, activities) : null),
+    [lead, activities],
+  );
   const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"sms"|"email">("timeline");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
@@ -770,6 +776,61 @@ export default function CrmLeadDetail() {
 
           {/* ── Sidebar ───────────────────────────────────────────────────── */}
           <div className="space-y-4">
+
+            {/* ── Lead Health Score ──────────────────────────────────────── */}
+            {health && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Lead Health</h3>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${health.bgColor} ${health.color} ${health.borderColor}`}>
+                    {health.badge}
+                  </span>
+                </div>
+
+                {/* Score gauge */}
+                <div>
+                  <div className="flex items-end gap-2 mb-1.5">
+                    <span className={`text-4xl font-bold leading-none ${health.color}`}>{health.score}</span>
+                    <span className="text-sm text-muted-foreground mb-0.5">/ 100</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-2 rounded-full transition-all ${health.barColor}`}
+                      style={{ width: `${health.score}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Reasons */}
+                {health.reasons.length > 0 && (
+                  <div className="space-y-1.5">
+                    {health.reasons.map((r, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-xs">
+                        <span className={`shrink-0 mt-0.5 font-bold ${
+                          r.type === "positive" ? "text-emerald-600" :
+                          r.type === "warning"  ? "text-amber-500"  :
+                          "text-red-500"
+                        }`}>
+                          {r.type === "positive" ? "✓" : r.type === "warning" ? "⚠" : "✗"}
+                        </span>
+                        <span className={
+                          r.type === "positive" ? "text-emerald-700" :
+                          r.type === "warning"  ? "text-amber-700"  :
+                          "text-red-600"
+                        }>{r.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recommended action */}
+                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Recommended Action</p>
+                  <p className="text-xs text-foreground font-medium">{health.action}</p>
+                </div>
+              </div>
+            )}
+
             {/* Lead management */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-4">
               <h3 className="font-serif font-bold text-sm text-foreground">Lead Management</h3>
