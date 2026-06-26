@@ -1,0 +1,165 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 14 — Campaign List View Enhancements
+
+MODULE:
+Campaigns frontend only.
+
+IMPORTANT:
+Work only inside the Campaigns module.
+Prefer frontend-only changes.
+Do not touch backend unless a tiny endpoint is absolutely required.
+Do not touch database schema.
+Do not touch Twilio routes.
+Do not touch locked modules.
+Do not refactor stable modules.
+Stay within the default change budget.
+Make surgical edits only.
+
+CURRENT STATE:
+Campaign drafts are persisted.
+Manual send works.
+Campaign analytics exists.
+Resend webhook tracking exists.
+Unique open/click tracking exists.
+Campaign History view exists.
+
+OBJECTIVE:
+Make the Campaign History list more useful and polished.
+
+TASK 1 — INSPECT ONLY CAMPAIGN FRONTEND
+
+Inspect only:
+
+* CrmCampaigns.tsx
+
+Do not inspect unrelated modules.
+
+TASK 2 — STATUS CHIPS
+
+In Campaign History list:
+
+Replace plain campaign status text with color-coded chips:
+
+* draft = gray
+* ready = blue
+* archived = green
+
+Keep it compact and readable.
+
+TASK 3 — SEND PERFORMANCE MICRO-BAR
+
+If recipient count and status counts are already available in the existing list response, show a small send-rate micro-bar under the campaign name.
+
+If status counts are not available without extra API calls, defer this and note it in the final report.
+
+Do not create a new backend endpoint just for this.
+
+TASK 4 — LAZY EVENT TRACKING BADGE
+
+Add a small expandable row or “details” toggle for each campaign.
+
+When expanded:
+
+* Fetch GET /api/crm/campaigns/:id/analytics
+* Show:
+
+  * send rate
+  * failed count
+  * skipped count
+  * event tracking status
+
+If eventMetrics.hasEvents is true:
+Show badge:
+“📊 Events Tracked”
+
+If false:
+Show:
+“No event data yet”
+
+Important:
+Do not fetch analytics for every campaign on initial list load.
+Fetch only when a row is expanded.
+
+TASK 5 — DELETE DRAFT ACTION
+
+Add delete icon/button for draft campaigns only.
+
+Behavior:
+
+* Inline confirmation:
+  “Sure? Yes / No”
+* Call existing:
+  DELETE /api/crm/campaigns/:id
+* Remove campaign from local list on success
+* Show small success/error message
+
+Do not use a modal.
+
+TASK 6 — SORTING
+
+Add sort toggle/dropdown in Campaign History header:
+
+Options:
+
+* Newest
+* Oldest
+* Name A-Z
+
+Default:
+Newest
+
+Client-side only.
+
+TASK 7 — DESIGN REQUIREMENTS
+
+Keep UI:
+
+* clean
+* compact
+* premium
+* readable
+* not cluttered
+
+Do not rewrite the whole page.
+
+TASK 8 — TESTING
+
+Test:
+
+1. /admin/crm/campaigns loads.
+2. Campaign History still loads.
+3. Status chips render.
+4. Sort Newest works.
+5. Sort Oldest works.
+6. Sort Name A-Z works.
+7. Expand row fetches analytics lazily.
+8. Event badge appears only when eventMetrics.hasEvents is true.
+9. No event data state appears safely.
+10. Delete draft confirms inline.
+11. Delete draft removes campaign locally.
+12. Non-draft campaigns cannot be deleted from this draft-only action.
+13. Campaign builder still opens saved campaigns.
+14. Campaign analytics view still works.
+15. Manual send still works.
+16. No backend changes unless strictly required.
+17. No schema/database changes.
+18. No Twilio files changed.
+19. No locked modules changed.
+20. TypeScript passes except pre-existing unrelated issue.
+21. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. UI changes
+4. Lazy analytics behavior
+5. Delete draft behavior
+6. Sorting behavior
+7. Tests performed
+8. Backend changes, if any
+9. Schema changes, if any
+10. Known limitations
+11. Recommended next phase

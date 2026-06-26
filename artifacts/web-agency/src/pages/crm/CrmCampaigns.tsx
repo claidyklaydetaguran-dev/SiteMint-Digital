@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
-  Mail, Users, Eye, Send, ChevronRight, ChevronLeft,
+  Mail, Users, Eye, Send, ChevronRight, ChevronLeft, ChevronDown,
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
   Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
   SkipForward, XCircle, BarChart2, Lightbulb, Award, ShieldCheck, AlertCircle, TrendingUp,
@@ -173,12 +173,12 @@ function EmailCard({ subject, body, badge, badgeColor }: { subject: string; body
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    draft:    "bg-gray-100 text-gray-600",
-    ready:    "bg-blue-100 text-blue-700",
-    archived: "bg-amber-100 text-amber-700",
+    draft:    "bg-gray-100 text-gray-600 border border-gray-200",
+    ready:    "bg-blue-100 text-blue-700 border border-blue-200",
+    archived: "bg-emerald-100 text-emerald-700 border border-emerald-200",
   };
   return (
-    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status] ?? "bg-gray-100 text-gray-500"}`}>
+    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status] ?? "bg-gray-100 text-gray-500 border border-gray-200"}`}>
       {status}
     </span>
   );
@@ -381,6 +381,11 @@ export default function CrmCampaigns() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError]     = useState("");
 
+  // ── History list: sort + lazy expand ──
+  const [sortOrder, setSortOrder]     = useState<"newest" | "oldest" | "name">("newest");
+  const [expandedId, setExpandedId]   = useState<number | null>(null);
+  const [rowAnalytics, setRowAnalytics] = useState<Map<number, CampaignAnalytics | "loading" | "error">>(new Map());
+
   // ── Send execution ──
   const [showSendConfirm, setShowSendConfirm]     = useState(false);
   const [sendConfirmChecked, setSendConfirmChecked] = useState(false);
@@ -411,6 +416,30 @@ export default function CrmCampaigns() {
     const d = await r.json();
     setCampaigns(d.campaigns ?? []);
   }, []);
+
+  // ── Sorted campaigns (client-side) ──
+  const sortedCampaigns = useMemo(() => {
+    const arr = [...campaigns];
+    if (sortOrder === "oldest") arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    else if (sortOrder === "name") arr.sort((a, b) => a.name.localeCompare(b.name));
+    else arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // newest
+    return arr;
+  }, [campaigns, sortOrder]);
+
+  // ── Lazy analytics expand for history rows ──
+  const toggleExpand = useCallback(async (id: number) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (rowAnalytics.has(id)) return; // already fetched
+    setRowAnalytics(prev => new Map(prev).set(id, "loading"));
+    try {
+      const r = await fetch(`/api/crm/campaigns/${id}/analytics`, { headers: { Authorization: `Bearer ${tok()}` } });
+      const d = await r.json();
+      setRowAnalytics(prev => new Map(prev).set(id, d));
+    } catch {
+      setRowAnalytics(prev => new Map(prev).set(id, "error"));
+    }
+  }, [expandedId, rowAnalytics]);
 
   // ── DISC map ──
   const discMap = useMemo(() => {
@@ -1318,53 +1347,136 @@ export default function CrmCampaigns() {
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              {/* List header + sort selector */}
               <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <h2 className="text-sm font-bold text-foreground">Campaign Drafts</h2>
+                <h2 className="text-sm font-bold text-foreground">Campaign History</h2>
                 <span className="text-xs text-muted-foreground ml-1">({campaigns.length})</span>
+                <div className="ml-auto flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground mr-1">Sort:</span>
+                  {(["newest", "oldest", "name"] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setSortOrder(s)}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors ${
+                        sortOrder === s ? "bg-[#1e293b] text-white" : "text-muted-foreground hover:bg-gray-100"
+                      }`}
+                    >
+                      {s === "newest" ? "Newest" : s === "oldest" ? "Oldest" : "A–Z"}
+                    </button>
+                  ))}
+                </div>
               </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["Name","Status","Recipients","Created","Updated",""].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                    <th className="w-8 px-3 py-3" />
+                    {["Name","Status","Recipients","Created",""].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {campaigns.map(c => (
-                    <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-5 py-3.5 font-medium text-foreground">{c.name}</td>
-                      <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
-                      <td className="px-5 py-3.5 text-muted-foreground text-xs">
-                        {c.recipientCount ?? 0} leads
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground">{fmtDate(c.createdAt)}</td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground">{fmtDate(c.updatedAt)}</td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openCampaign(c)}
-                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors"
-                          >
-                            Open
-                          </button>
-                          <button
-                            onClick={() => openAnalytics(c)}
-                            className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2.5 py-1 rounded-lg hover:bg-violet-50 transition-colors"
-                          >
-                            <BarChart2 className="w-3 h-3" /> Analytics
-                          </button>
-                          <DeleteCampaignBtn
-                            onConfirm={async () => {
-                              await fetch(`/api/crm/campaigns/${c.id}`, { method: "DELETE", headers: authH() });
-                              await refreshCampaigns();
-                            }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {sortedCampaigns.map(c => {
+                    const isExpanded = expandedId === c.id;
+                    const rowA = rowAnalytics.get(c.id);
+                    return (
+                      <>
+                        <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                          {/* Expand chevron */}
+                          <td className="pl-4 pr-1 py-3.5">
+                            <button
+                              onClick={() => toggleExpand(c.id)}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label={isExpanded ? "Collapse" : "Expand"}
+                            >
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3.5 font-medium text-foreground">{c.name}</td>
+                          <td className="px-4 py-3.5"><StatusBadge status={c.status} /></td>
+                          <td className="px-4 py-3.5 text-muted-foreground text-xs">{c.recipientCount ?? 0} leads</td>
+                          <td className="px-4 py-3.5 text-xs text-muted-foreground">{fmtDate(c.createdAt)}</td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => openCampaign(c)}
+                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                              >
+                                Open
+                              </button>
+                              <button
+                                onClick={() => openAnalytics(c)}
+                                className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors"
+                              >
+                                <BarChart2 className="w-3 h-3" /> Analytics
+                              </button>
+                              {/* Delete only for draft status */}
+                              {c.status === "draft" && (
+                                <DeleteCampaignBtn
+                                  onConfirm={async () => {
+                                    await fetch(`/api/crm/campaigns/${c.id}`, { method: "DELETE", headers: authH() });
+                                    setCampaigns(prev => prev.filter(x => x.id !== c.id));
+                                    if (expandedId === c.id) setExpandedId(null);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {/* Lazy-loaded analytics summary row */}
+                        {isExpanded && (
+                          <tr key={`${c.id}-exp`} className="bg-gray-50/60 border-t-0">
+                            <td />
+                            <td colSpan={5} className="px-4 py-3">
+                              {rowA === "loading" && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+                                </div>
+                              )}
+                              {rowA === "error" && (
+                                <p className="text-xs text-red-600">Failed to load analytics.</p>
+                              )}
+                              {rowA && rowA !== "loading" && rowA !== "error" && (
+                                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                                  {/* Send-rate micro-bar */}
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-emerald-500 rounded-full transition-all"
+                                        style={{ width: `${rowA.totals.sendRate}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-[10px] font-semibold text-emerald-700">{rowA.totals.sendRate}% sent</span>
+                                  </div>
+                                  {/* Stat pills */}
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {rowA.totals.sent} sent
+                                    {rowA.totals.failed  > 0 && <> · <span className="text-red-600">{rowA.totals.failed} failed</span></>}
+                                    {rowA.totals.skipped > 0 && <> · <span className="text-amber-600">{rowA.totals.skipped} skipped</span></>}
+                                  </span>
+                                  {/* Event tracking badge */}
+                                  {rowA.eventMetrics?.hasEvents ? (
+                                    <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                      <TrendingUp className="w-2.5 h-2.5" /> Events Tracked
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground italic">No event data yet</span>
+                                  )}
+                                  <button
+                                    onClick={() => openAnalytics(c)}
+                                    className="text-[10px] font-semibold text-violet-600 hover:text-violet-800 ml-auto shrink-0"
+                                  >
+                                    Full analytics →
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
