@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmMessages } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
-import { eq, desc, and, gte, lte, lt, or, ilike, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
@@ -580,6 +580,104 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
+  }
+});
+
+// ── Campaign Analytics ────────────────────────────────────────────────────────
+router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    // All recipients with lead info
+    const recipients = await db
+      .select({
+        id: crmCampaignRecipients.id,
+        leadId: crmCampaignRecipients.leadId,
+        status: crmCampaignRecipients.status,
+        discStyleUsed: crmCampaignRecipients.discStyleUsed,
+        sentAt: crmCampaignRecipients.sentAt,
+        lastError: crmCampaignRecipients.lastError,
+        leadName: crmLeads.name,
+        leadEmail: crmLeads.email,
+      })
+      .from(crmCampaignRecipients)
+      .innerJoin(crmLeads, eq(crmCampaignRecipients.leadId, crmLeads.id))
+      .where(eq(crmCampaignRecipients.campaignId, id))
+      .orderBy(desc(crmCampaignRecipients.createdAt));
+
+    // Totals
+    const total    = recipients.length;
+    const sent     = recipients.filter(r => r.status === "sent").length;
+    const failed   = recipients.filter(r => r.status === "failed").length;
+    const skipped  = recipients.filter(r => r.status === "skipped").length;
+    const selected = recipients.filter(r => r.status === "selected").length;
+    const sendRate    = total > 0 ? Math.round((sent / total) * 100)   : 0;
+    const failureRate = total > 0 ? Math.round((failed / total) * 100) : 0;
+
+    // DISC breakdown
+    const DISC_STYLES = ["Driver", "Expressive", "Amiable", "Analytical"];
+    const discBreakdown = DISC_STYLES.map(style => {
+      const group = recipients.filter(r => r.discStyleUsed === style);
+      return {
+        style,
+        count:   group.length,
+        sent:    group.filter(r => r.status === "sent").length,
+        failed:  group.filter(r => r.status === "failed").length,
+        skipped: group.filter(r => r.status === "skipped").length,
+      };
+    });
+
+    // Reply estimate — inbound CRM messages from recipient leads after their sentAt
+    const sentRecipients = recipients.filter(r => r.status === "sent" && r.sentAt);
+    let replyEstimate = { count: 0, total: sentRecipients.length, rate: 0 };
+    if (sentRecipients.length > 0) {
+      const sentLeadIds = sentRecipients.map(r => r.leadId);
+      const inboundMsgs = await db
+        .select({ leadId: crmMessages.leadId, createdAt: crmMessages.createdAt })
+        .from(crmMessages)
+        .where(and(
+          eq(crmMessages.direction, "inbound"),
+          inArray(crmMessages.leadId, sentLeadIds),
+        ));
+      const repliedLeads = new Set<number>();
+      for (const msg of inboundMsgs) {
+        if (msg.leadId) {
+          const rec = sentRecipients.find(r => r.leadId === msg.leadId);
+          if (rec?.sentAt && new Date(msg.createdAt) > new Date(rec.sentAt)) {
+            repliedLeads.add(msg.leadId);
+          }
+        }
+      }
+      const count = repliedLeads.size;
+      replyEstimate = {
+        count,
+        total: sentRecipients.length,
+        rate: sentRecipients.length > 0 ? Math.round((count / sentRecipients.length) * 100) : 0,
+      };
+    }
+
+    res.json({
+      campaign,
+      totals: { recipients: total, sent, failed, skipped, selected, sendRate, failureRate },
+      discBreakdown,
+      recentRecipients: recipients.map(r => ({
+        leadId:       r.leadId,
+        name:         r.leadName,
+        email:        r.leadEmail,
+        discStyleUsed: r.discStyleUsed,
+        status:       r.status,
+        sentAt:       r.sentAt,
+        lastError:    r.lastError,
+      })),
+      replyEstimate,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching campaign analytics");
+    res.status(500).json({ error: "Failed to load analytics" });
   }
 });
 

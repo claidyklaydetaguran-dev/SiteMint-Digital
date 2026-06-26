@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { crmLeads } from "./crmLeads";
@@ -51,3 +51,21 @@ export const insertCrmCampaignRecipientSchema = createInsertSchema(crmCampaignRe
 });
 export type InsertCrmCampaignRecipient = z.infer<typeof insertCrmCampaignRecipientSchema>;
 export type CrmCampaignRecipient = typeof crmCampaignRecipients.$inferSelect;
+
+// ── crm_campaign_events ───────────────────────────────────────────────────────
+// Event log per recipient. Populated by send execution and future webhook tracking.
+// Allowed event_type values: sent | failed | skipped | opened | clicked | bounced | replied_estimated
+
+export const crmCampaignEvents = pgTable("crm_campaign_events", {
+  id: serial("id").primaryKey(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+
+  campaignRecipientId: integer("campaign_recipient_id")
+    .notNull()
+    .references(() => crmCampaignRecipients.id, { onDelete: "cascade" }),
+
+  eventType: text("event_type").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+});
+
+export type CrmCampaignEvent = typeof crmCampaignEvents.$inferSelect;

@@ -1,0 +1,200 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 10 — Campaign Analytics Foundation
+
+MODULE:
+Campaigns only.
+
+IMPORTANT:
+Work only inside the Campaigns module unless compilation requires otherwise.
+Do not touch locked modules.
+Do not touch Twilio routes.
+Do not refactor stable modules.
+Stay within the default change budget if possible.
+Make surgical edits only.
+Use Drizzle migrations only if schema changes are required.
+
+CURRENT STATE:
+Campaign drafts are persisted.
+Campaign recipients are persisted.
+Manual campaign send works.
+Recipient statuses are tracked: selected, sent, skipped, failed.
+last_error exists.
+sent_at exists.
+Scheduling and automation are still disabled.
+
+OBJECTIVE:
+Add a Campaign Analytics foundation.
+
+This phase should focus on reliable analytics first:
+
+* sent
+* failed
+* skipped
+* total recipients
+* send rate
+* failure rate
+* DISC breakdown
+* reply estimate if existing CRM messages can support it
+
+Open/click tracking should be optional and only added if it can be done safely within scope.
+
+TASK 1 — INSPECT ONLY CAMPAIGN FILES
+
+Inspect only:
+
+* CrmCampaigns.tsx
+* crmCampaigns schema
+* campaign routes inside crm.ts
+* existing Resend/test-send logic
+* existing crm_messages fields only if needed for reply analytics
+
+Do not inspect unrelated modules.
+
+TASK 2 — CREATE CAMPAIGN ANALYTICS API
+
+Add protected endpoint:
+
+GET /api/crm/campaigns/:id/analytics
+
+Return:
+{
+campaign,
+totals: {
+recipients,
+sent,
+failed,
+skipped,
+selected,
+sendRate,
+failureRate
+},
+discBreakdown: [
+{ style, count, sent, failed, skipped }
+],
+recentRecipients: [
+{ leadId, name, email, status, discStyleUsed, sentAt, lastError }
+]
+}
+
+Optional if easy:
+replyEstimate:
+
+* Count recipients who have inbound messages after sent_at
+* Use crm_messages where direction = inbound and lead_id matches recipient lead_id
+* This is only an estimate and should be labeled as such.
+
+TASK 3 — OPTIONAL EVENT TABLE ONLY IF SAFE
+
+If within change budget, add:
+
+crm_campaign_events
+
+Fields:
+
+* id
+* campaign_recipient_id references crm_campaign_recipients(id) on delete cascade
+* event_type text
+* occurred_at timestamp default now()
+* metadata jsonb nullable
+
+Allowed event types:
+
+* sent
+* failed
+* skipped
+* opened
+* clicked
+* bounced
+* replied_estimated
+
+Important:
+Do NOT build full Resend webhook tracking unless it is simple and safe.
+Do NOT rely on fake open/click data.
+If webhook setup is not obvious, defer it and report it as future work.
+
+TASK 4 — FRONTEND ANALYTICS VIEW
+
+In /admin/crm/campaigns, add an Analytics view for saved campaigns.
+
+Where:
+
+* Add Analytics panel/tab when a campaign is opened, or
+* Add “View Analytics” action in Campaign History.
+
+Analytics UI should show:
+
+1. Summary cards:
+
+   * Total Recipients
+   * Sent
+   * Failed
+   * Skipped
+   * Send Rate
+   * Failure Rate
+
+2. DISC Performance Breakdown:
+
+   * Driver
+   * Expressive
+   * Amiable
+   * Analytical
+     Show count and status mix.
+
+3. Recipient Status Table:
+
+   * lead name
+   * email
+   * DISC style used
+   * status
+   * sent_at
+   * last_error
+
+4. Optional Reply Estimate:
+
+   * Label clearly:
+     “Estimated replies based on inbound CRM messages after campaign send.”
+
+TASK 5 — SAFETY / HONESTY
+
+Do not show open rate or click rate unless real event data exists.
+
+If no event/webhook tracking exists yet, show:
+“Open and click tracking are not configured yet.”
+
+Do not mock analytics as real analytics.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Campaign analytics endpoint works.
+2. Analytics works for campaign with no recipients.
+3. Analytics works for sent campaign.
+4. DISC breakdown calculates correctly.
+5. Send rate/failure rate handle zero division.
+6. Recipient status table loads.
+7. Reply estimate, if implemented, is clearly labeled.
+8. Campaign history still works.
+9. Campaign send still works.
+10. Test-send still works.
+11. No scheduling endpoint exists.
+12. No Twilio files changed.
+13. No locked modules changed.
+14. TypeScript passes except pre-existing unrelated issue.
+15. No console errors.
+16. Migration applied only if crm_campaign_events is added.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. APIs added
+4. Analytics calculations
+5. Event table created or deferred
+6. Frontend analytics behavior
+7. Tests performed
+8. Schema changes, if any
+9. Known limitations
+10. Recommended next phase

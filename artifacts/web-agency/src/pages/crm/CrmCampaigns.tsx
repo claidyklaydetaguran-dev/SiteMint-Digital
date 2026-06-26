@@ -5,7 +5,7 @@ import {
   Mail, Users, Eye, Send, ChevronRight, ChevronLeft,
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
   Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
-  SkipForward, XCircle,
+  SkipForward, XCircle, BarChart2,
 } from "lucide-react";
 import {
   computeSimplifiedDisc,
@@ -73,6 +73,42 @@ interface CampaignSendResult {
   skipped: number;
   results: RecipientSendResult[];
   testMode: boolean;
+}
+
+interface DiscBreakdownItem {
+  style: string;
+  count: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+}
+
+interface CampaignAnalytics {
+  campaign: Campaign;
+  totals: {
+    recipients: number;
+    sent: number;
+    failed: number;
+    skipped: number;
+    selected: number;
+    sendRate: number;
+    failureRate: number;
+  };
+  discBreakdown: DiscBreakdownItem[];
+  recentRecipients: Array<{
+    leadId: number;
+    name: string;
+    email: string;
+    discStyleUsed: string | null;
+    status: string;
+    sentAt: string | null;
+    lastError: string | null;
+  }>;
+  replyEstimate: {
+    count: number;
+    total: number;
+    rate: number;
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -151,8 +187,8 @@ export default function CrmCampaigns() {
   const [campaigns, setCampaigns]   = useState<Campaign[]>([]);
   const [loading, setLoading]       = useState(true);
 
-  // ── View: "history" | "builder" | "execution" ──
-  const [view, setView] = useState<"history" | "builder" | "execution">("history");
+  // ── View: "history" | "builder" | "execution" | "analytics" ──
+  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics">("history");
 
   // ── Persistence state ──
   const [campaignId, setCampaignId]           = useState<number | null>(null);
@@ -186,6 +222,11 @@ export default function CrmCampaigns() {
   const [testEmail, setTestEmail]           = useState("");
   const [testSending, setTestSending]       = useState(false);
   const [testResult, setTestResult]         = useState<{ ok: boolean; message: string } | null>(null);
+
+  // ── Analytics ──
+  const [analyticsData, setAnalyticsData]       = useState<CampaignAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError]     = useState("");
 
   // ── Send execution ──
   const [showSendConfirm, setShowSendConfirm]     = useState(false);
@@ -293,6 +334,29 @@ export default function CrmCampaigns() {
     setStep(0);
     setTestResult(null);
     setView("builder");
+  };
+
+  // ── Open analytics ──
+  const openAnalytics = async (c: Campaign) => {
+    setCampaignId(c.id);
+    setCampaignName(c.name);
+    setCampaignStatus(c.status);
+    setAnalyticsData(null);
+    setAnalyticsError("");
+    setAnalyticsLoading(true);
+    setView("analytics");
+    try {
+      const r = await fetch(`/api/crm/campaigns/${c.id}/analytics`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      const d = await r.json();
+      if (r.ok) setAnalyticsData(d);
+      else setAnalyticsError(d.error ?? "Failed to load analytics");
+    } catch {
+      setAnalyticsError("Network error loading analytics");
+    } finally {
+      setAnalyticsLoading(false);
+    }
   };
 
   // ── New campaign ──
@@ -653,6 +717,250 @@ export default function CrmCampaigns() {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // ANALYTICS VIEW
+  // ════════════════════════════════════════════════════════════════════════════
+
+  if (view === "analytics") {
+    const a = analyticsData;
+    const DISC_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
+      Driver:     { bg: "bg-red-50",    text: "text-red-700",    bar: "bg-red-400"    },
+      Expressive: { bg: "bg-amber-50",  text: "text-amber-700",  bar: "bg-amber-400"  },
+      Amiable:    { bg: "bg-green-50",  text: "text-green-700",  bar: "bg-green-400"  },
+      Analytical: { bg: "bg-blue-50",   text: "text-blue-700",   bar: "bg-blue-400"   },
+    };
+    return (
+      <CrmLayout>
+        <div className="p-6 max-w-5xl mx-auto space-y-5">
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setView("history")}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Campaigns
+              </button>
+              <span className="text-gray-300">/</span>
+              <span className="text-sm font-semibold text-foreground truncate max-w-xs">{campaignName}</span>
+              <StatusBadge status={campaignStatus} />
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 bg-violet-100 px-2.5 py-0.5 rounded-full border border-violet-200">
+                <BarChart2 className="w-3 h-3" /> Analytics
+              </span>
+            </div>
+            <button
+              onClick={() => openCampaign({ id: campaignId!, name: campaignName, subject: "", body: "", status: campaignStatus, createdAt: "", updatedAt: "" })}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              Open Builder
+            </button>
+          </div>
+
+          {/* Loading / error */}
+          {analyticsLoading && (
+            <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm">Loading analytics…</span>
+            </div>
+          )}
+          {analyticsError && (
+            <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <p className="text-xs text-red-700">{analyticsError}</p>
+            </div>
+          )}
+
+          {a && (
+            <>
+              {/* Open/click tracking notice */}
+              <div className="flex items-start gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                <Info className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-500">
+                  <strong className="text-gray-600">Open and click tracking are not configured yet.</strong>{" "}
+                  These metrics require Resend webhook integration and will be available in a future phase.
+                  Analytics below are based on send-time recipient status only.
+                </p>
+              </div>
+
+              {/* Summary tiles — 6 cards */}
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                {[
+                  { label: "Recipients", value: a.totals.recipients,  color: "bg-gray-50   border-gray-200  text-gray-700" },
+                  { label: "Sent",       value: a.totals.sent,        color: a.totals.sent     > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                  { label: "Failed",     value: a.totals.failed,      color: a.totals.failed   > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                  { label: "Skipped",    value: a.totals.skipped,     color: a.totals.skipped  > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                  { label: "Send Rate",  value: `${a.totals.sendRate}%`,    color: "bg-violet-50 border-violet-200 text-violet-700" },
+                  { label: "Fail Rate",  value: `${a.totals.failureRate}%`, color: a.totals.failureRate > 0 ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
+                    <p className="text-xl font-bold">{value}</p>
+                    <p className="text-[10px] font-semibold mt-0.5 opacity-70 uppercase tracking-wide">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* DISC Breakdown */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-muted-foreground" />
+                    <h2 className="text-sm font-bold text-foreground">DISC Performance Breakdown</h2>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {a.discBreakdown.map(d => {
+                      const dc = DISC_COLORS[d.style] ?? { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-400" };
+                      const meta = DISC_META[d.style as DiscStyle];
+                      return (
+                        <div key={d.style} className={`rounded-lg p-3 ${dc.bg}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-xs font-bold ${dc.text} flex items-center gap-1`}>
+                              {meta?.emoji ?? ""} {d.style}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{d.count} recipient{d.count !== 1 ? "s" : ""}</span>
+                          </div>
+                          {d.count === 0 ? (
+                            <p className="text-[10px] text-muted-foreground italic">No recipients with this DISC style</p>
+                          ) : (
+                            <div className="flex items-center gap-3 text-[10px] font-semibold">
+                              <span className="text-emerald-700">{d.sent} sent</span>
+                              {d.failed  > 0 && <span className="text-red-600">{d.failed} failed</span>}
+                              {d.skipped > 0 && <span className="text-amber-600">{d.skipped} skipped</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Reply Estimate */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-muted-foreground" />
+                    <h2 className="text-sm font-bold text-foreground">Reply Estimate</h2>
+                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                      Estimated
+                    </span>
+                  </div>
+                  <div className="p-5 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Based on inbound CRM messages received from sent recipients <strong>after</strong> their campaign send time.
+                      This is an approximation — messages may not be direct replies to the campaign.
+                    </p>
+                    {a.totals.sent === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <Mail className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                        <p className="text-xs">No emails sent yet — reply estimate unavailable.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-end gap-3">
+                          <span className="text-4xl font-bold text-foreground">{a.replyEstimate.count}</span>
+                          <span className="text-sm text-muted-foreground mb-1.5">
+                            of {a.replyEstimate.total} sent ({a.replyEstimate.rate}%)
+                          </span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-violet-400 rounded-full transition-all"
+                            style={{ width: `${a.replyEstimate.rate}%` }}
+                          />
+                        </div>
+                        {a.replyEstimate.count === 0 && (
+                          <p className="text-xs text-muted-foreground italic">
+                            No inbound messages detected from campaign recipients yet.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recipient Status Table */}
+              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <h2 className="text-sm font-bold text-foreground">Recipient Status</h2>
+                  <span className="text-xs text-muted-foreground ml-1">({a.recentRecipients.length})</span>
+                </div>
+                {a.recentRecipients.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <Users className="w-6 h-6 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs">No recipients added to this campaign yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          {["Name","Email","DISC Style","Status","Sent At","Error"].map(h => (
+                            <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {a.recentRecipients.map(rec => {
+                          const style = rec.discStyleUsed as DiscStyle | null;
+                          const meta  = style ? DISC_META[style] : null;
+                          return (
+                            <tr key={rec.leadId} className={`transition-colors ${
+                              rec.status === "sent"    ? "bg-emerald-50/30" :
+                              rec.status === "failed"  ? "bg-red-50/30"     :
+                              rec.status === "skipped" ? "bg-amber-50/20"   : ""
+                            }`}>
+                              <td className="px-4 py-3 font-medium text-xs text-foreground">{rec.name}</td>
+                              <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[140px]">{rec.email || "—"}</td>
+                              <td className="px-4 py-3">
+                                {meta && style
+                                  ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {style}</span>
+                                  : <span className="text-gray-300 text-xs">—</span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                {rec.status === "sent" && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                    <CheckCircle2 className="w-3 h-3" /> Sent
+                                  </span>
+                                )}
+                                {rec.status === "failed" && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                                    <XCircle className="w-3 h-3" /> Failed
+                                  </span>
+                                )}
+                                {rec.status === "skipped" && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                    <SkipForward className="w-3 h-3" /> Skipped
+                                  </span>
+                                )}
+                                {rec.status === "selected" && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                                    <Clock className="w-3 h-3" /> Pending
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-muted-foreground">
+                                {rec.sentAt ? new Date(rec.sentAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-red-500 max-w-[160px] truncate" title={rec.lastError ?? ""}>
+                                {rec.lastError ?? ""}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+        </div>
+      </CrmLayout>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // HISTORY VIEW
   // ════════════════════════════════════════════════════════════════════════════
 
@@ -739,6 +1047,12 @@ export default function CrmCampaigns() {
                             className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors"
                           >
                             Open
+                          </button>
+                          <button
+                            onClick={() => openAnalytics(c)}
+                            className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2.5 py-1 rounded-lg hover:bg-violet-50 transition-colors"
+                          >
+                            <BarChart2 className="w-3 h-3" /> Analytics
                           </button>
                           <DeleteCampaignBtn
                             onConfirm={async () => {
