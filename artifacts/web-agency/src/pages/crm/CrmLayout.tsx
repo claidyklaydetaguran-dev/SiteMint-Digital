@@ -14,10 +14,11 @@ const tok = () => localStorage.getItem("adminToken") || "";
 const NAV_ITEMS = [
   { href: "/admin/crm/dashboard", label: "Dashboard" },
   { href: "/admin/crm/leads", label: "People" },
+  { href: "/admin/crm/pipeline", label: "Lead Pipeline" },
   { href: "/admin/crm/inbox", label: "Inbox" },
   { href: "/admin/crm/tasks", label: "Tasks" },
   { href: "/admin/crm/calendar", label: "Calendar" },
-  { href: "/admin/crm/deals", label: "Deals" },
+  { href: "/admin/crm/deals", label: "Deals Kanban" },
   { href: "/admin/crm/reporting", label: "Reporting" },
   { href: "/admin/crm/admin", label: "Admin" },
 ];
@@ -691,39 +692,121 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
 }
 
 /* ─── Global Search Results ─── */
-function GlobalSearchDropdown({ q, leads, onClose }: { q: string; leads: CrmLead[]; onClose: () => void }) {
-  const [, navigate] = useLocation();
+const STATUS_BADGE: Record<string, string> = {
+  New:             "bg-blue-100 text-blue-700",
+  Contacted:       "bg-sky-100 text-sky-700",
+  "Follow-up":     "bg-yellow-100 text-yellow-700",
+  "Proposal Sent": "bg-orange-100 text-orange-700",
+  Negotiating:     "bg-purple-100 text-purple-700",
+  Won:             "bg-green-100 text-green-700",
+  Lost:            "bg-red-100 text-red-700",
+  Nurture:         "bg-gray-100 text-gray-600",
+};
+const PRIORITY_BADGE: Record<string, string> = {
+  High:   "bg-red-50 text-red-600",
+  Low:    "bg-gray-100 text-gray-500",
+};
+
+function GlobalSearchDropdown({ q, onClose, onNavigate }: {
+  q: string; onClose: () => void; onNavigate: (href: string) => void;
+}) {
+  const [results, setResults] = useState<CrmLead[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const [selIdx, setSelIdx] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [onClose]);
 
-  const results = leads.filter(l =>
-    l.name.toLowerCase().includes(q.toLowerCase()) ||
-    l.email.toLowerCase().includes(q.toLowerCase()) ||
-    (l.phone || "").includes(q) ||
-    (l.company || "").toLowerCase().includes(q.toLowerCase())
-  ).slice(0, 8);
+  useEffect(() => {
+    if (q.length < 2) { setResults([]); setLoading(false); setFetchError(false); return; }
+    setLoading(true);
+    setFetchError(false);
+    setSelIdx(0);
+    const ctrl = new AbortController();
+    fetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, {
+      headers: { Authorization: `Bearer ${tok()}` },
+      signal: ctrl.signal,
+    })
+      .then(r => { if (!r.ok) throw new Error("api"); return r.json() as Promise<{ leads: CrmLead[] }>; })
+      .then(d => { setResults((d.leads || []).slice(0, 8)); setLoading(false); })
+      .catch(err => {
+        if ((err as Error).name !== "AbortError") { setFetchError(true); setLoading(false); }
+      });
+    return () => ctrl.abort();
+  }, [q]);
+
+  const go = useCallback((lead: CrmLead) => {
+    onNavigate(`/admin/crm/leads/${lead.id}`);
+    onClose();
+  }, [onNavigate, onClose]);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSelIdx(i => Math.min(i + 1, results.length - 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setSelIdx(i => Math.max(i - 1, 0)); }
+      else if (e.key === "Enter" && results.length > 0) { go(results[selIdx] ?? results[0]); }
+      else if (e.key === "Escape") { onClose(); }
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [results, selIdx, go, onClose]);
 
   return (
     <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
-      {results.length === 0 ? (
-        <div className="p-4 text-xs text-muted-foreground text-center">No results for "{q}"</div>
-      ) : results.map(l => (
-        <button key={l.id} onClick={() => { navigate(`/admin/crm/leads/${l.id}`); onClose(); }}
-          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
-          <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
-            <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">{l.name}</p>
-            <p className="text-xs text-muted-foreground">{l.company ? `${l.company} · ` : ""}{l.email}</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
-        </button>
-      ))}
+      {loading ? (
+        <div className="flex items-center gap-2.5 px-4 py-3.5 text-xs text-muted-foreground">
+          <div className="w-3 h-3 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin shrink-0" />
+          Searching…
+        </div>
+      ) : fetchError ? (
+        <div className="flex items-center gap-2 px-4 py-3.5 text-xs text-red-600">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          Search unavailable — please try again.
+        </div>
+      ) : results.length === 0 ? (
+        <div className="px-4 py-3.5 text-xs text-muted-foreground text-center">
+          No results for <span className="font-medium text-foreground">"{q}"</span>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {results.map((l, idx) => (
+            <button
+              key={l.id}
+              onClick={() => go(l)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${idx === selIdx ? "bg-blue-50" : "hover:bg-gray-50"}`}
+            >
+              <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
+                <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{l.name}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {l.company ? `${l.company} · ` : ""}{l.email || l.phone || ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {l.status && (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_BADGE[l.status] ?? "bg-gray-100 text-gray-600"}`}>
+                    {l.status}
+                  </span>
+                )}
+                {l.priority && l.priority !== "Medium" && (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[l.priority] ?? "bg-gray-100 text-gray-500"}`}>
+                    {l.priority}
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -737,6 +820,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const profileRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -829,6 +913,12 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
   useEffect(() => {
+    if (search.length < 2) { setDebouncedSearch(""); return; }
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         if (modal === "profile") setModal(null);
@@ -888,11 +978,16 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             onChange={e => setSearch(e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-            placeholder="Search people, deals…"
+            onKeyDown={e => { if (e.key === "Escape") { setSearch(""); setSearchFocused(false); setDebouncedSearch(""); } }}
+            placeholder="Search people…"
             className="w-full bg-white/10 text-white text-xs placeholder-white/35 pl-8 pr-3 py-1.5 rounded-md border border-white/10 focus:outline-none focus:border-white/30 focus:bg-white/15"
           />
-          {searchFocused && search.length > 1 && (
-            <GlobalSearchDropdown q={search} leads={allLeads} onClose={() => { setSearch(""); setSearchFocused(false); }} />
+          {searchFocused && debouncedSearch.length > 1 && (
+            <GlobalSearchDropdown
+              q={debouncedSearch}
+              onNavigate={navigate}
+              onClose={() => { setSearch(""); setSearchFocused(false); setDebouncedSearch(""); }}
+            />
           )}
         </div>
 

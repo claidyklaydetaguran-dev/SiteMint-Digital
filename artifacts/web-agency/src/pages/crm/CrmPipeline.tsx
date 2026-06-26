@@ -70,8 +70,9 @@ export default function CrmPipeline() {
     <CrmLayout>
       <div className="p-4 sm:p-6">
         <div className="mb-5">
-          <h1 className="text-2xl font-serif font-bold text-foreground">Pipeline</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{total} leads across {STAGES.length} stages</p>
+          <h1 className="text-2xl font-serif font-bold text-foreground">Lead Pipeline</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Track where each lead/contact is in your follow-up journey.</p>
+          <p className="text-xs text-muted-foreground/60 mt-0.5">{total} leads across {STAGES.length} stages</p>
         </div>
 
         <div className="overflow-x-auto pb-4">

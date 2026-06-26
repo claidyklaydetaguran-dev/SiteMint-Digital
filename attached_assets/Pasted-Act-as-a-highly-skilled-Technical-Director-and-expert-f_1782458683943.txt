@@ -1,0 +1,177 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Improve CRM navigation clarity and wire the global CRM search.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/leads is the main contacts/leads table.
+* /admin/crm/pipeline exists and works as an 8-stage lead/contact pipeline, but it is hidden from the CRM nav.
+* /admin/crm/deals exists and works as a 5-stage deals Kanban.
+* /admin/crm/reporting is now a real reporting dashboard.
+* /admin/crm/inbox is now wired to real crm_messages data.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Do NOT break Discovery Portal.
+Do NOT remove working CRM pages.
+Keep this as a safe navigation + search improvement only.
+
+GOAL:
+Make CRM navigation more understandable and make the global search bar actually useful.
+
+TASK 1 — INSPECT CURRENT CRM LAYOUT
+
+Inspect:
+
+1. CrmLayout.tsx
+2. CRM nav item definitions
+3. Global search input behavior
+4. Existing GET /api/crm/leads?search= behavior
+5. Existing routes in App.tsx
+
+Report briefly what exists before changing code.
+
+TASK 2 — RESTORE PIPELINE TO NAV
+
+Add /admin/crm/pipeline back to the CRM sidebar/nav.
+
+Label:
+"Lead Pipeline"
+
+Reason:
+This pipeline uses crm_leads.status and represents the contact/lead journey.
+
+Keep /admin/crm/deals in the nav, but rename its label to:
+
+"Deals Kanban"
+
+Reason:
+Deals use crm_deals.stage and represent monetary opportunities.
+
+Expected CRM nav labels:
+
+* Dashboard
+* Leads / People
+* Lead Pipeline
+* Deals Kanban
+* Inbox
+* Tasks
+* Calendar
+* Reporting
+* Email Templates
+* Import Leads
+* Settings
+
+Do not delete any routes.
+
+TASK 3 — ADD SMALL EXPLANATION ON BOTH PAGES
+
+On /admin/crm/pipeline:
+Add a short helper text near the page title:
+“Track where each lead/contact is in your follow-up journey.”
+
+On /admin/crm/deals:
+Add a short helper text near the page title:
+“Track revenue opportunities and move deals through your sales stages.”
+
+Keep the UI clean.
+
+TASK 4 — WIRE GLOBAL CRM SEARCH
+
+The global search bar in CrmLayout should search real CRM leads.
+
+Behavior:
+
+* User types at least 2 characters.
+* Debounce search by around 300ms.
+* Call:
+  GET /api/crm/leads?search=<query>
+* Show a dropdown below the search input.
+
+Dropdown result should show:
+
+* Lead name
+* Email or phone
+* Company if available
+* Status badge
+* Priority badge if available
+
+Clicking a result should navigate to:
+/admin/crm/leads/:id
+
+Also include:
+
+* Loading state
+* “No results found” state
+* Error state if API fails
+* Keyboard-friendly behavior if easy:
+
+  * Escape closes dropdown
+  * Enter opens first result
+* Clear dropdown after navigation
+
+Important:
+
+* Do not search submissions here.
+* Do not search deals here yet.
+* Do not create a new API endpoint unless existing search does not work.
+* Protect against empty query and fast typing.
+* Do not flood API requests.
+
+TASK 5 — DESIGN REQUIREMENTS
+
+Global search should feel polished:
+
+* white/light dropdown over CRM layout
+* subtle border and shadow
+* clean spacing
+* readable text
+* status/priority badges
+* responsive width
+* no layout jumping
+
+TASK 6 — TESTING
+
+Test:
+
+1. CRM nav shows Lead Pipeline.
+2. CRM nav shows Deals Kanban.
+3. /admin/crm/pipeline loads.
+4. /admin/crm/deals loads.
+5. Helper text appears on both pages.
+6. Search with 1 character does not call API.
+7. Search with 2+ characters calls /api/crm/leads?search=.
+8. Search dropdown shows matching leads.
+9. Clicking a lead opens /admin/crm/leads/:id.
+10. Enter opens first result if implemented.
+11. Escape closes dropdown if implemented.
+12. Empty results show correctly.
+13. API error shows safely.
+14. /admin/dashboard still works.
+15. /admin/crm/dashboard still works.
+16. /admin/crm/inbox still works.
+17. /admin/crm/reporting still works.
+18. No TypeScript errors except any pre-existing unrelated issue.
+19. No console errors.
+20. No database migrations created.
+21. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. Navigation changes
+4. Pipeline vs Deals clarification
+5. Search behavior implemented
+6. API used
+7. Tests performed
+8. Confirmation no schema/database changes were made
+9. Known limitations
+10. Recommended next prompt

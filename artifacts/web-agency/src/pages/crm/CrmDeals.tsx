@@ -220,8 +220,9 @@ export default function CrmDealsPage() {
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center gap-3 shrink-0">
           <div>
-            <h1 className="font-bold text-foreground">Deals Pipeline</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="font-bold text-foreground">Deals Kanban</h1>
+            <p className="text-xs text-muted-foreground">Track revenue opportunities and move deals through your sales stages.</p>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">
               {deals.length} deal{deals.length !== 1 ? "s" : ""} · {fmt(deals.reduce((s, d) => s + Number(d.value), 0))} total value
             </p>
           </div>
