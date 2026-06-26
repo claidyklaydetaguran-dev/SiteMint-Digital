@@ -662,17 +662,22 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
 
     // Event metrics from crm_campaign_events (opened, clicked, bounced, failed via webhook)
     const recipientIds = recipients.map(r => r.id);
-    let eventMetrics = { hasEvents: false, opened: 0, clicked: 0, bounced: 0, deliveryFailed: 0, openRate: 0, clickRate: 0, bounceRate: 0 };
+    let eventMetrics = { hasEvents: false, opened: 0, clicked: 0, bounced: 0, deliveryFailed: 0, uniqueOpeners: 0, uniqueClickers: 0, openRate: 0, clickRate: 0, bounceRate: 0 };
     if (recipientIds.length > 0) {
       const events = await db
-        .select({ eventType: crmCampaignEvents.eventType })
+        .select({ eventType: crmCampaignEvents.eventType, campaignRecipientId: crmCampaignEvents.campaignRecipientId })
         .from(crmCampaignEvents)
         .where(inArray(crmCampaignEvents.campaignRecipientId, recipientIds));
       if (events.length > 0) {
-        const opened        = events.filter(e => e.eventType === "opened").length;
-        const clicked       = events.filter(e => e.eventType === "clicked").length;
+        const openedEvents  = events.filter(e => e.eventType === "opened");
+        const clickedEvents = events.filter(e => e.eventType === "clicked");
+        const opened        = openedEvents.length;
+        const clicked       = clickedEvents.length;
         const bounced       = events.filter(e => e.eventType === "bounced").length;
         const deliveryFailed = events.filter(e => e.eventType === "failed").length;
+        // Unique counts — distinct recipient per event type (what rates are based on)
+        const uniqueOpeners  = new Set(openedEvents.map(e => e.campaignRecipientId)).size;
+        const uniqueClickers = new Set(clickedEvents.map(e => e.campaignRecipientId)).size;
         const sentCount = sent > 0 ? sent : 1; // avoid div/0
         eventMetrics = {
           hasEvents:    true,
@@ -680,9 +685,11 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
           clicked,
           bounced,
           deliveryFailed,
-          openRate:    Math.round((opened  / sentCount) * 100),
-          clickRate:   Math.round((clicked / sentCount) * 100),
-          bounceRate:  Math.round((bounced / sentCount) * 100),
+          uniqueOpeners,
+          uniqueClickers,
+          openRate:    Math.round((uniqueOpeners  / sentCount) * 100),
+          clickRate:   Math.round((uniqueClickers / sentCount) * 100),
+          bounceRate:  Math.round((bounced        / sentCount) * 100),
         };
       }
     }
@@ -935,8 +942,24 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
     // Determine occurred_at from payload if available
     const occurredAt = data.created_at ? new Date(data.created_at as string) : new Date();
 
-    // Insert event (idempotent: duplicate events will just add extra rows but won't crash)
+    // Application-level dedup for opened/clicked — Resend retries can send duplicates
     const errorReason = (data.reason as string) ?? (data.error as string) ?? null;
+    if (eventType === "opened" || eventType === "clicked") {
+      const [existing] = await db
+        .select({ id: crmCampaignEvents.id })
+        .from(crmCampaignEvents)
+        .where(and(
+          eq(crmCampaignEvents.campaignRecipientId, recipient.id),
+          eq(crmCampaignEvents.eventType, eventType),
+        ))
+        .limit(1);
+      if (existing) {
+        req.log.info({ recipientId: recipient.id, eventType }, "Duplicate webhook event skipped");
+        res.json({ ok: true, eventType, recipientId: recipient.id, deduplicated: true });
+        return;
+      }
+    }
+
     await db.insert(crmCampaignEvents).values({
       campaignRecipientId: recipient.id,
       eventType,

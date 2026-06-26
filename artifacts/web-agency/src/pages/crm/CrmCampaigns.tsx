@@ -115,6 +115,8 @@ interface CampaignAnalytics {
     clicked: number;
     bounced: number;
     deliveryFailed: number;
+    uniqueOpeners: number;
+    uniqueClickers: number;
     openRate: number;
     clickRate: number;
     bounceRate: number;
@@ -935,13 +937,28 @@ export default function CrmCampaigns() {
                   </div>
                   <div className="p-4">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mb-4">
+                      {/* Opens — unique openers primary, total events sub-label */}
+                      <div className="border rounded-xl p-3 text-center bg-blue-50 border-blue-200 text-blue-700">
+                        <p className="text-xl font-bold">{a.eventMetrics.uniqueOpeners}</p>
+                        <p className="text-[10px] font-semibold mt-0.5 opacity-70 uppercase tracking-wide">Unique Opens</p>
+                        {a.eventMetrics.opened !== a.eventMetrics.uniqueOpeners && (
+                          <p className="text-[9px] opacity-50 mt-0.5">{a.eventMetrics.opened} total events</p>
+                        )}
+                      </div>
+                      {/* Clicks — unique clickers primary, total events sub-label */}
+                      <div className="border rounded-xl p-3 text-center bg-violet-50 border-violet-200 text-violet-700">
+                        <p className="text-xl font-bold">{a.eventMetrics.uniqueClickers}</p>
+                        <p className="text-[10px] font-semibold mt-0.5 opacity-70 uppercase tracking-wide">Unique Clicks</p>
+                        {a.eventMetrics.clicked !== a.eventMetrics.uniqueClickers && (
+                          <p className="text-[9px] opacity-50 mt-0.5">{a.eventMetrics.clicked} total events</p>
+                        )}
+                      </div>
+                      {/* Bounces, rates */}
                       {[
-                        { label: "Opens",          value: a.eventMetrics.opened,        color: "bg-blue-50   border-blue-200   text-blue-700" },
-                        { label: "Clicks",         value: a.eventMetrics.clicked,       color: "bg-violet-50 border-violet-200 text-violet-700" },
-                        { label: "Bounces",        value: a.eventMetrics.bounced,       color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
-                        { label: "Open Rate",      value: `${a.eventMetrics.openRate}%`,   color: "bg-blue-50   border-blue-200   text-blue-700" },
-                        { label: "Click Rate",     value: `${a.eventMetrics.clickRate}%`,  color: "bg-violet-50 border-violet-200 text-violet-700" },
-                        { label: "Bounce Rate",    value: `${a.eventMetrics.bounceRate}%`, color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                        { label: "Bounces",     value: a.eventMetrics.bounced,       color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                        { label: "Open Rate",   value: `${a.eventMetrics.openRate}%`,   color: "bg-blue-50   border-blue-200   text-blue-700" },
+                        { label: "Click Rate",  value: `${a.eventMetrics.clickRate}%`,  color: "bg-violet-50 border-violet-200 text-violet-700" },
+                        { label: "Bounce Rate", value: `${a.eventMetrics.bounceRate}%`, color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
                       ].map(({ label, value, color }) => (
                         <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
                           <p className="text-xl font-bold">{value}</p>

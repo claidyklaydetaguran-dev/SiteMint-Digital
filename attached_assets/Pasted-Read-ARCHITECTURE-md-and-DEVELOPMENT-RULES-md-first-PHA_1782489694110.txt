@@ -1,0 +1,152 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 13 — Webhook Event Deduplication + Unique Recipient Tracking
+
+MODULE:
+Campaigns + API Server only.
+
+IMPORTANT:
+Work only inside Campaigns/API Server unless compilation requires otherwise.
+Do not touch locked modules.
+Do not touch Twilio routes.
+Do not refactor stable modules.
+Stay within the default change budget.
+Make surgical edits only.
+Use Drizzle migrations only.
+Do not create fake analytics.
+
+CURRENT STATE:
+Resend webhook endpoint exists.
+crm_campaign_events stores webhook events.
+crm_campaign_recipients has resend_email_id.
+Analytics shows open/click/bounce metrics from real event rows.
+Known issue:
+Resend may retry webhooks, so duplicate open/click rows can inflate analytics.
+
+OBJECTIVE:
+Deduplicate open/click tracking and show unique opener/clicker counts.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* crmCampaigns schema
+* Resend webhook handler inside crm.ts
+* Campaign analytics endpoint inside crm.ts
+* CrmCampaigns.tsx analytics UI
+
+Do not inspect unrelated modules.
+
+TASK 2 — BACKEND DEDUP LOGIC
+
+In the Resend webhook handler:
+
+For event types:
+
+* opened
+* clicked
+
+Prevent duplicate event rows for the same:
+
+* campaign_recipient_id
+* event_type
+
+Implementation options:
+
+* Use ON CONFLICT DO NOTHING if a suitable unique constraint/index exists.
+* Or check for an existing opened/clicked event before inserting.
+
+Important:
+
+* bounced and failed events may repeat and should not be deduplicated unless clearly identical.
+* Duplicate opened/clicked webhook deliveries should return 200 safely.
+* Do not crash on duplicate delivery.
+
+TASK 3 — SCHEMA / INDEX
+
+If using DB-level protection, add the safest migration possible.
+
+Preferred:
+A partial unique index for opened/clicked events only:
+unique on (campaign_recipient_id, event_type)
+where event_type in ('opened', 'clicked')
+
+If Drizzle schema cannot express partial unique index cleanly, use application-level dedup instead and defer DB-level partial index.
+
+Do not add broad unique constraints that would block bounce/failure repeats.
+
+TASK 4 — ANALYTICS UNIQUE COUNTS
+
+Update:
+
+GET /api/crm/campaigns/:id/analytics
+
+eventMetrics should include:
+
+* opened: total open event rows
+* clicked: total click event rows
+* uniqueOpeners: distinct campaign_recipient_id count for opened
+* uniqueClickers: distinct campaign_recipient_id count for clicked
+* bounced
+* deliveryFailed
+* openRate: uniqueOpeners / sent recipients
+* clickRate: uniqueClickers / sent recipients
+* bounceRate: bounced / sent recipients
+* hasEvents
+
+Important:
+Use uniqueOpeners and uniqueClickers for rates.
+Do not use total opened/clicked rows for rates.
+
+TASK 5 — ANALYTICS UI UPDATE
+
+In CrmCampaigns.tsx analytics view:
+
+Update Opens tile:
+
+* Main value: uniqueOpeners
+* Sub-label: “X total open events”
+
+Update Clicks tile:
+
+* Main value: uniqueClickers
+* Sub-label: “X total click events”
+
+Update rate labels:
+
+* Open Rate = unique openers / sent
+* Click Rate = unique clickers / sent
+
+Keep bounce/failure display as-is.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Duplicate opened event does not inflate uniqueOpeners.
+2. Duplicate clicked event does not inflate uniqueClickers.
+3. Total opened/clicked event rows are still visible if duplicates exist.
+4. openRate uses uniqueOpeners.
+5. clickRate uses uniqueClickers.
+6. bounced/failed events still insert safely.
+7. Webhook still returns 200 on duplicate open/click.
+8. Analytics endpoint returns new fields.
+9. Analytics UI displays unique and total event counts.
+10. No Twilio files changed.
+11. No locked modules changed.
+12. TypeScript passes except pre-existing unrelated issue.
+13. No console errors.
+14. Migration applied only if necessary.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Deduplication approach used
+4. Schema/index changes, if any
+5. Analytics API changes
+6. Analytics UI changes
+7. Tests performed
+8. Known limitations
+9. Recommended next phase
