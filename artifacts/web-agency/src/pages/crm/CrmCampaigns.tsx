@@ -4,7 +4,8 @@ import { CrmLayout } from "./CrmLayout";
 import {
   Mail, Users, Eye, Send, ChevronRight, ChevronLeft,
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
-  Plus, Trash2, Clock, FileText, ArrowLeft, Save,
+  Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
+  SkipForward, XCircle,
 } from "lucide-react";
 import {
   computeSimplifiedDisc,
@@ -56,6 +57,22 @@ interface Campaign {
   createdAt: string;
   updatedAt: string;
   recipientCount?: number;
+}
+
+interface RecipientSendResult {
+  recipientId: number;
+  leadId: number;
+  email: string;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+}
+
+interface CampaignSendResult {
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: RecipientSendResult[];
+  testMode: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,8 +151,8 @@ export default function CrmCampaigns() {
   const [campaigns, setCampaigns]   = useState<Campaign[]>([]);
   const [loading, setLoading]       = useState(true);
 
-  // ── View: "history" | "builder" ──
-  const [view, setView] = useState<"history" | "builder">("history");
+  // ── View: "history" | "builder" | "execution" ──
+  const [view, setView] = useState<"history" | "builder" | "execution">("history");
 
   // ── Persistence state ──
   const [campaignId, setCampaignId]           = useState<number | null>(null);
@@ -169,6 +186,13 @@ export default function CrmCampaigns() {
   const [testEmail, setTestEmail]           = useState("");
   const [testSending, setTestSending]       = useState(false);
   const [testResult, setTestResult]         = useState<{ ok: boolean; message: string } | null>(null);
+
+  // ── Send execution ──
+  const [showSendConfirm, setShowSendConfirm]     = useState(false);
+  const [sendConfirmChecked, setSendConfirmChecked] = useState(false);
+  const [sending, setSending]                     = useState(false);
+  const [sendResult, setSendResult]               = useState<CampaignSendResult | null>(null);
+  const [resendingId, setResendingId]             = useState<number | null>(null);
 
   // ── Load initial data ──
   useEffect(() => {
@@ -344,6 +368,64 @@ export default function CrmCampaigns() {
     }
   };
 
+  // ── Send campaign ──
+  const sendCampaign = async () => {
+    if (!campaignId) return;
+    setSending(true);
+    setSendResult(null);
+    setShowSendConfirm(false);
+    setSendConfirmChecked(false);
+    setSaveError("");
+    try {
+      const r = await fetch(`/api/crm/campaigns/${campaignId}/send`, {
+        method: "POST",
+        headers: authH(),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setSendResult(d as CampaignSendResult);
+        setView("execution");
+        await refreshCampaigns();
+      } else {
+        setSaveError(d.error ?? "Failed to send campaign");
+      }
+    } catch {
+      setSaveError("Network error during send — please try again");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ── Resend one failed/skipped recipient ──
+  const resendRecipient = async (recipientId: number) => {
+    if (!campaignId || !sendResult) return;
+    setResendingId(recipientId);
+    try {
+      const r = await fetch(`/api/crm/campaigns/${campaignId}/recipients/${recipientId}/resend`, {
+        method: "POST",
+        headers: authH(),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setSendResult(prev => {
+          if (!prev) return prev;
+          const wasFailedOrSkipped = prev.results.find(x => x.recipientId === recipientId && (x.status === "failed" || x.status === "skipped"));
+          return {
+            ...prev,
+            sent:   prev.sent   + (d.status === "sent" ? 1 : 0),
+            failed: prev.failed - (wasFailedOrSkipped?.status === "failed" ? 1 : 0) + (d.status === "failed" ? 1 : 0),
+            results: prev.results.map(res =>
+              res.recipientId === recipientId
+                ? { ...res, status: d.status as "sent" | "failed" | "skipped", error: d.error }
+                : res
+            ),
+          };
+        });
+      }
+    } catch { /* silent */ }
+    finally { setResendingId(null); }
+  };
+
   // ── Delete campaign ──
   const deleteCampaign = async () => {
     if (!campaignId) { setView("history"); setShowDeleteConfirm(false); return; }
@@ -414,6 +496,163 @@ export default function CrmCampaigns() {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // EXECUTION VIEW — shown after a campaign send completes
+  // ════════════════════════════════════════════════════════════════════════════
+
+  if (view === "execution" && sendResult) {
+    const total    = sendResult.results.length;
+    const pctDone  = total > 0 ? Math.round(((sendResult.sent + sendResult.skipped) / total) * 100) : 0;
+    const hasFailed = sendResult.failed > 0;
+
+    return (
+      <CrmLayout>
+        <div className="p-6 max-w-5xl mx-auto space-y-5">
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setView("builder")}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Campaign
+              </button>
+              <span className="text-gray-300">/</span>
+              <h1 className="text-sm font-bold text-foreground truncate max-w-xs">{campaignName}</h1>
+              <StatusBadge status={campaignStatus} />
+            </div>
+            <button
+              onClick={() => setView("history")}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              All Campaigns
+            </button>
+          </div>
+
+          {/* Test mode notice */}
+          {sendResult.testMode && (
+            <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+              <p className="text-xs text-amber-800">
+                <strong>Test mode active.</strong> No emails were actually sent externally. Recipient statuses have been updated in the database as if sent. Set <code className="bg-amber-100 px-1 rounded">CRM_EMAIL_TEST_MODE=false</code> to enable live sending.
+              </p>
+            </div>
+          )}
+
+          {/* Summary tiles */}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: "Total",   value: total,              color: "bg-gray-50   border-gray-200  text-gray-700" },
+              { label: "Sent",    value: sendResult.sent,    color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+              { label: "Failed",  value: sendResult.failed,  color: sendResult.failed  > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+              { label: "Skipped", value: sendResult.skipped, color: sendResult.skipped > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className={`border rounded-xl p-4 text-center ${color}`}>
+                <p className="text-2xl font-bold">{value}</p>
+                <p className="text-xs font-semibold mt-0.5 opacity-80">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-foreground">Send Progress</p>
+              <p className="text-xs text-muted-foreground">{pctDone}% complete</p>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${hasFailed ? "bg-amber-400" : "bg-emerald-500"}`}
+                style={{ width: `${pctDone}%` }}
+              />
+            </div>
+            {hasFailed && (
+              <p className="text-xs text-red-600 mt-2 font-medium">
+                {sendResult.failed} recipient{sendResult.failed !== 1 ? "s" : ""} failed — use "Resend" below.
+              </p>
+            )}
+          </div>
+
+          {/* Per-recipient results table */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <h2 className="text-sm font-bold text-foreground">Recipient Results</h2>
+              <span className="text-xs text-muted-foreground ml-1">({total} total)</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {["Lead","Email","DISC Style","Status","Sent At","Error",""].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {sendResult.results.map(res => {
+                    const lead = allLeads.find(l => l.id === res.leadId);
+                    const disc = lead ? discMap.get(lead.id) : undefined;
+                    const meta = disc ? DISC_META[disc] : null;
+                    const isBusy = resendingId === res.recipientId;
+                    return (
+                      <tr key={res.recipientId} className={`transition-colors ${
+                        res.status === "sent"    ? "bg-emerald-50/30" :
+                        res.status === "failed"  ? "bg-red-50/30"     :
+                        "bg-gray-50/30"
+                      }`}>
+                        <td className="px-4 py-3 font-medium text-foreground text-xs">{lead?.name ?? `Lead #${res.leadId}`}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[140px]">{res.email || "—"}</td>
+                        <td className="px-4 py-3">
+                          {meta && disc
+                            ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {disc}</span>
+                            : <span className="text-gray-300 text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {res.status === "sent" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 className="w-3 h-3" /> Sent
+                            </span>
+                          )}
+                          {res.status === "failed" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                              <XCircle className="w-3 h-3" /> Failed
+                            </span>
+                          )}
+                          {res.status === "skipped" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                              <SkipForward className="w-3 h-3" /> Skipped
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">—</td>
+                        <td className="px-4 py-3 text-xs text-red-500 max-w-[160px] truncate" title={res.error}>{res.error ?? ""}</td>
+                        <td className="px-4 py-3">
+                          {(res.status === "failed" || (res.status === "skipped" && res.error !== "Already sent")) && (
+                            <button
+                              onClick={() => resendRecipient(res.recipientId)}
+                              disabled={isBusy || resendingId !== null}
+                              className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 disabled:opacity-40 transition-colors"
+                            >
+                              {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              {isBusy ? "Sending…" : "Resend"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </CrmLayout>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // HISTORY VIEW
   // ════════════════════════════════════════════════════════════════════════════
 
@@ -445,11 +684,11 @@ export default function CrmCampaigns() {
           </div>
 
           {/* Safety banner */}
-          <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
-            <p className="text-xs text-amber-800">
-              <strong>Bulk sending is disabled.</strong> Campaigns are saved as drafts.
-              Test send only sends to a manually entered address. Selected recipients are saved for preview/history only.
+          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+            <Info className="w-4 h-4 text-blue-500 shrink-0" />
+            <p className="text-xs text-blue-800">
+              <strong>Manual sending is enabled.</strong> Open a campaign, add recipients, and use the "Send Campaign" button in Step 3.
+              Scheduling and automation are still disabled. Test send always goes to a manually entered address only.
             </p>
           </div>
 
@@ -576,11 +815,11 @@ export default function CrmCampaigns() {
         </div>
 
         {/* ── Safety banner ─────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-          <p className="text-xs text-amber-800">
-            <strong>Safe mode active.</strong> No emails are sent automatically.
-            Selected recipients are saved for preview/history only.
+        <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+          <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+          <p className="text-xs text-blue-800">
+            <strong>Manual sending is enabled.</strong> Use "Send Campaign" in Step 3 to send to saved recipients.
+            Scheduling and automation are still disabled.
           </p>
         </div>
 
@@ -873,13 +1112,14 @@ export default function CrmCampaigns() {
         ══════════════════════════════════════════════════════════════════════ */}
         {step === 2 && (
           <div className="space-y-5">
-            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5">
-              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-3.5">
+              <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-amber-800 mb-0.5">Test Send Only · No Bulk Send</p>
-                <p className="text-xs text-amber-700">
-                  The <strong>Send Test Email</strong> button sends only to the address you enter — never to selected leads.
-                  Bulk sending is disabled in this phase.
+                <p className="text-xs font-bold text-blue-800 mb-0.5">Manual Sending Enabled · No Scheduling</p>
+                <p className="text-xs text-blue-700">
+                  <strong>Test Send</strong> goes only to the address you enter below.
+                  <strong> Send Campaign</strong> sends to all saved recipients — one at a time — after you confirm.
+                  Scheduling and automation are disabled.
                 </p>
               </div>
             </div>
@@ -1088,10 +1328,21 @@ export default function CrmCampaigns() {
                   {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   Save Draft
                 </button>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="w-3.5 h-3.5" />
-                  Bulk send available in a future Campaign Automation update.
-                </span>
+                {campaignId && selectedLeads.size > 0 && baseSubject && baseBody && (
+                  <button
+                    onClick={() => { setSendConfirmChecked(false); setShowSendConfirm(true); }}
+                    disabled={sending || isDirty}
+                    className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title={isDirty ? "Save your changes first before sending" : ""}
+                  >
+                    {sending
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                      : <><Send className="w-4 h-4" /> Send Campaign</>}
+                  </button>
+                )}
+                {isDirty && campaignId && (
+                  <span className="text-[10px] text-amber-600 font-semibold">Save changes first</span>
+                )}
               </div>
             </div>
           </div>
@@ -1125,6 +1376,80 @@ export default function CrmCampaigns() {
                   className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 disabled:opacity-40 transition-colors">
                   {deleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   {deleting ? "Deleting…" : campaignId ? "Delete" : "Discard"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Send confirm modal ─────────────────────────────────────────────── */}
+        {showSendConfirm && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                  <Send className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-base font-bold text-foreground">Confirm Campaign Send</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">This action will send emails to real recipients.</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Campaign</span>
+                  <span className="font-semibold text-foreground truncate max-w-[200px]">{campaignName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Recipients</span>
+                  <span className="font-semibold text-foreground">{selectedLeads.size} lead{selectedLeads.size !== 1 ? "s" : ""}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Send mode</span>
+                  <span className={`font-semibold ${process.env.NODE_ENV === "production" ? "text-emerald-600" : "text-amber-600"}`}>
+                    One at a time · No scheduling
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Already-sent leads</span>
+                  <span className="font-semibold text-foreground">Skipped automatically</span>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800">
+                  Emails will be sent individually to each selected recipient using their DISC-personalized version. This cannot be undone.
+                </p>
+              </div>
+
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={sendConfirmChecked}
+                  onChange={e => setSendConfirmChecked(e.target.checked)}
+                  className="mt-0.5 rounded border-gray-300 cursor-pointer"
+                />
+                <span className="text-xs text-foreground font-medium group-hover:text-gray-700">
+                  I understand this will send emails to {selectedLeads.size} selected recipient{selectedLeads.size !== 1 ? "s" : ""}.
+                </span>
+              </label>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setShowSendConfirm(false); setSendConfirmChecked(false); }}
+                  className="flex-1 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendCampaign}
+                  disabled={!sendConfirmChecked}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                  Send to {selectedLeads.size} Recipient{selectedLeads.size !== 1 ? "s" : ""}
                 </button>
               </div>
             </div>

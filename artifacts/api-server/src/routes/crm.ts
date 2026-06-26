@@ -583,6 +583,160 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
   }
 });
 
+// ── Campaign Send Execution ───────────────────────────────────────────────────
+// Sends to all selected recipients one at a time, tracks status per recipient.
+router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    const recipientsWithLeads = await db
+      .select({
+        id: crmCampaignRecipients.id,
+        leadId: crmCampaignRecipients.leadId,
+        status: crmCampaignRecipients.status,
+        personalizedSubject: crmCampaignRecipients.personalizedSubject,
+        personalizedBody: crmCampaignRecipients.personalizedBody,
+        leadEmail: crmLeads.email,
+        leadName: crmLeads.name,
+      })
+      .from(crmCampaignRecipients)
+      .innerJoin(crmLeads, eq(crmCampaignRecipients.leadId, crmLeads.id))
+      .where(eq(crmCampaignRecipients.campaignId, id));
+
+    if (recipientsWithLeads.length === 0) {
+      res.status(400).json({ error: "No recipients saved for this campaign" }); return;
+    }
+
+    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const results: Array<{ recipientId: number; leadId: number; email: string; status: string; error?: string }> = [];
+    let sent = 0, failed = 0, skipped = 0;
+
+    for (const r of recipientsWithLeads) {
+      // Skip already-sent recipients
+      if (r.status === "sent") {
+        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail ?? "", status: "skipped", error: "Already sent" });
+        skipped++;
+        continue;
+      }
+      // Skip recipients with no valid email
+      if (!r.leadEmail || r.leadEmail.includes("@imported.local")) {
+        await db.update(crmCampaignRecipients)
+          .set({ status: "skipped", lastError: "No valid email address" })
+          .where(eq(crmCampaignRecipients.id, r.id));
+        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail ?? "", status: "skipped", error: "No valid email address" });
+        skipped++;
+        continue;
+      }
+
+      const subject = r.personalizedSubject ?? campaign.subject;
+      const body    = r.personalizedBody   ?? campaign.body;
+
+      try {
+        if (!isTestMode) {
+          const resend = getResend();
+          await resend.emails.send({
+            from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
+            to: [r.leadEmail],
+            subject,
+            html: body.replace(/\n/g, "<br>"),
+          });
+          // 200 ms rate-limit guard between live sends
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        await db.update(crmCampaignRecipients)
+          .set({ status: "sent", sentAt: new Date(), lastError: null })
+          .where(eq(crmCampaignRecipients.id, r.id));
+        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "sent" });
+        sent++;
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : "Unknown send error";
+        await db.update(crmCampaignRecipients)
+          .set({ status: "failed", lastError: errMsg })
+          .where(eq(crmCampaignRecipients.id, r.id));
+        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: errMsg });
+        failed++;
+      }
+    }
+
+    // Mark campaign as archived if fully sent
+    if (failed === 0 && sent > 0) {
+      await db.update(crmCampaigns).set({ status: "archived", updatedAt: new Date() }).where(eq(crmCampaigns.id, id));
+    }
+
+    req.log.info({ campaignId: id, sent, failed, skipped, testMode: isTestMode }, "Campaign send complete");
+    res.json({ sent, failed, skipped, results, testMode: isTestMode });
+  } catch (err) {
+    req.log.error({ err }, "Error executing campaign send");
+    res.status(500).json({ error: "Failed to send campaign" });
+  }
+});
+
+// Resend to a single failed or skipped recipient
+router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id          = Number(req.params.id);
+    const recipientId = Number(req.params.recipientId);
+    if (isNaN(id) || isNaN(recipientId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    const [r] = await db
+      .select({
+        id: crmCampaignRecipients.id,
+        leadId: crmCampaignRecipients.leadId,
+        personalizedSubject: crmCampaignRecipients.personalizedSubject,
+        personalizedBody: crmCampaignRecipients.personalizedBody,
+        leadEmail: crmLeads.email,
+      })
+      .from(crmCampaignRecipients)
+      .innerJoin(crmLeads, eq(crmCampaignRecipients.leadId, crmLeads.id))
+      .where(and(
+        eq(crmCampaignRecipients.id, recipientId),
+        eq(crmCampaignRecipients.campaignId, id),
+      ));
+
+    if (!r) { res.status(404).json({ error: "Recipient not found" }); return; }
+    if (!r.leadEmail || r.leadEmail.includes("@imported.local")) {
+      res.status(400).json({ error: "No valid email address for this recipient" }); return;
+    }
+
+    const subject = r.personalizedSubject ?? campaign.subject;
+    const body    = r.personalizedBody   ?? campaign.body;
+    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+
+    try {
+      if (!isTestMode) {
+        const resend = getResend();
+        await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
+          to: [r.leadEmail],
+          subject,
+          html: body.replace(/\n/g, "<br>"),
+        });
+      }
+      await db.update(crmCampaignRecipients)
+        .set({ status: "sent", sentAt: new Date(), lastError: null })
+        .where(eq(crmCampaignRecipients.id, recipientId));
+      req.log.info({ campaignId: id, recipientId, testMode: isTestMode }, "Recipient resent");
+      res.json({ ok: true, status: "sent", testMode: isTestMode, email: r.leadEmail });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Unknown send error";
+      await db.update(crmCampaignRecipients)
+        .set({ status: "failed", lastError: errMsg })
+        .where(eq(crmCampaignRecipients.id, recipientId));
+      res.status(500).json({ ok: false, status: "failed", error: errMsg });
+    }
+  } catch (err) {
+    req.log.error({ err }, "Error resending to recipient");
+    res.status(500).json({ error: "Failed to resend" });
+  }
+});
+
 // ── CSV Import ────────────────────────────────────────────────────────────────
 router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => {
   try {

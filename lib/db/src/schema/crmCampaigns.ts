@@ -43,6 +43,7 @@ export const crmCampaignRecipients = pgTable("crm_campaign_recipients", {
   discStyleUsed: text("disc_style_used"),
   personalizedSubject: text("personalized_subject"),
   personalizedBody: text("personalized_body"),
+  lastError: text("last_error"),
 });
 
 export const insertCrmCampaignRecipientSchema = createInsertSchema(crmCampaignRecipients).omit({

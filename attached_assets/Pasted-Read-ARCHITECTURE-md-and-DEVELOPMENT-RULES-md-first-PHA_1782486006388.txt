@@ -1,0 +1,188 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 9 — Campaign Send Execution & Recipient Status Tracking
+
+MODULE:
+Campaigns only.
+
+IMPORTANT:
+Work only inside the Campaigns module unless compilation requires otherwise.
+Do not touch locked modules.
+Do not touch Twilio routes.
+Do not refactor stable modules.
+Stay within the default change budget if possible.
+Make surgical edits only.
+Use Drizzle only if schema changes are required.
+
+CURRENT STATE:
+Campaign drafts and recipients are already persisted.
+crm_campaigns exists.
+crm_campaign_recipients exists.
+Test send works.
+Bulk sending is still disabled.
+
+OBJECTIVE:
+Add safe manual campaign send execution.
+
+This is NOT scheduling.
+This is NOT automation.
+This is NOT drip campaigns.
+This is only a protected, manual “Send Campaign” flow with clear confirmation and recipient status tracking.
+
+TASK 1 — INSPECT ONLY CAMPAIGN FILES
+
+Inspect only:
+
+* CrmCampaigns.tsx
+* campaignPersonalization.ts
+* crmCampaigns schema
+* campaign routes inside crm.ts
+* existing email send/test-send helper logic
+
+Do not inspect unrelated CRM modules.
+
+TASK 2 — BACKEND SEND ENDPOINT
+
+Add protected endpoint:
+
+POST /api/crm/campaigns/:id/send
+
+Behavior:
+
+1. Load campaign.
+2. Load recipients.
+3. For each recipient:
+
+   * skip if no email
+   * skip if already sent
+   * send personalized_subject and personalized_body to the lead email
+   * use existing Resend logic / test mode behavior
+   * update recipient status:
+
+     * sent
+     * failed
+     * skipped
+   * set sent_at for successful sends
+4. Send one at a time.
+5. Add a small delay or safe rate limit between sends if easy.
+6. Return summary:
+   {
+   sent,
+   failed,
+   skipped,
+   results: [
+   { recipientId, leadId, email, status, error }
+   ],
+   testMode
+   }
+
+IMPORTANT:
+If CRM_EMAIL_TEST_MODE is true, do not send externally but still simulate safely and mark status in a clear way according to existing convention.
+Do not send to anyone unless admin manually confirms in UI.
+
+TASK 3 — RESEND FAILED ENDPOINT
+
+Add protected endpoint:
+
+POST /api/crm/campaigns/:id/recipients/:recipientId/resend
+
+Behavior:
+
+* Resend only that one failed or skipped recipient.
+* Use stored personalized subject/body.
+* Update status and sent_at.
+* Return result.
+
+TASK 4 — FRONTEND SEND CONFIRMATION
+
+In CrmCampaigns.tsx:
+
+Add a “Send Campaign” button only when:
+
+* campaign is saved
+* recipients exist
+* subject/body exist
+
+Before sending, show strong confirmation modal:
+
+Title:
+“Confirm Campaign Send”
+
+Content:
+
+* campaign name
+* recipient count
+* test mode status
+* warning that emails will be sent individually
+* checkbox:
+  “I understand this will send emails to selected recipients.”
+
+Button remains disabled until checkbox is checked.
+
+TASK 5 — EXECUTION VIEW
+
+After send starts, show campaign execution progress:
+
+* total recipients
+* sent count
+* failed count
+* skipped count
+* current recipient if possible
+* progress bar
+* per-recipient status table
+
+Recipient table:
+
+* lead name
+* email
+* DISC style used
+* status
+* sent_at
+* error if failed
+* resend failed button for failed/skipped rows
+
+TASK 6 — SAFETY GUARDS
+
+Keep all existing safety warnings.
+Remove or update “bulk sending disabled” language only where appropriate.
+
+New language:
+“Manual sending is enabled. Scheduling and automation are still disabled.”
+
+No schedule button.
+No automation.
+No recurring sends.
+
+TASK 7 — TESTING
+
+Test:
+
+1. Existing test-send still works.
+2. Saved campaign can be sent manually.
+3. Recipients without email are skipped.
+4. Already sent recipients are skipped.
+5. Failed recipients are marked failed.
+6. Successful recipients are marked sent with sent_at.
+7. Resend failed works for one recipient.
+8. Campaign history still loads.
+9. Campaign draft editing still works.
+10. No scheduling endpoint exists.
+11. No Twilio files changed.
+12. No locked modules changed.
+13. TypeScript passes except pre-existing unrelated issue.
+14. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. APIs added
+4. Send behavior
+5. Recipient status behavior
+6. UI confirmation behavior
+7. Execution view behavior
+8. Tests performed
+9. Schema changes, if any
+10. Known limitations
+11. Recommended next phase
