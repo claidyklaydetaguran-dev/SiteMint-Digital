@@ -1,0 +1,382 @@
+Act as a Principal Software Architect, Technical Director, CRM Architect, and Senior Full-Stack Engineer.
+
+PROJECT
+
+Sitemint Digital CRM
+
+Current completed modules:
+
+✓ Discovery Portal
+✓ Discovery → CRM Bridge
+✓ CRM Dashboard
+✓ CRM Reporting
+✓ CRM Inbox
+✓ CRM Import
+✓ Lead Detail Command Center
+✓ Lead Health Engine
+✓ Sales Workspace
+✓ Proposal Generator
+✓ Scope of Work Generator
+✓ Workflow Engine
+✓ Deals
+✓ Pipeline
+✓ Tasks
+✓ Activities
+✓ SMS / Email / Calls
+
+======================================================
+OBJECTIVE
+=========
+
+Build the Communication Intelligence foundation.
+
+This is NOT full DISC personality scoring yet.
+
+This is the layer that will later support:
+
+* DISC personality style detection
+* Tone-adjusted email campaigns
+* AI email drafting
+* SMS sequences
+* Follow-up automations
+* Response-risk detection
+* Communication coaching
+
+For now, build transparent rule-based communication scoring and a unified communication view.
+
+======================================================
+IMPORTANT
+=========
+
+Do NOT rebuild existing SMS, Email, Inbox, or Lead Detail systems.
+
+Do NOT touch Twilio webhook routes.
+
+Do NOT use auto schema sync.
+
+Do NOT modify the Lead Health Engine.
+
+Do NOT add AI calls yet.
+
+Do NOT build full campaign automation yet.
+
+No database schema changes unless absolutely unavoidable.
+
+Reuse existing crm_messages and crm_activities.
+
+======================================================
+TASK 1 — INSPECT EXISTING COMMUNICATION DATA
+============================================
+
+Inspect existing communication sources:
+
+1. crm_messages
+2. crm_activities
+3. Lead Detail SMS tab
+4. Lead Detail Email tab
+5. CRM Inbox
+6. Twilio message records
+7. Email sent activity records
+8. Call records
+
+Identify what counts as:
+
+* outbound message
+* inbound reply
+* call attempt
+* completed call
+* email sent
+* SMS sent
+* SMS received
+* last response
+* last outreach
+
+Report existing data shape before changing code.
+
+======================================================
+TASK 2 — CREATE COMMUNICATION INTELLIGENCE ENGINE
+=================================================
+
+Create a reusable pure TypeScript utility:
+
+src/lib/communicationIntelligence.ts
+
+No React dependency.
+No API calls inside utility.
+
+Export:
+
+* computeEngagementScore()
+* computeResponseRate()
+* computeCommunicationStats()
+* computeReplyRisk()
+* computePreferredChannel()
+* computeCommunicationRecommendations()
+
+Inputs:
+
+Lead
+Activities
+Messages
+Tasks if useful
+
+Outputs:
+
+Engagement Score 0–100
+
+Response Rate %
+
+Preferred Channel:
+
+* SMS
+* Email
+* Call
+* Unknown
+
+Reply Risk:
+
+* Low
+* Medium
+* High
+
+Communication Status:
+
+* Engaged
+* Waiting for Reply
+* Needs Follow-up
+* Cold
+* New
+
+Reason list:
+Every score must explain why.
+
+======================================================
+TASK 3 — ENGAGEMENT SCORE LOGIC
+===============================
+
+Use transparent rule-based scoring.
+
+Example scoring:
+
+Base score: 30
+
+Positive:
++20 recent inbound reply within 7 days
++15 two-way conversation exists
++10 outbound message sent within 3 days
++10 completed call
++10 task/follow-up scheduled
++5 email sent
++5 SMS sent
+
+Negative:
+-15 no response after 3 outbound attempts
+-20 no inbound reply ever
+-20 no communication in 14 days
+-25 no communication in 30 days
+-10 failed SMS/call status
+
+Clamp between 0 and 100.
+
+Badge:
+90–100 Highly Engaged
+70–89 Engaged
+50–69 Moderate
+30–49 Low Engagement
+0–29 Cold
+
+Every score must include reasons.
+
+======================================================
+TASK 4 — RESPONSE RATE LOGIC
+============================
+
+Calculate:
+
+outbound count
+inbound count
+response rate
+
+Formula:
+inbound responses / outbound attempts
+
+Also calculate:
+
+* last outbound date
+* last inbound date
+* days since last response
+* days since last outreach
+
+Handle zero division safely.
+
+======================================================
+TASK 5 — PREFERRED CHANNEL LOGIC
+================================
+
+Determine preferred channel by actual engagement.
+
+Examples:
+
+If most inbound replies are SMS:
+Preferred Channel = SMS
+
+If email activity has replies in future:
+Preferred Channel = Email
+
+If calls are completed often:
+Preferred Channel = Call
+
+If no reliable data:
+Preferred Channel = Unknown
+
+Do not guess too aggressively.
+
+======================================================
+TASK 6 — SALES WORKSPACE COMMUNICATIONS TAB
+===========================================
+
+Inside SalesWorkspace.tsx, add a new tab:
+
+Communications
+
+This tab should show:
+
+1. Communication Summary
+
+* Engagement Score
+* Response Rate
+* Preferred Channel
+* Reply Risk
+* Last Outreach
+* Last Response
+
+2. Unified Communication Timeline
+   Merge:
+
+* SMS messages
+* Call records
+* Email sent activities
+* Relevant communication activities
+
+Sort newest first.
+
+Display:
+
+* type icon
+* direction
+* summary/body preview
+* status
+* timestamp
+
+3. Recommendations
+   Use computeCommunicationRecommendations()
+
+Examples:
+
+* “Send a short SMS follow-up.”
+* “Try a phone call; SMS has not received a response.”
+* “Wait before following up; lead replied recently.”
+* “Use email for detailed proposal context.”
+* “No communication yet. Make first contact.”
+
+======================================================
+TASK 7 — LEAD DETAIL SIDEBAR
+============================
+
+Add a compact Communication Intelligence card to Lead Detail sidebar.
+
+Show:
+
+* Engagement Score
+* Reply Risk
+* Preferred Channel
+* Response Rate
+* Recommended Next Communication
+
+Do not duplicate the full Communications tab.
+
+======================================================
+TASK 8 — CRM DASHBOARD INTEGRATION
+==================================
+
+On CRM Dashboard add or enhance communication widgets:
+
+* Average Engagement Score
+* Waiting for Reply
+* High Reply Risk
+* Recently Responded
+* No Communication Yet
+
+Use existing fetched lead/message data where possible.
+
+Do not add extra expensive API requests if current dashboard already has leads/conversations.
+
+======================================================
+TASK 9 — CRM LEADS TABLE
+========================
+
+Add optional compact communication signal to leads table:
+
+* preferred channel badge
+* reply risk badge
+* engagement score mini badge
+
+Keep the table readable.
+
+Do not clutter it.
+
+======================================================
+TASK 10 — PERFORMANCE
+=====================
+
+Memoize calculations.
+
+Avoid duplicate API requests.
+
+Avoid computing full communication intelligence repeatedly inside loops without memoization.
+
+Use already-fetched lead/messages/activities when available.
+
+======================================================
+TASK 11 — TESTING
+=================
+
+Test:
+
+1. Existing Lead Detail still loads.
+2. Sales Workspace tabs still work.
+3. Communications tab renders with zero messages.
+4. Communications tab renders with SMS messages.
+5. Communications tab renders with call records.
+6. Email sent activities appear in unified timeline.
+7. Engagement Score explains its reasons.
+8. Response Rate handles zero outbound safely.
+9. Preferred Channel does not over-guess.
+10. Dashboard widgets render safely.
+11. Leads table remains readable.
+12. CRM Inbox still works.
+13. Twilio webhook routes untouched.
+14. No database migrations unless unavoidable.
+15. No TypeScript errors except known unrelated issue.
+16. No console errors.
+
+======================================================
+FINAL REPORT
+============
+
+Return:
+
+1. Files inspected
+2. Files changed
+3. Communication Intelligence utility architecture
+4. Scoring algorithm
+5. Response rate logic
+6. Preferred channel logic
+7. Sales Workspace integration
+8. Lead Detail integration
+9. Dashboard integration
+10. Leads table integration
+11. Tests performed
+12. Schema changes, if any
+13. Known limitations
+14. Recommended Prompt 14

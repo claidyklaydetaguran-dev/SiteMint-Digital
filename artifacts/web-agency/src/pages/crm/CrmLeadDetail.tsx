@@ -8,6 +8,10 @@ import {
   FileText, CheckCircle2, XCircle, RefreshCw,
 } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import {
+  computeCommunicationStats,
+  type CiLead,
+} from "@/lib/communicationIntelligence";
 import { SalesWorkspace } from "./SalesWorkspace";
 
 const token = () => localStorage.getItem("adminToken") || "";
@@ -115,6 +119,18 @@ export default function CrmLeadDetail() {
     () => (lead ? scoreLeadFromFields(lead, activities) : null),
     [lead, activities],
   );
+  const ciStats = useMemo(() => {
+    if (!lead) return null;
+    const ciLead: CiLead = {
+      id: lead.id, status: lead.status,
+      lastContactedAt: lead.lastContactedAt,
+      nextFollowUpAt: lead.nextFollowUpAt,
+      proposalStatus: lead.proposalStatus,
+      smsConsent: lead.smsConsent,
+      smsOptOut: lead.smsOptOut,
+    };
+    return computeCommunicationStats(ciLead, activities, []);
+  }, [lead, activities]);
   const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"sms"|"email">("timeline");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
@@ -839,6 +855,66 @@ export default function CrmLeadDetail() {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Recommended Action</p>
                   <p className="text-xs text-foreground font-medium">{health.action}</p>
                 </div>
+              </div>
+            )}
+
+            {/* ── Communication Intelligence ──────────────────────────────── */}
+            {ciStats && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Communication</h3>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${ciStats.engagementScore.bgColor} ${ciStats.engagementScore.color} ${ciStats.engagementScore.borderColor}`}>
+                    {ciStats.status}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-end gap-1.5 mb-1">
+                    <span className={`text-3xl font-bold leading-none ${ciStats.engagementScore.color}`}>
+                      {ciStats.engagementScore.score}
+                    </span>
+                    <span className="text-xs text-muted-foreground mb-0.5">/ 100 engagement</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full ${ciStats.engagementScore.barColor}`}
+                      style={{ width: `${ciStats.engagementScore.score}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Response Rate</p>
+                    <p className="text-sm font-bold text-foreground">{ciStats.responseRate.rate}%</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {ciStats.responseRate.inboundCount} / {ciStats.responseRate.outboundCount} msgs
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Reply Risk</p>
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ${
+                      ciStats.replyRisk === "Low"    ? "bg-green-50  text-green-700  border-green-200" :
+                      ciStats.replyRisk === "Medium" ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                                                       "bg-red-50    text-red-700    border-red-200"
+                    }`}>
+                      {ciStats.replyRisk}
+                    </span>
+                  </div>
+                </div>
+
+                {ciStats.engagementScore.badge !== "Highly Engaged" && (
+                  <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Badge</p>
+                    <p className={`text-xs font-semibold ${ciStats.engagementScore.color}`}>
+                      {ciStats.engagementScore.badge}
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-muted-foreground">
+                  Open <strong>Communications</strong> tab in Sales Workspace for full timeline.
+                </p>
               </div>
             )}
 

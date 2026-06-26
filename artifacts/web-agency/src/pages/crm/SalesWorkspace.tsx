@@ -1,15 +1,20 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   FileText, ClipboardList, Printer, Copy, Edit3, Loader2,
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
   X, DollarSign, Package, Zap, ChevronRight, RefreshCw,
-  StickyNote, History, Star, GitBranch,
+  StickyNote, History, Star, GitBranch, MessageSquare,
 } from "lucide-react";
 import {
   computeWorkflowSteps, computeNextBestAction,
   type ActionPriority,
 } from "@/lib/workflowEngine";
+import {
+  computeCommunicationStats, computeCommunicationRecommendations,
+  type CiLead, type CiMessage,
+  type CommunicationRecommendation,
+} from "@/lib/communicationIntelligence";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,7 +66,7 @@ export interface SalesWorkspaceProps {
   onReload: () => Promise<void>;
 }
 
-type WsTab = "overview" | "workflow" | "proposal" | "sow" | "notes" | "history" | "documents";
+type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents";
 
 const tk = () => localStorage.getItem("adminToken") || "";
 
@@ -873,12 +878,267 @@ function WorkflowTab({ lead, activities, tasks }: {
   );
 }
 
+// ── Communications Tab ────────────────────────────────────────────────────────
+
+function CommunicationsTab({ lead, activities }: {
+  lead: WorkspaceLead;
+  activities: WorkspaceActivity[];
+}) {
+  const [msgs, setMsgs] = useState<CiMessage[]>([]);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    const t = tk();
+    fetch(`/api/crm/leads/${lead.id}/messages`, {
+      headers: { Authorization: `Bearer ${t}` },
+    })
+      .then(r => r.ok ? r.json() : { messages: [] })
+      .then((d: { messages?: CiMessage[] }) => setMsgs(d.messages ?? []))
+      .catch(() => {})
+      .finally(() => setFetching(false));
+  }, [lead.id]);
+
+  const ciLead: CiLead = {
+    id: lead.id,
+    status: lead.status,
+    lastContactedAt: lead.lastContactedAt,
+    nextFollowUpAt: lead.nextFollowUpAt,
+    proposalStatus: lead.proposalStatus,
+  };
+
+  const stats = useMemo(
+    () => computeCommunicationStats(ciLead, activities, msgs),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, msgs],
+  );
+  const recs: CommunicationRecommendation[] = useMemo(
+    () => computeCommunicationRecommendations(ciLead, activities, msgs),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, msgs],
+  );
+
+  const timeline = useMemo(() => {
+    const COMM_TYPES = [
+      "email_sent", "sms_attempted", "sms_sent", "sms_received",
+      "call_initiated", "call_received", "sms_opt_out", "sms_opt_in",
+    ];
+    const iconMap: Record<string, string> = {
+      email_sent: "📧", sms_attempted: "📱", sms_sent: "📤", sms_received: "📩",
+      call_initiated: "📞", call_received: "📲", sms_opt_out: "🚫", sms_opt_in: "✅",
+    };
+
+    type TItem = {
+      key: string; icon: string; direction: string; channel: string;
+      summary: string; status?: string; timestamp: string;
+    };
+
+    const items: TItem[] = [];
+
+    for (const m of msgs) {
+      const isCall = m.channel === "call";
+      items.push({
+        key: `msg-${m.id}`,
+        icon: isCall
+          ? (m.direction === "inbound" ? "📲" : "📞")
+          : (m.direction === "inbound" ? "📩" : "📤"),
+        direction: m.direction,
+        channel: isCall ? "call" : "sms",
+        summary: isCall
+          ? `Call${m.callStatus ? ` — ${m.callStatus}` : ""}${m.duration ? ` (${m.duration}s)` : ""}`
+          : ((m.body ?? "SMS message").slice(0, 120)),
+        status: m.status ?? m.callStatus,
+        timestamp: m.createdAt,
+      });
+    }
+
+    for (const a of activities) {
+      if (!COMM_TYPES.includes(a.type)) continue;
+      items.push({
+        key: `act-${a.id}`,
+        icon: iconMap[a.type] ?? "💬",
+        direction: ["sms_received", "call_received"].includes(a.type) ? "inbound" : "outbound",
+        channel: a.type.startsWith("email") ? "email" : a.type.startsWith("call") ? "call" : "sms",
+        summary: a.title + (a.description ? ` — ${a.description.slice(0, 80)}` : ""),
+        timestamp: a.createdAt,
+      });
+    }
+
+    const seen = new Set<string>();
+    return items
+      .filter(i => { if (seen.has(i.key)) return false; seen.add(i.key); return true; })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [msgs, activities]);
+
+  const { engagementScore: es, responseRate: rr, preferredChannel, replyRisk, status } = stats;
+
+  const riskBadge: Record<string, string> = {
+    Low:    "text-green-700  bg-green-50  border-green-200",
+    Medium: "text-yellow-700 bg-yellow-50 border-yellow-200",
+    High:   "text-red-700    bg-red-50    border-red-200",
+  };
+  const statusColor: Record<string, string> = {
+    Engaged: "text-green-700", "Waiting for Reply": "text-blue-700",
+    "Needs Follow-up": "text-orange-700", Cold: "text-red-700", New: "text-gray-600",
+  };
+  const chanIcon: Record<string, string> = { SMS: "📱", Email: "📧", Call: "📞", Unknown: "—" };
+  const priorityStyle = (p: string) =>
+    p === "high"   ? "bg-orange-50 border-orange-200" :
+    p === "medium" ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200";
+
+  return (
+    <div className="p-5 space-y-5">
+
+      {/* ── Summary card ─────────────────────────────────────────────────── */}
+      <div className={`rounded-xl border p-4 ${es.bgColor} ${es.borderColor}`}>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <span className="text-xs font-bold uppercase tracking-wide text-foreground/60">
+            Communication Intelligence
+          </span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${es.bgColor} ${es.color} ${es.borderColor}`}>
+            {es.badge}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-white/70 rounded-lg p-2.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Engagement</p>
+            <p className={`text-2xl font-bold leading-none ${es.color}`}>
+              {es.score}<span className="text-xs font-normal text-muted-foreground">/100</span>
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-1 mt-1.5 overflow-hidden">
+              <div className={`h-1 rounded-full ${es.barColor}`} style={{ width: `${es.score}%` }} />
+            </div>
+          </div>
+
+          <div className="bg-white/70 rounded-lg p-2.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Response Rate</p>
+            <p className="text-2xl font-bold leading-none text-foreground">{rr.rate}%</p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {rr.inboundCount} reply · {rr.outboundCount} sent
+            </p>
+          </div>
+
+          <div className="bg-white/70 rounded-lg p-2.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Preferred</p>
+            <p className="text-sm font-semibold text-foreground mt-1">
+              {chanIcon[preferredChannel]} {preferredChannel}
+            </p>
+          </div>
+
+          <div className="bg-white/70 rounded-lg p-2.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Reply Risk</p>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${riskBadge[replyRisk]}`}>
+              {replyRisk}
+            </span>
+          </div>
+
+          <div className="bg-white/70 rounded-lg p-2.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Status</p>
+            <p className={`text-xs font-semibold mt-0.5 ${statusColor[status] ?? "text-foreground"}`}>{status}</p>
+          </div>
+
+          <div className="bg-white/70 rounded-lg p-2.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Last Reply</p>
+            <p className="text-xs text-foreground mt-0.5">
+              {rr.daysSinceLastResponse !== undefined ? `${rr.daysSinceLastResponse}d ago` : "—"}
+            </p>
+          </div>
+        </div>
+
+        {es.reasons.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {es.reasons.map((r, i) => (
+              <span key={i} className="text-[10px] bg-white/60 border border-black/10 rounded px-1.5 py-0.5 text-foreground/70">
+                {r}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Recommendations ──────────────────────────────────────────────── */}
+      {recs.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
+            Recommendations
+          </h3>
+          <div className="space-y-2">
+            {recs.map(rec => (
+              <div key={rec.id} className={`flex items-start gap-2.5 rounded-lg px-3 py-2.5 border text-sm ${priorityStyle(rec.priority)}`}>
+                <span className="text-base shrink-0">
+                  {rec.channel === "SMS" ? "📱" : rec.channel === "Call" ? "📞" : rec.channel === "Email" ? "📧" : "💡"}
+                </span>
+                <p className="text-foreground/90 leading-snug">{rec.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Unified timeline ─────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-2.5">
+          <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Communication Timeline
+          </h3>
+          {fetching && <Loader2 className="w-3 h-3 text-muted-foreground animate-spin ml-1" />}
+        </div>
+
+        {timeline.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            {fetching ? "Loading messages…" : "No communication history recorded yet."}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {timeline.map(item => (
+              <div
+                key={item.key}
+                className={`flex items-start gap-3 rounded-lg px-3 py-2.5 border text-sm ${
+                  item.direction === "inbound"
+                    ? "bg-blue-50/50 border-blue-100"
+                    : "bg-gray-50 border-gray-100"
+                }`}
+              >
+                <span className="text-base shrink-0 mt-0.5">{item.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span className={`text-[10px] font-semibold uppercase ${
+                      item.direction === "inbound" ? "text-blue-700" : "text-gray-500"
+                    }`}>
+                      {item.direction === "inbound" ? "← Inbound" : "→ Outbound"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground capitalize">{item.channel}</span>
+                    {item.status && !["delivered", "received", "completed"].includes(item.status.toLowerCase()) && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        item.status === "failed" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"
+                      }`}>
+                        {item.status}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-foreground/80 leading-snug text-xs break-words">{item.summary}</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5 whitespace-nowrap">
+                  {new Date(item.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "overview",   label: "Overview",      icon: Star },
-  { id: "workflow",   label: "Workflow",       icon: GitBranch },
-  { id: "proposal",   label: "Proposal",      icon: FileText },
+  { id: "workflow",        label: "Workflow",        icon: GitBranch },
+  { id: "communications", label: "Communications",  icon: MessageSquare },
+  { id: "proposal",       label: "Proposal",        icon: FileText },
   { id: "sow",        label: "Scope of Work", icon: ClipboardList },
   { id: "notes",      label: "Notes",         icon: StickyNote },
   { id: "history",    label: "History",       icon: History },
@@ -947,6 +1207,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
       {/* Tab content */}
       {activeTab === "overview" && <OverviewTab lead={lead} />}
       {activeTab === "workflow" && <WorkflowTab lead={lead} activities={activities} tasks={tasks} />}
+      {activeTab === "communications" && <CommunicationsTab lead={lead} activities={activities} />}
       {activeTab === "proposal" && <DocPanel lead={lead} kind="proposal" onReload={onReload} />}
       {activeTab === "sow" && <DocPanel lead={lead} kind="sow" onReload={onReload} />}
       {activeTab === "notes" && <NotesTab lead={lead} onReload={onReload} />}

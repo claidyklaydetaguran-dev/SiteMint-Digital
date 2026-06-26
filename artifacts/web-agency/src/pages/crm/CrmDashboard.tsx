@@ -159,6 +159,22 @@ export default function CrmDashboard() {
     return items;
   }, [allLeads, scoreMap]);
 
+  // ── Communication Signals (computed from lead contact fields) ────────────
+  const commHealth = useMemo(() => {
+    const now = Date.now();
+    const active = allLeads.filter(l => !["Won", "Lost"].includes(l.status));
+    return {
+      recentlyActive: active.filter(l => l.lastContactedAt &&
+        now - new Date(l.lastContactedAt).getTime() < 7 * DAY).length,
+      goingCold: active.filter(l => l.lastContactedAt &&
+        now - new Date(l.lastContactedAt).getTime() >= 7 * DAY &&
+        now - new Date(l.lastContactedAt).getTime() < 14 * DAY).length,
+      cold: active.filter(l => l.lastContactedAt &&
+        now - new Date(l.lastContactedAt).getTime() >= 14 * DAY).length,
+      neverContacted: active.filter(l => !l.lastContactedAt).length,
+    };
+  }, [allLeads]);
+
   // ── Workflow Queue (6 action-grouped buckets) ─────────────────────────────
   const workflowQueue = useMemo(
     () => computeWorkflowQueue(allLeads.map(l => ({
@@ -332,6 +348,37 @@ export default function CrmDashboard() {
           </div>
         </div>
 
+        {/* ── Communication Signals ──────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Communication Signals</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— contact recency across active leads</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-1">
+              <p className="text-3xl font-bold text-foreground">{commHealth.recentlyActive}</p>
+              <p className="text-xs font-semibold text-emerald-700">💬 Recently Active</p>
+              <p className="text-[10px] text-muted-foreground">Contacted within 7 days</p>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-1">
+              <p className="text-3xl font-bold text-foreground">{commHealth.goingCold}</p>
+              <p className="text-xs font-semibold text-yellow-700">⏳ Going Cold</p>
+              <p className="text-[10px] text-muted-foreground">No contact in 7–14 days</p>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-1">
+              <p className="text-3xl font-bold text-foreground">{commHealth.cold}</p>
+              <p className="text-xs font-semibold text-red-700">🥶 Cold</p>
+              <p className="text-[10px] text-muted-foreground">No contact in 14+ days</p>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-1">
+              <p className="text-3xl font-bold text-foreground">{commHealth.neverContacted}</p>
+              <p className="text-xs font-semibold text-gray-600">🆕 Never Contacted</p>
+              <p className="text-[10px] text-muted-foreground">No outreach recorded</p>
+            </div>
+          </div>
+        </div>
+
         {/* ── Workflow Queue ─────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -427,7 +474,7 @@ export default function CrmDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["Name","Health","Email","Phone","Last Activity","Time","Stage","Assigned"].map(h => (
+                    {["Name","Health","Contact","Email","Phone","Last Activity","Time","Stage","Assigned"].map(h => (
                       <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -462,6 +509,32 @@ export default function CrmDashboard() {
                               </div>
                             </Link>
                           ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        {/* Contact signal */}
+                        <td className="px-4 py-3">
+                          {(() => {
+                            if (!lead.lastContactedAt) return (
+                              <span title="Never contacted" className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 border border-gray-200 rounded-full px-1.5 py-0.5">
+                                🆕 New
+                              </span>
+                            );
+                            const days = Math.floor((Date.now() - new Date(lead.lastContactedAt).getTime()) / DAY);
+                            if (days < 7) return (
+                              <span title={`Contacted ${days}d ago`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                                💬 {days}d
+                              </span>
+                            );
+                            if (days < 14) return (
+                              <span title={`Contacted ${days}d ago`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-full px-1.5 py-0.5">
+                                ⏳ {days}d
+                              </span>
+                            );
+                            return (
+                              <span title={`Contacted ${days}d ago`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5">
+                                🥶 {days}d
+                              </span>
+                            );
+                          })()}
                         </td>
                         {/* Email */}
                         <td className="px-4 py-3">
