@@ -1,0 +1,351 @@
+You are working on the existing project for https://sitemintdigital.com.
+
+Current CRM route:
+https://sitemintdigital.com/admin/crm
+
+IMPORTANT:
+Do not randomly rebuild the whole app.
+First inspect the existing codebase, routes, auth, database schema, components, and CRM pages.
+Preserve what already works.
+Fix broken logic first, then improve structure.
+Do not use auto schema sync.
+All database changes must use Drizzle Kit migrations.
+
+PROJECT CONTEXT:
+App Type: Multi-tenant SaaS B2B CRM
+Tech Stack:
+
+* React + TypeScript frontend
+* Node.js / Express backend
+* PostgreSQL with Drizzle ORM
+* Tailwind CSS
+* shadcn/ui components
+
+Target Users:
+
+* Sales teams
+* Small business owners
+* Account managers
+* Website agency clients
+
+Core Goal:
+Create a secure, beautiful, responsive, multi-tenant CRM where each company/user can only access their own leads, contacts, deals, and activity.
+
+PHASE 0 — INSPECT, AUDIT, AND PLAN FIRST
+
+Before coding, do the following:
+
+1. Inspect the existing folder structure.
+2. Identify current frontend CRM routes.
+3. Identify current backend API routes.
+4. Identify current authentication/session logic.
+5. Identify current database schema and Drizzle setup.
+6. Check why the CRM may crash or show a blank screen.
+7. Check browser console errors, import errors, API errors, missing env variables, broken route guards, and database connection issues.
+8. Present a structured development plan before making major code changes.
+
+Return this first:
+
+A. Current CRM problems found
+B. Existing folder structure summary
+C. Proposed improved folder tree
+D. Database migration workflow
+E. Implementation order
+F. Risks and what you will avoid breaking
+
+PHASE 1 — CORE ENGINE
+
+Build the CRM foundation with strict multi-tenant security.
+
+DATABASE SCHEMA
+
+Use PostgreSQL with Drizzle ORM.
+
+Create or update these tables through migrations only:
+
+users:
+
+* id UUID primary key
+* email text unique not null
+* password_hash text not null
+* company_name text not null
+* role text default 'owner'
+* created_at timestamp default now()
+
+contacts:
+
+* id UUID primary key
+* user_id UUID not null references users(id) on delete cascade
+* first_name text not null
+* last_name text not null
+* email text
+* phone text
+* company text
+* status text default 'new'
+* lifetime_value numeric default 0
+* created_at timestamp default now()
+
+Important:
+Every contact query must be scoped by authenticated user_id.
+User A must never see, edit, delete, or search User B’s records.
+Never query contacts without a user_id filter.
+
+AUTHENTICATION & SECURITY
+
+Build secure email/password authentication.
+
+Requirements:
+
+* Register page
+* Login page
+* Logout feature
+* Password hashing using bcrypt or argon2
+* Secure JWT or session-based authentication
+* Auth middleware for protected API routes
+* Frontend protected dashboard routes
+* Redirect unauthenticated users to login
+* Prevent authenticated users from seeing login/register unnecessarily
+* Store tokens/cookies securely
+* Never expose password_hash to frontend
+
+CORE CRM UI LAYOUT
+
+Create a polished CRM dashboard layout.
+
+Pages:
+
+* Dashboard
+* Contacts
+* Deals
+* Settings
+
+Layout:
+
+* Persistent modern sidebar
+* Mobile responsive sidebar/drawer
+* Top bar with page title
+* Profile dropdown
+* Functional logout button
+* Dark-mode friendly design
+* Neutral zinc + rich indigo color palette
+* shadcn/ui components where appropriate
+
+CRM Design Vibe:
+Clean, fast, premium SaaS dashboard.
+Minimalist but not empty.
+Modern spacing, rounded cards, subtle borders, soft shadows, and strong hierarchy.
+
+CONTACTS MODULE
+
+Build a fully working Contacts page.
+
+Features:
+
+* Add contact form
+* Edit contact
+* Delete contact
+* Search contacts
+* Filter by status
+* Empty state for new users
+* Loading state
+* Error state
+* Responsive table/card layout
+* Zod validation on frontend and backend
+
+Contact statuses:
+
+* new
+* contacted
+* qualified
+* proposal
+* won
+* lost
+
+Validation:
+
+* first_name required
+* last_name required
+* email must be valid if provided
+* phone optional
+* lifetime_value must be a valid number
+
+API ROUTES
+
+Create protected routes:
+
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+GET /api/auth/me
+
+GET /api/contacts
+POST /api/contacts
+GET /api/contacts/:id
+PATCH /api/contacts/:id
+DELETE /api/contacts/:id
+
+Every contacts endpoint must require authentication and enforce user ownership.
+
+PROPOSED FOLDER STRUCTURE
+
+Use or migrate toward this structure if compatible with the existing app:
+
+server/
+db/
+index.ts
+schema.ts
+migrations/
+middleware/
+auth.ts
+errorHandler.ts
+routes/
+auth.routes.ts
+contacts.routes.ts
+controllers/
+auth.controller.ts
+contacts.controller.ts
+services/
+auth.service.ts
+contacts.service.ts
+validators/
+auth.schema.ts
+contacts.schema.ts
+utils/
+password.ts
+tokens.ts
+
+client/
+src/
+app/
+routes/
+components/
+layout/
+crm-sidebar.tsx
+crm-topbar.tsx
+profile-menu.tsx
+ui/
+features/
+auth/
+login-page.tsx
+register-page.tsx
+auth-provider.tsx
+protected-route.tsx
+contacts/
+contacts-page.tsx
+contact-form.tsx
+contacts-table.tsx
+contact-empty-state.tsx
+contact-filters.tsx
+dashboard/
+dashboard-page.tsx
+deals/
+deals-page.tsx
+settings/
+settings-page.tsx
+lib/
+api.ts
+utils.ts
+validators.ts
+
+MIGRATION WORKFLOW
+
+Use Drizzle Kit properly.
+
+Required:
+
+1. Update schema.ts.
+2. Generate migration with Drizzle Kit.
+3. Review generated SQL.
+4. Run migration.
+5. Never use push/auto-sync for production-style changes.
+6. Add notes in the response showing which migration was created and what it changed.
+
+TESTING REQUIREMENTS
+
+After implementation, test:
+
+Authentication:
+
+* New user can register
+* Existing user can login
+* Logout works
+* Protected routes block unauthenticated users
+
+Multi-tenancy:
+
+* User A creates contacts
+* User B cannot see User A contacts
+* User B cannot access User A contact by direct ID
+* Delete/edit only works for owner
+
+Contacts:
+
+* Add contact works
+* Search works
+* Filter works
+* Edit works
+* Delete works
+* Empty state appears for new accounts
+* Validation errors display clearly
+
+UI:
+
+* CRM does not blank screen
+* Sidebar works on desktop and mobile
+* Dark mode styling looks clean
+* No console errors
+* No TypeScript errors
+* No broken imports
+
+CRITICAL RULES
+
+Do not:
+
+* Rebuild the whole app without explaining why
+* Remove working pages
+* Break the public website
+* Expose all users’ contacts
+* Use database auto-sync
+* Skip migrations
+* Hardcode secrets
+* Store passwords in plain text
+* Create fake auth that only works visually
+
+Do:
+
+* Inspect first
+* Plan first
+* Use migrations
+* Keep code modular
+* Make frontend and backend clean
+* Add validation
+* Protect every CRM route
+* Make the CRM production-ready
+* Fix blank screen crashes before adding new features
+
+FINAL OUTPUT REQUIRED
+
+After changes, give me:
+
+1. Summary of what was fixed
+2. Files changed
+3. Migration created
+4. How to test locally
+5. Any environment variables needed
+6. Known limitations
+7. Recommended Phase 2 features
+
+PHASE 2 SHOULD NOT BE BUILT YET, but recommend it after Phase 1.
+
+Potential Phase 2 ideas:
+
+* Deals pipeline
+* Lead source tracking
+* Activity timeline
+* Notes and tasks
+* Email/SMS logging
+* Follow Up Boss-style calling/texting integrations
+* Role-based team permissions
+* Company/team accounts
+* Import/export contacts
+* CRM analytics dashboard
