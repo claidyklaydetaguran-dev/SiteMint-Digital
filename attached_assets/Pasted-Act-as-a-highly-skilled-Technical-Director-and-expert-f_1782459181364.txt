@@ -1,0 +1,221 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Upgrade the CRM Executive Dashboard with Quick Actions and Daily Command Center widgets.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/leads is Leads / People.
+* /admin/crm/pipeline is Lead Pipeline.
+* /admin/crm/deals is Deals Kanban.
+* /admin/crm/inbox is wired to real crm_messages.
+* /admin/crm/reporting is now a real analytics page.
+* Global CRM search is now wired to real CRM leads.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Do NOT break Discovery Portal.
+Do NOT remove working dashboard charts.
+Use existing APIs only if possible.
+
+Goal:
+Make /admin/crm/dashboard feel like the main daily sales command center.
+
+TASK 1 — INSPECT CURRENT CRM DASHBOARD
+
+Inspect:
+
+1. CrmExecutiveDashboard.tsx
+2. Existing dashboard data fetching
+3. Existing stats cards and charts
+4. Existing available API endpoints:
+
+   * GET /api/crm/stats
+   * GET /api/crm/deals/stats
+   * GET /api/crm/leads
+   * GET /api/crm/tasks
+   * GET /api/crm/conversations
+
+Report briefly what data is already being loaded before changing code.
+
+TASK 2 — ADD QUICK ACTIONS ROW
+
+Below the main KPI/stat cards, add a polished “Quick Actions” section.
+
+Create clickable cards for:
+
+1. Add Lead
+
+* opens existing add lead flow if available
+* otherwise routes to /admin/crm/leads with clear intent
+* icon: user plus
+
+2. Lead Pipeline
+
+* routes to /admin/crm/pipeline
+
+3. Deals Kanban
+
+* routes to /admin/crm/deals
+
+4. Inbox
+
+* routes to /admin/crm/inbox
+* show unread/inbound count badge if conversation data is available
+
+5. Tasks
+
+* routes to /admin/crm/tasks
+* show overdue count badge if tasks data is available
+
+6. Import Leads
+
+* routes to /admin/crm/import
+
+Design:
+
+* premium SaaS card style
+* icon
+* short label
+* helper text
+* optional badge
+* hover effect
+* responsive grid
+
+TASK 3 — ADD “TODAY’S PRIORITIES” WIDGET
+
+Add a dashboard card called:
+
+“Today’s Priorities”
+
+Use existing data from leads/tasks/conversations.
+
+Show up to 5 priority items:
+
+* overdue tasks
+* follow-ups due today
+* high-priority leads with no recent contact
+* inbound messages that may need review
+
+Each item should show:
+
+* type badge
+* title
+* short reason
+* link to relevant page
+
+If no priorities:
+Show positive empty state:
+“You’re caught up for today.”
+
+TASK 4 — ADD “HOT LEADS TO REVIEW” WIDGET
+
+Add a card called:
+
+“Hot Leads to Review”
+
+Use GET /api/crm/leads.
+
+Rank leads using simple rule-based logic:
+
+* priority High first
+* estimatedValue higher first if available
+* nextFollowUpAt due/overdue first
+* status not Won/Lost first
+
+Show up to 5 leads:
+
+* name
+* company
+* status
+* priority
+* estimated value if available
+* button/link to view lead
+
+Do not call this AI.
+Label if needed as:
+“Rule-based”
+
+TASK 5 — ADD “RECENT COMMUNICATIONS” WIDGET
+
+Use GET /api/crm/conversations if available.
+
+Show up to 5 recent threads:
+
+* lead/contact name
+* channel badge: SMS or Call
+* direction: inbound/outbound
+* last message preview
+* timestamp
+* link to /admin/crm/inbox
+
+If no messages:
+Show empty state:
+“No messages yet. SMS and calls will appear here once Twilio is connected.”
+
+TASK 6 — OPTIONAL SAFE POLISH
+
+Add a small top-right refresh button:
+
+* Re-fetch dashboard data
+* Show loading state while refreshing
+* Do not reload the whole page
+
+TASK 7 — DESIGN REQUIREMENTS
+
+The dashboard should feel like a true command center:
+
+* clean premium cards
+* clear hierarchy
+* readable spacing
+* responsive grid
+* no fake data
+* no clutter
+* good empty states
+* no broken charts when data is missing
+
+TASK 8 — TESTING
+
+Test:
+
+1. /admin/crm/dashboard loads.
+2. Existing KPI cards still work.
+3. Existing charts still work.
+4. Quick Actions cards navigate correctly.
+5. Inbox badge displays safely.
+6. Tasks overdue badge displays safely.
+7. Today’s Priorities works with data.
+8. Today’s Priorities works with no data.
+9. Hot Leads to Review works.
+10. Recent Communications works.
+11. Refresh button re-fetches data if implemented.
+12. /admin/dashboard still works.
+13. /admin/crm/leads still works.
+14. /admin/crm/pipeline still works.
+15. /admin/crm/deals still works.
+16. /admin/crm/inbox still works.
+17. /admin/crm/reporting still works.
+18. No TypeScript errors except pre-existing unrelated issue.
+19. No console errors.
+20. No database migrations created.
+21. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. Data sources used
+4. Quick Actions completed
+5. Today’s Priorities logic
+6. Hot Leads ranking logic
+7. Recent Communications behavior
+8. Tests performed
+9. Confirmation no schema/database changes were made
+10. Known limitations
+11. Recommended next prompt
