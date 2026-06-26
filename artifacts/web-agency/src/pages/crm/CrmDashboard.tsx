@@ -4,6 +4,7 @@ import { CrmLayout } from "./CrmLayout";
 import { Phone, MessageSquare, SlidersHorizontal, AlertTriangle, TrendingUp, Zap, GitBranch, ChevronRight } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
 import { computeWorkflowQueue } from "@/lib/workflowEngine";
+import { computeSimplifiedDisc, DISC_META, type DiscStyle } from "@/lib/discEngine";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -83,6 +84,7 @@ export default function CrmDashboard() {
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStage, setFilterStage] = useState("");
+  const [filterDisc, setFilterDisc]   = useState("");
 
   useEffect(() => {
     if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }

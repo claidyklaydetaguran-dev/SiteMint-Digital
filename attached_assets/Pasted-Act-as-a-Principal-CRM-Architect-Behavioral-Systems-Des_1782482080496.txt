@@ -1,0 +1,419 @@
+Act as a Principal CRM Architect, Behavioral Systems Designer, Technical Director, and Senior Full-Stack Engineer.
+
+PROJECT
+
+Sitemint Digital CRM
+
+Current completed modules:
+
+✓ Discovery Portal
+✓ CRM Dashboard
+✓ CRM Reporting
+✓ CRM Inbox
+✓ CRM Import
+✓ Lead Health Engine
+✓ Workflow Engine
+✓ Communication Intelligence
+✓ Sales Workspace
+✓ Proposal Generator
+✓ Scope of Work Generator
+✓ SMS
+✓ Email
+✓ Calls
+✓ Activities
+✓ Preferred Channel
+✓ Engagement Score
+
+======================================================
+OBJECTIVE
+=========
+
+Build the DISC Communication Intelligence Engine.
+
+IMPORTANT:
+
+This is NOT AI.
+
+This is NOT OpenAI.
+
+This is a transparent rule-based behavioral engine.
+
+Every score must be explainable.
+
+This engine will later power:
+
+* Email Campaign Automation
+* SMS Automation
+* AI Email Writer
+* Call Scripts
+* Proposal Writing Style
+* Follow-up Recommendations
+* Sales Coaching
+
+Do NOT build those yet.
+
+======================================================
+IMPORTANT
+=========
+
+Do NOT rebuild CRM pages.
+
+Do NOT touch Twilio webhook routes.
+
+Do NOT modify Communication Intelligence.
+
+Do NOT modify Lead Health Engine.
+
+Do NOT use auto schema sync.
+
+No AI API calls.
+
+No LLM calls.
+
+No database schema changes unless absolutely necessary.
+
+Reuse existing CRM data.
+
+======================================================
+TASK 1 — INSPECT AVAILABLE SIGNALS
+==================================
+
+Inspect existing CRM data sources.
+
+Examples:
+
+Lead fields
+
+Discovery responses
+
+SMS history
+
+Email history
+
+Call history
+
+Activity history
+
+Response timing
+
+Message length
+
+Reply frequency
+
+Preferred channel
+
+Engagement score
+
+Health score
+
+Workflow state
+
+Determine what behavioral signals already exist.
+
+Return a short signal inventory before coding.
+
+======================================================
+TASK 2 — CREATE DISC ENGINE
+===========================
+
+Create:
+
+src/lib/discEngine.ts
+
+Pure TypeScript.
+
+Zero React.
+
+Zero API calls.
+
+Export:
+
+computeDiscProfile()
+
+computeCommunicationTone()
+
+computeConfidence()
+
+computeBehaviorReasons()
+
+Inputs:
+
+Lead
+
+Messages
+
+Activities
+
+Discovery data (if linked)
+
+Outputs:
+
+Driver score
+
+Amiable score
+
+Expressive score
+
+Analytical score
+
+Primary style
+
+Secondary style
+
+Confidence %
+
+Reason list
+
+======================================================
+TASK 3 — RULE-BASED DISC SCORING
+================================
+
+Use transparent scoring.
+
+Examples only (adjust if better):
+
+Driver
+
+* short replies
+
+* fast responses
+
+* decisive status changes
+
+* high urgency
+
+* direct wording
+
+Analytical
+
+* long emails
+
+* multiple questions
+
+* proposal reviewed repeatedly
+
+* detailed notes
+
+* comparison requests
+
+Amiable
+
+* relationship language
+
+* appreciation
+
+* slower thoughtful replies
+
+* family/team references
+
+Expressive
+
+* emojis
+
+* enthusiastic wording
+
+* excitement
+
+* storytelling
+
+* multiple exclamation marks
+
+Every score must include reasons.
+
+No black-box calculations.
+
+======================================================
+TASK 4 — COMMUNICATION PROFILE
+==============================
+
+Create a reusable Communication Profile object.
+
+Display:
+
+Primary DISC
+
+Secondary DISC
+
+Confidence
+
+Preferred Channel
+
+Communication Length
+
+Decision Speed
+
+Suggested Tone
+
+Suggested Follow-up Style
+
+======================================================
+TASK 5 — CRM UI
+===============
+
+Lead Detail
+
+Add:
+
+Communication Profile card.
+
+Display:
+
+DISC radar/bar visualization
+
+Primary style
+
+Secondary style
+
+Confidence
+
+Reasons
+
+Suggested communication approach
+
+Examples:
+
+Driver
+
+"Keep communication brief and outcome-focused."
+
+Analytical
+
+"Provide supporting data and comparisons."
+
+Amiable
+
+"Build trust before asking for commitment."
+
+Expressive
+
+"Be enthusiastic and paint the vision."
+
+======================================================
+TASK 6 — DASHBOARD
+==================
+
+Add a DISC overview widget.
+
+Examples:
+
+Driver 22%
+
+Analytical 35%
+
+Amiable 28%
+
+Expressive 15%
+
+Based on active leads.
+
+======================================================
+TASK 7 — SEARCH
+===============
+
+Allow filtering by DISC profile.
+
+Examples:
+
+Driver
+
+Analytical
+
+Amiable
+
+Expressive
+
+Hot Driver
+
+Cold Analytical
+
+No schema changes required if this can be computed client-side.
+
+======================================================
+TASK 8 — PREPARE FOR CAMPAIGNS
+==============================
+
+Do NOT build campaigns yet.
+
+Instead expose a reusable helper:
+
+getCommunicationStyle()
+
+Example output:
+
+Tone:
+Active
+
+Length:
+Short
+
+Emotion:
+Professional
+
+CTA:
+Direct
+
+Greeting:
+Brief
+
+Closing:
+Action-oriented
+
+Future email automation will consume this helper.
+
+======================================================
+TASK 9 — PERFORMANCE
+====================
+
+Memoize calculations.
+
+Avoid recomputing DISC for every render.
+
+Reuse already-loaded CRM data.
+
+======================================================
+TASK 10 — TESTING
+=================
+
+Verify:
+
+Lead Detail still loads.
+
+Sales Workspace still works.
+
+Dashboard still works.
+
+CRM Search still works.
+
+DISC profile renders with no messages.
+
+DISC profile improves as more communication history exists.
+
+Confidence behaves reasonably.
+
+No Twilio changes.
+
+No schema changes unless required.
+
+No TypeScript errors except known unrelated issue.
+
+No console errors.
+
+======================================================
+FINAL REPORT
+============
+
+Return:
+
+1. Files inspected
+2. Files changed
+3. DISC engine architecture
+4. Scoring rules
+5. Confidence algorithm
+6. Communication Profile structure
+7. Dashboard integration
+8. Search integration
+9. Performance considerations
+10. Tests performed
+11. Schema changes
+12. Known limitations
+13. Recommended Prompt 15

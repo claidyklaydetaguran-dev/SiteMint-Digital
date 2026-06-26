@@ -12,6 +12,11 @@ import {
   computeCommunicationStats,
   type CiLead,
 } from "@/lib/communicationIntelligence";
+import {
+  computeDiscProfile,
+  DISC_META,
+  type DiLead,
+} from "@/lib/discEngine";
 import { SalesWorkspace } from "./SalesWorkspace";
 
 const token = () => localStorage.getItem("adminToken") || "";
@@ -130,6 +135,19 @@ export default function CrmLeadDetail() {
       smsOptOut: lead.smsOptOut,
     };
     return computeCommunicationStats(ciLead, activities, []);
+  }, [lead, activities]);
+  const discProfile = useMemo(() => {
+    if (!lead) return null;
+    const diLead: DiLead = {
+      id: lead.id, status: lead.status, priority: lead.priority,
+      source: lead.source, serviceInterest: lead.serviceInterest,
+      notes: lead.notes, tags: lead.tags, estimatedValue: lead.estimatedValue,
+      packageType: lead.packageType, proposalStatus: lead.proposalStatus,
+      discoveryFormStatus: lead.discoveryFormStatus,
+      lastContactedAt: lead.lastContactedAt, nextFollowUpAt: lead.nextFollowUpAt,
+      smsConsent: lead.smsConsent, smsOptOut: lead.smsOptOut,
+    };
+    return computeDiscProfile(diLead, [], activities);
   }, [lead, activities]);
   const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"sms"|"email">("timeline");
   const smsThreadRef = useRef<HTMLDivElement>(null);
