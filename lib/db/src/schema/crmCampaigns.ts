@@ -44,6 +44,8 @@ export const crmCampaignRecipients = pgTable("crm_campaign_recipients", {
   personalizedSubject: text("personalized_subject"),
   personalizedBody: text("personalized_body"),
   lastError: text("last_error"),
+  // Resend email id — stored after a live send so webhook events can be matched back
+  resendEmailId: text("resend_email_id"),
 });
 
 export const insertCrmCampaignRecipientSchema = createInsertSchema(crmCampaignRecipients).omit({

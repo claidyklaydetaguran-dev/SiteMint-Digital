@@ -109,6 +109,16 @@ interface CampaignAnalytics {
     total: number;
     rate: number;
   };
+  eventMetrics?: {
+    hasEvents: boolean;
+    opened: number;
+    clicked: number;
+    bounced: number;
+    deliveryFailed: number;
+    openRate: number;
+    clickRate: number;
+    bounceRate: number;
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -913,15 +923,57 @@ export default function CrmCampaigns() {
 
           {a && (
             <>
-              {/* Open/click tracking notice */}
-              <div className="flex items-start gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                <Info className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-gray-500">
-                  <strong className="text-gray-600">Open and click tracking are not configured yet.</strong>{" "}
-                  These metrics require Resend webhook integration and will be available in a future phase.
-                  Analytics below are based on send-time recipient status only.
-                </p>
-              </div>
+              {/* Open/click/bounce tracking — shows real event cards or setup notice */}
+              {a.eventMetrics?.hasEvents ? (
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <h2 className="text-sm font-bold text-foreground">Email Engagement</h2>
+                    <span className="ml-auto text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      Tracked by Resend webhooks
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mb-4">
+                      {[
+                        { label: "Opens",          value: a.eventMetrics.opened,        color: "bg-blue-50   border-blue-200   text-blue-700" },
+                        { label: "Clicks",         value: a.eventMetrics.clicked,       color: "bg-violet-50 border-violet-200 text-violet-700" },
+                        { label: "Bounces",        value: a.eventMetrics.bounced,       color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                        { label: "Open Rate",      value: `${a.eventMetrics.openRate}%`,   color: "bg-blue-50   border-blue-200   text-blue-700" },
+                        { label: "Click Rate",     value: `${a.eventMetrics.clickRate}%`,  color: "bg-violet-50 border-violet-200 text-violet-700" },
+                        { label: "Bounce Rate",    value: `${a.eventMetrics.bounceRate}%`, color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
+                          <p className="text-xl font-bold">{value}</p>
+                          <p className="text-[10px] font-semibold mt-0.5 opacity-70 uppercase tracking-wide">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {a.eventMetrics.deliveryFailed > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        {a.eventMetrics.deliveryFailed} delivery failure{a.eventMetrics.deliveryFailed !== 1 ? "s" : ""} reported by Resend.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="flex items-start gap-2.5 px-4 py-3">
+                    <Info className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">
+                        <strong className="text-gray-600">Open and click tracking are not configured yet, or no events have been received.</strong>{" "}
+                        Analytics below are based on send-time recipient status only.
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        Webhook URL: <code className="font-mono bg-white border border-gray-200 rounded px-1">/api/crm/webhooks/resend</code>
+                        {" · "}Required env: <code className="font-mono bg-white border border-gray-200 rounded px-1">RESEND_WEBHOOK_SECRET</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Summary tiles — 6 cards */}
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">

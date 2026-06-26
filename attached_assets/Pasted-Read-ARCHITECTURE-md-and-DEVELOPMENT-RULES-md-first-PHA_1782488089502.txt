@@ -1,0 +1,205 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 12 — Resend Webhook Integration for Campaign Open / Click / Bounce Tracking
+
+MODULE:
+Campaigns + API Server only.
+
+IMPORTANT:
+Work only inside Campaigns/API Server unless compilation requires otherwise.
+Do not touch locked modules.
+Do not touch Twilio routes.
+Do not refactor stable modules.
+Stay within the default change budget if possible.
+Make surgical edits only.
+Use Drizzle migrations only.
+Do not create fake analytics.
+Do not show open/click rates unless real event data exists.
+
+CURRENT STATE:
+crm_campaigns exists.
+crm_campaign_recipients exists.
+crm_campaign_events exists.
+Campaign send works.
+Campaign analytics works.
+Campaign performance insights work.
+Open/click tracking is not configured yet.
+
+OBJECTIVE:
+Wire real Resend webhook events into crm_campaign_events so campaign analytics can show real open, click, bounce, and delivery-failure metrics.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* crmCampaigns schema
+* campaign send routes in crm.ts
+* campaign analytics route in crm.ts
+* CrmCampaigns.tsx analytics view
+* package.json only if a webhook verification dependency is needed
+
+Do not inspect unrelated CRM modules.
+
+TASK 2 — ADD resend_email_id COLUMN
+
+Add to crm_campaign_recipients:
+
+resend_email_id text nullable
+
+Use Drizzle migration/push properly.
+
+Optional if easy:
+Add index on resend_email_id for webhook lookup.
+
+TASK 3 — STORE RESEND EMAIL ID AT SEND TIME
+
+During campaign send and single-recipient resend:
+
+* Capture the email id returned by Resend.
+* Store it in crm_campaign_recipients.resend_email_id.
+* If CRM_EMAIL_TEST_MODE is true and no real Resend id exists, store null and do not create fake event IDs.
+* Do not break existing test mode.
+
+TASK 4 — ADD RESEND WEBHOOK ENDPOINT
+
+Add public endpoint:
+
+POST /api/crm/webhooks/resend
+
+No admin auth guard.
+
+Security:
+
+* Use RESEND_WEBHOOK_SECRET.
+* Verify the webhook signature if Resend/Svix verification is already supported or can be added safely.
+* If the secret is missing, return a clear 500/disabled response in non-production or reject safely.
+* Do not accept unverified production webhooks.
+
+Parse event types:
+
+* email.opened
+* email.clicked
+* email.bounced
+* email.delivery_failed
+
+For each event:
+
+1. Extract Resend email id from payload.
+2. Find crm_campaign_recipients row by resend_email_id.
+3. If no match, return 200 with ignored: true.
+4. If matched, insert crm_campaign_events:
+
+   * campaign_recipient_id
+   * event_type:
+
+     * opened
+     * clicked
+     * bounced
+     * failed
+   * metadata
+   * occurred_at from payload timestamp if available, otherwise now()
+5. For bounce or delivery failure:
+
+   * update recipient status to failed
+   * update last_error with event reason if available
+
+Important:
+
+* Webhook must be idempotent if possible.
+* If duplicate events come in, do not crash.
+* Do not modify Twilio webhook routes.
+
+TASK 5 — UPDATE ANALYTICS API
+
+Update:
+
+GET /api/crm/campaigns/:id/analytics
+
+Add event metrics only when event data exists:
+
+eventMetrics:
+{
+hasEvents,
+opened,
+clicked,
+bounced,
+deliveryFailed,
+openRate,
+clickRate,
+bounceRate
+}
+
+Calculate rates based on sent recipients.
+
+Do not show fake values.
+
+TASK 6 — UPDATE ANALYTICS UI
+
+In CrmCampaigns.tsx analytics view:
+
+If eventMetrics.hasEvents is false:
+Show:
+“Open and click tracking are not configured yet or no events have been received.”
+
+If true:
+Show real cards:
+
+* Open Rate
+* Click Rate
+* Bounce Rate
+* Opens
+* Clicks
+* Bounces
+
+Clearly label:
+“Tracked by Resend webhooks.”
+
+TASK 7 — ADD SETUP NOTE
+
+Add a small setup note in analytics view:
+
+Webhook URL:
+`/api/crm/webhooks/resend`
+
+Required env:
+RESEND_WEBHOOK_SECRET
+
+Do not expose secret value.
+
+TASK 8 — TESTING
+
+Test:
+
+1. Migration adds resend_email_id.
+2. Campaign send still works.
+3. Test mode still works and does not fake event IDs.
+4. Live send path stores Resend id when available.
+5. Webhook rejects invalid/missing signature if verification enabled.
+6. Webhook accepts valid simulated payload if possible.
+7. Unknown Resend email id returns ignored safely.
+8. Matching event writes crm_campaign_events.
+9. Bounce/failure updates recipient status failed.
+10. Analytics endpoint includes eventMetrics.
+11. UI shows no-event notice when no events exist.
+12. UI shows real event cards when events exist.
+13. No fake open/click rates.
+14. No scheduling endpoint exists.
+15. No Twilio files changed.
+16. No locked modules changed.
+17. TypeScript passes except pre-existing unrelated issue.
+18. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Migration created
+4. resend_email_id behavior
+5. Webhook verification behavior
+6. Event mapping behavior
+7. Analytics API updates
+8. Analytics UI updates
+9. Tests performed
+10. Known limitations
+11. Recommended next phase

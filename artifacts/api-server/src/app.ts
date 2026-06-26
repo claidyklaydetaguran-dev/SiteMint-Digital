@@ -26,6 +26,8 @@ app.use(
   }),
 );
 app.use(cors());
+// Capture raw body for Resend webhook sig verification BEFORE json() runs
+app.use("/api/crm/webhooks/resend", express.raw({ type: "application/json" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

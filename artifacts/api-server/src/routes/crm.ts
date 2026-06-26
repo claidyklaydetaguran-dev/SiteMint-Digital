@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmMessages } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
@@ -660,6 +660,33 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
       };
     }
 
+    // Event metrics from crm_campaign_events (opened, clicked, bounced, failed via webhook)
+    const recipientIds = recipients.map(r => r.id);
+    let eventMetrics = { hasEvents: false, opened: 0, clicked: 0, bounced: 0, deliveryFailed: 0, openRate: 0, clickRate: 0, bounceRate: 0 };
+    if (recipientIds.length > 0) {
+      const events = await db
+        .select({ eventType: crmCampaignEvents.eventType })
+        .from(crmCampaignEvents)
+        .where(inArray(crmCampaignEvents.campaignRecipientId, recipientIds));
+      if (events.length > 0) {
+        const opened        = events.filter(e => e.eventType === "opened").length;
+        const clicked       = events.filter(e => e.eventType === "clicked").length;
+        const bounced       = events.filter(e => e.eventType === "bounced").length;
+        const deliveryFailed = events.filter(e => e.eventType === "failed").length;
+        const sentCount = sent > 0 ? sent : 1; // avoid div/0
+        eventMetrics = {
+          hasEvents:    true,
+          opened,
+          clicked,
+          bounced,
+          deliveryFailed,
+          openRate:    Math.round((opened  / sentCount) * 100),
+          clickRate:   Math.round((clicked / sentCount) * 100),
+          bounceRate:  Math.round((bounced / sentCount) * 100),
+        };
+      }
+    }
+
     res.json({
       campaign,
       totals: { recipients: total, sent, failed, skipped, selected, sendRate, failureRate },
@@ -674,6 +701,7 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
         lastError:    r.lastError,
       })),
       replyEstimate,
+      eventMetrics,
     });
   } catch (err) {
     req.log.error({ err }, "Error fetching campaign analytics");
@@ -733,10 +761,11 @@ router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: R
       const subject = r.personalizedSubject ?? campaign.subject;
       const body    = r.personalizedBody   ?? campaign.body;
 
+      let resendEmailId: string | null = null;
       try {
         if (!isTestMode) {
           const resend = getResend();
-          await resend.emails.send({
+          const { data } = await resend.emails.send({
             from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
             to: [r.leadEmail],
             subject,
@@ -744,9 +773,10 @@ router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: R
           });
           // 200 ms rate-limit guard between live sends
           await new Promise(resolve => setTimeout(resolve, 200));
+          resendEmailId = data?.id ?? null;
         }
         await db.update(crmCampaignRecipients)
-          .set({ status: "sent", sentAt: new Date(), lastError: null })
+          .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId })
           .where(eq(crmCampaignRecipients.id, r.id));
         results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "sent" });
         sent++;
@@ -807,18 +837,20 @@ router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, a
     const body    = r.personalizedBody   ?? campaign.body;
     const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
 
+    let resendEmailIdSingle: string | null = null;
     try {
       if (!isTestMode) {
         const resend = getResend();
-        await resend.emails.send({
+        const { data } = await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
           to: [r.leadEmail],
           subject,
           html: body.replace(/\n/g, "<br>"),
         });
+        resendEmailIdSingle = data?.id ?? null;
       }
       await db.update(crmCampaignRecipients)
-        .set({ status: "sent", sentAt: new Date(), lastError: null })
+        .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId: resendEmailIdSingle })
         .where(eq(crmCampaignRecipients.id, recipientId));
       req.log.info({ campaignId: id, recipientId, testMode: isTestMode }, "Recipient resent");
       res.json({ ok: true, status: "sent", testMode: isTestMode, email: r.leadEmail });
@@ -832,6 +864,98 @@ router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, a
   } catch (err) {
     req.log.error({ err }, "Error resending to recipient");
     res.status(500).json({ error: "Failed to resend" });
+  }
+});
+
+// ── Resend Webhook ────────────────────────────────────────────────────────────
+// Public endpoint — no admin auth. Signature verified via svix (RESEND_WEBHOOK_SECRET).
+router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
+  try {
+    const secret = process.env.RESEND_WEBHOOK_SECRET;
+    if (!secret) {
+      req.log.warn("RESEND_WEBHOOK_SECRET not set — webhook endpoint disabled");
+      res.status(500).json({ error: "Webhook not configured — RESEND_WEBHOOK_SECRET is missing" });
+      return;
+    }
+
+    // req.body is a Buffer thanks to express.raw() mounted in app.ts for this path
+    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body);
+
+    // Verify Resend webhook signature using svix
+    let payload: Record<string, unknown>;
+    try {
+      const { Webhook } = await import("svix");
+      const wh = new Webhook(secret);
+      payload = wh.verify(rawBody, {
+        "svix-id":        req.headers["svix-id"] as string,
+        "svix-timestamp": req.headers["svix-timestamp"] as string,
+        "svix-signature": req.headers["svix-signature"] as string,
+      }) as Record<string, unknown>;
+    } catch (verifyErr) {
+      req.log.warn({ err: verifyErr }, "Resend webhook signature verification failed");
+      res.status(400).json({ error: "Invalid webhook signature" });
+      return;
+    }
+
+    // Map Resend event type → internal event_type
+    const RESEND_EVENT_MAP: Record<string, string> = {
+      "email.opened":          "opened",
+      "email.clicked":         "clicked",
+      "email.bounced":         "bounced",
+      "email.delivery_failed": "failed",
+    };
+    const resendEventType = (payload.type as string) ?? "";
+    const eventType = RESEND_EVENT_MAP[resendEventType];
+    if (!eventType) {
+      // Unknown event type — ack but ignore
+      res.json({ ok: true, ignored: true, reason: "unknown_event_type" });
+      return;
+    }
+
+    // Extract Resend email id from payload data
+    const data = (payload.data as Record<string, unknown>) ?? {};
+    const resendEmailId = (data.email_id as string) ?? null;
+    if (!resendEmailId) {
+      res.json({ ok: true, ignored: true, reason: "no_email_id" });
+      return;
+    }
+
+    // Find matching recipient
+    const [recipient] = await db
+      .select({ id: crmCampaignRecipients.id, campaignId: crmCampaignRecipients.campaignId })
+      .from(crmCampaignRecipients)
+      .where(eq(crmCampaignRecipients.resendEmailId, resendEmailId))
+      .limit(1);
+
+    if (!recipient) {
+      res.json({ ok: true, ignored: true, reason: "no_matching_recipient" });
+      return;
+    }
+
+    // Determine occurred_at from payload if available
+    const occurredAt = data.created_at ? new Date(data.created_at as string) : new Date();
+
+    // Insert event (idempotent: duplicate events will just add extra rows but won't crash)
+    const errorReason = (data.reason as string) ?? (data.error as string) ?? null;
+    await db.insert(crmCampaignEvents).values({
+      campaignRecipientId: recipient.id,
+      eventType,
+      occurredAt,
+      metadata: { resendEventType, resendEmailId, raw: data },
+    });
+
+    // For bounce / failure: update recipient status
+    if (eventType === "bounced" || eventType === "failed") {
+      await db.update(crmCampaignRecipients)
+        .set({ status: "failed", lastError: errorReason ?? `${resendEventType} via webhook` })
+        .where(eq(crmCampaignRecipients.id, recipient.id));
+    }
+
+    req.log.info({ recipientId: recipient.id, eventType, resendEmailId }, "Resend webhook event recorded");
+    res.json({ ok: true, eventType, recipientId: recipient.id });
+  } catch (err) {
+    req.log.error({ err }, "Error processing Resend webhook");
+    res.status(500).json({ error: "Internal error processing webhook" });
   }
 });
 
