@@ -1,0 +1,92 @@
+Act as a Principal Software Architect and Technical Director.
+
+TASK:
+Create a permanent project architecture guide to reduce future Replit Agent usage, prevent spaghetti code, and keep all future development organized.
+
+IMPORTANT:
+Do NOT build new product features.
+Do NOT change database schema.
+Do NOT touch Twilio routes.
+Do NOT refactor existing code.
+Do NOT rewrite working files.
+This is documentation + lightweight project governance only.
+
+CREATE THESE FILES:
+
+1. ARCHITECTURE.md
+2. DEVELOPMENT_RULES.md
+
+ARCHITECTURE.md should include:
+
+* Project overview
+* Tech stack
+* Current modules
+* Module status:
+
+  * Discovery Portal: LOCKED
+  * CRM Dashboard: STABLE
+  * Leads: STABLE
+  * Lead Detail Command Center: STABLE
+  * Sales Workspace: STABLE
+  * Workflow Engine: LOCKED
+  * Lead Health Engine: LOCKED
+  * Communication Intelligence: LOCKED
+  * DISC / Behavioral Intelligence: LOCKED
+  * Campaigns: ACTIVE
+  * Inbox: STABLE
+  * Reporting: STABLE
+  * Import Leads: STABLE
+  * Twilio / Phone routes: LOCKED
+* Existing route map
+* Existing API map
+* Existing database table map
+* Which modules future prompts may touch
+* Which modules future prompts must not touch unless explicitly requested
+
+DEVELOPMENT_RULES.md should include:
+
+* Always inspect only the files needed
+* Do not inspect the whole repo unless required
+* Prefer surgical edits
+* Do not rewrite large files unless approved
+* Maximum default change budget:
+
+  * 5 files
+  * 300 changed lines
+  * 1 migration
+  * 1 new utility
+  * 2 new components
+* Use Drizzle migrations only
+* No auto schema sync
+* Never touch Twilio webhook routes unless the prompt specifically says so
+* Never change locked engines unless explicitly requested
+* Do not optimize unrelated code
+* Do not rename files unnecessarily
+* Do not refactor stable modules
+* Test only changed pages/APIs plus TypeScript
+* Report if a task exceeds scope before continuing
+
+Also add a small section:
+
+“Future Prompt Template”
+
+Example:
+
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+Work only inside [MODULE NAME].
+Do not touch locked modules.
+Stay within change budget.
+Make surgical edits.
+Return files changed, tests performed, and known limitations.
+
+FINAL REPORT:
+Return:
+
+1. Files created
+2. Key rules added
+3. Locked modules listed
+4. Active modules listed
+5. How future prompts should reference these files
+6. Confirmation no product code changed
+7. Confirmation no schema/database changes
+8. Confirmation Twilio routes untouched

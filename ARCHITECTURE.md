@@ -1,0 +1,307 @@
+# SiteMint Digital CRM — Architecture Guide
+
+> Read this file before every development session.
+> Last updated: 2026-06-26
+
+---
+
+## Project Overview
+
+SiteMint Digital CRM is an internal admin tool for `sitemintdigital.com`. It manages the full sales lifecycle: capturing leads from the Discovery Portal, tracking them through a pipeline, communicating via email/SMS, scoring them with DISC behavioral intelligence, generating proposals and SOWs, and running personalized email campaigns.
+
+**There is no public-facing product.** All routes under `/admin` require a session token obtained from `POST /api/admin/login`.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Monorepo | pnpm workspaces, Node.js 24 |
+| Language | TypeScript 5.9 (strict) |
+| Frontend | React + Vite + wouter + shadcn/ui |
+| Backend | Express 5 |
+| Database | PostgreSQL + Drizzle ORM |
+| Validation | Zod (`zod/v4`), `drizzle-zod` |
+| Email | Resend (`RESEND_API_KEY`) |
+| Phone/SMS | Twilio (`TWILIO_*` env vars) |
+| Auth | Session token in memory; `POST /api/admin/login` → Bearer token stored in `localStorage` as `adminToken` |
+| Migration | `drizzle-kit push` only — **no migration files** |
+| Build | esbuild (CJS bundle via `build.mjs`) |
+
+---
+
+## Repository Layout
+
+```
+artifacts/
+  api-server/          — Express 5 API (port 8080, proxied to /api)
+    src/
+      routes/
+        admin.ts       — Discovery portal admin, form submissions
+        crm.ts         — All CRM endpoints (leads, tasks, email, campaigns, deals, pipeline, import)
+        contact.ts     — Public contact form
+        discovery.ts   — Public discovery portal submission
+        health.ts      — Health check
+        index.ts       — Route registration
+        phone.ts       — Twilio SMS/voice + webhooks (LOCKED)
+      middlewares/     — requireAdmin auth guard
+      lib/             — Shared server-side helpers
+  web-agency/          — React + Vite frontend (port varies, proxied to /)
+    src/
+      pages/crm/
+        CrmLayout.tsx            — Shell: sidebar nav, global search, quick-add lead
+        CrmDashboard.tsx         — Executive dashboard (stats, pipeline tiles)
+        CrmExecutiveDashboard.tsx
+        CrmLeads.tsx             — People list, filters
+        CrmLeadDetail.tsx        — Lead Command Center (DISC, score, timeline, tasks)
+        SalesWorkspace.tsx       — Full sales workspace per lead
+        CrmPipeline.tsx          — Pipeline kanban
+        CrmInbox.tsx             — Unified inbox (email + SMS threads)
+        CrmDeals.tsx             — Deals kanban
+        CrmCampaigns.tsx         — Campaign builder + history (ACTIVE)
+        CrmReporting.tsx         — Reporting
+        CrmTasks.tsx             — Task manager
+        CrmCalendar.tsx          — Calendar view
+        CrmImport.tsx            — CSV import + Discovery import
+        CrmEmailTemplates.tsx    — Email template library
+        CrmSettings.tsx          — Settings
+        CrmAdminSettings.tsx     — Admin settings
+      lib/
+        campaignPersonalization.ts   — DISC-aware email personalization (ACTIVE)
+        communicationIntelligence.ts — CI engine (LOCKED)
+        discEngine.ts                — DISC scoring engine (LOCKED)
+        leadScore.ts                 — Lead health score engine (LOCKED)
+        workflowEngine.ts            — Workflow trigger engine (LOCKED)
+        utils.ts                     — Shared helpers
+
+lib/
+  db/                  — Drizzle ORM schema + client (composite lib)
+    src/schema/
+      crmLeads.ts
+      crmDeals.ts
+      crmActivities.ts
+      crmTasks.ts
+      crmMessages.ts
+      crmEmailTemplates.ts
+      crmCampaigns.ts       — crm_campaigns + crm_campaign_recipients
+      submissions.ts        — discovery_submissions
+      formSubmissions.ts    — form_submissions
+      index.ts              — barrel export (all tables)
+
+scripts/               — Utility scripts (@workspace/scripts)
+```
+
+---
+
+## Module Status
+
+| Module | Status | Key Files | Notes |
+|---|---|---|---|
+| Discovery Portal | **LOCKED** | `routes/discovery.ts`, `routes/admin.ts` (submissions), `CrmImport.tsx` | Submission + proposal/SOW generation; do not modify |
+| CRM Dashboard | STABLE | `CrmDashboard.tsx`, `CrmExecutiveDashboard.tsx` | Stats from `/api/crm/stats` |
+| Leads | STABLE | `CrmLeads.tsx`, `crm.ts` lines 59–190 | CRUD, filtering, search |
+| Lead Detail Command Center | STABLE | `CrmLeadDetail.tsx` | DISC, score, timeline, proposal/SOW |
+| Sales Workspace | STABLE | `SalesWorkspace.tsx` | Full per-lead workspace with comms |
+| Workflow Engine | **LOCKED** | `lib/workflowEngine.ts` | Trigger/action engine; do not modify |
+| Lead Health Engine | **LOCKED** | `lib/leadScore.ts` | Scoring algorithm; do not modify |
+| Communication Intelligence | **LOCKED** | `lib/communicationIntelligence.ts` | CI sidebar card, comms scoring; do not modify |
+| DISC / Behavioral Intelligence | **LOCKED** | `lib/discEngine.ts` | DISC computation + DISC_META; do not modify |
+| Campaigns | **ACTIVE** | `CrmCampaigns.tsx`, `lib/campaignPersonalization.ts`, `crm.ts` lines 387–590, `schema/crmCampaigns.ts` | Phase 8 complete; Phase 9 (send execution) is next |
+| Inbox | STABLE | `CrmInbox.tsx`, `phone.ts` (read paths) | Unified email + SMS inbox |
+| Reporting | STABLE | `CrmReporting.tsx` | Read-only reporting |
+| Import Leads | STABLE | `CrmImport.tsx`, `crm.ts` lines 587–757 | CSV + Discovery import |
+| Twilio / Phone Routes | **LOCKED** | `routes/phone.ts` (entire file) | SMS, voice, webhooks; never touch |
+| Email Templates | STABLE | `CrmEmailTemplates.tsx`, `crm.ts` lines 339–386 | Template CRUD |
+| Deals / Pipeline | STABLE | `CrmDeals.tsx`, `CrmPipeline.tsx`, `crm.ts` lines 758–929 | Kanban + stats |
+| Tasks | STABLE | `CrmTasks.tsx`, `crm.ts` lines 213–305 | Task CRUD |
+
+---
+
+## Frontend Route Map
+
+All routes live in `artifacts/web-agency/src/App.tsx` and require the `adminToken` in `localStorage`.
+
+| Path | Component |
+|---|---|
+| `/admin` | Admin login redirect |
+| `/admin/crm` | CRM root (redirects to dashboard) |
+| `/admin/crm/dashboard` | CrmDashboard |
+| `/admin/crm/leads` | CrmLeads |
+| `/admin/crm/leads/:id` | CrmLeadDetail |
+| `/admin/crm/leads/:id/workspace` | SalesWorkspace |
+| `/admin/crm/pipeline` | CrmPipeline |
+| `/admin/crm/inbox` | CrmInbox |
+| `/admin/crm/tasks` | CrmTasks |
+| `/admin/crm/calendar` | CrmCalendar |
+| `/admin/crm/deals` | CrmDeals |
+| `/admin/crm/campaigns` | CrmCampaigns |
+| `/admin/crm/reporting` | CrmReporting |
+| `/admin/crm/admin` | CrmAdminSettings |
+| `/admin/crm/settings` | CrmSettings |
+| `/admin/crm/import` | CrmImport |
+| `/admin/crm/email-templates` | CrmEmailTemplates |
+
+---
+
+## API Route Map
+
+All CRM endpoints require `Authorization: Bearer <token>`. Base path: `/api`.
+
+### Auth
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/admin/login` | Returns session token |
+
+### Admin / Discovery
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/admin/submissions` | List discovery submissions |
+| GET | `/admin/submissions/:id` | Single submission |
+| PATCH | `/admin/submissions/:id` | Update submission |
+| POST | `/admin/submissions/:id/proposal` | Generate HTML proposal |
+| POST | `/admin/submissions/:id/sow` | Generate HTML SOW |
+| GET | `/admin/submissions/export/csv` | CSV export |
+| GET | `/admin/form-submissions` | List contact form submissions |
+| PATCH | `/admin/form-submissions/:id` | Update form submission |
+| POST | `/discovery/submit` | Public: submit discovery form |
+
+### Leads
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/stats` | Dashboard KPI stats |
+| GET | `/crm/leads` | List leads (with filters) |
+| POST | `/crm/leads` | Create lead |
+| GET | `/crm/leads/:id` | Lead detail |
+| PATCH | `/crm/leads/:id` | Update lead |
+| DELETE | `/crm/leads/:id` | Delete lead |
+| POST | `/crm/leads/:id/notes` | Add note (creates activity) |
+| POST | `/crm/leads/:id/email` | Send email via Resend |
+| POST | `/crm/leads/:id/proposal/generate` | Generate proposal HTML |
+| PATCH | `/crm/leads/:id/proposal` | Save proposal edits |
+| POST | `/crm/leads/:id/sow/generate` | Generate SOW HTML |
+| PATCH | `/crm/leads/:id/sow` | Save SOW edits |
+
+### Tasks
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/tasks` | List all tasks |
+| POST | `/crm/leads/:id/tasks` | Create task for lead |
+| PATCH | `/crm/tasks/:id` | Update task |
+| DELETE | `/crm/tasks/:id` | Delete task |
+
+### Email Templates
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/email-templates` | List templates |
+| POST | `/crm/email-templates` | Create template |
+| PUT | `/crm/email-templates/:id` | Update template |
+| DELETE | `/crm/email-templates/:id` | Delete template |
+
+### Campaigns
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/campaigns` | List all campaigns (with recipient counts) |
+| POST | `/crm/campaigns` | Create draft campaign |
+| GET | `/crm/campaigns/:id` | Campaign detail + recipients |
+| PATCH | `/crm/campaigns/:id` | Update campaign fields/status |
+| DELETE | `/crm/campaigns/:id` | Delete campaign (cascades recipients) |
+| POST | `/crm/campaigns/:id/recipients` | Replace recipients (with DISC personalization) |
+| POST | `/crm/campaigns/:id/test-send` | Test send from persisted campaign |
+| POST | `/crm/campaigns/test-send` | Test send from unsaved draft body |
+
+### Deals / Pipeline
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/deals/stats` | Deal stage stats |
+| GET | `/crm/deals` | List deals |
+| POST | `/crm/deals` | Create deal |
+| PATCH | `/crm/deals/:id` | Update deal |
+| DELETE | `/crm/deals/:id` | Delete deal |
+| GET | `/crm/pipeline` | Full pipeline view with leads + deals |
+
+### Import
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/crm/import` | CSV lead import |
+| POST | `/crm/import-discovery` | Import discovery submissions to CRM |
+| POST | `/crm/import-discovery/:id` | Import single discovery submission |
+
+### Phone / SMS / Voice (LOCKED — `routes/phone.ts`)
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/phone/status` | Twilio config status |
+| POST | `/crm/phone/test-sms` | Test SMS |
+| GET | `/crm/conversations` | SMS conversation list |
+| GET | `/crm/leads/:id/messages` | Lead SMS thread |
+| POST | `/crm/leads/:id/sms` | Send SMS |
+| POST | `/crm/leads/:id/call` | Initiate call |
+| PATCH | `/crm/leads/:id/sms-consent` | Update SMS consent |
+| POST | `/crm/webhooks/twilio/sms` | **Twilio webhook** |
+| POST | `/crm/webhooks/twilio/sms/status` | **Twilio webhook** |
+| POST | `/crm/webhooks/twilio/voice` | **Twilio webhook** |
+| POST | `/crm/webhooks/twilio/voice/bridge` | **Twilio webhook** |
+| POST | `/crm/webhooks/twilio/voice/status` | **Twilio webhook** |
+
+---
+
+## Database Table Map
+
+All schema lives in `lib/db/src/schema/`. Migration: `pnpm --filter @workspace/db run push`.
+
+| Table | Schema File | Purpose |
+|---|---|---|
+| `crm_leads` | `crmLeads.ts` | Core lead/contact records |
+| `crm_deals` | `crmDeals.ts` | Deals linked to leads; pipeline stages |
+| `crm_activities` | `crmActivities.ts` | Activity timeline (notes, emails, calls) |
+| `crm_tasks` | `crmTasks.ts` | Tasks linked to leads |
+| `crm_messages` | `crmMessages.ts` | SMS/email message thread per lead |
+| `crm_email_templates` | `crmEmailTemplates.ts` | Reusable email templates |
+| `crm_campaigns` | `crmCampaigns.ts` | Campaign records (name, subject, body, status) |
+| `crm_campaign_recipients` | `crmCampaigns.ts` | Per-recipient DISC-personalized email data; FK → crm_leads (cascade) |
+| `discovery_submissions` | `submissions.ts` | Discovery portal form submissions |
+| `form_submissions` | `formSubmissions.ts` | Public contact form submissions |
+
+---
+
+## Locked Engines — Do Not Modify Without Explicit Request
+
+These files are compute engines with complex, tested logic. Touching them risks breaking lead scoring, DISC analysis, and communication intelligence across the entire CRM.
+
+| File | What it does |
+|---|---|
+| `lib/discEngine.ts` | `computeSimplifiedDisc`, `getCommunicationStyle`, `DISC_META` — DISC behavioral typing |
+| `lib/leadScore.ts` | `computeLeadHealthScore` — multi-factor lead health scoring |
+| `lib/communicationIntelligence.ts` | `buildCommunicationIntelligence` — activity-based CI signals |
+| `lib/workflowEngine.ts` | Trigger/action workflow execution engine |
+| `routes/phone.ts` | All Twilio SMS, voice, and webhook handlers |
+
+---
+
+## Which Modules Future Prompts May Touch
+
+- **Campaigns** (`CrmCampaigns.tsx`, `crm.ts` campaign section, `campaignPersonalization.ts`, `crmCampaigns.ts` schema) — next phase: send execution
+- **Reporting** (`CrmReporting.tsx`) — additional metrics, charts
+- **Dashboard** (`CrmDashboard.tsx`, `CrmExecutiveDashboard.tsx`) — new KPI tiles
+- **Deals / Pipeline** (`CrmDeals.tsx`, `CrmPipeline.tsx`) — new stages or fields
+- **Inbox** (`CrmInbox.tsx`) — read-side; do not touch send paths in `phone.ts`
+- **Email Templates** (`CrmEmailTemplates.tsx`) — new template fields
+
+## Which Modules Future Prompts Must NOT Touch (Unless Explicitly Requested)
+
+- `routes/phone.ts` — entire file (Twilio webhooks)
+- `lib/discEngine.ts` — DISC engine
+- `lib/leadScore.ts` — Lead health engine
+- `lib/communicationIntelligence.ts` — CI engine
+- `lib/workflowEngine.ts` — Workflow engine
+- `App.tsx` line 72 — pre-existing ThankYouProps TS2322 error; do not attempt to fix
+
+---
+
+## Known Constraints
+
+- **Email test mode**: if `CRM_EMAIL_TEST_MODE` env var is not set to `"false"`, all Resend sends are simulated (`testMode: true` in response).
+- **No bulk send**: no `/campaigns/:id/send-all` endpoint exists by design. Phase 9 will add controlled send execution.
+- **Auth token is in-memory**: the session token changes on every API server restart. Frontend must re-login after a server restart.
+- **Default admin password**: `sitemint2024` (overridable via `ADMIN_PASSWORD` env var).
+- **Route ordering in `crm.ts`**: static routes (e.g. `/campaigns/test-send`) must appear BEFORE parameterized routes (e.g. `/campaigns/:id`) to avoid Express matching conflicts.
