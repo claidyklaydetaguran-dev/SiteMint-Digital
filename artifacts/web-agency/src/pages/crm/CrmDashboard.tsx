@@ -177,6 +177,25 @@ export default function CrmDashboard() {
     };
   }, [allLeads]);
 
+  // ── DISC Distribution (computed from lead fields only, no extra API calls) ──
+  const discMap = useMemo(() => {
+    const map = new Map<number, DiscStyle>();
+    allLeads.forEach(lead => {
+      map.set(lead.id, computeSimplifiedDisc(lead));
+    });
+    return map;
+  }, [allLeads]);
+
+  const discDist = useMemo(() => {
+    const active = allLeads.filter(l => !["Won", "Lost"].includes(l.status));
+    const counts: Record<DiscStyle, number> = { Driver: 0, Expressive: 0, Amiable: 0, Analytical: 0 };
+    active.forEach(l => {
+      const s = discMap.get(l.id);
+      if (s) counts[s]++;
+    });
+    return { counts, total: active.length };
+  }, [allLeads, discMap]);
+
   // ── Workflow Queue (6 action-grouped buckets) ─────────────────────────────
   const workflowQueue = useMemo(
     () => computeWorkflowQueue(allLeads.map(l => ({
@@ -257,7 +276,9 @@ export default function CrmDashboard() {
   ] : [];
 
   const STAGES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
-  const filtered = filterStage ? allLeads.filter(l => l.status === filterStage) : allLeads;
+  const filtered = allLeads
+    .filter(l => !filterStage || l.status === filterStage)
+    .filter(l => !filterDisc  || discMap.get(l.id) === filterDisc);
 
   if (loading) return (
     <CrmLayout>
@@ -381,6 +402,46 @@ export default function CrmDashboard() {
           </div>
         </div>
 
+        {/* ── DISC Behavioral Distribution ──────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base leading-none">🧠</span>
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Behavioral Profiles</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— DISC distribution across active leads (rule-based, no AI)</span>
+          </div>
+          {discDist.total === 0 ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-8 text-center text-sm text-muted-foreground">
+              No behavioral profile data yet. Add leads to see DISC distribution.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(["Driver","Expressive","Amiable","Analytical"] as DiscStyle[]).map(style => {
+                const meta = DISC_META[style];
+                const count = discDist.counts[style];
+                const pct = discDist.total > 0 ? Math.round((count / discDist.total) * 100) : 0;
+                return (
+                  <button
+                    key={style}
+                    onClick={() => setFilterDisc(filterDisc === style ? "" : style)}
+                    className={`rounded-xl border p-4 text-left transition-all hover:shadow-sm ${
+                      filterDisc === style
+                        ? `${meta.bgColor} ${meta.borderColor} ring-2 ring-offset-1 ring-current ${meta.textColor}`
+                        : `${meta.bgColor} ${meta.borderColor}`
+                    }`}
+                  >
+                    <p className="text-3xl font-bold text-foreground mb-0.5">{count}</p>
+                    <p className={`text-xs font-semibold ${meta.textColor} mb-1`}>{meta.emoji} {style}</p>
+                    <div className="h-1 w-full bg-white/60 rounded-full overflow-hidden mb-1">
+                      <div className={`h-1 rounded-full ${meta.barColor}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{pct}% · {meta.shortDesc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ── Workflow Queue ─────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -461,6 +522,24 @@ export default function CrmDashboard() {
                 <option value="">All Stages</option>
                 {STAGES.map(s => <option key={s}>{s}</option>)}
               </select>
+              <select
+                value={filterDisc}
+                onChange={e => setFilterDisc(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none bg-white text-foreground"
+              >
+                <option value="">All DISC Styles</option>
+                {(["Driver","Expressive","Amiable","Analytical"] as DiscStyle[]).map(s => (
+                  <option key={s} value={s}>{DISC_META[s].emoji} {s}</option>
+                ))}
+              </select>
+              {(filterStage || filterDisc) && (
+                <button
+                  onClick={() => { setFilterStage(""); setFilterDisc(""); }}
+                  className="text-xs text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors"
+                >
+                  ✕ Clear
+                </button>
+              )}
               <button className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-foreground">
                 <SlidersHorizontal className="w-3 h-3" /> Filter
               </button>
@@ -476,7 +555,7 @@ export default function CrmDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["Name","Health","Contact","Email","Phone","Last Activity","Time","Stage","Assigned"].map(h => (
+                    {["Name","Health","DISC","Contact","Email","Phone","Last Activity","Time","Stage","Assigned"].map(h => (
                       <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -511,6 +590,19 @@ export default function CrmDashboard() {
                               </div>
                             </Link>
                           ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        {/* DISC Style Badge */}
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const style = discMap.get(lead.id);
+                            if (!style) return <span className="text-gray-300">—</span>;
+                            const meta = DISC_META[style];
+                            return (
+                              <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>
+                                {meta.emoji} {style}
+                              </span>
+                            );
+                          })()}
                         </td>
                         {/* Contact signal */}
                         <td className="px-4 py-3">

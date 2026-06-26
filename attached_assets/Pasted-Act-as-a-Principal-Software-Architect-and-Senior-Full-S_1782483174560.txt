@@ -1,0 +1,139 @@
+Act as a Principal Software Architect and Senior Full-Stack Engineer.
+
+Phase 6 is now stable after recovery.
+
+Current state:
+
+* src/lib/discEngine.ts exists and compiles.
+* Lead Detail now has a DISC / Communication Style card.
+* CrmDashboard has partial DISC imports/state from the interrupted edit.
+* Dashboard DISC widget and filter were intentionally deferred.
+* No schema changes were made.
+* Twilio routes were untouched.
+
+TASK:
+Safely complete the CrmDashboard DISC integration only.
+
+IMPORTANT:
+Do NOT modify discEngine.ts.
+Do NOT modify communicationIntelligence.ts.
+Do NOT touch Twilio routes.
+Do NOT change database schema.
+Do NOT use auto schema sync.
+Do NOT refactor the whole dashboard.
+Do NOT add campaign automation yet.
+Do NOT add AI calls.
+
+TASK 1 — INSPECT CURRENT DASHBOARD STATE
+
+Inspect CrmDashboard.tsx and confirm:
+
+1. Existing lead data shape
+2. Existing filters
+3. Existing Communication Signals section
+4. Existing leads table
+5. Existing partial DISC imports/state
+6. Correct insertion points for widget, filter, and badge
+
+TASK 2 — ADD DISC MAP
+
+Add a memoized discMap:
+
+* Use useMemo.
+* Compute computeSimplifiedDisc() for each active lead.
+* Use already-loaded lead fields only.
+* Do not fetch extra APIs.
+* Key by lead id.
+* Handle missing lead data safely.
+
+TASK 3 — ADD DISC DISTRIBUTION WIDGET
+
+Add a DISC distribution widget after the Communication Signals section.
+
+Display 4 tiles:
+
+* Driver
+* Expressive
+* Amiable
+* Analytical
+
+Each tile should show:
+
+* count
+* percentage of active leads
+* short style description
+* color/icon from DISC_META if available
+
+If no leads exist:
+Show an empty state:
+“No behavioral profile data yet.”
+
+TASK 4 — ADD DISC FILTER
+
+Add a DISC filter dropdown beside the existing stage/status filter.
+
+Options:
+
+* All DISC Styles
+* Driver
+* Expressive
+* Amiable
+* Analytical
+
+Behavior:
+
+* Client-side only.
+* No backend changes.
+* Filters the visible lead list based on computed primary DISC style.
+* Works together with existing filters.
+* Reset behavior should be safe if existing filters are cleared.
+
+TASK 5 — ADD DISC BADGE TO LEADS TABLE
+
+Add a compact DISC style badge to each row in the dashboard leads table.
+
+Badge should show:
+
+* primary DISC style
+* confidence if available
+* color/icon if available
+
+Do not clutter the table.
+Keep it compact and readable.
+
+TASK 6 — TESTING
+
+Test:
+
+1. /admin/crm/dashboard loads.
+2. DISC widget renders.
+3. DISC widget works with no leads.
+4. DISC widget percentages calculate correctly.
+5. DISC filter works.
+6. DISC filter combines safely with existing stage/status filter.
+7. DISC badge appears in table rows.
+8. Lead Detail still loads.
+9. Sales Workspace still loads.
+10. CRM global search still works.
+11. Inbox still works.
+12. Reporting still works.
+13. No new TypeScript errors.
+14. No console errors.
+15. No database migrations created.
+16. Twilio routes untouched.
+
+FINAL REPORT REQUIRED:
+
+Return:
+
+1. Files inspected
+2. Files changed
+3. DISC map logic
+4. Distribution widget behavior
+5. Filter behavior
+6. Table badge behavior
+7. Tests performed
+8. Confirmation no schema/database changes were made
+9. Confirmation Twilio routes untouched
+10. Known limitations
+11. Recommended next prompt

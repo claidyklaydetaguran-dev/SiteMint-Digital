@@ -3,3 +3,4 @@
 - [CRM App.tsx constraints](crm-apptsx.md) — DO NOT fix ThankYou route TS error; DO NOT use nested routes in App.tsx with wouter
 - [CRM deals table](crm-deals.md) — separate crm_deals table (not crm_leads); stages: Lead/Qualified/Proposal/Won/Lost; integer leadId FK; /admin/crm/dashboard is the new landing page.
 - [Communication Intelligence](crm-communication-intelligence.md) — Phase 5 complete; pure TS utility at src/lib/communicationIntelligence.ts; sidebar CI card uses activities only (no messages); SalesWorkspace Communications tab lazy-fetches messages; dashboard tiles from lastContactedAt field.
+- [DISC Engine Phase 6](crm-disc-engine.md) — src/lib/discEngine.ts; computeSimplifiedDisc (lead fields only, no API) powers dashboard; computeDiscProfile (lead+activities) powers sidebar; CrmDashboard Lead interface lacks notes/tags/source/discoveryFormStatus but DiLead accepts them as optional.
