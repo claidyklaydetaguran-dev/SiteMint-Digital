@@ -90,15 +90,16 @@ export default function CrmLeads() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<NewLeadForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [importingDiscovery, setImportingDiscovery] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
     const r = await fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate("/admin"); return; }
+    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const d = await r.json() as { leads: Lead[] };
     setAllLeads(d.leads || []);
     setLoading(false);
@@ -139,7 +140,12 @@ export default function CrmLeads() {
   };
 
   const createLead = async () => {
-    if (!form.name || !form.email) return;
+    const errors: { name?: string; email?: string } = {};
+    if (!form.name.trim()) errors.name = "Full name is required.";
+    if (!form.email.trim()) errors.email = "Email address is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = "Enter a valid email address.";
+    if (Object.keys(errors).length) { setFormErrors(errors); return; }
+    setFormErrors({});
     setSaving(true);
     const r = await fetch("/api/crm/leads", {
       method: "POST",
@@ -148,6 +154,10 @@ export default function CrmLeads() {
     });
     setSaving(false);
     if (r.ok) { setShowCreate(false); setForm(emptyForm); load(); }
+    else {
+      const d = await r.json().catch(() => ({})) as { error?: string };
+      setFormErrors({ name: d.error || "Failed to create lead. Please try again." });
+    }
   };
 
   const importDiscovery = async () => {
@@ -313,9 +323,33 @@ export default function CrmLeads() {
           {/* Table */}
           <div className="flex-1 overflow-auto bg-white">
             {loading ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="w-7 h-7 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
-              </div>
+              <table className="w-full text-sm border-collapse">
+                <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
+                  <tr>
+                    {["Name","Last Communication","Last Email","Updated","Last Activity","Stage","Assigned","Phone"].map(h => (
+                      <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
+                          <div className="space-y-1">
+                            <div className="h-3 w-24 bg-gray-200 rounded" />
+                            <div className="h-2 w-16 bg-gray-100 rounded" />
+                          </div>
+                        </div>
+                      </td>
+                      {Array.from({ length: 7 }).map((_, j) => (
+                        <td key={j} className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-16" /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : leads.length === 0 ? (
               <div className="py-16 text-center">
                 <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -387,7 +421,16 @@ export default function CrmLeads() {
                       </td>
                       {/* Stage */}
                       <td className="px-4 py-2.5">
-                        <span className="text-xs text-foreground">{lead.status}</span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+                          lead.status === "Won" ? "bg-green-100 text-green-700" :
+                          lead.status === "Lost" ? "bg-red-100 text-red-600" :
+                          lead.status === "Proposal Sent" ? "bg-purple-100 text-purple-700" :
+                          lead.status === "Negotiating" ? "bg-orange-100 text-orange-700" :
+                          lead.status === "New" ? "bg-blue-100 text-blue-700" :
+                          lead.status === "Contacted" ? "bg-indigo-100 text-indigo-700" :
+                          lead.status === "Follow-up" ? "bg-yellow-100 text-yellow-700" :
+                          "bg-gray-100 text-gray-600"
+                        }`}>{lead.status}</span>
                       </td>
                       {/* Assigned */}
                       <td className="px-4 py-2.5">
@@ -443,15 +486,24 @@ export default function CrmLeads() {
                 { label: "Company", key: "company", type: "text", placeholder: "Company name" },
                 { label: "Phone", key: "phone", type: "tel", placeholder: "(555) 000-0000" },
                 { label: "Website", key: "website", type: "url", placeholder: "https://..." },
-              ].map(({ label, key, type, placeholder }) => (
-                <div key={key}>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
-                  <input type={type} placeholder={placeholder}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    value={(form as unknown as Record<string, string>)[key]}
-                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
-                </div>
-              ))}
+              ].map(({ label, key, type, placeholder }) => {
+                const err = formErrors[key as keyof typeof formErrors];
+                return (
+                  <div key={key}>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
+                    <input type={type} placeholder={placeholder}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${
+                        err ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-gray-200 focus:ring-foreground/20"
+                      }`}
+                      value={(form as unknown as Record<string, string>)[key]}
+                      onChange={e => {
+                        setForm(f => ({ ...f, [key]: e.target.value }));
+                        if (err) setFormErrors(fe => ({ ...fe, [key]: undefined }));
+                      }} />
+                    {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
+                  </div>
+                );
+              })}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Source</label>
@@ -497,8 +549,8 @@ export default function CrmLeads() {
               </div>
             </div>
             <div className="flex gap-2 p-5 border-t border-gray-100">
-              <Button variant="outline" className="flex-1" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button className="flex-1" onClick={createLead} disabled={saving || !form.name || !form.email}>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowCreate(false); setFormErrors({}); setForm(emptyForm); }}>Cancel</Button>
+              <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={createLead} disabled={saving}>
                 {saving ? "Saving…" : "Create Lead"}
               </Button>
             </div>

@@ -90,10 +90,10 @@ export default function CrmLeadDetail() {
   const [emailMsg, setEmailMsg] = useState("");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
     const r = await fetch(`/api/crm/leads/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate("/admin"); return; }
+    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     if (!r.ok) { navigate("/admin/crm/leads"); return; }
     const d = await r.json() as { lead:Lead; activities:Activity[]; tasks:Task[] };
     setLead(d.lead);

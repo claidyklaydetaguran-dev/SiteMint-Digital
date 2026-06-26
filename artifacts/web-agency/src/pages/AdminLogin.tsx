@@ -28,7 +28,8 @@ export default function AdminLogin() {
       }
       const { token } = await res.json() as { token: string };
       localStorage.setItem("adminToken", token);
-      navigate("/admin/dashboard");
+      const redirect = new URLSearchParams(window.location.search).get("redirect");
+      navigate(redirect && redirect.startsWith("/admin") ? redirect : "/admin/crm");
     } catch {
       setError("Connection error. Make sure the server is running.");
     } finally {
@@ -64,6 +65,7 @@ export default function AdminLogin() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Enter admin password"
                 className="h-12"
+                autoComplete="current-password"
                 autoFocus
               />
             </div>
@@ -74,8 +76,8 @@ export default function AdminLogin() {
               </p>
             )}
 
-            <Button type="submit" className="w-full h-12 text-base" disabled={loading || !password}>
-              {loading ? "Signing in..." : "Sign In"}
+            <Button type="submit" className="w-full h-12 text-base bg-emerald-600 hover:bg-emerald-700 text-white border-0" disabled={loading || !password}>
+              {loading ? "Signing in…" : "Sign In"}
             </Button>
           </form>
         </div>
