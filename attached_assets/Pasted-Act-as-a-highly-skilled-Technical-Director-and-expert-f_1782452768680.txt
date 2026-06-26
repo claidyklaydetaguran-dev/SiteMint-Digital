@@ -1,0 +1,179 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Project: Sitemint Digital Website + Internal CRM
+Website: https://sitemintdigital.com
+CRM Main Route: https://sitemintdigital.com/admin/crm
+CRM Dashboard Route: https://sitemintdigital.com/admin/crm/dashboard
+
+IMPORTANT:
+Do NOT build new features yet.
+Do NOT refactor large parts yet.
+Do NOT rebuild the CRM.
+Do NOT change the database schema yet.
+This first task is ONLY audit, testing, debugging, and planning.
+
+The goal is to inspect the existing CRM carefully so future prompts do not create spaghetti code.
+
+TASK 1 — FULL CRM AUDIT
+
+Please inspect the current codebase and test the following:
+
+1. Website health
+
+* Confirm the public website still loads.
+* Confirm admin routes do not break public routes.
+* Check for console errors.
+* Check for broken imports.
+* Check for missing components.
+* Check for TypeScript errors.
+
+2. CRM route health
+   Test these routes:
+
+* /admin/crm
+* /admin/crm/dashboard
+* /admin/crm/leads
+* /admin/crm/contacts
+* /admin/crm/deals
+* /admin/crm/settings
+* Any existing CRM detail pages
+
+For each route, report:
+
+* Loads successfully or fails
+* Blank screen or not
+* Console/API errors
+* Missing data issue
+* Broken layout issue
+* Authentication issue
+
+3. Login and redirect audit
+   Test:
+
+* Normal login should go to /admin/crm/dashboard
+* Direct deep-link access while logged out should return to the originally requested CRM route after login
+* Logout should work properly
+* Unauthenticated users should not access protected CRM pages
+* Authenticated users should not be sent to the old submissions dashboard unless intentionally clicking it
+
+4. Backend/API audit
+   Inspect all CRM-related API routes.
+
+Report:
+
+* Existing auth routes
+* Existing lead/contact routes
+* Existing deal routes
+* Existing activity routes
+* Any duplicated routes
+* Any unused routes
+* Any inconsistent route naming
+* Any unprotected admin routes
+* Any API routes returning bad data shape
+
+5. Database/Drizzle audit
+   Inspect:
+
+* Drizzle schema
+* Existing migrations
+* Current database tables
+* Any mismatch between schema and UI expectations
+* Any fields the frontend expects but the database does not have
+* Any fields the database has but the frontend does not use
+
+IMPORTANT:
+Do not use auto schema sync.
+Do not run destructive database changes.
+Do not modify schema in this audit prompt unless absolutely needed to fix a crash, and ask/report before doing so.
+
+6. CRM UI/UX audit
+   Review:
+
+* Sidebar layout
+* Dashboard layout
+* Mobile responsiveness
+* Tables
+* Cards
+* Forms
+* Empty states
+* Loading states
+* Error states
+* Dark/light mode consistency
+* Navigation flow
+* Visual hierarchy
+* shadcn/ui consistency
+
+7. Code quality audit
+   Check for:
+
+* Spaghetti code
+* Repeated logic
+* Overly large components
+* Poor folder organization
+* API calls mixed directly into UI components
+* Missing validators
+* Missing shared types
+* Missing error handling
+* Inconsistent naming
+* Dead code
+* Unused files
+* Broken imports
+
+TASK 2 — BUG FIX ONLY IF SAFE
+
+If you find small, obvious bugs causing the CRM to crash or blank screen, fix only those bugs.
+
+Allowed fixes:
+
+* Broken imports
+* Wrong route redirect
+* Missing component export
+* Undefined data crash
+* Bad optional chaining
+* Incorrect route path
+* Frontend API URL mismatch
+* Loading/error state crash
+* TypeScript compile issue
+
+Not allowed yet:
+
+* Major refactor
+* New database tables
+* New CRM modules
+* New Kanban board
+* New dashboard charts
+* New activities timeline
+* Rebuilding auth from scratch
+
+TASK 3 — CREATE A CLEAN IMPLEMENTATION ROADMAP
+
+After the audit, give me a clear roadmap with this structure:
+
+A. Critical bugs found
+B. Safe fixes completed
+C. Remaining problems
+D. Existing CRM folder structure
+E. Recommended improved folder structure
+F. Current API route map
+G. Current database schema summary
+H. What should be built next
+I. What should NOT be touched yet
+J. Recommended prompt order for the next 3 Replit prompts
+
+TASK 4 — FINAL RESPONSE FORMAT
+
+At the end, provide:
+
+1. Audit summary
+2. Exact files inspected
+3. Exact files changed, if any
+4. Errors found
+5. Errors fixed
+6. Tests performed
+7. Routes tested
+8. Database status
+9. Recommended next prompt
+
+Remember:
+This prompt is not for building new features.
+This is to stabilize the CRM first so the next phases are clean and organized.
