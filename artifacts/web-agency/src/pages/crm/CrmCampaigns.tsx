@@ -5,7 +5,7 @@ import {
   Mail, Users, Eye, Send, ChevronRight, ChevronLeft,
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
   Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
-  SkipForward, XCircle, BarChart2,
+  SkipForward, XCircle, BarChart2, Lightbulb, Award, ShieldCheck, AlertCircle, TrendingUp,
 } from "lucide-react";
 import {
   computeSimplifiedDisc,
@@ -170,6 +170,147 @@ function StatusBadge({ status }: { status: string }) {
       {status}
     </span>
   );
+}
+
+// ── Campaign Insights (rule-based, no AI) ─────────────────────────────────────
+
+function generateInsights(a: CampaignAnalytics): string[] {
+  const ins: string[] = [];
+  const { totals, discBreakdown, replyEstimate } = a;
+
+  // Send completion
+  if (totals.recipients === 0) {
+    ins.push("Add recipients to start sending this campaign.");
+  } else if (totals.sendRate === 100) {
+    ins.push("Campaign fully delivered — all recipients reached successfully.");
+  } else if (totals.sendRate === 0 && totals.selected > 0) {
+    ins.push("Campaign has not been sent yet. Use Step 3 in the builder to send.");
+  } else if (totals.sendRate === 0 && totals.selected === 0 && totals.recipients > 0) {
+    ins.push("Campaign has been sent. All recipients are in a terminal state (sent / skipped / failed).");
+  } else if (totals.sendRate < 50) {
+    ins.push(`Only ${totals.sendRate}% of recipients were reached. Review failed and skipped contacts before resending.`);
+  } else if (totals.sendRate >= 80) {
+    ins.push(`Strong delivery — ${totals.sendRate}% of recipients received this campaign.`);
+  }
+
+  // Data quality / skipped
+  const skippedRate = totals.recipients > 0 ? Math.round((totals.skipped / totals.recipients) * 100) : 0;
+  if (skippedRate > 30) {
+    ins.push(`High skipped rate (${skippedRate}%). Many leads are missing valid email addresses — clean up contacts before the next send.`);
+  } else if (skippedRate > 10) {
+    ins.push(`${skippedRate}% of recipients were skipped. Check contact records for leads without valid emails.`);
+  }
+
+  // Failures
+  if (totals.failureRate > 10) {
+    ins.push(`${totals.failureRate}% of sends failed. Check the error column in the recipient table and use Resend on failed contacts.`);
+  }
+
+  // DISC audience composition
+  const activeDisc = discBreakdown.filter(d => d.count > 0).sort((x, y) => y.count - x.count);
+  if (activeDisc.length > 0 && totals.recipients > 0) {
+    const top = activeDisc[0];
+    const pct = Math.round((top.count / totals.recipients) * 100);
+    const COPY: Record<string, string> = {
+      Driver:     "Keep future campaigns concise with a direct CTA and clear next step.",
+      Expressive: "Use energetic language and big-picture outcomes to engage this audience.",
+      Amiable:    "Lead with relationship and trust. A warmer, reassuring CTA may perform better.",
+      Analytical: "Support future campaigns with proof, data points, timelines, and pricing details.",
+    };
+    ins.push(`Most recipients (${pct}%) are ${top.style}-style leads. ${COPY[top.style] ?? ""}`);
+  }
+
+  // Best vs worst DISC delivery
+  const withSent = discBreakdown.filter(d => d.count > 0 && d.sent > 0);
+  if (withSent.length >= 2) {
+    const best  = [...withSent].sort((x, y) => (y.sent / y.count) - (x.sent / x.count))[0];
+    const worst = [...discBreakdown.filter(d => d.count > 0)].sort((x, y) => {
+      return ((y.failed + y.skipped) / y.count) - ((x.failed + x.skipped) / x.count);
+    })[0];
+    ins.push(`${best.style} leads had the highest delivery success in this campaign.`);
+    if (worst.style !== best.style && (worst.failed + worst.skipped) > 0) {
+      ins.push(`${worst.style} leads had the most delivery issues — review their contact records.`);
+    }
+  }
+
+  // Reply estimate
+  if (replyEstimate.total > 0) {
+    if (replyEstimate.rate >= 10) {
+      ins.push(`Strong estimated reply activity — ${replyEstimate.rate}% of sent recipients have since sent inbound messages.`);
+    } else if (replyEstimate.count === 0) {
+      ins.push("No estimated replies detected yet. Consider a follow-up campaign or a direct SMS touchpoint to re-engage.");
+    }
+  }
+
+  return ins;
+}
+
+// ── Campaign Quality Score ─────────────────────────────────────────────────────
+
+interface QualityScore {
+  score: number;
+  badge: "Excellent" | "Good" | "Needs Cleanup" | "Risky";
+  reasons: string[];
+}
+
+function computeQualityScore(a: CampaignAnalytics): QualityScore {
+  const { totals, replyEstimate } = a;
+  const reasons: string[] = [];
+
+  if (totals.recipients === 0) {
+    return { score: 0, badge: "Risky", reasons: ["No recipients added to this campaign"] };
+  }
+
+  let score = 0;
+
+  // Send rate → up to 40 pts
+  score += Math.round(totals.sendRate * 0.4);
+  if (totals.sendRate === 100)      reasons.push("All recipients successfully reached (+40)");
+  else if (totals.sendRate >= 80)   reasons.push(`${totals.sendRate}% send rate — strong delivery`);
+  else if (totals.sendRate >= 50)   reasons.push(`${totals.sendRate}% send rate — moderate delivery`);
+  else if (totals.sendRate > 0)     reasons.push(`${totals.sendRate}% send rate — many recipients not reached`);
+  else                              reasons.push("Campaign not yet sent — send rate is 0%");
+
+  // Failure rate → deduct up to 20 pts
+  if (totals.failureRate > 0) {
+    const pen = Math.min(20, Math.round(totals.failureRate * 0.4));
+    score -= pen;
+    reasons.push(`${totals.failureRate}% failure rate (−${pen} pts)`);
+  }
+
+  // Skipped rate → deduct up to 15 pts
+  const skippedRate = Math.round((totals.skipped / totals.recipients) * 100);
+  if (skippedRate > 30) {
+    score -= 15;
+    reasons.push(`${skippedRate}% skipped — many leads lack valid emails (−15 pts)`);
+  } else if (skippedRate > 10) {
+    score -= 5;
+    reasons.push(`${skippedRate}% skipped — some leads need email cleanup (−5 pts)`);
+  }
+
+  // Recipient count → up to 10 pts
+  if (totals.recipients >= 20)     { score += 10; reasons.push("Large audience (20+ recipients, +10)"); }
+  else if (totals.recipients >= 5) { score += 5;  reasons.push("Reasonable audience size (+5)"); }
+  else                             { reasons.push("Small audience — consider adding more recipients"); }
+
+  // Reply estimate bonus → up to 10 pts
+  if (replyEstimate.total > 0 && replyEstimate.rate >= 10) {
+    score += 10;
+    reasons.push(`Estimated ${replyEstimate.rate}% reply rate — strong engagement signal (+10)`);
+  } else if (replyEstimate.total > 0 && replyEstimate.rate >= 5) {
+    score += 5;
+    reasons.push(`Estimated ${replyEstimate.rate}% reply rate (+5)`);
+  }
+
+  score = Math.max(0, Math.min(100, score));
+
+  let badge: QualityScore["badge"];
+  if (score >= 80)      badge = "Excellent";
+  else if (score >= 60) badge = "Good";
+  else if (score >= 40) badge = "Needs Cleanup";
+  else                  badge = "Risky";
+
+  return { score, badge, reasons };
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -799,33 +940,124 @@ export default function CrmCampaigns() {
                 ))}
               </div>
 
+              {/* ── Quality Score ───────────────────────────────────────────── */}
+              {(() => {
+                const qs = computeQualityScore(a);
+                const badgeStyles: Record<string, string> = {
+                  Excellent:       "bg-emerald-100 text-emerald-800 border-emerald-200",
+                  Good:            "bg-blue-100 text-blue-800 border-blue-200",
+                  "Needs Cleanup": "bg-amber-100 text-amber-800 border-amber-200",
+                  Risky:           "bg-red-100 text-red-800 border-red-200",
+                };
+                const trackColor: Record<string, string> = {
+                  Excellent: "bg-emerald-500", Good: "bg-blue-500",
+                  "Needs Cleanup": "bg-amber-400", Risky: "bg-red-400",
+                };
+                return (
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-muted-foreground" />
+                      <h2 className="text-sm font-bold text-foreground">Campaign Quality Score</h2>
+                      <span className="text-[10px] text-muted-foreground ml-auto">Not AI · Rule-based</span>
+                    </div>
+                    <div className="p-5 flex gap-6 items-start">
+                      <div className="shrink-0 text-center">
+                        <p className="text-5xl font-black text-foreground leading-none">{qs.score}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">out of 100</p>
+                        <span className={`mt-2 inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${badgeStyles[qs.badge]}`}>
+                          {qs.badge}
+                        </span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${trackColor[qs.badge]}`} style={{ width: `${qs.score}%` }} />
+                        </div>
+                        <ul className="space-y-1.5 mt-3">
+                          {qs.reasons.map((r, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                              <TrendingUp className="w-3 h-3 shrink-0 mt-0.5 text-gray-400" />
+                              {r}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── Campaign Insights ────────────────────────────────────────── */}
+              {(() => {
+                const insights = generateInsights(a);
+                return (
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-amber-500" />
+                      <h2 className="text-sm font-bold text-foreground">Campaign Insights</h2>
+                      <span className="text-[10px] text-muted-foreground ml-auto">Rule-based · Not AI generated</span>
+                    </div>
+                    <div className="p-4">
+                      {insights.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No insights available — send the campaign to see results.</p>
+                      ) : (
+                        <ul className="space-y-2.5">
+                          {insights.map((ins, i) => (
+                            <li key={i} className="flex items-start gap-3 text-xs text-foreground">
+                              <span className="w-5 h-5 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5">
+                                <Lightbulb className="w-2.5 h-2.5 text-amber-600" />
+                              </span>
+                              {ins}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* DISC Breakdown */}
+                {/* DISC Performance Cards — enhanced */}
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-muted-foreground" />
-                    <h2 className="text-sm font-bold text-foreground">DISC Performance Breakdown</h2>
+                    <h2 className="text-sm font-bold text-foreground">DISC Performance</h2>
                   </div>
                   <div className="p-4 space-y-3">
                     {a.discBreakdown.map(d => {
-                      const dc = DISC_COLORS[d.style] ?? { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-400" };
+                      const dc   = DISC_COLORS[d.style] ?? { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-400" };
                       const meta = DISC_META[d.style as DiscStyle];
+                      const successRate = d.count > 0 ? Math.round((d.sent / d.count) * 100) : 0;
+                      const skippedRate = d.count > 0 ? Math.round((d.skipped / d.count) * 100) : 0;
+                      const RECO: Record<string, string> = {
+                        Driver:     "Use short copy, direct CTA, clear next step.",
+                        Analytical: "Add proof, pricing details, timelines, and supporting data.",
+                        Amiable:    "Use warmer language, reassurance, and relationship-building.",
+                        Expressive: "Use energetic language, visuals, and big-picture outcomes.",
+                      };
                       return (
-                        <div key={d.style} className={`rounded-lg p-3 ${dc.bg}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-bold ${dc.text} flex items-center gap-1`}>
+                        <div key={d.style} className={`rounded-xl p-3 border ${dc.bg} ${d.count === 0 ? "opacity-50" : ""}`} style={{ borderColor: "transparent" }}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className={`text-xs font-bold ${dc.text} flex items-center gap-1.5`}>
                               {meta?.emoji ?? ""} {d.style}
                             </span>
-                            <span className="text-xs text-muted-foreground">{d.count} recipient{d.count !== 1 ? "s" : ""}</span>
+                            <span className="text-[10px] text-muted-foreground">{d.count} recipient{d.count !== 1 ? "s" : ""}</span>
                           </div>
                           {d.count === 0 ? (
-                            <p className="text-[10px] text-muted-foreground italic">No recipients with this DISC style</p>
+                            <p className="text-[10px] text-muted-foreground italic">No recipients with this style</p>
                           ) : (
-                            <div className="flex items-center gap-3 text-[10px] font-semibold">
-                              <span className="text-emerald-700">{d.sent} sent</span>
-                              {d.failed  > 0 && <span className="text-red-600">{d.failed} failed</span>}
-                              {d.skipped > 0 && <span className="text-amber-600">{d.skipped} skipped</span>}
-                            </div>
+                            <>
+                              {/* Progress bar — success rate */}
+                              <div className="h-1.5 bg-white/60 rounded-full overflow-hidden mb-2">
+                                <div className={`h-full rounded-full ${dc.bar}`} style={{ width: `${successRate}%` }} />
+                              </div>
+                              <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold mb-2">
+                                <span className="text-emerald-700">{d.sent} sent ({successRate}%)</span>
+                                <span className={d.failed > 0 ? "text-red-600" : "text-gray-400"}>{d.failed} failed</span>
+                                <span className={d.skipped > 0 ? "text-amber-600" : "text-gray-400"}>{d.skipped} skipped ({skippedRate}%)</span>
+                              </div>
+                              <p className={`text-[10px] ${dc.text} opacity-80 italic`}>{RECO[d.style] ?? ""}</p>
+                            </>
                           )}
                         </div>
                       );
@@ -1539,6 +1771,70 @@ export default function CrmCampaigns() {
 
               {/* ── Right: original vs personalized + test send ── */}
               <div className="lg:col-span-2 space-y-4">
+
+                {/* Pre-Send Quality Check */}
+                {(() => {
+                  const validEmailLeads = [...selectedLeads].filter(id => {
+                    const lead = allLeads.find(l => l.id === id);
+                    return lead?.email && !lead.email.includes("@imported.local");
+                  });
+                  const skippedRisk = selectedLeads.size - validEmailLeads.length;
+                  const hasSubject    = baseSubject.trim().length > 0;
+                  const hasBody       = baseBody.trim().length > 0;
+                  const hasRecipients = selectedLeads.size > 0;
+                  const hasEmail      = validEmailLeads.length > 0;
+                  const hasPersonalization = hasSubject && hasBody;
+                  const testDone      = !!(testResult?.ok);
+
+                  const checks: Array<{ label: string; pass: boolean; warn: boolean; detail?: string }> = [
+                    { label: "Subject line",          pass: hasSubject,        warn: false },
+                    { label: "Email body",            pass: hasBody,           warn: false },
+                    { label: "Recipients selected",   pass: hasRecipients,     warn: false, detail: hasRecipients ? `${selectedLeads.size} lead${selectedLeads.size !== 1 ? "s" : ""}` : "None" },
+                    { label: "Valid email coverage",  pass: hasEmail,          warn: !hasEmail, detail: hasRecipients ? `${validEmailLeads.length} of ${selectedLeads.size} have email` : undefined },
+                    { label: "DISC personalization",  pass: hasPersonalization, warn: false },
+                    ...(skippedRisk > 0 ? [{ label: `${skippedRisk} lead${skippedRisk !== 1 ? "s" : ""} may be skipped (no email)`, pass: false, warn: true }] : []),
+                    { label: "Test send completed",   pass: testDone, warn: !testDone, detail: testDone ? "Verified" : "Recommended" },
+                  ];
+
+                  const hasErrors = checks.some(c => !c.pass && !c.warn);
+                  const hasWarnings = checks.some(c => c.warn && !c.pass);
+                  const statusLabel = hasErrors ? "Needs Attention" : hasWarnings ? "Warning" : "Ready";
+                  const statusStyle = hasErrors
+                    ? "bg-red-50 border-red-200 text-red-700"
+                    : hasWarnings
+                    ? "bg-amber-50 border-amber-200 text-amber-700"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700";
+                  const StatusIcon = hasErrors ? XCircle : hasWarnings ? AlertCircle : CheckCircle2;
+
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                        <h2 className="text-sm font-bold text-foreground">Pre-Send Quality Check</h2>
+                        <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${statusStyle}`}>
+                          <StatusIcon className="w-3 h-3" /> {statusLabel}
+                        </span>
+                      </div>
+                      <ul className="divide-y divide-gray-50">
+                        {checks.map((c, i) => (
+                          <li key={i} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                            <span className="flex items-center gap-2 text-xs text-foreground">
+                              {c.pass
+                                ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                : c.warn
+                                ? <AlertCircle  className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                : <XCircle      className="w-3.5 h-3.5 text-red-400 shrink-0" />}
+                              {c.label}
+                            </span>
+                            {c.detail && (
+                              <span className="text-[10px] text-muted-foreground shrink-0">{c.detail}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
                 {previewResult && (
                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                     <div className="px-5 py-3.5 border-b border-gray-100">

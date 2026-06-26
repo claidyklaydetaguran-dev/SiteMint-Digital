@@ -1,0 +1,173 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 11 — Campaign Performance Insights
+
+MODULE:
+Campaigns only.
+
+IMPORTANT:
+Work only inside the Campaigns module unless compilation requires otherwise.
+Do not touch locked modules.
+Do not touch Twilio routes.
+Do not refactor stable modules.
+Stay within the default change budget if possible.
+Make surgical edits only.
+No new schema changes unless absolutely necessary.
+Do not build Resend webhooks yet.
+Do not show fake open/click rates.
+
+CURRENT STATE:
+Campaign drafts are persisted.
+Manual send works.
+Recipient status tracking works.
+Campaign analytics endpoint exists.
+Campaign analytics UI exists.
+crm_campaign_events table exists but is not used yet.
+Open/click tracking is not configured yet.
+
+OBJECTIVE:
+Improve campaign analytics into useful business insights using existing reliable data only.
+
+TASK 1 — INSPECT ONLY CAMPAIGN FILES
+
+Inspect only:
+
+* CrmCampaigns.tsx
+* campaign analytics endpoint inside crm.ts
+* crmCampaigns schema
+* campaignPersonalization.ts if needed
+
+Do not inspect unrelated modules.
+
+TASK 2 — ADD CAMPAIGN INSIGHT SUMMARY
+
+In the Analytics view, add a “Campaign Insights” section.
+
+Generate rule-based insights from existing analytics:
+
+* Send completion insight
+* Failure risk insight
+* DISC audience composition insight
+* Best represented DISC style
+* Weakest performing DISC style based on failure/skipped rate
+* Reply estimate insight if replyEstimate exists
+* Data quality insight if many skipped/no-email recipients
+
+Examples:
+
+* “Most recipients were Driver-style leads. Keep future campaigns concise and action-focused.”
+* “A high skipped rate suggests some leads need valid email addresses before sending.”
+* “Reply estimate is low. Consider a shorter follow-up or SMS touchpoint.”
+* “Amiable leads made up 40% of this campaign. A warmer trust-building CTA may perform better.”
+
+Label clearly:
+“Rule-based insights”
+
+TASK 3 — ADD DISC PERFORMANCE CARDS
+
+Enhance DISC breakdown.
+
+For each style:
+
+* total selected
+* sent
+* failed
+* skipped
+* send success rate
+* skipped rate
+* recommendation based on style
+
+Style recommendations:
+Driver:
+“Use short copy, direct CTA, clear next step.”
+
+Analytical:
+“Add proof, pricing details, timelines, and supporting data.”
+
+Amiable:
+“Use warmer language, reassurance, and relationship-building.”
+
+Expressive:
+“Use energetic language, visuals, and big-picture outcomes.”
+
+TASK 4 — ADD CAMPAIGN QUALITY SCORE
+
+Create a simple score from 0–100.
+
+Inputs:
+
+* send rate
+* failure rate
+* skipped rate
+* reply estimate if available
+* recipient count
+
+Display:
+
+* Quality Score
+* badge:
+
+  * Excellent
+  * Good
+  * Needs Cleanup
+  * Risky
+* reasons explaining the score
+
+Do not call this AI.
+Do not use fake engagement metrics.
+
+TASK 5 — ADD PRE-SEND QUALITY CHECK
+
+In Campaign Builder before sending, add a “Pre-Send Quality Check” card.
+
+Check:
+
+* campaign has subject
+* campaign has body
+* recipients selected
+* selected recipients have valid emails
+* DISC personalization exists
+* any skipped-risk recipients
+* test send completed if detectable; otherwise show as recommended, not required
+
+Show:
+
+* Ready
+* Needs Attention
+* Warning
+
+This should help avoid bad sends.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Analytics view still loads.
+2. Campaign Insights section renders with no recipients.
+3. Campaign Insights section renders with sent/skipped/failed recipients.
+4. DISC performance cards calculate rates safely.
+5. Campaign Quality Score handles zero recipients.
+6. Pre-Send Quality Check works in builder.
+7. Manual send still works.
+8. Test-send still works.
+9. Campaign history still works.
+10. No fake open/click rates shown.
+11. No Twilio files changed.
+12. No locked modules changed.
+13. TypeScript passes except pre-existing unrelated issue.
+14. No console errors.
+15. No schema migration unless truly required.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Insights added
+4. DISC performance behavior
+5. Quality score logic
+6. Pre-send quality check behavior
+7. Tests performed
+8. Schema changes, if any
+9. Known limitations
+10. Recommended next phase
