@@ -1,0 +1,205 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Wire the CRM Inbox to real message data.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/inbox should become the true communication hub.
+* Twilio routes and crm_messages already exist.
+* Lead detail already has SMS/email activity features.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema.
+Do NOT touch Twilio webhook routes unless absolutely necessary.
+Do NOT break existing Lead Detail SMS/email functionality.
+Do NOT replace working API routes without checking them first.
+Do NOT use auto schema sync.
+
+Known from audit:
+
+* CrmInbox currently shows activity-log style data.
+* crm_messages table already exists.
+* Existing endpoint:
+  GET /api/crm/leads/:id/messages
+  returns messages for one lead.
+* Existing endpoint:
+  POST /api/crm/leads/:id/sms
+  sends SMS for one lead.
+* Existing endpoint:
+  GET /api/crm/leads
+  returns CRM leads.
+
+Goal:
+Turn /admin/crm/inbox into a real SMS/call communication inbox using crm_messages records.
+
+TASK 1 — INSPECT CURRENT INBOX + MESSAGE DATA FLOW
+
+Before coding, inspect:
+
+1. CrmInbox.tsx
+2. crm_messages schema
+3. Existing GET /api/crm/leads/:id/messages endpoint
+4. Existing POST /api/crm/leads/:id/sms endpoint
+5. Twilio webhook handlers that create inbound messages
+6. Any current message display in CrmLeadDetail
+
+Report what already works before changing code.
+
+TASK 2 — BACKEND SUPPORT FOR INBOX LIST
+
+If there is no efficient endpoint to fetch all message threads, create a protected endpoint:
+
+GET /api/crm/messages
+
+Return recent messages grouped or sortable by lead.
+
+Suggested response shape:
+{
+threads: [
+{
+leadId,
+leadName,
+leadEmail,
+leadPhone,
+lastMessageAt,
+unreadCount,
+messages: [
+{
+id,
+direction,
+channel,
+body,
+status,
+fromNumber,
+toNumber,
+duration,
+callStatus,
+createdAt
+}
+]
+}
+]
+}
+
+Important:
+
+* Use crm_messages as source of truth.
+* Join crm_leads when leadId exists.
+* Include orphan messages if leadId is null, but label them as “Unknown Contact.”
+* Sort threads by most recent message.
+* Protect this endpoint with admin auth.
+* Do not modify Twilio webhook routes.
+
+TASK 3 — BUILD REAL INBOX UI
+
+Update /admin/crm/inbox.
+
+Layout:
+
+* Left column: conversation/thread list
+* Right column: selected conversation detail
+
+Thread list should show:
+
+* Lead/contact name
+* Phone or email
+* Last message preview
+* Last message timestamp
+* Channel badge: SMS or Call
+* Direction indicator: inbound/outbound
+* Unread count if available, otherwise omit
+
+Conversation detail should show:
+
+* Lead/contact header
+* Link to CRM lead detail page
+* SMS/call badges
+* Message bubbles:
+
+  * inbound aligned left
+  * outbound aligned right
+  * failed/error status clearly shown
+  * timestamps visible
+* Call records displayed as call event cards:
+
+  * inbound/outbound call
+  * duration if available
+  * call status if available
+
+TASK 4 — SMS COMPOSE PANEL
+
+Add a simple compose box at the bottom of the selected thread.
+
+Requirements:
+
+* Only show SMS compose if selected thread has a valid leadId.
+* Textarea for message body.
+* Send button.
+* Calls:
+  POST /api/crm/leads/:id/sms
+* On success:
+
+  * clear textarea
+  * refresh thread messages
+  * show success toast/message
+* On failure:
+
+  * show clear error message
+* Respect existing smsConsent or smsOptOut fields if returned by lead API.
+  If smsOptOut is true, disable sending and show:
+  “SMS disabled: this lead has opted out.”
+
+TASK 5 — EMPTY / LOADING / ERROR STATES
+
+Add:
+
+* Loading state while fetching inbox
+* Empty inbox state if no messages exist
+* Error state if API fails
+* Empty selected thread state
+* Mobile responsive stacked layout
+
+TASK 6 — OPTIONAL SAFE IMPROVEMENT
+
+If the existing GET /api/crm/leads/:id/messages endpoint is still needed by CrmLeadDetail, do not remove it.
+
+If useful, reuse shared components or helper functions, but do not do a large refactor.
+
+TASK 7 — TESTING
+
+Test:
+
+1. /admin/crm/inbox loads without crashing.
+2. Inbox uses crm_messages, not crm_activities.
+3. Threads sort by most recent message.
+4. SMS messages show inbound/outbound clearly.
+5. Call records render correctly if present.
+6. Unknown/orphan messages do not crash the inbox.
+7. Sending SMS from inbox calls existing endpoint.
+8. After sending SMS, thread refreshes.
+9. Lead detail page message functionality still works.
+10. Twilio webhook routes are untouched.
+11. /admin/dashboard still works.
+12. /admin/crm/dashboard still works.
+13. No TypeScript errors.
+14. No console errors.
+15. No database migrations were created.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. API endpoint added or reused
+4. Inbox data source confirmation
+5. UI behavior completed
+6. SMS compose behavior
+7. Tests performed
+8. Confirmation no schema/database changes were made
+9. Confirmation Twilio webhook routes were not changed
+10. Known limitations
+11. Recommended next prompt

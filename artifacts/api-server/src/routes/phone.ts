@@ -114,7 +114,7 @@ router.get("/crm/conversations", requireAdmin, async (req: Request, res: Respons
 
     const leadIds = [...new Set(messages.map(m => m.leadId).filter((id): id is number => id !== null))];
     const leads = leadIds.length
-      ? await db.select({ id: crmLeads.id, name: crmLeads.name, phone: crmLeads.phone, email: crmLeads.email, company: crmLeads.company })
+      ? await db.select({ id: crmLeads.id, name: crmLeads.name, phone: crmLeads.phone, email: crmLeads.email, company: crmLeads.company, smsOptOut: crmLeads.smsOptOut })
           .from(crmLeads).where(or(...leadIds.map(id => eq(crmLeads.id, id))))
       : [];
 
