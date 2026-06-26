@@ -29,7 +29,7 @@ export default function AdminLogin() {
       const { token } = await res.json() as { token: string };
       localStorage.setItem("adminToken", token);
       const redirect = new URLSearchParams(window.location.search).get("redirect");
-      navigate(redirect && redirect.startsWith("/admin") ? redirect : "/admin/crm/dashboard");
+      navigate(redirect && redirect.startsWith("/admin") ? redirect : "/admin/dashboard");
     } catch {
       setError("Connection error. Make sure the server is running.");
     } finally {
