@@ -1,0 +1,770 @@
+import { useState, useRef, useCallback, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  FileText, ClipboardList, Printer, Copy, Edit3, Loader2,
+  CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
+  X, DollarSign, Package, Zap, ChevronRight, RefreshCw,
+  StickyNote, History, Star,
+} from "lucide-react";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface WorkspaceLead {
+  id: number;
+  name: string;
+  company?: string;
+  email: string;
+  serviceInterest?: string;
+  status: string;
+  source: string;
+  packageType?: string;
+  estimatedValue?: string;
+  discoveryFormStatus: string;
+  proposalStatus: string;
+  sowStatus: string;
+  notes?: string;
+  generatedProposal?: string;
+  generatedSow?: string;
+  discoverySubmissionId?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface WorkspaceActivity {
+  id: number;
+  type: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+}
+
+interface WorkspaceTask {
+  id: number;
+  type: string;
+  title: string;
+  status: string;
+  dueDate?: string;
+  completedAt?: string;
+  createdAt: string;
+}
+
+export interface SalesWorkspaceProps {
+  lead: WorkspaceLead;
+  activities: WorkspaceActivity[];
+  tasks: WorkspaceTask[];
+  onReload: () => Promise<void>;
+}
+
+type WsTab = "overview" | "proposal" | "sow" | "notes" | "history" | "documents";
+
+const tk = () => localStorage.getItem("adminToken") || "";
+
+// ── Sales Stage Tracker ───────────────────────────────────────────────────────
+
+const STAGES = [
+  { label: "Discovery",   check: (l: WorkspaceLead) => l.discoveryFormStatus !== "Not Started" },
+  { label: "Qualified",   check: (l: WorkspaceLead) => l.status !== "New" },
+  { label: "Proposal",    check: (l: WorkspaceLead) => l.proposalStatus !== "Not Started" },
+  { label: "Sent",        check: (l: WorkspaceLead) => l.status === "Proposal Sent" || l.proposalStatus === "Sent" },
+  { label: "Negotiating", check: (l: WorkspaceLead) => l.status === "Negotiating" || l.status === "Won" },
+  { label: "Contract",    check: (l: WorkspaceLead) => l.proposalStatus === "Signed" || l.status === "Won" },
+  { label: "Won 🎉",      check: (l: WorkspaceLead) => l.status === "Won" },
+];
+
+function StageTracker({ lead }: { lead: WorkspaceLead }) {
+  const isLost = lead.status === "Lost";
+  const completedCount = STAGES.filter(s => s.check(lead)).length;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sales Progress</h3>
+        {isLost ? (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Lost</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">{completedCount}/{STAGES.length} stages</span>
+        )}
+      </div>
+      <div className="relative">
+        <div className="absolute top-3 left-3 right-3 h-0.5 bg-gray-100" />
+        <div
+          className={`absolute top-3 left-3 h-0.5 transition-all ${isLost ? "bg-red-300" : "bg-green-400"}`}
+          style={{ width: `${Math.max(0, (completedCount - 1) / (STAGES.length - 1)) * (100 - (6 / STAGES.length * 100))}%` }}
+        />
+        <div className="relative flex justify-between">
+          {STAGES.map((stage, i) => {
+            const done = stage.check(lead);
+            const active = done && (i === STAGES.length - 1 || !STAGES[i + 1].check(lead));
+            return (
+              <div key={stage.label} className="flex flex-col items-center gap-1.5" style={{ minWidth: 0 }}>
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs z-10 transition-all ${
+                  isLost && i === 0
+                    ? "border-red-400 bg-red-50 text-red-600"
+                    : done
+                    ? "border-green-400 bg-green-400 text-white"
+                    : active
+                    ? "border-foreground bg-foreground text-background animate-pulse"
+                    : "border-gray-200 bg-white text-gray-300"
+                }`}>
+                  {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span>{i + 1}</span>}
+                </div>
+                <span className="text-[9px] text-center text-muted-foreground leading-tight max-w-[48px]">{stage.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Status Badge ──────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    "Not Started": "bg-gray-100 text-gray-500",
+    "Draft": "bg-yellow-100 text-yellow-700",
+    "Sent": "bg-blue-100 text-blue-700",
+    "Viewed": "bg-indigo-100 text-indigo-700",
+    "Signed": "bg-green-100 text-green-700",
+    "Rejected": "bg-red-100 text-red-700",
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${map[status] || "bg-gray-100 text-gray-600"}`}>
+      {status}
+    </span>
+  );
+}
+
+// ── Doc Preview Modal ─────────────────────────────────────────────────────────
+
+function DocPreviewModal({ html, title, onClose }: { html: string; title: string; onClose: () => void }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const handlePrint = () => iframeRef.current?.contentWindow?.print();
+  const handleCopy = () => {
+    const text = iframeRef.current?.contentDocument?.body?.innerText || "";
+    navigator.clipboard.writeText(text);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
+      <div className="bg-foreground text-background px-6 py-3 flex items-center justify-between gap-4 shrink-0">
+        <h2 className="font-serif font-semibold text-base">{title}</h2>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleCopy} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1.5">
+            <Copy className="w-3.5 h-3.5" /> Copy Text
+          </Button>
+          <Button onClick={handlePrint} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1.5">
+            <Printer className="w-3.5 h-3.5" /> Print / PDF
+          </Button>
+          <Button onClick={onClose} variant="outline" size="sm" className="border-white/20 text-background hover:bg-white/10">
+            Close
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-hidden bg-gray-200 p-4">
+        <iframe ref={iframeRef} srcDoc={html} className="w-full h-full bg-white rounded-lg shadow-xl" title={title} />
+      </div>
+    </div>
+  );
+}
+
+// ── Edit HTML Modal ───────────────────────────────────────────────────────────
+
+function EditHtmlModal({
+  html, title, saving, onSave, onClose,
+}: { html: string; title: string; saving: boolean; onSave: (v: string) => void; onClose: () => void }) {
+  const [value, setValue] = useState(html);
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
+      <div className="bg-foreground text-background px-6 py-3 flex items-center justify-between gap-4 shrink-0">
+        <h2 className="font-serif font-semibold text-base">Edit {title} HTML</h2>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => onSave(value)} disabled={saving} size="sm" className="bg-white text-foreground hover:bg-white/90 gap-1.5">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save
+          </Button>
+          <Button onClick={onClose} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10">
+            Cancel
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-hidden p-4">
+        <textarea
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          className="w-full h-full font-mono text-xs bg-white rounded-lg p-4 border-0 outline-none resize-none shadow-xl"
+          spellCheck={false}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Doc Panel (Proposal or SOW) ───────────────────────────────────────────────
+
+function DocPanel({
+  lead,
+  kind,
+  onReload,
+}: {
+  lead: WorkspaceLead;
+  kind: "proposal" | "sow";
+  onReload: () => Promise<void>;
+}) {
+  const html = kind === "proposal" ? lead.generatedProposal : lead.generatedSow;
+  const docStatus = kind === "proposal" ? lead.proposalStatus : lead.sowStatus;
+  const label = kind === "proposal" ? "Proposal" : "Scope of Work";
+
+  const [generating, setGenerating] = useState(false);
+  const [savingHtml, setSavingHtml] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  };
+
+  const generate = useCallback(async () => {
+    setGenerating(true);
+    try {
+      const r = await fetch(`/api/crm/leads/${lead.id}/${kind}/generate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tk()}` },
+      });
+      if (!r.ok) throw new Error();
+      showToast(`${label} generated!`);
+      await onReload();
+    } catch {
+      showToast("Generation failed — try again.");
+    } finally {
+      setGenerating(false);
+    }
+  }, [lead.id, kind, label, onReload]);
+
+  const saveHtml = useCallback(async (newHtml: string) => {
+    setSavingHtml(true);
+    try {
+      await fetch(`/api/crm/leads/${lead.id}/${kind}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ html: newHtml }),
+      });
+      showToast("Saved!");
+      setEditOpen(false);
+      await onReload();
+    } catch {
+      showToast("Save failed.");
+    } finally {
+      setSavingHtml(false);
+    }
+  }, [lead.id, kind, onReload]);
+
+  const updateStatus = useCallback(async (newStatus: string) => {
+    setSavingStatus(true);
+    try {
+      const field = kind === "proposal" ? "proposalStatus" : "sowStatus";
+      await fetch(`/api/crm/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: newStatus }),
+      });
+      showToast(`Status updated to ${newStatus}`);
+      await onReload();
+    } catch {
+      showToast("Update failed.");
+    } finally {
+      setSavingStatus(false);
+    }
+  }, [lead.id, kind, onReload]);
+
+  const STATUSES = ["Not Started", "Draft", "Sent", "Signed", "Rejected"];
+
+  return (
+    <div className="p-5 space-y-5">
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-foreground text-background px-4 py-2.5 rounded-lg text-sm shadow-lg animate-in fade-in">
+          {toast}
+        </div>
+      )}
+
+      {!html ? (
+        /* Empty state */
+        <div className="text-center py-12">
+          <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
+            {kind === "proposal" ? <FileText className="w-7 h-7 text-gray-300" /> : <ClipboardList className="w-7 h-7 text-gray-300" />}
+          </div>
+          <h3 className="font-semibold text-foreground mb-1">No {label} Yet</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
+            {lead.discoverySubmissionId
+              ? `This lead has a discovery submission — generate a rich ${label.toLowerCase()} from it.`
+              : `Generate a ${label.toLowerCase()} from the lead's contact and service details.`}
+          </p>
+          <Button onClick={generate} disabled={generating} className="gap-2">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {generating ? `Generating ${label}…` : `Generate ${label}`}
+          </Button>
+        </div>
+      ) : (
+        /* Document exists */
+        <div className="space-y-4">
+          {/* Header row */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">{label}</span>
+              <StatusBadge status={docStatus} />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button onClick={() => setPreviewOpen(true)} variant="outline" size="sm" className="gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Preview
+              </Button>
+              <Button onClick={() => setEditOpen(true)} variant="outline" size="sm" className="gap-1.5">
+                <Edit3 className="w-3.5 h-3.5" /> Edit HTML
+              </Button>
+              <Button onClick={generate} disabled={generating} variant="outline" size="sm" className="gap-1.5">
+                {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Regenerate
+              </Button>
+            </div>
+          </div>
+
+          {/* Thumbnail preview */}
+          <div
+            className="relative w-full rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:border-gray-300 transition-colors group"
+            style={{ height: 220 }}
+            onClick={() => setPreviewOpen(true)}
+          >
+            <iframe
+              srcDoc={html}
+              className="w-full h-full pointer-events-none"
+              style={{ transform: "scale(0.6)", transformOrigin: "top left", width: "167%", height: "167%" }}
+              title={`${label} preview`}
+            />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10">
+              <span className="bg-white rounded-lg px-3 py-1.5 text-sm font-medium shadow">Click to open full preview</span>
+            </div>
+          </div>
+
+          {/* Status updater */}
+          <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Update Status</span>
+              {savingStatus && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {STATUSES.map(s => (
+                <button
+                  key={s}
+                  onClick={() => updateStatus(s)}
+                  disabled={savingStatus}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    docStatus === s
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-white text-muted-foreground border-gray-200 hover:border-gray-300 hover:text-foreground"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewOpen && html && <DocPreviewModal html={html} title={label} onClose={() => setPreviewOpen(false)} />}
+      {editOpen && html && (
+        <EditHtmlModal html={html} title={label} saving={savingHtml} onSave={saveHtml} onClose={() => setEditOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+// ── Notes Tab ─────────────────────────────────────────────────────────────────
+
+function parseNotes(raw?: string): { timestamp: string; text: string }[] {
+  if (!raw?.trim()) return [];
+  const parts = raw.split(/\n\n(?=\[)/);
+  return parts
+    .map(p => {
+      const match = p.match(/^\[([^\]]+)\]\s*([\s\S]*)/);
+      return match
+        ? { timestamp: match[1], text: match[2].trim() }
+        : { timestamp: "", text: p.trim() };
+    })
+    .reverse();
+}
+
+function NotesTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Promise<void> }) {
+  const [search, setSearch] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const notes = useMemo(() => parseNotes(lead.notes), [lead.notes]);
+  const filtered = useMemo(() =>
+    search ? notes.filter(n => n.text.toLowerCase().includes(search.toLowerCase()) || n.timestamp.toLowerCase().includes(search.toLowerCase())) : notes,
+    [notes, search],
+  );
+
+  const addNote = async () => {
+    if (!newNote.trim()) return;
+    setAdding(true);
+    try {
+      const r = await fetch(`/api/crm/leads/${lead.id}/notes`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ note: newNote }),
+      });
+      if (!r.ok) throw new Error();
+      setNewNote("");
+      showToast("Note added!");
+      await onReload();
+    } catch {
+      showToast("Failed to add note.");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="p-5 space-y-4">
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-foreground text-background px-4 py-2.5 rounded-lg text-sm shadow-lg">
+          {toast}
+        </div>
+      )}
+
+      {/* Add note */}
+      <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Add Note</h3>
+        <textarea
+          value={newNote}
+          onChange={e => setNewNote(e.target.value)}
+          placeholder="Type a note about this lead…"
+          rows={3}
+          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none bg-white"
+        />
+        <div className="flex justify-end mt-2">
+          <Button onClick={addNote} disabled={adding || !newNote.trim()} size="sm" className="gap-1.5">
+            {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            Add Note
+          </Button>
+        </div>
+      </div>
+
+      {/* Search */}
+      {notes.length > 2 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search notes…"
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          />
+        </div>
+      )}
+
+      {/* Notes list */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-10">
+          <StickyNote className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">{search ? "No notes match your search." : "No notes yet — add the first one above."}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((note, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
+              {note.timestamp && (
+                <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">{note.timestamp}</p>
+              )}
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{note.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── History Tab ───────────────────────────────────────────────────────────────
+
+const ACTIVITY_ICONS: Record<string, string> = {
+  lead_created: "🟢", lead_imported: "📥", status_changed: "🔄", note_added: "📝",
+  email_sent: "📧", task_created: "✅", task_completed: "🎯", follow_up_changed: "⏰",
+  sms_sent: "📤", sms_received: "📩", sms_attempted: "📱",
+  call_initiated: "📞", call_received: "📲",
+  proposal_generated: "📄", sow_generated: "📋",
+  sms_opt_out: "🚫", sms_opt_in: "✅",
+};
+
+function formatRelative(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  if (mins < 2) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs < 24) return `${hrs}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: days > 365 ? "numeric" : undefined });
+}
+
+function groupByDate(activities: WorkspaceActivity[]) {
+  const groups: { label: string; items: WorkspaceActivity[] }[] = [];
+  const seen = new Map<string, number>();
+  for (const a of activities) {
+    const d = new Date(a.createdAt);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    const label = diff === 0 ? "Today" : diff === 1 ? "Yesterday" : d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const idx = seen.get(label);
+    if (idx !== undefined) {
+      groups[idx].items.push(a);
+    } else {
+      seen.set(label, groups.length);
+      groups.push({ label, items: [a] });
+    }
+  }
+  return groups;
+}
+
+function HistoryTab({ activities, tasks }: { activities: WorkspaceActivity[]; tasks: WorkspaceTask[] }) {
+  const allItems = useMemo(() => {
+    const taskActivities: WorkspaceActivity[] = tasks
+      .filter(t => t.completedAt)
+      .map(t => ({
+        id: t.id + 100000,
+        type: "task_completed",
+        title: `Task completed: ${t.title}`,
+        description: t.type,
+        createdAt: t.completedAt!,
+      }));
+    return [...activities, ...taskActivities].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [activities, tasks]);
+
+  const groups = useMemo(() => groupByDate(allItems), [allItems]);
+
+  if (allItems.length === 0) {
+    return (
+      <div className="p-5 text-center py-12">
+        <History className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground">No activity yet for this lead.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5">
+      <div className="space-y-5">
+        {groups.map(group => (
+          <div key={group.label}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+            <div className="space-y-2">
+              {group.items.map(a => (
+                <div key={a.id} className="flex items-start gap-3 py-2">
+                  <span className="text-base shrink-0 mt-0.5">{ACTIVITY_ICONS[a.type] || "•"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground leading-snug">{a.title}</p>
+                    {a.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{a.description}</p>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">{formatRelative(a.createdAt)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Overview Tab ──────────────────────────────────────────────────────────────
+
+function OverviewTab({ lead }: { lead: WorkspaceLead }) {
+  const docStats = [
+    { label: "Discovery Form", status: lead.discoveryFormStatus },
+    { label: "Proposal", status: lead.proposalStatus },
+    { label: "Scope of Work", status: lead.sowStatus },
+  ];
+
+  return (
+    <div className="p-5 space-y-5">
+      {/* Stage tracker */}
+      <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+        <StageTracker lead={lead} />
+      </div>
+
+      {/* Deal summary */}
+      <div className="grid sm:grid-cols-2 gap-3">
+        {lead.estimatedValue && (
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+              <DollarSign className="w-4 h-4 text-green-600" />
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Est. Value</p>
+              <p className="text-sm font-semibold text-foreground">
+                ${Number(lead.estimatedValue).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        )}
+        {lead.packageType && (
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+              <Package className="w-4 h-4 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Package</p>
+              <p className="text-sm font-semibold text-foreground">{lead.packageType}</p>
+            </div>
+          </div>
+        )}
+        {lead.serviceInterest && (
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Service</p>
+              <p className="text-sm font-semibold text-foreground">{lead.serviceInterest}</p>
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+          <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
+            <Star className="w-4 h-4 text-orange-500" />
+          </div>
+          <div>
+            <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Source</p>
+            <p className="text-sm font-semibold text-foreground">{lead.source}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Document statuses */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Document Pipeline</h3>
+        <div className="space-y-2.5">
+          {docStats.map(d => (
+            <div key={d.label} className="flex items-center justify-between">
+              <span className="text-sm text-foreground">{d.label}</span>
+              <StatusBadge status={d.status} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Discovery link */}
+      {lead.discoverySubmissionId && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-sm text-blue-700">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>Discovery submission linked — proposals will be generated from the full form data.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
+const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
+  { id: "overview",   label: "Overview",      icon: Star },
+  { id: "proposal",   label: "Proposal",      icon: FileText },
+  { id: "sow",        label: "Scope of Work", icon: ClipboardList },
+  { id: "notes",      label: "Notes",         icon: StickyNote },
+  { id: "history",    label: "History",       icon: History },
+  { id: "documents",  label: "Documents",     icon: Folder },
+];
+
+export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
+  const [activeTab, setActiveTab] = useState<WsTab>("overview");
+
+  const proposalCount = lead.generatedProposal ? 1 : 0;
+  const sowCount = lead.generatedSow ? 1 : 0;
+  const noteCount = useMemo(() => parseNotes(lead.notes).length, [lead.notes]);
+
+  function getBadge(tab: WsTab): number | null {
+    if (tab === "notes" && noteCount > 0) return noteCount;
+    if (tab === "history" && activities.length > 0) return activities.length;
+    return null;
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-5 pt-4 pb-0 border-b border-gray-200">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-5 h-5 rounded bg-foreground flex items-center justify-center">
+            <ChevronRight className="w-3 h-3 text-background" />
+          </div>
+          <h2 className="font-serif font-bold text-base text-foreground">Sales Workspace</h2>
+          {(proposalCount > 0 || sowCount > 0) && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium ml-auto">
+              {proposalCount > 0 && sowCount > 0 ? "Proposal + SOW ready" : proposalCount > 0 ? "Proposal ready" : "SOW ready"}
+            </span>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex overflow-x-auto -mb-px">
+          {WS_TABS.map(tab => {
+            const badge = getBadge(tab.id);
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px shrink-0 ${
+                  activeTab === tab.id
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+                {badge !== null && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    activeTab === tab.id ? "bg-foreground text-background" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "overview" && <OverviewTab lead={lead} />}
+      {activeTab === "proposal" && <DocPanel lead={lead} kind="proposal" onReload={onReload} />}
+      {activeTab === "sow" && <DocPanel lead={lead} kind="sow" onReload={onReload} />}
+      {activeTab === "notes" && <NotesTab lead={lead} onReload={onReload} />}
+      {activeTab === "history" && <HistoryTab activities={activities} tasks={tasks} />}
+      {activeTab === "documents" && (
+        <div className="p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">
+            <Folder className="w-6 h-6 text-gray-300" />
+          </div>
+          <h3 className="font-semibold text-foreground mb-1">Documents</h3>
+          <p className="text-sm text-muted-foreground">
+            File attachments, contracts, and client uploads are coming in a future phase.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

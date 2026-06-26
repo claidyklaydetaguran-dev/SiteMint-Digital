@@ -8,6 +8,7 @@ import {
   FileText, CheckCircle2, XCircle, RefreshCw,
 } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import { SalesWorkspace } from "./SalesWorkspace";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -82,8 +83,10 @@ interface Lead {
   source:string; serviceInterest?:string; status:string; priority:string; assignedTo?:string;
   tags:string[]; lastContactedAt?:string; nextFollowUpAt?:string; notes?:string;
   estimatedValue?:string; packageType?:string; discoveryFormStatus:string;
-  proposalStatus:string; sowStatus:string; createdAt:string; discoverySubmissionId?:number;
+  proposalStatus:string; sowStatus:string; createdAt:string; updatedAt:string;
+  discoverySubmissionId?:number;
   smsConsent:boolean; smsOptOut:boolean;
+  generatedProposal?:string; generatedSow?:string;
 }
 interface Activity { id:number; type:string; title:string; description?:string; createdAt:string; }
 interface CrmMessage {
@@ -510,6 +513,14 @@ export default function CrmLeadDetail() {
                 </div>
               )}
             </div>
+
+            {/* Sales Workspace */}
+            <SalesWorkspace
+              lead={lead}
+              activities={activities}
+              tasks={tasks}
+              onReload={load}
+            />
 
             {/* Tab panel */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm">

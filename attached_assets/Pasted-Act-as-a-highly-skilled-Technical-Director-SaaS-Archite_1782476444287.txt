@@ -1,0 +1,316 @@
+Act as a highly skilled Technical Director, SaaS Architect, and Senior Software Engineer.
+
+PROJECT
+
+Sitemint Digital Internal Platform
+
+Current modules already completed:
+
+✓ Discovery Portal
+✓ CRM Dashboard
+✓ CRM Intelligence
+✓ Leads
+✓ Lead Detail Command Center
+✓ Pipeline
+✓ Deals
+✓ Inbox
+✓ Reporting
+✓ Import Leads
+✓ Discovery → CRM Bridge
+✓ Lead Health Engine
+
+=====================================================
+
+GOAL
+
+Transform every CRM Lead into a complete Sales Workspace.
+
+The Lead Detail page should become the central place where the entire sales cycle is managed.
+
+This is NOT project management.
+
+This is PRE-SALE management.
+
+=====================================================
+
+DO NOT
+
+Do not rebuild existing pages.
+
+Do not touch Twilio.
+
+Do not modify the Lead Health Engine.
+
+Do not use auto schema sync.
+
+Use Drizzle migrations only if absolutely required.
+
+=====================================================
+
+TASK 1
+
+Inspect existing modules.
+
+Determine whether Proposal Generator, Scope of Work Generator, Quote Generator, or Discovery Documents already exist.
+
+Reuse them whenever possible.
+
+Do not duplicate logic.
+
+=====================================================
+
+TASK 2
+
+Inside CRM Lead Detail create a new section:
+
+Sales Workspace
+
+Tabs:
+
+Overview
+
+Proposal
+
+Scope of Work
+
+Documents
+
+Client Notes
+
+History
+
+=====================================================
+
+TASK 3
+
+Proposal Tab
+
+If proposal already exists
+
+show:
+
+Proposal Status
+
+Created Date
+
+Last Updated
+
+Version
+
+Preview button
+
+Edit button
+
+Export PDF
+
+Send to Client
+
+Duplicate Proposal
+
+If proposal doesn't exist
+
+show:
+
+Generate Proposal
+
+=====================================================
+
+TASK 4
+
+Scope of Work
+
+Exactly the same concept.
+
+Generate
+
+Preview
+
+Edit
+
+Version history
+
+Export
+
+=====================================================
+
+TASK 5
+
+Client Documents
+
+Allow attaching:
+
+Proposal
+
+Scope
+
+Contract
+
+Logo
+
+Brand Assets
+
+Reference Files
+
+Meeting Notes
+
+Discovery PDFs
+
+Show:
+
+file
+
+date
+
+uploaded by
+
+download
+
+preview
+
+=====================================================
+
+TASK 6
+
+Client Notes
+
+Rich notes.
+
+Pin important notes.
+
+Search notes.
+
+Newest first.
+
+=====================================================
+
+TASK 7
+
+Sales Timeline
+
+Merge:
+
+Discovery Submitted
+
+Lead Imported
+
+Emails
+
+SMS
+
+Calls
+
+Meetings
+
+Tasks
+
+Status Changes
+
+Proposal Created
+
+Proposal Sent
+
+Proposal Viewed (future)
+
+Contract Sent
+
+Everything should appear as one chronological sales history.
+
+=====================================================
+
+TASK 8
+
+Sales Progress
+
+Add a visual progress tracker.
+
+Example
+
+Discovery
+
+↓
+
+Lead Qualified
+
+↓
+
+Proposal
+
+↓
+
+Negotiation
+
+↓
+
+Contract
+
+↓
+
+Deposit
+
+↓
+
+Project Kickoff
+
+Highlight completed stages.
+
+=====================================================
+
+TASK 9
+
+Dashboard Integration
+
+Dashboard should show:
+
+Proposal Waiting
+
+Proposal Draft
+
+Needs Scope
+
+Contract Pending
+
+Ready for Kickoff
+
+=====================================================
+
+TASK 10
+
+Testing
+
+Verify:
+
+No existing CRM pages break.
+
+Lead Detail remains responsive.
+
+Discovery integration still works.
+
+Proposal workflow works.
+
+Timeline remains chronological.
+
+No duplicate proposal records.
+
+No TypeScript errors.
+
+No console errors.
+
+No schema changes unless required.
+
+=====================================================
+
+FINAL REPORT
+
+Files changed
+
+Components added
+
+Workflow created
+
+APIs reused
+
+Any migrations
+
+Known limitations
+
+Recommended Prompt 12

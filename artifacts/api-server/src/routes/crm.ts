@@ -1,8 +1,10 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals } from "@workspace/db";
+import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { getResend } from "../lib/email.js";
+import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
 
@@ -672,6 +674,142 @@ router.get("/crm/pipeline", requireAdmin, async (req: Request, res: Response) =>
     res.json({ pipeline });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch pipeline" });
+  }
+});
+
+// ── Sales Workspace: helpers ───────────────────────────────────────────────────
+
+function crmLeadToSubmission(lead: CrmLead): DiscoverySubmission {
+  const VALID_SERVICES = [
+    "new-website", "redesign", "web-app", "crm", "seo",
+    "blog", "maintenance", "automation", "consultation",
+  ];
+  const serviceKey = (lead.serviceInterest || "new-website")
+    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z-]/g, "");
+  const services = VALID_SERVICES.includes(serviceKey) ? [serviceKey] : ["new-website"];
+
+  return {
+    id: 0,
+    createdAt: lead.createdAt,
+    updatedAt: lead.updatedAt,
+    contactName: lead.name,
+    companyName: lead.company || lead.name,
+    email: lead.email,
+    phone: lead.phone ?? null,
+    industry: null,
+    serviceInterest: lead.serviceInterest ?? null,
+    budget: "5k-10k",
+    timeline: "flexible",
+    decisionMaker: "just-me",
+    leadScore: 5,
+    tags: lead.tags,
+    status: "CRM Lead",
+    recommendedPackage: lead.packageType ?? null,
+    formData: {
+      services,
+      budget: "5k-10k",
+      timeline: "flexible",
+      decisionMaker: "just-me",
+      projectGoals: ["grow-online-presence", "generate-leads"],
+      marketingFeatures: [],
+      salesFeatures: [],
+      membershipFeatures: [],
+      automationFeatures: [],
+      otherFeatures: [],
+      integrations: [],
+      specificRequirements: lead.notes || "",
+    },
+    generatedProposal: null,
+    generatedSow: null,
+    internalNotes: lead.notes ?? null,
+  } as unknown as DiscoverySubmission;
+}
+
+// ── Sales Workspace: Proposal ─────────────────────────────────────────────────
+
+router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+
+    let html: string;
+    if (lead.discoverySubmissionId) {
+      const [sub] = await db.select().from(discoverySubmissions).where(eq(discoverySubmissions.id, lead.discoverySubmissionId));
+      html = sub ? generateProposal(sub) : generateProposal(crmLeadToSubmission(lead));
+    } else {
+      html = generateProposal(crmLeadToSubmission(lead));
+    }
+
+    const newStatus = lead.proposalStatus === "Not Started" ? "Draft" : lead.proposalStatus;
+    await db.update(crmLeads).set({ generatedProposal: html, proposalStatus: newStatus, updatedAt: new Date() }).where(eq(crmLeads.id, id));
+    await logActivity(id, "proposal_generated", "Proposal generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
+    req.log.info({ id }, "Proposal generated for CRM lead");
+    res.json({ proposal: html });
+  } catch (err) {
+    req.log.error({ err }, "Error generating proposal");
+    res.status(500).json({ error: "Failed to generate proposal" });
+  }
+});
+
+router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { html, status } = req.body as { html?: string; status?: string };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (html !== undefined) updates.generatedProposal = html;
+    if (status !== undefined) updates.proposalStatus = status;
+    await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error saving proposal");
+    res.status(500).json({ error: "Failed to save proposal" });
+  }
+});
+
+// ── Sales Workspace: Scope of Work ────────────────────────────────────────────
+
+router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+
+    let html: string;
+    if (lead.discoverySubmissionId) {
+      const [sub] = await db.select().from(discoverySubmissions).where(eq(discoverySubmissions.id, lead.discoverySubmissionId));
+      html = sub ? generateSOW(sub) : generateSOW(crmLeadToSubmission(lead));
+    } else {
+      html = generateSOW(crmLeadToSubmission(lead));
+    }
+
+    const newStatus = lead.sowStatus === "Not Started" ? "Draft" : lead.sowStatus;
+    await db.update(crmLeads).set({ generatedSow: html, sowStatus: newStatus, updatedAt: new Date() }).where(eq(crmLeads.id, id));
+    await logActivity(id, "sow_generated", "Scope of Work generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
+    req.log.info({ id }, "SOW generated for CRM lead");
+    res.json({ sow: html });
+  } catch (err) {
+    req.log.error({ err }, "Error generating SOW");
+    res.status(500).json({ error: "Failed to generate SOW" });
+  }
+});
+
+router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { html, status } = req.body as { html?: string; status?: string };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (html !== undefined) updates.generatedSow = html;
+    if (status !== undefined) updates.sowStatus = status;
+    await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error saving SOW");
+    res.status(500).json({ error: "Failed to save SOW" });
   }
 });
 

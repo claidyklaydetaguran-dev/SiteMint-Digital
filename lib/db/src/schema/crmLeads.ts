@@ -56,6 +56,10 @@ export const crmLeads = pgTable("crm_leads", {
   // SMS / Phone
   smsConsent: boolean("sms_consent").default(false).notNull(),
   smsOptOut: boolean("sms_opt_out").default(false).notNull(),
+
+  // Generated sales documents (stored as full HTML)
+  generatedProposal: text("generated_proposal"),
+  generatedSow: text("generated_sow"),
 });
 
 export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
