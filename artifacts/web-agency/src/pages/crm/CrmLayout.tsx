@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/admin/crm/tasks", label: "Tasks" },
   { href: "/admin/crm/calendar", label: "Calendar" },
   { href: "/admin/crm/deals", label: "Deals Kanban" },
+  { href: "/admin/crm/campaigns", label: "Campaigns" },
   { href: "/admin/crm/reporting", label: "Reporting" },
   { href: "/admin/crm/admin", label: "Admin" },
 ];

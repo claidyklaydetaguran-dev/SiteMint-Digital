@@ -1,0 +1,294 @@
+Act as a Principal Software Architect, Technical Director, CRM Architect, and Senior Full-Stack Engineer.
+
+PHASE 7 — Personality-Aware Email Campaign Foundation
+
+PROJECT:
+Sitemint Digital CRM
+
+Current completed modules:
+
+* Discovery Portal
+* CRM Dashboard
+* Lead Health Engine
+* Workflow Engine
+* Communication Intelligence
+* DISC / Communication Style Engine
+* Sales Workspace
+* Inbox
+* Lead Detail Command Center
+* Email sending via existing Resend integration
+* CRM email templates
+
+OBJECTIVE:
+Build the foundation for personality-aware email campaigns.
+
+This phase should NOT send bulk emails yet.
+This phase should NOT schedule campaigns yet.
+This phase should create campaign drafts, audience selection, DISC-personalized previews, and safe test-send behavior.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT touch Twilio routes.
+Do NOT change Lead Health Engine.
+Do NOT change Communication Intelligence.
+Do NOT change discEngine.ts unless absolutely required.
+Do NOT use auto schema sync.
+Do NOT create real automation/scheduling yet.
+Do NOT send bulk emails automatically.
+Use Drizzle migrations only if schema is required.
+
+TASK 1 — INSPECT EXISTING EMAIL SYSTEM
+Inspect:
+
+1. Existing email template system
+2. Existing Resend email route
+3. Existing Lead Detail email modal
+4. Existing CRM email activity logging
+5. Existing crm_email_templates schema
+6. Existing email test mode behavior
+7. getCommunicationStyle() from discEngine.ts
+
+Report what can be reused before coding.
+
+TASK 2 — CREATE PERSONALIZATION UTILITY
+Create a pure TypeScript helper if needed:
+
+src/lib/campaignPersonalization.ts
+
+No React dependency.
+No API calls.
+
+It should export:
+
+* personalizeCampaignEmail()
+* createDiscVariants()
+* previewPersonalizedEmail()
+
+Inputs:
+
+* base subject
+* base body
+* lead
+* DISC / communication style profile
+
+Outputs:
+
+* personalized subject
+* personalized body
+* style used
+* tone settings
+* explanation of personalization
+
+Personality behavior:
+Driver:
+
+* shorter
+* direct
+* outcome-focused
+* clear CTA
+
+Analytical:
+
+* detailed
+* evidence-based
+* structured
+* numbers and reasoning
+
+Amiable:
+
+* warm
+* supportive
+* trust-building
+* softer CTA
+
+Expressive:
+
+* energetic
+* vision-focused
+* enthusiastic
+* emotionally engaging
+
+No AI calls.
+Use rule-based transformations and template sections only.
+
+TASK 3 — CAMPAIGN BUILDER UI
+
+Create a new CRM page if not already present:
+
+/admin/crm/campaigns
+
+Add it to the CRM nav as:
+“Campaigns”
+
+Campaign Builder should include:
+
+1. Campaign Info
+
+* campaign name
+* base subject
+* base email body
+
+2. Audience Selection
+   Allow filtering/selecting leads by:
+
+* status
+* priority
+* DISC style
+* source
+* health score range if easy
+* communication status if easy
+
+3. Lead Selection Table
+   Show:
+
+* checkbox
+* name
+* email
+* company
+* status
+* priority
+* DISC style
+* communication style
+* health score if available
+
+Disable rows with no email.
+
+4. Personalization Preview
+   For selected lead:
+
+* show original base version
+* show personalized version
+* show DISC style used
+* show explanation:
+  “Adjusted to Driver style: shortened message, direct CTA, outcome-focused wording.”
+
+5. DISC Variant Preview
+   Show four tabs:
+
+* Driver Version
+* Analytical Version
+* Amiable Version
+* Expressive Version
+
+This lets the admin understand how the message changes by personality.
+
+TASK 4 — TEST SEND ONLY
+
+Add safe test-send behavior only.
+
+Button:
+“Send Test Email”
+
+Behavior:
+
+* Sends only to a manually entered test email address
+* Uses selected lead’s personalized version as preview context
+* Uses existing email sending route if possible
+* Clearly labels it as test
+* Does NOT send to selected audience
+* Does NOT schedule anything
+* Does NOT mark campaign as sent to all leads
+
+If backend test mode exists, respect it and show visible banner:
+“Email test mode is enabled.”
+
+TASK 5 — OPTIONAL MINIMAL SCHEMA
+
+If persistence is needed, create minimal campaign draft storage only.
+
+Allowed table:
+crm_campaigns
+
+Fields:
+
+* id
+* name
+* subject
+* body
+* status default "draft"
+* created_at
+* updated_at
+
+Do NOT create scheduling tables yet.
+Do NOT create campaign recipients table yet unless absolutely required.
+If no persistence is needed for this phase, keep state client-side and avoid schema.
+
+TASK 6 — NAVIGATION
+
+Add Campaigns to CRM nav.
+
+Recommended order:
+Dashboard
+People
+Lead Pipeline
+Deals Kanban
+Inbox
+Tasks
+Calendar
+Campaigns
+Reporting
+Email Templates
+Import Leads
+Admin / Settings
+
+TASK 7 — DESIGN REQUIREMENTS
+
+Use:
+
+* shadcn/ui style
+* Tailwind
+* clean premium SaaS layout
+* step-by-step builder
+* clear safety warnings
+* loading states
+* empty states
+* validation messages
+
+Avoid:
+
+* clutter
+* hidden sending behavior
+* accidental bulk send
+* fake AI language
+* real automation in this phase
+
+TASK 8 — TESTING
+
+Test:
+
+1. /admin/crm/campaigns loads.
+2. Campaigns nav item appears.
+3. Base subject/body can be entered.
+4. Leads load.
+5. Filters work.
+6. Rows without email are disabled.
+7. DISC style appears per lead.
+8. Personalized preview changes by lead style.
+9. Four DISC variant tabs render.
+10. Test send works or fails safely with clear error.
+11. No bulk send occurs.
+12. Lead Detail email still works.
+13. Email Templates still work.
+14. Dashboard still works.
+15. Inbox still works.
+16. Reporting still works.
+17. No TypeScript errors except pre-existing unrelated issue.
+18. No console errors.
+19. No schema changes unless explicitly created.
+20. Twilio routes untouched.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. APIs reused or added
+4. Personalization logic
+5. Campaign Builder UI
+6. Audience filter behavior
+7. Preview behavior
+8. Test-send behavior
+9. Schema changes, if any
+10. Tests performed
+11. Known limitations
+12. Recommended Prompt 16

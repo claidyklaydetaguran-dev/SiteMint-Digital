@@ -382,6 +382,38 @@ router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res
   }
 });
 
+// ── Campaign Test Send ────────────────────────────────────────────────────────
+// Sends a single test email to a manually specified address — NOT to leads.
+router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { to, subject, body } = req.body as { to?: string; subject?: string; body?: string };
+    if (!to || !subject || !body) {
+      res.status(400).json({ error: "to, subject, and body are required" }); return;
+    }
+    // Basic email format guard
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      res.status(400).json({ error: "Invalid test email address" }); return;
+    }
+
+    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    if (!isTestMode) {
+      const resend = getResend();
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
+        to: [to],
+        subject: `[TEST] ${subject}`,
+        html: body.replace(/\n/g, "<br>"),
+      });
+    }
+
+    req.log.info({ to, testMode: isTestMode }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: isTestMode, to });
+  } catch (err) {
+    req.log.error({ err }, "Error sending campaign test email");
+    res.status(500).json({ error: "Failed to send test email" });
+  }
+});
+
 // ── CSV Import ────────────────────────────────────────────────────────────────
 router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => {
   try {
