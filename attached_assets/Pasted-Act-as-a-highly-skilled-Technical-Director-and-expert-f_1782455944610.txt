@@ -1,0 +1,47 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Project: Sitemint Digital internal admin system.
+
+Current structure:
+
+* Normal admin login lands on /admin/dashboard, the Discovery Portal.
+* Discovery Portal manages discovery submissions, proposals, and SOW workflows.
+* CRM lives at /admin/crm/dashboard and should become the sales command center.
+* CRM is a secondary module launched from the Discovery Portal.
+
+IMPORTANT:
+Do NOT build new features yet.
+Do NOT change the database schema yet.
+Do NOT refactor large files yet.
+Do NOT touch Twilio webhooks yet.
+Do NOT use auto schema sync.
+This prompt is for planning and integration architecture only.
+
+Goal:
+Create a clean implementation plan for integrating the Discovery Portal and CRM so the CRM becomes a powerful command center similar to the reference dashboard: AI insights, lead intelligence, contacts, inbox/outbox, campaigns, pipeline, follow-ups, tasks, reporting, and future Follow Up Boss-style calling/texting.
+
+Please inspect the current codebase and answer:
+
+1. How Discovery Portal currently stores submissions.
+2. How CRM currently stores leads, deals, tasks, messages, activities, and stats.
+3. Whether discovery submissions can be converted/imported into CRM leads.
+4. Existing CRM API endpoints that can support dashboard intelligence.
+5. Existing CRM pages and which ones are production-ready.
+6. Existing gaps compared to the reference dashboard.
+7. Which features should be built first.
+8. Which features should be avoided for now.
+9. Recommended database changes, but do not apply them yet.
+10. Recommended implementation order for the next 5 prompts.
+
+Required final output:
+
+* Current architecture summary
+* Discovery Portal → CRM integration map
+* CRM module roadmap
+* Database migration plan
+* API route plan
+* Frontend page/component plan
+* Risk list
+* Recommended next Replit prompt
+
+Do not write code in this prompt unless fixing a tiny obvious issue that blocks inspection.
