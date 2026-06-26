@@ -386,42 +386,60 @@ router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => 
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: "No rows provided" }); return; }
 
-    let imported = 0, skipped = 0;
-    const errors: string[] = [];
+    const VALID_STS = new Set(["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"]);
+    const VALID_PRI = new Set(["Low","Medium","High"]);
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normSt = (s?: string) => { const c = s?.trim(); if (!c) return "New"; if (VALID_STS.has(c)) return c; const l = c.toLowerCase(); return [...VALID_STS].find(x => x.toLowerCase() === l) ?? "New"; };
+    const normPr = (p?: string) => { const c = p?.trim(); if (!c) return "Medium"; if (VALID_PRI.has(c)) return c; const l = c.toLowerCase(); return [...VALID_PRI].find(x => x.toLowerCase() === l) ?? "Medium"; };
 
-    for (const row of rows) {
-      const email = row.email?.trim().toLowerCase();
-      const phone = row.phone?.trim();
-      if (!email && !phone) { skipped++; errors.push(`Row missing email and phone: ${JSON.stringify(row)}`); continue; }
+    let created = 0, skippedDuplicates = 0, invalid = 0;
+    const errors: { rowIndex: number; message: string }[] = [];
 
-      // Duplicate check
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const name = (row.name || row.Name || "").trim();
+      const email = (row.email || row.Email || "").trim().toLowerCase();
+      const phone = (row.phone || row.Phone || "").trim();
+
+      if (!name) { invalid++; errors.push({ rowIndex: i, message: "Name is required" }); continue; }
+      if (email && !EMAIL_RE.test(email)) { invalid++; errors.push({ rowIndex: i, message: `Invalid email: ${email}` }); continue; }
+
       if (email) {
         const [existing] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.email, email)).limit(1);
-        if (existing) { skipped++; continue; }
+        if (existing) { skippedDuplicates++; continue; }
       }
+
+      const finalEmail = email || (phone ? `${phone.replace(/\D/g, "")}@imported.local` : `import-${i}-${Date.now()}@imported.local`);
+      const rawEv = (row.estimatedValue || row.estimated_value || row["Estimated Value"] || "").replace(/[^0-9.]/g, "");
+      const estimatedValue = rawEv && !isNaN(parseFloat(rawEv)) ? String(parseFloat(rawEv)) : null;
+      const rawTags = (row.tags || row.Tags || "").trim();
+      const tags = rawTags ? rawTags.split(",").map((t: string) => t.trim()).filter(Boolean) : [];
 
       try {
         const [lead] = await db.insert(crmLeads).values({
-          name: row.name || row.Name || "Unknown",
-          email: email || `${phone?.replace(/\D/g, "")}@imported.local`,
-          company: row.company || row.Company,
-          phone: phone || row.Phone,
-          website: row.website || row.Website,
+          name,
+          email: finalEmail,
+          company: (row.company || row.Company || "").trim() || undefined,
+          phone: phone || undefined,
+          website: (row.website || row.Website || "").trim() || undefined,
           source: "CSV Import",
-          serviceInterest: row.service_interest || row["Service Interest"],
-          status: "New",
-          priority: "Medium",
-          notes: row.notes || row.Notes,
+          serviceInterest: (row.serviceInterest || row.service_interest || row["Service Interest"] || "").trim() || undefined,
+          status: normSt(row.status || row.Status),
+          priority: normPr(row.priority || row.Priority),
+          assignedTo: (row.assignedTo || row.assigned_to || row["Assigned To"] || "").trim() || undefined,
+          notes: (row.notes || row.Notes || "").trim() || undefined,
+          tags,
+          estimatedValue,
         }).returning();
-        await logActivity(lead.id, "lead_imported", `Lead imported from CSV: ${lead.name}`);
-        imported++;
+        await logActivity(lead.id, "lead_imported", `Imported from CSV: ${lead.name}`, "Lead imported through CRM Import page.");
+        created++;
       } catch (e) {
-        skipped++;
-        errors.push(`Failed to import row: ${String(e)}`);
+        invalid++;
+        errors.push({ rowIndex: i, message: `Insert failed: ${String(e).slice(0, 80)}` });
       }
     }
 
-    res.json({ imported, skipped, errors: errors.slice(0, 10) });
+    res.json({ created, skippedDuplicates, invalid, errors: errors.slice(0, 20) });
   } catch (err) {
     req.log.error({ err }, "Error importing CSV");
     res.status(500).json({ error: "Failed to import" });

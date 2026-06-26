@@ -1,229 +1,559 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useRef, useState, useCallback } from "react";
+import { Link, useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
-import { Button } from "@/components/ui/button";
-import { Upload, FileText, CheckCircle, AlertTriangle, X, Download } from "lucide-react";
+import {
+  Upload, CheckCircle2, XCircle, AlertTriangle, ChevronRight,
+  FileText, Users, GitBranch, RefreshCw, Download, X,
+} from "lucide-react";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
-const FIELD_MAPPING: Record<string, string[]> = {
-  name: ["name","full name","fullname","contact","contact name","first name","lead name"],
-  email: ["email","email address","e-mail"],
-  phone: ["phone","phone number","mobile","cell","telephone"],
-  company: ["company","business","organization","company name","business name"],
-  website: ["website","url","web","site"],
-  service_interest: ["service","service interest","interested in","services"],
-  notes: ["notes","note","comments","comment","description"],
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-function mapCsvHeaders(headers: string[]): Record<string, string> {
-  const mapping: Record<string, string> = {};
-  for (const header of headers) {
-    const normalized = header.toLowerCase().trim();
-    for (const [field, aliases] of Object.entries(FIELD_MAPPING)) {
-      if (aliases.includes(normalized)) { mapping[header] = field; break; }
+const VALID_STATUSES = new Set(["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"]);
+const VALID_PRIORITIES = new Set(["Low","Medium","High"]);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const SAMPLE_CSV = [
+  "name,email,phone,company,source,status,priority,estimatedValue,serviceInterest,tags,notes",
+  "Jane Smith,jane@acme.com,555-0100,Acme Corp,Referral,New,High,5000,Web Design,\"seo,branding\",Full package inquiry",
+  "Bob Jones,bob@techco.com,555-0200,Tech Co,,Contacted,Medium,,SEO,,Follow up next week",
+  "Maria Lee,maria@startupxyz.com,,Startup XYZ,Cold Outreach,Follow-up,Low,2500,Branding,,",
+].join("\n");
+
+const COLUMNS = [
+  { name: "name",            req: true,  note: "Full contact name" },
+  { name: "email",           req: false, note: "Used for duplicate detection" },
+  { name: "phone",           req: false, note: "" },
+  { name: "company",         req: false, note: "" },
+  { name: "source",          req: false, note: "Defaults to CSV Import" },
+  { name: "status",          req: false, note: "New · Contacted · Follow-up · Proposal Sent · Negotiating · Won · Lost · Nurture" },
+  { name: "priority",        req: false, note: "Low · Medium (default) · High" },
+  { name: "estimatedValue",  req: false, note: "Numeric, e.g. 5000" },
+  { name: "serviceInterest", req: false, note: "e.g. Web Design, SEO" },
+  { name: "tags",            req: false, note: "Comma-separated within the cell" },
+  { name: "assignedTo",      req: false, note: "Team member name" },
+  { name: "notes",           req: false, note: "" },
+];
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ParsedRow {
+  idx: number;
+  raw: Record<string, string>;
+  errors: string[];
+  warnings: string[];
+  isDupInCSV: boolean;
+}
+interface ImportResult {
+  created: number;
+  skippedDuplicates: number;
+  invalid: number;
+  errors: { rowIndex: number; message: string }[];
+}
+
+// ── CSV Parser ────────────────────────────────────────────────────────────────
+
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let field = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') { if (line[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { fields.push(field.trim()); field = ""; }
+      else field += c;
     }
   }
-  return mapping;
+  fields.push(field.trim());
+  return fields;
 }
 
-function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
-  const rows = lines.slice(1).map(line => {
-    const values = line.split(",").map(v => v.replace(/^"|"$/g, "").trim());
-    return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
+function parseCSV(text: string): { headers: string[]; data: Record<string, string>[] } {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return { headers: [], data: [] };
+  const headers = parseCsvLine(lines[0]);
+  const data = lines.slice(1).map(line => {
+    const vals = parseCsvLine(line);
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => { row[h] = vals[i] ?? ""; });
+    return row;
   });
-  return { headers, rows };
+  return { headers, data };
 }
 
-interface ImportResult { imported: number; skipped: number; errors: string[]; }
+// ── Row Validation ────────────────────────────────────────────────────────────
+
+function validateRows(data: Record<string, string>[]): ParsedRow[] {
+  const emailsSeen = new Set<string>();
+  return data.map((raw, idx) => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let isDupInCSV = false;
+
+    if (!raw.name?.trim()) errors.push("Name is required");
+
+    const email = raw.email?.trim().toLowerCase();
+    if (email) {
+      if (!EMAIL_RE.test(email)) errors.push("Invalid email format");
+      else if (emailsSeen.has(email)) { isDupInCSV = true; warnings.push("Duplicate email in this CSV — will be skipped"); }
+      else emailsSeen.add(email);
+    }
+
+    const status = raw.status?.trim();
+    if (status && !VALID_STATUSES.has(status)) warnings.push(`Status "${status}" → normalized to "New"`);
+
+    const priority = raw.priority?.trim();
+    if (priority && !VALID_PRIORITIES.has(priority)) warnings.push(`Priority "${priority}" → normalized to "Medium"`);
+
+    const ev = raw.estimatedValue?.trim();
+    if (ev && isNaN(parseFloat(ev.replace(/[^0-9.]/g, "")))) warnings.push(`estimatedValue "${ev}" is not a valid number`);
+
+    return { idx, raw, errors, warnings, isDupInCSV };
+  });
+}
+
+// ── Sample download ───────────────────────────────────────────────────────────
+
+function downloadSample() {
+  const blob = new Blob([SAMPLE_CSV], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "sitemint-crm-import-sample.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CrmImport() {
   const [, navigate] = useLocation();
-  const [file, setFile] = useState<File|null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<Record<string,string>[]>([]);
-  const [columnMap, setColumnMap] = useState<Record<string,string>>({});
-  const [step, setStep] = useState<"upload"|"map"|"preview"|"done">("upload");
-  const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportResult|null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
   const [dragOver, setDragOver] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
-  const handleFile = (f: File) => {
-    setFile(f);
+  const [discLoading, setDiscLoading] = useState(false);
+  const [discResult, setDiscResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [discError, setDiscError] = useState<string | null>(null);
+
+  const processFile = useCallback((file: File) => {
+    if (!file.name.toLowerCase().endsWith(".csv")) { alert("Please upload a .csv file."); return; }
+    setFileName(file.name);
+    setImportResult(null);
+    setImportError(null);
+    setShowAll(false);
     const reader = new FileReader();
-    reader.onload = e => {
-      const text = e.target?.result as string;
-      const parsed = parseCsv(text);
-      setHeaders(parsed.headers);
-      setRows(parsed.rows);
-      setColumnMap(mapCsvHeaders(parsed.headers));
-      setStep("map");
-    };
-    reader.readAsText(f);
-  };
-
-  const doImport = async () => {
-    setImporting(true);
-    // Remap rows using column map
-    const mapped = rows.map(row => {
-      const out: Record<string, string> = {};
-      for (const [csvCol, fieldName] of Object.entries(columnMap)) {
-        if (fieldName && row[csvCol]) out[fieldName] = row[csvCol];
+    reader.onload = (e) => {
+      try {
+        const { data } = parseCSV(e.target?.result as string);
+        setRows(validateRows(data));
+      } catch {
+        setFileName(null); setRows([]);
+        alert("Could not parse the CSV. Please check the file format.");
       }
-      return out;
-    });
+    };
+    reader.readAsText(file);
+  }, []);
 
-    const r = await fetch("/api/crm/import", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ rows: mapped }),
-    });
-    const d = await r.json() as ImportResult;
-    setResult(d);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (f) processFile(f); e.target.value = "";
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files?.[0]; if (f) processFile(f);
+  };
+  const resetFile = () => {
+    setFileName(null); setRows([]); setImportResult(null); setImportError(null);
+  };
+
+  // Rows to send: no fatal errors AND not a CSV duplicate
+  const sendable = rows.filter(r => r.errors.length === 0 && !r.isDupInCSV);
+  const errorCount = rows.filter(r => r.errors.length > 0).length;
+  const dupCount = rows.filter(r => r.isDupInCSV).length;
+  const displayRows = showAll ? rows : rows.slice(0, 15);
+
+  const runImport = async () => {
+    if (!token()) { navigate("/admin?redirect=/admin/crm/import"); return; }
+    if (sendable.length === 0) return;
+    setImporting(true); setImportError(null);
+    try {
+      const res = await fetch("/api/crm/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ rows: sendable.map(r => r.raw) }),
+      });
+      if (!res.ok) { const d = await res.json() as { error?: string }; throw new Error(d.error ?? "Server error"); }
+      setImportResult(await res.json() as ImportResult);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Import failed");
+    }
     setImporting(false);
-    setStep("done");
   };
 
-  const reset = () => { setFile(null); setHeaders([]); setRows([]); setColumnMap({}); setStep("upload"); setResult(null); };
-
-  const downloadSample = () => {
-    const csv = `name,email,phone,company,website,service_interest,notes\nJohn Doe,john@example.com,555-1234,Acme Corp,https://acme.com,Website,Interested in redesign\nJane Smith,jane@smith.biz,555-5678,Smith LLC,,CRM System,Cold outreach lead`;
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "sample-leads.csv"; a.click();
+  const runDiscovery = async () => {
+    if (!token()) { navigate("/admin?redirect=/admin/crm/import"); return; }
+    setDiscLoading(true); setDiscError(null); setDiscResult(null);
+    try {
+      const res = await fetch("/api/crm/import-discovery", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (!res.ok) { const d = await res.json() as { error?: string }; throw new Error(d.error ?? "Server error"); }
+      setDiscResult(await res.json() as { imported: number; skipped: number });
+    } catch (e) {
+      setDiscError(e instanceof Error ? e.message : "Import failed");
+    }
+    setDiscLoading(false);
   };
-
-  const CRM_FIELDS = ["name","email","phone","company","website","service_interest","notes","— skip —"];
 
   return (
     <CrmLayout>
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-serif font-bold text-foreground">Import Leads</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Upload a CSV file to bulk import leads. Duplicates are skipped automatically.</p>
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Import Leads</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Upload a CSV to add contacts into your CRM without duplicates.</p>
+          </div>
+          <Link href="/admin/crm/leads">
+            <button className="flex items-center gap-1.5 text-sm border border-gray-200 bg-white hover:bg-gray-50 px-3.5 py-2 rounded-lg transition-colors font-medium text-muted-foreground">
+              <Users className="w-3.5 h-3.5" /> View Leads
+            </button>
+          </Link>
         </div>
 
-        {step === "upload" && (
-          <div className="space-y-4">
-            <div
-              className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors cursor-pointer ${dragOver ? "border-foreground bg-foreground/5" : "border-gray-200 hover:border-gray-400"}`}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f?.name.endsWith(".csv")) handleFile(f); }}
-              onClick={() => document.getElementById("csv-input")?.click()}
-            >
-              <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="font-medium text-foreground">Drop your CSV file here, or click to browse</p>
-              <p className="text-sm text-muted-foreground mt-1">Only .csv files supported</p>
-              <input id="csv-input" type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+        {/* ── Import Result ─────────────────────────────────────────────────── */}
+        {importResult && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <h2 className="font-semibold text-foreground">Import Complete</h2>
             </div>
-
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="h-px flex-1 bg-gray-200" />
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-              <FileText className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-blue-900">Need a template?</p>
-                <p className="text-sm text-blue-700 mt-0.5">Download our sample CSV with the correct column format.</p>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
+                  <p className="text-3xl font-bold text-green-700">{importResult.created}</p>
+                  <p className="text-xs font-medium text-green-600 mt-1">Leads Created</p>
+                </div>
+                <div className="bg-yellow-50 rounded-xl p-4 text-center border border-yellow-100">
+                  <p className="text-3xl font-bold text-yellow-700">{importResult.skippedDuplicates}</p>
+                  <p className="text-xs font-medium text-yellow-600 mt-1">Skipped (Duplicate)</p>
+                </div>
+                <div className="bg-red-50 rounded-xl p-4 text-center border border-red-100">
+                  <p className="text-3xl font-bold text-red-700">{importResult.invalid}</p>
+                  <p className="text-xs font-medium text-red-600 mt-1">Invalid Rows</p>
+                </div>
               </div>
-              <Button variant="outline" size="sm" className="shrink-0" onClick={downloadSample}>
-                <Download className="w-3.5 h-3.5 mr-1.5" /> Sample CSV
-              </Button>
+              {importResult.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3 space-y-1">
+                  <p className="text-xs font-semibold text-red-700 mb-1.5">Row-level errors:</p>
+                  {importResult.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-red-600">Row {e.rowIndex + 1}: {e.message}</p>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Link href="/admin/crm/leads">
+                  <button className="flex items-center gap-1.5 text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    <Users className="w-3.5 h-3.5" /> View Leads
+                  </button>
+                </Link>
+                <Link href="/admin/crm/pipeline">
+                  <button className="flex items-center gap-1.5 text-sm bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+                    <GitBranch className="w-3.5 h-3.5" /> Lead Pipeline
+                  </button>
+                </Link>
+                <button onClick={resetFile}
+                  className="flex items-center gap-1.5 text-sm border border-gray-200 bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                  <Upload className="w-3.5 h-3.5" /> Import Another CSV
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {step === "map" && (
-          <div className="space-y-5">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-semibold text-foreground">{file?.name} — {rows.length} rows detected</span>
-                <button onClick={reset} className="ml-auto text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button>
+        {/* ── Upload Card (no file selected, no result) ─────────────────────── */}
+        {!fileName && !importResult && (
+          <>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="font-semibold text-foreground">Upload CSV File</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Accepts .csv only. Data is validated before import.</p>
               </div>
-
-              <p className="text-sm font-semibold text-foreground mb-3">Map CSV columns to CRM fields</p>
-              <div className="space-y-2">
-                {headers.map(header => (
-                  <div key={header} className="flex items-center gap-3">
-                    <div className="w-40 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-foreground font-mono truncate">{header}</div>
-                    <span className="text-muted-foreground text-sm">→</span>
-                    <select
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
-                      value={columnMap[header] || "— skip —"}
-                      onChange={e => setColumnMap(m => ({ ...m, [header]: e.target.value === "— skip —" ? "" : e.target.value }))}
-                    >
-                      {CRM_FIELDS.map(f => <option key={f}>{f}</option>)}
-                    </select>
-                  </div>
-                ))}
+              <div className="p-5">
+                <div
+                  className={`border-2 border-dashed rounded-xl p-14 text-center cursor-pointer transition-all ${dragOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-300"}`}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Upload className={`w-10 h-10 mx-auto mb-3 ${dragOver ? "text-blue-400" : "text-gray-300"}`} />
+                  <p className="font-semibold text-foreground">Drop your CSV here</p>
+                  <p className="text-sm text-muted-foreground mt-1">or <span className="text-blue-600 underline">click to browse</span></p>
+                  <p className="text-xs text-muted-foreground mt-3">.csv files only</p>
+                </div>
+                <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
+                <div className="mt-3 flex justify-end">
+                  <button onClick={downloadSample} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    <Download className="w-3.5 h-3.5" /> Download sample CSV
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Preview first 3 rows */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <p className="text-sm font-semibold text-foreground mb-3">Preview (first 3 rows)</p>
+            {/* Column reference */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="font-semibold text-foreground">Supported CSV Columns</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Column headers must match exactly (case-sensitive)</p>
+              </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100">
-                      {headers.map(h => <th key={h} className="text-left py-1 px-2 text-muted-foreground font-semibold">{h}</th>)}
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Column</th>
+                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Required</th>
+                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Notes</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {rows.slice(0,3).map((row,i) => (
-                      <tr key={i} className="border-b border-gray-50">
-                        {headers.map(h => <td key={h} className="py-1.5 px-2 text-foreground">{row[h]||""}</td>)}
+                  <tbody className="divide-y divide-gray-50">
+                    {COLUMNS.map(col => (
+                      <tr key={col.name}>
+                        <td className="px-5 py-2.5">
+                          <code className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">{col.name}</code>
+                        </td>
+                        <td className="px-5 py-2.5">
+                          {col.req
+                            ? <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Required</span>
+                            : <span className="text-[10px] text-muted-foreground">Optional</span>}
+                        </td>
+                        <td className="px-5 py-2.5 text-xs text-muted-foreground">{col.note}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={reset}>Back</Button>
-              <Button onClick={doImport} disabled={importing} className="gap-1.5">
-                <Upload className="w-3.5 h-3.5" />
-                {importing ? `Importing ${rows.length} rows…` : `Import ${rows.length} Leads`}
-              </Button>
-            </div>
-          </div>
+          </>
         )}
 
-        {step === "done" && result && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
-            <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-serif font-bold text-foreground mb-2">Import Complete</h2>
-            <div className="flex justify-center gap-8 my-5">
-              <div>
-                <p className="text-3xl font-bold text-green-600">{result.imported}</p>
-                <p className="text-sm text-muted-foreground">Imported</p>
+        {/* ── Preview & Validate (file selected, not yet imported) ──────────── */}
+        {fileName && !importResult && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* File header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                <div>
+                  <h2 className="font-semibold text-foreground">{fileName}</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">{rows.length} row{rows.length !== 1 ? "s" : ""} parsed</p>
+                </div>
               </div>
-              <div>
-                <p className="text-3xl font-bold text-yellow-600">{result.skipped}</p>
-                <p className="text-sm text-muted-foreground">Skipped (duplicates)</p>
-              </div>
+              <button onClick={resetFile} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            {result.errors.length > 0 && (
-              <div className="text-left bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <div className="flex items-center gap-2 mb-2"><AlertTriangle className="w-4 h-4 text-red-600"/><p className="text-sm font-semibold text-red-800">Errors ({result.errors.length})</p></div>
-                {result.errors.slice(0,5).map((e,i) => <p key={i} className="text-xs text-red-700">{e}</p>)}
+
+            {/* Validation summary bar */}
+            <div className="flex items-center gap-4 px-5 py-3 bg-gray-50/60 border-b border-gray-100 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-xs font-medium text-foreground">{sendable.length} valid</span>
+              </div>
+              {errorCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-xs font-medium text-red-700">{errorCount} with error{errorCount !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+              {dupCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <span className="text-xs font-medium text-yellow-700">{dupCount} duplicate{dupCount !== 1 ? "s" : ""} in CSV</span>
+                </div>
+              )}
+            </div>
+
+            {/* Preview table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/40">
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground w-8">#</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Row</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Email</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Phone</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Company</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Status</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Priority</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Issues</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {displayRows.map(row => {
+                    const hasErr = row.errors.length > 0;
+                    const isDup = row.isDupInCSV;
+                    return (
+                      <tr key={row.idx} className={hasErr ? "bg-red-50/30" : isDup ? "bg-yellow-50/30" : ""}>
+                        <td className="px-4 py-2 text-muted-foreground">{row.idx + 1}</td>
+                        <td className="px-4 py-2">
+                          {hasErr ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                              <XCircle className="w-2.5 h-2.5" /> Error
+                            </span>
+                          ) : isDup ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                              <AlertTriangle className="w-2.5 h-2.5" /> CSV Dup
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                              <CheckCircle2 className="w-2.5 h-2.5" /> OK
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 font-medium text-foreground max-w-[130px] truncate">
+                          {row.raw.name || <span className="text-red-500 italic">missing</span>}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground max-w-[160px] truncate">{row.raw.email || "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{row.raw.phone || "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground max-w-[110px] truncate">{row.raw.company || "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{row.raw.status || "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{row.raw.priority || "—"}</td>
+                        <td className="px-4 py-2 max-w-[220px]">
+                          {row.errors.map((e, i) => (
+                            <p key={i} className="text-[10px] text-red-600 leading-tight mb-0.5">{e}</p>
+                          ))}
+                          {row.warnings.map((w, i) => (
+                            <p key={i} className="text-[10px] text-yellow-700 leading-tight mb-0.5">{w}</p>
+                          ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {rows.length > 15 && (
+              <div className="px-5 py-3 border-t border-gray-100 text-center">
+                <button onClick={() => setShowAll(v => !v)} className="text-xs text-blue-600 hover:text-blue-700">
+                  {showAll ? "Show first 15 rows" : `Show all ${rows.length} rows`}
+                </button>
               </div>
             )}
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={reset}>Import Another File</Button>
-              <Button onClick={() => navigate("/admin/crm/leads")}>View Leads</Button>
+
+            {/* Import CTA */}
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between gap-4">
+              <div>
+                {sendable.length > 0 ? (
+                  <p className="text-sm text-foreground font-medium">{sendable.length} row{sendable.length !== 1 ? "s" : ""} ready to import</p>
+                ) : (
+                  <p className="text-sm text-red-600 font-medium">No valid rows to import</p>
+                )}
+                {(errorCount > 0 || dupCount > 0) && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {[
+                      errorCount > 0 && `${errorCount} error row${errorCount !== 1 ? "s" : ""} skipped`,
+                      dupCount > 0 && `${dupCount} CSV duplicate${dupCount !== 1 ? "s" : ""} skipped`,
+                    ].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={resetFile}
+                  className="text-sm border border-gray-200 bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                  Cancel
+                </button>
+                <button
+                  onClick={runImport}
+                  disabled={importing || sendable.length === 0}
+                  className="flex items-center gap-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg transition-colors font-medium"
+                >
+                  {importing
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Importing…</>
+                    : <><Upload className="w-3.5 h-3.5" /> Import {sendable.length} Lead{sendable.length !== 1 ? "s" : ""}</>}
+                </button>
+              </div>
             </div>
+
+            {importError && (
+              <div className="px-5 py-3 border-t border-red-100 bg-red-50 flex items-center gap-2 text-sm text-red-700">
+                <XCircle className="w-4 h-4 shrink-0" /> {importError}
+              </div>
+            )}
           </div>
         )}
+
+        {/* ── Discovery Import Section ──────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-foreground">Import from Discovery Portal</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Pull all unimported discovery form submissions into the CRM. Already-imported submissions are skipped automatically.
+            </p>
+          </div>
+          <div className="p-5">
+            {discResult ? (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-green-50 border border-green-100 rounded-lg px-5 py-3 text-center">
+                    <p className="text-2xl font-bold text-green-700">{discResult.imported}</p>
+                    <p className="text-xs text-green-600 font-medium">Imported</p>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-100 rounded-lg px-5 py-3 text-center">
+                    <p className="text-2xl font-bold text-yellow-700">{discResult.skipped}</p>
+                    <p className="text-xs text-yellow-600 font-medium">Already in CRM</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href="/admin/crm/leads">
+                    <button className="flex items-center gap-1.5 text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                      <Users className="w-3.5 h-3.5" /> View Leads <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </Link>
+                  <button onClick={() => { setDiscResult(null); setDiscError(null); }}
+                    className="text-sm border border-gray-200 bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    Import Again
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  <p className="text-sm text-foreground">Batch-import all unimported discovery form submissions from the admin portal.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Individual submissions can also be imported from the Discovery Portal detail pages.</p>
+                </div>
+                <button
+                  onClick={runDiscovery}
+                  disabled={discLoading}
+                  className="flex items-center gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors font-medium shrink-0"
+                >
+                  {discLoading
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Importing…</>
+                    : <>Import Discovery Leads</>}
+                </button>
+              </div>
+            )}
+            {discError && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-2.5">
+                <XCircle className="w-4 h-4 shrink-0" /> {discError}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </CrmLayout>
   );

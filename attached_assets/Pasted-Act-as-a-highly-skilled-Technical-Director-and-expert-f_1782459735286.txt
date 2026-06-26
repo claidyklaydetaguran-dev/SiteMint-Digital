@@ -1,0 +1,266 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Build the missing CRM Import Leads page.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/import is linked from the CRM Dashboard Quick Actions.
+* The Quick Action currently points to /admin/crm/import, but the page may be missing or incomplete.
+* Discovery Portal → CRM single-submission conversion already works.
+* CRM Inbox is wired to real crm_messages.
+* CRM Reporting is live.
+* CRM global search is live.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema unless absolutely necessary.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Do NOT break existing Discovery Portal → CRM conversion.
+Use existing CRM lead schema.
+
+Goal:
+Create a polished /admin/crm/import page that lets the admin import leads by CSV safely.
+
+TASK 1 — INSPECT EXISTING IMPORT SETUP
+
+Before coding, inspect:
+
+1. App.tsx route registration for /admin/crm/import
+2. CrmImport.tsx if it exists
+3. Existing CRM import API routes
+4. Existing crm_leads schema
+5. Existing duplicate prevention behavior
+6. Existing discovery import behavior
+
+Report what already exists before changing code.
+
+TASK 2 — BUILD OR FIX /admin/crm/import PAGE
+
+Create or complete the page at:
+
+/admin/crm/import
+
+UI sections:
+
+1. Header
+   Title:
+   “Import Leads”
+
+Subtitle:
+“Upload a CSV to add contacts into your CRM without duplicates.”
+
+2. CSV Upload Card
+
+* Drag-and-drop area
+* File picker fallback
+* Accept .csv only
+* Show selected filename
+* Provide sample CSV format
+
+3. Required/Supported Columns
+   Show a helper table/list:
+
+Required:
+
+* name
+
+Recommended:
+
+* email
+* phone
+* company
+* source
+* status
+* priority
+* estimatedValue
+* serviceInterest
+* tags
+
+Accepted statuses:
+
+* New
+* Contacted
+* Follow-up
+* Proposal Sent
+* Negotiating
+* Won
+* Lost
+* Nurture
+
+Accepted priorities:
+
+* Low
+* Medium
+* High
+
+4. CSV Preview
+   After file upload:
+
+* Parse CSV client-side if possible
+* Show preview table of first 10–20 rows
+* Show total row count
+* Highlight missing required names
+* Highlight invalid email formats
+* Highlight invalid status/priority values
+* Show duplicates if detectable by email within the CSV
+
+5. Confirm Import
+   Button:
+   “Import Leads”
+
+On click:
+
+* Send parsed rows to backend import endpoint
+* Show loading state
+* Show success summary:
+
+  * Created count
+  * Skipped duplicate count
+  * Invalid row count
+* Show error state if backend fails
+
+6. Post-Import Actions
+   After success, show:
+
+* View Leads button → /admin/crm/leads
+* Import Another CSV button
+* View Lead Pipeline button → /admin/crm/pipeline
+
+TASK 3 — BACKEND IMPORT ENDPOINT
+
+If an appropriate endpoint already exists, reuse it.
+
+If not, create:
+
+POST /api/crm/leads/import
+
+Protected by admin auth.
+
+Request:
+{
+rows: [
+{
+name,
+email,
+phone,
+company,
+source,
+status,
+priority,
+estimatedValue,
+serviceInterest,
+tags
+}
+]
+}
+
+Backend behavior:
+
+1. Validate rows server-side.
+2. Require name.
+3. Validate email format if email is provided.
+4. Normalize status to allowed CRM statuses.
+5. Normalize priority to Low/Medium/High.
+6. Convert estimatedValue to decimal/number safely.
+7. Convert tags from comma-separated text to array if needed.
+8. Prevent duplicate leads by email when email exists.
+9. If no email exists, allow import but do not dedupe by blank email.
+10. Insert valid non-duplicate leads.
+11. For each created lead, create a crm_activities entry:
+    type: "lead_imported"
+    title: "Imported from CSV"
+    description: "Lead imported through CRM Import page."
+
+Response:
+{
+created: number,
+skippedDuplicates: number,
+invalid: number,
+errors: [
+{ rowIndex, message }
+]
+}
+
+Do not create database migrations unless the current schema cannot support the existing fields.
+
+TASK 4 — KEEP DISCOVERY IMPORT SEPARATE
+
+Do not remove or break:
+
+* POST /api/crm/import-discovery
+* POST /api/crm/import-discovery/:id
+* Discovery Portal “Send to CRM”
+* AdminSubmissionDetail CRM bridge card
+
+If CrmImport already has Discovery Import tools, keep them but clearly separate them into a second section:
+
+“Import from Discovery Portal”
+
+TASK 5 — DESIGN REQUIREMENTS
+
+Use:
+
+* shadcn/ui cards
+* Tailwind
+* clean premium dashboard layout
+* readable preview table
+* clear validation badges
+* loading states
+* empty states
+* error states
+* success summary
+
+Avoid:
+
+* fake data
+* silent failures
+* importing invalid rows without telling user
+* crashing on malformed CSV
+* huge refactor
+
+TASK 6 — TESTING
+
+Test:
+
+1. /admin/crm/import loads.
+2. Upload valid CSV.
+3. Preview table renders.
+4. Missing name row is flagged.
+5. Invalid email row is flagged.
+6. Invalid status is flagged or normalized.
+7. Invalid priority is flagged or normalized.
+8. Duplicate email in the CSV is flagged.
+9. Duplicate email already in CRM is skipped.
+10. Valid rows are imported.
+11. Created leads appear in /admin/crm/leads.
+12. Created leads appear in /admin/crm/pipeline.
+13. Import activity is created for each new lead.
+14. Discovery import still works.
+15. Discovery Portal “Send to CRM” still works.
+16. /admin/dashboard still works.
+17. /admin/crm/dashboard still works.
+18. /admin/crm/inbox still works.
+19. /admin/crm/reporting still works.
+20. No TypeScript errors except pre-existing unrelated issue.
+21. No console errors.
+22. No database migrations created unless explicitly required.
+23. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. Whether existing import endpoint was reused or new endpoint was added
+4. CSV columns supported
+5. Validation behavior
+6. Duplicate prevention behavior
+7. UI sections completed
+8. Tests performed
+9. Confirmation no schema/database changes were made, or migration details if unavoidable
+10. Known limitations
+11. Recommended next prompt
