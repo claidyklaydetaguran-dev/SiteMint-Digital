@@ -936,6 +936,94 @@ export default function CrmLeadDetail() {
               </div>
             )}
 
+            {/* ── DISC Behavioral Profile ──────────────────────────────────── */}
+            {discProfile && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Behavioral Profile</h3>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${DISC_META[discProfile.primaryStyle].bgColor} ${DISC_META[discProfile.primaryStyle].textColor} ${DISC_META[discProfile.primaryStyle].borderColor}`}>
+                    {DISC_META[discProfile.primaryStyle].emoji} {discProfile.primaryStyle}
+                  </span>
+                </div>
+
+                {/* Primary + Secondary */}
+                <div className="flex items-center gap-2">
+                  <div className={`flex-1 rounded-lg p-2 text-center ${DISC_META[discProfile.primaryStyle].bgColor} ${DISC_META[discProfile.primaryStyle].borderColor} border`}>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Primary</p>
+                    <p className={`text-sm font-bold ${DISC_META[discProfile.primaryStyle].textColor}`}>
+                      {DISC_META[discProfile.primaryStyle].emoji} {discProfile.primaryStyle}
+                    </p>
+                    <p className={`text-[10px] ${DISC_META[discProfile.primaryStyle].textColor} opacity-80`}>{DISC_META[discProfile.primaryStyle].shortDesc}</p>
+                  </div>
+                  <div className={`flex-1 rounded-lg p-2 text-center ${DISC_META[discProfile.secondaryStyle].bgColor} ${DISC_META[discProfile.secondaryStyle].borderColor} border opacity-80`}>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Secondary</p>
+                    <p className={`text-sm font-bold ${DISC_META[discProfile.secondaryStyle].textColor}`}>
+                      {DISC_META[discProfile.secondaryStyle].emoji} {discProfile.secondaryStyle}
+                    </p>
+                    <p className={`text-[10px] ${DISC_META[discProfile.secondaryStyle].textColor} opacity-80`}>{DISC_META[discProfile.secondaryStyle].shortDesc}</p>
+                  </div>
+                </div>
+
+                {/* Confidence */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Confidence</span>
+                    <span className="text-[10px] font-bold text-foreground">{discProfile.confidence}%</span>
+                  </div>
+                  <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-1 rounded-full bg-gray-400 transition-all"
+                      style={{ width: `${discProfile.confidence}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Score bars */}
+                <div className="space-y-1.5">
+                  {(["Driver","Expressive","Amiable","Analytical"] as const).map(style => {
+                    const key = style.toLowerCase() as "driver"|"expressive"|"amiable"|"analytical";
+                    const pct = discProfile.normalized[key];
+                    const meta = DISC_META[style];
+                    return (
+                      <div key={style} className="flex items-center gap-2">
+                        <span className={`text-[10px] font-medium w-16 shrink-0 ${meta.textColor}`}>{meta.emoji} {style}</span>
+                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-1.5 rounded-full ${meta.barColor} transition-all`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0">{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Top reasons */}
+                {discProfile.reasons.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">Signals detected</p>
+                    {discProfile.reasons.slice(0, 4).map((r, i) => (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style].textColor}`}>{DISC_META[r.style].emoji}</span>
+                        <p className="text-[10px] text-muted-foreground leading-snug">{r.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Suggested approach */}
+                <div className={`rounded-lg p-2.5 border ${DISC_META[discProfile.primaryStyle].bgColor} ${DISC_META[discProfile.primaryStyle].borderColor}`}>
+                  <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground mb-1">Suggested Approach</p>
+                  <p className={`text-xs font-medium leading-snug ${DISC_META[discProfile.primaryStyle].textColor}`}>
+                    {discProfile.communicationProfile.approach}
+                  </p>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground">
+                  Based on activities and lead fields. More signals improve accuracy.
+                </p>
+              </div>
+            )}
+
             {/* Lead management */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-4">
               <h3 className="font-serif font-bold text-sm text-foreground">Lead Management</h3>

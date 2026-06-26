@@ -1,0 +1,126 @@
+Act as a Principal Software Architect and Senior Full-Stack Engineer.
+
+We started Phase 6 — DISC / Behavioral Intelligence Engine, but the implementation was stopped mid-edit.
+
+Your first job is to stabilize and audit the partial changes before continuing.
+
+IMPORTANT:
+Do NOT add new features yet.
+Do NOT continue parallel edits.
+Do NOT touch Twilio routes.
+Do NOT change database schema.
+Do NOT use auto schema sync.
+Do NOT refactor large files.
+Do NOT assume the previous edit completed successfully.
+
+TASK 1 — PARTIAL IMPLEMENTATION AUDIT
+
+Inspect the current codebase and identify exactly what was changed during the interrupted Phase 6 work.
+
+Check especially:
+
+1. src/lib/discEngine.ts
+2. CrmLeadDetail.tsx
+3. CrmDashboard.tsx
+4. Any imports added for discEngine
+5. Any useMemo hooks added for DISC profile
+6. Any unfinished JSX
+7. Any TypeScript errors
+8. Any missing imports
+9. Any references to variables that do not exist
+10. Any partially added dashboard filters
+11. Any partially added sidebar cards
+
+TASK 2 — STABILIZE FIRST
+
+Fix only compile/runtime issues caused by the interrupted DISC work.
+
+Allowed fixes:
+
+* missing imports
+* broken JSX
+* undefined variables
+* incomplete useMemo hooks
+* bad type references
+* dangling components
+* syntax errors
+
+Do not add new UI features yet unless needed to make the app compile.
+
+TASK 3 — REPORT CURRENT STATE
+
+After stabilizing, report:
+
+A. Files changed before interruption
+B. Files currently broken
+C. Files fixed
+D. Whether src/lib/discEngine.ts exists and compiles
+E. Whether CrmLeadDetail still loads
+F. Whether CrmDashboard still loads
+G. Whether CRM Search still works
+H. Whether Sales Workspace still works
+I. TypeScript status
+J. Console/runtime status
+
+TASK 4 — ONLY IF STABLE, COMPLETE MINIMAL PHASE 6 FOUNDATION
+
+Only after the app compiles and loads, complete the smallest safe version of Phase 6.
+
+Do NOT build the full dashboard filter yet.
+Do NOT build campaign automation yet.
+Do NOT add database fields.
+
+Minimum Phase 6 foundation:
+
+1. Keep src/lib/discEngine.ts as a pure TypeScript utility.
+2. Export:
+
+   * computeDiscProfile()
+   * getCommunicationStyle()
+3. Add a compact Communication Style / DISC card only to Lead Detail sidebar.
+4. Show:
+
+   * Primary style
+   * Secondary style
+   * Confidence
+   * Simple score bars for Driver, Analytical, Amiable, Expressive
+   * 3–5 reasons
+   * Suggested communication approach
+5. Do not add dashboard widgets yet unless already safely completed.
+6. Do not add DISC filtering yet unless already safely completed and compiling.
+
+TASK 5 — TESTING
+
+Test:
+
+1. /admin/crm/dashboard loads.
+2. /admin/crm/leads loads.
+3. /admin/crm/leads/:id loads.
+4. Lead Detail sidebar card renders safely.
+5. Lead with no messages/activities still works.
+6. Lead with activities/messages still works.
+7. CRM global search still works.
+8. Sales Workspace still works.
+9. Inbox still works.
+10. Reporting still works.
+11. No new TypeScript errors.
+12. No console errors.
+13. No database migrations created.
+14. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+Return:
+
+1. Partial changes found
+2. Files fixed
+3. Whether app was broken
+4. Whether discEngine.ts compiles
+5. Whether Lead Detail DISC card was added
+6. Whether dashboard/filter work was deferred or completed
+7. Tests performed
+8. Confirmation no schema/database changes were made
+9. Confirmation Twilio routes untouched
+10. Recommended next prompt
+
+This is a recovery and stabilization prompt. Keep it small, safe, and controlled.
