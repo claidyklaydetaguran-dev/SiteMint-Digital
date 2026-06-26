@@ -1,0 +1,349 @@
+Act as a Principal Software Architect, Technical Director, and Senior Full-Stack Engineer.
+
+PROJECT
+
+Sitemint Digital CRM
+
+Current completed modules:
+
+✓ Discovery Portal
+✓ Discovery → CRM Bridge
+✓ CRM Dashboard
+✓ CRM Reporting
+✓ CRM Inbox
+✓ CRM Import
+✓ Lead Detail Command Center
+✓ Lead Health Engine
+✓ Sales Workspace
+✓ Proposal Generator
+✓ Scope of Work Generator
+✓ Deals
+✓ Pipeline
+✓ Tasks
+✓ Activities
+
+======================================================
+OBJECTIVE
+======================================================
+
+Build the Workflow Engine.
+
+This is NOT an automation engine yet.
+
+This is the foundation that every future automation will use.
+
+Examples of future modules:
+
+• Communication Intelligence
+• Email Campaigns
+• SMS Sequences
+• AI Recommendations
+• Client Onboarding
+• Project Management
+• Team Notifications
+
+Do NOT build those yet.
+
+======================================================
+IMPORTANT
+======================================================
+
+Do NOT rebuild existing CRM pages.
+
+Do NOT duplicate business logic.
+
+Reuse existing APIs.
+
+Do NOT modify Twilio routes.
+
+Do NOT use auto schema sync.
+
+Use Drizzle migrations only if absolutely required.
+
+======================================================
+TASK 1
+WORKFLOW STATE INSPECTION
+======================================================
+
+Inspect existing CRM data.
+
+Determine which events already exist.
+
+Examples:
+
+Discovery Imported
+
+Lead Created
+
+Proposal Generated
+
+Proposal Sent
+
+SOW Generated
+
+Task Created
+
+Task Completed
+
+Email Sent
+
+SMS Sent
+
+Call Completed
+
+Deal Created
+
+Deal Won
+
+Status Changed
+
+Pipeline Changed
+
+Reuse existing activity records whenever possible.
+
+======================================================
+TASK 2
+WORKFLOW ENGINE
+======================================================
+
+Create a reusable workflow helper.
+
+Every workflow step should contain:
+
+id
+
+title
+
+description
+
+status
+
+completed
+
+completedAt
+
+nextStep
+
+recommendedAction
+
+source
+
+Do NOT hardcode this inside React pages.
+
+Create reusable workflow utilities.
+
+======================================================
+TASK 3
+WORKFLOW TIMELINE
+======================================================
+
+Inside the Sales Workspace add:
+
+Workflow
+
+Timeline
+
+Show completed and pending workflow steps.
+
+Example
+
+✓ Discovery Submitted
+
+✓ Lead Imported
+
+✓ Proposal Generated
+
+○ Proposal Sent
+
+○ Contract Pending
+
+○ Deposit Pending
+
+○ Kickoff Pending
+
+Every completed step should display:
+
+timestamp
+
+who completed it
+
+source
+
+======================================================
+TASK 4
+NEXT BEST ACTION
+======================================================
+
+Create a reusable rule engine.
+
+Input:
+
+Lead
+
+Activities
+
+Tasks
+
+Deals
+
+Proposal
+
+Output:
+
+Recommended Action
+
+Reason
+
+Priority
+
+Link
+
+Examples:
+
+Generate Proposal
+
+Send Proposal
+
+Follow Up
+
+Schedule Meeting
+
+Create Deal
+
+Send Contract
+
+Wait for Client
+
+No AI.
+
+Transparent rules only.
+
+======================================================
+TASK 5
+WORKFLOW QUEUE
+======================================================
+
+On CRM Dashboard create:
+
+Workflow Queue
+
+Groups:
+
+Needs Proposal
+
+Needs SOW
+
+Needs Follow-up
+
+Proposal Waiting
+
+Ready for Deal
+
+Ready for Kickoff
+
+Each section:
+
+count
+
+top leads
+
+View All
+
+======================================================
+TASK 6
+REUSABILITY
+======================================================
+
+The Workflow Engine must NOT depend on:
+
+Dashboard
+
+Lead Detail
+
+Sales Workspace
+
+Instead:
+
+Dashboard uses Workflow Engine.
+
+Lead Detail uses Workflow Engine.
+
+Future modules will reuse Workflow Engine.
+
+======================================================
+TASK 7
+PERFORMANCE
+======================================================
+
+Memoize workflow calculations.
+
+Avoid duplicate API requests.
+
+Avoid expensive recalculations.
+
+======================================================
+TASK 8
+TESTING
+======================================================
+
+Verify:
+
+Sales Workspace still works.
+
+Proposal generation still works.
+
+SOW generation still works.
+
+Lead Detail still works.
+
+Dashboard still works.
+
+Discovery Portal still works.
+
+Workflow Queue updates immediately after:
+
+Proposal generated
+
+Task completed
+
+Deal updated
+
+Lead status updated
+
+Import
+
+Discovery conversion
+
+No TypeScript errors.
+
+No console errors.
+
+No schema changes unless absolutely required.
+
+======================================================
+FINAL REPORT
+======================================================
+
+Return:
+
+1. Files inspected
+
+2. Files changed
+
+3. Workflow helper architecture
+
+4. Rule engine architecture
+
+5. Dashboard integration
+
+6. Sales Workspace integration
+
+7. Performance considerations
+
+8. Tests performed
+
+9. Schema changes
+
+10. Known limitations
+
+11. Recommended Prompt 13

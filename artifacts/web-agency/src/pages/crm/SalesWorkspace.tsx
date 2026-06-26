@@ -4,8 +4,12 @@ import {
   FileText, ClipboardList, Printer, Copy, Edit3, Loader2,
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
   X, DollarSign, Package, Zap, ChevronRight, RefreshCw,
-  StickyNote, History, Star,
+  StickyNote, History, Star, GitBranch,
 } from "lucide-react";
+import {
+  computeWorkflowSteps, computeNextBestAction,
+  type ActionPriority,
+} from "@/lib/workflowEngine";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,6 +30,8 @@ export interface WorkspaceLead {
   generatedProposal?: string;
   generatedSow?: string;
   discoverySubmissionId?: number;
+  lastContactedAt?: string;
+  nextFollowUpAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,7 +61,7 @@ export interface SalesWorkspaceProps {
   onReload: () => Promise<void>;
 }
 
-type WsTab = "overview" | "proposal" | "sow" | "notes" | "history" | "documents";
+type WsTab = "overview" | "workflow" | "proposal" | "sow" | "notes" | "history" | "documents";
 
 const tk = () => localStorage.getItem("adminToken") || "";
 
@@ -678,10 +684,200 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
   );
 }
 
+// ── Workflow Tab ──────────────────────────────────────────────────────────────
+
+function WorkflowTab({ lead, activities, tasks }: {
+  lead: WorkspaceLead;
+  activities: WorkspaceActivity[];
+  tasks: WorkspaceTask[];
+}) {
+  const steps = useMemo(
+    () => computeWorkflowSteps(lead, activities, tasks),
+    [lead, activities, tasks],
+  );
+  const action = useMemo(
+    () => computeNextBestAction(lead, activities, tasks, steps),
+    [lead, activities, tasks, steps],
+  );
+
+  const priorityConfig: Record<ActionPriority, {
+    badge: string; card: string; icon: React.ElementType; ring: string;
+  }> = {
+    critical: {
+      badge: "bg-red-100 text-red-700 border-red-200",
+      card: "border-red-200 bg-red-50",
+      ring: "ring-red-200",
+      icon: AlertCircle,
+    },
+    high: {
+      badge: "bg-orange-100 text-orange-700 border-orange-200",
+      card: "border-orange-200 bg-orange-50",
+      ring: "ring-orange-200",
+      icon: Zap,
+    },
+    medium: {
+      badge: "bg-yellow-100 text-yellow-700 border-yellow-200",
+      card: "border-yellow-200 bg-yellow-50",
+      ring: "ring-yellow-200",
+      icon: Clock,
+    },
+    low: {
+      badge: "bg-gray-100 text-gray-600 border-gray-200",
+      card: "border-gray-200 bg-gray-50",
+      ring: "ring-gray-200",
+      icon: CheckCircle2,
+    },
+  };
+
+  const pc = priorityConfig[action.priority] ?? priorityConfig.low;
+  const PIcon = pc.icon;
+
+  return (
+    <div className="p-5 space-y-5">
+
+      {/* Next Best Action ─────────────────────────────────────────────── */}
+      <div className={`rounded-xl border p-4 ${pc.card}`}>
+        <div className="flex items-start justify-between gap-2 mb-2.5">
+          <div className="flex items-center gap-2">
+            <PIcon className="w-4 h-4 shrink-0" />
+            <span className="text-xs font-bold uppercase tracking-wide text-foreground/70">
+              Next Best Action
+            </span>
+          </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase shrink-0 ${pc.badge}`}>
+            {action.priority}
+          </span>
+        </div>
+        <h3 className="font-semibold text-foreground mb-1 leading-snug">{action.title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{action.description}</p>
+        <p className="text-xs text-muted-foreground/70 mt-1.5 italic">Reason: {action.reason}</p>
+        {action.actionHint && (
+          <p className="text-xs font-medium text-muted-foreground mt-2 pt-2 border-t border-black/5">
+            💡 {action.actionHint}
+          </p>
+        )}
+      </div>
+
+      {/* Pre-Sale Workflow Timeline ───────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Pre-Sale Workflow
+          </h3>
+          <span className="text-[10px] text-muted-foreground">
+            — {steps.filter(s => s.completed).length} of {steps.length} steps complete
+          </span>
+        </div>
+
+        <div className="relative pl-2">
+          {/* Vertical connector line */}
+          <div className="absolute left-5 top-3 bottom-3 w-px bg-gray-100" />
+
+          <div className="space-y-0">
+            {steps.map(step => (
+              <div key={step.id} className="flex items-start gap-3.5 py-2.5 relative">
+                {/* Step indicator */}
+                <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${
+                  step.status === "completed"
+                    ? "border-green-400 bg-green-400"
+                    : step.status === "active"
+                    ? "border-gray-900 bg-gray-900"
+                    : step.status === "skipped"
+                    ? "border-gray-200 bg-gray-100"
+                    : "border-gray-200 bg-white"
+                }`}>
+                  {step.status === "completed" ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                  ) : step.status === "active" ? (
+                    <span className="w-2 h-2 rounded-full bg-white" />
+                  ) : (
+                    <span className="w-2 h-2 rounded-full bg-gray-200" />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className={`text-sm leading-snug ${
+                        step.status === "completed"
+                          ? "text-foreground font-medium"
+                          : step.status === "active"
+                          ? "text-foreground font-semibold"
+                          : step.status === "skipped"
+                          ? "text-muted-foreground/50 line-through"
+                          : "text-muted-foreground"
+                      }`}>
+                        {step.title}
+                      </p>
+
+                      {step.status === "completed" && step.completedAt && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {new Date(step.completedAt).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric",
+                          })}
+                          {" · "}
+                          {step.completedBy}
+                          {" · "}
+                          <span className="capitalize">
+                            {step.source === "sales_workspace" ? "Workspace" :
+                             step.source === "discovery" ? "Discovery" : "CRM"}
+                          </span>
+                        </p>
+                      )}
+
+                      {step.status === "active" && step.recommendedAction && (
+                        <p className="text-[11px] text-orange-600 font-medium mt-0.5">
+                          → {step.recommendedAction}
+                        </p>
+                      )}
+                    </div>
+
+                    {step.status === "completed" && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium shrink-0">
+                        ✓ Done
+                      </span>
+                    )}
+                    {step.status === "active" && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-900 text-white font-medium shrink-0">
+                        Active
+                      </span>
+                    )}
+                    {step.status === "skipped" && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium shrink-0">
+                        Skipped
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Rule Engine Legend ───────────────────────────────────────────── */}
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
+          About This Engine
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Workflow steps and next actions are computed in real-time from lead status, activity history,
+          proposal state, and follow-up dates. No AI — transparent rules only. Updates immediately
+          when you change status, generate documents, or log activity.
+        </p>
+      </div>
+
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "overview",   label: "Overview",      icon: Star },
+  { id: "workflow",   label: "Workflow",       icon: GitBranch },
   { id: "proposal",   label: "Proposal",      icon: FileText },
   { id: "sow",        label: "Scope of Work", icon: ClipboardList },
   { id: "notes",      label: "Notes",         icon: StickyNote },
@@ -750,6 +946,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
 
       {/* Tab content */}
       {activeTab === "overview" && <OverviewTab lead={lead} />}
+      {activeTab === "workflow" && <WorkflowTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "proposal" && <DocPanel lead={lead} kind="proposal" onReload={onReload} />}
       {activeTab === "sow" && <DocPanel lead={lead} kind="sow" onReload={onReload} />}
       {activeTab === "notes" && <NotesTab lead={lead} onReload={onReload} />}

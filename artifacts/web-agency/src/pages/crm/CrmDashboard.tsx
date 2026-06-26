@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
-import { Phone, MessageSquare, SlidersHorizontal, AlertTriangle, TrendingUp, Zap } from "lucide-react";
+import { Phone, MessageSquare, SlidersHorizontal, AlertTriangle, TrendingUp, Zap, GitBranch, ChevronRight } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import { computeWorkflowQueue } from "@/lib/workflowEngine";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -19,6 +20,7 @@ interface Lead {
   estimatedValue?: string | null;
   nextFollowUpAt?: string | null;
   proposalStatus?: string;
+  sowStatus?: string;
   smsConsent?: boolean;
 }
 
@@ -156,6 +158,18 @@ export default function CrmDashboard() {
 
     return items;
   }, [allLeads, scoreMap]);
+
+  // ── Workflow Queue (6 action-grouped buckets) ─────────────────────────────
+  const workflowQueue = useMemo(
+    () => computeWorkflowQueue(allLeads.map(l => ({
+      id: l.id, name: l.name, company: l.company, status: l.status,
+      proposalStatus: l.proposalStatus ?? "Not Started",
+      sowStatus: l.sowStatus ?? "Not Started",
+      lastContactedAt: l.lastContactedAt, nextFollowUpAt: l.nextFollowUpAt,
+      estimatedValue: l.estimatedValue, updatedAt: l.updatedAt, createdAt: l.createdAt,
+    }))),
+    [allLeads],
+  );
 
   // ── Smart CRM Lists (7 intelligence-based lists) ──────────────────────────
   const smartLists = useMemo(() => {
@@ -314,6 +328,73 @@ export default function CrmDashboard() {
                   <p className="text-[10px] text-muted-foreground">{list.desc}</p>
                 </div>
               </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Workflow Queue ─────────────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <GitBranch className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Workflow Queue</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— action-grouped lead pipeline</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {workflowQueue.map(group => (
+              <div
+                key={group.id}
+                className={`rounded-xl border ${group.borderClass} ${group.bgClass} p-4`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-xl leading-none mt-0.5">{group.emoji}</span>
+                    <div>
+                      <p className={`text-sm font-semibold leading-tight ${group.colorClass}`}>
+                        {group.label}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{group.description}</p>
+                    </div>
+                  </div>
+                  <span className={`text-2xl font-bold leading-none shrink-0 ${group.colorClass}`}>
+                    {group.count}
+                  </span>
+                </div>
+
+                {group.topLeads.length > 0 ? (
+                  <div className="space-y-1">
+                    {group.topLeads.map(lead => (
+                      <Link href={`/admin/crm/leads/${lead.id}`} key={lead.id}>
+                        <div className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-white/70 hover:bg-white transition-colors cursor-pointer border border-transparent hover:border-white/80 hover:shadow-sm">
+                          <div className="min-w-0">
+                            <span className="text-xs font-medium text-foreground truncate block">
+                              {lead.name}
+                            </span>
+                            {lead.company && (
+                              <span className="text-[10px] text-muted-foreground truncate block">
+                                {lead.company}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0 ml-2" />
+                        </div>
+                      </Link>
+                    ))}
+                    {group.count > 4 && (
+                      <Link href="/admin/crm/leads">
+                        <div className="text-center pt-1.5">
+                          <span className={`text-xs font-semibold ${group.colorClass} hover:underline cursor-pointer`}>
+                            View all {group.count} →
+                          </span>
+                        </div>
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-3">
+                    <p className="text-xs text-muted-foreground">All clear ✓</p>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
