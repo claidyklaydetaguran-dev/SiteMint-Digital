@@ -1,0 +1,263 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Upgrade CRM Lead Detail into a Follow Up Boss-style Contact Command Center.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/leads is the main Leads / People table.
+* /admin/crm/leads/:id is the CRM Lead Detail page.
+* /admin/crm/inbox is wired to real crm_messages.
+* /admin/crm/import is built and working.
+* Discovery Portal → CRM conversion works.
+* Twilio message/call APIs already exist.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes unless absolutely required.
+Do NOT break existing Lead Detail features.
+Do NOT break SMS/email/tasks/activities already working.
+Use existing APIs where possible.
+
+Goal:
+Make /admin/crm/leads/:id feel like a true contact command center where sales reps can quickly call, text, email, log notes, create tasks, update status, and view communication history.
+
+TASK 1 — INSPECT CURRENT LEAD DETAIL
+
+Before coding, inspect:
+
+1. CrmLeadDetail.tsx
+2. Existing lead fetch behavior
+3. Existing activity timeline
+4. Existing notes functionality
+5. Existing tasks functionality
+6. Existing email functionality
+7. Existing SMS functionality
+8. Existing message history behavior
+9. Existing API endpoints:
+
+   * GET /api/crm/leads/:id
+   * PATCH /api/crm/leads/:id
+   * POST /api/crm/leads/:id/notes
+   * POST /api/crm/leads/:id/tasks
+   * POST /api/crm/leads/:id/email
+   * POST /api/crm/leads/:id/sms
+   * GET /api/crm/leads/:id/messages
+   * POST /api/crm/phone/call or existing call endpoint
+
+Report what exists before changing code.
+
+TASK 2 — ADD TOP CONTACT COMMAND BAR
+
+At the top of /admin/crm/leads/:id, add a premium sticky or near-top command bar.
+
+Buttons:
+
+1. Call
+2. Text
+3. Email
+4. Add Note
+5. Add Task
+6. Update Status
+
+Behavior:
+
+* Each button should open the matching existing panel/modal/section if one exists.
+* If no modal exists, create a lightweight inline modal/dialog.
+* Do not duplicate existing functionality unnecessarily.
+* Keep UI clean and fast.
+
+TASK 3 — CALL ACTION
+
+Add a Call button.
+
+Behavior:
+
+* If lead has no phone number, disable button and show tooltip/message.
+* If Twilio is not configured, show clear error after API response.
+* Call existing endpoint if available:
+  POST /api/crm/phone/call
+  or the current project’s existing call endpoint.
+* Payload should include leadId and phone number if required by existing API.
+* On success, show success toast/message:
+  “Call started.”
+* Refresh messages/activity if the API logs the call.
+
+Do not modify Twilio webhook routes.
+
+TASK 4 — TEXT ACTION
+
+Improve Text action.
+
+Behavior:
+
+* Open SMS composer.
+* Show lead phone number.
+* Respect smsOptOut:
+  If opted out, disable texting and show:
+  “SMS disabled: this lead has opted out.”
+* Send through:
+  POST /api/crm/leads/:id/sms
+* On success:
+
+  * clear composer
+  * refresh messages
+  * show success toast/message
+
+TASK 5 — EMAIL ACTION
+
+Improve Email action.
+
+Behavior:
+
+* Open email composer.
+* Show recipient email.
+* Disable if no email exists.
+* Allow subject and body.
+* Use existing:
+  POST /api/crm/leads/:id/email
+* If backend is in test mode, show visible banner:
+  “Email test mode is enabled. Message may not be sent externally.”
+* On success:
+
+  * clear composer
+  * refresh activity timeline
+  * show success toast/message
+
+TASK 6 — ADD NOTE ACTION
+
+Add quick note modal/panel.
+
+Behavior:
+
+* Textarea
+* Submit to:
+  POST /api/crm/leads/:id/notes
+* On success:
+
+  * clear note
+  * refresh lead/activity
+  * show success toast/message
+
+TASK 7 — ADD TASK ACTION
+
+Add quick task modal/panel.
+
+Fields:
+
+* task title
+* task type
+* due date
+* optional due time if existing schema supports it
+
+Submit to:
+POST /api/crm/leads/:id/tasks
+
+On success:
+
+* refresh lead/tasks
+* show success toast/message
+
+TASK 8 — UPDATE STATUS ACTION
+
+Add quick status update control.
+
+Allowed statuses:
+
+* New
+* Contacted
+* Follow-up
+* Proposal Sent
+* Negotiating
+* Won
+* Lost
+* Nurture
+
+Behavior:
+
+* Current status visible.
+* Changing status calls:
+  PATCH /api/crm/leads/:id
+* On success:
+
+  * refresh lead
+  * activity should log status change if backend already does it
+  * show success toast/message
+
+TASK 9 — COMMUNICATION HISTORY PANEL
+
+Make sure lead detail shows real communication history from:
+
+GET /api/crm/leads/:id/messages
+
+Display:
+
+* SMS messages
+* Call records
+* inbound/outbound styling
+* timestamps
+* status/errors
+* link to full Inbox thread if useful
+
+Do not replace the activity timeline. Communication history and activity timeline can be separate sections.
+
+TASK 10 — UX POLISH
+
+Add:
+
+* Loading states
+* Button disabled states
+* Success/error toasts or inline messages
+* Empty states
+* Responsive layout
+* Clear contact info card
+* “View Discovery Submission” link should remain if discoverySubmissionId exists
+
+TASK 11 — TESTING
+
+Test:
+
+1. /admin/crm/leads/:id loads.
+2. Contact command bar appears.
+3. Call button handles no phone safely.
+4. Call button calls existing endpoint when phone exists.
+5. SMS composer works.
+6. SMS opt-out disables sending.
+7. Email composer works.
+8. Email no-recipient state works.
+9. Email test-mode banner appears if applicable.
+10. Add note works.
+11. Add task works.
+12. Update status works.
+13. Activity timeline refreshes after note/status/email/task.
+14. Communication history uses crm_messages.
+15. View Discovery Submission link still works.
+16. /admin/crm/inbox still works.
+17. /admin/crm/dashboard still works.
+18. /admin/dashboard still works.
+19. No TypeScript errors except pre-existing unrelated issue.
+20. No console errors.
+21. No database migrations created.
+22. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. Existing APIs reused
+4. Command bar actions completed
+5. Call behavior
+6. SMS behavior
+7. Email behavior
+8. Note/task/status behavior
+9. Communication history behavior
+10. Tests performed
+11. Confirmation no schema/database changes were made
+12. Confirmation Twilio webhook routes were not changed
+13. Known limitations
+14. Recommended next prompt
