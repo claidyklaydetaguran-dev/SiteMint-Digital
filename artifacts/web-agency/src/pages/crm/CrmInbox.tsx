@@ -4,73 +4,65 @@ import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import {
   Phone, MessageSquare, Mail, Send, AlertCircle, CheckCircle2,
-  Building, Globe, Tag, Calendar, ChevronRight,
+  Building, Globe, Tag, Calendar, ChevronRight, RefreshCw,
 } from "lucide-react";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
+// FUTURE ENHANCEMENT: Browser Notification API could surface inbound messages
+// as desktop notifications when the tab is in the background. Requires user
+// permission (Notification.requestPermission()) and should only fire for
+// inbound messages from threads not currently selected. Defer until needed.
+
+const POLL_INTERVAL_MS = 30_000;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 const AVATAR_COLORS = [
-  "bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500",
-  "bg-red-400", "bg-orange-400", "bg-yellow-500", "bg-teal-500",
-  "bg-cyan-500", "bg-emerald-500",
+  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
+  "bg-red-400","bg-orange-400","bg-yellow-500","bg-teal-500",
+  "bg-cyan-500","bg-emerald-500",
 ];
 function initials(name: string) {
-  return name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase();
+  return name.trim().split(/\s+/).map(n => n[0]).slice(0,2).join("").toUpperCase();
 }
 function avatarColor(name: string) {
-  const i = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length;
+  const i = name.split("").reduce((a,c) => a+c.charCodeAt(0),0) % AVATAR_COLORS.length;
   return AVATAR_COLORS[i];
 }
 function timeAgo(d: string) {
   const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
+  const m = Math.floor(diff/60000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
+  const h = Math.floor(m/60);
   if (h < 24) return `${h}h ago`;
-  const days = Math.floor(h / 24);
+  const days = Math.floor(h/24);
   if (days === 1) return "1d ago";
   if (days < 30) return `${days}d ago`;
   return new Date(d).toLocaleDateString();
 }
 function formatDuration(seconds: number) {
-  const m = Math.floor(seconds / 60);
+  const m = Math.floor(seconds/60);
   const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2,"0")}`;
 }
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CrmMessage {
-  id: number;
-  createdAt: string;
-  leadId: number | null;
-  direction: string;
-  channel: string;
-  body?: string | null;
-  fromNumber?: string | null;
-  toNumber?: string | null;
-  status?: string | null;
-  errorCode?: string | null;
-  callStatus?: string | null;
-  duration?: number | null;
+  id: number; createdAt: string; leadId: number | null; direction: string; channel: string;
+  body?: string | null; fromNumber?: string | null; toNumber?: string | null;
+  status?: string | null; errorCode?: string | null; callStatus?: string | null; duration?: number | null;
 }
-
 interface ThreadLead {
-  id: number;
-  name: string;
-  phone?: string | null;
-  email: string;
-  company?: string | null;
-  smsOptOut?: boolean | null;
+  id: number; name: string; phone?: string | null; email: string;
+  company?: string | null; smsOptOut?: boolean | null;
 }
-
 interface ConversationThread {
-  leadId: number | null;
-  lead: ThreadLead | null;
-  messages: CrmMessage[];
-  lastAt: string;
-  unread: number;
+  leadId: number | null; lead: ThreadLead | null; messages: CrmMessage[];
+  lastAt: string; unread: number;
 }
-
 interface FullLead {
   id: number; name: string; company?: string; email: string; phone?: string;
   status: string; assignedTo?: string; website?: string; source?: string;
@@ -78,36 +70,125 @@ interface FullLead {
   tags: string[]; smsOptOut?: boolean; smsConsent?: boolean;
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function CrmInbox() {
   const [, navigate] = useLocation();
+
+  // Core data
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [selected, setSelected] = useState<ConversationThread | null>(null);
   const [selectedLead, setSelectedLead] = useState<FullLead | null>(null);
   const [messages, setMessages] = useState<CrmMessage[]>([]);
+
+  // Loading states
   const [loading, setLoading] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Error / status
   const [error, setError] = useState("");
+  const [pollError, setPollError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Compose
   const [smsBody, setSmsBody] = useState("");
   const [sending, setSending] = useState(false);
   const [smsError, setSmsError] = useState("");
   const [toast, setToast] = useState("");
-  const threadRef = useRef<HTMLDivElement>(null);
 
-  const showToast = (msg: string) => {
+  // TASK 4 — Session-based unread: tracked per session only (not persisted)
+  // When a thread is selected it's marked "viewed"; badge hides.
+  // If new messages arrive for a viewed thread, it's removed from viewedLeads
+  // and the unread badge reappears. Resets on page reload by design.
+  const [viewedLeads, setViewedLeads] = useState<Set<number>>(new Set());
+
+  // TASK 5 — Highlight rows that just received new messages
+  const [newlyUpdated, setNewlyUpdated] = useState<Set<number>>(new Set());
+
+  // TASK 2 — Banner when selected thread has new messages but user isn't at bottom
+  const [showNewBanner, setShowNewBanner] = useState(false);
+
+  // Refs
+  const threadRef = useRef<HTMLDivElement>(null);       // scroll container for messages
+  const isNearBottom = useRef(true);                    // whether user is near bottom of messages
+  const knownLastAt = useRef<Map<number, string>>(new Map()); // leadId → lastAt for change detection
+  const selectedRef = useRef<ConversationThread | null>(null); // always-current selected thread
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep selectedRef in sync
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3500);
-  };
+  }, []);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     setTimeout(() => threadRef.current?.scrollTo({ top: 99999, behavior: "smooth" }), 80);
-  };
+  }, []);
 
-  // Load all conversation threads
-  const loadThreads = useCallback(async (keepSelected?: ConversationThread) => {
+  // "Near bottom" tracking — used by TASK 2 smart scroll
+  const handleThreadScroll = useCallback(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottom.current = distFromBottom < 120;
+  }, []);
+
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", handleThreadScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleThreadScroll);
+  }, [handleThreadScroll, selected]); // re-attach when thread changes
+
+  // ── Session unread helper ────────────────────────────────────────────────────
+
+  const effectiveUnread = useCallback((thread: ConversationThread): number => {
+    if (thread.leadId == null) return thread.unread;
+    return viewedLeads.has(thread.leadId) ? 0 : thread.unread;
+  }, [viewedLeads]);
+
+  // ── Data fetch helpers ───────────────────────────────────────────────────────
+
+  const loadFullLead = useCallback(async (leadId: number) => {
+    const r = await fetch(`/api/crm/leads/${leadId}`, {
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    if (r.ok) {
+      const d = await r.json() as { lead: FullLead };
+      setSelectedLead(d.lead ?? null);
+    }
+  }, []);
+
+  const loadMessages = useCallback(async (leadId: number) => {
+    setLoadingMsgs(true);
+    try {
+      const r = await fetch(`/api/crm/leads/${leadId}/messages`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (r.ok) {
+        const d = await r.json() as { messages: CrmMessage[] };
+        setMessages((d.messages || []).slice().reverse());
+        scrollToBottom();
+      }
+    } finally {
+      setLoadingMsgs(false);
+    }
+  }, [scrollToBottom]);
+
+  // ── Initial full load ────────────────────────────────────────────────────────
+
+  const loadThreads = useCallback(async () => {
     if (!token()) {
       navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
+    setLoading(true);
+    setError("");
     try {
       const r = await fetch("/api/crm/conversations", {
         headers: { Authorization: `Bearer ${token()}` },
@@ -120,63 +201,152 @@ export default function CrmInbox() {
       const d = await r.json() as { conversations: ConversationThread[] };
       const convs = d.conversations || [];
       setThreads(convs);
-      if (!keepSelected && convs.length > 0) {
+      setLastUpdated(new Date());
+
+      // Seed the lastAt map for future change detection
+      for (const t of convs) {
+        if (t.leadId != null) knownLastAt.current.set(t.leadId, t.lastAt);
+      }
+
+      // Auto-select first thread (initial load only)
+      if (convs.length > 0) {
         const first = convs[0];
         setSelected(first);
+        selectedRef.current = first;
         setMessages(first.messages.slice().reverse());
         scrollToBottom();
+        if (first.leadId) {
+          setViewedLeads(new Set([first.leadId]));
+          loadMessages(first.leadId);
+          loadFullLead(first.leadId);
+        }
       }
     } catch {
       setError("Failed to load inbox. Please refresh.");
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, scrollToBottom, loadMessages, loadFullLead]);
 
-  useEffect(() => { loadThreads(); }, []);
+  useEffect(() => { loadThreads(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load full lead detail (for right panel + smsOptOut flag)
-  const loadFullLead = useCallback(async (leadId: number) => {
-    const r = await fetch(`/api/crm/leads/${leadId}`, {
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    if (r.ok) {
-      const d = await r.json() as { lead: FullLead };
-      setSelectedLead(d.lead ?? null);
-    }
-  }, []);
+  // ── TASK 2 — Silent poll refresh ─────────────────────────────────────────────
+  // Fetches conversations silently (no full-page loading, no thread reset,
+  // no composer clear). If the selected thread has new messages, fetches them
+  // and scrolls to bottom only if the user was already near the bottom.
 
-  // Refresh messages for selected thread
-  const loadMessages = useCallback(async (leadId: number) => {
-    setLoadingMsgs(true);
+  const silentRefresh = useCallback(async (manual = false) => {
+    if (manual) setIsRefreshing(true);
+    setPollError("");
     try {
-      const r = await fetch(`/api/crm/leads/${leadId}/messages`, {
+      const r = await fetch("/api/crm/conversations", {
         headers: { Authorization: `Bearer ${token()}` },
       });
-      if (r.ok) {
-        const d = await r.json() as { messages: CrmMessage[] };
-        const msgs = (d.messages || []).slice().reverse(); // oldest first for display
-        setMessages(msgs);
-        scrollToBottom();
-      }
-    } finally {
-      setLoadingMsgs(false);
-    }
-  }, []);
+      if (r.status === 401) return; // session expired — don't crash
+      if (!r.ok) throw new Error("fetch failed");
+      const d = await r.json() as { conversations: ConversationThread[] };
+      const convs = d.conversations || [];
 
-  const selectThread = (thread: ConversationThread) => {
+      // Detect which threads have new messages since last poll
+      const updatedLeadIds: number[] = [];
+      for (const thread of convs) {
+        if (thread.leadId == null) continue;
+        const prev = knownLastAt.current.get(thread.leadId);
+        if (prev !== undefined && thread.lastAt > prev) {
+          updatedLeadIds.push(thread.leadId);
+        }
+        // Update map with new lastAt
+        knownLastAt.current.set(thread.leadId, thread.lastAt);
+      }
+
+      // Update thread list (preserves selected identity via selectedRef)
+      setThreads(convs);
+      setLastUpdated(new Date());
+
+      // If selected thread has new messages, silently fetch them
+      const selId = selectedRef.current?.leadId;
+      if (selId != null && updatedLeadIds.includes(selId)) {
+        const r2 = await fetch(`/api/crm/leads/${selId}/messages`, {
+          headers: { Authorization: `Bearer ${token()}` },
+        });
+        if (r2.ok) {
+          const d2 = await r2.json() as { messages: CrmMessage[] };
+          const msgs = (d2.messages || []).slice().reverse();
+          setMessages(msgs);
+          if (isNearBottom.current) {
+            scrollToBottom();
+          } else {
+            // TASK 5 — subtle banner instead of forcing scroll
+            setShowNewBanner(true);
+          }
+        }
+      }
+
+      // TASK 4 — Remove newly-updated threads from viewedLeads so
+      // unread badge reappears for threads that got new inbound messages
+      if (updatedLeadIds.length > 0) {
+        setViewedLeads(prev => {
+          const next = new Set(prev);
+          updatedLeadIds.forEach(lid => next.delete(lid));
+          return next;
+        });
+
+        // TASK 5 — Highlight newly updated rows briefly
+        setNewlyUpdated(prev => {
+          const next = new Set(prev);
+          updatedLeadIds.forEach(lid => next.add(lid));
+          return next;
+        });
+        setTimeout(() => {
+          setNewlyUpdated(prev => {
+            const next = new Set(prev);
+            updatedLeadIds.forEach(lid => next.delete(lid));
+            return next;
+          });
+        }, 3000);
+      }
+
+    } catch {
+      // TASK 5 — Non-destructive: show error in header, don't wipe the inbox
+      setPollError("Auto-refresh failed. Will retry in 30s.");
+    } finally {
+      if (manual) setIsRefreshing(false);
+    }
+  }, [scrollToBottom]);
+
+  // TASK 2 — Start polling after initial load; stop on unmount
+  useEffect(() => {
+    if (loading) return;
+    pollIntervalRef.current = setInterval(() => silentRefresh(false), POLL_INTERVAL_MS);
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [loading, silentRefresh]);
+
+  // ── Thread selection ─────────────────────────────────────────────────────────
+
+  const selectThread = useCallback((thread: ConversationThread) => {
     setSelected(thread);
+    selectedRef.current = thread;
     setSelectedLead(null);
-    setSmsBody("");
+    setSmsBody(""); // intentional: switching threads clears composer
     setSmsError("");
+    setShowNewBanner(false);
+    isNearBottom.current = true;
+
     const msgs = thread.messages.slice().reverse();
     setMessages(msgs);
     scrollToBottom();
-    if (thread.leadId) {
+
+    if (thread.leadId != null) {
+      // TASK 4 — Mark thread as viewed this session
+      setViewedLeads(prev => new Set(prev).add(thread.leadId!));
       loadMessages(thread.leadId);
       loadFullLead(thread.leadId);
     }
-  };
+  }, [scrollToBottom, loadMessages, loadFullLead]);
+
+  // ── SMS send ─────────────────────────────────────────────────────────────────
 
   const sendSms = async () => {
     if (!selected?.leadId || !smsBody.trim()) return;
@@ -185,19 +355,16 @@ export default function CrmInbox() {
     try {
       const r = await fetch(`/api/crm/leads/${selected.leadId}/sms`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token()}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body: smsBody.trim() }),
       });
-      const d = await r.json() as { error?: string; success?: boolean };
+      const data = await r.json() as { error?: string; success?: boolean };
       if (r.ok) {
         setSmsBody("");
         showToast("SMS sent.");
         if (selected.leadId) loadMessages(selected.leadId);
       } else {
-        setSmsError(d.error ?? "Failed to send SMS.");
+        setSmsError(data.error ?? "Failed to send SMS.");
       }
     } catch {
       setSmsError("Network error. Please try again.");
@@ -206,15 +373,21 @@ export default function CrmInbox() {
     }
   };
 
+  // ── Derived values ───────────────────────────────────────────────────────────
+
   const smsOptOut = selectedLead?.smsOptOut ?? selected?.lead?.smsOptOut ?? false;
   const displayName = (t: ConversationThread) => t.lead?.name ?? "Unknown Contact";
   const lastMsg = (t: ConversationThread) => t.messages[0] ?? null;
 
+  const totalUnread = threads.reduce((sum, t) => sum + effectiveUnread(t), 0);
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
     <CrmLayout>
-      {/* Toast */}
+      {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-6 right-6 z-50 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           {toast}
         </div>
@@ -222,22 +395,63 @@ export default function CrmInbox() {
 
       <div className="flex h-[calc(100vh-48px)]">
 
-        {/* ── LEFT — Thread list ─────────────────────────────────────────────── */}
+        {/* ══ LEFT — Thread list ══════════════════════════════════════════════ */}
         <div className="w-72 bg-white border-r border-gray-200 flex flex-col shrink-0">
-          <div className="px-4 py-3 border-b border-gray-100">
+
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-100 space-y-1.5">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-sm text-foreground">
+              <h2 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                 Inbox
                 {!loading && (
-                  <span className="ml-1.5 text-muted-foreground font-normal">({threads.length})</span>
+                  <span className="text-muted-foreground font-normal">({threads.length})</span>
+                )}
+                {totalUnread > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {totalUnread > 99 ? "99+" : totalUnread}
+                  </span>
                 )}
               </h2>
-              <span className="text-[10px] text-muted-foreground bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-full font-medium">
-                SMS &amp; Calls
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full font-medium">
+                  SMS &amp; Calls
+                </span>
+                {/* TASK 3 — Manual refresh button */}
+                <button
+                  onClick={() => silentRefresh(true)}
+                  disabled={isRefreshing || loading}
+                  title="Refresh inbox"
+                  className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors text-muted-foreground disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                </button>
+              </div>
             </div>
+
+            {/* TASK 5 — Live indicator + last updated */}
+            {!loading && (
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live · 30s
+                </span>
+                {lastUpdated && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {timeAgo(lastUpdated.toISOString())}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* TASK 5 — Non-destructive poll error */}
+            {pollError && (
+              <p className="flex items-center gap-1 text-[10px] text-amber-600">
+                <AlertCircle className="w-3 h-3 shrink-0" />{pollError}
+              </p>
+            )}
           </div>
 
+          {/* Thread list */}
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
             {loading ? (
               <div className="flex items-center justify-center h-32">
@@ -247,6 +461,9 @@ export default function CrmInbox() {
               <div className="p-5 text-center">
                 <AlertCircle className="w-6 h-6 mx-auto mb-2 text-red-400" />
                 <p className="text-sm text-red-600">{error}</p>
+                <button onClick={loadThreads} className="mt-2 text-xs text-blue-600 hover:underline">
+                  Retry
+                </button>
               </div>
             ) : threads.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">
@@ -260,9 +477,11 @@ export default function CrmInbox() {
               threads.map((thread, idx) => {
                 const name = displayName(thread);
                 const last = lastMsg(thread);
-                const isActive = selected?.leadId === thread.leadId && selected?.leadId !== null
-                  ? true
+                const unread = effectiveUnread(thread); // TASK 4 — session-based
+                const isActive = thread.leadId != null
+                  ? selected?.leadId === thread.leadId
                   : selected === thread;
+                const isNewlyUpdated = thread.leadId != null && newlyUpdated.has(thread.leadId);
                 const preview = last?.channel === "call"
                   ? (last.direction === "inbound" ? "📞 Incoming call" : "📞 Outgoing call")
                   : (last?.body?.substring(0, 55) ?? "—");
@@ -271,32 +490,43 @@ export default function CrmInbox() {
                   <button
                     key={`${thread.leadId ?? "orphan"}-${idx}`}
                     onClick={() => selectThread(thread)}
-                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                      isActive ? "bg-blue-50 border-l-2 border-blue-500" : "border-l-2 border-transparent"
+                    className={`w-full text-left px-4 py-3 transition-colors border-l-2 ${
+                      isActive
+                        ? "bg-blue-50 border-blue-500 hover:bg-blue-50"
+                        : isNewlyUpdated
+                          ? "bg-emerald-50 border-emerald-400 hover:bg-emerald-50" // TASK 5 — new message highlight
+                          : "border-transparent hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-full ${avatarColor(name)} flex items-center justify-center shrink-0 relative`}>
                         <span className="text-white text-xs font-semibold">{initials(name)}</span>
-                        {thread.unread > 0 && (
+                        {/* TASK 4 — hide badge for viewed threads, show when new messages arrive */}
+                        {unread > 0 && (
                           <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center">
-                            {thread.unread > 9 ? "9+" : thread.unread}
+                            {unread > 9 ? "9+" : unread}
                           </span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className={`text-sm truncate ${thread.unread > 0 ? "font-bold text-foreground" : "font-medium text-foreground"}`}>
+                          <span className={`text-sm truncate ${unread > 0 ? "font-bold text-foreground" : "font-medium text-foreground"}`}>
                             {name}
                           </span>
-                          <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(thread.lastAt)}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* TASK 5 — "New" pill for newly updated threads */}
+                            {isNewlyUpdated && !isActive && (
+                              <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+                                NEW
+                              </span>
+                            )}
+                            <span className="text-[10px] text-muted-foreground">{timeAgo(thread.lastAt)}</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-1 mt-0.5">
                           {last && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                              last.channel === "sms"
-                                ? "bg-sky-100 text-sky-700"
-                                : "bg-gray-100 text-gray-600"
+                              last.channel === "sms" ? "bg-sky-100 text-sky-700" : "bg-gray-100 text-gray-600"
                             }`}>
                               {last.channel === "sms" ? "SMS" : "Call"}
                             </span>
@@ -318,7 +548,7 @@ export default function CrmInbox() {
           </div>
         </div>
 
-        {/* ── CENTER — Message thread ────────────────────────────────────────── */}
+        {/* ══ CENTER — Message thread ══════════════════════════════════════════ */}
         <div className="flex-1 flex flex-col min-w-0">
           {selected ? (
             <>
@@ -358,7 +588,7 @@ export default function CrmInbox() {
                 </div>
               </div>
 
-              {/* Messages */}
+              {/* Messages scroll area */}
               <div ref={threadRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50">
                 {loadingMsgs ? (
                   <div className="flex items-center justify-center h-32">
@@ -378,9 +608,9 @@ export default function CrmInbox() {
                     if (isCall) {
                       const statusColor =
                         msg.callStatus === "completed" ? "text-green-600 bg-green-100" :
-                        msg.callStatus === "no-answer" || msg.callStatus === "busy" || msg.callStatus === "failed" ? "text-red-500 bg-red-100" :
-                        "text-gray-500 bg-gray-100";
-
+                        msg.callStatus === "no-answer" || msg.callStatus === "busy" || msg.callStatus === "failed"
+                          ? "text-red-500 bg-red-100"
+                          : "text-gray-500 bg-gray-100";
                       return (
                         <div key={msg.id} className="flex justify-center">
                           <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 max-w-xs shadow-sm w-full">
@@ -398,9 +628,7 @@ export default function CrmInbox() {
                                   </span>
                                 )}
                                 {msg.duration != null && msg.duration > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDuration(msg.duration)}
-                                  </span>
+                                  <span className="text-xs text-muted-foreground">{formatDuration(msg.duration)}</span>
                                 )}
                                 <span className="text-[11px] text-muted-foreground">{timeAgo(msg.createdAt)}</span>
                               </div>
@@ -447,7 +675,19 @@ export default function CrmInbox() {
                 )}
               </div>
 
-              {/* ── SMS Compose panel ── */}
+              {/* TASK 5 — "New messages" banner when user isn't at bottom */}
+              {showNewBanner && (
+                <div className="shrink-0 px-4 pb-2">
+                  <button
+                    onClick={() => { setShowNewBanner(false); scrollToBottom(); }}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg py-2 transition-colors"
+                  >
+                    <span>↓</span> New message — scroll to bottom
+                  </button>
+                </div>
+              )}
+
+              {/* SMS Compose panel */}
               {selected.leadId ? (
                 <div className="bg-white border-t border-gray-200 p-4 shrink-0">
                   {smsOptOut ? (
@@ -476,9 +716,7 @@ export default function CrmInbox() {
                           placeholder={`Message ${selected.lead.phone}…`}
                           value={smsBody}
                           onChange={e => setSmsBody(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendSms();
-                          }}
+                          onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendSms(); }}
                         />
                         <Button
                           size="sm"
@@ -524,7 +762,7 @@ export default function CrmInbox() {
           )}
         </div>
 
-        {/* ── RIGHT — Contact profile ────────────────────────────────────────── */}
+        {/* ══ RIGHT — Contact profile ══════════════════════════════════════════ */}
         {selected?.lead && (
           <div className="w-64 bg-white border-l border-gray-200 overflow-y-auto shrink-0">
             <div className="p-4 border-b border-gray-100">
@@ -602,7 +840,7 @@ export default function CrmInbox() {
               </div>
             </div>
 
-            {/* CRM details from full lead */}
+            {/* CRM details */}
             {selectedLead && (
               <div className="p-4 border-b border-gray-100 space-y-1.5">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">CRM Details</h3>

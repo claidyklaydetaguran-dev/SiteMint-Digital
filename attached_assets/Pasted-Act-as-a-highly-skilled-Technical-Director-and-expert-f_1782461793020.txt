@@ -1,0 +1,138 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Add CRM Inbox auto-refresh and safer unread behavior.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal.
+* /admin/crm/dashboard is the CRM Command Center.
+* /admin/crm/inbox is wired to real crm_messages data.
+* /admin/crm/leads/:id now has a Contact Command Center.
+* Twilio inbound/outbound SMS and call routes already exist.
+
+IMPORTANT:
+Do NOT rebuild the CRM.
+Do NOT change database schema unless absolutely necessary.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Do NOT break existing Inbox SMS compose.
+Do NOT break Lead Detail command center.
+Use existing APIs where possible.
+
+Goal:
+Make /admin/crm/inbox feel live by adding safe auto-refresh polling and better unread indicators.
+
+TASK 1 — INSPECT CURRENT INBOX
+
+Inspect:
+
+1. CrmInbox.tsx
+2. GET /api/crm/conversations response shape
+3. GET /api/crm/leads/:id/messages
+4. Existing unread count behavior
+5. Existing SMS compose refresh behavior
+
+Report what exists before changing code.
+
+TASK 2 — ADD AUTO-REFRESH POLLING
+
+On /admin/crm/inbox:
+
+Add polling every 30 seconds:
+
+* Fetch GET /api/crm/conversations silently.
+* Do not show full-page loading during polling.
+* Do not clear the selected thread.
+* Do not interrupt the user while typing an SMS.
+* Do not scroll the message view unless the selected thread has new messages and the user is already near the bottom.
+
+Behavior:
+
+* If new thread appears, add it to the top of thread list.
+* If existing thread has new lastAt timestamp, update preview and badge.
+* If selected thread has new messages, fetch:
+  GET /api/crm/leads/:id/messages
+* Show a subtle “New message” indicator if the user is not at the bottom.
+
+TASK 3 — MANUAL REFRESH BUTTON
+
+Add a small refresh button to the inbox header.
+
+Behavior:
+
+* Calls the same refresh logic.
+* Shows spinner while refreshing.
+* Does not reset composer text.
+* Does not reset selected thread.
+* Shows small success or “Updated” state if appropriate.
+
+TASK 4 — SAFER UNREAD INDICATORS WITHOUT DB MIGRATION
+
+Do not add read/unread columns yet.
+
+Implement client-side “viewed this session” behavior:
+
+* When a thread is selected, mark it as viewed in React state.
+* Hide or reduce unread badge for viewed threads during the current session.
+* If a new message arrives after the thread was viewed, show the unread/new indicator again.
+* This does not need to persist after page reload.
+
+Important:
+Clearly keep this as session-based unread behavior.
+Do not pretend it is permanent unread tracking.
+
+TASK 5 — NOTIFICATION / VISUAL POLISH
+
+Add:
+
+* “Live” or “Auto-refreshing every 30s” indicator
+* Last updated timestamp
+* New message pill/badge on thread rows
+* Gentle animation or highlight for newly updated thread rows
+* Empty state still works
+* Error state if polling fails, but do not destroy existing inbox view
+
+TASK 6 — OPTIONAL SAFE IMPROVEMENT
+
+If browser Notification API is simple and safe, do NOT implement it yet.
+Just leave a comment or note in final report as a future enhancement.
+
+TASK 7 — TESTING
+
+Test:
+
+1. /admin/crm/inbox loads.
+2. Polling starts after page load.
+3. Polling stops on unmount.
+4. Manual refresh works.
+5. Selected thread remains selected after refresh.
+6. Composer text is preserved during refresh.
+7. New messages update thread preview.
+8. Selected thread refreshes messages when new messages arrive.
+9. Viewed-session unread behavior works.
+10. No full-page loading flash during polling.
+11. Polling API failure does not crash page.
+12. /admin/crm/leads/:id still works.
+13. SMS compose still works.
+14. /admin/crm/dashboard still works.
+15. /admin/dashboard still works.
+16. No TypeScript errors except pre-existing unrelated issue.
+17. No console errors.
+18. No database migrations created.
+19. Twilio webhook routes untouched.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files inspected
+2. Files changed
+3. Polling behavior
+4. Manual refresh behavior
+5. Session-based unread behavior
+6. New-message indicator behavior
+7. Tests performed
+8. Confirmation no schema/database changes were made
+9. Confirmation Twilio webhook routes were not changed
+10. Known limitations
+11. Recommended next prompt
