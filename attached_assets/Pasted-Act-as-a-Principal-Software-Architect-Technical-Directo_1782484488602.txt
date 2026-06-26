@@ -1,0 +1,243 @@
+Act as a Principal Software Architect, Technical Director, CRM Architect, and Senior Full-Stack Engineer.
+
+PHASE 8 — Campaign Persistence & Send History
+
+PROJECT:
+Sitemint Digital CRM
+
+Current completed modules:
+
+* Discovery Portal
+* CRM Dashboard
+* Lead Health Engine
+* Workflow Engine
+* Communication Intelligence
+* DISC / Communication Style Engine
+* Campaign Builder Foundation
+* Personality-aware campaign preview
+* Safe campaign test-send
+* CRM Email Templates
+* Existing Resend integration
+
+OBJECTIVE:
+Add persistent campaign drafts and campaign history.
+
+This phase should NOT send bulk emails yet.
+This phase should NOT schedule campaigns yet.
+This phase should save campaign drafts, selected recipients, personalized versions, and test-send history safely.
+
+IMPORTANT:
+Do NOT rebuild Campaign Builder.
+Do NOT touch Twilio routes.
+Do NOT add real automation/scheduling yet.
+Do NOT send campaigns to selected audiences yet.
+Do NOT use auto schema sync.
+Use Drizzle Kit migrations properly.
+Review generated SQL before applying.
+Keep changes focused and reversible.
+
+TASK 1 — INSPECT EXISTING CAMPAIGN FOUNDATION
+
+Inspect:
+
+1. CrmCampaigns.tsx
+2. campaignPersonalization.ts
+3. Existing POST /api/crm/campaigns/test-send
+4. Existing email template system
+5. Existing crm_leads schema
+6. Existing activity logging patterns
+7. Drizzle schema/migration setup
+
+Report what can be reused before coding.
+
+TASK 2 — DATABASE SCHEMA
+
+Create campaign persistence tables with Drizzle migration only.
+
+Table: crm_campaigns
+
+Fields:
+
+* id
+* name
+* subject
+* body
+* status default "draft"
+* created_at default now()
+* updated_at default now()
+
+Allowed statuses:
+
+* draft
+* ready
+* archived
+
+Table: crm_campaign_recipients
+
+Fields:
+
+* id
+* campaign_id references crm_campaigns(id) on delete cascade
+* lead_id references crm_leads(id) on delete cascade
+* status default "selected"
+* disc_style_used
+* personalized_subject
+* personalized_body
+* created_at default now()
+* sent_at nullable
+
+Allowed recipient statuses:
+
+* selected
+* test_previewed
+* sent
+* skipped
+* failed
+
+Important:
+No scheduling fields yet.
+No automation fields yet.
+No bulk send execution yet.
+
+TASK 3 — BACKEND API
+
+Create protected campaign endpoints:
+
+GET /api/crm/campaigns
+
+* list campaigns
+* include recipient count if easy
+
+POST /api/crm/campaigns
+
+* create draft campaign
+* save name, subject, body, status
+
+GET /api/crm/campaigns/:id
+
+* return campaign details
+* return recipients with lead info and personalization details
+
+PATCH /api/crm/campaigns/:id
+
+* update name, subject, body, status
+
+DELETE /api/crm/campaigns/:id
+
+* delete campaign and cascade recipients
+
+POST /api/crm/campaigns/:id/recipients
+
+* replace selected recipients for this campaign
+* accepts lead IDs
+* computes or receives personalized subject/body and DISC style
+* stores personalized versions for history
+
+POST /api/crm/campaigns/:id/test-send
+
+* test-send using the persisted campaign
+* send only to manually entered test email
+* never send to selected recipients
+* log test-send result if existing logging pattern allows
+
+Keep existing:
+POST /api/crm/campaigns/test-send
+working for non-persisted drafts.
+
+TASK 4 — FRONTEND CAMPAIGN BUILDER UPDATE
+
+Update /admin/crm/campaigns.
+
+Add:
+
+1. Save Draft button
+2. Save & Continue button
+3. Load Existing Campaign panel
+4. Campaign status badge
+5. Unsaved changes indicator
+6. Last saved timestamp
+7. Delete draft action with confirmation
+
+Behavior:
+
+* Admin can create a campaign draft.
+* Admin can select leads.
+* Admin can save selected recipients and personalized versions.
+* Admin can reload the campaign and see the same draft/recipients.
+* Admin can continue editing.
+* Admin can test-send from saved or unsaved campaign.
+
+TASK 5 — CAMPAIGN HISTORY VIEW
+
+On /admin/crm/campaigns, add a Campaign History / Drafts section.
+
+Show:
+
+* campaign name
+* status
+* created date
+* updated date
+* recipient count
+* actions:
+
+  * Open
+  * Duplicate if easy
+  * Delete
+
+Do not build analytics yet.
+Do not build send results yet beyond recipient status.
+
+TASK 6 — SAFETY GUARDS
+
+Add clear warnings:
+
+* “Bulk sending is disabled in this phase.”
+* “Test send only sends to the manually entered test email.”
+* “Selected recipients are saved for preview/history only.”
+
+Prevent accidental bulk send:
+
+* No “Send Campaign” button yet.
+* No schedule button yet.
+* No backend endpoint that sends to all recipients.
+
+TASK 7 — TESTING
+
+Test:
+
+1. Migration generated and applied correctly.
+2. /admin/crm/campaigns loads.
+3. Create new draft.
+4. Save draft.
+5. Edit draft.
+6. Reload saved draft.
+7. Select recipients.
+8. Save recipients.
+9. Personalized subject/body saved per recipient.
+10. Campaign history lists draft.
+11. Open saved campaign.
+12. Delete campaign cascades recipients.
+13. Test-send still works.
+14. Existing non-persisted test-send still works.
+15. No bulk send endpoint exists.
+16. Lead Detail email still works.
+17. Email Templates still work.
+18. Dashboard still works.
+19. Twilio routes untouched.
+20. No TypeScript errors except pre-existing unrelated issue.
+21. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Migration created
+4. Tables created
+5. APIs added
+6. Campaign Builder persistence behavior
+7. Campaign History behavior
+8. Safety guards
+9. Tests performed
+10. Known limitations
+11. Recommended Prompt 17

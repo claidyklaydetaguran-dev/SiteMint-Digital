@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
@@ -379,6 +379,175 @@ router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete template" });
+  }
+});
+
+// ── Campaign CRUD ─────────────────────────────────────────────────────────────
+
+router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const list = await db.select().from(crmCampaigns).orderBy(desc(crmCampaigns.updatedAt));
+    // Attach recipient counts
+    const counts = await db
+      .select({ campaignId: crmCampaignRecipients.campaignId, count: sql<number>`count(*)::int` })
+      .from(crmCampaignRecipients)
+      .groupBy(crmCampaignRecipients.campaignId);
+    const countMap = new Map(counts.map(c => [c.campaignId, c.count]));
+    const campaigns = list.map(c => ({ ...c, recipientCount: countMap.get(c.id) ?? 0 }));
+    res.json({ campaigns });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching campaigns");
+    res.status(500).json({ error: "Failed to fetch campaigns" });
+  }
+});
+
+router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { name, subject, body, status } = req.body as Record<string, string>;
+    if (!name || !subject || !body) {
+      res.status(400).json({ error: "name, subject, and body are required" }); return;
+    }
+    const allowed = ["draft","ready","archived"];
+    const safeStatus = allowed.includes(status) ? status : "draft";
+    const [campaign] = await db.insert(crmCampaigns)
+      .values({ name, subject, body, status: safeStatus })
+      .returning();
+    res.status(201).json({ campaign });
+  } catch (err) {
+    req.log.error({ err }, "Error creating campaign");
+    res.status(500).json({ error: "Failed to create campaign" });
+  }
+});
+
+router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+    const recipients = await db
+      .select({
+        id: crmCampaignRecipients.id,
+        leadId: crmCampaignRecipients.leadId,
+        status: crmCampaignRecipients.status,
+        discStyleUsed: crmCampaignRecipients.discStyleUsed,
+        personalizedSubject: crmCampaignRecipients.personalizedSubject,
+        personalizedBody: crmCampaignRecipients.personalizedBody,
+        sentAt: crmCampaignRecipients.sentAt,
+        leadName: crmLeads.name,
+        leadEmail: crmLeads.email,
+        leadCompany: crmLeads.company,
+      })
+      .from(crmCampaignRecipients)
+      .innerJoin(crmLeads, eq(crmCampaignRecipients.leadId, crmLeads.id))
+      .where(eq(crmCampaignRecipients.campaignId, id));
+    res.json({ campaign, recipients });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching campaign");
+    res.status(500).json({ error: "Failed to fetch campaign" });
+  }
+});
+
+router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { name, subject, body, status } = req.body as Record<string, string>;
+    const allowed = ["draft","ready","archived"];
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (name)   updates.name    = name;
+    if (subject) updates.subject = subject;
+    if (body)   updates.body    = body;
+    if (status && allowed.includes(status)) updates.status = status;
+    const [updated] = await db.update(crmCampaigns).set(updates).where(eq(crmCampaigns.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Campaign not found" }); return; }
+    res.json({ campaign: updated });
+  } catch (err) {
+    req.log.error({ err }, "Error updating campaign");
+    res.status(500).json({ error: "Failed to update campaign" });
+  }
+});
+
+router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    await db.delete(crmCampaigns).where(eq(crmCampaigns.id, id)); // cascade deletes recipients
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting campaign");
+    res.status(500).json({ error: "Failed to delete campaign" });
+  }
+});
+
+// Replace all recipients for a campaign (upsert pattern)
+router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { recipients } = req.body as {
+      recipients: Array<{
+        leadId: number;
+        discStyleUsed?: string;
+        personalizedSubject?: string;
+        personalizedBody?: string;
+      }>;
+    };
+    if (!Array.isArray(recipients)) {
+      res.status(400).json({ error: "recipients array required" }); return;
+    }
+    // Delete existing then re-insert
+    await db.delete(crmCampaignRecipients).where(eq(crmCampaignRecipients.campaignId, id));
+    if (recipients.length > 0) {
+      await db.insert(crmCampaignRecipients).values(
+        recipients.map(r => ({
+          campaignId: id,
+          leadId: r.leadId,
+          status: "selected" as const,
+          discStyleUsed: r.discStyleUsed ?? null,
+          personalizedSubject: r.personalizedSubject ?? null,
+          personalizedBody: r.personalizedBody ?? null,
+        })),
+      );
+    }
+    // Bump campaign updatedAt
+    await db.update(crmCampaigns).set({ updatedAt: new Date() }).where(eq(crmCampaigns.id, id));
+    res.json({ ok: true, count: recipients.length });
+  } catch (err) {
+    req.log.error({ err }, "Error saving campaign recipients");
+    res.status(500).json({ error: "Failed to save recipients" });
+  }
+});
+
+// Per-campaign test send (uses persisted campaign data)
+router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { to } = req.body as { to?: string };
+    if (!to) { res.status(400).json({ error: "to is required" }); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      res.status(400).json({ error: "Invalid test email address" }); return;
+    }
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    if (!isTestMode) {
+      const resend = getResend();
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
+        to: [to],
+        subject: `[TEST] ${campaign.subject}`,
+        html: campaign.body.replace(/\n/g, "<br>"),
+      });
+    }
+
+    req.log.info({ to, campaignId: id, testMode: isTestMode }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: isTestMode, to });
+  } catch (err) {
+    req.log.error({ err }, "Error sending campaign test email");
+    res.status(500).json({ error: "Failed to send test email" });
   }
 });
 
