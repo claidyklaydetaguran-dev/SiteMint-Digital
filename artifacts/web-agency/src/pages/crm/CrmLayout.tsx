@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 const tok = () => localStorage.getItem("adminToken") || "";
 
 const NAV_ITEMS = [
-  { href: "/admin/crm", label: "Dashboard", exact: true },
+  { href: "/admin/crm/dashboard", label: "Dashboard" },
   { href: "/admin/crm/leads", label: "People" },
   { href: "/admin/crm/inbox", label: "Inbox" },
   { href: "/admin/crm/tasks", label: "Tasks" },
@@ -867,10 +867,10 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* Nav items */}
         <div className="flex items-center h-full overflow-x-auto no-scrollbar">
-          {NAV_ITEMS.map(({ href, label, exact }) => (
+          {NAV_ITEMS.map(({ href, label }) => (
             <Link key={href} href={href}>
               <button className={`h-12 px-3 text-[13px] font-medium whitespace-nowrap transition-colors relative shrink-0 ${
-                isActive(href, exact)
+                isActive(href)
                   ? "text-white after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-blue-400 after:rounded-full"
                   : "text-white/55 hover:text-white/90"
               }`}>

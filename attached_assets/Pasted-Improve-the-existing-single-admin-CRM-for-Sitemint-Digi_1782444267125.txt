@@ -1,0 +1,277 @@
+Improve the existing single-admin CRM for Sitemint Digital.
+
+IMPORTANT CONTEXT:
+This is NOT a multi-tenant CRM.
+This is a single-admin CRM for our internal Sitemint Digital website/admin system.
+
+Current CRM:
+https://sitemintdigital.com/admin/crm
+
+Do not rebuild the entire app.
+Inspect the existing CRM, preserve what works, fix what is broken, and improve the structure carefully.
+Use Drizzle Kit migrations only for database changes.
+Do not use auto schema sync.
+
+MAIN ROUTING FIX:
+After successful login, redirect the admin to:
+
+/admin/crm/dashboard
+
+or if that route does not exist yet, create it and make it the main CRM landing page.
+
+Deep-linking should still work:
+
+* If the admin directly visits /admin/crm/leads/5 while logged out, after login they should return to /admin/crm/leads/5.
+* But normal login from the login page should go to /admin/crm/dashboard.
+* Do not send users to the old submissions dashboard after login.
+
+PHASE 1 — EXECUTIVE CRM DASHBOARD
+
+Build the main dashboard page for:
+
+/admin/crm/dashboard
+
+Use recharts and shadcn/ui components.
+
+Create three dashboard sections:
+
+1. Big Number Stat Grid
+   Display:
+
+* Total Revenue
+* Active Leads
+* Win Rate
+* Open Deals
+* Won Deals
+* Lost Deals
+
+2. Sales Pipeline Distribution Bar Chart
+   Show deal count and/or deal value grouped by stage:
+
+* Lead
+* Qualified
+* Proposal
+* Won
+* Lost
+
+3. Monthly Performance Line Chart
+   Track won deal values over time by month.
+
+Important:
+Dashboard data should update when deals are created, edited, deleted, or moved on the Kanban board.
+If true real-time is not already implemented, use clean refetching/state invalidation after mutations.
+
+PHASE 2 — DEALS PIPELINE / KANBAN BOARD
+
+Create a Deals table linked to contacts.
+
+Database table: deals
+
+Fields:
+
+* id UUID primary key
+* contact_id UUID nullable or not null depending on current CRM structure
+* name text not null
+* value numeric default 0
+* stage text not null default 'Lead'
+* close_date date nullable
+* created_at timestamp default now()
+* updated_at timestamp default now()
+
+Allowed stages:
+
+* Lead
+* Qualified
+* Proposal
+* Won
+* Lost
+
+Use a proper Drizzle migration.
+
+Build a beautiful drag-and-drop Kanban board at:
+
+/admin/crm/deals
+
+Use either:
+
+* @hello-pangea/dnd
+  or
+* simple HTML5 drag-and-drop if dependency issues happen.
+
+Kanban Requirements:
+
+* One column per stage
+* Deal cards inside each stage
+* Drag deal cards between stages
+* Updating stage should persist to the database
+* Each stage column should show:
+
+  * total number of deals
+  * total deal value
+  * average deal value if easy to add
+* Smooth UI interactions
+* Loading states
+* Empty states
+* Error states
+* Mobile responsive fallback
+
+Deal Card Should Show:
+
+* Deal name
+* Linked contact name if available
+* Deal value
+* Close date
+* Stage badge
+
+API Routes Needed:
+
+* GET /api/crm/deals
+* POST /api/crm/deals
+* PATCH /api/crm/deals/:id
+* DELETE /api/crm/deals/:id
+* PATCH /api/crm/deals/:id/stage
+
+Make sure all routes are protected by admin authentication.
+
+PHASE 3 — CONTACT ACTIVITY TIMELINE
+
+Create an Activities table linked to contacts.
+
+Database table: activities
+
+Fields:
+
+* id UUID primary key
+* contact_id UUID not null references contacts(id) on delete cascade
+* type text not null
+* content text not null
+* created_at timestamp default now()
+
+Allowed activity types:
+
+* Call
+* Email
+* Meeting
+* Note
+* Status Change
+
+Build this into the Contact Detail page:
+
+/admin/crm/contacts/:id
+
+or use the existing lead/contact detail route if already present.
+
+Activity Timeline Requirements:
+
+* Chronological feed, newest first
+* Activity icon based on type
+* Timestamp
+* Activity content
+* Clean card-based timeline design
+* Empty state if no activities exist
+
+Quick Log Form:
+At the top of the contact detail page, add a quick activity form with:
+
+* Activity type dropdown
+* Content textarea
+* Submit button
+
+Also allow quick status updates:
+
+* Change contact/lead status
+* When status changes, automatically create a “Status Change” activity entry
+
+API Routes Needed:
+
+* GET /api/crm/contacts/:id/activities
+* POST /api/crm/contacts/:id/activities
+* PATCH /api/crm/contacts/:id/status
+
+PHASE 4 — UI / NAVIGATION IMPROVEMENTS
+
+Update CRM sidebar navigation to include:
+
+* Dashboard
+* Leads / Contacts
+* Deals
+* Activities if needed
+* Settings
+* Logout
+
+Dashboard should be the default CRM landing page.
+
+Use a clean modern CRM aesthetic:
+
+* dark navy / zinc sidebar
+* rich indigo accents
+* clean white or soft-zinc content area
+* rounded cards
+* subtle borders
+* premium SaaS dashboard feel
+* responsive layout
+
+PHASE 5 — TESTING AND BUG FIXES
+
+Before final output, test these flows:
+
+Login / Routing:
+
+* Normal login goes to /admin/crm/dashboard
+* Deep-link login returns to the originally requested CRM page
+* Logout works
+* Unauthenticated users cannot access CRM pages
+
+Dashboard:
+
+* Total Revenue calculates from won deals
+* Active Leads calculates from Lead / Qualified / Proposal stages
+* Win Rate calculates correctly
+* Charts render without crashing
+* Dashboard does not show blank screen
+
+Deals:
+
+* Deal can be created
+* Deal can be edited
+* Deal can be deleted
+* Deal can be dragged between stages
+* Stage update persists after refresh
+* Aggregate values update correctly
+
+Activities:
+
+* Activity can be added to a contact
+* Timeline displays activities correctly
+* Status change creates an activity entry
+* Contact detail page does not crash if no activities exist
+
+Technical:
+
+* No TypeScript errors
+* No console errors
+* No broken imports
+* No database auto-sync
+* Migration files are created properly
+* Existing public website pages are not broken
+
+FINAL RESPONSE REQUIRED:
+
+After completing changes, report:
+
+1. What was fixed
+2. What was added
+3. Files changed
+4. Database migrations created
+5. How to test
+6. Any known limitations
+7. Recommended next phase
+
+Recommended next phase after this:
+
+* Email/SMS logging
+* Follow Up Boss-style call/text integration
+* Lead source tracking
+* Task reminders
+* Import/export contacts
+* Team permissions if needed later

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { getResend } from "../lib/email.js";
@@ -466,6 +466,118 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
   } catch (err) {
     req.log.error({ err }, "Error importing discovery submissions");
     res.status(500).json({ error: "Failed to import" });
+  }
+});
+
+// ── Deals ─────────────────────────────────────────────────────────────────────
+router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const deals = await db.select().from(crmDeals);
+    const wonDeals = deals.filter(d => d.stage === "Won");
+    const lostDeals = deals.filter(d => d.stage === "Lost");
+    const openDeals = deals.filter(d => !["Won", "Lost"].includes(d.stage));
+    const totalRevenue = wonDeals.reduce((s, d) => s + Number(d.value), 0);
+    const winRate = (wonDeals.length + lostDeals.length) > 0
+      ? Math.round((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100)
+      : 0;
+
+    const stageOrder = ["Lead", "Qualified", "Proposal", "Won", "Lost"];
+    const pipeline = stageOrder.map(stage => {
+      const stageDeals = deals.filter(d => d.stage === stage);
+      const total = stageDeals.reduce((s, d) => s + Number(d.value), 0);
+      return { stage, count: stageDeals.length, total };
+    });
+
+    const monthlyMap = new Map<string, number>();
+    wonDeals.forEach(d => {
+      const m = new Date(d.createdAt).toISOString().substring(0, 7);
+      monthlyMap.set(m, (monthlyMap.get(m) || 0) + Number(d.value));
+    });
+    const now = new Date();
+    const monthly = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const key = d.toISOString().substring(0, 7);
+      return { month: d.toLocaleString("en-US", { month: "short" }), revenue: monthlyMap.get(key) || 0 };
+    });
+
+    const activeLeads = await db.select({ count: sql<number>`count(*)` }).from(crmLeads)
+      .where(sql`status NOT IN ('Won', 'Lost')`).then(r => Number(r[0].count));
+
+    res.json({
+      totalRevenue, winRate, activeLeads,
+      openDeals: openDeals.length, wonDeals: wonDeals.length, lostDeals: lostDeals.length,
+      pipeline, monthly,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching deals stats");
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const deals = await db.select().from(crmDeals).orderBy(desc(crmDeals.createdAt));
+    const leadsMap = new Map<number, string>();
+    const leads = await db.select({ id: crmLeads.id, name: crmLeads.name }).from(crmLeads);
+    leads.forEach(l => leadsMap.set(l.id, l.name));
+    const enriched = deals.map(d => ({
+      ...d,
+      leadName: d.leadId ? leadsMap.get(d.leadId) ?? null : null,
+    }));
+    res.json({ deals: enriched });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching deals");
+    res.status(500).json({ error: "Failed to fetch deals" });
+  }
+});
+
+router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number>;
+    if (!name) { res.status(400).json({ error: "Name is required" }); return; }
+    const [deal] = await db.insert(crmDeals).values({
+      name: String(name),
+      value: value ? String(value) : "0",
+      stage: String(stage || "Lead"),
+      closeDate: closeDate ? String(closeDate) : null,
+      notes: notes ? String(notes) : null,
+      leadId: leadId ? Number(leadId) : null,
+    }).returning();
+    res.json({ deal });
+  } catch (err) {
+    req.log.error({ err }, "Error creating deal");
+    res.status(500).json({ error: "Failed to create deal" });
+  }
+});
+
+router.patch("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number | null>;
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (value !== undefined) updates.value = String(value);
+    if (stage !== undefined) updates.stage = stage;
+    if (closeDate !== undefined) updates.closeDate = closeDate || null;
+    if (notes !== undefined) updates.notes = notes;
+    if (leadId !== undefined) updates.leadId = leadId ? Number(leadId) : null;
+    const [deal] = await db.update(crmDeals).set(updates).where(eq(crmDeals.id, id)).returning();
+    if (!deal) { res.status(404).json({ error: "Deal not found" }); return; }
+    res.json({ deal });
+  } catch (err) {
+    req.log.error({ err }, "Error updating deal");
+    res.status(500).json({ error: "Failed to update deal" });
+  }
+});
+
+router.delete("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    await db.delete(crmDeals).where(eq(crmDeals.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting deal");
+    res.status(500).json({ error: "Failed to delete deal" });
   }
 });
 

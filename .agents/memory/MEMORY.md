@@ -1,3 +1,4 @@
 - [SiteMint Discovery Portal](sitemint-discovery-portal.md) — Admin auth uses session token in memory; password via ADMIN_PASSWORD env var (default: sitemint2024); proposal/SOW generated as full HTML, stored in DB.
 - [Twilio CRM integration](twilio-crm.md) — full phone/SMS integration built; DB tables, backend routes, all frontend pages; needs env vars to activate
 - [CRM App.tsx constraints](crm-apptsx.md) — DO NOT fix ThankYou route TS error; DO NOT use nested routes in App.tsx with wouter
+- [CRM deals table](crm-deals.md) — separate crm_deals table (not crm_leads); stages: Lead/Qualified/Proposal/Won/Lost; integer leadId FK; /admin/crm/dashboard is the new landing page.

@@ -16,6 +16,7 @@ import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
 import CrmDashboard from "@/pages/crm/CrmDashboard";
+import CrmExecutiveDashboard from "@/pages/crm/CrmExecutiveDashboard";
 import CrmLeads from "@/pages/crm/CrmLeads";
 import CrmLeadDetail from "@/pages/crm/CrmLeadDetail";
 import CrmPipeline from "@/pages/crm/CrmPipeline";
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/admin/submissions/:id" component={AdminSubmissionDetail} />
 
       {/* CRM routes — ErrorBoundary is inside CrmLayout */}
+      <Route path="/admin/crm/dashboard" component={CrmExecutiveDashboard} />
       <Route path="/admin/crm" component={CrmDashboard} />
       <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
       <Route path="/admin/crm/leads" component={CrmLeads} />

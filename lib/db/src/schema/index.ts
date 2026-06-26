@@ -5,3 +5,4 @@ export * from "./crmActivities";
 export * from "./crmTasks";
 export * from "./crmEmailTemplates";
 export * from "./crmMessages";
+export * from "./crmDeals";
