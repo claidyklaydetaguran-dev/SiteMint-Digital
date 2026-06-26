@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, FileText, ClipboardList, Save, Printer, Copy, LogOut,
   Star, Tag, Package, Clock, DollarSign, User, Building, Mail, Phone,
-  CheckCircle2, AlertCircle
+  CheckCircle2, AlertCircle, ExternalLink, Loader2,
 } from "lucide-react";
 
 interface Submission {
@@ -137,6 +137,8 @@ export default function AdminSubmissionDetail() {
   const [generatingSOW, setGeneratingSOW] = useState(false);
   const [docModal, setDocModal] = useState<{ html: string; title: string } | null>(null);
   const [toast, setToast] = useState("");
+  const [crmLeadId, setCrmLeadId] = useState<number | null>(null);
+  const [sendingToCrm, setSendingToCrm] = useState(false);
 
   const token = localStorage.getItem("adminToken") || "";
 
@@ -157,6 +159,23 @@ export default function AdminSubmissionDetail() {
       setSubmission(data.submission);
       setStatus(data.submission.status);
       setNotes(data.submission.internalNotes || "");
+      // Check if this submission is already in CRM
+      try {
+        const crmRes = await fetch(
+          `/api/crm/leads?search=${encodeURIComponent(data.submission.email)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (crmRes.ok) {
+          const crmData = await crmRes.json() as { leads: { id: number; email: string; discoverySubmissionId: number | null }[] };
+          const match = crmData.leads.find(l =>
+            l.discoverySubmissionId === Number(params.id) ||
+            l.email.toLowerCase() === data.submission.email.toLowerCase()
+          );
+          if (match) setCrmLeadId(match.id);
+        }
+      } catch {
+        // non-critical — CRM check failure does not block the page
+      }
     } catch {
       setError("Failed to load submission.");
     } finally {
@@ -222,6 +241,27 @@ export default function AdminSubmissionDetail() {
       showToast("Failed to generate SOW.");
     } finally {
       setGeneratingSOW(false);
+    }
+  };
+
+  const sendToCrmLead = async () => {
+    setSendingToCrm(true);
+    try {
+      const res = await fetch(`/api/crm/import-discovery/${params.id}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json() as { imported: boolean; existing: boolean; leadId: number; message: string };
+      if (res.ok) {
+        setCrmLeadId(data.leadId);
+        showToast(data.existing ? "Already in CRM — linked above." : data.message);
+      } else {
+        showToast("Failed to send to CRM. Please try again.");
+      }
+    } catch {
+      showToast("Connection error. Please try again.");
+    } finally {
+      setSendingToCrm(false);
     }
   };
 
@@ -487,6 +527,46 @@ export default function AdminSubmissionDetail() {
                 <p className="text-xs text-muted-foreground text-center mt-3">
                   Use Print → Save as PDF in the viewer
                 </p>
+              </div>
+
+              {/* CRM Bridge Card */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-5 h-5 rounded bg-emerald-100 flex items-center justify-center">
+                    <ExternalLink className="w-3 h-3 text-emerald-600" />
+                  </span>
+                  <h3 className="font-serif font-bold text-sm text-foreground">CRM Lead</h3>
+                </div>
+                {crmLeadId ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      This submission is connected to CRM.
+                    </div>
+                    <Link href={`/admin/crm/leads/${crmLeadId}`}>
+                      <Button size="sm" variant="outline" className="w-full gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
+                        <ExternalLink className="w-3.5 h-3.5" /> View CRM Lead
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Convert this discovery submission into a CRM lead to begin sales follow-up.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={sendToCrmLead}
+                      disabled={sendingToCrm}
+                      className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                    >
+                      {sendingToCrm
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <ExternalLink className="w-3.5 h-3.5" />}
+                      {sendingToCrm ? "Sending to CRM…" : "Send to CRM"}
+                    </Button>
+                  </>
+                )}
               </div>
 
               <p className="text-xs text-muted-foreground text-center">

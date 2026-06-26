@@ -469,6 +469,70 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
   }
 });
 
+// ── Single submission import ───────────────────────────────────────────────────
+router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const subId = Number(req.params.id);
+    if (!subId) { res.status(400).json({ error: "Invalid submission id" }); return; }
+
+    const [sub] = await db.select().from(discoverySubmissions)
+      .where(eq(discoverySubmissions.id, subId)).limit(1);
+    if (!sub) { res.status(404).json({ error: "Submission not found" }); return; }
+
+    // Check for existing lead by discoverySubmissionId OR email
+    const [existing] = await db.select({ id: crmLeads.id })
+      .from(crmLeads)
+      .where(or(eq(crmLeads.discoverySubmissionId, subId), eq(crmLeads.email, sub.email)))
+      .limit(1);
+
+    if (existing) {
+      res.json({
+        imported: false,
+        existing: true,
+        leadId: existing.id,
+        message: "Submission is already connected to a CRM lead.",
+      });
+      return;
+    }
+
+    const score = sub.leadScore ?? 1;
+    const priority = score >= 8 ? "High" : score >= 5 ? "Medium" : "Low";
+
+    const [lead] = await db.insert(crmLeads).values({
+      name: sub.contactName,
+      email: sub.email,
+      company: sub.companyName,
+      phone: sub.phone ?? undefined,
+      source: "Discovery Form",
+      serviceInterest: sub.serviceInterest ?? undefined,
+      status: "New",
+      priority,
+      tags: sub.tags,
+      notes: sub.internalNotes ?? undefined,
+      packageType: sub.recommendedPackage ?? undefined,
+      discoverySubmissionId: sub.id,
+      discoveryFormStatus: "Completed",
+    }).returning();
+
+    await logActivity(
+      lead.id,
+      "lead_imported",
+      "Imported from Discovery Portal",
+      `${sub.companyName} — ${sub.contactName}${sub.serviceInterest ? ` · ${sub.serviceInterest}` : ""}`,
+    );
+
+    res.json({
+      imported: true,
+      existing: false,
+      leadId: lead.id,
+      message: `${sub.contactName} from ${sub.companyName} added to CRM.`,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error importing single discovery submission");
+    res.status(500).json({ error: "Failed to import submission" });
+  }
+});
+
 // ── Deals ─────────────────────────────────────────────────────────────────────
 router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response) => {
   try {

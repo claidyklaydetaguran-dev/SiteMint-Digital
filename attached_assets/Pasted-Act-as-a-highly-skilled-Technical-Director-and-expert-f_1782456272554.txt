@@ -1,0 +1,174 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+Task: Build the Discovery Portal → CRM single-submission conversion bridge.
+
+Current product structure:
+
+* /admin/dashboard is the Discovery Portal and main admin landing page.
+* /admin/crm/dashboard is the CRM command center.
+* Discovery Portal handles intake, proposals, and SOWs.
+* CRM handles leads, follow-ups, deals, activities, tasks, messages, and sales pipeline.
+
+IMPORTANT:
+Do NOT rebuild the Discovery Portal.
+Do NOT rebuild the CRM.
+Do NOT change database schema in this prompt.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Use the existing relationship:
+crm_leads.discovery_submission_id → discovery_submissions.id
+
+Existing API:
+POST /api/crm/import-discovery currently bulk-imports all discovery submissions.
+
+Goal:
+Create a clean single-submission conversion flow so one discovery submission can be sent into the CRM as a lead.
+
+TASK 1 — BACKEND SINGLE CONVERSION ENDPOINT
+
+Create a protected endpoint:
+
+POST /api/crm/import-discovery/:id
+
+Behavior:
+
+1. Find the discovery submission by id.
+2. If not found, return 404.
+3. Check if a CRM lead already exists by:
+
+   * discoverySubmissionId matching the submission id, OR
+   * same email if email exists.
+4. If an existing CRM lead is found, do not duplicate it.
+5. Return the existing lead with:
+
+   * imported: false
+   * existing: true
+   * leadId
+   * message: "Submission is already connected to a CRM lead."
+6. If no lead exists, create a new crm_leads record.
+
+Map fields:
+
+* contactName → name
+* companyName → company
+* email → email
+* phone → phone
+* serviceInterest → serviceInterest
+* tags → tags
+* internalNotes → notes
+* recommendedPackage → packageType
+* discovery submission id → discoverySubmissionId
+* source = "Discovery Form"
+* status = "New"
+* discoveryFormStatus = "Completed"
+
+Priority mapping:
+
+* leadScore >= 8 → High
+* leadScore >= 5 → Medium
+* otherwise Low
+
+After creating the lead:
+
+* Create a crm_activities record:
+  type: "lead_imported"
+  title: "Imported from Discovery Portal"
+  description: Include the submission company/name and service interest if available.
+  leadId: new lead id
+
+Return:
+{
+imported: true,
+existing: false,
+leadId,
+message
+}
+
+TASK 2 — ADMIN DASHBOARD UI
+
+In /admin/dashboard, add a clear conversion action for each discovery submission row/card:
+
+Button states:
+
+* "Send to CRM" if not imported
+* "In CRM ✓" if already imported
+* "View CRM Lead" if lead exists
+
+Behavior:
+
+* Clicking "Send to CRM" calls POST /api/crm/import-discovery/:id
+* On success, update the UI without full page reload if possible
+* Show success toast/message
+* Provide direct link to:
+  /admin/crm/leads/:leadId
+
+Important:
+If there is no existing direct reverse field on discovery_submissions, determine imported state by checking CRM leads matching discoverySubmissionId or email using existing APIs.
+Do not add a schema field in this prompt.
+
+TASK 3 — ADMIN SUBMISSION DETAIL UI
+
+On the discovery submission detail page, add a premium CRM bridge card:
+
+Title:
+"CRM Lead"
+
+States:
+
+1. Not imported:
+
+   * Show “Convert this discovery submission into a CRM lead.”
+   * Button: “Send to CRM”
+
+2. Imported/existing:
+
+   * Show “This submission is connected to CRM.”
+   * Button/link: “View CRM Lead”
+   * Link to /admin/crm/leads/:leadId
+
+TASK 4 — CRM LEAD DETAIL UI
+
+On /admin/crm/leads/:id:
+
+If lead.discoverySubmissionId exists, show a small polished link/card:
+"View Original Discovery Submission"
+
+Link to:
+/admin/submissions/:discoverySubmissionId
+
+Do not break the existing lead detail page.
+
+TASK 5 — TESTING
+
+Test these flows:
+
+1. Convert a new discovery submission to CRM.
+2. Confirm the new lead appears in /admin/crm/leads.
+3. Confirm the lead detail page works.
+4. Confirm “View Original Discovery Submission” works.
+5. Try converting the same submission twice.
+6. Confirm no duplicate lead is created.
+7. Try a submission with an email that already exists as a CRM lead.
+8. Confirm the existing lead is returned.
+9. Confirm activity log shows “Imported from Discovery Portal.”
+10. Confirm public website still works.
+11. Confirm /admin/dashboard still works.
+12. Confirm /admin/crm/dashboard still works.
+13. Confirm no TypeScript errors.
+14. Confirm no console errors.
+15. Confirm no database migrations were created.
+
+FINAL RESPONSE REQUIRED:
+
+After implementation, report:
+
+1. Files changed
+2. API endpoint added
+3. Field mapping used
+4. Duplicate prevention logic
+5. UI changes in Discovery Portal
+6. UI changes in CRM Lead Detail
+7. Tests performed
+8. Confirmation that no schema/database changes were made
+9. Known limitations
+10. Recommended next prompt

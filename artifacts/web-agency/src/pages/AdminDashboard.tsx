@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, TrendingUp, FileText, Star, LogOut, ExternalLink,
   Search, RefreshCw, ChevronRight, LayoutDashboard, ArrowRight,
-  Zap, Trophy,
+  Zap, Trophy, CheckCircle2, Loader2,
 } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 
@@ -67,6 +67,13 @@ interface CrmStats {
   won: number;
 }
 
+interface CrmImportResult {
+  imported: boolean;
+  existing: boolean;
+  leadId: number;
+  message: string;
+}
+
 export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -75,16 +82,26 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [error, setError] = useState("");
   const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
+  const [crmSubMap, setCrmSubMap] = useState<Record<number, number>>({});
+  const [crmEmailMap, setCrmEmailMap] = useState<Record<string, number>>({});
+  const [importingId, setImportingId] = useState<number | null>(null);
+  const [importToast, setImportToast] = useState("");
 
   const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : "";
+
+  const showImportToast = (msg: string) => {
+    setImportToast(msg);
+    setTimeout(() => setImportToast(""), 4000);
+  };
 
   const load = useCallback(async () => {
     if (!token) { navigate("/admin"); return; }
     setLoading(true);
     try {
-      const [res, statsRes] = await Promise.all([
+      const [res, statsRes, leadsRes] = await Promise.all([
         fetch("/api/admin/submissions", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/crm/stats", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       if (res.status === 401) { localStorage.removeItem("adminToken"); navigate("/admin"); return; }
       if (!res.ok) throw new Error("Failed to load");
@@ -94,12 +111,45 @@ export default function AdminDashboard() {
         const sd = await statsRes.json() as { stats: CrmStats };
         setCrmStats(sd.stats);
       }
+      if (leadsRes.ok) {
+        const ld = await leadsRes.json() as { leads: { id: number; email: string; discoverySubmissionId: number | null }[] };
+        const subMap: Record<number, number> = {};
+        const emailMap: Record<string, number> = {};
+        ld.leads.forEach(l => {
+          if (l.discoverySubmissionId) subMap[l.discoverySubmissionId] = l.id;
+          emailMap[l.email.toLowerCase()] = l.id;
+        });
+        setCrmSubMap(subMap);
+        setCrmEmailMap(emailMap);
+      }
     } catch {
       setError("Failed to load submissions.");
     } finally {
       setLoading(false);
     }
   }, [token, navigate]);
+
+  const sendToCrm = async (submissionId: number) => {
+    if (!token) return;
+    setImportingId(submissionId);
+    try {
+      const res = await fetch(`/api/crm/import-discovery/${submissionId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json() as CrmImportResult;
+      if (res.ok) {
+        setCrmSubMap(prev => ({ ...prev, [submissionId]: data.leadId }));
+        showImportToast(data.existing ? "Already in CRM — navigating to lead." : data.message);
+      } else {
+        showImportToast("Failed to send to CRM. Please try again.");
+      }
+    } catch {
+      showImportToast("Connection error. Please try again.");
+    } finally {
+      setImportingId(null);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -124,6 +174,12 @@ export default function AdminDashboard() {
   }).length;
 
   return (
+    <>
+      {importToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> {importToast}
+        </div>
+      )}
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
       <header className="bg-foreground text-background px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
@@ -252,7 +308,7 @@ export default function AdminDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {["Client", "Company", "Industry", "Service", "Budget", "Score", "Status", "Date", ""].map(h => (
+                    {["Client", "Company", "Industry", "Service", "Budget", "Score", "Status", "Date", "CRM", ""].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -273,6 +329,37 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
                         {new Date(s.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {(() => {
+                          const leadId = crmSubMap[s.id] ?? crmEmailMap[s.email.toLowerCase()];
+                          if (leadId) {
+                            return (
+                              <Link href={`/admin/crm/leads/${leadId}`}>
+                                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-semibold">
+                                  <CheckCircle2 className="w-3 h-3" /> In CRM
+                                </Button>
+                              </Link>
+                            );
+                          }
+                          if (importingId === s.id) {
+                            return (
+                              <Button size="sm" variant="ghost" disabled className="gap-1 text-xs h-7">
+                                <Loader2 className="w-3 h-3 animate-spin" /> Sending…
+                              </Button>
+                            );
+                          }
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs h-7 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => sendToCrm(s.id)}
+                            >
+                              Send to CRM
+                            </Button>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         <Link href={`/admin/submissions/${s.id}`}>
@@ -297,5 +384,6 @@ export default function AdminDashboard() {
         </p>
       </main>
     </div>
+    </>
   );
 }
