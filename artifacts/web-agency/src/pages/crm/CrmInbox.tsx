@@ -79,7 +79,7 @@ export default function CrmInbox() {
   const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } })
       .then(r => r.json())
       .then(d => {

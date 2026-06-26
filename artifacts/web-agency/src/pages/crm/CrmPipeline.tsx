@@ -35,9 +35,9 @@ export default function CrmPipeline() {
   const [movingId, setMovingId] = useState<number|null>(null);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const r = await fetch("/api/crm/pipeline", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate("/admin"); return; }
+    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const d = await r.json() as { pipeline: Record<string,Lead[]> };
     setPipeline(d.pipeline || {});
     setLoading(false);

@@ -36,7 +36,7 @@ export default function CrmCalendar() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     Promise.all([
       fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),
       fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, TrendingUp, FileText, Star, LogOut, ExternalLink,
   Search, RefreshCw, ChevronRight, LayoutDashboard, ArrowRight,
+  Zap, Trophy,
 } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 
@@ -59,6 +60,13 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${colors[status] || "bg-gray-100 text-gray-700 border-gray-200"}`}>{status}</span>;
 }
 
+interface CrmStats {
+  total: number;
+  newLeads: number;
+  hotLeads: number;
+  won: number;
+}
+
 export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -66,6 +74,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [error, setError] = useState("");
+  const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : "";
 
@@ -73,13 +82,18 @@ export default function AdminDashboard() {
     if (!token) { navigate("/admin"); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/submissions", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [res, statsRes] = await Promise.all([
+        fetch("/api/admin/submissions", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/crm/stats", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
       if (res.status === 401) { localStorage.removeItem("adminToken"); navigate("/admin"); return; }
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json() as { submissions: Submission[] };
       setSubmissions(data.submissions);
+      if (statsRes.ok) {
+        const sd = await statsRes.json() as { stats: CrmStats };
+        setCrmStats(sd.stats);
+      }
     } catch {
       setError("Failed to load submissions.");
     } finally {
@@ -151,6 +165,53 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
             </div>
           ))}
+        </div>
+
+        {/* CRM Module Card */}
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-gray-900 via-gray-800 to-emerald-900 shadow-lg overflow-hidden">
+          <div className="px-6 py-5 sm:px-8 sm:py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <LayoutDashboard className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="text-base font-bold text-white">Sitemint CRM</h2>
+                    <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase tracking-wide">Active</span>
+                  </div>
+                  <p className="text-sm text-gray-400 leading-relaxed max-w-lg">
+                    Manage leads, deals, activities, pipeline, messages, tasks, and sales performance.
+                  </p>
+                </div>
+              </div>
+              <Link href="/admin/crm/dashboard" className="shrink-0">
+                <Button className="bg-emerald-500 hover:bg-emerald-400 text-white border-0 gap-2 shadow-md px-5 h-10 font-semibold whitespace-nowrap">
+                  Open Sitemint CRM
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+
+            {crmStats && (
+              <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Active Leads", value: crmStats.total, icon: Users, color: "text-blue-400" },
+                  { label: "New This Week", value: crmStats.newLeads, icon: Zap, color: "text-yellow-400" },
+                  { label: "Hot Leads", value: crmStats.hotLeads, icon: TrendingUp, color: "text-orange-400" },
+                  { label: "Won", value: crmStats.won, icon: Trophy, color: "text-emerald-400" },
+                ].map(({ label, value, icon: Icon, color }) => (
+                  <div key={label} className="flex items-center gap-2.5">
+                    <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                    <div>
+                      <p className="text-lg font-bold text-white leading-none">{value}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Table */}

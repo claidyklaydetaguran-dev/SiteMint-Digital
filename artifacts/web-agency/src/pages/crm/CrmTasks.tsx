@@ -34,10 +34,10 @@ export default function CrmTasks() {
   const [tab, setTab] = useState<TabFilter>("due-today");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
     const r = await fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate("/admin"); return; }
+    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const d = await r.json() as { tasks: Task[] };
     setTasks(d.tasks || []);
     setLoading(false);

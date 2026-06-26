@@ -88,7 +88,7 @@ export default function CrmReporting() {
   const [tab, setTab] = useState("overview");
 
   useEffect(() => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     fetch("/api/crm/stats", { headers: { Authorization: `Bearer ${token()}` } })
       .then(r => r.json())
       .then(d => setStats(d.stats));

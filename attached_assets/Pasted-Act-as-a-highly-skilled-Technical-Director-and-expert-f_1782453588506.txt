@@ -1,0 +1,189 @@
+Act as a highly skilled Technical Director and expert full-stack software engineer.
+
+We need to correct the admin login and CRM routing behavior based on the current product direction.
+
+IMPORTANT CONTEXT:
+This is the Sitemint Digital internal admin system.
+The Discovery Portal should be the main landing page after normal admin login.
+The CRM is a secondary module accessible through an enhanced CRM button/card inside the Discovery Portal.
+
+Do NOT rebuild the CRM.
+Do NOT rebuild the Discovery Portal.
+Do NOT change the database schema.
+Do NOT use auto schema sync.
+Do NOT touch Twilio webhook routes.
+Do NOT delete working CRM pages.
+
+CURRENT DESIRED ROUTING:
+
+1. Normal admin login should go to the Discovery Portal, not CRM.
+2. The Discovery Portal should have a clear, enhanced CRM button/card that opens:
+   /admin/crm/dashboard
+3. If someone deep-links directly to a protected CRM route while logged out, preserve that destination after login.
+4. /admin/crm should redirect to:
+   /admin/crm/dashboard
+5. CRM internal navigation should stay inside CRM.
+6. Discovery Portal and CRM should feel connected but not confused.
+
+TASK 1 — AUDIT CURRENT LOGIN REDIRECT
+
+Inspect the current admin login flow.
+
+Find:
+
+* Where successful login redirects now
+* Whether redirect query params are supported
+* Whether normal login goes to Discovery Portal
+* Whether old submissions dashboard is still acting as the default
+* Whether CRM deep-link redirects are preserved
+
+Do not change anything until this is understood.
+
+TASK 2 — IMPLEMENT CORRECT LOGIN BEHAVIOR
+
+Implement this exact behavior:
+
+A. Normal login:
+When the admin signs in normally from /admin with no redirect query param, send them to the Discovery Portal.
+
+Use the current Discovery Portal route if it already exists.
+
+If the route is currently:
+
+* /admin/dashboard
+  then keep that as the normal login landing route.
+
+Do not redirect normal login to:
+
+* /admin/crm
+* /admin/crm/dashboard
+  unless there is an explicit redirect query param.
+
+B. Deep-link login:
+If admin visits a protected CRM route while logged out, redirect to:
+
+/admin?redirect=<encoded-current-path>
+
+Example:
+Unauthenticated visit:
+/admin/crm/leads/5
+
+Redirect to:
+/admin?redirect=%2Fadmin%2Fcrm%2Fleads%2F5
+
+After successful login, send them to:
+/admin/crm/leads/5
+
+C. CRM root:
+If user visits:
+/admin/crm
+
+Redirect them to:
+/admin/crm/dashboard
+
+TASK 3 — UPDATE CRM PAGE AUTH REDIRECTS SAFELY
+
+For CRM pages that redirect unauthenticated users to /admin, update them to preserve the current route.
+
+Use this behavior:
+navigate("/admin?redirect=" + encodeURIComponent(window.location.pathname))
+
+Apply this only to CRM-protected pages, including:
+
+* CrmTasks
+* CrmReporting
+* CrmCalendar
+* CrmEmailTemplates
+* CrmDeals
+* CrmPipeline
+* CrmInbox
+* CrmSettings
+* Any CRM page with an auth guard that currently loses the destination
+
+Do not change public website routes.
+
+TASK 4 — ENHANCE CRM BUTTON IN DISCOVERY PORTAL
+
+Find the Discovery Portal/admin landing page.
+
+Enhance the CRM access button/card.
+
+Requirements:
+
+* Make it visually clear and premium
+* Label it something like:
+  “Open Sitemint CRM”
+* Add supporting text:
+  “Manage leads, deals, activities, pipeline, messages, tasks, and sales performance.”
+* Link directly to:
+  /admin/crm/dashboard
+* Add an icon if existing icon library is available
+* Add hover state
+* Make it stand out as a primary admin action
+* Do not remove existing discovery submissions functionality
+
+Optional if easy:
+Show a small CRM summary badge/card if existing CRM stats endpoint is already available:
+
+* Active leads
+* Open deals
+* Won revenue
+
+But do not create new APIs just for this in this prompt.
+
+TASK 5 — KEEP DISCOVERY PORTAL AS ADMIN HOME
+
+Make sure:
+
+* /admin/dashboard remains the Discovery Portal/admin home if that is the current route.
+* Normal login lands there.
+* CRM button takes user to /admin/crm/dashboard.
+* Logout still works.
+* Returning from CRM to admin home is clear if the layout already supports it.
+
+TASK 6 — TESTING
+
+Test:
+
+Login:
+
+1. Normal login from /admin goes to Discovery Portal/admin dashboard.
+2. Login with redirect=/admin/crm/dashboard goes to CRM dashboard.
+3. Login with redirect=/admin/crm/leads/5 goes to that lead detail route.
+4. Logout works.
+
+Routes:
+5. /admin/crm redirects to /admin/crm/dashboard.
+6. /admin/crm/dashboard loads.
+7. /admin/crm/deals loads.
+8. /admin/crm/leads loads.
+9. /admin/dashboard or the existing Discovery Portal route loads.
+10. Public website pages still load.
+
+Discovery Portal:
+11. CRM button/card is visible.
+12. CRM button/card routes to /admin/crm/dashboard.
+13. Discovery submissions are still visible and working.
+14. No layout break on mobile.
+
+Technical:
+15. No TypeScript errors.
+16. No console errors.
+17. No database migrations created.
+18. No schema changes made.
+
+FINAL RESPONSE REQUIRED:
+
+After completing, report:
+
+1. Current normal login landing route
+2. How redirect query param works
+3. Files changed
+4. CRM button/card changes
+5. Routes tested
+6. Confirmation no database/schema changes were made
+7. Any remaining routing issues
+8. Recommended next prompt
+
+This is a routing and UX stabilization task only.
+Keep changes small, intentional, and safe.

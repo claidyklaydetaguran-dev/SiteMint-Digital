@@ -116,7 +116,7 @@ export default function CrmDealsPage() {
       fetch("/api/crm/deals", { headers: { Authorization: `Bearer ${token()}` } }),
       fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }),
     ]);
-    if (dealsRes.status === 401) { navigate("/admin"); return; }
+    if (dealsRes.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const dealsData = await dealsRes.json() as { deals: Deal[] };
     const leadsData = await leadsRes.json() as { leads: Lead[] };
     setDeals(dealsData.deals || []);

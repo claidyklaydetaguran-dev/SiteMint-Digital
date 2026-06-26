@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ interface PhoneStatus {
 }
 
 export default function CrmSettings() {
+  const [, navigate] = useLocation();
   const [testMode, setTestMode] = useState(true);
   const [saved, setSaved] = useState(false);
   const [phoneStatus, setPhoneStatus] = useState<PhoneStatus | null>(null);
@@ -42,6 +44,10 @@ export default function CrmSettings() {
     } catch { /* ignore */ }
     setLoadingPhone(false);
   }, []);
+
+  useEffect(() => {
+    if (!tok()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+  }, [navigate]);
 
   useEffect(() => { loadPhoneStatus(); }, [loadPhoneStatus]);
 

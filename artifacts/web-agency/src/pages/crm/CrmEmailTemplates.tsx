@@ -30,9 +30,9 @@ export default function CrmEmailTemplates() {
   const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate("/admin"); return; }
+    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const r = await fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate("/admin"); return; }
+    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     const d = await r.json() as { templates: Template[] };
     setTemplates(d.templates || []);
     setLoading(false);

@@ -1,5 +1,6 @@
 import { Layout } from "@/components/layout/Layout";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,7 +16,6 @@ import ThankYou from "@/pages/ThankYou";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
-import CrmDashboard from "@/pages/crm/CrmDashboard";
 import CrmExecutiveDashboard from "@/pages/crm/CrmExecutiveDashboard";
 import CrmLeads from "@/pages/crm/CrmLeads";
 import CrmLeadDetail from "@/pages/crm/CrmLeadDetail";
@@ -33,6 +33,12 @@ import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
 
+function CrmHomeRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate("/admin/crm/dashboard"); }, [navigate]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -43,7 +49,7 @@ function Router() {
 
       {/* CRM routes — ErrorBoundary is inside CrmLayout */}
       <Route path="/admin/crm/dashboard" component={CrmExecutiveDashboard} />
-      <Route path="/admin/crm" component={CrmDashboard} />
+      <Route path="/admin/crm" component={CrmHomeRedirect} />
       <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
       <Route path="/admin/crm/leads" component={CrmLeads} />
       <Route path="/admin/crm/inbox" component={CrmInbox} />

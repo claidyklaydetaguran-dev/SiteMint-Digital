@@ -101,7 +101,7 @@ export default function CrmExecutiveDashboard() {
         fetch("/api/crm/deals/stats", { headers: { Authorization: `Bearer ${token()}` } }),
         fetch("/api/crm/deals", { headers: { Authorization: `Bearer ${token()}` } }),
       ]);
-      if (statsRes.status === 401) { navigate("/admin"); return; }
+      if (statsRes.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       const statsData = await statsRes.json() as DealStats;
       const dealsData = await dealsRes.json() as { deals: RecentDeal[] };
       setStats(statsData);
