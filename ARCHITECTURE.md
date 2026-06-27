@@ -1,7 +1,7 @@
 # SiteMint Digital CRM — Architecture Guide
 
 > Read this file before every development session.
-> Last updated: 2026-06-26
+> Last updated: 2026-06-27
 
 ---
 
@@ -107,7 +107,7 @@ scripts/               — Utility scripts (@workspace/scripts)
 | Lead Health Engine | **LOCKED** | `lib/leadScore.ts` | Scoring algorithm; do not modify |
 | Communication Intelligence | **LOCKED** | `lib/communicationIntelligence.ts` | CI sidebar card, comms scoring; do not modify |
 | DISC / Behavioral Intelligence | **LOCKED** | `lib/discEngine.ts` | DISC computation + DISC_META; do not modify |
-| Campaigns | **ACTIVE** | `CrmCampaigns.tsx`, `lib/campaignPersonalization.ts`, `crm.ts` lines 387–590, `schema/crmCampaigns.ts` | Phase 8 complete; Phase 9 (send execution) is next |
+| Campaigns | STABLE | `CrmCampaigns.tsx`, `lib/campaignPersonalization.ts`, `crm.ts` campaign section, `schema/crmCampaigns.ts` | All core features complete — see Campaign Feature Inventory below |
 | Inbox | STABLE | `CrmInbox.tsx`, `phone.ts` (read paths) | Unified email + SMS inbox |
 | Reporting | STABLE | `CrmReporting.tsx` | Read-only reporting |
 | Import Leads | STABLE | `CrmImport.tsx`, `crm.ts` lines 587–757 | CSV + Discovery import |
@@ -207,8 +207,12 @@ All CRM endpoints require `Authorization: Bearer <token>`. Base path: `/api`.
 | PATCH | `/crm/campaigns/:id` | Update campaign fields/status |
 | DELETE | `/crm/campaigns/:id` | Delete campaign (cascades recipients) |
 | POST | `/crm/campaigns/:id/recipients` | Replace recipients (with DISC personalization) |
-| POST | `/crm/campaigns/:id/test-send` | Test send from persisted campaign |
 | POST | `/crm/campaigns/test-send` | Test send from unsaved draft body |
+| POST | `/crm/campaigns/:id/test-send` | Test send from persisted campaign |
+| POST | `/crm/campaigns/:id/send` | Batch send to all pending recipients |
+| POST | `/crm/campaigns/:id/recipients/:recipientId/resend` | Resend to a single failed recipient |
+| GET | `/crm/campaigns/:id/analytics` | Analytics — sent/open/click/bounce rates, unique openers/clickers |
+| POST | `/crm/webhooks/resend` | Resend event webhook (open, click, bounce, delivery failure) |
 
 ### Deals / Pipeline
 | Method | Path | Purpose |
@@ -278,9 +282,51 @@ These files are compute engines with complex, tested logic. Touching them risks 
 
 ---
 
+## Campaign Feature Inventory
+
+### Complete
+| Feature | Notes |
+|---|---|
+| Campaign builder | Name, subject, body editor |
+| Draft persistence | `crm_campaigns` table; `status: draft\|ready\|archived` |
+| Recipient persistence | `crm_campaign_recipients` with DISC-personalized subject + body |
+| Manual send execution | `POST /crm/campaigns/:id/send` — sends to all `selected`/`failed` recipients |
+| Test send | Both persisted (`/:id/test-send`) and unsaved-draft (`/test-send`) variants |
+| Per-recipient status tracking | `status: selected\|test_previewed\|sent\|skipped\|failed` + `lastError` |
+| Resend failed | `POST /crm/campaigns/:id/recipients/:recipientId/resend` |
+| Analytics view | `GET /crm/campaigns/:id/analytics` — sent, skipped, failed counts |
+| Event tracking table | `crm_campaign_events` — `sent\|failed\|skipped\|opened\|clicked\|bounced\|replied_estimated` |
+| Resend webhook endpoint | `POST /crm/webhooks/resend` — receives open/click/bounce events from Resend |
+| Unique open/click tracking | Deduplication via Set on `campaignRecipientId` in analytics query |
+| Performance insights | `openRate`, `clickRate`, `bounceRate` computed in analytics route |
+| Campaign list polish | Recipient counts, status badges, history view |
+
+### Not Yet Built
+| Feature | Notes |
+|---|---|
+| Campaign scheduling | Send at a future date/time |
+| Drip sequences | Multi-step automated email flows |
+| A/B testing | Subject/body variant testing |
+| Segment automation | Auto-enroll leads by filter/tag |
+| Live send progress | Real-time browser progress bar during batch send |
+| Deduplicated webhook DB index | Dedup currently in-memory (Set); no unique DB constraint on `(campaign_recipient_id, event_type)` |
+
+---
+
+## Suggested Future Phases
+
+1. **SMS Consent Management UI** — admin view for opt-in/opt-out status, consent history
+2. **Campaign Scheduling** — schedule a campaign to send at a specific date/time
+3. **Drip Sequence Builder** — multi-step email flows triggered by lead actions
+4. **AI Copilot Drafting** — AI-assisted subject/body suggestions in the campaign builder
+5. **Client Portal** — lead-facing status page for proposals and SOWs
+6. **Executive Forecasting Dashboard** — revenue forecast, pipeline velocity, win-rate trends
+
+---
+
 ## Which Modules Future Prompts May Touch
 
-- **Campaigns** (`CrmCampaigns.tsx`, `crm.ts` campaign section, `campaignPersonalization.ts`, `crmCampaigns.ts` schema) — next phase: send execution
+- **Campaigns** (`CrmCampaigns.tsx`, `crm.ts` campaign section, `campaignPersonalization.ts`, `crmCampaigns.ts` schema) — STABLE; future work: scheduling, drip sequences, A/B testing
 - **Reporting** (`CrmReporting.tsx`) — additional metrics, charts
 - **Dashboard** (`CrmDashboard.tsx`, `CrmExecutiveDashboard.tsx`) — new KPI tiles
 - **Deals / Pipeline** (`CrmDeals.tsx`, `CrmPipeline.tsx`) — new stages or fields
@@ -301,7 +347,7 @@ These files are compute engines with complex, tested logic. Touching them risks 
 ## Known Constraints
 
 - **Email test mode**: if `CRM_EMAIL_TEST_MODE` env var is not set to `"false"`, all Resend sends are simulated (`testMode: true` in response).
-- **No bulk send**: no `/campaigns/:id/send-all` endpoint exists by design. Phase 9 will add controlled send execution.
+- **Campaign send is synchronous**: `POST /campaigns/:id/send` sends all recipients in a single async loop; there is no real-time progress stream. Large lists may take several seconds.
 - **Auth token is in-memory**: the session token changes on every API server restart. Frontend must re-login after a server restart.
 - **Default admin password**: `sitemint2024` (overridable via `ADMIN_PASSWORD` env var).
 - **Route ordering in `crm.ts`**: static routes (e.g. `/campaigns/test-send`) must appear BEFORE parameterized routes (e.g. `/campaigns/:id`) to avoid Express matching conflicts.

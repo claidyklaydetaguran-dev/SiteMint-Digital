@@ -1,0 +1,120 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 23 — Campaign Module Consistency Audit & Documentation Sync
+
+MODULE:
+Campaigns documentation + lightweight code audit only.
+
+IMPORTANT:
+Do not build new features.
+Do not touch Twilio.
+Do not touch database schema.
+Do not refactor Campaigns.
+Do not modify locked engines.
+Do not change campaign sending behavior.
+Make surgical documentation/code-comment updates only.
+
+CURRENT STATE:
+Campaign module already includes:
+
+* Campaign drafts
+* Recipient persistence
+* Manual send execution
+* Recipient statuses
+* Resend failed
+* Campaign analytics
+* Resend webhook tracking
+* Unique open/click tracking
+* Campaign performance insights
+* Campaign list polish
+
+Some docs/recommendations may still say Campaign Send Execution is missing.
+
+OBJECTIVE:
+Audit and synchronize documentation so future prompts do not repeat already-completed work.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect:
+
+* ARCHITECTURE.md
+* DEVELOPMENT_RULES.md
+* .agents/memory/MEMORY.md if it exists
+* CrmCampaigns.tsx only to confirm current features
+* crmCampaigns schema only to confirm tables/columns
+* campaign routes in crm.ts only to confirm endpoints
+
+Do not inspect unrelated modules.
+
+TASK 2 — CAMPAIGN FEATURE INVENTORY
+
+Create/update a concise Campaign Module inventory in ARCHITECTURE.md.
+
+Mark as COMPLETE:
+
+* Campaign Builder
+* Draft persistence
+* Recipient persistence
+* Manual send execution
+* Test send
+* Per-recipient status tracking
+* Resend failed
+* Analytics view
+* Event tracking table
+* Resend webhook endpoint
+* Unique open/click tracking
+* Performance insights
+* Campaign history/list polish
+
+Mark as NOT YET BUILT:
+
+* Campaign scheduling
+* Drip sequences
+* A/B testing
+* Segment automation
+* Browser/live send progress
+* Deduplicated webhook DB index if still not added
+
+TASK 3 — UPDATE FUTURE ROADMAP
+
+Update docs so the recommended next phases are accurate:
+
+Suggested future phases:
+
+1. SMS consent management UI
+2. Campaign scheduling
+3. Drip sequence builder
+4. AI Copilot drafting
+5. Client portal
+6. Executive forecasting dashboard
+
+Remove stale recommendation:
+
+* “Build campaign send execution”
+* “Add send-all endpoint”
+  if those are already complete.
+
+TASK 4 — LIGHTWEIGHT VALIDATION
+
+Confirm existing endpoints exist:
+
+* POST /api/crm/campaigns/:id/send
+* POST /api/crm/campaigns/:id/recipients/:recipientId/resend
+* GET /api/crm/campaigns/:id/analytics
+* POST /api/crm/webhooks/resend
+
+Do not change them.
+
+TASK 5 — FINAL REPORT
+
+Return:
+
+1. Files inspected
+2. Files changed
+3. Campaign features confirmed complete
+4. Campaign features confirmed not built yet
+5. Stale docs/recommendations removed
+6. Updated roadmap
+7. Confirmation no product code changed unless only comments
+8. Confirmation no schema changes
+9. Confirmation no Twilio changes

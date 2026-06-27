@@ -2,7 +2,7 @@
 
 > Read this file before every development session.
 > These rules exist to prevent scope creep, spaghetti code, and accidental breakage of locked modules.
-> Last updated: 2026-06-26
+> Last updated: 2026-06-27
 
 ---
 
@@ -215,7 +215,7 @@ curl -s "http://localhost:80/api/crm/leads" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### Active development area (Phase 9)
-Module: **Campaigns**
-Next work: send execution, per-recipient status tracking, send progress view
-Files to touch: `CrmCampaigns.tsx`, `crm.ts` (campaign section only), `crmCampaigns.ts` schema
+### Active development area
+Module: **Next phase TBD** — see Suggested Future Phases in ARCHITECTURE.md
+Campaigns module is now STABLE — send execution, analytics, and webhook tracking are all complete.
+Suggested next areas: SMS Consent Management UI, Campaign Scheduling, Drip Sequence Builder.
