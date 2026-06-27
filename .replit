@@ -30,3 +30,9 @@ externalPort = 8081
 [[ports]]
 localPort = 22065
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+CRM_BASE_URL = "https://a4d0d5f2-52ef-4ef5-bb8c-7d4810b97340-00-367ll2vfuepi5.sisko.replit.dev"
+PHONE_PROVIDER = "twilio"
