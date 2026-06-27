@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages } from "@workspace/db";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
@@ -446,14 +446,24 @@ router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) =
 
 router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { name, subject, body, status } = req.body as Record<string, string>;
+    const { name, subject, body, status, type, objective, toneProfile, description, stopOnReply, autoSend } = req.body as Record<string, unknown>;
     if (!name || !subject || !body) {
       res.status(400).json({ error: "name, subject, and body are required" }); return;
     }
-    const allowed = ["draft","ready","archived"];
-    const safeStatus = allowed.includes(status) ? status : "draft";
+    const allowedStatus = ["draft","ready","archived"];
+    const allowedType   = ["broadcast","nurture","drip"];
+    const safeStatus = allowedStatus.includes(String(status)) ? String(status) : "draft";
+    const safeType   = allowedType.includes(String(type)) ? String(type) : "broadcast";
     const [campaign] = await db.insert(crmCampaigns)
-      .values({ name, subject, body, status: safeStatus })
+      .values({
+        name: String(name), subject: String(subject), body: String(body),
+        status: safeStatus, type: safeType,
+        objective:   objective   !== undefined ? String(objective)   : undefined,
+        toneProfile: toneProfile !== undefined ? String(toneProfile) : undefined,
+        description: description !== undefined ? String(description) : undefined,
+        stopOnReply: stopOnReply !== undefined ? Boolean(stopOnReply) : true,
+        autoSend:    autoSend    !== undefined ? Boolean(autoSend)    : false,
+      })
       .returning();
     res.status(201).json({ campaign });
   } catch (err) {
@@ -461,6 +471,135 @@ router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) 
     res.status(500).json({ error: "Failed to create campaign" });
   }
 });
+
+// ── Campaign Scheduled Message Queue (static routes — must come before /:id) ──
+
+router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { status, campaignId } = req.query as Record<string, string>;
+    const conditions = [];
+    if (status)     conditions.push(eq(crmCampaignScheduledMessages.status, status));
+    if (campaignId) conditions.push(eq(crmCampaignScheduledMessages.campaignId, Number(campaignId)));
+    const msgs = await db
+      .select({
+        id:          crmCampaignScheduledMessages.id,
+        campaignId:  crmCampaignScheduledMessages.campaignId,
+        recipientId: crmCampaignScheduledMessages.recipientId,
+        stepId:      crmCampaignScheduledMessages.stepId,
+        leadId:      crmCampaignScheduledMessages.leadId,
+        channel:     crmCampaignScheduledMessages.channel,
+        subject:     crmCampaignScheduledMessages.subject,
+        body:        crmCampaignScheduledMessages.body,
+        status:      crmCampaignScheduledMessages.status,
+        scheduledAt: crmCampaignScheduledMessages.scheduledAt,
+        sentAt:      crmCampaignScheduledMessages.sentAt,
+        lastError:   crmCampaignScheduledMessages.lastError,
+        createdAt:   crmCampaignScheduledMessages.createdAt,
+        leadName:    crmLeads.name,
+        leadEmail:   crmLeads.email,
+        campaignName: crmCampaigns.name,
+      })
+      .from(crmCampaignScheduledMessages)
+      .innerJoin(crmLeads,     eq(crmCampaignScheduledMessages.leadId,     crmLeads.id))
+      .innerJoin(crmCampaigns, eq(crmCampaignScheduledMessages.campaignId, crmCampaigns.id))
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(crmCampaignScheduledMessages.scheduledAt));
+    res.json({ messages: msgs });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching scheduled message queue");
+    res.status(500).json({ error: "Failed to fetch queue" });
+  }
+});
+
+router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const messageId = Number(req.params.messageId);
+    if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { subject, body, scheduledAt, status } = req.body as Record<string, string>;
+    const updates: Record<string, unknown> = {};
+    if (subject !== undefined)     updates.subject     = subject;
+    if (body !== undefined)        updates.body        = body;
+    if (scheduledAt !== undefined) updates.scheduledAt = new Date(scheduledAt);
+    if (status !== undefined) {
+      const allowed = ["scheduled","queued","canceled","skipped"];
+      if (!allowed.includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
+      updates.status = status;
+    }
+    if (!Object.keys(updates).length) { res.status(400).json({ error: "No fields to update" }); return; }
+    const [msg] = await db.update(crmCampaignScheduledMessages)
+      .set(updates)
+      .where(eq(crmCampaignScheduledMessages.id, messageId))
+      .returning();
+    if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
+    res.json({ message: msg });
+  } catch (err) {
+    req.log.error({ err }, "Error updating scheduled message");
+    res.status(500).json({ error: "Failed to update message" });
+  }
+});
+
+router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const messageId = Number(req.params.messageId);
+    if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [msg] = await db
+      .select()
+      .from(crmCampaignScheduledMessages)
+      .where(eq(crmCampaignScheduledMessages.id, messageId));
+    if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
+    if (!["scheduled","queued"].includes(msg.status)) {
+      res.status(400).json({ error: "Message is not in a sendable state" }); return;
+    }
+    if (msg.channel !== "email") {
+      await db.update(crmCampaignScheduledMessages)
+        .set({ status: "sent", sentAt: new Date() })
+        .where(eq(crmCampaignScheduledMessages.id, messageId));
+      res.json({ ok: true, note: "Non-email channel marked sent" }); return;
+    }
+    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, msg.leadId));
+    if (!lead?.email || lead.email.includes("@imported.local")) {
+      await db.update(crmCampaignScheduledMessages)
+        .set({ status: "failed", lastError: "No valid email address" })
+        .where(eq(crmCampaignScheduledMessages.id, messageId));
+      res.status(400).json({ error: "No valid email address" }); return;
+    }
+    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    let resendId: string | null = null;
+    if (!isTestMode) {
+      const resend = getResend();
+      const { data } = await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
+        to: [lead.email],
+        subject: msg.subject ?? "(no subject)",
+        html: (msg.body ?? "").replace(/\n/g, "<br>"),
+      });
+      resendId = data?.id ?? null;
+    }
+    await db.update(crmCampaignScheduledMessages)
+      .set({ status: "sent", sentAt: new Date(), resendEmailId: resendId })
+      .where(eq(crmCampaignScheduledMessages.id, messageId));
+    res.json({ ok: true, testMode: isTestMode });
+  } catch (err) {
+    req.log.error({ err }, "Error sending scheduled message");
+    res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const messageId = Number(req.params.messageId);
+    if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    await db.update(crmCampaignScheduledMessages)
+      .set({ status: "canceled" })
+      .where(eq(crmCampaignScheduledMessages.id, messageId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error canceling scheduled message");
+    res.status(500).json({ error: "Failed to cancel message" });
+  }
+});
+
+// ── Campaign CRUD (parameterized routes) ──────────────────────────────────────
 
 router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -495,13 +634,20 @@ router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respo
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-    const { name, subject, body, status } = req.body as Record<string, string>;
-    const allowed = ["draft","ready","archived"];
+    const { name, subject, body, status, type, objective, toneProfile, description, stopOnReply, autoSend } = req.body as Record<string, unknown>;
+    const allowedStatus = ["draft","ready","archived"];
+    const allowedType   = ["broadcast","nurture","drip"];
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (name)   updates.name    = name;
-    if (subject) updates.subject = subject;
-    if (body)   updates.body    = body;
-    if (status && allowed.includes(status)) updates.status = status;
+    if (name    !== undefined) updates.name    = String(name);
+    if (subject !== undefined) updates.subject = String(subject);
+    if (body    !== undefined) updates.body    = String(body);
+    if (status  !== undefined && allowedStatus.includes(String(status))) updates.status = String(status);
+    if (type    !== undefined && allowedType.includes(String(type)))     updates.type   = String(type);
+    if (objective   !== undefined) updates.objective   = objective   ? String(objective)   : null;
+    if (toneProfile !== undefined) updates.toneProfile = toneProfile ? String(toneProfile) : null;
+    if (description !== undefined) updates.description = description ? String(description) : null;
+    if (stopOnReply !== undefined) updates.stopOnReply = Boolean(stopOnReply);
+    if (autoSend    !== undefined) updates.autoSend    = Boolean(autoSend);
     const [updated] = await db.update(crmCampaigns).set(updates).where(eq(crmCampaigns.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Campaign not found" }); return; }
     res.json({ campaign: updated });
@@ -1538,6 +1684,264 @@ router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (
   } catch (err) {
     req.log.error({ err }, "Error deleting behavioral event");
     res.status(500).json({ error: "Failed to delete behavioral event" });
+  }
+});
+
+// ── Campaign Steps CRUD ───────────────────────────────────────────────────────
+
+router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const steps = await db
+      .select()
+      .from(crmCampaignSteps)
+      .where(eq(crmCampaignSteps.campaignId, id))
+      .orderBy(crmCampaignSteps.stepNumber);
+    res.json({ steps });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching campaign steps");
+    res.status(500).json({ error: "Failed to fetch steps" });
+  }
+});
+
+router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    const { stepNumber, dayOffset, channel, subject, body, callPrompt, taskDescription, sendTime, businessDaysOnly } = req.body as Record<string, unknown>;
+    const allowedChannels  = ["email","sms","call_prompt","task"];
+    const allowedSendTimes = ["immediate","morning","afternoon","evening"];
+    if (!channel || !allowedChannels.includes(String(channel))) {
+      res.status(400).json({ error: "channel must be one of: email, sms, call_prompt, task" }); return;
+    }
+
+    const [step] = await db.insert(crmCampaignSteps).values({
+      campaignId:      id,
+      stepNumber:      stepNumber      !== undefined ? Number(stepNumber) : 1,
+      dayOffset:       dayOffset       !== undefined ? Number(dayOffset)  : 0,
+      channel:         String(channel),
+      subject:         subject         ? String(subject)         : null,
+      body:            body            ? String(body)            : null,
+      callPrompt:      callPrompt      ? String(callPrompt)      : null,
+      taskDescription: taskDescription ? String(taskDescription) : null,
+      sendTime:        sendTime && allowedSendTimes.includes(String(sendTime)) ? String(sendTime) : "immediate",
+      businessDaysOnly: businessDaysOnly !== undefined ? Boolean(businessDaysOnly) : true,
+    }).returning();
+    res.status(201).json({ step });
+  } catch (err) {
+    req.log.error({ err }, "Error creating campaign step");
+    res.status(500).json({ error: "Failed to create step" });
+  }
+});
+
+router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id     = Number(req.params.id);
+    const stepId = Number(req.params.stepId);
+    if (isNaN(id) || isNaN(stepId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { stepNumber, dayOffset, channel, subject, body, callPrompt, taskDescription, sendTime, businessDaysOnly } = req.body as Record<string, unknown>;
+    const allowedChannels  = ["email","sms","call_prompt","task"];
+    const allowedSendTimes = ["immediate","morning","afternoon","evening"];
+    const updates: Record<string, unknown> = {};
+    if (stepNumber      !== undefined) updates.stepNumber      = Number(stepNumber);
+    if (dayOffset       !== undefined) updates.dayOffset       = Number(dayOffset);
+    if (channel         !== undefined && allowedChannels.includes(String(channel)))   updates.channel  = String(channel);
+    if (sendTime        !== undefined && allowedSendTimes.includes(String(sendTime))) updates.sendTime = String(sendTime);
+    if (subject         !== undefined) updates.subject         = subject         ? String(subject)         : null;
+    if (body            !== undefined) updates.body            = body            ? String(body)            : null;
+    if (callPrompt      !== undefined) updates.callPrompt      = callPrompt      ? String(callPrompt)      : null;
+    if (taskDescription !== undefined) updates.taskDescription = taskDescription ? String(taskDescription) : null;
+    if (businessDaysOnly !== undefined) updates.businessDaysOnly = Boolean(businessDaysOnly);
+    if (!Object.keys(updates).length) { res.status(400).json({ error: "No fields to update" }); return; }
+    const [step] = await db.update(crmCampaignSteps)
+      .set(updates)
+      .where(and(eq(crmCampaignSteps.id, stepId), eq(crmCampaignSteps.campaignId, id)))
+      .returning();
+    if (!step) { res.status(404).json({ error: "Step not found" }); return; }
+    res.json({ step });
+  } catch (err) {
+    req.log.error({ err }, "Error updating campaign step");
+    res.status(500).json({ error: "Failed to update step" });
+  }
+});
+
+router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id     = Number(req.params.id);
+    const stepId = Number(req.params.stepId);
+    if (isNaN(id) || isNaN(stepId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    await db.delete(crmCampaignSteps)
+      .where(and(eq(crmCampaignSteps.id, stepId), eq(crmCampaignSteps.campaignId, id)));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting campaign step");
+    res.status(500).json({ error: "Failed to delete step" });
+  }
+});
+
+// ── Campaign Sequence Enrollment ──────────────────────────────────────────────
+
+router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    const steps = await db
+      .select()
+      .from(crmCampaignSteps)
+      .where(eq(crmCampaignSteps.campaignId, id))
+      .orderBy(crmCampaignSteps.stepNumber);
+    if (!steps.length) {
+      res.status(400).json({ error: "Campaign has no steps. Add steps before enrolling contacts." }); return;
+    }
+
+    const { leadIds } = req.body as { leadIds: number[] };
+    if (!Array.isArray(leadIds) || !leadIds.length) {
+      res.status(400).json({ error: "leadIds array is required" }); return;
+    }
+
+    const leads = await db.select().from(crmLeads).where(inArray(crmLeads.id, leadIds));
+    const enrolledAt = new Date();
+    let enrolledCount = 0;
+    const scheduledMessages: { recipientId: number; stepId: number; leadId: number; subject: string | null; body: string | null; channel: string; scheduledAt: Date; campaignId: number }[] = [];
+
+    for (const lead of leads) {
+      // Upsert enrollment — update status if already enrolled
+      const [existing] = await db
+        .select()
+        .from(crmCampaignRecipients)
+        .where(and(eq(crmCampaignRecipients.campaignId, id), eq(crmCampaignRecipients.leadId, lead.id)));
+
+      let recipientId: number;
+      if (existing) {
+        await db.update(crmCampaignRecipients)
+          .set({ enrollmentStatus: "active", currentStep: 0, enrolledAt })
+          .where(eq(crmCampaignRecipients.id, existing.id));
+        recipientId = existing.id;
+      } else {
+        const [rec] = await db.insert(crmCampaignRecipients)
+          .values({ campaignId: id, leadId: lead.id, status: "selected", enrollmentStatus: "active", enrolledAt, currentStep: 0 })
+          .returning();
+        recipientId = rec.id;
+        enrolledCount++;
+      }
+
+      // Schedule one message per step
+      for (const step of steps) {
+        const scheduledAt = new Date(enrolledAt);
+        scheduledAt.setDate(scheduledAt.getDate() + step.dayOffset);
+        scheduledMessages.push({
+          campaignId: id,
+          recipientId,
+          stepId: step.id,
+          leadId: lead.id,
+          channel: step.channel,
+          subject: step.subject,
+          body: step.body,
+          scheduledAt,
+        });
+      }
+    }
+
+    if (scheduledMessages.length) {
+      await db.insert(crmCampaignScheduledMessages).values(
+        scheduledMessages.map(m => ({ ...m, status: "scheduled" }))
+      );
+    }
+
+    res.json({ ok: true, enrolled: enrolledCount, scheduled: scheduledMessages.length });
+  } catch (err) {
+    req.log.error({ err }, "Error enrolling leads in campaign");
+    res.status(500).json({ error: "Failed to enroll leads" });
+  }
+});
+
+// ── Campaign Recipient Enrollment Status ──────────────────────────────────────
+
+router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id  = Number(req.params.id);
+    const rid = Number(req.params.rid);
+    if (isNaN(id) || isNaN(rid)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { enrollmentStatus } = req.body as { enrollmentStatus: string };
+    const allowed = ["active","paused","completed","stopped"];
+    if (!allowed.includes(enrollmentStatus)) {
+      res.status(400).json({ error: "enrollmentStatus must be one of: active, paused, completed, stopped" }); return;
+    }
+    const [updated] = await db.update(crmCampaignRecipients)
+      .set({ enrollmentStatus })
+      .where(and(eq(crmCampaignRecipients.id, rid), eq(crmCampaignRecipients.campaignId, id)))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Recipient not found" }); return; }
+
+    // Cancel pending scheduled messages if stopped or paused
+    if (enrollmentStatus === "stopped" || enrollmentStatus === "paused") {
+      await db.update(crmCampaignScheduledMessages)
+        .set({ status: enrollmentStatus === "stopped" ? "canceled" : "scheduled" })
+        .where(and(
+          eq(crmCampaignScheduledMessages.recipientId, rid),
+          eq(crmCampaignScheduledMessages.status, "scheduled"),
+        ));
+    }
+    res.json({ ok: true, recipient: updated });
+  } catch (err) {
+    req.log.error({ err }, "Error updating recipient enrollment status");
+    res.status(500).json({ error: "Failed to update enrollment status" });
+  }
+});
+
+// ── Campaign Activity Feed ────────────────────────────────────────────────────
+
+router.get("/crm/campaigns/:id/activity", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    const messages = await db
+      .select({
+        id:          crmCampaignScheduledMessages.id,
+        channel:     crmCampaignScheduledMessages.channel,
+        subject:     crmCampaignScheduledMessages.subject,
+        status:      crmCampaignScheduledMessages.status,
+        scheduledAt: crmCampaignScheduledMessages.scheduledAt,
+        sentAt:      crmCampaignScheduledMessages.sentAt,
+        lastError:   crmCampaignScheduledMessages.lastError,
+        stepId:      crmCampaignScheduledMessages.stepId,
+        leadId:      crmCampaignScheduledMessages.leadId,
+        leadName:    crmLeads.name,
+        leadEmail:   crmLeads.email,
+      })
+      .from(crmCampaignScheduledMessages)
+      .innerJoin(crmLeads, eq(crmCampaignScheduledMessages.leadId, crmLeads.id))
+      .where(eq(crmCampaignScheduledMessages.campaignId, id))
+      .orderBy(desc(crmCampaignScheduledMessages.scheduledAt));
+
+    const events = await db
+      .select()
+      .from(crmCampaignEvents)
+      .where(
+        inArray(
+          crmCampaignEvents.campaignRecipientId,
+          db.select({ id: crmCampaignRecipients.id })
+            .from(crmCampaignRecipients)
+            .where(eq(crmCampaignRecipients.campaignId, id))
+        )
+      )
+      .orderBy(desc(crmCampaignEvents.occurredAt));
+
+    res.json({ messages, events });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching campaign activity");
+    res.status(500).json({ error: "Failed to fetch activity" });
   }
 });
 

@@ -1,11 +1,14 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
+import CrmCampaignSequence from "./CrmCampaignSequence";
+import CrmCampaignQueue   from "./CrmCampaignQueue";
 import {
   Mail, Users, Eye, Send, ChevronRight, ChevronLeft, ChevronDown,
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
   Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
   SkipForward, XCircle, BarChart2, Lightbulb, Award, ShieldCheck, AlertCircle, TrendingUp,
+  Layers, Calendar,
 } from "lucide-react";
 import {
   computeSimplifiedDisc,
@@ -54,6 +57,13 @@ interface Campaign {
   subject: string;
   body: string;
   status: "draft" | "ready" | "archived";
+  // broadcast (single email) | nurture | drip (multi-step sequences)
+  type?: "broadcast" | "nurture" | "drip";
+  objective?: string | null;
+  toneProfile?: string | null;
+  description?: string | null;
+  stopOnReply?: boolean;
+  autoSend?: boolean;
   createdAt: string;
   updatedAt: string;
   recipientCount?: number;
@@ -340,8 +350,13 @@ export default function CrmCampaigns() {
   const [campaigns, setCampaigns]   = useState<Campaign[]>([]);
   const [loading, setLoading]       = useState(true);
 
-  // ── View: "history" | "builder" | "execution" | "analytics" ──
-  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics">("history");
+  // ── View ──
+  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics" | "sequence" | "queue">("history");
+
+  // ── Sequence / queue navigation state ──
+  const [sequenceCampaignId,   setSequenceCampaignId]   = useState<number | null>(null);
+  const [sequenceCampaignName, setSequenceCampaignName] = useState("");
+  const [sequenceCampaignType, setSequenceCampaignType] = useState("broadcast");
 
   // ── Persistence state ──
   const [campaignId, setCampaignId]           = useState<number | null>(null);
@@ -358,6 +373,7 @@ export default function CrmCampaigns() {
 
   // ── Step 1 — Campaign setup ──
   const [campaignName, setCampaignName]     = useState("");
+  const [campaignType, setCampaignType]     = useState<"broadcast"|"nurture"|"drip">("broadcast");
   const [baseSubject, setBaseSubject]       = useState("");
   const [baseBody, setBaseBody]             = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
@@ -507,6 +523,7 @@ export default function CrmCampaigns() {
     const { campaign, recipients } = d as { campaign: Campaign; recipients: Array<{ leadId: number; discStyleUsed?: string }> };
     setCampaignId(campaign.id);
     setCampaignName(campaign.name);
+    setCampaignType((campaign.type as "broadcast"|"nurture"|"drip") ?? "broadcast");
     setBaseSubject(campaign.subject);
     setBaseBody(campaign.body);
     setCampaignStatus(campaign.status);
@@ -545,6 +562,7 @@ export default function CrmCampaigns() {
   const newCampaign = () => {
     setCampaignId(null);
     setCampaignName("");
+    setCampaignType("broadcast");
     setBaseSubject("");
     setBaseBody("");
     setCampaignStatus("draft");
@@ -555,6 +573,26 @@ export default function CrmCampaigns() {
     setStep(0);
     setTestResult(null);
     setView("builder");
+  };
+
+  // ── Open sequence builder ──
+  const openSequence = (c: Campaign) => {
+    setSequenceCampaignId(c.id);
+    setSequenceCampaignName(c.name);
+    setSequenceCampaignType(c.type ?? "broadcast");
+    setView("sequence");
+  };
+
+  // ── Open message queue ──
+  const openQueue = (c?: Campaign) => {
+    if (c) {
+      setSequenceCampaignId(c.id);
+      setSequenceCampaignName(c.name);
+    } else {
+      setSequenceCampaignId(null);
+      setSequenceCampaignName("");
+    }
+    setView("queue");
   };
 
   // ── Save draft ──
@@ -571,7 +609,7 @@ export default function CrmCampaigns() {
         const r = await fetch("/api/crm/campaigns", {
           method: "POST",
           headers: authH(),
-          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus }),
+          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType }),
         });
         const d = await r.json();
         if (!r.ok) { setSaveError(d.error ?? "Failed to save"); return; }
@@ -582,7 +620,7 @@ export default function CrmCampaigns() {
         const r = await fetch(`/api/crm/campaigns/${id}`, {
           method: "PATCH",
           headers: authH(),
-          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus }),
+          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType }),
         });
         const d = await r.json();
         if (!r.ok) { setSaveError(d.error ?? "Failed to save"); return; }
@@ -727,6 +765,29 @@ export default function CrmCampaigns() {
   // ── Validations ──
   const step1Valid = campaignName.trim() && baseSubject.trim() && baseBody.trim();
   const step2Valid = selectedLeads.size > 0;
+
+  // ── Sequence builder view ──
+  if (view === "sequence" && sequenceCampaignId !== null) {
+    return (
+      <CrmCampaignSequence
+        campaignId={sequenceCampaignId}
+        campaignName={sequenceCampaignName}
+        campaignType={sequenceCampaignType}
+        onBack={() => { setView("history"); refreshCampaigns(); }}
+      />
+    );
+  }
+
+  // ── Queue view ──
+  if (view === "queue") {
+    return (
+      <CrmCampaignQueue
+        campaignId={sequenceCampaignId ?? undefined}
+        campaignName={sequenceCampaignName || undefined}
+        onBack={() => setView("history")}
+      />
+    );
+  }
 
   // ── Loading state ──
   if (loading) {
@@ -1313,12 +1374,20 @@ export default function CrmCampaigns() {
                 Compose DISC-personalized email campaigns. No bulk sending — test send only.
               </p>
             </div>
-            <button
-              onClick={newCampaign}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
-            >
-              <Plus className="w-4 h-4" /> New Campaign
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openQueue()}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-sm font-semibold rounded-lg hover:bg-gray-50 text-muted-foreground transition-colors"
+              >
+                <Calendar className="w-4 h-4" /> Global Queue
+              </button>
+              <button
+                onClick={newCampaign}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
+              >
+                <Plus className="w-4 h-4" /> New Campaign
+              </button>
+            </div>
           </div>
 
           {/* Safety banner */}
@@ -1405,9 +1474,23 @@ export default function CrmCampaigns() {
                               >
                                 Open
                               </button>
+                              {(c.type === "nurture" || c.type === "drip") && (
+                                <button
+                                  onClick={() => openSequence(c)}
+                                  className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors"
+                                >
+                                  <Layers className="w-3 h-3" /> Sequence
+                                </button>
+                              )}
+                              <button
+                                onClick={() => openQueue(c)}
+                                className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 px-2 py-1 rounded-lg hover:bg-amber-50 transition-colors"
+                              >
+                                <Calendar className="w-3 h-3" /> Queue
+                              </button>
                               <button
                                 onClick={() => openAnalytics(c)}
-                                className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors"
+                                className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors"
                               >
                                 <BarChart2 className="w-3 h-3" /> Analytics
                               </button>
@@ -1581,6 +1664,40 @@ export default function CrmCampaigns() {
                   value={campaignName}
                   onChange={e => mark(setCampaignName)(e.target.value)}
                 />
+              </div>
+
+              {/* Campaign type selector */}
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Campaign Type</label>
+                <div className="flex gap-2">
+                  {(["broadcast", "nurture", "drip"] as const).map(t => {
+                    const meta: Record<string, { label: string; desc: string; color: string }> = {
+                      broadcast: { label: "Broadcast",  desc: "One email to all recipients at once",     color: "border-gray-400 bg-gray-50 text-gray-700" },
+                      nurture:   { label: "Nurture",    desc: "Multi-step sequence over days/weeks",     color: "border-violet-400 bg-violet-50 text-violet-700" },
+                      drip:      { label: "Drip",       desc: "Automated follow-up drip sequence",       color: "border-blue-400 bg-blue-50 text-blue-700" },
+                    };
+                    const m = meta[t];
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => { setCampaignType(t); setIsDirty(true); }}
+                        className={`flex-1 rounded-xl border-2 p-3 text-left transition-all ${
+                          campaignType === t
+                            ? `${m.color} shadow-sm`
+                            : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        <p className="text-xs font-bold">{m.label}</p>
+                        <p className="text-[10px] mt-0.5 opacity-80">{m.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {(campaignType === "nurture" || campaignType === "drip") && (
+                  <p className="text-[10px] text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5 mt-2">
+                    Save this campaign first, then use <strong>Sequence Builder</strong> to add steps and enroll contacts.
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-4">
