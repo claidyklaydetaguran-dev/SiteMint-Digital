@@ -15,6 +15,10 @@ import {
   type CiLead, type CiMessage,
   type CommunicationRecommendation,
 } from "@/lib/communicationIntelligence";
+import {
+  computeSalesNBA, computeLeadMomentum,
+  type SiLead, type SiActivity, type SiTask,
+} from "@/lib/salesIntelligence";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -66,7 +70,7 @@ export interface SalesWorkspaceProps {
   onReload: () => Promise<void>;
 }
 
-type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents";
+type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence";
 
 const tk = () => localStorage.getItem("adminToken") || "";
 
@@ -1132,6 +1136,214 @@ function CommunicationsTab({ lead, activities }: {
   );
 }
 
+// ── Intelligence Tab ──────────────────────────────────────────────────────────
+
+function IntelligenceTab({ lead, activities, tasks }: {
+  lead: WorkspaceLead;
+  activities: WorkspaceActivity[];
+  tasks: WorkspaceTask[];
+}) {
+  const siLead: SiLead = {
+    id: lead.id, name: lead.name, company: lead.company, status: lead.status,
+    priority: "Medium",
+    estimatedValue: lead.estimatedValue,
+    lastContactedAt: lead.lastContactedAt,
+    nextFollowUpAt: lead.nextFollowUpAt,
+    proposalStatus: lead.proposalStatus,
+    sowStatus: lead.sowStatus,
+    generatedProposal: lead.generatedProposal,
+    generatedSow: lead.generatedSow,
+    discoverySubmissionId: lead.discoverySubmissionId,
+    createdAt: lead.createdAt,
+    updatedAt: lead.updatedAt,
+  };
+  const siActivities: SiActivity[] = activities.map(a => ({ type: a.type, createdAt: a.createdAt }));
+  const siTasks: SiTask[] = tasks.map(t => ({
+    status: t.status, dueDate: t.dueDate, completedAt: t.completedAt, createdAt: t.createdAt,
+  }));
+
+  const ciLead: CiLead = {
+    id: lead.id, status: lead.status, lastContactedAt: lead.lastContactedAt,
+    nextFollowUpAt: lead.nextFollowUpAt, proposalStatus: lead.proposalStatus,
+  };
+  const commStats = useMemo(() => computeCommunicationStats(ciLead, activities, []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities]);
+
+  const healthProxy = useMemo(() => {
+    const now = Date.now(); const DAY = 86_400_000;
+    let score = 50;
+    if (lead.lastContactedAt) {
+      const d = (now - new Date(lead.lastContactedAt).getTime()) / DAY;
+      if (d < 3) score += 20; else if (d < 7) score += 10;
+      else if (d > 21) score -= 20; else if (d > 14) score -= 10;
+    }
+    if (lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) < new Date()) score -= 15;
+    if (lead.generatedProposal) score += 10;
+    if (lead.proposalStatus === "Signed") score += 20;
+    return Math.max(0, Math.min(100, score));
+  }, [lead]);
+
+  const nba = useMemo(() => computeSalesNBA(siLead, siActivities, siTasks, healthProxy, commStats.engagementScore.score),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, tasks, healthProxy]);
+
+  const momentum = useMemo(() => computeLeadMomentum(siLead, siActivities, siTasks, healthProxy, commStats.engagementScore.score),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, tasks, healthProxy]);
+
+  const NBA_PRIORITY_STYLE = {
+    critical: { border: "border-red-200 bg-red-50",   badge: "bg-red-50 text-red-700 border-red-200",    label: "🚨 Critical" },
+    high:     { border: "border-orange-200 bg-orange-50", badge: "bg-orange-50 text-orange-700 border-orange-200", label: "🔥 High" },
+    medium:   { border: "border-amber-200 bg-amber-50",   badge: "bg-yellow-50 text-yellow-700 border-yellow-200", label: "⚠️ Medium" },
+    low:      { border: "border-gray-100 bg-gray-50",     badge: "bg-gray-50 text-gray-600 border-gray-200",       label: "· Low" },
+  };
+  const ps = NBA_PRIORITY_STYLE[nba.priority];
+
+  return (
+    <div className="p-5 space-y-5">
+
+      {/* ── Next Best Action ─────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Next Best Action</p>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ps.badge}`}>{ps.label}</span>
+        </div>
+        <div className={`rounded-xl border ${ps.border} p-4`}>
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center shrink-0 mt-0.5">
+              <Zap className="w-5 h-5 text-foreground" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-base font-bold text-foreground leading-tight">{nba.action}</p>
+              <p className={`text-[10px] font-semibold mt-0.5 ${
+                nba.urgency === "immediate" ? "text-red-600" :
+                nba.urgency === "today"     ? "text-orange-600" :
+                nba.urgency === "this-week" ? "text-amber-600" : "text-muted-foreground"
+              }`}>
+                {nba.urgency === "immediate" ? "🚨 Act now" :
+                 nba.urgency === "today"     ? "📅 Do today" :
+                 nba.urgency === "this-week" ? "📆 This week" : "· When ready"}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide shrink-0 pt-px w-14">Why</span>
+              <p className="text-xs text-muted-foreground leading-snug">{nba.reason}</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide shrink-0 pt-px w-14">Outcome</span>
+              <p className="text-xs font-medium text-foreground leading-snug">{nba.expectedOutcome}</p>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-black/5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Confidence</span>
+              <span className="text-[10px] font-bold text-foreground">{nba.confidence}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  nba.confidence >= 80 ? "bg-emerald-500" :
+                  nba.confidence >= 60 ? "bg-amber-400" : "bg-gray-400"
+                }`}
+                style={{ width: `${nba.confidence}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Lead Momentum ────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Lead Momentum</p>
+          <span className={`text-[10px] font-bold ${
+            momentum.trend === "rising"    ? "text-emerald-600" :
+            momentum.trend === "declining" ? "text-red-600"     : "text-muted-foreground"
+          }`}>
+            {momentum.trend === "rising" ? "↑ Rising" :
+             momentum.trend === "declining" ? "↓ Declining" : "→ Stable"}
+          </span>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <div>
+            <div className="flex items-end gap-2 mb-1.5">
+              <span className={`text-3xl font-bold leading-none ${
+                momentum.score >= 65 ? "text-emerald-600" :
+                momentum.score <= 35 ? "text-red-500"     : "text-amber-600"
+              }`}>{momentum.score}</span>
+              <span className="text-xs text-muted-foreground mb-0.5">/ 100</span>
+            </div>
+            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  momentum.score >= 65 ? "bg-emerald-400" :
+                  momentum.score <= 35 ? "bg-red-400"     : "bg-amber-400"
+                }`}
+                style={{ width: `${momentum.score}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground leading-snug">{momentum.explanation}</p>
+          {(momentum.positiveSignals.length > 0 || momentum.negativeSignals.length > 0) && (
+            <div className="space-y-1 pt-1 border-t border-gray-50">
+              {momentum.positiveSignals.map((s, i) => (
+                <div key={i} className="flex items-start gap-1.5 text-xs">
+                  <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                  <span className="text-emerald-700">{s}</span>
+                </div>
+              ))}
+              {momentum.negativeSignals.map((s, i) => (
+                <div key={i} className="flex items-start gap-1.5 text-xs">
+                  <span className="text-red-500 font-bold shrink-0">✗</span>
+                  <span className="text-red-600">{s}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Communication Snapshot ────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Communication Snapshot</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-0.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Engagement</p>
+            <p className={`text-xl font-bold leading-tight ${commStats.engagementScore.color}`}>
+              {commStats.engagementScore.score}
+            </p>
+            <p className="text-[10px] text-muted-foreground">/ 100</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-0.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Reply Risk</p>
+            <p className={`text-sm font-bold ${
+              commStats.replyRisk === "Low"    ? "text-emerald-600" :
+              commStats.replyRisk === "Medium" ? "text-amber-600"   : "text-red-600"
+            }`}>{commStats.replyRisk}</p>
+            <p className="text-[10px] text-muted-foreground">Status: {commStats.status}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Engine Legend ────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
+          How This Works
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Next Best Action, momentum, and confidence are computed in real-time from lead status,
+          activity history, proposal state, and contact recency. No AI — transparent rules only.
+          Scores update immediately when you log activity or change lead data.
+        </p>
+      </div>
+
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
@@ -1143,6 +1355,7 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "notes",      label: "Notes",         icon: StickyNote },
   { id: "history",    label: "History",       icon: History },
   { id: "documents",  label: "Documents",     icon: Folder },
+  { id: "intelligence", label: "Intelligence", icon: Zap },
 ];
 
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
@@ -1212,6 +1425,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
       {activeTab === "sow" && <DocPanel lead={lead} kind="sow" onReload={onReload} />}
       {activeTab === "notes" && <NotesTab lead={lead} onReload={onReload} />}
       {activeTab === "history" && <HistoryTab activities={activities} tasks={tasks} />}
+      {activeTab === "intelligence" && <IntelligenceTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "documents" && (
         <div className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">

@@ -18,6 +18,10 @@ import {
   type DiLead,
 } from "@/lib/discEngine";
 import { SalesWorkspace } from "./SalesWorkspace";
+import {
+  computeSalesNBA, computeLeadMomentum,
+  type SiLead, type SiActivity, type SiTask,
+} from "@/lib/salesIntelligence";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -136,6 +140,36 @@ export default function CrmLeadDetail() {
     };
     return computeCommunicationStats(ciLead, activities, []);
   }, [lead, activities]);
+  const siLead = useMemo((): SiLead | null => {
+    if (!lead) return null;
+    return {
+      id: lead.id, name: lead.name, company: lead.company, status: lead.status,
+      priority: lead.priority, estimatedValue: lead.estimatedValue,
+      lastContactedAt: lead.lastContactedAt, nextFollowUpAt: lead.nextFollowUpAt,
+      proposalStatus: lead.proposalStatus ?? "Not Started",
+      sowStatus: lead.sowStatus ?? "Not Started",
+      generatedProposal: lead.generatedProposal, generatedSow: lead.generatedSow,
+      discoverySubmissionId: lead.discoverySubmissionId,
+      createdAt: lead.createdAt, updatedAt: lead.updatedAt,
+    };
+  }, [lead]);
+
+  const siActivities = useMemo((): SiActivity[] =>
+    activities.map(a => ({ type: a.type, createdAt: a.createdAt })), [activities]);
+
+  const siTasks = useMemo((): SiTask[] =>
+    tasks.map(t => ({ status: t.status, dueDate: t.dueDate, completedAt: t.completedAt, createdAt: t.createdAt })), [tasks]);
+
+  const salesNBA = useMemo(() => {
+    if (!siLead) return null;
+    return computeSalesNBA(siLead, siActivities, siTasks, health?.score ?? 50, ciStats?.engagementScore.score ?? 50);
+  }, [siLead, siActivities, siTasks, health, ciStats]);
+
+  const momentum = useMemo(() => {
+    if (!siLead) return null;
+    return computeLeadMomentum(siLead, siActivities, siTasks, health?.score ?? 50, ciStats?.engagementScore.score ?? 50);
+  }, [siLead, siActivities, siTasks, health, ciStats]);
+
   const discProfile = useMemo(() => {
     if (!lead) return null;
     const diLead: DiLead = {
@@ -932,6 +966,120 @@ export default function CrmLeadDetail() {
 
                 <p className="text-[10px] text-muted-foreground">
                   Open <strong>Communications</strong> tab in Sales Workspace for full timeline.
+                </p>
+              </div>
+            )}
+
+            {/* ── Sales Intelligence ───────────────────────────────────────── */}
+            {salesNBA && momentum && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Sales Intelligence</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    salesNBA.priority === "critical" ? "bg-red-50 text-red-700 border-red-200" :
+                    salesNBA.priority === "high"     ? "bg-orange-50 text-orange-700 border-orange-200" :
+                    salesNBA.priority === "medium"   ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                                                       "bg-gray-50 text-gray-600 border-gray-200"
+                  }`}>
+                    {salesNBA.priority === "critical" ? "🚨 Critical" :
+                     salesNBA.priority === "high"     ? "🔥 High"     :
+                     salesNBA.priority === "medium"   ? "⚠️ Medium"   : "· Low"}
+                  </span>
+                </div>
+
+                {/* Next Best Action */}
+                <div className={`rounded-lg px-3 py-2.5 border ${
+                  salesNBA.priority === "critical" ? "bg-red-50 border-red-200" :
+                  salesNBA.priority === "high"     ? "bg-orange-50 border-orange-200" :
+                  salesNBA.priority === "medium"   ? "bg-amber-50 border-amber-200" :
+                                                     "bg-gray-50 border-gray-100"
+                }`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Next Best Action</p>
+                  <p className="text-sm font-bold text-foreground mb-1">{salesNBA.action}</p>
+                  <p className="text-xs text-muted-foreground leading-snug mb-1.5">{salesNBA.reason}</p>
+                  <p className="text-[11px] font-medium text-foreground leading-snug">{salesNBA.expectedOutcome}</p>
+                </div>
+
+                {/* Confidence + Urgency */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Confidence</p>
+                    <p className="text-sm font-bold text-foreground">{salesNBA.confidence}%</p>
+                    <div className="h-1 w-full bg-gray-200 rounded-full mt-1 overflow-hidden">
+                      <div
+                        className={`h-1 rounded-full ${
+                          salesNBA.confidence >= 80 ? "bg-emerald-500" :
+                          salesNBA.confidence >= 60 ? "bg-amber-400" : "bg-gray-400"
+                        }`}
+                        style={{ width: `${salesNBA.confidence}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Urgency</p>
+                    <span className={`text-xs font-semibold ${
+                      salesNBA.urgency === "immediate" ? "text-red-600" :
+                      salesNBA.urgency === "today"     ? "text-orange-600" :
+                      salesNBA.urgency === "this-week" ? "text-amber-600" : "text-muted-foreground"
+                    }`}>
+                      {salesNBA.urgency === "immediate" ? "🚨 Immediate" :
+                       salesNBA.urgency === "today"     ? "📅 Today" :
+                       salesNBA.urgency === "this-week" ? "📆 This Week" : "· When Ready"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Lead Momentum */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Momentum</span>
+                    <span className={`text-[10px] font-bold ${
+                      momentum.trend === "rising"   ? "text-emerald-600" :
+                      momentum.trend === "declining" ? "text-red-600"    : "text-muted-foreground"
+                    }`}>
+                      {momentum.trend === "rising" ? "↑ Rising" :
+                       momentum.trend === "declining" ? "↓ Declining" : "→ Stable"}
+                    </span>
+                  </div>
+                  <div className="flex items-end gap-2 mb-1">
+                    <span className={`text-2xl font-bold leading-none ${
+                      momentum.score >= 65 ? "text-emerald-600" :
+                      momentum.score <= 35 ? "text-red-600"     : "text-amber-600"
+                    }`}>{momentum.score}</span>
+                    <span className="text-xs text-muted-foreground mb-0.5">/ 100</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${
+                        momentum.score >= 65 ? "bg-emerald-400" :
+                        momentum.score <= 35 ? "bg-red-400"     : "bg-amber-400"
+                      }`}
+                      style={{ width: `${momentum.score}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">{momentum.explanation}</p>
+                </div>
+
+                {/* Top signals */}
+                {(momentum.positiveSignals.length > 0 || momentum.negativeSignals.length > 0) && (
+                  <div className="space-y-1">
+                    {momentum.positiveSignals.slice(0, 2).map((s, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                        <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                        <span className="text-emerald-700">{s}</span>
+                      </div>
+                    ))}
+                    {momentum.negativeSignals.slice(0, 2).map((s, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                        <span className="text-red-500 font-bold shrink-0">✗</span>
+                        <span className="text-red-600">{s}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-[10px] text-muted-foreground">
+                  Open <strong>Intelligence</strong> tab in Sales Workspace for full breakdown.
                 </p>
               </div>
             )}

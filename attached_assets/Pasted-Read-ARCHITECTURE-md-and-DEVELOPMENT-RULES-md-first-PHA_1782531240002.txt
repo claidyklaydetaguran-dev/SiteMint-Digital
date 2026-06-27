@@ -1,0 +1,435 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 15 — Sales Intelligence Hub (Next Best Action + Opportunity Radar + Daily Sales Brief)
+
+MODULE:
+CRM Dashboard + Sales Workspace + Lead Detail
+
+IMPORTANT:
+This phase is NOT AI.
+
+Do NOT use OpenAI or any LLM.
+
+Everything must be transparent, deterministic, explainable, and rule-based.
+
+Reuse the existing engines whenever possible:
+
+* leadScore.ts
+* communicationIntelligence.ts
+* workflowEngine.ts
+* discEngine.ts
+
+Do not modify these engines unless absolutely required.
+
+Do not touch:
+
+* Twilio
+* Campaign sending
+* Resend
+* Locked modules
+* Database schema unless a very small addition becomes absolutely necessary.
+
+Stay within the normal change budget.
+
+---
+
+CURRENT STATE
+
+The CRM already has:
+
+✓ Lead Health Score
+✓ Engagement Score
+✓ DISC Personality Engine
+✓ Workflow Engine
+✓ Communication Intelligence
+✓ Proposal Generator
+✓ SOW Generator
+✓ Campaign Analytics
+✓ Inbox
+✓ Deals
+✓ Tasks
+
+The CRM already knows a tremendous amount.
+
+Now use all of this information to help the salesperson decide WHAT TO DO NEXT.
+
+---
+
+OBJECTIVE
+
+Turn the CRM into an intelligent sales assistant.
+
+Instead of only showing information,
+the CRM should recommend actions.
+
+Every recommendation must explain WHY.
+
+Nothing should feel like a black box.
+
+---
+
+TASK 1 — Build Sales Intelligence Engine
+
+Create:
+
+src/lib/salesIntelligence.ts
+
+Pure TypeScript.
+
+Zero React.
+
+Zero API calls.
+
+No AI.
+
+Export:
+
+computeNextBestAction()
+
+computeOpportunityRadar()
+
+computeDailyBrief()
+
+computeLeadMomentum()
+
+computeRecommendationConfidence()
+
+computeSalesPriority()
+
+Use existing outputs from:
+
+leadScore
+
+engagement
+
+workflow
+
+DISC
+
+communication
+
+task state
+
+proposal state
+
+SOW state
+
+campaign activity
+
+---
+
+TASK 2 — Next Best Action
+
+Every lead should produce:
+
+{
+action,
+confidence,
+priority,
+reason,
+expectedOutcome,
+dueToday,
+urgency
+}
+
+Example actions:
+
+Call
+
+Send SMS
+
+Send Email
+
+Generate Proposal
+
+Send Proposal
+
+Generate SOW
+
+Follow Up
+
+Schedule Meeting
+
+Re-engage
+
+Close Deal
+
+Archive Lead
+
+Every recommendation must include:
+
+Why
+
+Expected outcome
+
+Confidence
+
+Priority
+
+---
+
+TASK 3 — Opportunity Radar
+
+Create 4 intelligent buckets.
+
+🔥 Hot Opportunities
+
+High health
+
+High engagement
+
+High value
+
+Proposal active
+
+High confidence
+
+---
+
+⚠ Cooling Down
+
+Health dropping
+
+No reply
+
+Low engagement
+
+Needs follow-up
+
+---
+
+❄ At Risk
+
+Overdue
+
+Proposal ignored
+
+Cold communication
+
+Lost momentum
+
+---
+
+🌱 Nurture
+
+Low urgency
+
+Long-term
+
+Relationship building
+
+Every card shows:
+
+Lead
+
+Company
+
+Value
+
+Health
+
+Engagement
+
+DISC
+
+Recommendation
+
+Confidence
+
+---
+
+TASK 4 — Daily Sales Brief
+
+Create a dashboard card.
+
+Every morning it summarizes:
+
+Today's Priorities
+
+High Priority Calls
+
+Proposal Follow Ups
+
+Tasks Due Today
+
+Messages Waiting
+
+Hot Opportunities
+
+Deals Near Closing
+
+New Discovery Forms
+
+Campaign Responses
+
+Needs Attention
+
+Everything computed from existing CRM data.
+
+No API additions unless absolutely necessary.
+
+---
+
+TASK 5 — Lead Momentum
+
+Create a momentum score.
+
+Separate from Health.
+
+Separate from Engagement.
+
+Momentum measures:
+
+Are we moving toward a sale?
+
+Signals include:
+
+Proposal progress
+
+Communication
+
+Workflow progression
+
+Recent activity
+
+Task completion
+
+Discovery completion
+
+Momentum:
+
+Rising
+
+Stable
+
+Declining
+
+Each includes:
+
+Explanation
+
+Arrow indicator
+
+Confidence
+
+---
+
+TASK 6 — Dashboard Integration
+
+Without redesigning the page:
+
+Add:
+
+Sales Intelligence
+
+Opportunity Radar
+
+Daily Sales Brief
+
+Momentum Summary
+
+These should appear naturally below existing KPI cards.
+
+Reuse existing layout components.
+
+---
+
+TASK 7 — Lead Detail Integration
+
+Add a Sales Intelligence card.
+
+Show:
+
+Next Best Action
+
+Why
+
+Expected Outcome
+
+Confidence
+
+Priority
+
+Momentum
+
+Recommendation History (last few rule-based recommendations)
+
+---
+
+TASK 8 — Sales Workspace Integration
+
+Add an Intelligence tab.
+
+Show:
+
+Next Best Action
+
+Opportunity Summary
+
+Proposal Readiness
+
+Communication Health
+
+Workflow Readiness
+
+Recommended Next Step
+
+Everything should update automatically from existing lead data.
+
+---
+
+TASK 9 — Performance
+
+Everything must use useMemo where appropriate.
+
+No duplicate API requests.
+
+Reuse already-loaded data.
+
+No polling.
+
+No background workers.
+
+No AI.
+
+---
+
+TASK 10 — Testing
+
+Verify:
+
+1. Dashboard loads.
+2. Lead Detail loads.
+3. Sales Workspace loads.
+4. Intelligence engine handles empty leads.
+5. High-value leads rank correctly.
+6. Opportunity Radar buckets populate correctly.
+7. Daily Brief computes correctly.
+8. Momentum updates correctly.
+9. No additional API calls beyond reused data.
+10. No schema changes unless required.
+11. No Twilio changes.
+12. No Campaign changes.
+13. No locked modules changed.
+14. TypeScript passes.
+15. No console errors.
+
+FINAL REPORT
+
+Return:
+
+1. Files inspected
+2. Files changed
+3. Sales Intelligence Engine design
+4. Next Best Action logic
+5. Opportunity Radar logic
+6. Daily Brief logic
+7. Momentum logic
+8. Dashboard integration
+9. Lead Detail integration
+10. Sales Workspace integration
+11. Tests performed
+12. Performance considerations
+13. Schema changes (if any)
+14. Known limitations
+15. Recommended Phase 16
