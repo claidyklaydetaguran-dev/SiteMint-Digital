@@ -69,7 +69,7 @@ function Router() {
       <Route path="/discovery" component={Discovery} />
 
       {/* Thank You — no main layout */}
-      <Route path="/thank-you" component={ThankYou} />
+      <Route path="/thank-you">{() => <ThankYou />}</Route>
 
       {/* Public site — with main layout */}
       <Route>

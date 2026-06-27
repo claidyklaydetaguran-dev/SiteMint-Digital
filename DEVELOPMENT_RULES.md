@@ -64,7 +64,7 @@ These files must never be modified unless the user's prompt explicitly names the
 | `artifacts/web-agency/src/lib/leadScore.ts` | Never touch — lead health scoring engine |
 | `artifacts/web-agency/src/lib/communicationIntelligence.ts` | Never touch — CI engine |
 | `artifacts/web-agency/src/lib/workflowEngine.ts` | Never touch — workflow trigger engine |
-| `artifacts/web-agency/src/App.tsx` line 72 | Never fix ThankYouProps TS2322 — pre-existing, intentionally left |
+
 
 If a task would require touching a locked module, **stop and tell the user** before proceeding.
 
@@ -89,7 +89,7 @@ Do NOT write new tests for stable or locked modules.
 
 **Required checks before marking any task done:**
 - `npx tsc --noEmit` exits 0 in `api-server` (only pre-existing errors are allowed)
-- `npx tsc --noEmit` exits with only the known ThankYouProps error in `web-agency`
+- `npx tsc --noEmit` exits 0 in `web-agency` (TypeScript baseline is now fully clean)
 - At least one `curl` or Playwright test for every new API route
 - Both workflows (api-server, web-agency) running without errors in logs
 
@@ -164,7 +164,7 @@ Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
 Work only inside [MODULE NAME — e.g. Campaigns].
 
 Do not touch locked modules (discEngine, leadScore, communicationIntelligence,
-workflowEngine, phone.ts, App.tsx line 72).
+workflowEngine, phone.ts).
 
 Stay within the default change budget (5 files, 300 lines, 1 migration, 1 utility, 2 components).
 

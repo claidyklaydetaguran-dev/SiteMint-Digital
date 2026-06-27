@@ -294,7 +294,7 @@ These files are compute engines with complex, tested logic. Touching them risks 
 - `lib/leadScore.ts` — Lead health engine
 - `lib/communicationIntelligence.ts` — CI engine
 - `lib/workflowEngine.ts` — Workflow engine
-- `App.tsx` line 72 — pre-existing ThankYouProps TS2322 error; do not attempt to fix
+
 
 ---
 
