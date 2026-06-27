@@ -1,7 +1,7 @@
 # SiteMint Digital CRM — Architecture Guide
 
 > Read this file before every development session.
-> Last updated: 2026-06-27
+> Last updated: 2026-06-27 (Phase 24A+24B)
 
 ---
 
@@ -108,6 +108,7 @@ scripts/               — Utility scripts (@workspace/scripts)
 | Communication Intelligence | **LOCKED** | `lib/communicationIntelligence.ts` | CI sidebar card, comms scoring; do not modify |
 | DISC / Behavioral Intelligence | **LOCKED** | `lib/discEngine.ts` | DISC computation + DISC_META; do not modify |
 | Campaigns | STABLE | `CrmCampaigns.tsx`, `lib/campaignPersonalization.ts`, `crm.ts` campaign section, `schema/crmCampaigns.ts` | All core features complete — see Campaign Feature Inventory below |
+| Behavioral Intelligence | **ACTIVE** | `lib/behavioralIntelligence.ts` (engine), `schema/crmBehavioralEvents.ts` (data), `crm.ts` behavioral routes | Phase 24A+24B complete — data layer + DNA engine live; UI (24C) is next |
 | Inbox | STABLE | `CrmInbox.tsx`, `phone.ts` (read paths) | Unified email + SMS inbox |
 | Reporting | STABLE | `CrmReporting.tsx` | Read-only reporting |
 | Import Leads | STABLE | `CrmImport.tsx`, `crm.ts` lines 587–757 | CSV + Discovery import |
@@ -214,6 +215,13 @@ All CRM endpoints require `Authorization: Bearer <token>`. Base path: `/api`.
 | GET | `/crm/campaigns/:id/analytics` | Analytics — sent/open/click/bounce rates, unique openers/clickers |
 | POST | `/crm/webhooks/resend` | Resend event webhook (open, click, bounce, delivery failure) |
 
+### Behavioral Intelligence
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/crm/leads/:id/behavioral-events` | List all behavioral events for a lead (newest first) |
+| POST | `/crm/leads/:id/behavioral-events` | Record a new behavioral event with optional DNA deltas |
+| DELETE | `/crm/leads/:id/behavioral-events/:eventId` | Delete a single event (manual correction) |
+
 ### Deals / Pipeline
 | Method | Path | Purpose |
 |---|---|---|
@@ -263,6 +271,8 @@ All schema lives in `lib/db/src/schema/`. Migration: `pnpm --filter @workspace/d
 | `crm_email_templates` | `crmEmailTemplates.ts` | Reusable email templates |
 | `crm_campaigns` | `crmCampaigns.ts` | Campaign records (name, subject, body, status) |
 | `crm_campaign_recipients` | `crmCampaigns.ts` | Per-recipient DISC-personalized email data; FK → crm_leads (cascade) |
+| `crm_campaign_events` | `crmCampaigns.ts` | Per-recipient email events (opened, clicked, bounced); FK → crm_campaign_recipients (cascade) |
+| `crm_behavioral_events` | `crmBehavioralEvents.ts` | Lead behavioral events with per-dimension DNA score deltas; FK → crm_leads (cascade) |
 | `discovery_submissions` | `submissions.ts` | Discovery portal form submissions |
 | `form_submissions` | `formSubmissions.ts` | Public contact form submissions |
 
@@ -315,12 +325,16 @@ These files are compute engines with complex, tested logic. Touching them risks 
 
 ## Suggested Future Phases
 
-1. **SMS Consent Management UI** — admin view for opt-in/opt-out status, consent history
-2. **Campaign Scheduling** — schedule a campaign to send at a specific date/time
-3. **Drip Sequence Builder** — multi-step email flows triggered by lead actions
-4. **AI Copilot Drafting** — AI-assisted subject/body suggestions in the campaign builder
-5. **Client Portal** — lead-facing status page for proposals and SOWs
-6. **Executive Forecasting Dashboard** — revenue forecast, pipeline velocity, win-rate trends
+1. **Phase 24C — Behavioral Timeline UI** — Behavior Timeline card in SalesWorkspace; Lead DNA score panel; Intent Stage badge; event feed with score impact labels
+2. **Phase 24D — Intent Stage System** — replace raw stage field with 10-bucket intent stage; dashboard panel showing distribution
+3. **Phase 24E — Campaign Intelligence** — email objectives, desired behaviors, conditional routing (opened → path A, ignored → path B)
+4. **Phase 24F — Sales Intelligence Recommendations** — "Call John today — Intent rose 38% this week" panel in CrmDashboard
+5. **SMS Consent Management UI** — admin view for opt-in/opt-out status, consent history
+6. **Campaign Scheduling** — schedule a campaign to send at a specific date/time
+7. **Drip Sequence Builder** — multi-step email flows triggered by lead actions
+8. **AI Copilot Drafting** — AI-assisted subject/body suggestions in the campaign builder
+9. **Client Portal** — lead-facing status page for proposals and SOWs
+10. **Executive Forecasting Dashboard** — revenue forecast, pipeline velocity, win-rate trends
 
 ---
 

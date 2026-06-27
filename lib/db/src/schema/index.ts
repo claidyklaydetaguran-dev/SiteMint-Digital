@@ -7,3 +7,4 @@ export * from "./crmEmailTemplates";
 export * from "./crmMessages";
 export * from "./crmDeals";
 export * from "./crmCampaigns";
+export * from "./crmBehavioralEvents";

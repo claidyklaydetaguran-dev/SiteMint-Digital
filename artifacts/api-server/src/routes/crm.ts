@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents } from "@workspace/db";
+import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
@@ -1452,6 +1453,91 @@ router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Respo
   } catch (err) {
     req.log.error({ err }, "Error saving SOW");
     res.status(500).json({ error: "Failed to save SOW" });
+  }
+});
+
+// ── Behavioral Intelligence — Phase 24A ───────────────────────────────────────
+
+// GET /crm/leads/:id/behavioral-events
+// Returns all behavioral events for a lead, newest first.
+router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [lead] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.id, id));
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+    const events = await db
+      .select()
+      .from(crmBehavioralEvents)
+      .where(eq(crmBehavioralEvents.leadId, id))
+      .orderBy(desc(crmBehavioralEvents.occurredAt));
+    res.json({ events });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching behavioral events");
+    res.status(500).json({ error: "Failed to fetch behavioral events" });
+  }
+});
+
+// POST /crm/leads/:id/behavioral-events
+// Records a new behavioral event for a lead.
+// Body: { eventType, label?, dClientIntent?, dUrgency?, dTrust?,
+//         dProjectReadiness?, dBudgetConfidence?, dCommunicationScore?,
+//         dReferralProbability?, metadata?, occurredAt? }
+router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const [lead] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.id, id));
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+
+    const {
+      eventType, label, occurredAt,
+      dClientIntent, dUrgency, dTrust,
+      dProjectReadiness, dBudgetConfidence,
+      dCommunicationScore, dReferralProbability,
+      metadata,
+    } = req.body as Partial<InsertCrmBehavioralEvent> & { occurredAt?: string };
+
+    if (!eventType) { res.status(400).json({ error: "eventType is required" }); return; }
+
+    const row: InsertCrmBehavioralEvent = {
+      leadId: id,
+      eventType,
+      ...(label              !== undefined && { label }),
+      ...(occurredAt         !== undefined && { occurredAt: new Date(occurredAt) }),
+      ...(dClientIntent      !== undefined && { dClientIntent }),
+      ...(dUrgency           !== undefined && { dUrgency }),
+      ...(dTrust             !== undefined && { dTrust }),
+      ...(dProjectReadiness  !== undefined && { dProjectReadiness }),
+      ...(dBudgetConfidence  !== undefined && { dBudgetConfidence }),
+      ...(dCommunicationScore!== undefined && { dCommunicationScore }),
+      ...(dReferralProbability!==undefined && { dReferralProbability }),
+      ...(metadata           !== undefined && { metadata }),
+    };
+
+    const [inserted] = await db.insert(crmBehavioralEvents).values(row).returning();
+    req.log.info({ leadId: id, eventType }, "Behavioral event recorded");
+    res.status(201).json({ event: inserted });
+  } catch (err) {
+    req.log.error({ err }, "Error recording behavioral event");
+    res.status(500).json({ error: "Failed to record behavioral event" });
+  }
+});
+
+// DELETE /crm/leads/:id/behavioral-events/:eventId
+// Removes a single behavioral event (manual correction).
+router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const leadId  = Number(req.params.id);
+    const eventId = Number(req.params.eventId);
+    if (isNaN(leadId) || isNaN(eventId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    await db
+      .delete(crmBehavioralEvents)
+      .where(and(eq(crmBehavioralEvents.id, eventId), eq(crmBehavioralEvents.leadId, leadId)));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting behavioral event");
+    res.status(500).json({ error: "Failed to delete behavioral event" });
   }
 });
 
