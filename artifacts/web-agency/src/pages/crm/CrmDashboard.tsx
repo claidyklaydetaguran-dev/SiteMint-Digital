@@ -586,7 +586,7 @@ export default function CrmDashboard() {
           <div className="flex items-center gap-2 mb-3">
             <span className="text-base leading-none">🤝</span>
             <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Relationship Overview</h2>
-            <span className="text-[10px] text-muted-foreground ml-1">— computed from health, engagement &amp; workflow signals</span>
+            <span className="text-[10px] text-muted-foreground ml-1">— computed from health, engagement &amp; workflow signals · rule-based, no AI</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-1">

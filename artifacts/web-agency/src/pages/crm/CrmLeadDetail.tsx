@@ -1389,6 +1389,10 @@ export default function CrmLeadDetail() {
                   </span>
                 </div>
 
+                <p className="text-[10px] text-muted-foreground -mt-1">
+                  Deal stage, recency, proposal status &amp; activity · rule-based
+                </p>
+
                 {/* Score gauge */}
                 <div>
                   <div className="flex items-end gap-2 mb-1.5">
@@ -1433,6 +1437,58 @@ export default function CrmLeadDetail() {
               </div>
             )}
 
+            {/* ── Relationship Intelligence ─────────────────────────────── */}
+            {relProfile && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Relationship</h3>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${relProfile.strength.bgColor} ${relProfile.strength.color} ${relProfile.strength.borderColor}`}>
+                    {relProfile.strength.label}
+                  </span>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground -mt-1">
+                  Combined score: health + engagement + stage + recency · rule-based
+                </p>
+
+                {/* Score bar */}
+                <div>
+                  <div className="flex items-end gap-1.5 mb-1">
+                    <span className={`text-3xl font-bold leading-none ${relProfile.strength.color}`}>
+                      {relProfile.strength.score}
+                    </span>
+                    <span className="text-xs text-muted-foreground mb-0.5">/ 100 strength</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full ${relProfile.strength.barColor}`}
+                      style={{ width: `${relProfile.strength.score}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Risk */}
+                <div className={`rounded-lg px-3 py-2.5 border ${relProfile.risk.bgColor} ${relProfile.risk.borderColor}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Relationship Risk</p>
+                  <p className={`text-xs font-semibold ${relProfile.risk.color}`}>{relProfile.risk.level}</p>
+                  {relProfile.risk.signals.length > 0 && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{relProfile.risk.signals[0].label}</p>
+                  )}
+                </div>
+
+                {/* Conversation recommendation */}
+                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recommended Next Step</p>
+                  <p className="text-xs font-semibold text-foreground">{relProfile.conversation.action}</p>
+                  <p className="text-[10px] text-muted-foreground">{relProfile.conversation.why}</p>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground">
+                  Open <strong>Relationship</strong> tab in Sales Workspace for full analysis.
+                </p>
+              </div>
+            )}
+
             {/* ── Communication Intelligence ──────────────────────────────── */}
             {ciStats && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
@@ -1442,6 +1498,10 @@ export default function CrmLeadDetail() {
                     {ciStats.status}
                   </span>
                 </div>
+
+                <p className="text-[10px] text-muted-foreground -mt-1">
+                  Engagement based on message volume, recency &amp; inbound replies · rule-based
+                </p>
 
                 <div>
                   <div className="flex items-end gap-1.5 mb-1">
@@ -1480,7 +1540,7 @@ export default function CrmLeadDetail() {
 
                 {ciStats.engagementScore.badge !== "Highly Engaged" && (
                   <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Badge</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Engagement Badge</p>
                     <p className={`text-xs font-semibold ${ciStats.engagementScore.color}`}>
                       {ciStats.engagementScore.badge}
                     </p>
@@ -1489,59 +1549,6 @@ export default function CrmLeadDetail() {
 
                 <p className="text-[10px] text-muted-foreground">
                   Open <strong>Communications</strong> tab in Sales Workspace for full timeline.
-                </p>
-              </div>
-            )}
-
-            {/* ── Relationship Intelligence ─────────────────────────────── */}
-            {relProfile && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif font-bold text-sm text-foreground">Relationship</h3>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${relProfile.strength.bgColor} ${relProfile.strength.color} ${relProfile.strength.borderColor}`}>
-                    {relProfile.strength.label}
-                  </span>
-                </div>
-
-                {/* Score bar */}
-                <div>
-                  <div className="flex items-end gap-1.5 mb-1">
-                    <span className={`text-3xl font-bold leading-none ${relProfile.strength.color}`}>
-                      {relProfile.strength.score}
-                    </span>
-                    <span className="text-xs text-muted-foreground mb-0.5">/ 100 strength</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className={`h-1.5 rounded-full ${relProfile.strength.barColor}`}
-                      style={{ width: `${relProfile.strength.score}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Risk */}
-                <div className={`rounded-lg px-3 py-2.5 border ${relProfile.risk.bgColor} ${relProfile.risk.borderColor}`}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Risk</p>
-                  <p className={`text-xs font-semibold ${relProfile.risk.color}`}>{relProfile.risk.level}</p>
-                  {relProfile.risk.signals.length > 0 && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{relProfile.risk.signals[0].label}</p>
-                  )}
-                </div>
-
-                {/* Conversation recommendation */}
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recommended Next Step</p>
-                  <p className="text-xs font-semibold text-foreground">{relProfile.conversation.action}</p>
-                  <p className="text-[10px] text-muted-foreground">{relProfile.conversation.why}</p>
-                </div>
-
-                {/* Summary */}
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  {relProfile.summary}
-                </p>
-
-                <p className="text-[10px] text-muted-foreground">
-                  Open <strong>Relationship</strong> tab in Sales Workspace for full analysis.
                 </p>
               </div>
             )}
@@ -1591,6 +1598,7 @@ export default function CrmLeadDetail() {
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Sales Intelligence</h3>
+
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     salesNBA.priority === "critical" ? "bg-red-50 text-red-700 border-red-200" :
                     salesNBA.priority === "high"     ? "bg-orange-50 text-orange-700 border-orange-200" :

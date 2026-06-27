@@ -4,7 +4,7 @@ import {
   FileText, ClipboardList, Printer, Copy, Edit3, Loader2,
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
   X, DollarSign, Package, Zap, Bot, ChevronRight, RefreshCw,
-  StickyNote, History, Star, GitBranch, MessageSquare,
+  StickyNote, History, Star, GitBranch, MessageSquare, Network,
 } from "lucide-react";
 import {
   computeWorkflowSteps, computeNextBestAction,
@@ -1838,7 +1838,7 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "documents",  label: "Documents",     icon: Folder },
   { id: "intelligence", label: "Intelligence", icon: Zap },
   { id: "automation",   label: "Automation",   icon: Bot },
-  { id: "relationship", label: "Relationship", icon: Star },
+  { id: "relationship", label: "Relationship", icon: Network },
 ];
 
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
