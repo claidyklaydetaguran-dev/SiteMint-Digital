@@ -5,9 +5,25 @@ import { Button } from "@/components/ui/button";
 import {
   MessageSquare, AlertCircle, Settings, Shield, Bell,
   TestTube, Phone, CheckCircle, XCircle, Copy, RefreshCw,
+  Search, Sparkles,
 } from "lucide-react";
 
 const tok = () => localStorage.getItem("adminToken") || "";
+
+interface AuditRow {
+  id: number;
+  name: string;
+  phone: string;
+  normalizedPhone: string;
+  issue: string;
+  canAutoFix: boolean;
+}
+
+interface NormalizeResult {
+  updated: number;
+  skipped: number;
+  errors: number;
+}
 
 interface PhoneStatus {
   configured: boolean;
@@ -39,6 +55,15 @@ export default function CrmSettings() {
   const [testSmsSending, setTestSmsSending] = useState(false);
   const [testSmsResult, setTestSmsResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  // ── Phone audit state ──────────────────────────────────────────────────────
+  const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditRan, setAuditRan] = useState(false);
+  const [auditError, setAuditError] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [normalizing, setNormalizing] = useState(false);
+  const [normalizeResult, setNormalizeResult] = useState<NormalizeResult | null>(null);
 
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 3000); };
 
@@ -77,6 +102,74 @@ export default function CrmSettings() {
       setTestSmsResult({ ok: false, msg: String(e) });
     }
     setTestSmsSending(false);
+  };
+
+  const runAudit = async () => {
+    setAuditLoading(true);
+    setAuditError("");
+    setNormalizeResult(null);
+    setSelectedIds(new Set());
+    try {
+      const r = await fetch("/api/crm/phone/audit", {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const d = await r.json() as { leads: AuditRow[] };
+      setAuditRows(d.leads);
+      // Pre-select all auto-fixable rows
+      setSelectedIds(new Set(d.leads.filter(l => l.canAutoFix).map(l => l.id)));
+      setAuditRan(true);
+    } catch (e) {
+      setAuditError(String(e));
+    }
+    setAuditLoading(false);
+  };
+
+  const runNormalize = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setNormalizing(true);
+    try {
+      const r = await fetch("/api/crm/phone/normalize", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: ids }),
+      });
+      const d = await r.json() as NormalizeResult;
+      setNormalizeResult(d);
+      // Refresh audit after normalize
+      await runAudit();
+    } catch (e) {
+      setAuditError(String(e));
+    }
+    setNormalizing(false);
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const fixableRows = auditRows.filter(r => r.canAutoFix);
+  const allFixableSelected = fixableRows.length > 0 && fixableRows.every(r => selectedIds.has(r.id));
+
+  const toggleSelectAll = () => {
+    if (allFixableSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        fixableRows.forEach(r => next.delete(r.id));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        fixableRows.forEach(r => next.add(r.id));
+        return next;
+      });
+    }
   };
 
   const copyToClipboard = (text: string, key: string) => {
@@ -387,6 +480,150 @@ export default function CrmSettings() {
               <li>• API credentials are stored server-side only — never exposed to browser</li>
             </ul>
           </div>
+        </div>
+
+        {/* Phone Data Hygiene */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <h2 className="font-semibold text-sm text-foreground">Phone Data Hygiene</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Scan all lead phone numbers for formatting issues and normalize them to E.164 format in bulk.
+            Only confidently recognized numbers will be updated.
+          </p>
+
+          {/* Run audit button + result summary */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={runAudit}
+              disabled={auditLoading}
+              className="gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${auditLoading ? "animate-spin" : ""}`} />
+              {auditLoading ? "Scanning…" : auditRan ? "Re-scan" : "Run Phone Audit"}
+            </Button>
+            {auditRan && !auditLoading && (
+              <span className="text-xs text-muted-foreground">
+                {auditRows.length === 0
+                  ? "✓ All phone numbers look clean"
+                  : `${auditRows.length} number${auditRows.length === 1 ? "" : "s"} need attention · ${fixableRows.length} can be auto-fixed`}
+              </span>
+            )}
+          </div>
+
+          {/* Error */}
+          {auditError && (
+            <div className="mt-3 flex items-start gap-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              {auditError}
+            </div>
+          )}
+
+          {/* Success banner after normalize */}
+          {normalizeResult && (
+            <div className="mt-3 flex items-start gap-2 text-xs bg-green-50 border border-green-200 text-green-700 rounded-lg px-3 py-2">
+              <CheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Done — <strong>{normalizeResult.updated}</strong> updated,{" "}
+                <strong>{normalizeResult.skipped}</strong> skipped
+                {normalizeResult.errors > 0 && `, ${normalizeResult.errors} error${normalizeResult.errors === 1 ? "" : "s"}`}.
+              </span>
+            </div>
+          )}
+
+          {/* Audit preview table */}
+          {auditRan && auditRows.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-foreground">
+                  Preview ({auditRows.length} {auditRows.length === 1 ? "lead" : "leads"})
+                </p>
+                {fixableRows.length > 0 && (
+                  <button
+                    onClick={toggleSelectAll}
+                    className="text-[11px] text-blue-600 hover:underline"
+                  >
+                    {allFixableSelected ? "Deselect all fixable" : "Select all fixable"}
+                  </button>
+                )}
+              </div>
+
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="w-8 px-3 py-2 text-left">
+                        <span className="sr-only">Select</span>
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-foreground">Lead</th>
+                      <th className="px-3 py-2 text-left font-semibold text-foreground">Current</th>
+                      <th className="px-3 py-2 text-left font-semibold text-foreground">Suggested</th>
+                      <th className="px-3 py-2 text-left font-semibold text-foreground">Issue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {auditRows.map(row => (
+                      <tr key={row.id} className={`${selectedIds.has(row.id) ? "bg-blue-50/40" : ""}`}>
+                        <td className="px-3 py-2">
+                          {row.canAutoFix ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(row.id)}
+                              onChange={() => toggleSelect(row.id)}
+                              className="rounded border-gray-300 text-foreground focus:ring-foreground/30 cursor-pointer"
+                            />
+                          ) : (
+                            <span className="text-gray-300 text-[10px]">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-foreground max-w-[120px] truncate">
+                          {row.name}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-muted-foreground">{row.phone}</td>
+                        <td className="px-3 py-2 font-mono">
+                          {row.canAutoFix ? (
+                            <span className="text-green-700">{row.normalizedPhone}</span>
+                          ) : (
+                            <span className="text-gray-400 text-[11px]">Manual review needed</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            row.canAutoFix
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-gray-100 text-gray-500"
+                          }`}>
+                            {row.issue}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Normalize selected button */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button
+                  size="sm"
+                  onClick={runNormalize}
+                  disabled={normalizing || selectedIds.size === 0}
+                  className="gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {normalizing
+                    ? "Normalizing…"
+                    : `Normalize Selected (${selectedIds.size})`}
+                </Button>
+                <p className="text-[11px] text-muted-foreground">
+                  Only confidently recognized numbers will be updated. Unrecognized formats are skipped.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Security */}

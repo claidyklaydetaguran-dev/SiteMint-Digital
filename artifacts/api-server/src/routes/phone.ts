@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, crmLeads, crmActivities, crmMessages } from "@workspace/db";
-import { eq, desc, or, and } from "drizzle-orm";
+import { eq, desc, or, and, isNotNull } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import {
   isTwilioConfigured, getTwilio, getTwilioPhone, getForwardPhone, getCrmBaseUrl,
@@ -480,6 +480,109 @@ router.post("/crm/webhooks/twilio/voice/status", validateTwilioWebhook, async (r
     res.sendStatus(204);
   } catch {
     res.sendStatus(204);
+  }
+});
+
+// ── GET /crm/phone/audit ──────────────────────────────────────────────────────
+router.get("/crm/phone/audit", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const leads = await db
+      .select({ id: crmLeads.id, name: crmLeads.name, phone: crmLeads.phone })
+      .from(crmLeads)
+      .where(isNotNull(crmLeads.phone));
+
+    const results = [];
+    for (const lead of leads) {
+      if (!lead.phone) continue;
+      const phone = lead.phone;
+      const normalized = normalizePhone(phone);
+      // Already clean: E.164 and normalizePhone agrees
+      if (phone.startsWith("+") && normalized === phone) continue;
+
+      const digits = phone.replace(/\D/g, "");
+      let issue: string;
+      if (!phone.startsWith("+") && digits.length === 11 && digits.startsWith("0")) {
+        issue = "Possible PH trunk format";
+      } else if (
+        !phone.startsWith("+") &&
+        (digits.length === 10 ||
+          (digits.length === 11 && digits.startsWith("1")) ||
+          (digits.length === 12 && digits.startsWith("63")))
+      ) {
+        issue = "Needs E.164 formatting";
+      } else {
+        issue = "Unrecognized phone format";
+      }
+
+      const canAutoFix = normalized !== phone && normalized.startsWith("+");
+      results.push({ id: lead.id, name: lead.name, phone, normalizedPhone: normalized, issue, canAutoFix });
+    }
+
+    res.json({ leads: results });
+  } catch (err) {
+    req.log.error({ err }, "Phone audit failed");
+    res.status(500).json({ error: "Audit failed" });
+  }
+});
+
+// ── POST /crm/phone/normalize ─────────────────────────────────────────────────
+router.post("/crm/phone/normalize", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { leadIds } = req.body as { leadIds?: number[] };
+    if (!Array.isArray(leadIds) || leadIds.length === 0) {
+      res.status(400).json({ error: "leadIds must be a non-empty array" });
+      return;
+    }
+
+    const results: { leadId: number; oldPhone: string | null; newPhone: string | null; status: string; reason: string }[] = [];
+    let updated = 0;
+    let skipped = 0;
+    const errors: number[] = [];
+
+    for (const leadId of leadIds) {
+      try {
+        const [lead] = await db
+          .select({ id: crmLeads.id, phone: crmLeads.phone })
+          .from(crmLeads)
+          .where(eq(crmLeads.id, leadId));
+
+        if (!lead || !lead.phone) {
+          skipped++;
+          results.push({ leadId, oldPhone: null, newPhone: null, status: "skipped", reason: "No phone" });
+          continue;
+        }
+
+        const normalized = normalizePhone(lead.phone);
+
+        if (normalized === lead.phone) {
+          skipped++;
+          results.push({ leadId, oldPhone: lead.phone, newPhone: lead.phone, status: "skipped", reason: "Already normalized" });
+          continue;
+        }
+
+        if (!normalized.startsWith("+")) {
+          skipped++;
+          results.push({ leadId, oldPhone: lead.phone, newPhone: normalized, status: "skipped", reason: "Cannot safely normalize" });
+          continue;
+        }
+
+        await db
+          .update(crmLeads)
+          .set({ phone: normalized, updatedAt: new Date() })
+          .where(eq(crmLeads.id, leadId));
+
+        updated++;
+        results.push({ leadId, oldPhone: lead.phone, newPhone: normalized, status: "updated", reason: "Normalized to E.164" });
+      } catch (err) {
+        errors.push(leadId);
+        results.push({ leadId, oldPhone: null, newPhone: null, status: "error", reason: String(err) });
+      }
+    }
+
+    res.json({ updated, skipped, errors: errors.length, results });
+  } catch (err) {
+    req.log.error({ err }, "Bulk normalize failed");
+    res.status(500).json({ error: "Normalize failed" });
   }
 });
 

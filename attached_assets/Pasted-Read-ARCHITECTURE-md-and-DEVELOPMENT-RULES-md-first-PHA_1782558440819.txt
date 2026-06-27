@@ -1,0 +1,160 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17G — Bulk Phone Audit & Normalize Utility
+
+MODULE:
+CRM Settings + Lead API + Phone Utility
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* normalizePhone supports US and PH mobile formats.
+* Lead Detail inline phone edit works.
+* Server-side PATCH /crm/leads/:id normalizes phone on save.
+* Settings shows forwarding guidance.
+* Need a way to find and fix existing non-normalized lead phone numbers.
+
+OBJECTIVE:
+Add a safe bulk phone audit tool in CRM Settings.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/api-server/src/lib/twilio.ts
+* artifacts/api-server/src/routes/crm.ts
+* artifacts/api-server/src/routes/phone.ts if needed
+* artifacts/web-agency/src/pages/crm/CrmSettings.tsx
+
+TASK 2 — BACKEND PHONE AUDIT ENDPOINT
+
+Add protected endpoint:
+
+GET /api/crm/phone/audit
+
+Return leads with phone numbers that may need cleanup.
+
+For each lead:
+{
+id,
+name,
+phone,
+normalizedPhone,
+issue,
+canAutoFix
+}
+
+Rules:
+
+* If phone is empty/null, ignore.
+* If normalizedPhone === phone and phone starts with "+", clean.
+* If normalizePhone(phone) differs from phone and starts with "+", canAutoFix = true.
+* If cannot confidently normalize, canAutoFix = false.
+* Include issues like:
+
+  * "Needs E.164 formatting"
+  * "Possible PH trunk format"
+  * "Unrecognized phone format"
+
+TASK 3 — BACKEND BULK NORMALIZE ENDPOINT
+
+Add protected endpoint:
+
+POST /api/crm/phone/normalize
+
+Body:
+{
+leadIds: number[]
+}
+
+Behavior:
+
+* For each lead ID:
+
+  * load lead
+  * skip if no phone
+  * normalize phone
+  * update only if normalized value is different and looks valid
+* Return:
+  {
+  updated,
+  skipped,
+  errors,
+  results: [
+  { leadId, oldPhone, newPhone, status, reason }
+  ]
+  }
+
+Do not update numbers that cannot be safely normalized.
+
+TASK 4 — SETTINGS UI PHONE AUDIT TOOL
+
+In CrmSettings.tsx add a section:
+
+“Phone Data Hygiene”
+
+Features:
+
+* Run Phone Audit button
+* Shows count of leads needing cleanup
+* Preview table:
+
+  * Lead
+  * Current phone
+  * Suggested phone
+  * Issue
+  * Auto-fix available
+* Button:
+  “Normalize Selected”
+* Checkbox selection for fixable rows
+* Success summary after normalize
+* Refresh audit after normalize
+
+Safety:
+
+* Do not auto-normalize without admin clicking confirm.
+* Clearly state:
+  “Only confidently normalized numbers will be updated.”
+
+TASK 5 — TESTING
+
+Test:
+
+1. Audit endpoint returns messy numbers.
+2. Clean E.164 numbers are excluded.
+3. PH trunk numbers get suggested +63 format.
+4. US 10-digit numbers get suggested +1 format.
+5. Unrecognized numbers are listed but not auto-fixable.
+6. Normalize endpoint updates selected safe rows.
+7. Normalize endpoint skips unsafe rows.
+8. Settings UI shows preview.
+9. Settings UI normalize selected works.
+10. Lead Detail reflects normalized number after update.
+11. Outbound SMS/call still works or fails safely.
+12. No Twilio webhook changes.
+13. No schema/database changes.
+14. No locked modules changed.
+15. TypeScript passes except known unrelated issue.
+16. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Audit endpoint behavior
+4. Normalize endpoint behavior
+5. Settings UI behavior
+6. Safety behavior
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended Phase 17H
