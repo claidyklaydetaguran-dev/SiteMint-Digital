@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   MessageSquare, AlertCircle, Settings, Shield, Bell,
   TestTube, Phone, CheckCircle, XCircle, Copy, RefreshCw,
-  Search, Sparkles,
+  Search, Sparkles, Activity,
 } from "lucide-react";
 
 const tok = () => localStorage.getItem("adminToken") || "";
@@ -45,6 +45,8 @@ interface PhoneStatus {
   } | null;
 }
 
+type HStatus = "healthy" | "warning" | "action";
+
 export default function CrmSettings() {
   const [, navigate] = useLocation();
   const [testMode, setTestMode] = useState(true);
@@ -80,7 +82,7 @@ export default function CrmSettings() {
     if (!tok()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
   }, [navigate]);
 
-  useEffect(() => { loadPhoneStatus(); }, [loadPhoneStatus]);
+  useEffect(() => { loadPhoneStatus(); runAudit(); }, [loadPhoneStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendTestSms = async () => {
     if (!testSmsTo.trim()) return;
@@ -181,12 +183,197 @@ export default function CrmSettings() {
   const isConnected = phoneStatus?.configured && phoneStatus.accountStatus === "active";
   const isError = phoneStatus?.configured && phoneStatus.accountStatus === "error";
 
+  // ── Health Center computations ──────────────────────────────────────────────
+  const hTwilio: HStatus =
+    phoneStatus?.configured && phoneStatus.accountStatus === "active" ? "healthy"
+    : phoneStatus?.configured ? "warning" : "action";
+
+  const hForward: HStatus =
+    phoneStatus?.forwardConfigured && phoneStatus.forwardingNumberLooksValid !== false ? "healthy"
+    : phoneStatus?.forwardConfigured ? "warning" : "action";
+
+  const hSecurity: HStatus =
+    !phoneStatus?.configured ? "warning"
+    : phoneStatus.webhookSecurityMode === "enabled" ? "healthy"
+    : phoneStatus.webhookSecurityMode === "development-bypass" ? "warning" : "action";
+
+  const hBaseUrl: HStatus = phoneStatus?.baseUrlMissing ? "action" : "healthy";
+
+  const hAudit: HStatus =
+    !auditRan ? "warning"
+    : auditRows.length === 0 ? "healthy"
+    : auditRows.length <= 3 ? "warning" : "action";
+
+  const hEmail: HStatus = testMode ? "warning" : "healthy";
+
+  const healthCards: { title: string; status: HStatus; desc: string; action?: string }[] = [
+    {
+      title: "Twilio SMS/Voice",
+      status: hTwilio,
+      desc: hTwilio === "healthy" ? "Account connected and active."
+        : hTwilio === "warning" ? "Credentials set but account status unknown."
+        : "TWILIO_ACCOUNT_SID, AUTH_TOKEN, PHONE_NUMBER not set.",
+      action: hTwilio !== "healthy" ? "Add Twilio env vars in Replit Secrets" : undefined,
+    },
+    {
+      title: "Call Forwarding",
+      status: hForward,
+      desc: hForward === "healthy" ? "Forwarding number configured and valid."
+        : hForward === "warning" ? "Set but may be invalid E.164 format."
+        : "FORWARD_TO_PHONE_NUMBER not set — calls won't ring your cell.",
+      action: hForward !== "healthy" ? "Set FORWARD_TO_PHONE_NUMBER in E.164 format" : undefined,
+    },
+    {
+      title: "Webhook Security",
+      status: hSecurity,
+      desc: hSecurity === "healthy" ? "Signature validation active — webhooks are secure."
+        : !phoneStatus?.configured ? "Configure Twilio first to enable security."
+        : phoneStatus.webhookSecurityMode === "development-bypass" ? "Dev bypass active — not suitable for production."
+        : "TWILIO_AUTH_TOKEN missing — webhooks not validated.",
+      action: hSecurity === "action" ? "Set TWILIO_AUTH_TOKEN to enable validation" : undefined,
+    },
+    {
+      title: "Webhook Base URL",
+      status: hBaseUrl,
+      desc: hBaseUrl === "healthy" ? "CRM_BASE_URL set — Twilio can route inbound events."
+        : "CRM_BASE_URL missing — Twilio cannot deliver SMS or calls.",
+      action: hBaseUrl === "action" ? "Set CRM_BASE_URL to your deployed domain" : undefined,
+    },
+    {
+      title: "Phone Data Quality",
+      status: hAudit,
+      desc: !auditRan && auditLoading ? "Scanning lead phone numbers…"
+        : !auditRan ? "Audit scan not yet run."
+        : auditRows.length === 0 ? "All lead phone numbers are clean."
+        : `${auditRows.length} number${auditRows.length === 1 ? "" : "s"} need attention.`,
+      action: hAudit !== "healthy" && auditRan && auditRows.length > 0
+        ? "Fix issues in Phone Data Hygiene section below" : undefined,
+    },
+    {
+      title: "Email Mode",
+      status: hEmail,
+      desc: testMode
+        ? "Test mode on — emails are simulated, not sent to leads."
+        : "Live mode — emails deliver via Resend.",
+      action: testMode ? "Disable test mode in Email Settings when ready" : undefined,
+    },
+  ];
+
+  const healthScore = Math.max(
+    0,
+    100
+    - healthCards.filter(c => c.status === "warning").length * 15
+    - healthCards.filter(c => c.status === "action").length * 30,
+  );
+  const healthLabel =
+    healthScore >= 90 ? "Excellent" :
+    healthScore >= 70 ? "Good" :
+    healthScore >= 50 ? "Needs Attention" : "Critical";
+  const healthScoreColor =
+    healthScore >= 90 ? "text-emerald-700" :
+    healthScore >= 70 ? "text-blue-700" :
+    healthScore >= 50 ? "text-amber-700" : "text-red-700";
+  const healthScoreBg =
+    healthScore >= 90 ? "bg-emerald-50 border-emerald-200" :
+    healthScore >= 70 ? "bg-blue-50 border-blue-200" :
+    healthScore >= 50 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200";
+  const healthBarColor =
+    healthScore >= 90 ? "bg-emerald-500" :
+    healthScore >= 70 ? "bg-blue-500" :
+    healthScore >= 50 ? "bg-amber-500" : "bg-red-500";
+  const healthNextActions = [
+    ...healthCards.filter(c => c.status === "action" && c.action),
+    ...healthCards.filter(c => c.status === "warning" && c.action),
+  ].slice(0, 3);
+
   return (
     <CrmLayout>
       <div className="p-6 max-w-3xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-serif font-bold text-foreground">Settings</h1>
           <p className="text-muted-foreground text-sm mt-0.5">CRM configuration and integrations</p>
+        </div>
+
+        {/* ── CRM System Health ────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-4 h-4 text-muted-foreground" />
+            <h2 className="font-semibold text-sm text-foreground">CRM System Health</h2>
+            <button
+              onClick={() => { loadPhoneStatus(); runAudit(); }}
+              className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+              title="Refresh health check"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingPhone || auditLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          {/* Overall score banner */}
+          {!loadingPhone && (
+            <div className={`flex items-center gap-4 p-3.5 rounded-xl border mb-4 ${healthScoreBg}`}>
+              <div className="text-center shrink-0 w-16">
+                <p className={`text-3xl font-bold leading-none ${healthScoreColor}`}>
+                  {healthScore}<span className="text-sm font-normal">%</span>
+                </p>
+                <p className={`text-[10px] font-bold mt-1 uppercase tracking-wide ${healthScoreColor}`}>{healthLabel}</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="h-1.5 w-full bg-white/70 rounded-full overflow-hidden mb-2">
+                  <div
+                    className={`h-1.5 rounded-full ${healthBarColor} transition-all duration-500`}
+                    style={{ width: `${healthScore}%` }}
+                  />
+                </div>
+                {healthNextActions.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {healthNextActions.map((a, i) => (
+                      <p key={i} className={`text-[10px] leading-snug ${healthScoreColor}`}>
+                        {i + 1}. {a.action}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`text-[10px] font-medium ${healthScoreColor}`}>All systems configured ✓</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Health cards grid */}
+          {loadingPhone ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-20 bg-gray-50 border border-gray-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {healthCards.map(card => {
+                const cardBg = card.status === "healthy" ? "bg-emerald-50 border-emerald-200"
+                  : card.status === "warning" ? "bg-amber-50 border-amber-200"
+                  : "bg-red-50 border-red-200";
+                const cardLabel = card.status === "healthy" ? "Healthy"
+                  : card.status === "warning" ? "Warning" : "Action Needed";
+                const labelColor = card.status === "healthy" ? "text-emerald-700"
+                  : card.status === "warning" ? "text-amber-700" : "text-red-700";
+                const icon = card.status === "healthy"
+                  ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  : card.status === "warning"
+                  ? <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  : <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />;
+                return (
+                  <div key={card.title} className={`rounded-xl border p-3 ${cardBg}`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {icon}
+                      <span className={`text-[10px] font-semibold ${labelColor}`}>{cardLabel}</span>
+                    </div>
+                    <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{card.title}</p>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{card.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Email settings */}

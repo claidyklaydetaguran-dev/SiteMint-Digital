@@ -1,0 +1,137 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 22 — CRM System Health Center
+
+MODULE:
+CRM Settings + existing status endpoints only.
+
+IMPORTANT:
+Do not build new product features.
+Do not touch Twilio webhook routing.
+Do not touch Campaign sending.
+Do not change database schema.
+Do not touch locked engines.
+Do not refactor stable modules.
+Frontend-focused if possible.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* TypeScript is now clean.
+* Twilio status endpoint exists.
+* Phone audit exists.
+* Campaigns have sending, analytics, and webhook tracking.
+* Settings page already has Twilio and phone hygiene sections.
+* Multiple systems now depend on env/config correctness.
+
+OBJECTIVE:
+Create a simple CRM System Health Center inside CRM Settings so the admin can quickly see whether the CRM is configured correctly.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* CrmSettings.tsx
+* existing status endpoints already used by Settings
+* phone status endpoint if needed
+* campaign/resend status if an endpoint already exists
+
+Do not inspect unrelated modules.
+
+TASK 2 — ADD HEALTH CENTER SECTION
+
+In CrmSettings.tsx, add a top section:
+
+“CRM System Health”
+
+Show compact cards for:
+
+* Twilio configured
+* Forwarding phone configured
+* Webhook security
+* CRM_BASE_URL configured
+* Phone audit clean
+* Email test mode / Resend status if available
+* Campaign tracking readiness if available
+
+Each card:
+
+* status: Healthy / Warning / Action Needed
+* short explanation
+* link/anchor to related settings section if easy
+
+TASK 3 — USE EXISTING DATA ONLY
+
+Do not create new backend endpoints unless absolutely necessary.
+
+Use existing:
+
+* /api/crm/phone/status
+* /api/crm/phone/audit
+* any existing email/campaign status already available
+
+If email/campaign status is not available, show a neutral card:
+“Email status not checked in this phase.”
+
+TASK 4 — ADD OVERALL HEALTH SCORE
+
+Compute client-side:
+
+Healthy = 100
+Warning subtracts 15
+Action Needed subtracts 30
+
+Show:
+
+* Overall Health %
+* Label:
+
+  * Excellent
+  * Good
+  * Needs Attention
+  * Critical
+* 3 most important next actions
+
+TASK 5 — DESIGN REQUIREMENTS
+
+Keep it clean:
+
+* compact cards
+* color-coded icons
+* not too much text
+* no scary language
+* practical next steps
+
+TASK 6 — TESTING
+
+Test:
+
+1. Settings page loads.
+2. Health Center renders.
+3. Twilio configured card reflects real status.
+4. Forwarding configured card reflects real status.
+5. Webhook security card reflects real mode.
+6. CRM_BASE_URL missing warning works.
+7. Phone audit card reflects dirty count.
+8. Overall health score computes safely.
+9. Settings existing sections still work.
+10. No backend changes unless necessary.
+11. No schema changes.
+12. No Twilio route changes.
+13. No locked modules changed.
+14. TypeScript passes clean.
+15. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Health cards added
+4. Health scoring logic
+5. Existing endpoints used
+6. Tests performed
+7. Backend changes if any
+8. Schema changes if any
+9. Known limitations
+10. Recommended next phase
