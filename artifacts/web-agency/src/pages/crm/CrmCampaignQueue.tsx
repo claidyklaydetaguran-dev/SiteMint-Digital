@@ -264,6 +264,16 @@ interface Props {
   onBack: () => void;
 }
 
+interface SchedulerStatus {
+  running: boolean;
+  lastRunAt: string | null;
+  lastRunProcessed: number;
+  lastRunErrors: number;
+  totalProcessed: number;
+  totalErrors: number;
+  totalSkipped: number;
+}
+
 export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: Props) {
   const [messages,   setMessages]   = useState<ScheduledMessage[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -271,6 +281,8 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [busyId,     setBusyId]     = useState<number | null>(null);
   const [feedback,   setFeedback]   = useState<{ ok: boolean; text: string } | null>(null);
+  const [scheduler,  setScheduler]  = useState<SchedulerStatus | null>(null);
+  const [runningNow, setRunningNow] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -292,7 +304,39 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
     }
   }, [statusFilter, campaignId]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadScheduler = useCallback(async () => {
+    try {
+      const r = await fetch("/api/crm/campaigns/scheduler/status", {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (r.ok) setScheduler(await r.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); loadScheduler(); }, [load, loadScheduler]);
+
+  const runSchedulerNow = async () => {
+    setRunningNow(true);
+    setFeedback(null);
+    try {
+      const r = await fetch("/api/crm/campaigns/scheduler/run", {
+        method: "POST",
+        headers: authH(),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setFeedback({ ok: true, text: `Scheduler ran: ${d.processed} sent, ${d.skipped} skipped, ${d.errors} errors.` });
+        await load();
+        await loadScheduler();
+      } else {
+        setFeedback({ ok: false, text: d.error ?? "Scheduler run failed" });
+      }
+    } catch {
+      setFeedback({ ok: false, text: "Network error" });
+    } finally {
+      setRunningNow(false);
+    }
+  };
 
   const sendNow = async (id: number) => {
     setBusyId(id);
@@ -374,6 +418,33 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
             {feedback.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
             {feedback.text}
             <button onClick={() => setFeedback(null)} className="ml-auto"><X className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
+
+        {/* Scheduler status card */}
+        {!campaignId && scheduler && (
+          <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${scheduler.running ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
+              <span className="font-semibold text-foreground">Auto-Send Scheduler</span>
+              <span className="text-muted-foreground">{scheduler.running ? "Running…" : "Idle"}</span>
+            </div>
+            {scheduler.lastRunAt && (
+              <span className="text-muted-foreground">
+                Last run: {new Date(scheduler.lastRunAt).toLocaleTimeString()} —&nbsp;
+                <span className="text-emerald-600 font-medium">{scheduler.totalProcessed} sent</span>
+                {scheduler.totalSkipped > 0 && <span className="text-amber-600 font-medium">, {scheduler.totalSkipped} skipped</span>}
+                {scheduler.totalErrors > 0 && <span className="text-red-600 font-medium">, {scheduler.totalErrors} errors</span>}
+              </span>
+            )}
+            <button
+              onClick={runSchedulerNow}
+              disabled={runningNow || scheduler.running}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-[#1e293b] text-white rounded-lg hover:bg-[#2d3e53] disabled:opacity-50 transition-colors font-semibold"
+            >
+              {runningNow ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+              Run Now
+            </button>
           </div>
         )}
 

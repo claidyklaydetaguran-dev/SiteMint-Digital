@@ -1,0 +1,341 @@
+import { db } from "@workspace/db";
+import {
+  crmCampaignScheduledMessages,
+  crmCampaignRecipients,
+  crmCampaigns,
+  crmLeads,
+  crmCampaignEvents,
+} from "@workspace/db/schema";
+import { eq, and, lte, count, inArray } from "drizzle-orm";
+import { getResend } from "./email.js";
+import { getTwilio, getTwilioPhone, isTwilioConfigured } from "./twilio.js";
+import { logger } from "./logger.js";
+
+const FROM_ADDRESS =
+  process.env.RESEND_FROM_EMAIL ??
+  "SiteMint Digital Solutions <noreply@sitemintdigital.com>";
+
+const BATCH_SIZE = 30;
+const REPLY_EVENT_TYPES = ["replied_estimated", "replied"];
+
+export interface SchedulerStatus {
+  running: boolean;
+  lastRunAt: Date | null;
+  lastRunProcessed: number;
+  lastRunErrors: number;
+  totalProcessed: number;
+  totalErrors: number;
+  totalSkipped: number;
+}
+
+const _status: SchedulerStatus = {
+  running: false,
+  lastRunAt: null,
+  lastRunProcessed: 0,
+  lastRunErrors: 0,
+  totalProcessed: 0,
+  totalErrors: 0,
+  totalSkipped: 0,
+};
+
+export function getSchedulerStatus(): SchedulerStatus {
+  return { ..._status };
+}
+
+async function hasReplied(recipientId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(crmCampaignEvents)
+    .where(
+      and(
+        eq(crmCampaignEvents.campaignRecipientId, recipientId),
+        inArray(crmCampaignEvents.eventType, REPLY_EVENT_TYPES),
+      ),
+    );
+  return (row?.n ?? 0) > 0;
+}
+
+async function markMessageSent(
+  msgId: number,
+  resendEmailId: string | null,
+): Promise<void> {
+  await db
+    .update(crmCampaignScheduledMessages)
+    .set({ status: "sent", sentAt: new Date(), resendEmailId, lastError: null })
+    .where(eq(crmCampaignScheduledMessages.id, msgId));
+}
+
+async function markMessageFailed(msgId: number, error: string): Promise<void> {
+  await db
+    .update(crmCampaignScheduledMessages)
+    .set({ status: "failed", lastError: error })
+    .where(eq(crmCampaignScheduledMessages.id, msgId));
+}
+
+async function markMessageSkipped(
+  msgId: number,
+  reason: string,
+): Promise<void> {
+  await db
+    .update(crmCampaignScheduledMessages)
+    .set({
+      status: "skipped",
+      sentAt: new Date(),
+      lastError: null,
+      metadata: { skipReason: reason },
+    })
+    .where(eq(crmCampaignScheduledMessages.id, msgId));
+}
+
+async function checkAndCompleteRecipient(recipientId: number): Promise<void> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(crmCampaignScheduledMessages)
+    .where(
+      and(
+        eq(crmCampaignScheduledMessages.recipientId, recipientId),
+        eq(crmCampaignScheduledMessages.status, "scheduled"),
+      ),
+    );
+  if ((row?.n ?? 0) === 0) {
+    await db
+      .update(crmCampaignRecipients)
+      .set({ enrollmentStatus: "completed" })
+      .where(
+        and(
+          eq(crmCampaignRecipients.id, recipientId),
+          eq(crmCampaignRecipients.enrollmentStatus, "active"),
+        ),
+      );
+  }
+}
+
+export async function processScheduledMessages(): Promise<{
+  processed: number;
+  errors: number;
+  skipped: number;
+}> {
+  if (_status.running) {
+    logger.debug("Campaign scheduler already running — skipping tick");
+    return { processed: 0, errors: 0, skipped: 0 };
+  }
+
+  _status.running = true;
+  let processed = 0;
+  let errors = 0;
+  let skipped = 0;
+
+  try {
+    const now = new Date();
+
+    const messages = await db
+      .select({
+        msg: crmCampaignScheduledMessages,
+        recipientId: crmCampaignRecipients.id,
+        recipientCurrentStep: crmCampaignRecipients.currentStep,
+        enrollmentStatus: crmCampaignRecipients.enrollmentStatus,
+        campaignId: crmCampaigns.id,
+        campaignName: crmCampaigns.name,
+        stopOnReply: crmCampaigns.stopOnReply,
+        leadEmail: crmLeads.email,
+        leadPhone: crmLeads.phone,
+        leadName: crmLeads.name,
+      })
+      .from(crmCampaignScheduledMessages)
+      .innerJoin(
+        crmCampaignRecipients,
+        eq(crmCampaignScheduledMessages.recipientId, crmCampaignRecipients.id),
+      )
+      .innerJoin(
+        crmCampaigns,
+        eq(crmCampaignScheduledMessages.campaignId, crmCampaigns.id),
+      )
+      .innerJoin(
+        crmLeads,
+        eq(crmCampaignScheduledMessages.leadId, crmLeads.id),
+      )
+      .where(
+        and(
+          eq(crmCampaignScheduledMessages.status, "scheduled"),
+          lte(crmCampaignScheduledMessages.scheduledAt, now),
+          eq(crmCampaigns.autoSend, true),
+          eq(crmCampaignRecipients.enrollmentStatus, "active"),
+        ),
+      )
+      .limit(BATCH_SIZE);
+
+    if (messages.length > 0) {
+      logger.info({ count: messages.length }, "Campaign scheduler: processing messages");
+    }
+
+    for (const row of messages) {
+      const { msg, recipientId, stopOnReply, leadEmail, leadPhone, leadName, campaignName } = row;
+
+      try {
+        // ── stopOnReply guard ────────────────────────────────────────────────
+        if (stopOnReply && (await hasReplied(recipientId))) {
+          await markMessageSkipped(msg.id, "Lead has replied — sequence stopped");
+          await db
+            .update(crmCampaignRecipients)
+            .set({ enrollmentStatus: "stopped" })
+            .where(eq(crmCampaignRecipients.id, recipientId));
+          skipped++;
+          _status.totalSkipped++;
+          continue;
+        }
+
+        const channel = msg.channel;
+        const subject = msg.subject ?? `Message from ${campaignName}`;
+        const body = msg.body ?? "";
+        const fullName = leadName ?? leadEmail.split("@")[0] ?? "there";
+
+        // ── Email ────────────────────────────────────────────────────────────
+        if (channel === "email") {
+          if (!leadEmail) {
+            await markMessageSkipped(msg.id, "Lead has no email address");
+            skipped++;
+            _status.totalSkipped++;
+            continue;
+          }
+
+          let resendEmailId: string | null = null;
+          const resend = getResend();
+          const { data } = await resend.emails.send({
+            from: FROM_ADDRESS,
+            to: [leadEmail],
+            subject,
+            html: buildSequenceEmailHtml(fullName, subject, body),
+          });
+          resendEmailId = data?.id ?? null;
+          await markMessageSent(msg.id, resendEmailId);
+          await db
+            .update(crmCampaignRecipients)
+            .set({ currentStep: (row.recipientCurrentStep ?? 0) + 1 })
+            .where(eq(crmCampaignRecipients.id, recipientId));
+          processed++;
+          _status.totalProcessed++;
+        }
+
+        // ── SMS ──────────────────────────────────────────────────────────────
+        else if (channel === "sms") {
+          if (!leadPhone) {
+            await markMessageSkipped(msg.id, "Lead has no phone number");
+            skipped++;
+            _status.totalSkipped++;
+            continue;
+          }
+          if (!isTwilioConfigured()) {
+            await markMessageSkipped(msg.id, "Twilio is not configured");
+            skipped++;
+            _status.totalSkipped++;
+            continue;
+          }
+
+          const client = getTwilio();
+          await client.messages.create({
+            body: body || subject,
+            from: getTwilioPhone(),
+            to: leadPhone,
+          });
+          await markMessageSent(msg.id, null);
+          await db
+            .update(crmCampaignRecipients)
+            .set({ currentStep: (row.recipientCurrentStep ?? 0) + 1 })
+            .where(eq(crmCampaignRecipients.id, recipientId));
+          processed++;
+          _status.totalProcessed++;
+        }
+
+        // ── Call prompt / Task — manual; mark skipped with note ──────────────
+        else {
+          const reason =
+            channel === "call_prompt"
+              ? "Call prompt — manual action required"
+              : "Task — manual action required";
+          await markMessageSkipped(msg.id, reason);
+          await db
+            .update(crmCampaignRecipients)
+            .set({ currentStep: (row.recipientCurrentStep ?? 0) + 1 })
+            .where(eq(crmCampaignRecipients.id, recipientId));
+          skipped++;
+          _status.totalSkipped++;
+        }
+
+        // ── Check if recipient is now done with all steps ────────────────────
+        await checkAndCompleteRecipient(recipientId);
+      } catch (err) {
+        errors++;
+        _status.totalErrors++;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.error({ err, msgId: msg.id }, "Campaign scheduler: failed to send message");
+        try {
+          await markMessageFailed(msg.id, errMsg);
+        } catch (dbErr) {
+          logger.error({ dbErr }, "Campaign scheduler: could not mark message as failed");
+        }
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "Campaign scheduler: batch query failed");
+  } finally {
+    _status.running = false;
+    _status.lastRunAt = new Date();
+    _status.lastRunProcessed = processed;
+    _status.lastRunErrors = errors;
+  }
+
+  return { processed, errors, skipped };
+}
+
+export function startScheduler(intervalMs = 60_000): ReturnType<typeof setInterval> {
+  logger.info({ intervalMs }, "Campaign scheduler started");
+  processScheduledMessages().catch((err) =>
+    logger.error({ err }, "Campaign scheduler: initial run error"),
+  );
+  return setInterval(() => {
+    processScheduledMessages().catch((err) =>
+      logger.error({ err }, "Campaign scheduler: tick error"),
+    );
+  }, intervalMs);
+}
+
+// ── Email template for sequence messages ─────────────────────────────────────
+
+function buildSequenceEmailHtml(name: string, subject: string, body: string): string {
+  const bodyHtml = body
+    .split(/\n\n+/)
+    .map((p) => `<p style="color:#374151;line-height:1.7;margin:0 0 16px;">${p.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
+  <div style="max-width:620px;margin:32px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+    <div style="background:#1e293b;padding:24px 32px;">
+      <div style="display:inline-flex;align-items:center;gap:10px;">
+        <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="9" fill="#1e293b"/>
+          <rect width="40" height="40" rx="9" fill="white" fill-opacity="0.08"/>
+          <path d="M20 11L29 20L20 29L11 20Z" fill="#34d399" opacity="0.90"/>
+          <path d="M20 16L24 20L20 24L16 20Z" fill="#1e293b"/>
+          <circle cx="20" cy="13" r="2.5" fill="#34d399"/>
+        </svg>
+        <span style="color:#ffffff;font-size:18px;font-weight:700;font-family:Georgia,serif;">SiteMint <span style="color:#94a3b8;">Digital</span></span>
+      </div>
+    </div>
+    <div style="padding:32px;">
+      <h1 style="color:#1e293b;font-size:20px;margin:0 0 20px;">${subject}</h1>
+      ${bodyHtml}
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0 20px;"/>
+      <p style="color:#374151;margin:0 0 4px;font-weight:700;">Best Regards,</p>
+      <p style="color:#374151;margin:0;">SiteMint Digital Solutions</p>
+    </div>
+    <div style="background:#f8fafc;padding:14px 32px;text-align:center;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      SiteMint Digital Solutions &middot; <a href="mailto:info.sitemint@gmail.com" style="color:#3b82f6;">info.sitemint@gmail.com</a> &middot; 949-880-6515
+      <br/><span style="font-size:11px;color:#9ca3af;">You are receiving this because you opted in. Reply STOP to unsubscribe.</span>
+    </div>
+  </div>
+</body>
+</html>`;
+}

@@ -7,6 +7,7 @@ import { validateToken } from "../lib/admin-session.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
+import { getSchedulerStatus, processScheduledMessages } from "../lib/campaignScheduler.js";
 
 const router: IRouter = Router();
 
@@ -469,6 +470,21 @@ router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) 
   } catch (err) {
     req.log.error({ err }, "Error creating campaign");
     res.status(500).json({ error: "Failed to create campaign" });
+  }
+});
+
+// ── Scheduler status & manual trigger (static — before /:id) ─────────────────
+
+router.get("/crm/campaigns/scheduler/status", requireAdmin, (_req: Request, res: Response) => {
+  res.json(getSchedulerStatus());
+});
+
+router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await processScheduledMessages();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: "Scheduler run failed" });
   }
 });
 
