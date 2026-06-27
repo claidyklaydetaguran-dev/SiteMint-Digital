@@ -4,7 +4,8 @@ import { CrmLayout } from "./CrmLayout";
 import CrmCampaignSequence from "./CrmCampaignSequence";
 import CrmCampaignQueue   from "./CrmCampaignQueue";
 import {
-  Mail, Users, Eye, Send, ChevronRight, ChevronLeft, ChevronDown,
+  Mail, Users, Eye, Send, ChevronRight, ChevronLeft, ChevronDown, GitBranch,
+  MessageSquare, Phone, CheckSquare, ArrowRight,
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
   Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
   SkipForward, XCircle, BarChart2, Lightbulb, Award, ShieldCheck, AlertCircle, TrendingUp,
@@ -93,6 +94,31 @@ interface DiscBreakdownItem {
   skipped: number;
 }
 
+interface FunnelStep {
+  stepId: number;
+  stepNumber: number;
+  dayOffset: number;
+  channel: string;
+  subject: string | null;
+  sendTime: string;
+  sent: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+  canceled: number;
+  total: number;
+  reachRate: number;
+  sentRate: number;
+}
+
+interface FunnelData {
+  campaignType: string;
+  enrollmentStats: { total: number; active: number; completed: number; stopped: number; paused: number };
+  steps: FunnelStep[];
+  stopOnReply: boolean;
+  autoSend: boolean;
+}
+
 interface CampaignAnalytics {
   campaign: Campaign;
   totals: {
@@ -131,6 +157,7 @@ interface CampaignAnalytics {
     clickRate: number;
     bounceRate: number;
   };
+  funnelData?: FunnelData;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -545,12 +572,14 @@ export default function CrmCampaigns() {
     setAnalyticsLoading(true);
     setView("analytics");
     try {
-      const r = await fetch(`/api/crm/campaigns/${c.id}/analytics`, {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
-      const d = await r.json();
-      if (r.ok) setAnalyticsData(d);
-      else setAnalyticsError(d.error ?? "Failed to load analytics");
+      const [ar, fr] = await Promise.all([
+        fetch(`/api/crm/campaigns/${c.id}/analytics`, { headers: { Authorization: `Bearer ${tok()}` } }),
+        fetch(`/api/crm/campaigns/${c.id}/funnel`,    { headers: { Authorization: `Bearer ${tok()}` } }),
+      ]);
+      const ad = await ar.json();
+      const fd = fr.ok ? await fr.json() : null;
+      if (ar.ok) setAnalyticsData({ ...ad, funnelData: fd ?? undefined });
+      else setAnalyticsError(ad.error ?? "Failed to load analytics");
     } catch {
       setAnalyticsError("Network error loading analytics");
     } finally {
@@ -1015,6 +1044,174 @@ export default function CrmCampaigns() {
 
           {a && (
             <>
+              {/* ── Sequence Funnel ────────────────────────────────────────────── */}
+              {a.funnelData && a.funnelData.steps.length > 0 && (() => {
+                const f = a.funnelData!;
+                const es = f.enrollmentStats;
+                const maxReach = Math.max(...f.steps.map(s => s.reachRate), 1);
+
+                function ChannelIcon({ ch }: { ch: string }) {
+                  if (ch === "email")       return <Mail className="w-3 h-3" />;
+                  if (ch === "sms")         return <MessageSquare className="w-3 h-3" />;
+                  if (ch === "call_prompt") return <Phone className="w-3 h-3" />;
+                  return <CheckSquare className="w-3 h-3" />;
+                }
+
+                const CH_LABEL: Record<string, string> = {
+                  email: "Email", sms: "SMS", call_prompt: "Call", task: "Task",
+                };
+
+                return (
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    {/* Header */}
+                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <GitBranch className="w-4 h-4 text-violet-600" />
+                      <h2 className="text-sm font-bold text-foreground">Sequence Funnel</h2>
+                      <span className="text-[10px] font-semibold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full border border-violet-200 capitalize ml-1">
+                        {f.campaignType}
+                      </span>
+                      {f.autoSend && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Auto-Send On
+                        </span>
+                      )}
+                      {f.stopOnReply && (
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          Stops on Reply
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-5 space-y-5">
+                      {/* Enrollment status tiles */}
+                      <div className="grid grid-cols-4 gap-3">
+                        {[
+                          { label: "Enrolled",  value: es.total,     color: "bg-gray-50 border-gray-200 text-gray-700" },
+                          { label: "Active",    value: es.active,    color: es.active    > 0 ? "bg-blue-50 border-blue-200 text-blue-700"       : "bg-gray-50 border-gray-200 text-gray-400" },
+                          { label: "Completed", value: es.completed, color: es.completed > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                          { label: "Stopped on Reply", value: es.stopped, color: es.stopped > 0 ? "bg-amber-50 border-amber-200 text-amber-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} className={`rounded-xl border p-3 text-center ${color}`}>
+                            <p className="text-2xl font-black">{value}</p>
+                            <p className="text-[10px] font-semibold mt-0.5 uppercase tracking-wide opacity-70">{label}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Waterfall bars */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Step-by-Step Reach (% of enrolled)</p>
+                        {f.steps.map((step, idx) => {
+                          const prevReach = idx === 0 ? 100 : f.steps[idx - 1].reachRate;
+                          const drop = prevReach - step.reachRate;
+                          return (
+                            <div key={step.stepId} className="space-y-1">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="w-5 h-5 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">
+                                  {step.stepNumber}
+                                </span>
+                                <span className="flex items-center gap-1 text-muted-foreground shrink-0">
+                                  <ChannelIcon ch={step.channel} />
+                                  <span className="text-[10px] font-semibold">{CH_LABEL[step.channel] ?? step.channel}</span>
+                                </span>
+                                <span className="text-[10px] text-muted-foreground shrink-0">Day {step.dayOffset}</span>
+                                <span className="text-[10px] text-foreground font-medium truncate max-w-[180px]">
+                                  {step.subject || "(no subject)"}
+                                </span>
+                                <span className="ml-auto text-[10px] font-bold text-foreground shrink-0">{step.reachRate}%</span>
+                                {idx > 0 && drop > 0 && (
+                                  <span className="text-[10px] text-red-500 shrink-0">−{drop}%</span>
+                                )}
+                              </div>
+                              {/* Stacked bar */}
+                              <div className="h-4 rounded-full bg-gray-100 overflow-hidden flex">
+                                {/* Sent — green */}
+                                <div
+                                  className="h-full bg-emerald-400 transition-all"
+                                  style={{ width: `${(step.sent / (es.total || 1)) * 100}%` }}
+                                  title={`Sent: ${step.sent}`}
+                                />
+                                {/* Failed — red */}
+                                <div
+                                  className="h-full bg-red-400 transition-all"
+                                  style={{ width: `${(step.failed / (es.total || 1)) * 100}%` }}
+                                  title={`Failed: ${step.failed}`}
+                                />
+                                {/* Skipped — amber */}
+                                <div
+                                  className="h-full bg-amber-300 transition-all"
+                                  style={{ width: `${(step.skipped / (es.total || 1)) * 100}%` }}
+                                  title={`Skipped: ${step.skipped}`}
+                                />
+                                {/* Pending — blue-gray */}
+                                <div
+                                  className="h-full bg-blue-200 transition-all"
+                                  style={{ width: `${(step.pending / (es.total || 1)) * 100}%` }}
+                                  title={`Pending: ${step.pending}`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Legend */}
+                        <div className="flex items-center gap-4 pt-1">
+                          {[
+                            { color: "bg-emerald-400", label: "Sent" },
+                            { color: "bg-red-400",     label: "Failed" },
+                            { color: "bg-amber-300",   label: "Skipped" },
+                            { color: "bg-blue-200",    label: "Pending" },
+                          ].map(({ color, label }) => (
+                            <span key={label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                              <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Per-step detail table */}
+                      <div className="overflow-x-auto rounded-xl border border-gray-100">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                              {["Step", "Channel", "Day", "Subject", "Sent", "Failed", "Skipped", "Pending", "Canceled", "Reach"].map(h => (
+                                <th key={h} className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {f.steps.map(step => (
+                              <tr key={step.stepId} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-3 py-2.5 font-bold text-foreground">{step.stepNumber}</td>
+                                <td className="px-3 py-2.5">
+                                  <span className="flex items-center gap-1 text-muted-foreground font-medium">
+                                    <ChannelIcon ch={step.channel} />
+                                    {CH_LABEL[step.channel] ?? step.channel}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-muted-foreground">{step.dayOffset}</td>
+                                <td className="px-3 py-2.5 text-foreground max-w-[160px] truncate" title={step.subject ?? ""}>{step.subject || "—"}</td>
+                                <td className="px-3 py-2.5 font-semibold text-emerald-700">{step.sent}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.failed > 0 ? "text-red-600" : "text-gray-300"}`}>{step.failed}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.skipped > 0 ? "text-amber-600" : "text-gray-300"}`}>{step.skipped}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.pending > 0 ? "text-blue-600" : "text-gray-300"}`}>{step.pending}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.canceled > 0 ? "text-gray-500" : "text-gray-300"}`}>{step.canceled}</td>
+                                <td className="px-3 py-2.5">
+                                  <span className={`font-bold ${step.reachRate >= 60 ? "text-emerald-700" : step.reachRate >= 30 ? "text-amber-600" : "text-red-600"}`}>
+                                    {step.reachRate}%
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Open/click/bounce tracking — shows real event cards or setup notice */}
               {a.eventMetrics?.hasEvents ? (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">

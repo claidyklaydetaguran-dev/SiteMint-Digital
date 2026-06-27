@@ -922,6 +922,98 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
   }
 });
 
+// ── Campaign Sequence Funnel ──────────────────────────────────────────────────
+// Per-step delivery funnel for nurture/drip campaigns.
+// Works for broadcast too (returns empty steps array).
+router.get("/crm/campaigns/:id/funnel", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+    const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    // Enrollment status breakdown from recipients
+    const recipients = await db
+      .select({
+        enrollmentStatus: crmCampaignRecipients.enrollmentStatus,
+      })
+      .from(crmCampaignRecipients)
+      .where(eq(crmCampaignRecipients.campaignId, id));
+
+    const enrollmentStats = {
+      total:     recipients.length,
+      active:    recipients.filter(r => r.enrollmentStatus === "active").length,
+      completed: recipients.filter(r => r.enrollmentStatus === "completed").length,
+      stopped:   recipients.filter(r => r.enrollmentStatus === "stopped").length,
+      paused:    recipients.filter(r => r.enrollmentStatus === "paused").length,
+    };
+
+    // Fetch steps in order
+    const steps = await db
+      .select()
+      .from(crmCampaignSteps)
+      .where(eq(crmCampaignSteps.campaignId, id))
+      .orderBy(crmCampaignSteps.stepNumber);
+
+    // Fetch all scheduled messages for this campaign
+    const messages = await db
+      .select({
+        stepId: crmCampaignScheduledMessages.stepId,
+        status: crmCampaignScheduledMessages.status,
+      })
+      .from(crmCampaignScheduledMessages)
+      .where(eq(crmCampaignScheduledMessages.campaignId, id));
+
+    // Group messages by stepId
+    const msgByStep = new Map<number | null, typeof messages>();
+    for (const msg of messages) {
+      const key = msg.stepId;
+      if (!msgByStep.has(key)) msgByStep.set(key, []);
+      msgByStep.get(key)!.push(msg);
+    }
+
+    const enrolled = enrollmentStats.total || 1; // avoid div/0
+
+    const stepFunnel = steps.map(step => {
+      const stepMsgs = msgByStep.get(step.id) ?? [];
+      const sent      = stepMsgs.filter(m => m.status === "sent").length;
+      const failed    = stepMsgs.filter(m => m.status === "failed").length;
+      const skipped   = stepMsgs.filter(m => m.status === "skipped").length;
+      const pending   = stepMsgs.filter(m => m.status === "scheduled" || m.status === "queued").length;
+      const canceled  = stepMsgs.filter(m => m.status === "canceled").length;
+      const total     = stepMsgs.length;
+      return {
+        stepId:      step.id,
+        stepNumber:  step.stepNumber,
+        dayOffset:   step.dayOffset,
+        channel:     step.channel,
+        subject:     step.subject,
+        sendTime:    step.sendTime,
+        sent,
+        failed,
+        skipped,
+        pending,
+        canceled,
+        total,
+        reachRate:   Math.round((sent / enrolled) * 100),
+        sentRate:    total > 0 ? Math.round((sent / total) * 100) : 0,
+      };
+    });
+
+    res.json({
+      campaignType: campaign.type,
+      enrollmentStats,
+      steps: stepFunnel,
+      stopOnReply: campaign.stopOnReply,
+      autoSend:    campaign.autoSend,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching campaign funnel");
+    res.status(500).json({ error: "Failed to load funnel" });
+  }
+});
+
 // ── Campaign Send Execution ───────────────────────────────────────────────────
 // Sends to all selected recipients one at a time, tracks status per recipient.
 router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: Response) => {
