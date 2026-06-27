@@ -15,6 +15,7 @@ import {
   type CiLead, type CiMessage,
   type CommunicationRecommendation,
 } from "@/lib/communicationIntelligence";
+import { getSmsStatusInfo } from "@/lib/smsStatus";
 import {
   computeSalesNBA, computeLeadMomentum,
   type SiLead, type SiActivity, type SiTask,
@@ -1119,9 +1120,23 @@ function CommunicationsTab({ lead, activities }: {
                       {item.direction === "inbound" ? "← Inbound" : "→ Outbound"}
                     </span>
                     <span className="text-[10px] text-muted-foreground capitalize">{item.channel}</span>
-                    {item.status && !["delivered", "received", "completed"].includes(item.status.toLowerCase()) && (
+                    {item.channel === "sms" && item.status && (() => {
+                      const info = getSmsStatusInfo(item.status);
+                      if (!info.label) return null;
+                      return (
+                        <span
+                          title={info.tooltip}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${info.className}`}
+                        >
+                          {info.label}
+                        </span>
+                      );
+                    })()}
+                    {item.channel === "call" && item.status && !["completed", "in-progress"].includes(item.status) && (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                        item.status === "failed" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"
+                        ["failed", "no-answer", "busy"].includes(item.status)
+                          ? "bg-red-100 text-red-700"
+                          : "bg-gray-100 text-gray-600"
                       }`}>
                         {item.status}
                       </span>

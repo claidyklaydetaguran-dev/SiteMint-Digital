@@ -1,0 +1,134 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17H — SMS Delivery Status Visibility
+
+MODULE:
+CRM Communications + Inbox + Lead Detail
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* Outbound SMS works.
+* Inbound SMS works.
+* Twilio SMS status callback updates crm_messages.status and errorCode by twilioSid.
+* CRM Inbox shows messages.
+* Lead Detail Communications tab shows SMS/call history.
+* Delivery status exists in DB but is not clearly surfaced everywhere.
+
+OBJECTIVE:
+Make SMS delivery status visible and useful in the CRM.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/web-agency/src/pages/crm/CrmInbox.tsx
+* artifacts/web-agency/src/pages/crm/CrmLeadDetail.tsx
+* artifacts/web-agency/src/pages/crm/SalesWorkspace.tsx only if Communications tab renders SMS messages
+* artifacts/api-server/src/routes/phone.ts only to confirm status fields already update
+* crmMessages schema only if needed
+
+TASK 2 — CREATE SMS STATUS HELPER
+
+If useful, create or add a small frontend helper:
+
+getSmsStatusBadge(status, errorCode)
+
+Statuses to handle:
+
+* queued
+* sending
+* sent
+* delivered
+* failed
+* undelivered
+* received
+* unknown/null
+
+Display:
+
+* label
+* color
+* tooltip/help text
+
+TASK 3 — INBOX MESSAGE STATUS BADGES
+
+In CrmInbox.tsx:
+
+For outbound SMS bubbles:
+
+* show delivery badge under or beside timestamp
+* show errorCode if failed/undelivered
+* style failed/undelivered clearly in red
+* delivered in green
+* sent/queued in blue/gray
+* inbound messages should show “Received” or no badge if UI gets cluttered
+
+Do not clutter call records.
+
+TASK 4 — LEAD DETAIL COMMUNICATIONS STATUS
+
+In CrmLeadDetail SMS/messages section:
+
+Show the same SMS delivery badge for outbound SMS messages.
+
+If failed/undelivered:
+
+* show a small warning:
+  “Message may not have been delivered.”
+* include errorCode if present.
+
+TASK 5 — SALES WORKSPACE COMMUNICATIONS TAB
+
+If SalesWorkspace Communications tab renders crm_messages:
+
+* show SMS delivery badge there too.
+  If it does not have enough message detail or would require extra fetches, defer and report.
+
+TASK 6 — OPTIONAL SETTINGS NOTE
+
+In CrmSettings Twilio section, add a small note:
+“SMS delivery status depends on Twilio status callbacks and CRM_BASE_URL being configured.”
+
+Only if the file is already touched or easy.
+
+TASK 7 — TESTING
+
+Test:
+
+1. Inbox loads.
+2. Outbound SMS with status delivered shows delivered badge.
+3. Outbound SMS with status failed/undelivered shows red badge and error code.
+4. Outbound SMS with sent/queued shows neutral badge.
+5. Inbound SMS still renders correctly.
+6. Call records are not affected.
+7. Lead Detail SMS section shows status badge.
+8. Failed SMS warning displays.
+9. Sales Workspace handled or safely deferred.
+10. No Twilio route changes.
+11. No schema/database changes.
+12. No locked modules changed.
+13. TypeScript passes except known unrelated issue.
+14. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. SMS status helper behavior
+4. Inbox badge behavior
+5. Lead Detail badge behavior
+6. Sales Workspace behavior completed or deferred
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended next phase

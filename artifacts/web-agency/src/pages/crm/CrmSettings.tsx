@@ -480,6 +480,12 @@ export default function CrmSettings() {
               <li>• API credentials are stored server-side only — never exposed to browser</li>
             </ul>
           </div>
+
+          <p className="text-xs text-muted-foreground mt-3">
+            📍 SMS delivery status (Delivered, Failed, Undelivered) is updated via Twilio status callbacks.
+            This requires <code className="bg-gray-100 px-0.5 rounded">CRM_BASE_URL</code> to be configured and
+            webhook URLs set in your Twilio Console.
+          </p>
         </div>
 
         {/* Phone Data Hygiene */}

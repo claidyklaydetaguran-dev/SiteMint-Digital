@@ -30,6 +30,7 @@ export interface CiMessage {
   channel: string;         // "sms" | "call"
   body?: string;
   status?: string;
+  errorCode?: string | null;
   callStatus?: string;
   duration?: number;
   createdAt: string;

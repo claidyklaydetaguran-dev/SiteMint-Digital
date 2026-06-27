@@ -8,6 +8,7 @@ import {
   FileText, CheckCircle2, XCircle, RefreshCw,
 } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import { getSmsStatusInfo } from "@/lib/smsStatus";
 import {
   computeCommunicationStats,
   type CiLead,
@@ -124,7 +125,7 @@ interface Lead {
 }
 interface Activity { id:number; type:string; title:string; description?:string; createdAt:string; metadata?:Record<string,unknown>|null; }
 interface CrmMessage {
-  id:number; direction:string; channel:string; body?:string; status?:string;
+  id:number; direction:string; channel:string; body?:string; status?:string; errorCode?:string|null;
   fromNumber?:string; toNumber?:string; callStatus?:string; duration?:number; createdAt:string;
 }
 interface Task {
@@ -1074,10 +1075,12 @@ export default function CrmLeadDetail() {
                     ) : messages.map(m => {
                       const isOut = m.direction === "outbound";
                       const isCall = m.channel === "call";
+                      const smsInfo = !isCall && isOut && m.status ? getSmsStatusInfo(m.status, m.errorCode) : null;
                       return (
-                        <div key={m.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+                        <div key={m.id} className={`flex flex-col ${isOut ? "items-end" : "items-start"}`}>
                           <div className={`max-w-sm rounded-2xl px-4 py-2.5 text-sm ${
                             isCall ? "bg-gray-100 text-gray-700 border border-gray-200 w-full"
+                            : smsInfo?.isError ? "bg-red-50 border border-red-200 text-red-900"
                             : isOut ? "bg-foreground text-white"
                             : "bg-blue-50 border border-blue-200 text-foreground"
                           }`}>
@@ -1091,13 +1094,26 @@ export default function CrmLeadDetail() {
                                 </div>
                               </div>
                             ) : (
-                              <>
-                                <p className="whitespace-pre-wrap">{m.body}</p>
-                                {m.status && <p className={`text-[10px] mt-1 ${isOut?"text-white/60":"text-muted-foreground"}`}>{m.status}</p>}
-                              </>
+                              <p className="whitespace-pre-wrap">{m.body}</p>
                             )}
-                            <p className={`text-[10px] mt-1 ${isOut&&!isCall?"text-white/50":"text-muted-foreground/60"}`}>{new Date(m.createdAt).toLocaleString()}</p>
+                            <p className={`text-[10px] mt-1 ${isOut&&!isCall?(smsInfo?.isError?"text-red-400":"text-white/50"):"text-muted-foreground/60"}`}>{new Date(m.createdAt).toLocaleString()}</p>
                           </div>
+                          {smsInfo && smsInfo.label && (
+                            <div className="mt-1 space-y-0.5">
+                              <span
+                                title={smsInfo.tooltip}
+                                className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${smsInfo.className}`}
+                              >
+                                {smsInfo.label}
+                              </span>
+                              {smsInfo.isError && (
+                                <p className="text-[10px] text-amber-700 flex items-center gap-0.5 mt-0.5">
+                                  <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                  Message may not have been delivered.
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

@@ -6,6 +6,7 @@ import {
   Phone, MessageSquare, Mail, Send, AlertCircle, CheckCircle2,
   Building, Globe, Tag, Calendar, ChevronRight, RefreshCw,
 } from "lucide-react";
+import { getSmsStatusInfo } from "@/lib/smsStatus";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -640,35 +641,41 @@ export default function CrmInbox() {
                     }
 
                     // SMS bubble
+                    const smsInfo = isOut && msg.status ? getSmsStatusInfo(msg.status, msg.errorCode) : null;
                     return (
-                      <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+                      <div key={msg.id} className={`flex flex-col ${isOut ? "items-end" : "items-start"}`}>
                         <div className={`max-w-sm rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                          hasError
-                            ? "bg-red-50 border border-red-200 text-red-700"
+                          smsInfo?.isError
+                            ? "bg-red-50 border border-red-200 text-red-900"
                             : isOut
                               ? "bg-foreground text-background"
                               : "bg-white border border-gray-200 text-foreground"
                         }`}>
                           <p className="whitespace-pre-wrap leading-relaxed">{msg.body}</p>
                           <div className={`flex items-center gap-1.5 mt-1 ${isOut ? "justify-end" : "justify-start"}`}>
-                            <span className={`text-[10px] ${isOut ? "text-background/50" : "text-muted-foreground"}`}>
+                            <span className={`text-[10px] ${smsInfo?.isError ? "text-red-500" : isOut ? "text-background/50" : "text-muted-foreground"}`}>
                               {timeAgo(msg.createdAt)}
                             </span>
-                            {isOut && !hasError && msg.status && msg.status !== "delivered" && msg.status !== "sent" && (
-                              <span className={`text-[10px] ${isOut ? "text-background/50" : "text-muted-foreground"}`}>
-                                · {msg.status}
-                              </span>
-                            )}
-                            {isOut && msg.status === "delivered" && (
+                            {isOut && msg.status === "delivered" && !smsInfo?.isError && (
                               <CheckCircle2 className="w-2.5 h-2.5 text-background/50" />
-                            )}
-                            {hasError && (
-                              <span className="text-[10px] text-red-500 font-medium">
-                                · Failed {msg.errorCode ? `(${msg.errorCode})` : ""}
-                              </span>
                             )}
                           </div>
                         </div>
+                        {smsInfo && smsInfo.label && (
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            <span
+                              title={smsInfo.tooltip}
+                              className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${smsInfo.className}`}
+                            >
+                              {smsInfo.label}
+                            </span>
+                            {smsInfo.isError && (
+                              <span className="text-[10px] text-muted-foreground">
+                                Message may not have been delivered.
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })
