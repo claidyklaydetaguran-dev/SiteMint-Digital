@@ -359,9 +359,24 @@ router.post("/crm/webhooks/twilio/sms/status", validateTwilioWebhook, async (req
   try {
     const { MessageSid, MessageStatus, ErrorCode } = req.body as Record<string, string>;
     if (MessageSid) {
-      await db.update(crmMessages)
+      const updated = await db.update(crmMessages)
         .set({ status: MessageStatus, errorCode: ErrorCode ?? null })
-        .where(eq(crmMessages.twilioSid, MessageSid));
+        .where(eq(crmMessages.twilioSid, MessageSid))
+        .returning({ leadId: crmMessages.leadId });
+
+      if (
+        (MessageStatus === "failed" || MessageStatus === "undelivered") &&
+        updated[0]?.leadId != null
+      ) {
+        const errorSuffix = ErrorCode ? ` (error ${ErrorCode})` : "";
+        await logActivity(
+          updated[0].leadId,
+          "sms_failed",
+          `SMS delivery failed${errorSuffix}`,
+          `Status: ${MessageStatus}${ErrorCode ? ` · Twilio error ${ErrorCode}` : ""}`,
+          { twilioSid: MessageSid, status: MessageStatus, errorCode: ErrorCode ?? null },
+        );
+      }
     }
     res.sendStatus(204);
   } catch {

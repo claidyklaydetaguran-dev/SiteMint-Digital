@@ -15,6 +15,7 @@ const token = () => localStorage.getItem("adminToken") || "";
 interface Stats {
   total: number; newLeads: number; hotLeads: number;
   won: number; lost: number; followUpToday: number; overdue: number;
+  smsSent30d: number; smsDelivered30d: number;
 }
 
 interface RecentActivity {
@@ -375,12 +376,26 @@ export default function CrmDashboard() {
     ];
   }, [allLeads, scoreMap]);
 
-  const statCards = stats ? [
-    { label: "NEW LEADS",        value: stats.newLeads,      sub: `${stats.total} total`,  color: "#6366f1", seed: 1 },
-    { label: "HOT LEADS",        value: stats.hotLeads,      sub: "High priority",          color: "#f97316", seed: 2 },
-    { label: "FOLLOW-UPS TODAY", value: stats.followUpToday, sub: "Due today",              color: "#0ea5e9", seed: 3 },
-    { label: "OVERDUE",          value: stats.overdue,       sub: "Need attention",         color: "#ef4444", seed: 4 },
-    { label: "WON",              value: stats.won,           sub: "Closed deals",           color: "#34d399", seed: 5 },
+  const smsRate = stats && stats.smsSent30d > 0
+    ? Math.round((stats.smsDelivered30d / stats.smsSent30d) * 100)
+    : null;
+
+  const statCards: { label: string; value: number; valueDisplay?: string; sub: string; color: string; seed: number }[] = stats ? [
+    { label: "NEW LEADS",        value: stats.newLeads,      sub: `${stats.total} total`,   color: "#6366f1", seed: 1 },
+    { label: "HOT LEADS",        value: stats.hotLeads,      sub: "High priority",           color: "#f97316", seed: 2 },
+    { label: "FOLLOW-UPS TODAY", value: stats.followUpToday, sub: "Due today",               color: "#0ea5e9", seed: 3 },
+    { label: "OVERDUE",          value: stats.overdue,       sub: "Need attention",          color: "#ef4444", seed: 4 },
+    { label: "WON",              value: stats.won,           sub: "Closed deals",            color: "#34d399", seed: 5 },
+    {
+      label: "SMS DELIVERY",
+      value: smsRate ?? 0,
+      valueDisplay: smsRate != null ? `${smsRate}%` : "N/A",
+      sub: smsRate != null
+        ? `${stats.smsDelivered30d}/${stats.smsSent30d} delivered · 30d`
+        : "No SMS sent in 30 days",
+      color: smsRate == null ? "#94a3b8" : smsRate >= 80 ? "#10b981" : "#ef4444",
+      seed: 6,
+    },
   ] : [];
 
   const STAGES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
@@ -391,8 +406,8 @@ export default function CrmDashboard() {
   if (loading) return (
     <CrmLayout>
       <div className="p-6 max-w-7xl mx-auto animate-pulse">
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+          {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-4 pb-0 overflow-hidden h-24">
               <div className="h-2 w-16 bg-gray-200 rounded mb-2" />
               <div className="h-7 w-10 bg-gray-200 rounded mb-1" />
@@ -409,11 +424,11 @@ export default function CrmDashboard() {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
 
         {/* ── Stat cards ───────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-          {statCards.map(({ label, value, sub, color, seed }) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          {statCards.map(({ label, value, valueDisplay, sub, color, seed }) => (
             <div key={label} className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-4 pb-0 overflow-hidden">
               <p className="text-[10px] font-semibold tracking-widest text-muted-foreground mb-1">{label}</p>
-              <p className="text-3xl font-bold text-foreground leading-tight">{value}</p>
+              <p className="text-3xl font-bold text-foreground leading-tight">{valueDisplay ?? value}</p>
               <p className="text-xs text-muted-foreground mt-0.5 mb-2">{sub}</p>
               <div className="-mx-4"><Sparkline seed={seed + value} color={color} /></div>
             </div>

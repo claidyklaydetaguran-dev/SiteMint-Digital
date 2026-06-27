@@ -29,8 +29,9 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 86400000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [total, newLeads, hotLeads, won, lost, followUpToday, overdue] = await Promise.all([
+    const [total, newLeads, hotLeads, won, lost, followUpToday, overdue, smsSent30d, smsDelivered30d] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.status, "New")).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.priority, "High")).then(r => Number(r[0].count)),
@@ -38,6 +39,12 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.status, "Lost")).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(and(gte(crmLeads.nextFollowUpAt, todayStart), lt(crmLeads.nextFollowUpAt, todayEnd))).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(lt(crmLeads.nextFollowUpAt, todayStart)).then(r => Number(r[0].count)),
+      db.select({ count: sql<number>`count(*)` }).from(crmMessages)
+        .where(and(eq(crmMessages.direction, "outbound"), eq(crmMessages.channel, "sms"), gte(crmMessages.createdAt, thirtyDaysAgo)))
+        .then(r => Number(r[0].count)),
+      db.select({ count: sql<number>`count(*)` }).from(crmMessages)
+        .where(and(eq(crmMessages.direction, "outbound"), eq(crmMessages.channel, "sms"), eq(crmMessages.status, "delivered"), gte(crmMessages.createdAt, thirtyDaysAgo)))
+        .then(r => Number(r[0].count)),
     ]);
 
     const recentActivity = await db.select({
@@ -49,7 +56,7 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
       leadId: crmActivities.leadId,
     }).from(crmActivities).orderBy(desc(crmActivities.createdAt)).limit(15);
 
-    res.json({ stats: { total, newLeads, hotLeads, won, lost, followUpToday, overdue }, recentActivity });
+    res.json({ stats: { total, newLeads, hotLeads, won, lost, followUpToday, overdue, smsSent30d, smsDelivered30d }, recentActivity });
   } catch (err) {
     req.log.error({ err }, "Error fetching CRM stats");
     res.status(500).json({ error: "Failed to fetch stats" });

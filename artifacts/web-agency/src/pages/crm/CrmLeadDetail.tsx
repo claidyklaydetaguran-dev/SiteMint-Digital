@@ -498,6 +498,29 @@ export default function CrmLeadDetail() {
     setLogActTitle(""); setLogActDescription("");
   };
 
+  const retrySms = async (body: string) => {
+    if (!lead) return;
+    setSendingSms(true);
+    try {
+      const r = await fetch(`/api/crm/leads/${params.id}/sms`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      if (r.ok) {
+        showToast(`SMS resent to ${lead.name}`);
+        loadMessages();
+      } else {
+        const d = await r.json() as { error?: string };
+        showToast(d.error ?? "Retry failed", "error");
+      }
+    } catch {
+      showToast("Network error — retry failed", "error");
+    } finally {
+      setSendingSms(false);
+    }
+  };
+
   const sendSms = async () => {
     if (!smsBody.trim() || !lead) return;
     setSendingSms(true);
@@ -1107,10 +1130,21 @@ export default function CrmLeadDetail() {
                                 {smsInfo.label}
                               </span>
                               {smsInfo.isError && (
-                                <p className="text-[10px] text-amber-700 flex items-center gap-0.5 mt-0.5">
-                                  <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                  Message may not have been delivered.
-                                </p>
+                                <>
+                                  <p className="text-[10px] text-amber-700 flex items-center gap-0.5 mt-0.5">
+                                    <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                    Message may not have been delivered.
+                                  </p>
+                                  {m.body && (
+                                    <button
+                                      onClick={() => retrySms(m.body!)}
+                                      disabled={sendingSms}
+                                      className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline font-medium disabled:opacity-50 mt-0.5"
+                                    >
+                                      ↻ Retry send
+                                    </button>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}

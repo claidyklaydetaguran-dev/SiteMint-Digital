@@ -349,6 +349,28 @@ export default function CrmInbox() {
 
   // ── SMS send ─────────────────────────────────────────────────────────────────
 
+  const retrySms = async (leadId: number, body: string) => {
+    setSending(true);
+    try {
+      const r = await fetch(`/api/crm/leads/${leadId}/sms`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data = await r.json() as { error?: string };
+      if (r.ok) {
+        showToast("SMS resent.");
+        loadMessages(leadId);
+      } else {
+        showToast(data.error ?? "Retry failed.");
+      }
+    } catch {
+      showToast("Network error — retry failed.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   const sendSms = async () => {
     if (!selected?.leadId || !smsBody.trim()) return;
     setSending(true);
@@ -670,9 +692,20 @@ export default function CrmInbox() {
                               {smsInfo.label}
                             </span>
                             {smsInfo.isError && (
-                              <span className="text-[10px] text-muted-foreground">
-                                Message may not have been delivered.
-                              </span>
+                              <>
+                                <span className="text-[10px] text-muted-foreground">
+                                  May not have been delivered.
+                                </span>
+                                {msg.body && selected?.leadId && (
+                                  <button
+                                    onClick={() => retrySms(selected.leadId!, msg.body!)}
+                                    disabled={sending}
+                                    className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline font-medium disabled:opacity-50"
+                                  >
+                                    ↻ Retry
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
