@@ -7,6 +7,7 @@ import {
   normalizePhone, isOptOutMessage, isOptInMessage,
   createWebhookValidator, getWebhookSecurityMode,
 } from "../lib/twilio.js";
+import { stampReplyAndStop } from "../lib/sequenceReply.js";
 
 const router: IRouter = Router();
 const validateTwilioWebhook = createWebhookValidator();
@@ -346,6 +347,9 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
 
     await logActivity(lead.id, "sms_received", `Inbound SMS from ${lead.name}`, Body?.substring(0, 100));
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
+
+    // Stop any active sequence enrollments for this lead
+    await stampReplyAndStop(lead.id, "sms", { twilioSid: MessageSid, from: From });
 
     res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
   } catch (err) {

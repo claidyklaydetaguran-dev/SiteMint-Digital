@@ -8,6 +8,7 @@ import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
 import { getSchedulerStatus, processScheduledMessages } from "../lib/campaignScheduler.js";
+import { stampReplyAndStop } from "../lib/sequenceReply.js";
 
 const router: IRouter = Router();
 
@@ -1115,6 +1116,7 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
       "email.clicked":         "clicked",
       "email.bounced":         "bounced",
       "email.delivery_failed": "failed",
+      "email.complained":      "complained",
     };
     const resendEventType = (payload.type as string) ?? "";
     const eventType = RESEND_EVENT_MAP[resendEventType];
@@ -1132,9 +1134,9 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
       return;
     }
 
-    // Find matching recipient
+    // Find matching recipient (include leadId so we can do sequence reply logic)
     const [recipient] = await db
-      .select({ id: crmCampaignRecipients.id, campaignId: crmCampaignRecipients.campaignId })
+      .select({ id: crmCampaignRecipients.id, campaignId: crmCampaignRecipients.campaignId, leadId: crmCampaignRecipients.leadId })
       .from(crmCampaignRecipients)
       .where(eq(crmCampaignRecipients.resendEmailId, resendEmailId))
       .limit(1);
@@ -1172,11 +1174,17 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
       metadata: { resendEventType, resendEmailId, raw: data },
     });
 
-    // For bounce / failure: update recipient status
-    if (eventType === "bounced" || eventType === "failed") {
+    // For bounce / failure / complaint: update recipient status
+    if (eventType === "bounced" || eventType === "failed" || eventType === "complained") {
       await db.update(crmCampaignRecipients)
         .set({ status: "failed", lastError: errorReason ?? `${resendEventType} via webhook` })
         .where(eq(crmCampaignRecipients.id, recipient.id));
+    }
+
+    // For complaint (spam report): also stop all active sequences for this lead immediately
+    if (eventType === "complained" && recipient.leadId) {
+      await stampReplyAndStop(recipient.leadId, "email", { resendEventType, resendEmailId });
+      req.log.info({ leadId: recipient.leadId }, "Sequences stopped due to spam complaint");
     }
 
     req.log.info({ recipientId: recipient.id, eventType, resendEmailId }, "Resend webhook event recorded");
