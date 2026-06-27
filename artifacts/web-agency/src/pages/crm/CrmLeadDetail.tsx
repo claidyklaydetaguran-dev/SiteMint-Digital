@@ -748,13 +748,38 @@ export default function CrmLeadDetail() {
                   <Mail className="w-3.5 h-3.5 shrink-0" /> {lead.email}
                 </a>
                 {lead.phone && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                      <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
-                    </a>
-                    {lead.smsOptOut && (
-                      <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
-                    )}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                        <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
+                      </a>
+                      {lead.smsOptOut && (
+                        <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
+                      )}
+                    </div>
+                    {(() => {
+                      const digits = lead.phone.replace(/\D/g, "");
+                      const isE164 = lead.phone.startsWith("+");
+                      // PH trunk: 09XXXXXXXXX (11 digits, starts with 0) — will normalize wrong without fix
+                      if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
+                        return (
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                            <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                            Phone may need country code — suggested: +63{digits.slice(1)}
+                          </span>
+                        );
+                      }
+                      // Not E.164 and not a standard 10-digit US number
+                      if (!isE164 && digits.length !== 10 && digits.length !== 11) {
+                        return (
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                            <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                            Phone number may need country code formatting
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
                 {lead.website && (

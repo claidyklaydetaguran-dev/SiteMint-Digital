@@ -74,11 +74,18 @@ router.get("/crm/phone/status", requireAdmin, async (req: Request, res: Response
 
   const securityMode = getWebhookSecurityMode();
 
+  const normalizedForwardTo = forwardTo ? normalizePhone(forwardTo) : "";
+  const forwardingNumberLooksValid =
+    normalizedForwardTo.startsWith("+") &&
+    normalizedForwardTo.replace(/\D/g, "").length >= 10;
+
   res.json({
     configured,
     provider: process.env.PHONE_PROVIDER ?? "twilio",
     businessNumber,
     forwardTo,
+    normalizedForwardTo,
+    forwardingNumberLooksValid,
     accountStatus,
     forwardConfigured: !!forwardTo,
     baseUrlMissing: !baseUrl,

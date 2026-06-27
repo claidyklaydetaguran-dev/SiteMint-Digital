@@ -36,11 +36,27 @@ export function getCrmBaseUrl(): string {
 }
 
 export function normalizePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  // Already in E.164 format — trust it and return as-is
   if (raw.startsWith("+")) return raw;
-  return `+${digits}`;
+
+  const digits = raw.replace(/\D/g, "");
+
+  // US 10-digit: no country code present, assume +1 (e.g. 9498806515 → +19498806515)
+  if (digits.length === 10) return `+1${digits}`;
+
+  // US 11-digit starting with 1 (e.g. 19498806515 → +19498806515)
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+
+  // Philippine mobile: 09XXXXXXXXX — leading 0 is a trunk prefix, strip it and prepend +63
+  // Example: 09186069624 → +639186069624
+  if (digits.length === 11 && digits.startsWith("0")) return `+63${digits.slice(1)}`;
+
+  // Philippine mobile: 639XXXXXXXXX — already has country code digits, just add + prefix
+  // Example: 639186069624 → +639186069624
+  if (digits.length === 12 && digits.startsWith("63")) return `+${digits}`;
+
+  // Fallback: cannot safely determine country code — return original to avoid corruption
+  return raw;
 }
 
 export const SMS_OPT_OUT_KEYWORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"];

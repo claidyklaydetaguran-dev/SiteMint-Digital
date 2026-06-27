@@ -1,0 +1,126 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17E — Phone Data Hygiene & Admin Forwarding UX
+
+MODULE:
+Phone / Twilio + CRM Settings + Lead Phone Hygiene only.
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema unless absolutely required.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* Click-to-call works.
+* Inbound calls forward to admin cell if FORWARD_TO_PHONE_NUMBER is configured.
+* Twilio status panel exists.
+* Webhook security status exists.
+* Call outcomes and call history exist.
+* Known issue: PH-style numbers like 09186069624 may normalize incorrectly as +09186069624 instead of +639186069624.
+
+OBJECTIVE:
+Make phone number handling clearer and improve admin visibility around forwarding configuration.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/api-server/src/lib/twilio.ts
+* artifacts/api-server/src/routes/phone.ts
+* artifacts/web-agency/src/pages/crm/CrmSettings.tsx
+* artifacts/web-agency/src/pages/crm/CrmLeadDetail.tsx only if phone display/validation is needed
+
+TASK 2 — PHONE NORMALIZATION HARDENING
+
+Improve phone number normalization helper.
+
+Requirements:
+
+* Preserve existing US normalization.
+* Add safe handling for Philippine mobile numbers:
+
+  * 09XXXXXXXXX → +639XXXXXXXXX
+  * 639XXXXXXXXX → +639XXXXXXXXX
+  * +639XXXXXXXXX remains unchanged
+* Do not corrupt existing +1 US numbers.
+* If number cannot be normalized safely, return original or null based on current helper convention.
+* Add inline comments explaining assumptions.
+
+TASK 3 — PHONE FORMAT WARNINGS
+
+In Lead Detail, when phone number exists but appears invalid or not normalized:
+Show a small warning near the phone field:
+“Phone number may need country code formatting.”
+
+Examples:
+
+* 09186069624 should suggest +639186069624
+* 9186069624 should not blindly assume country unless current system supports it
+
+TASK 4 — SETTINGS FORWARDING UX
+
+In CrmSettings.tsx, improve the forwarding section.
+
+Show:
+
+* Forwarding configured / missing
+* Current forwarding number
+* Example format:
+
+  * US: +19498806515
+  * PH: +639186069624
+* Clear warning:
+  “Inbound calls will not ring your cell phone unless forwarding is configured.”
+
+Do not create runtime env editing yet.
+Only improve visibility and guidance.
+
+TASK 5 — STATUS ENDPOINT OPTIONAL ENHANCEMENT
+
+If easy, add:
+
+* normalizedForwardTo
+* forwardingNumberLooksValid
+
+to GET /api/crm/phone/status.
+
+No schema changes.
+
+TASK 6 — TESTING
+
+Test:
+
+1. US numbers still normalize correctly.
+2. PH 09XXXXXXXXX normalizes to +639XXXXXXXXX.
+3. PH 639XXXXXXXXX normalizes to +639XXXXXXXXX.
+4. Existing +639XXXXXXXXX stays unchanged.
+5. Invalid/short numbers do not crash.
+6. Lead Detail warning appears for suspicious phone numbers.
+7. Settings shows forwarding guidance.
+8. Phone status endpoint still works.
+9. Outbound SMS route still works or fails safely.
+10. Outbound call route still works or fails safely.
+11. Inbound webhook routes untouched.
+12. No schema/database changes.
+13. No locked modules changed.
+14. TypeScript passes except known unrelated issue.
+15. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Phone normalization behavior
+4. Lead Detail warning behavior
+5. Settings forwarding UX behavior
+6. Status endpoint changes if any
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended Phase 17F

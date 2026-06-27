@@ -14,6 +14,8 @@ interface PhoneStatus {
   provider: string;
   businessNumber: string;
   forwardTo: string;
+  normalizedForwardTo?: string;
+  forwardingNumberLooksValid?: boolean;
   accountStatus: string | null;
   forwardConfigured: boolean;
   baseUrlMissing: boolean;
@@ -194,12 +196,67 @@ export default function CrmSettings() {
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Set via <code className="bg-gray-100 px-0.5 rounded">TWILIO_PHONE_NUMBER</code></p>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">Forward-to Number (Your Cell)</label>
-                <div className={`px-3 py-2 border rounded-lg text-sm font-mono ${phoneStatus?.configured && !phoneStatus?.forwardConfigured ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-foreground"}`}>
-                  {phoneStatus?.forwardTo || <span className="font-sans font-medium">⚠ Not set — calls won't forward</span>}
+              <div className="col-span-2">
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                  Forward-to Number (Your Cell)
+                </label>
+
+                {/* Not configured warning */}
+                {!phoneStatus?.forwardConfigured && (
+                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 mb-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700 font-medium">
+                      Inbound calls will not ring your cell phone unless forwarding is configured.
+                      Set <code className="bg-red-100 px-0.5 rounded">FORWARD_TO_PHONE_NUMBER</code> to your mobile number.
+                    </p>
+                  </div>
+                )}
+
+                {/* Current value display */}
+                <div className={`px-3 py-2 border rounded-lg text-sm font-mono ${
+                  phoneStatus?.forwardConfigured
+                    ? phoneStatus.forwardingNumberLooksValid === false
+                      ? "bg-amber-50 border-amber-200 text-amber-700"
+                      : "bg-gray-50 border-gray-200 text-foreground"
+                    : "bg-red-50 border-red-200 text-red-600"
+                }`}>
+                  {phoneStatus?.forwardTo
+                    ? <>
+                        {phoneStatus.forwardTo}
+                        {phoneStatus.normalizedForwardTo && phoneStatus.normalizedForwardTo !== phoneStatus.forwardTo && (
+                          <span className="text-[10px] font-sans text-amber-700 ml-2">
+                            (normalizes to {phoneStatus.normalizedForwardTo})
+                          </span>
+                        )}
+                      </>
+                    : <span className="font-sans font-medium">⚠ Not set — calls won't forward to your cell</span>
+                  }
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Set via <code className="bg-gray-100 px-0.5 rounded">FORWARD_TO_PHONE_NUMBER</code></p>
+
+                {/* Format guidance */}
+                <div className="mt-1.5 text-[10px] text-muted-foreground space-y-0.5">
+                  <p>Set via <code className="bg-gray-100 px-0.5 rounded">FORWARD_TO_PHONE_NUMBER</code> environment variable</p>
+                  <p>
+                    <span className="font-semibold">Format examples:</span>{" "}
+                    US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
+                    · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Always use E.164 format (+ followed by country code and number, no spaces or dashes).</p>
+                </div>
+
+                {/* Valid number confirmation */}
+                {phoneStatus?.forwardConfigured && phoneStatus.forwardingNumberLooksValid && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                    <span className="text-[10px] text-emerald-700 font-medium">Forwarding number looks valid</span>
+                  </div>
+                )}
+                {phoneStatus?.forwardConfigured && phoneStatus.forwardingNumberLooksValid === false && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <AlertCircle className="w-3 h-3 text-amber-600" />
+                    <span className="text-[10px] text-amber-700 font-medium">Number format may be invalid — check E.164 formatting above</span>
+                  </div>
+                )}
               </div>
             </div>
 
