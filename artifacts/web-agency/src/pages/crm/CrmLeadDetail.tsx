@@ -258,6 +258,7 @@ export default function CrmLeadDetail() {
     };
     return computeDiscProfile(diLead, [], activities);
   }, [lead, activities]);
+
   const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"calls"|"sms"|"email">("timeline");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
@@ -282,6 +283,25 @@ export default function CrmLeadDetail() {
   const [callLogDisposition, setCallLogDisposition] = useState<CallDisposition>("Connected");
   const [callLogNotes, setCallLogNotes] = useState("");
   const [savingCallLog, setSavingCallLog] = useState(false);
+  const [callFilter, setCallFilter] = useState<"all"|"connected"|"missed"|"voicemail"|"follow_up"|"inbound"|"outbound">("all");
+
+  const callSummary = useMemo(() => {
+    const msgs = messages.filter(m => m.channel === "call");
+    const acts = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type));
+    const connected = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Connected").length;
+    const voicemail = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Left Voicemail").length;
+    const followUp  = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Follow Up").length;
+    const missed    = acts.filter(a => a.type === "call_missed").length;
+    const allTs     = [...msgs.map(m => new Date(m.createdAt).getTime()), ...acts.map(a => new Date(a.createdAt).getTime())];
+    const lastCallTs = allTs.length > 0 ? Math.max(...allTs) : null;
+    const mostRecent = acts.filter(a => a.type === "call_outcome").sort((x,y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime())[0];
+    return {
+      totalCalls: msgs.length,
+      connected, missed, voicemail, followUp,
+      lastCallAt: lastCallTs ? new Date(lastCallTs).toLocaleDateString() : null,
+      recentOutcome: mostRecent ? (mostRecent.metadata?.disposition as string | undefined) : undefined,
+    };
+  }, [messages, activities]);
 
   // Log activity modal state
   const [logActType, setLogActType] = useState<LogActType>("note_added");
@@ -1000,9 +1020,52 @@ export default function CrmLeadDetail() {
               {activeTab === "calls" && (() => {
                 const callMsgs = messages.filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
                 const callActs = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type)).map(a => ({ key:`act-${a.id}`, kind:"activity" as const, ts: new Date(a.createdAt).getTime(), data: a }));
-                const merged = [...callMsgs, ...callActs].sort((a,b) => b.ts - a.ts);
+                const all = [...callMsgs, ...callActs].sort((a,b) => b.ts - a.ts);
+                const merged = callFilter === "all" ? all : all.filter(entry => {
+                  if (entry.kind === "message") {
+                    const m = entry.data as CrmMessage;
+                    if (callFilter === "connected") return m.callStatus === "completed";
+                    if (callFilter === "missed")    return m.callStatus === "no-answer" || m.callStatus === "busy" || m.callStatus === "failed";
+                    if (callFilter === "inbound")   return m.direction === "inbound";
+                    if (callFilter === "outbound")  return m.direction === "outbound";
+                    return false;
+                  } else {
+                    const a = entry.data as Activity;
+                    if (callFilter === "connected")  return a.type === "call_outcome" && (a.metadata?.disposition as string|undefined) === "Connected";
+                    if (callFilter === "missed")     return a.type === "call_missed";
+                    if (callFilter === "voicemail")  return a.type === "call_outcome" && (a.metadata?.disposition as string|undefined) === "Left Voicemail";
+                    if (callFilter === "follow_up")  return a.type === "call_outcome" && (a.metadata?.disposition as string|undefined) === "Follow Up";
+                    if (callFilter === "inbound")    return a.type === "call_received";
+                    if (callFilter === "outbound")   return a.type === "call_initiated" || a.type === "call_outcome";
+                    return false;
+                  }
+                });
+                const filterPills: { key: typeof callFilter; label: string }[] = [
+                  { key: "all",       label: "All" },
+                  { key: "connected", label: "✅ Connected" },
+                  { key: "missed",    label: "📵 Missed" },
+                  { key: "voicemail", label: "📮 Voicemail" },
+                  { key: "follow_up", label: "🔁 Follow-Up" },
+                  { key: "inbound",   label: "⬇ Inbound" },
+                  { key: "outbound",  label: "⬆ Outbound" },
+                ];
                 return (
                   <div className="p-5">
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {filterPills.map(p => (
+                        <button
+                          key={p.key}
+                          onClick={() => setCallFilter(p.key)}
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all ${
+                            callFilter === p.key
+                              ? "bg-foreground text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
                     {loadingMessages ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
@@ -1243,6 +1306,46 @@ export default function CrmLeadDetail() {
                 </p>
               </div>
             )}
+
+            {/* ── Call Summary ─────────────────────────────────────────────── */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif font-bold text-sm text-foreground">Call Summary</h3>
+                {callSummary.lastCallAt && (
+                  <span className="text-[10px] text-muted-foreground">Last: {callSummary.lastCallAt}</span>
+                )}
+              </div>
+              {callSummary.totalCalls === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">No calls yet</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Total Calls</p>
+                      <p className="text-2xl font-bold text-foreground">{callSummary.totalCalls}</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-lg px-2.5 py-2">
+                      <p className="text-[10px] text-emerald-700 uppercase tracking-wide mb-0.5">Connected</p>
+                      <p className="text-2xl font-bold text-emerald-700">{callSummary.connected}</p>
+                    </div>
+                    <div className="bg-red-50 rounded-lg px-2.5 py-2">
+                      <p className="text-[10px] text-red-600 uppercase tracking-wide mb-0.5">Missed</p>
+                      <p className="text-2xl font-bold text-red-600">{callSummary.missed}</p>
+                    </div>
+                    <div className="bg-amber-50 rounded-lg px-2.5 py-2">
+                      <p className="text-[10px] text-amber-700 uppercase tracking-wide mb-0.5">Voicemail</p>
+                      <p className="text-2xl font-bold text-amber-700">{callSummary.voicemail}</p>
+                    </div>
+                  </div>
+                  {callSummary.recentOutcome && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Last Outcome</p>
+                      <p className="text-xs font-semibold text-foreground">{callSummary.recentOutcome}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* ── Sales Intelligence ───────────────────────────────────────── */}
             {salesNBA && momentum && (

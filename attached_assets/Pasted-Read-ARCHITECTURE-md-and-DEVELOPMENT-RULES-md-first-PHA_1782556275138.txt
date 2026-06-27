@@ -1,0 +1,148 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17D — Lead-Level Call Stats & Quick Filters
+
+MODULE:
+Lead Detail + CRM Dashboard activity rendering only.
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* Calls tab exists in Lead Detail.
+* Manual Log Activity exists.
+* call_outcome activities exist.
+* call_missed activities exist.
+* crm_messages stores call-channel records.
+* Dashboard recent activity list exists.
+* No schema changes are needed.
+
+OBJECTIVE:
+Make call history easier to understand at a glance.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/web-agency/src/pages/crm/CrmLeadDetail.tsx
+* artifacts/web-agency/src/pages/crm/CrmDashboard.tsx
+
+Do not inspect unrelated modules.
+
+TASK 2 — ADD CALL SUMMARY TILE TO LEAD DETAIL SIDEBAR
+
+Add a compact “Call Summary” card in Lead Detail sidebar.
+
+Compute from existing:
+
+* crm_messages where channel = call
+* crm_activities where type is call_outcome / call_missed / call_initiated / call_received
+
+Show:
+
+* Total calls
+* Last call date
+* Connected count
+* Missed count
+* Voicemail count
+* Follow-up count
+* Most recent disposition if available
+
+Empty state:
+“No call activity yet.”
+
+Use memoization.
+
+TASK 3 — ADD CALL FILTERS IN CALLS TAB
+
+In the Calls tab, add filter pills:
+
+* All
+* Connected
+* Missed
+* Voicemail
+* Follow Up
+* Inbound
+* Outbound
+
+Behavior:
+
+* Client-side only.
+* Works on merged call history.
+* Shows count on each filter if easy.
+* Empty filtered state:
+  “No calls match this filter.”
+
+TASK 4 — DASHBOARD ACTIVITY ICON POLISH
+
+In CRM Dashboard recent activity list, update rendering for activity types:
+
+* call_outcome
+* call_missed
+* email_logged
+* meeting_logged
+* follow_up_logged
+* note_added
+
+Show colored icons or badges instead of default bullet.
+
+Do not rewrite the dashboard.
+
+TASK 5 — OPTIONAL SAFE ENHANCEMENT
+
+When manually logging meeting_logged activity, optionally show a checkbox:
+
+“Mark lead as Qualified”
+
+If checked:
+
+* call existing PATCH /api/crm/leads/:id
+* update status to “Qualified” or the closest existing valid status if “Qualified” is not supported
+
+If this is risky or status vocab does not support Qualified, defer and report.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Lead Detail loads.
+2. Call Summary card renders.
+3. Call Summary works with no calls.
+4. Call Summary counts connected/missed/voicemail/follow-up correctly.
+5. Calls filter All works.
+6. Calls filter Connected works.
+7. Calls filter Missed works.
+8. Calls filter Voicemail works.
+9. Calls filter Follow Up works.
+10. Calls filter Inbound/Outbound works.
+11. Empty filtered state renders safely.
+12. Dashboard recent activity icons render.
+13. Manual Log Activity still works.
+14. Click-to-call still works.
+15. Inbox still works.
+16. No Twilio files changed.
+17. No schema/database changes.
+18. No locked modules changed.
+19. TypeScript passes except known unrelated issue.
+20. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Call Summary logic
+4. Call filter behavior
+5. Dashboard activity icon updates
+6. Optional meeting-to-qualified behavior completed or deferred
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended next phase

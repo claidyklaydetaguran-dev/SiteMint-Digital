@@ -17,6 +17,11 @@ interface Stats {
   won: number; lost: number; followUpToday: number; overdue: number;
 }
 
+interface RecentActivity {
+  id: number; type: string; title: string; description: string | null;
+  createdAt: string; leadId: number;
+}
+
 interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
   status: string; priority: string; assignedTo?: string;
@@ -85,6 +90,7 @@ const DAY = 86_400_000;
 export default function CrmDashboard() {
   const [, navigate] = useLocation();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStage, setFilterStage] = useState("");
@@ -97,6 +103,7 @@ export default function CrmDashboard() {
       fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),
     ]).then(([sd, ld]) => {
       setStats(sd.stats);
+      setRecentActivities(sd.recentActivity || []);
       setAllLeads((ld.leads || []).slice().sort(
         (a: Lead, b: Lead) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       ));
@@ -786,6 +793,49 @@ export default function CrmDashboard() {
             </div>
           )}
         </div>
+
+        {/* ── Activity Feed ──────────────────────────────────────────────────── */}
+        {recentActivities.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Activity Feed</h2>
+              <span className="text-[10px] text-muted-foreground">{recentActivities.length} recent</span>
+            </div>
+            <ul className="divide-y divide-gray-50">
+              {recentActivities.map(a => {
+                const iconMap: Record<string, { emoji: string; bg: string; text: string }> = {
+                  call_outcome:     { emoji: "📞", bg: "bg-emerald-100", text: "text-emerald-700" },
+                  call_missed:      { emoji: "📵", bg: "bg-red-100",     text: "text-red-600" },
+                  call_initiated:   { emoji: "📲", bg: "bg-blue-100",    text: "text-blue-700" },
+                  call_received:    { emoji: "📥", bg: "bg-purple-100",  text: "text-purple-700" },
+                  sms_sent:         { emoji: "💬", bg: "bg-sky-100",     text: "text-sky-700" },
+                  email_sent:       { emoji: "✉️",  bg: "bg-indigo-100", text: "text-indigo-700" },
+                  note_added:       { emoji: "📝", bg: "bg-yellow-100",  text: "text-yellow-700" },
+                  status_changed:   { emoji: "🔄", bg: "bg-gray-100",   text: "text-gray-600" },
+                  task_created:     { emoji: "✅", bg: "bg-green-100",  text: "text-green-700" },
+                  email_logged:     { emoji: "📧", bg: "bg-violet-100", text: "text-violet-700" },
+                  meeting_logged:   { emoji: "🤝", bg: "bg-teal-100",   text: "text-teal-700" },
+                  follow_up_logged: { emoji: "🔁", bg: "bg-orange-100", text: "text-orange-700" },
+                };
+                const ic = iconMap[a.type] ?? { emoji: "·", bg: "bg-gray-100", text: "text-gray-500" };
+                return (
+                  <li key={a.id} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50/60 transition-colors">
+                    <span className={`text-sm w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${ic.bg}`}>
+                      {ic.emoji}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-semibold truncate ${ic.text}`}>{a.title}</p>
+                      {a.description && <p className="text-[11px] text-muted-foreground truncate">{a.description}</p>}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0 mt-0.5">
+                      {timeAgo(a.createdAt)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {/* ── Daily Sales Brief ──────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
