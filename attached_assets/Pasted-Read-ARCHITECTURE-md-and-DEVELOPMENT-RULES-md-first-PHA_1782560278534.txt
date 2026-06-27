@@ -1,0 +1,285 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 18 — Relationship Intelligence Engine
+
+MODULE:
+CRM Intelligence Layer
+
+IMPORTANT
+
+This is an intelligence phase.
+
+Do NOT modify Twilio.
+
+Do NOT modify Campaign sending.
+
+Do NOT rebuild Lead Health.
+
+Do NOT rebuild DISC.
+
+Do NOT rebuild Sales Intelligence.
+
+Reuse all existing engines.
+
+Maximum:
+
+1 new utility
+4 modified files
+No schema changes
+No migrations
+OBJECTIVE
+
+Create a unified Relationship Intelligence Engine that combines:
+
+Lead Health
+Engagement
+DISC
+Sales Intelligence
+Workflow
+Automation
+Communication
+
+into one recommendation layer.
+
+Nothing AI.
+
+Everything transparent.
+
+Everything rule-based.
+
+TASK 1
+
+Create:
+
+src/lib/relationshipIntelligence.ts
+
+Pure TypeScript.
+
+No React.
+
+No API.
+
+Exports:
+
+computeRelationshipProfile()
+
+computeRiskScore()
+
+computeRelationshipStrength()
+
+computeNextConversation()
+
+computeRelationshipSummary()
+
+computeExecutiveRecommendation()
+TASK 2
+
+Relationship Strength
+
+0-100
+
+Built from
+
+Health
+
+Engagement
+
+Workflow
+
+Response rate
+
+Communication recency
+
+Deal stage
+
+Proposal progress
+
+DISC confidence
+
+Output
+
+Weak
+
+Growing
+
+Strong
+
+Excellent
+
+TASK 3
+
+Risk Score
+
+0-100
+
+Signals:
+
+No contact
+
+Missed follow-up
+
+Proposal stalled
+
+Cold lead
+
+Failed SMS
+
+No replies
+
+Declining momentum
+
+Outputs:
+
+Low Risk
+
+Moderate
+
+High
+
+Critical
+
+TASK 4
+
+Conversation Recommendation
+
+Generate transparent recommendations such as:
+
+"Call today."
+
+"Send DISC-friendly email."
+
+"Schedule Zoom."
+
+"Wait 3 days."
+
+"Send proposal."
+
+"Generate SOW."
+
+"Request Discovery."
+
+Always include WHY.
+
+TASK 5
+
+Executive Recommendation
+
+One paragraph.
+
+Example:
+
+"This relationship is healthy but momentum is slowing. The client responds well to concise phone conversations and has opened prior proposals. Recommend calling within two days before sending a revised proposal."
+
+No AI.
+
+Entirely rule generated.
+
+TASK 6
+
+CRM Dashboard
+
+New card:
+
+Relationship Overview
+
+Shows:
+
+Average relationship score
+
+High-risk relationships
+
+Strongest relationships
+
+Needs attention
+
+Trend
+
+TASK 7
+
+Lead Detail
+
+New sidebar card:
+
+Relationship Intelligence
+
+Displays
+
+Relationship Score
+
+Risk
+
+Strength
+
+Recommendation
+
+Conversation advice
+
+Executive Summary
+
+TASK 8
+
+Sales Workspace
+
+New tab
+
+Relationship
+
+Displays
+
+All recommendations
+
+Signals
+
+Rule explanations
+
+Timeline impact
+
+DISC influence
+
+Communication influence
+
+TASK 9
+
+Testing
+
+Verify:
+
+Dashboard
+
+Lead Detail
+
+Workspace
+
+No new API calls
+
+No schema changes
+
+No Twilio changes
+
+TypeScript
+
+No locked modules touched
+
+FINAL REPORT
+
+Return:
+
+Files inspected
+
+Files changed
+
+Relationship engine functions
+
+Dashboard integration
+
+Lead Detail integration
+
+Sales Workspace integration
+
+Tests
+
+Schema changes
+
+Known limitations
+
+Recommended next phase

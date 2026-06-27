@@ -9,6 +9,10 @@ import {
   computeDailyBrief, computeOpportunityRadar,
   type BriefInput, type RadarInput, type RadarEntry,
 } from "@/lib/salesIntelligence";
+import {
+  computeRelationshipStrength, computeRiskScore,
+  type RiLead, type StrengthLabel, type RiskLevel,
+} from "@/lib/relationshipIntelligence";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -256,6 +260,58 @@ export default function CrmDashboard() {
       }));
     return computeOpportunityRadar(inputs);
   }, [allLeads, scoreMap, discMap]);
+
+  // ── Relationship Overview ─────────────────────────────────────────────────
+  const relationshipOverview = useMemo(() => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    function proxyEngagement(lead: Lead): number {
+      if (!lead.lastContactedAt) return 20;
+      const days = (now - new Date(lead.lastContactedAt).getTime()) / DAY;
+      if (days < 3)  return 80;
+      if (days < 7)  return 65;
+      if (days < 14) return 45;
+      if (days < 30) return 30;
+      return 15;
+    }
+    const active = allLeads.filter(l => !["Won", "Lost"].includes(l.status));
+    const entries = active.map(l => {
+      const riLead: RiLead = {
+        id: l.id, name: l.name, company: l.company, status: l.status,
+        lastContactedAt: l.lastContactedAt, nextFollowUpAt: l.nextFollowUpAt,
+        proposalStatus: l.proposalStatus, sowStatus: l.sowStatus,
+        generatedProposal: null, estimatedValue: l.estimatedValue,
+        createdAt: l.createdAt, updatedAt: l.updatedAt,
+      };
+      const eng = proxyEngagement(l);
+      const strength = computeRelationshipStrength(riLead, scoreMap.get(l.id)?.score ?? 50, eng);
+      const risk     = computeRiskScore(riLead, [], eng);
+      return { lead: l, strength, risk };
+    });
+
+    const avg = entries.length > 0
+      ? Math.round(entries.reduce((s, e) => s + e.strength.score, 0) / entries.length)
+      : 0;
+
+    const highRisk  = entries.filter(e => e.risk.level === "High" || e.risk.level === "Critical");
+    const strongest = [...entries].sort((a, b) => b.strength.score - a.strength.score).slice(0, 3);
+    const needsAttn = [...highRisk].sort((a, b) => b.risk.score - a.risk.score).slice(0, 3);
+
+    const STRENGTH_LABEL_STYLES: Record<StrengthLabel, string> = {
+      Excellent: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      Strong:    "bg-blue-50    text-blue-700    border-blue-200",
+      Growing:   "bg-amber-50   text-amber-700   border-amber-200",
+      Weak:      "bg-red-50     text-red-700     border-red-200",
+    };
+    const RISK_LABEL_STYLES: Record<RiskLevel, string> = {
+      "Low Risk": "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "Moderate": "bg-amber-50   text-amber-700   border-amber-200",
+      "High":     "bg-orange-50  text-orange-700  border-orange-200",
+      "Critical": "bg-red-50     text-red-700     border-red-200",
+    };
+
+    return { avg, highRiskCount: highRisk.length, strongest, needsAttn, STRENGTH_LABEL_STYLES, RISK_LABEL_STYLES };
+  }, [allLeads, scoreMap]);
 
   // ── Automation Queue Tiles (5 readiness buckets) ─────────────────────────
   const automationTiles = useMemo(() => {
@@ -521,6 +577,70 @@ export default function CrmDashboard() {
               <p className="text-3xl font-bold text-foreground">{commHealth.neverContacted}</p>
               <p className="text-xs font-semibold text-gray-600">🆕 Never Contacted</p>
               <p className="text-[10px] text-muted-foreground">No outreach recorded</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Relationship Overview ─────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base leading-none">🤝</span>
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Relationship Overview</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— computed from health, engagement &amp; workflow signals</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-1">
+              <p className="text-3xl font-bold text-foreground">{relationshipOverview.avg}</p>
+              <p className="text-xs font-semibold text-blue-700">📊 Avg Rel. Score</p>
+              <p className="text-[10px] text-muted-foreground">Active leads</p>
+            </div>
+            <div className={`rounded-xl p-4 space-y-1 border ${
+              relationshipOverview.highRiskCount === 0
+                ? "bg-emerald-50 border-emerald-200"
+                : relationshipOverview.highRiskCount >= 3
+                  ? "bg-red-50 border-red-200"
+                  : "bg-orange-50 border-orange-200"
+            }`}>
+              <p className="text-3xl font-bold text-foreground">{relationshipOverview.highRiskCount}</p>
+              <p className={`text-xs font-semibold ${
+                relationshipOverview.highRiskCount === 0 ? "text-emerald-700" :
+                relationshipOverview.highRiskCount >= 3 ? "text-red-700" : "text-orange-700"
+              }`}>⚠️ High Risk</p>
+              <p className="text-[10px] text-muted-foreground">Need immediate action</p>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Strongest</p>
+              {relationshipOverview.strongest.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No leads yet</p>
+              ) : (
+                relationshipOverview.strongest.map(({ lead: l, strength }) => (
+                  <Link key={l.id} href={`/admin/crm/leads/${l.id}`}>
+                    <div className="flex items-center justify-between gap-1 hover:opacity-70">
+                      <span className="text-[11px] text-foreground truncate">{l.name}</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${relationshipOverview.STRENGTH_LABEL_STYLES[strength.label]}`}>
+                        {strength.score}
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Needs Attention</p>
+              {relationshipOverview.needsAttn.length === 0 ? (
+                <p className="text-xs text-emerald-700">✓ All relationships healthy</p>
+              ) : (
+                relationshipOverview.needsAttn.map(({ lead: l, risk }) => (
+                  <Link key={l.id} href={`/admin/crm/leads/${l.id}`}>
+                    <div className="flex items-center justify-between gap-1 hover:opacity-70">
+                      <span className="text-[11px] text-foreground truncate">{l.name}</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${relationshipOverview.RISK_LABEL_STYLES[risk.level]}`}>
+                        {risk.level}
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              )}
             </div>
           </div>
         </div>

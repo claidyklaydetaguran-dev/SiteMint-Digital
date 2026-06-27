@@ -28,6 +28,10 @@ import {
   computeMissingInformation, computeRecommendedSequence,
   type AuLead,
 } from "@/lib/salesAutomation";
+import {
+  computeRelationshipProfile,
+  type RiLead, type RiActivity,
+} from "@/lib/relationshipIntelligence";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -259,6 +263,26 @@ export default function CrmLeadDetail() {
     };
     return computeDiscProfile(diLead, [], activities);
   }, [lead, activities]);
+
+  const relProfile = useMemo(() => {
+    if (!lead) return null;
+    const riLead: RiLead = {
+      id: lead.id, name: lead.name, company: lead.company,
+      status: lead.status, lastContactedAt: lead.lastContactedAt,
+      nextFollowUpAt: lead.nextFollowUpAt, proposalStatus: lead.proposalStatus,
+      sowStatus: lead.sowStatus, generatedProposal: lead.generatedProposal,
+      estimatedValue: lead.estimatedValue, createdAt: lead.createdAt, updatedAt: lead.updatedAt,
+    };
+    const riActivities: RiActivity[] = activities.map(a => ({ type: a.type, createdAt: a.createdAt }));
+    return computeRelationshipProfile(
+      riLead, riActivities,
+      health?.score ?? 50,
+      ciStats?.engagementScore.score ?? 50,
+      discProfile?.primaryStyle ?? "",
+      discProfile?.confidence ?? 0,
+      momentum?.trend ?? "stable",
+    );
+  }, [lead, activities, health, ciStats, discProfile, momentum]);
 
   const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"calls"|"sms"|"email">("timeline");
   const smsThreadRef = useRef<HTMLDivElement>(null);
@@ -1465,6 +1489,59 @@ export default function CrmLeadDetail() {
 
                 <p className="text-[10px] text-muted-foreground">
                   Open <strong>Communications</strong> tab in Sales Workspace for full timeline.
+                </p>
+              </div>
+            )}
+
+            {/* ── Relationship Intelligence ─────────────────────────────── */}
+            {relProfile && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Relationship</h3>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${relProfile.strength.bgColor} ${relProfile.strength.color} ${relProfile.strength.borderColor}`}>
+                    {relProfile.strength.label}
+                  </span>
+                </div>
+
+                {/* Score bar */}
+                <div>
+                  <div className="flex items-end gap-1.5 mb-1">
+                    <span className={`text-3xl font-bold leading-none ${relProfile.strength.color}`}>
+                      {relProfile.strength.score}
+                    </span>
+                    <span className="text-xs text-muted-foreground mb-0.5">/ 100 strength</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full ${relProfile.strength.barColor}`}
+                      style={{ width: `${relProfile.strength.score}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Risk */}
+                <div className={`rounded-lg px-3 py-2.5 border ${relProfile.risk.bgColor} ${relProfile.risk.borderColor}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Risk</p>
+                  <p className={`text-xs font-semibold ${relProfile.risk.color}`}>{relProfile.risk.level}</p>
+                  {relProfile.risk.signals.length > 0 && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{relProfile.risk.signals[0].label}</p>
+                  )}
+                </div>
+
+                {/* Conversation recommendation */}
+                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recommended Next Step</p>
+                  <p className="text-xs font-semibold text-foreground">{relProfile.conversation.action}</p>
+                  <p className="text-[10px] text-muted-foreground">{relProfile.conversation.why}</p>
+                </div>
+
+                {/* Summary */}
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  {relProfile.summary}
+                </p>
+
+                <p className="text-[10px] text-muted-foreground">
+                  Open <strong>Relationship</strong> tab in Sales Workspace for full analysis.
                 </p>
               </div>
             )}

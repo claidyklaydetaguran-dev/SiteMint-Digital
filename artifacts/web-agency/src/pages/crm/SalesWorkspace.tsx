@@ -26,6 +26,10 @@ import {
   computeRequiredDocuments, computeAutomationSuggestions,
   type AuLead,
 } from "@/lib/salesAutomation";
+import {
+  computeRelationshipProfile,
+  type RiLead, type RiActivity,
+} from "@/lib/relationshipIntelligence";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,7 +81,7 @@ export interface SalesWorkspaceProps {
   onReload: () => Promise<void>;
 }
 
-type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation";
+type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation" | "relationship";
 
 const tk = () => localStorage.getItem("adminToken") || "";
 
@@ -1680,6 +1684,149 @@ function AutomationTab({ lead, activities, tasks }: {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+// ── Relationship Tab ──────────────────────────────────────────────────────────
+
+function RelationshipTab({ lead, activities, tasks }: {
+  lead: WorkspaceLead;
+  activities: WorkspaceActivity[];
+  tasks: WorkspaceTask[];
+}) {
+  void tasks;
+
+  const riLead: RiLead = {
+    id: lead.id, name: lead.name, company: lead.company, status: lead.status,
+    lastContactedAt: lead.lastContactedAt, nextFollowUpAt: lead.nextFollowUpAt,
+    proposalStatus: lead.proposalStatus, sowStatus: lead.sowStatus,
+    generatedProposal: lead.generatedProposal, estimatedValue: lead.estimatedValue,
+    createdAt: lead.createdAt, updatedAt: lead.updatedAt,
+  };
+  const riActivities: RiActivity[] = activities.map(a => ({ type: a.type, createdAt: a.createdAt }));
+
+  const healthProxy = useMemo(() => {
+    const now = Date.now(); const DAY = 86_400_000;
+    let score = 50;
+    if (lead.lastContactedAt) {
+      const d = (now - new Date(lead.lastContactedAt).getTime()) / DAY;
+      if (d < 3) score += 20; else if (d < 7) score += 10;
+      else if (d > 21) score -= 20; else if (d > 14) score -= 10;
+    }
+    if (lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) < new Date()) score -= 15;
+    if (lead.generatedProposal) score += 10;
+    if (lead.proposalStatus === "Signed") score += 20;
+    return Math.max(0, Math.min(100, score));
+  }, [lead]);
+
+  const profile = useMemo(
+    () => computeRelationshipProfile(riLead, riActivities, healthProxy),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, healthProxy],
+  );
+
+  const { strength, risk, conversation, summary, executiveRecommendation } = profile;
+
+  const URGENCY_STYLE = {
+    immediate:   "bg-red-50   border-red-200   text-red-700",
+    today:       "bg-orange-50 border-orange-200 text-orange-700",
+    "this-week": "bg-amber-50 border-amber-200  text-amber-700",
+    "when-ready":"bg-gray-50  border-gray-200   text-gray-600",
+  };
+  const URGENCY_LABEL = {
+    immediate:   "🚨 Immediate",
+    today:       "🔥 Today",
+    "this-week": "📅 This Week",
+    "when-ready":"✓ When Ready",
+  };
+  const CHANNEL_ICON: Record<string, string> = {
+    SMS: "💬", Call: "📞", Email: "📧", Meeting: "📅", Wait: "⏸",
+  };
+  const SEVERITY_STYLE = {
+    high:   "bg-red-50    text-red-700   border-red-200",
+    medium: "bg-amber-50  text-amber-700 border-amber-200",
+    low:    "bg-gray-50   text-gray-600  border-gray-200",
+  };
+
+  return (
+    <div className="p-5 space-y-5">
+
+      {/* Summary */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <p className="text-sm text-foreground leading-relaxed">{summary}</p>
+      </div>
+
+      {/* Strength + Risk side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className={`rounded-xl border p-4 space-y-2 ${strength.bgColor} ${strength.borderColor}`}>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Relationship Strength</p>
+          <p className={`text-3xl font-bold leading-none ${strength.color}`}>{strength.score}</p>
+          <p className={`text-xs font-semibold px-2 py-0.5 rounded-full border inline-block ${strength.bgColor} ${strength.color} ${strength.borderColor}`}>
+            {strength.label}
+          </p>
+          <div className="w-full bg-white/60 rounded-full h-1.5 overflow-hidden">
+            <div className={`h-1.5 rounded-full ${strength.barColor}`} style={{ width: `${strength.score}%` }} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">{strength.description}</p>
+        </div>
+
+        <div className={`rounded-xl border p-4 space-y-2 ${risk.bgColor} ${risk.borderColor}`}>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Risk Score</p>
+          <p className={`text-3xl font-bold leading-none ${risk.color}`}>{risk.score}</p>
+          <p className={`text-xs font-semibold px-2 py-0.5 rounded-full border inline-block ${risk.bgColor} ${risk.color} ${risk.borderColor}`}>
+            {risk.level}
+          </p>
+          {risk.signals.length === 0 ? (
+            <p className="text-[11px] text-emerald-700">No risk signals detected</p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">{risk.signals.length} signal{risk.signals.length > 1 ? "s" : ""} detected</p>
+          )}
+        </div>
+      </div>
+
+      {/* Risk signals */}
+      {risk.signals.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Risk Signals</p>
+          <div className="space-y-1.5">
+            {risk.signals.map((s, i) => (
+              <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${SEVERITY_STYLE[s.severity]}`}>
+                <span>{s.severity === "high" ? "🔴" : s.severity === "medium" ? "🟡" : "🟢"}</span>
+                <span>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Conversation Recommendation */}
+      <div className={`rounded-xl border p-4 space-y-3 ${URGENCY_STYLE[conversation.urgency]}`}>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conversation Recommendation</p>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${URGENCY_STYLE[conversation.urgency]}`}>
+            {URGENCY_LABEL[conversation.urgency]}
+          </span>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-xl shrink-0">{CHANNEL_ICON[conversation.channel]}</span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{conversation.action}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">via {conversation.channel}</p>
+          </div>
+        </div>
+        <div className="bg-white/60 rounded-lg px-3 py-2 border border-white/80">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Why</p>
+          <p className="text-xs text-foreground">{conversation.why}</p>
+        </div>
+      </div>
+
+      {/* Executive Recommendation */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Executive Summary</p>
+        <p className="text-sm text-foreground leading-relaxed">{executiveRecommendation}</p>
+      </div>
+
+    </div>
+  );
+}
+
 const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "overview",   label: "Overview",      icon: Star },
   { id: "workflow",        label: "Workflow",        icon: GitBranch },
@@ -1691,6 +1838,7 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "documents",  label: "Documents",     icon: Folder },
   { id: "intelligence", label: "Intelligence", icon: Zap },
   { id: "automation",   label: "Automation",   icon: Bot },
+  { id: "relationship", label: "Relationship", icon: Star },
 ];
 
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
@@ -1762,6 +1910,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
       {activeTab === "history" && <HistoryTab activities={activities} tasks={tasks} />}
       {activeTab === "intelligence" && <IntelligenceTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "automation" && <AutomationTab lead={lead} activities={activities} tasks={tasks} />}
+      {activeTab === "relationship" && <RelationshipTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "documents" && (
         <div className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">
