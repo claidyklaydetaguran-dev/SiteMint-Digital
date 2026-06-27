@@ -1,0 +1,167 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17C — Call History Tab & Manual Activity Log
+
+MODULE:
+Lead Detail + CRM Activities only.
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* Click-to-call works.
+* Call outcome modal works after successful call initiation.
+* call_outcome activities are logged.
+* call_missed activities are logged from voice status callbacks.
+* crm_messages stores call-channel records.
+* POST /api/crm/leads/:id/activities exists.
+* Lead Detail has existing activity timeline and communication sections.
+
+OBJECTIVE:
+Make call history easy to review and allow the admin to manually log important activity without starting a call.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/web-agency/src/pages/crm/CrmLeadDetail.tsx
+* artifacts/api-server/src/routes/crm.ts only if activity endpoint behavior needs checking
+* crmMessages schema only if needed
+
+TASK 2 — ADD CALL HISTORY TAB / SECTION
+
+Inside Lead Detail communication area, add a “Calls” tab or compact Call History section.
+
+It should merge:
+
+* crm_messages where channel = "call"
+* crm_activities where type is:
+
+  * call_outcome
+  * call_missed
+  * call_initiated
+  * call_received if present
+
+Sort newest first.
+
+Each call entry should show:
+
+* type: outbound / inbound / missed / outcome
+* timestamp
+* call status
+* duration if available
+* disposition if available
+* notes if available
+* callSid if available in metadata
+* clear icon/color
+
+Empty state:
+“No call history yet.”
+
+TASK 3 — ADD MANUAL LOG ACTIVITY BUTTON
+
+Add a “Log Activity” button on Lead Detail.
+
+Modal fields:
+
+* activity type:
+
+  * Note
+  * Call Outcome
+  * Email
+  * Meeting
+  * Follow-up
+* title
+* description / notes
+* optional disposition if Call Outcome
+* optional date/time if simple and safe
+
+Submit:
+POST /api/crm/leads/:id/activities
+
+Use activity types:
+
+* note_added
+* call_outcome
+* email_logged
+* meeting_logged
+* follow_up_logged
+
+After saving:
+
+* refresh lead/activity data
+* show toast
+* close modal
+
+TASK 4 — FOLLOW-UP TASK PROMPT
+
+If manual activity type is Call Outcome and disposition = Follow Up:
+
+After saving activity, show a small inline option:
+“Create follow-up task?”
+
+If existing task endpoint is easy to reuse:
+
+* prefill title: “Follow up after call”
+* due date: tomorrow
+* call POST /api/crm/leads/:id/tasks
+
+If not easy, defer and report.
+
+TASK 5 — ACTIVITY FEED DISPLAY
+
+Make sure new manual activity types render safely:
+
+* email_logged
+* meeting_logged
+* follow_up_logged
+* note_added
+* call_outcome
+
+Do not rewrite full activity feed.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Lead Detail loads.
+2. Calls section renders.
+3. Calls section works with no call records.
+4. Calls section merges call messages and call activities.
+5. Calls sort newest first.
+6. Log Activity modal opens.
+7. Note activity saves.
+8. Call Outcome activity saves with disposition.
+9. Email logged activity saves.
+10. Meeting logged activity saves.
+11. Follow-up logged activity saves.
+12. Activity feed refreshes after save.
+13. Follow-up task prompt works or is safely deferred.
+14. Inbox still works.
+15. Click-to-call still works.
+16. No Twilio files changed.
+17. No schema/database changes.
+18. No locked modules changed.
+19. TypeScript passes except known unrelated issue.
+20. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Call History behavior
+4. Manual Log Activity behavior
+5. Follow-up task prompt behavior
+6. Activity feed rendering updates
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended Phase 17D

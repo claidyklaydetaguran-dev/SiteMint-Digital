@@ -61,6 +61,7 @@ const activityIcon: Record<string,string> = {
   sms_attempted:"📱",sms_sent:"📤",sms_received:"📩",
   call_initiated:"📞",call_received:"📲",sms_opt_out:"🚫",sms_opt_in:"✅",
   call_outcome:"📞",call_missed:"📵",
+  email_logged:"📧",meeting_logged:"🤝",follow_up_logged:"⏰",
 };
 
 const CALL_DISPOSITIONS = [
@@ -130,7 +131,16 @@ interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
   dueDate?:string; status:string; completedAt?:string; createdAt:string;
 }
-type ModalType = "call"|"calllog"|"text"|"email"|"note"|"task"|"status"|null;
+type ModalType = "call"|"calllog"|"logact"|"text"|"email"|"note"|"task"|"status"|null;
+
+const LOG_ACTIVITY_TYPES = [
+  { value: "note_added",       label: "Note",         icon: "📝" },
+  { value: "call_outcome",     label: "Call Outcome", icon: "📞" },
+  { value: "email_logged",     label: "Email",        icon: "📧" },
+  { value: "meeting_logged",   label: "Meeting",      icon: "🤝" },
+  { value: "follow_up_logged", label: "Follow-up",    icon: "⏰" },
+] as const;
+type LogActType = typeof LOG_ACTIVITY_TYPES[number]["value"];
 interface ToastItem { id:number; type:"success"|"error"|"info"; msg:string; }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -248,7 +258,7 @@ export default function CrmLeadDetail() {
     };
     return computeDiscProfile(diLead, [], activities);
   }, [lead, activities]);
-  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"sms"|"email">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"calls"|"sms"|"email">("timeline");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
   // Modals & toasts
@@ -272,6 +282,15 @@ export default function CrmLeadDetail() {
   const [callLogDisposition, setCallLogDisposition] = useState<CallDisposition>("Connected");
   const [callLogNotes, setCallLogNotes] = useState("");
   const [savingCallLog, setSavingCallLog] = useState(false);
+
+  // Log activity modal state
+  const [logActType, setLogActType] = useState<LogActType>("note_added");
+  const [logActTitle, setLogActTitle] = useState("");
+  const [logActDescription, setLogActDescription] = useState("");
+  const [logActDisposition, setLogActDisposition] = useState<CallDisposition>("Connected");
+  const [savingLogAct, setSavingLogAct] = useState(false);
+  const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
+  const [creatingFollowUpTask, setCreatingFollowUpTask] = useState(false);
 
   // Edit state (sidebar)
   const [editStatus, setEditStatus] = useState("");
@@ -342,7 +361,7 @@ export default function CrmLeadDetail() {
   }, [params.id]);
 
   useEffect(() => {
-    if (activeTab === "sms") loadMessages();
+    if (activeTab === "sms" || activeTab === "calls") loadMessages();
   }, [activeTab, loadMessages]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
@@ -393,6 +412,63 @@ export default function CrmLeadDetail() {
       showToast("Network error", "error");
     }
     setSavingCallLog(false);
+  };
+
+  const logManualActivity = async () => {
+    if (!lead || savingLogAct || !logActTitle.trim()) return;
+    setSavingLogAct(true);
+    try {
+      const body: Record<string, unknown> = {
+        type: logActType,
+        title: logActTitle.trim(),
+        description: logActDescription.trim() || undefined,
+      };
+      if (logActType === "call_outcome") {
+        body.metadata = { disposition: logActDisposition, source: "manual_log" };
+      }
+      const r = await fetch(`/api/crm/leads/${params.id}/activities`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) {
+        showToast("Activity logged");
+        load();
+        if (logActType === "call_outcome" && logActDisposition === "Follow Up") {
+          setShowFollowUpPrompt(true);
+        } else {
+          setOpenModal(null);
+          setLogActTitle("");
+          setLogActDescription("");
+        }
+      } else {
+        const e = await r.json() as { error?: string };
+        showToast(e.error ?? "Failed to log activity", "error");
+      }
+    } catch {
+      showToast("Network error", "error");
+    }
+    setSavingLogAct(false);
+  };
+
+  const createFollowUpTask = async () => {
+    if (creatingFollowUpTask) return;
+    setCreatingFollowUpTask(true);
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const r = await fetch(`/api/crm/leads/${params.id}/tasks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "Follow Up", title: "Follow up after call", dueDate: tomorrow.toISOString().split("T")[0] }),
+      });
+      if (r.ok) { showToast("Follow-up task created"); load(); }
+      else showToast("Failed to create task", "error");
+    } catch { showToast("Network error", "error"); }
+    setCreatingFollowUpTask(false);
+    setShowFollowUpPrompt(false);
+    setOpenModal(null);
+    setLogActTitle(""); setLogActDescription("");
   };
 
   const sendSms = async () => {
@@ -695,7 +771,7 @@ export default function CrmLeadDetail() {
             {/* Tab panel */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
               <div className="flex border-b border-gray-200 px-4 overflow-x-auto">
-                {(["timeline","tasks","sms","email"] as const).map(tab => (
+                {(["timeline","tasks","calls","sms","email"] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -705,10 +781,11 @@ export default function CrmLeadDetail() {
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "timeline" ? "Activity Timeline"
+                    {tab === "timeline" ? "Activity"
                       : tab === "tasks" ? `Tasks${pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}`
-                      : tab === "sms" ? "📱 SMS & Calls"
-                      : "Send Email"}
+                      : tab === "calls" ? "📞 Calls"
+                      : tab === "sms" ? "💬 SMS"
+                      : "Email"}
                   </button>
                 ))}
               </div>
@@ -724,9 +801,14 @@ export default function CrmLeadDetail() {
                       value={noteText}
                       onChange={e => setNoteText(e.target.value)}
                     />
-                    <Button size="sm" className="mt-2" onClick={addNote} disabled={addingNote || !noteText.trim()}>
-                      {addingNote ? "Saving…" : "Add Note"}
-                    </Button>
+                    <div className="flex gap-2 mt-2">
+                      <Button size="sm" onClick={addNote} disabled={addingNote || !noteText.trim()}>
+                        {addingNote ? "Saving…" : "Add Note"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setLogActType("note_added"); setLogActTitle(""); setLogActDescription(""); setShowFollowUpPrompt(false); setOpenModal("logact"); }}>
+                        + Log Activity
+                      </Button>
+                    </div>
                   </div>
                   {lead.notes && (
                     <div className="mb-5 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-foreground whitespace-pre-wrap">
@@ -913,6 +995,86 @@ export default function CrmLeadDetail() {
                   )}
                 </div>
               )}
+
+              {/* ── Calls tab ─── */}
+              {activeTab === "calls" && (() => {
+                const callMsgs = messages.filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
+                const callActs = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type)).map(a => ({ key:`act-${a.id}`, kind:"activity" as const, ts: new Date(a.createdAt).getTime(), data: a }));
+                const merged = [...callMsgs, ...callActs].sort((a,b) => b.ts - a.ts);
+                return (
+                  <div className="p-5">
+                    {loadingMessages ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+                      </div>
+                    ) : merged.length === 0 ? (
+                      <div className="text-center text-muted-foreground text-sm py-12">
+                        <p className="text-2xl mb-2">📵</p>
+                        <p>No call history yet.</p>
+                        <p className="text-xs mt-1">Bridge calls and missed calls will appear here.</p>
+                      </div>
+                    ) : (
+                      <ul className="space-y-3">
+                        {merged.map(entry => {
+                          if (entry.kind === "message") {
+                            const m = entry.data as CrmMessage;
+                            const isOut = m.direction === "outbound";
+                            const ok = m.callStatus === "completed";
+                            const failed = m.callStatus === "no-answer" || m.callStatus === "busy" || m.callStatus === "failed";
+                            return (
+                              <li key={entry.key} className="flex gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">
+                                <span className={`text-base mt-0.5 shrink-0 ${ok?"text-green-600":failed?"text-red-500":"text-yellow-600"}`}>
+                                  {ok ? "✅" : failed ? "📵" : "📞"}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-foreground">{isOut ? "Outbound" : "Inbound"} Call</p>
+                                    {m.callStatus && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${ok?"bg-green-100 text-green-700":failed?"bg-red-100 text-red-700":"bg-yellow-100 text-yellow-700"}`}>
+                                        {m.callStatus}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {m.duration != null && m.duration > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      ⏱ {Math.floor(m.duration/60)}:{String(m.duration%60).padStart(2,"0")} duration
+                                    </p>
+                                  )}
+                                  {m.fromNumber && <p className="text-xs text-muted-foreground/70">From: {m.fromNumber}</p>}
+                                  <p className="text-xs text-muted-foreground/60 mt-1">{new Date(m.createdAt).toLocaleString()}</p>
+                                </div>
+                              </li>
+                            );
+                          } else {
+                            const a = entry.data as Activity;
+                            const isMissed = a.type === "call_missed";
+                            const isOutcome = a.type === "call_outcome";
+                            const disposition = isOutcome ? (a.metadata?.disposition as CallDisposition | undefined) : undefined;
+                            return (
+                              <li key={entry.key} className={`flex gap-3 p-3 rounded-xl border ${isMissed?"border-red-100 bg-red-50":"border-gray-200 bg-white"}`}>
+                                <span className="text-base mt-0.5 shrink-0">{activityIcon[a.type] || "•"}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium ${isMissed?"text-red-600":"text-foreground"}`}>{a.title}</p>
+                                  {isOutcome && disposition && (
+                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-gray-100 text-gray-600"}`}>
+                                      {disposition}
+                                    </span>
+                                  )}
+                                  {a.description && <p className="text-xs text-muted-foreground mt-0.5">{a.description}</p>}
+                                  {isOutcome && a.metadata?.source === "manual_log" && (
+                                    <span className="inline-block text-[10px] text-muted-foreground/60 mt-0.5">Manually logged</span>
+                                  )}
+                                  <p className="text-xs text-muted-foreground/60 mt-1">{new Date(a.createdAt).toLocaleString()}</p>
+                                </div>
+                              </li>
+                            );
+                          }
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── Email tab ─── */}
               {activeTab === "email" && (
@@ -1565,6 +1727,104 @@ export default function CrmLeadDetail() {
               {savingCallLog ? "Saving…" : "Log Outcome"}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Log Activity Modal ─── */}
+      <Modal open={openModal === "logact"} onClose={() => { setOpenModal(null); setShowFollowUpPrompt(false); }} title="✏️ Log Activity">
+        <div className="px-5 py-4 space-y-4">
+          {showFollowUpPrompt ? (
+            <>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
+                <p className="font-semibold mb-1">Activity logged ✓</p>
+                <p className="text-xs">Disposition was <strong>Follow Up</strong>. Create a follow-up task for tomorrow?</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowFollowUpPrompt(false); setOpenModal(null); setLogActTitle(""); setLogActDescription(""); }}>Skip</Button>
+                <Button className="flex-1 gap-2" onClick={createFollowUpTask} disabled={creatingFollowUpTask}>
+                  {creatingFollowUpTask ? "Creating…" : "Create Task"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-2">Activity Type</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {LOG_ACTIVITY_TYPES.map(t => (
+                    <button
+                      key={t.value}
+                      onClick={() => setLogActType(t.value)}
+                      className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center ${
+                        logActType === t.value
+                          ? "bg-foreground text-white border-foreground"
+                          : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="block text-base mb-0.5">{t.icon}</span>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {logActType === "call_outcome" && (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-2">Disposition</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {CALL_DISPOSITIONS.map(d => (
+                      <button
+                        key={d}
+                        onClick={() => setLogActDisposition(d)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-left ${
+                          logActDisposition === d
+                            ? `${dispositionColor[d]} border-current`
+                            : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Title <span className="text-red-500">*</span></label>
+                <input
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  placeholder={
+                    logActType === "note_added" ? "Note summary…"
+                    : logActType === "call_outcome" ? "e.g. Spoke with John about SEO package"
+                    : logActType === "email_logged" ? "e.g. Sent proposal follow-up"
+                    : logActType === "meeting_logged" ? "e.g. Discovery call completed"
+                    : "e.g. Scheduled follow-up for next week"
+                  }
+                  value={logActTitle}
+                  onChange={e => setLogActTitle(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes <span className="font-normal text-muted-foreground/60">(optional)</span></label>
+                <textarea
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                  rows={3}
+                  placeholder="Additional details…"
+                  value={logActDescription}
+                  onChange={e => setLogActDescription(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setOpenModal(null)}>Cancel</Button>
+                <Button className="flex-1" onClick={logManualActivity} disabled={savingLogAct || !logActTitle.trim()}>
+                  {savingLogAct ? "Saving…" : "Log Activity"}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
