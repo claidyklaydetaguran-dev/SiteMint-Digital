@@ -249,6 +249,54 @@ export default function CrmDashboard() {
     return computeOpportunityRadar(inputs);
   }, [allLeads, scoreMap, discMap]);
 
+  // ── Automation Queue Tiles (5 readiness buckets) ─────────────────────────
+  const automationTiles = useMemo(() => {
+    const active = allLeads.filter(l => !["Won", "Lost"].includes(l.status));
+    return [
+      {
+        emoji: "📤", label: "Ready to Send",
+        desc: "Draft proposal waiting",
+        color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-200",
+        count: active.filter(l => l.proposalStatus === "Draft").length,
+        action: "Review and send drafted proposals to clients",
+      },
+      {
+        emoji: "⚠️", label: "Missing Info",
+        desc: "Profile incomplete",
+        color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200",
+        count: active.filter(l => !l.email || !l.estimatedValue || !l.serviceInterest).length,
+        action: "Complete lead profiles to enable full automation",
+      },
+      {
+        emoji: "📝", label: "Proposal Needed",
+        desc: "No proposal started",
+        color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200",
+        count: active.filter(l =>
+          (l.proposalStatus == null || l.proposalStatus === "Not Started") &&
+          ["Contacted", "Follow-up"].includes(l.status)
+        ).length,
+        action: "Generate proposals for qualified active leads",
+      },
+      {
+        emoji: "📋", label: "SOW Needed",
+        desc: "Proposal sent, no SOW",
+        color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-200",
+        count: active.filter(l =>
+          (l.proposalStatus === "Sent" || l.status === "Proposal Sent") &&
+          (l.sowStatus == null || l.sowStatus === "Not Started")
+        ).length,
+        action: "Create Scope of Work for leads with active proposals",
+      },
+      {
+        emoji: "🚀", label: "Ready for Kickoff",
+        desc: "Deal closed — schedule start",
+        color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200",
+        count: allLeads.filter(l => l.status === "Won").length,
+        action: "Schedule project kickoff meetings for won deals",
+      },
+    ];
+  }, [allLeads]);
+
   // ── Workflow Queue (6 action-grouped buckets) ─────────────────────────────
   const workflowQueue = useMemo(
     () => computeWorkflowQueue(allLeads.map(l => ({
@@ -864,6 +912,31 @@ export default function CrmDashboard() {
             </div>
           );
         })()}
+
+        {/* ── Automation Queue ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Automation Queue</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— pending actions by category · drafts only, nothing auto-sends</span>
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+            {automationTiles.map(tile => (
+              <div key={tile.label} className={`rounded-xl border ${tile.border} ${tile.bg} p-3.5`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-lg leading-none">{tile.emoji}</span>
+                  <span className={`text-xl font-bold leading-none ${tile.color}`}>{tile.count}</span>
+                </div>
+                <p className={`text-xs font-bold ${tile.color} mb-0.5`}>{tile.label}</p>
+                <p className="text-[10px] text-muted-foreground leading-snug mb-2">{tile.desc}</p>
+                <p className="text-[10px] text-muted-foreground leading-snug italic">{tile.action}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            Open any lead → <strong>Automation</strong> tab in Sales Workspace for step-by-step actions, readiness gates, and recommended sequence.
+          </p>
+        </div>
 
         {/* ── Intelligence note ─────────────────────────────────────────────── */}
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">

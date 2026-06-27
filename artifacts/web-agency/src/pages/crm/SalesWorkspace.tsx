@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   FileText, ClipboardList, Printer, Copy, Edit3, Loader2,
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
-  X, DollarSign, Package, Zap, ChevronRight, RefreshCw,
+  X, DollarSign, Package, Zap, Bot, ChevronRight, RefreshCw,
   StickyNote, History, Star, GitBranch, MessageSquare,
 } from "lucide-react";
 import {
@@ -19,6 +19,12 @@ import {
   computeSalesNBA, computeLeadMomentum,
   type SiLead, type SiActivity, type SiTask,
 } from "@/lib/salesIntelligence";
+import {
+  computeAutomationQueue, computeLeadReadiness,
+  computeMissingInformation, computeRecommendedSequence,
+  computeRequiredDocuments, computeAutomationSuggestions,
+  type AuLead,
+} from "@/lib/salesAutomation";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -70,7 +76,7 @@ export interface SalesWorkspaceProps {
   onReload: () => Promise<void>;
 }
 
-type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence";
+type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation";
 
 const tk = () => localStorage.getItem("adminToken") || "";
 
@@ -1344,6 +1350,319 @@ function IntelligenceTab({ lead, activities, tasks }: {
   );
 }
 
+// ── AutomationTab ─────────────────────────────────────────────────────────────
+
+const AU_PRIORITY_STYLE = {
+  critical: { border: "border-red-200 bg-red-50",   badge: "bg-red-50 text-red-700 border-red-200",    label: "🚨 Critical", text: "text-red-700" },
+  high:     { border: "border-orange-200 bg-orange-50", badge: "bg-orange-50 text-orange-700 border-orange-200", label: "🔥 High",     text: "text-orange-700" },
+  medium:   { border: "border-amber-200 bg-amber-50",   badge: "bg-yellow-50 text-yellow-700 border-yellow-200", label: "⚠️ Medium",  text: "text-amber-700" },
+  low:      { border: "border-gray-100 bg-gray-50",     badge: "bg-gray-50 text-gray-600 border-gray-200",       label: "· Low",       text: "text-gray-600" },
+};
+
+function AutomationTab({ lead, activities, tasks }: {
+  lead: WorkspaceLead;
+  activities: WorkspaceActivity[];
+  tasks: WorkspaceTask[];
+}) {
+  const auLead: AuLead = {
+    id: lead.id, name: lead.name, company: lead.company,
+    email: lead.email,
+    status: lead.status, priority: "Medium",
+    serviceInterest: lead.serviceInterest,
+    estimatedValue: lead.estimatedValue,
+    notes: lead.notes,
+    lastContactedAt: lead.lastContactedAt,
+    nextFollowUpAt: lead.nextFollowUpAt,
+    proposalStatus: lead.proposalStatus ?? "Not Started",
+    sowStatus: lead.sowStatus ?? "Not Started",
+    generatedProposal: lead.generatedProposal,
+    generatedSow: lead.generatedSow,
+    discoverySubmissionId: lead.discoverySubmissionId,
+    source: lead.source,
+    createdAt: lead.createdAt, updatedAt: lead.updatedAt,
+  };
+  const auActivities: SiActivity[] = activities.map(a => ({ type: a.type, createdAt: a.createdAt }));
+  const auTasks: SiTask[] = tasks.map(t => ({
+    status: t.status, dueDate: t.dueDate, completedAt: t.completedAt, createdAt: t.createdAt,
+  }));
+
+  const queue = useMemo(
+    () => computeAutomationQueue(auLead, auActivities, auTasks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, tasks],
+  );
+  const readiness = useMemo(
+    () => computeLeadReadiness(auLead, auActivities, auTasks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, tasks],
+  );
+  const missingInfo = useMemo(
+    () => computeMissingInformation(auLead),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, lead.updatedAt],
+  );
+  const sequence = useMemo(
+    () => computeRecommendedSequence(auLead, auActivities, auTasks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, tasks],
+  );
+  const docs = useMemo(
+    () => computeRequiredDocuments(auLead),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, lead.updatedAt],
+  );
+  const suggestions = useMemo(
+    () => computeAutomationSuggestions(auLead, auActivities, auTasks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lead.id, activities, tasks],
+  );
+
+  const gates = [readiness.salesReady, readiness.proposalReady, readiness.contractReady, readiness.onboardingReady];
+
+  return (
+    <div className="p-5 space-y-6">
+
+      {/* ── Header banner ───────────────────────────────────────────────── */}
+      <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 flex items-start gap-3">
+        <Zap className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-semibold text-foreground mb-0.5">Sales Automation Engine</p>
+          <p className="text-xs text-muted-foreground leading-snug">
+            Rule-based, deterministic — no AI. Nothing auto-sends.
+            All outputs are <strong>drafts and recommendations</strong> requiring your approval before anything reaches the client.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Readiness Gates ─────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Readiness Gates</h3>
+          <span className="text-[10px] text-muted-foreground ml-1">— overall {readiness.overallScore}%</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {gates.map(gate => (
+            <div key={gate.gate} className={`rounded-xl border p-3.5 ${gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-xs font-bold ${gate.ready ? "text-emerald-700" : "text-foreground"}`}>
+                  {gate.ready ? "✓ " : ""}{gate.gate}
+                </span>
+                <span className={`text-sm font-bold ${gate.ready ? "text-emerald-600" : gate.score >= 50 ? "text-amber-600" : "text-gray-400"}`}>
+                  {gate.score}%
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2.5">
+                <div
+                  className={`h-1.5 rounded-full transition-all ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-gray-300"}`}
+                  style={{ width: `${gate.score}%` }}
+                />
+              </div>
+              {gate.missing.length > 0 ? (
+                <div className="space-y-0.5">
+                  {gate.missing.slice(0, 2).map((m, i) => (
+                    <p key={i} className="text-[10px] text-muted-foreground leading-snug">· {m}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[10px] text-emerald-600 font-medium leading-snug">{gate.nextAction}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Action Queue ─────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Action Queue</h3>
+          <span className="ml-auto text-[10px] font-medium text-muted-foreground">
+            {queue.availableCount} available · {queue.blockedCount} blocked
+          </span>
+        </div>
+        <div className="space-y-2.5">
+          {queue.items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm font-medium text-foreground mb-0.5">All caught up</p>
+              <p className="text-xs text-muted-foreground">No pending actions for this lead right now.</p>
+            </div>
+          ) : queue.items.map(item => {
+            const ps = AU_PRIORITY_STYLE[item.priority];
+            return (
+              <div key={item.id} className={`rounded-xl border p-3.5 ${item.status === "blocked" ? "opacity-60 border-gray-200 bg-gray-50" : ps.border}`}>
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <p className={`text-sm font-bold leading-tight ${item.status === "blocked" ? "text-muted-foreground" : ps.text}`}>
+                    {item.status === "blocked" ? "🔒 " : ""}{item.action}
+                  </p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${ps.badge}`}>
+                      {ps.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">~{item.estimatedMinutes}m</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-snug mb-1">{item.reason}</p>
+                {item.blockedReason && (
+                  <p className="text-[11px] text-amber-600 font-medium">Blocked: {item.blockedReason}</p>
+                )}
+                {item.requiredData.length > 0 && item.status === "available" && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Needs: {item.requiredData.join(", ")}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Required Documents ───────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <FileText className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Required Documents</h3>
+        </div>
+        <div className="space-y-2">
+          {docs.map(doc => (
+            <div key={doc.name} className={`flex items-start justify-between gap-3 rounded-lg border px-3.5 py-2.5 ${
+              doc.status === "complete" ? "bg-emerald-50 border-emerald-200" :
+              doc.status === "draft"   ? "bg-amber-50 border-amber-200" :
+                                         "bg-gray-50 border-gray-200"
+            }`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-xs font-semibold text-foreground truncate">{doc.name}</p>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
+                    doc.importance === "critical" ? "bg-red-100 text-red-600" :
+                    doc.importance === "high"     ? "bg-orange-100 text-orange-600" :
+                                                   "bg-gray-100 text-gray-500"
+                  }`}>{doc.importance}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">{doc.action}</p>
+              </div>
+              <span className={`text-[10px] font-bold shrink-0 mt-0.5 ${
+                doc.status === "complete" ? "text-emerald-600" :
+                doc.status === "draft"   ? "text-amber-600"  : "text-gray-400"
+              }`}>
+                {doc.status === "complete" ? "✓ Done" : doc.status === "draft" ? "◑ Draft" : "○ Missing"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Missing Information ──────────────────────────────────────────── */}
+      {missingInfo.fields.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Profile Gaps</h3>
+            <span className="ml-auto text-[10px] font-medium text-muted-foreground">
+              Completeness: {missingInfo.completenessScore}%
+            </span>
+          </div>
+          <div className="space-y-2">
+            {missingInfo.fields.map((f, i) => (
+              <div key={i} className={`rounded-lg border px-3.5 py-2.5 ${
+                f.importance === "critical" ? "bg-red-50 border-red-200" :
+                f.importance === "high"     ? "bg-amber-50 border-amber-200" :
+                                             "bg-gray-50 border-gray-200"
+              }`}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className={`text-xs font-bold ${
+                    f.importance === "critical" ? "text-red-700" :
+                    f.importance === "high"     ? "text-amber-700" : "text-foreground"
+                  }`}>{f.field}</p>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${
+                    f.importance === "critical" ? "bg-red-100 text-red-600" :
+                    f.importance === "high"     ? "bg-amber-100 text-amber-600" :
+                                                 "bg-gray-100 text-gray-500"
+                  }`}>{f.importance}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug mb-1">{f.impact}</p>
+                <p className="text-[11px] text-foreground font-medium leading-snug">→ {f.recommendation}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recommended Sequence ─────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <GitBranch className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Recommended Sequence</h3>
+          <span className="ml-auto text-[10px] text-muted-foreground">
+            {sequence.currentStep}/{sequence.totalSteps} · ~{sequence.completionEstimateDays}d to close
+          </span>
+        </div>
+        <div className="space-y-1.5">
+          {sequence.steps.map(step => (
+            <div key={step.step} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${
+              step.status === "completed" ? "bg-emerald-50 border-emerald-200" :
+              step.status === "current"   ? "bg-blue-50 border-blue-300 shadow-sm" :
+              step.status === "blocked"   ? "bg-gray-50 border-dashed border-gray-200 opacity-50" :
+                                           "bg-white border-gray-100"
+            }`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold ${
+                step.status === "completed" ? "bg-emerald-400 text-white" :
+                step.status === "current"   ? "bg-blue-600 text-white" :
+                step.status === "blocked"   ? "bg-gray-200 text-gray-400" :
+                                             "bg-gray-100 text-gray-400"
+              }`}>
+                {step.status === "completed" ? "✓" : step.step}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-semibold leading-tight mb-0.5 ${
+                  step.status === "current"   ? "text-blue-700" :
+                  step.status === "completed" ? "text-emerald-700" :
+                  step.status === "blocked"   ? "text-muted-foreground" : "text-foreground"
+                }`}>{step.action}</p>
+                <p className="text-[10px] text-muted-foreground leading-snug">{step.why}</p>
+                {step.waitDays && step.waitDays > 0 && step.status !== "completed" && (
+                  <p className="text-[10px] text-blue-500 mt-0.5">Wait {step.waitDays} day{step.waitDays !== 1 ? "s" : ""} after this step</p>
+                )}
+                {step.blockReason && (
+                  <p className="text-[10px] text-amber-600 mt-0.5 font-medium">{step.blockReason}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Quick Wins ───────────────────────────────────────────────────── */}
+      {suggestions.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Quick Wins</h3>
+          </div>
+          <div className="space-y-2">
+            {suggestions.map((s, i) => (
+              <div key={i} className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5">
+                <div className="flex items-start justify-between gap-2 mb-0.5">
+                  <p className="text-xs font-semibold text-foreground">{s.action}</p>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
+                    s.effort === "low"    ? "bg-emerald-100 text-emerald-700" :
+                    s.effort === "medium" ? "bg-amber-100 text-amber-700" :
+                                           "bg-red-100 text-red-700"
+                  }`}>{s.effort} effort</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug mb-0.5">{s.why}</p>
+                <p className="text-[11px] text-emerald-700 font-medium leading-snug">↑ {s.impact}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
@@ -1356,6 +1675,7 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "history",    label: "History",       icon: History },
   { id: "documents",  label: "Documents",     icon: Folder },
   { id: "intelligence", label: "Intelligence", icon: Zap },
+  { id: "automation",   label: "Automation",   icon: Bot },
 ];
 
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
@@ -1426,6 +1746,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
       {activeTab === "notes" && <NotesTab lead={lead} onReload={onReload} />}
       {activeTab === "history" && <HistoryTab activities={activities} tasks={tasks} />}
       {activeTab === "intelligence" && <IntelligenceTab lead={lead} activities={activities} tasks={tasks} />}
+      {activeTab === "automation" && <AutomationTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "documents" && (
         <div className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">

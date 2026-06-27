@@ -1,0 +1,348 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 16 — Sales Automation Engine (Human-in-the-Loop)
+
+MODULE:
+Discovery Portal
+CRM
+Sales Workspace
+
+IMPORTANT:
+
+This phase is NOT AI.
+
+Do NOT use OpenAI.
+
+Everything must be deterministic.
+
+Nothing should automatically contact customers.
+
+Nothing should send emails or SMS automatically.
+
+Everything should generate drafts and recommendations for human approval.
+
+Do not modify locked modules.
+
+Do not touch Twilio.
+
+Do not modify Campaign sending.
+
+Reuse existing engines.
+
+Stay within the default change budget.
+
+---
+
+OBJECTIVE
+
+Create a centralized Sales Automation Engine that prepares work for the salesperson automatically whenever a lead enters or changes state.
+
+The CRM should become proactive rather than reactive.
+
+---
+
+TASK 1 — Create Sales Automation Engine
+
+Create:
+
+src/lib/salesAutomation.ts
+
+Pure TypeScript.
+
+Zero React.
+
+Zero API calls.
+
+Export:
+
+computeAutomationQueue()
+
+computeAutomationSuggestions()
+
+computeLeadReadiness()
+
+computeRequiredDocuments()
+
+computeMissingInformation()
+
+computeRecommendedSequence()
+
+Reuse:
+
+leadScore
+
+communicationIntelligence
+
+workflowEngine
+
+discEngine
+
+salesIntelligence
+
+---
+
+TASK 2 — Automation Queue
+
+Every lead should generate a queue of pending actions.
+
+Example:
+
+Generate Proposal
+
+Generate SOW
+
+Create Follow-up Task
+
+Draft Email
+
+Draft SMS
+
+Schedule Call
+
+Update Pipeline Stage
+
+Review Discovery Form
+
+Each item includes:
+
+priority
+
+reason
+
+required data
+
+recommended owner
+
+estimated completion time
+
+status
+
+---
+
+TASK 3 — Readiness Score
+
+Every lead receives:
+
+Sales Ready
+
+Proposal Ready
+
+Contract Ready
+
+Onboarding Ready
+
+Each explains:
+
+What's complete
+
+What's missing
+
+What should happen next
+
+---
+
+TASK 4 — Missing Information Detector
+
+Identify missing:
+
+Phone
+
+Email
+
+Budget
+
+Timeline
+
+Decision maker
+
+Discovery form
+
+Proposal
+
+SOW
+
+Service selection
+
+Preferred communication channel
+
+Show clear recommendations.
+
+---
+
+TASK 5 — Recommended Sequence
+
+Instead of isolated recommendations:
+
+Generate a sequence.
+
+Example:
+
+1. Review Discovery
+
+↓
+
+2. Generate Proposal
+
+↓
+
+3. Review Proposal
+
+↓
+
+4. Send Proposal
+
+↓
+
+5. Wait 3 days
+
+↓
+
+6. Follow-up Call
+
+↓
+
+7. Send SMS
+
+↓
+
+8. Generate SOW
+
+↓
+
+9. Schedule Closing
+
+Every step should explain WHY.
+
+---
+
+TASK 6 — Dashboard
+
+Add:
+
+Automation Queue
+
+Ready to Send
+
+Missing Information
+
+Ready for Proposal
+
+Ready for Contract
+
+Ready for Kickoff
+
+Use existing dashboard components.
+
+---
+
+TASK 7 — Lead Detail
+
+Add an Automation card showing:
+
+Pending Actions
+
+Blocked Items
+
+Readiness
+
+Missing Information
+
+Recommended Sequence
+
+---
+
+TASK 8 — Sales Workspace
+
+Add an Automation tab.
+
+Display:
+
+Generated drafts available
+
+Proposal readiness
+
+Document readiness
+
+Communication readiness
+
+Checklist before sending
+
+---
+
+TASK 9 — Performance
+
+No additional polling.
+
+No duplicate API requests.
+
+Reuse loaded data.
+
+Use useMemo.
+
+---
+
+TASK 10 — Testing
+
+Verify:
+
+Dashboard loads.
+
+Lead Detail loads.
+
+Sales Workspace loads.
+
+Automation queue populates.
+
+Readiness computes correctly.
+
+Missing information detection works.
+
+Sequences generate correctly.
+
+No automatic customer communication.
+
+No schema changes unless absolutely necessary.
+
+No Twilio changes.
+
+No Campaign changes.
+
+No locked modules modified.
+
+TypeScript passes.
+
+No console errors.
+
+FINAL REPORT
+
+Return:
+
+1. Files inspected
+
+2. Files changed
+
+3. Automation Engine architecture
+
+4. Queue logic
+
+5. Readiness logic
+
+6. Missing Information logic
+
+7. Recommended Sequence logic
+
+8. Dashboard integration
+
+9. Lead Detail integration
+
+10. Sales Workspace integration
+
+11. Tests performed
+
+12. Performance considerations
+
+13. Schema changes (if any)
+
+14. Known limitations
+
+15. Recommended Phase 17

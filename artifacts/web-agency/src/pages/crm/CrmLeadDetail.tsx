@@ -22,6 +22,11 @@ import {
   computeSalesNBA, computeLeadMomentum,
   type SiLead, type SiActivity, type SiTask,
 } from "@/lib/salesIntelligence";
+import {
+  computeAutomationQueue, computeLeadReadiness,
+  computeMissingInformation, computeRecommendedSequence,
+  type AuLead,
+} from "@/lib/salesAutomation";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
@@ -169,6 +174,51 @@ export default function CrmLeadDetail() {
     if (!siLead) return null;
     return computeLeadMomentum(siLead, siActivities, siTasks, health?.score ?? 50, ciStats?.engagementScore.score ?? 50);
   }, [siLead, siActivities, siTasks, health, ciStats]);
+
+  const auLead = useMemo((): AuLead | null => {
+    if (!lead) return null;
+    return {
+      id: lead.id, name: lead.name, company: lead.company,
+      email: lead.email, phone: lead.phone,
+      status: lead.status, priority: lead.priority,
+      serviceInterest: lead.serviceInterest,
+      estimatedValue: lead.estimatedValue,
+      notes: lead.notes,
+      lastContactedAt: lead.lastContactedAt,
+      nextFollowUpAt: lead.nextFollowUpAt,
+      proposalStatus: lead.proposalStatus ?? "Not Started",
+      sowStatus: lead.sowStatus ?? "Not Started",
+      generatedProposal: lead.generatedProposal,
+      generatedSow: lead.generatedSow,
+      discoverySubmissionId: lead.discoverySubmissionId,
+      smsConsent: lead.smsConsent,
+      source: lead.source,
+      createdAt: lead.createdAt, updatedAt: lead.updatedAt,
+    };
+  }, [lead]);
+
+  const autoQueue = useMemo(
+    () => (auLead ? computeAutomationQueue(auLead, siActivities, siTasks) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auLead, activities, tasks],
+  );
+
+  const readiness = useMemo(
+    () => (auLead ? computeLeadReadiness(auLead, siActivities, siTasks) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auLead, activities, tasks],
+  );
+
+  const missingInfo = useMemo(
+    () => (auLead ? computeMissingInformation(auLead) : null),
+    [auLead],
+  );
+
+  const sequence = useMemo(
+    () => (auLead ? computeRecommendedSequence(auLead, siActivities, siTasks) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auLead, activities, tasks],
+  );
 
   const discProfile = useMemo(() => {
     if (!lead) return null;
@@ -1080,6 +1130,113 @@ export default function CrmLeadDetail() {
 
                 <p className="text-[10px] text-muted-foreground">
                   Open <strong>Intelligence</strong> tab in Sales Workspace for full breakdown.
+                </p>
+              </div>
+            )}
+
+            {/* ── Sales Automation ─────────────────────────────────────────── */}
+            {autoQueue && readiness && missingInfo && sequence && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif font-bold text-sm text-foreground">Sales Automation</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    autoQueue.availableCount === 0
+                      ? "bg-gray-50 text-gray-500 border-gray-200"
+                      : autoQueue.topItem?.priority === "critical"
+                        ? "bg-red-50 text-red-700 border-red-200"
+                        : autoQueue.topItem?.priority === "high"
+                          ? "bg-orange-50 text-orange-700 border-orange-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}>
+                    {autoQueue.availableCount} pending
+                  </span>
+                </div>
+
+                {/* Readiness gates — 2×2 grid */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Readiness</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[readiness.salesReady, readiness.proposalReady, readiness.contractReady, readiness.onboardingReady].map(gate => (
+                      <div key={gate.gate} className={`rounded-lg px-2.5 py-2 border ${
+                        gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"
+                      }`}>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className={`text-[9px] font-bold ${gate.ready ? "text-emerald-600" : "text-gray-400"}`}>
+                            {gate.ready ? "✓" : "○"}
+                          </span>
+                          <p className={`text-[9px] font-bold uppercase tracking-wide leading-tight ${gate.ready ? "text-emerald-700" : "text-muted-foreground"}`}>
+                            {gate.gate.replace(" Ready", "")}
+                          </p>
+                        </div>
+                        <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-1 rounded-full ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-gray-300"}`}
+                            style={{ width: `${gate.score}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top pending action */}
+                {autoQueue.topItem && (
+                  <div className={`rounded-lg px-3 py-2.5 border ${
+                    autoQueue.topItem.priority === "critical" ? "bg-red-50 border-red-200" :
+                    autoQueue.topItem.priority === "high"     ? "bg-orange-50 border-orange-200" :
+                                                               "bg-blue-50 border-blue-200"
+                  }`}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Top Action</p>
+                    <p className={`text-xs font-bold mb-0.5 ${
+                      autoQueue.topItem.priority === "critical" ? "text-red-700" :
+                      autoQueue.topItem.priority === "high"     ? "text-orange-700" : "text-blue-700"
+                    }`}>{autoQueue.topItem.action}</p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">{autoQueue.topItem.reason}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">~{autoQueue.topItem.estimatedMinutes} min</p>
+                  </div>
+                )}
+
+                {/* Missing info summary */}
+                {missingInfo.criticalCount + missingInfo.highCount > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Profile Gaps</p>
+                    <div className="space-y-1">
+                      {missingInfo.fields
+                        .filter(f => f.importance === "critical" || f.importance === "high")
+                        .slice(0, 3)
+                        .map((f, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                            <span className={`font-bold shrink-0 ${f.importance === "critical" ? "text-red-500" : "text-amber-500"}`}>
+                              {f.importance === "critical" ? "!" : "·"}
+                            </span>
+                            <span className="text-muted-foreground leading-snug">
+                              <span className="font-medium text-foreground">{f.field}</span>
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sequence progress */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sequence</p>
+                    <span className="text-[10px] text-muted-foreground">Step {sequence.currentStep}/{sequence.totalSteps}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                    <div
+                      className="h-1.5 rounded-full bg-foreground transition-all"
+                      style={{ width: `${(sequence.currentStep / sequence.totalSteps) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Next: <span className="font-medium text-foreground">{sequence.nextAction}</span>
+                  </p>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground">
+                  Open <strong>Automation</strong> tab in Sales Workspace for full queue and sequence.
                 </p>
               </div>
             )}
