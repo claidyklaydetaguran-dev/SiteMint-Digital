@@ -209,6 +209,35 @@ router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Resp
   }
 });
 
+// ── Activities (manual creation) ──────────────────────────────────────────────
+router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+    const { type, title, description, metadata } = req.body as {
+      type?: string; title?: string; description?: string; metadata?: Record<string, unknown>;
+    };
+    if (!type?.trim()) { res.status(400).json({ error: "type is required" }); return; }
+    if (!title?.trim()) { res.status(400).json({ error: "title is required" }); return; }
+
+    const [lead] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.id, id));
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+
+    const [activity] = await db.insert(crmActivities).values({
+      leadId: id,
+      type: type.trim(),
+      title: title.trim(),
+      description: description?.trim() || undefined,
+      metadata: metadata ?? undefined,
+    }).returning();
+
+    res.json({ activity });
+  } catch (err) {
+    req.log.error({ err }, "Error creating activity");
+    res.status(500).json({ error: "Failed to create activity" });
+  }
+});
+
 // ── Tasks ──────────────────────────────────────────────────────────────────────
 router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Response) => {
   try {

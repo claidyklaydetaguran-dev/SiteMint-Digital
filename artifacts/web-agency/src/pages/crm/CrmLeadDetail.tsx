@@ -60,6 +60,21 @@ const activityIcon: Record<string,string> = {
   email_sent:"📧",task_created:"✅",task_completed:"🎯",follow_up_changed:"⏰",
   sms_attempted:"📱",sms_sent:"📤",sms_received:"📩",
   call_initiated:"📞",call_received:"📲",sms_opt_out:"🚫",sms_opt_in:"✅",
+  call_outcome:"📞",call_missed:"📵",
+};
+
+const CALL_DISPOSITIONS = [
+  "Connected","No Answer","Left Voicemail","Wrong Number","Not Interested","Follow Up",
+] as const;
+type CallDisposition = typeof CALL_DISPOSITIONS[number];
+
+const dispositionColor: Record<CallDisposition, string> = {
+  "Connected": "bg-green-100 text-green-700",
+  "No Answer": "bg-red-100 text-red-700",
+  "Left Voicemail": "bg-yellow-100 text-yellow-700",
+  "Wrong Number": "bg-gray-100 text-gray-600",
+  "Not Interested": "bg-red-100 text-red-700",
+  "Follow Up": "bg-blue-100 text-blue-700",
 };
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -106,7 +121,7 @@ interface Lead {
   smsConsent:boolean; smsOptOut:boolean;
   generatedProposal?:string; generatedSow?:string;
 }
-interface Activity { id:number; type:string; title:string; description?:string; createdAt:string; }
+interface Activity { id:number; type:string; title:string; description?:string; createdAt:string; metadata?:Record<string,unknown>|null; }
 interface CrmMessage {
   id:number; direction:string; channel:string; body?:string; status?:string;
   fromNumber?:string; toNumber?:string; callStatus?:string; duration?:number; createdAt:string;
@@ -115,7 +130,7 @@ interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
   dueDate?:string; status:string; completedAt?:string; createdAt:string;
 }
-type ModalType = "call"|"text"|"email"|"note"|"task"|"status"|null;
+type ModalType = "call"|"calllog"|"text"|"email"|"note"|"task"|"status"|null;
 interface ToastItem { id:number; type:"success"|"error"|"info"; msg:string; }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -252,6 +267,12 @@ export default function CrmLeadDetail() {
   const [sendingSms, setSendingSms] = useState(false);
   const [callingLead, setCallingLead] = useState(false);
 
+  // Call log modal state
+  const [callLogSid, setCallLogSid] = useState<string|null>(null);
+  const [callLogDisposition, setCallLogDisposition] = useState<CallDisposition>("Connected");
+  const [callLogNotes, setCallLogNotes] = useState("");
+  const [savingCallLog, setSavingCallLog] = useState(false);
+
   // Edit state (sidebar)
   const [editStatus, setEditStatus] = useState("");
   const [editPriority, setEditPriority] = useState("");
@@ -332,15 +353,46 @@ export default function CrmLeadDetail() {
       method: "POST",
       headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
     });
-    const d = await r.json() as { error?: string };
+    const d = await r.json() as { error?: string; sid?: string };
     if (r.ok) {
       showToast("Bridge call initiated — your phone will ring shortly.", "info");
-      setOpenModal(null);
+      setCallLogSid(d.sid ?? null);
+      setCallLogDisposition("Connected");
+      setCallLogNotes("");
+      setOpenModal("calllog");
       load();
     } else {
       showToast(d.error ?? "Failed to initiate call", "error");
     }
     setCallingLead(false);
+  };
+
+  const logCallOutcome = async () => {
+    if (!lead || savingCallLog) return;
+    setSavingCallLog(true);
+    try {
+      const r = await fetch(`/api/crm/leads/${params.id}/activities`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "call_outcome",
+          title: `Call outcome: ${callLogDisposition}`,
+          description: callLogNotes.trim() || `Outcome: ${callLogDisposition}`,
+          metadata: { disposition: callLogDisposition, callSid: callLogSid, source: "lead_detail_call_modal" },
+        }),
+      });
+      if (r.ok) {
+        showToast("Call outcome logged");
+        setOpenModal(null);
+        load();
+      } else {
+        const e = await r.json() as { error?: string };
+        showToast(e.error ?? "Failed to log outcome", "error");
+      }
+    } catch {
+      showToast("Network error", "error");
+    }
+    setSavingCallLog(false);
   };
 
   const sendSms = async () => {
@@ -685,16 +737,26 @@ export default function CrmLeadDetail() {
                     <p className="text-center text-muted-foreground text-sm py-8">No activity yet.</p>
                   ) : (
                     <ul className="space-y-3">
-                      {activities.map(a => (
-                        <li key={a.id} className="flex gap-3">
-                          <span className="text-base mt-0.5 shrink-0">{activityIcon[a.type] || "•"}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground">{a.title}</p>
-                            {a.description && <p className="text-xs text-muted-foreground mt-0.5">{a.description}</p>}
-                            <p className="text-xs text-muted-foreground/60 mt-1">{new Date(a.createdAt).toLocaleString()}</p>
-                          </div>
-                        </li>
-                      ))}
+                      {activities.map(a => {
+                        const isMissed = a.type === "call_missed";
+                        const isOutcome = a.type === "call_outcome";
+                        const disposition = isOutcome ? (a.metadata?.disposition as CallDisposition | undefined) : undefined;
+                        return (
+                          <li key={a.id} className="flex gap-3">
+                            <span className="text-base mt-0.5 shrink-0">{activityIcon[a.type] || "•"}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${isMissed ? "text-red-600" : "text-foreground"}`}>{a.title}</p>
+                              {isOutcome && disposition && (
+                                <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-gray-100 text-gray-600"}`}>
+                                  {disposition}
+                                </span>
+                              )}
+                              {a.description && <p className="text-xs text-muted-foreground mt-0.5">{a.description}</p>}
+                              <p className="text-xs text-muted-foreground/60 mt-1">{new Date(a.createdAt).toLocaleString()}</p>
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
@@ -1455,6 +1517,53 @@ export default function CrmLeadDetail() {
                 {callingLead ? "Initiating…" : "Start Call"}
               </Button>
             )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Call Log Modal ─── */}
+      <Modal open={openModal === "calllog"} onClose={() => setOpenModal(null)} title="📋 Log Call Outcome">
+        <div className="px-5 py-4 space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
+            Call initiated to <strong>{lead.name}</strong>. Log the outcome below.
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground block mb-2">Disposition</label>
+            <div className="grid grid-cols-2 gap-2">
+              {CALL_DISPOSITIONS.map(d => (
+                <button
+                  key={d}
+                  onClick={() => setCallLogDisposition(d)}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors text-left ${
+                    callLogDisposition === d
+                      ? `${dispositionColor[d]} border-current`
+                      : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes <span className="font-normal">(optional)</span></label>
+            <textarea
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+              rows={3}
+              placeholder="What was discussed? Any follow-up needed?"
+              value={callLogNotes}
+              onChange={e => setCallLogNotes(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setOpenModal(null)}>Skip</Button>
+            <Button className="flex-1 gap-2" onClick={logCallOutcome} disabled={savingCallLog}>
+              {savingCallLog ? "Saving…" : "Log Outcome"}
+            </Button>
           </div>
         </div>
       </Modal>

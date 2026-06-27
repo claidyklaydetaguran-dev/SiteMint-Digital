@@ -1,0 +1,149 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17B — Call Outcomes & Post-Call Notes
+
+MODULE:
+Phone / Twilio + Lead Detail only.
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation from Phase 17A.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* Click-to-call works.
+* Inbound calls forward to admin cell.
+* Call/SMS logs appear in crm_messages.
+* Missed call activity logging works.
+* Twilio webhook signature validation is active in production.
+* crm_activities supports free-form type + metadata JSONB.
+
+OBJECTIVE:
+After calls, let the admin quickly log the call outcome and notes so CRM history becomes useful.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/api-server/src/routes/crm.ts
+* artifacts/web-agency/src/pages/crm/CrmLeadDetail.tsx
+* artifacts/web-agency/src/pages/crm/SalesWorkspace.tsx only if call action exists there
+* crmActivities schema only if needed
+
+TASK 2 — ADD OR REUSE ACTIVITY ENDPOINT
+
+If an endpoint already exists for creating lead activities, reuse it.
+
+If not, add:
+
+POST /api/crm/leads/:id/activities
+
+Protected by admin auth.
+
+Body:
+{
+type,
+title,
+description,
+metadata
+}
+
+Behavior:
+
+* Validate lead exists.
+* Insert crm_activities row.
+* Return created activity.
+* Do not change schema.
+
+TASK 3 — CALL LOG MODAL
+
+Create or add a lightweight Call Log modal in Lead Detail.
+
+Trigger:
+After a successful call initiation from the Call button, open the modal.
+
+Fields:
+
+* disposition
+* notes
+
+Disposition options:
+
+* Connected
+* No Answer
+* Left Voicemail
+* Wrong Number
+* Not Interested
+* Follow Up
+
+Optional:
+
+* follow-up date if existing task creation endpoint can be reused safely
+
+Submit:
+Creates activity:
+
+type: "call_outcome"
+title: "Call outcome: [Disposition]"
+description: notes or short fallback
+metadata:
+{
+disposition,
+callSid if available,
+source: "lead_detail_call_modal"
+}
+
+TASK 4 — ACTIVITY FEED DISPLAY
+
+Update activity rendering so:
+
+call_outcome appears with phone icon and disposition.
+call_missed appears with missed-call styling.
+Existing activity types still render normally.
+
+Do not rewrite the entire activity feed.
+
+TASK 5 — SALES WORKSPACE INTEGRATION
+
+If SalesWorkspace has a call action or communication timeline that can display activities, make sure call_outcome and call_missed render safely.
+
+If not easy, defer and report.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Lead Detail loads.
+2. Call button still initiates call.
+3. Successful call opens Call Log modal.
+4. Modal can be dismissed without saving.
+5. Saving creates call_outcome activity.
+6. Activity feed shows call_outcome.
+7. call_missed activity still displays safely.
+8. Duplicate submit is prevented while saving.
+9. No phone number state still works.
+10. Inbox still works.
+11. Twilio webhooks still work.
+12. No schema changes.
+13. No locked modules changed.
+14. TypeScript passes except known unrelated issue.
+15. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Activity endpoint reused or added
+4. Call Log modal behavior
+5. Activity feed behavior
+6. Sales Workspace handling
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended Phase 17C
