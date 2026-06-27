@@ -529,6 +529,139 @@ export default function CrmDashboard() {
           </div>
         )}
 
+        {/* ── section divider: today's focus ───────────────────────────────── */}
+        <div className="flex items-center gap-2">
+          <div className="h-px flex-1 bg-gray-100" />
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground px-2">Today's Focus</p>
+          <div className="h-px flex-1 bg-gray-100" />
+        </div>
+
+        {/* ── Daily Sales Brief ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
+            <Zap className="w-4 h-4 text-indigo-500" />
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Daily Sales Brief</h2>
+            <span className="ml-auto text-[10px] text-muted-foreground">{dailyBrief.date}</span>
+          </div>
+          <div className="px-5 py-3 border-b border-gray-50">
+            <p className={`text-sm font-medium ${
+              dailyBrief.topPriorityCount > 5 ? "text-red-600" :
+              dailyBrief.topPriorityCount > 0 ? "text-foreground" : "text-emerald-700"
+            }`}>
+              {dailyBrief.topPriorityCount > 0 && (
+                <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse mr-2 align-middle" />
+              )}
+              {dailyBrief.summary}
+            </p>
+          </div>
+          {dailyBrief.items.length === 0 ? (
+            <div className="px-5 py-5 text-center">
+              <p className="text-2xl mb-1">🎉</p>
+              <p className="text-sm text-muted-foreground">All clear — no urgent actions today.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-px bg-gray-100">
+              {dailyBrief.items.map(item => (
+                <div key={item.label} className={`bg-white px-4 py-3 flex flex-col gap-0.5 ${
+                  item.urgency === "high"   ? "border-t-2 border-red-400" :
+                  item.urgency === "medium" ? "border-t-2 border-amber-400" :
+                                             "border-t-2 border-gray-200"
+                }`}>
+                  <p className="text-xl leading-none">{item.emoji}</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">{item.count}</p>
+                  <p className={`text-[11px] font-semibold leading-tight ${
+                    item.urgency === "high" ? "text-red-600" :
+                    item.urgency === "medium" ? "text-amber-700" : "text-muted-foreground"
+                  }`}>{item.label}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Opportunity Radar ──────────────────────────────────────────────── */}
+        {(() => {
+          const total = opportunityRadar.hot.length + opportunityRadar.cooling.length +
+            opportunityRadar.atRisk.length + opportunityRadar.nurture.length;
+          if (total === 0) return null;
+
+          const buckets: {
+            key: "hot" | "cooling" | "atRisk" | "nurture";
+            label: string; emoji: string;
+            color: string; bg: string; border: string;
+            leads: RadarEntry[];
+          }[] = [
+            {
+              key: "hot", label: "Hot", emoji: "🔥",
+              color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200",
+              leads: opportunityRadar.hot,
+            },
+            {
+              key: "atRisk", label: "At Risk", emoji: "⚠️",
+              color: "text-red-700", bg: "bg-red-50", border: "border-red-200",
+              leads: opportunityRadar.atRisk,
+            },
+            {
+              key: "cooling", label: "Cooling", emoji: "⏳",
+              color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200",
+              leads: opportunityRadar.cooling,
+            },
+            {
+              key: "nurture", label: "Nurture", emoji: "🌱",
+              color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200",
+              leads: opportunityRadar.nurture,
+            },
+          ];
+
+          return (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <GitBranch className="w-4 h-4 text-muted-foreground" />
+                <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Opportunity Radar</h2>
+                <span className="text-[10px] text-muted-foreground ml-1">— {total} active lead{total !== 1 ? "s" : ""} classified · rule-based</span>
+              </div>
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                {buckets.map(bucket => (
+                  <div key={bucket.key} className={`rounded-xl border ${bucket.border} ${bucket.bg} overflow-hidden`}>
+                    <div className={`flex items-center justify-between px-3.5 py-2.5 border-b ${bucket.border}`}>
+                      <p className={`text-xs font-bold ${bucket.color}`}>
+                        {bucket.emoji} {bucket.label}
+                      </p>
+                      <span className={`text-sm font-bold ${bucket.color}`}>{bucket.leads.length}</span>
+                    </div>
+                    <div className="divide-y divide-white/50">
+                      {bucket.leads.length === 0 ? (
+                        <p className="px-3.5 py-4 text-[11px] text-muted-foreground text-center">No leads in this bucket</p>
+                      ) : bucket.leads.slice(0, 4).map(entry => (
+                        <Link href={`/admin/crm/leads/${entry.id}`} key={entry.id}>
+                          <div className="px-3.5 py-2.5 hover:bg-white/70 transition-colors cursor-pointer">
+                            <div className="flex items-start justify-between gap-1.5 mb-0.5">
+                              <p className="text-xs font-semibold text-foreground leading-tight truncate">{entry.name}</p>
+                              <span className="text-[10px] font-bold text-muted-foreground shrink-0">{entry.healthScore}</span>
+                            </div>
+                            {entry.company && (
+                              <p className="text-[10px] text-muted-foreground truncate mb-1">{entry.company}</p>
+                            )}
+                            <p className={`text-[10px] leading-snug ${bucket.color}`}>{entry.recommendation}</p>
+                          </div>
+                        </Link>
+                      ))}
+                      {bucket.leads.length > 4 && (
+                        <Link href="/admin/crm/leads">
+                          <p className="px-3.5 py-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-center">
+                            +{bucket.leads.length - 4} more →
+                          </p>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Smart CRM Lists ───────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -645,6 +778,38 @@ export default function CrmDashboard() {
           </div>
         </div>
 
+        {/* ── Automation Queue ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Automation Queue</h2>
+            <span className="text-[10px] text-muted-foreground ml-1">— pending actions by category · drafts only, nothing auto-sends</span>
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+            {automationTiles.map(tile => (
+              <div key={tile.label} className={`rounded-xl border ${tile.border} ${tile.bg} p-3.5`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-lg leading-none">{tile.emoji}</span>
+                  <span className={`text-xl font-bold leading-none ${tile.color}`}>{tile.count}</span>
+                </div>
+                <p className={`text-xs font-bold ${tile.color} mb-0.5`}>{tile.label}</p>
+                <p className="text-[10px] text-muted-foreground leading-snug mb-2">{tile.desc}</p>
+                <p className="text-[10px] text-muted-foreground leading-snug italic">{tile.action}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            Open any lead → <strong>Automation</strong> tab in Sales Workspace for step-by-step actions, readiness gates, and recommended sequence.
+          </p>
+        </div>
+
+        {/* ── section divider: pipeline analytics ──────────────────────────── */}
+        <div className="flex items-center gap-2">
+          <div className="h-px flex-1 bg-gray-100" />
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground px-2">Pipeline Analytics</p>
+          <div className="h-px flex-1 bg-gray-100" />
+        </div>
+
         {/* ── DISC Behavioral Distribution ──────────────────────────────────── */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -750,6 +915,13 @@ export default function CrmDashboard() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* ── section divider: activity & follow-up ───────────────────────── */}
+        <div className="flex items-center gap-2">
+          <div className="h-px flex-1 bg-gray-100" />
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground px-2">Activity &amp; Follow-up</p>
+          <div className="h-px flex-1 bg-gray-100" />
         </div>
 
         {/* ── Recent Activity table with Health Score ───────────────────────── */}
@@ -971,157 +1143,6 @@ export default function CrmDashboard() {
             </ul>
           </div>
         )}
-
-        {/* ── Daily Sales Brief ──────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
-            <Zap className="w-4 h-4 text-indigo-500" />
-            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Daily Sales Brief</h2>
-            <span className="ml-auto text-[10px] text-muted-foreground">{dailyBrief.date}</span>
-          </div>
-          <div className="px-5 py-3 border-b border-gray-50">
-            <p className={`text-sm font-medium ${
-              dailyBrief.topPriorityCount > 5 ? "text-red-600" :
-              dailyBrief.topPriorityCount > 0 ? "text-foreground" : "text-emerald-700"
-            }`}>
-              {dailyBrief.topPriorityCount > 0 && (
-                <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse mr-2 align-middle" />
-              )}
-              {dailyBrief.summary}
-            </p>
-          </div>
-          {dailyBrief.items.length === 0 ? (
-            <div className="px-5 py-5 text-center">
-              <p className="text-2xl mb-1">🎉</p>
-              <p className="text-sm text-muted-foreground">All clear — no urgent actions today.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-px bg-gray-100">
-              {dailyBrief.items.map(item => (
-                <div key={item.label} className={`bg-white px-4 py-3 flex flex-col gap-0.5 ${
-                  item.urgency === "high"   ? "border-t-2 border-red-400" :
-                  item.urgency === "medium" ? "border-t-2 border-amber-400" :
-                                             "border-t-2 border-gray-200"
-                }`}>
-                  <p className="text-xl leading-none">{item.emoji}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">{item.count}</p>
-                  <p className={`text-[11px] font-semibold leading-tight ${
-                    item.urgency === "high" ? "text-red-600" :
-                    item.urgency === "medium" ? "text-amber-700" : "text-muted-foreground"
-                  }`}>{item.label}</p>
-                  <p className="text-[10px] text-muted-foreground leading-tight">{item.detail}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Opportunity Radar ──────────────────────────────────────────────── */}
-        {(() => {
-          const total = opportunityRadar.hot.length + opportunityRadar.cooling.length +
-            opportunityRadar.atRisk.length + opportunityRadar.nurture.length;
-          if (total === 0) return null;
-
-          const buckets: {
-            key: "hot" | "cooling" | "atRisk" | "nurture";
-            label: string; emoji: string;
-            color: string; bg: string; border: string;
-            leads: RadarEntry[];
-          }[] = [
-            {
-              key: "hot", label: "Hot", emoji: "🔥",
-              color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200",
-              leads: opportunityRadar.hot,
-            },
-            {
-              key: "atRisk", label: "At Risk", emoji: "⚠️",
-              color: "text-red-700", bg: "bg-red-50", border: "border-red-200",
-              leads: opportunityRadar.atRisk,
-            },
-            {
-              key: "cooling", label: "Cooling", emoji: "⏳",
-              color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200",
-              leads: opportunityRadar.cooling,
-            },
-            {
-              key: "nurture", label: "Nurture", emoji: "🌱",
-              color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200",
-              leads: opportunityRadar.nurture,
-            },
-          ];
-
-          return (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <GitBranch className="w-4 h-4 text-muted-foreground" />
-                <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Opportunity Radar</h2>
-                <span className="text-[10px] text-muted-foreground ml-1">— {total} active lead{total !== 1 ? "s" : ""} classified · rule-based</span>
-              </div>
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                {buckets.map(bucket => (
-                  <div key={bucket.key} className={`rounded-xl border ${bucket.border} ${bucket.bg} overflow-hidden`}>
-                    <div className={`flex items-center justify-between px-3.5 py-2.5 border-b ${bucket.border}`}>
-                      <p className={`text-xs font-bold ${bucket.color}`}>
-                        {bucket.emoji} {bucket.label}
-                      </p>
-                      <span className={`text-sm font-bold ${bucket.color}`}>{bucket.leads.length}</span>
-                    </div>
-                    <div className="divide-y divide-white/50">
-                      {bucket.leads.length === 0 ? (
-                        <p className="px-3.5 py-4 text-[11px] text-muted-foreground text-center">No leads in this bucket</p>
-                      ) : bucket.leads.slice(0, 4).map(entry => (
-                        <Link href={`/admin/crm/leads/${entry.id}`} key={entry.id}>
-                          <div className="px-3.5 py-2.5 hover:bg-white/70 transition-colors cursor-pointer">
-                            <div className="flex items-start justify-between gap-1.5 mb-0.5">
-                              <p className="text-xs font-semibold text-foreground leading-tight truncate">{entry.name}</p>
-                              <span className="text-[10px] font-bold text-muted-foreground shrink-0">{entry.healthScore}</span>
-                            </div>
-                            {entry.company && (
-                              <p className="text-[10px] text-muted-foreground truncate mb-1">{entry.company}</p>
-                            )}
-                            <p className={`text-[10px] leading-snug ${bucket.color}`}>{entry.recommendation}</p>
-                          </div>
-                        </Link>
-                      ))}
-                      {bucket.leads.length > 4 && (
-                        <Link href="/admin/crm/leads">
-                          <p className="px-3.5 py-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-center">
-                            +{bucket.leads.length - 4} more →
-                          </p>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ── Automation Queue ──────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-4 h-4 text-muted-foreground" />
-            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Automation Queue</h2>
-            <span className="text-[10px] text-muted-foreground ml-1">— pending actions by category · drafts only, nothing auto-sends</span>
-          </div>
-          <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
-            {automationTiles.map(tile => (
-              <div key={tile.label} className={`rounded-xl border ${tile.border} ${tile.bg} p-3.5`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lg leading-none">{tile.emoji}</span>
-                  <span className={`text-xl font-bold leading-none ${tile.color}`}>{tile.count}</span>
-                </div>
-                <p className={`text-xs font-bold ${tile.color} mb-0.5`}>{tile.label}</p>
-                <p className="text-[10px] text-muted-foreground leading-snug mb-2">{tile.desc}</p>
-                <p className="text-[10px] text-muted-foreground leading-snug italic">{tile.action}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-3">
-            Open any lead → <strong>Automation</strong> tab in Sales Workspace for step-by-step actions, readiness gates, and recommended sequence.
-          </p>
-        </div>
 
         {/* ── Intelligence note ─────────────────────────────────────────────── */}
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">

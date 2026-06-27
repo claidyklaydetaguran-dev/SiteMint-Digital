@@ -1,0 +1,107 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 20 — Dashboard Section Reorder
+
+MODULE:
+CRM Dashboard only.
+
+IMPORTANT:
+Frontend-only.
+Do not touch backend.
+Do not touch database schema.
+Do not touch Twilio.
+Do not touch Campaigns.
+Do not touch locked engines.
+Do not refactor the dashboard.
+Do not rewrite CrmDashboard.tsx.
+Make surgical JSX movement only.
+
+CURRENT STATE:
+CrmDashboard.tsx is large.
+All sections work.
+UX audit found that the most important sections are buried too low.
+
+OBJECTIVE:
+Reorder CRM Dashboard sections to follow the intended command-center hierarchy.
+
+Target order:
+
+1. Header / top actions
+2. KPI stat cards
+3. Intelligence Insights
+4. Daily Sales Brief
+5. Opportunity Radar
+6. Relationship Overview
+7. Automation Queue
+8. Quick Actions
+9. Charts / analytics
+10. Recent Activity
+11. Tables / secondary lists
+
+TASK 1 — INSPECT ONLY CrmDashboard.tsx
+
+Identify the JSX blocks for:
+
+* KPI stat cards
+* Intelligence Insights
+* Daily Sales Brief
+* Opportunity Radar
+* Relationship Overview
+* Automation Queue
+* Quick Actions
+* Charts
+* Recent Activity
+* Recent Deals / tables
+
+Do not inspect unrelated files.
+
+TASK 2 — REORDER JSX ONLY
+
+Move existing sections only.
+
+Do not change logic.
+Do not change useMemo.
+Do not change API calls.
+Do not rename variables.
+Do not rewrite components.
+Do not remove sections.
+
+Only reorder JSX blocks.
+
+TASK 3 — ADD LIGHT SECTION DIVIDERS IF SAFE
+
+If easy and low-risk, add subtle helper labels:
+
+* “Today’s focus”
+* “Pipeline intelligence”
+* “Activity & follow-up”
+
+Do not over-design.
+
+TASK 4 — TESTING
+
+Test:
+
+1. Dashboard loads.
+2. All previous dashboard sections still render.
+3. No JSX bracket errors.
+4. No missing variables.
+5. No console errors.
+6. TypeScript passes except known unrelated issue.
+7. No backend changes.
+8. No schema changes.
+9. No Twilio changes.
+10. No locked modules changed.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Old order
+4. New order
+5. Sections moved
+6. Tests performed
+7. Confirm no backend/schema/Twilio changes
+8. Known limitations
+9. Recommended next phase
