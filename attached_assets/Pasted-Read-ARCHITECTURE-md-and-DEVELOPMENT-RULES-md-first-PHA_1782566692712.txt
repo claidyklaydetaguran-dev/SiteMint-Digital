@@ -1,0 +1,160 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 24C — Behavioral Timeline UI
+
+MODULE:
+Sales Workspace only.
+
+IMPORTANT:
+Frontend-only if possible.
+Do not touch Twilio.
+Do not touch Campaign sending.
+Do not touch database schema.
+Do not touch locked modules.
+Do not refactor SalesWorkspace.tsx.
+Make surgical edits only.
+Stay within change budget.
+
+CURRENT STATE:
+
+* crm_behavioral_events table exists.
+* GET /api/crm/leads/:id/behavioral-events exists.
+* behavioralIntelligence.ts exists.
+* computeLeadDna() exists.
+* computeIntentTrend() exists.
+* No UI currently displays Lead DNA or behavioral events.
+
+OBJECTIVE:
+Surface Lead DNA and Behavioral Timeline inside Sales Workspace.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/web-agency/src/pages/crm/SalesWorkspace.tsx
+* artifacts/web-agency/src/lib/behavioralIntelligence.ts
+
+TASK 2 — FETCH BEHAVIORAL EVENTS
+
+In SalesWorkspace.tsx:
+
+* Fetch GET /api/crm/leads/:id/behavioral-events when the workspace opens or when the new tab is selected.
+* Store events in local state.
+* Handle loading, error, and empty states.
+* Do not add new backend routes.
+
+TASK 3 — ADD “Behavior” TAB
+
+Add a new tab in Sales Workspace:
+
+Label:
+Behavior
+
+Icon:
+DNA, Activity, Sparkles, or similar existing icon.
+
+Place near:
+Relationship / Intelligence / Automation tabs.
+
+TASK 4 — LEAD DNA PANEL
+
+Inside Behavior tab, show:
+
+* Intent Stage badge
+* Event count
+* Last signal date
+* Overall behavior summary
+* 7 score bars:
+
+  * Client Intent
+  * Urgency
+  * Trust
+  * Project Readiness
+  * Budget Confidence
+  * Communication Score
+  * Referral Probability
+
+Use computeLeadDna(events).
+
+Each score bar:
+
+* value 0–100
+* color based on level
+* short explanation if available
+
+TASK 5 — INTENT TREND PANEL
+
+Use computeIntentTrend(events).
+
+Show:
+
+* Rising / Stable / Falling
+* Direction icon
+* Short explanation
+* Recent signal count
+
+TASK 6 — BEHAVIOR TIMELINE
+
+Scrollable timeline sorted newest first.
+
+Each event shows:
+
+* event type icon
+* event label
+* occurred_at
+* impact summary:
+  e.g. “+28 Client Intent · +22 Urgency”
+* metadata summary if useful
+* delete/correction button only if existing DELETE endpoint can be called safely
+
+If delete is implemented:
+
+* confirm inline before deleting
+* call DELETE /api/crm/leads/:id/behavioral-events/:eventId
+* refresh events after delete
+
+TASK 7 — EMPTY STATE
+
+If no behavioral events:
+Show:
+“No behavioral signals yet.”
+Explain:
+“Campaign opens, clicks, replies, meetings, proposal views, and manual events will appear here.”
+
+TASK 8 — TESTING
+
+Test:
+
+1. Sales Workspace loads.
+2. Behavior tab appears.
+3. Behavioral events fetch successfully.
+4. Empty state works.
+5. Lead DNA scores render.
+6. Intent Trend renders.
+7. Timeline renders newest first.
+8. Impact summary displays event deltas.
+9. Delete event works if implemented.
+10. Existing Sales Workspace tabs still work.
+11. Lead Detail still works.
+12. No backend changes.
+13. No schema changes.
+14. No Twilio changes.
+15. No Campaign changes.
+16. TypeScript passes clean.
+17. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Behavioral event fetch behavior
+4. Behavior tab UI
+5. Lead DNA panel behavior
+6. Intent trend behavior
+7. Timeline behavior
+8. Delete/correction behavior if implemented
+9. Tests performed
+10. Schema/backend changes if any
+11. Known limitations
+12. Recommended next phase

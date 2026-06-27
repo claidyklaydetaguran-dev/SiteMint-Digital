@@ -205,6 +205,36 @@ export const INTENT_STAGE_COLOR: Record<IntentStage, string> = {
   "At Risk":          "bg-red-100 text-red-700",
 };
 
+// ── Per-event impact summary (for timeline display) ───────────────────────────
+// Returns a string like "+28 Client Intent · +22 Urgency" for a single event.
+// Uses stored delta columns when present, falls back to EVENT_DEFAULTS.
+
+export function getEventImpactSummary(ev: BehavioralEvent): string {
+  const defaults = EVENT_DEFAULTS[ev.eventType] ?? {};
+  const resolve = (stored: string | null, key: keyof typeof BASELINE): number => {
+    if (stored !== null) {
+      const n = parseFloat(stored);
+      return isNaN(n) ? 0 : n;
+    }
+    return (defaults[key] as number) ?? 0;
+  };
+  const dims: { stored: string | null; key: keyof typeof BASELINE; label: string }[] = [
+    { stored: ev.dClientIntent,        key: "clientIntent",        label: "Client Intent" },
+    { stored: ev.dUrgency,             key: "urgency",             label: "Urgency" },
+    { stored: ev.dTrust,               key: "trust",               label: "Trust" },
+    { stored: ev.dProjectReadiness,    key: "projectReadiness",    label: "Proj. Readiness" },
+    { stored: ev.dBudgetConfidence,    key: "budgetConfidence",    label: "Budget Conf." },
+    { stored: ev.dCommunicationScore,  key: "communicationScore",  label: "Comm. Score" },
+    { stored: ev.dReferralProbability, key: "referralProbability", label: "Referral" },
+  ];
+  const parts: string[] = [];
+  for (const { stored, key, label } of dims) {
+    const val = resolve(stored, key);
+    if (val !== 0) parts.push(`${val > 0 ? "+" : ""}${Math.round(val)} ${label}`);
+  }
+  return parts.join(" · ");
+}
+
 export const EVENT_TYPE_LABELS: Record<string, string> = {
   email_opened:               "Email Opened",
   email_clicked_cta:          "Clicked Email CTA",

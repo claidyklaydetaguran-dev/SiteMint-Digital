@@ -5,6 +5,7 @@ import {
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
   X, DollarSign, Package, Zap, Bot, ChevronRight, RefreshCw,
   StickyNote, History, Star, GitBranch, MessageSquare, Network,
+  Activity,
 } from "lucide-react";
 import {
   computeWorkflowSteps, computeNextBestAction,
@@ -30,6 +31,11 @@ import {
   computeRelationshipProfile,
   type RiLead, type RiActivity,
 } from "@/lib/relationshipIntelligence";
+import {
+  computeLeadDna, computeIntentTrend, getEventImpactSummary,
+  type BehavioralEvent,
+  INTENT_STAGE_COLOR, EVENT_TYPE_LABELS,
+} from "@/lib/behavioralIntelligence";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -81,7 +87,7 @@ export interface SalesWorkspaceProps {
   onReload: () => Promise<void>;
 }
 
-type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation" | "relationship";
+type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation" | "relationship" | "behavior";
 
 const tk = () => localStorage.getItem("adminToken") || "";
 
@@ -1827,6 +1833,268 @@ function RelationshipTab({ lead, activities, tasks }: {
   );
 }
 
+// ── Behavior Tab ─────────────────────────────────────────────────────────────
+
+const EVENT_ICONS: Record<string, string> = {
+  email_opened: "📧", email_clicked_cta: "🖱️", email_ignored: "🚫", email_replied: "↩️",
+  proposal_viewed: "📄", proposal_reopened: "🔁", proposal_downloaded: "⬇️",
+  sow_opened: "📋", sow_downloaded: "📥",
+  call_answered: "📞", call_missed: "📵", call_duration_long: "🕐",
+  sms_replied: "💬", sms_ignored: "🔕",
+  discovery_form_submitted: "📝", contact_form_submitted: "📬",
+  referral: "🌟", facebook_lead: "📘", instagram_lead: "📸",
+  google_ppc: "🔍", organic: "🌱",
+  meeting_booked: "📅", meeting_attended: "🤝", meeting_no_show: "❌",
+  manual: "✏️",
+};
+
+function scoreBarColor(v: number): string {
+  return v >= 70 ? "bg-emerald-400" : v >= 45 ? "bg-amber-400" : v >= 25 ? "bg-blue-400" : "bg-gray-300";
+}
+function scoreTextColor(v: number): string {
+  return v >= 70 ? "text-emerald-600" : v >= 45 ? "text-amber-600" : v >= 25 ? "text-blue-600" : "text-gray-400";
+}
+
+function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Promise<void> }) {
+  const [events, setEvents] = useState<BehavioralEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/crm/leads/${lead.id}/behavioral-events`, {
+        headers: { Authorization: `Bearer ${tk()}` },
+      });
+      if (!r.ok) throw new Error("bad response");
+      const data = await r.json() as { events: BehavioralEvent[] };
+      setEvents(data.events ?? []);
+    } catch {
+      setError("Failed to load behavioral signals.");
+    } finally {
+      setLoading(false);
+    }
+  }, [lead.id]);
+
+  useEffect(() => { void fetchEvents(); }, [fetchEvents]);
+
+  const dna   = useMemo(() => computeLeadDna(events),           [events]);
+  const trend = useMemo(() => computeIntentTrend(events),       [events]);
+
+  const deleteEvent = async (eventId: number) => {
+    setDeletingId(eventId);
+    try {
+      const r = await fetch(`/api/crm/leads/${lead.id}/behavioral-events/${eventId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${tk()}` },
+      });
+      if (!r.ok) throw new Error();
+      showToast("Event removed.");
+      setConfirmDeleteId(null);
+      await fetchEvents();
+      await onReload();
+    } catch {
+      showToast("Delete failed — please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const DNA_DIMS = [
+    { label: "Client Intent",        value: dna.clientIntent },
+    { label: "Urgency",              value: dna.urgency },
+    { label: "Trust",                value: dna.trust },
+    { label: "Project Readiness",    value: dna.projectReadiness },
+    { label: "Budget Confidence",    value: dna.budgetConfidence },
+    { label: "Communication Score",  value: dna.communicationScore },
+    { label: "Referral Probability", value: dna.referralProbability },
+  ];
+
+  const TREND_CONFIG = {
+    rising:  { icon: "↑", color: "text-emerald-600", label: "Rising",  bg: "bg-emerald-50 border-emerald-200" },
+    stable:  { icon: "→", color: "text-gray-500",    label: "Stable",  bg: "bg-gray-50 border-gray-200" },
+    falling: { icon: "↓", color: "text-red-600",     label: "Falling", bg: "bg-red-50 border-red-200" },
+  };
+  const tc = TREND_CONFIG[trend.direction];
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center gap-2 text-muted-foreground text-sm">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading behavioral signals…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <AlertCircle className="w-8 h-8 text-red-300 mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground mb-3">{error}</p>
+        <Button onClick={() => void fetchEvents()} variant="outline" size="sm" className="gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" /> Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="p-8 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">
+          <Activity className="w-6 h-6 text-gray-300" />
+        </div>
+        <h3 className="font-semibold text-foreground mb-1">No Behavioral Signals Yet</h3>
+        <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+          Campaign opens, clicks, replies, meetings, proposal views, and manual events will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5 space-y-5">
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-foreground text-background px-4 py-2.5 rounded-lg text-sm shadow-lg animate-in fade-in">
+          {toast}
+        </div>
+      )}
+
+      {/* ── Intent Stage + Summary ────────────────────────────────────────── */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Lead DNA</span>
+          </div>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${INTENT_STAGE_COLOR[dna.intentStage]}`}>
+            {dna.intentStage}
+          </span>
+        </div>
+        <div className="flex items-center gap-6 flex-wrap">
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Signals</p>
+            <p className="text-2xl font-bold text-foreground leading-none">{dna.eventCount}</p>
+          </div>
+          {dna.lastEventAt && (
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Last Signal</p>
+              <p className="text-sm font-medium text-foreground">{formatRelative(dna.lastEventAt)}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 7 DNA Score Bars ─────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Score Breakdown</p>
+        {DNA_DIMS.map(({ label, value }) => (
+          <div key={label}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-foreground">{label}</span>
+              <span className={`text-xs font-bold tabular-nums ${scoreTextColor(value)}`}>{value}</span>
+            </div>
+            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-1.5 rounded-full transition-all ${scoreBarColor(value)}`}
+                style={{ width: `${value}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Intent Trend ─────────────────────────────────────────────────── */}
+      <div className={`rounded-xl border p-4 space-y-1.5 ${tc.bg}`}>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widests text-muted-foreground">Intent Trend</p>
+          <span className={`text-sm font-bold ${tc.color}`}>{tc.icon} {tc.label}</span>
+        </div>
+        <p className="text-xs text-muted-foreground leading-snug">
+          {trend.direction === "rising"
+            ? `Client intent is climbing (${trend.delta > 0 ? "+" : ""}${trend.delta} pts vs prior window).`
+            : trend.direction === "falling"
+            ? `Client intent is cooling (${trend.delta} pts vs prior window). Consider a re-engagement touch.`
+            : "Client intent is holding steady across recent signals."}
+        </p>
+        <p className="text-[10px] text-muted-foreground">{dna.eventCount} total signal{dna.eventCount !== 1 ? "s" : ""} analysed</p>
+      </div>
+
+      {/* ── Behavior Timeline ────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <History className="w-3.5 h-3.5 text-muted-foreground" />
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Behavior Timeline</p>
+        </div>
+        <div className="space-y-2">
+          {events.map(ev => {
+            const impact   = getEventImpactSummary(ev);
+            const isConfirm = confirmDeleteId === ev.id;
+            const isDeleting = deletingId === ev.id;
+            return (
+              <div key={ev.id} className="bg-white border border-gray-200 rounded-xl p-3.5">
+                <div className="flex items-start gap-3">
+                  <span className="text-base shrink-0 mt-0.5" aria-hidden="true">
+                    {EVENT_ICONS[ev.eventType] ?? "🔵"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-foreground">
+                        {EVENT_TYPE_LABELS[ev.eventType] ?? ev.eventType}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {formatRelative(ev.occurredAt)}
+                      </span>
+                    </div>
+                    {ev.label && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{ev.label}</p>
+                    )}
+                    {impact && (
+                      <p className="text-[10px] text-blue-600 font-medium mt-1">{impact}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  {isConfirm ? (
+                    <>
+                      <span className="text-[10px] text-muted-foreground">Remove this event?</span>
+                      <button
+                        onClick={() => void deleteEvent(ev.id)}
+                        disabled={isDeleting}
+                        className="text-[10px] px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 font-medium disabled:opacity-50 transition-colors"
+                      >
+                        {isDeleting ? "Removing…" : "Confirm"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-[10px] px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(ev.id)}
+                      className="text-[10px] text-muted-foreground hover:text-red-500 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "overview",   label: "Overview",      icon: Star },
   { id: "workflow",        label: "Workflow",        icon: GitBranch },
@@ -1839,6 +2107,7 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "intelligence", label: "Intelligence", icon: Zap },
   { id: "automation",   label: "Automation",   icon: Bot },
   { id: "relationship", label: "Relationship", icon: Network },
+  { id: "behavior",     label: "Behavior",     icon: Activity },
 ];
 
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
@@ -1911,6 +2180,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
       {activeTab === "intelligence" && <IntelligenceTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "automation" && <AutomationTab lead={lead} activities={activities} tasks={tasks} />}
       {activeTab === "relationship" && <RelationshipTab lead={lead} activities={activities} tasks={tasks} />}
+      {activeTab === "behavior" && <BehaviorTab lead={lead} onReload={onReload} />}
       {activeTab === "documents" && (
         <div className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">
