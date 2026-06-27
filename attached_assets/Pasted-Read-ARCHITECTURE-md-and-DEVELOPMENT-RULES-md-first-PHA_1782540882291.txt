@@ -1,0 +1,129 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17A — Telephony Stabilization
+
+MODULE:
+Phone / Twilio + CRM Settings only.
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch locked modules.
+Do not touch Campaigns.
+Do not use auto schema sync.
+Make surgical edits only.
+
+OBJECTIVE:
+Make the current Twilio integration production-safer and more observable.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/api-server/src/routes/phone.ts
+* artifacts/api-server/src/lib/twilio.ts
+* artifacts/web-agency/src/pages/crm/CrmSettings.tsx
+* crmMessages schema only if needed
+* crmActivities schema only if needed
+
+TASK 2 — ADD TWILIO SIGNATURE VALIDATION
+
+Add request validation to all public Twilio webhook routes:
+
+* /crm/webhooks/twilio/sms
+* /crm/webhooks/twilio/sms/status
+* /crm/webhooks/twilio/voice
+* /crm/webhooks/twilio/voice/bridge
+* /crm/webhooks/twilio/voice/status
+
+Use:
+twilio.validateRequest()
+
+Requirements:
+
+* In production, reject invalid signatures with 403.
+* In development, allow bypass so local testing still works.
+* If TWILIO_AUTH_TOKEN is missing, reject safely outside development.
+* Use CRM_BASE_URL to reconstruct the webhook URL.
+* Do not break current webhook behavior.
+
+TASK 3 — MISSED CALL ACTIVITY LOGGING
+
+In voice status callback:
+
+When CallStatus is:
+
+* no-answer
+* busy
+* failed
+
+Then:
+
+1. Find crm_messages row by CallSid / twilioSid.
+2. If leadId exists, create crm_activities row:
+   type: "call_missed"
+   title: "Missed call"
+   description: include status and duration if available
+   metadata: include callSid, callStatus, duration
+3. Do not create duplicates if the same status callback arrives again.
+
+No schema changes.
+
+TASK 4 — PHONE STATUS ENDPOINT ENHANCEMENTS
+
+Update GET /crm/phone/status to include:
+
+* forwardConfigured: boolean
+* baseUrlMissing: boolean
+* webhookSecurityEnabled: boolean
+* webhookSecurityMode: "enabled" | "development-bypass" | "disabled-missing-secret"
+
+TASK 5 — SETTINGS UI UPDATE
+
+In CrmSettings.tsx:
+
+Show:
+
+* Forwarding number configured / missing
+* Webhook security status
+* CRM_BASE_URL warning if missing
+* Clear explanation:
+  “Webhook signature validation protects the CRM from fake SMS/call posts.”
+
+Keep UI clean.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Twilio status endpoint returns new fields.
+2. Settings page renders new warnings.
+3. Development bypass works.
+4. Production invalid signature rejects with 403 if testable.
+5. Existing inbound SMS handler still works in dev.
+6. Existing voice webhook still works in dev.
+7. Missed call callback creates call_missed activity.
+8. Duplicate missed call callback does not create duplicate activity.
+9. Outbound SMS still works.
+10. Outbound call endpoint still works.
+11. Inbox still loads.
+12. Lead Detail command bar still loads.
+13. No schema changes.
+14. No Twilio route refactor.
+15. No locked modules changed.
+16. TypeScript passes except known unrelated issue.
+17. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Signature validation behavior
+4. Missed call logging behavior
+5. Status endpoint changes
+6. Settings UI changes
+7. Tests performed
+8. Schema changes if any
+9. Known limitations
+10. Recommended Phase 17B

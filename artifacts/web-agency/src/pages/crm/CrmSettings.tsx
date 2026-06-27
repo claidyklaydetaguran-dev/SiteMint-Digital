@@ -15,6 +15,10 @@ interface PhoneStatus {
   businessNumber: string;
   forwardTo: string;
   accountStatus: string | null;
+  forwardConfigured: boolean;
+  baseUrlMissing: boolean;
+  webhookSecurityEnabled: boolean;
+  webhookSecurityMode: "enabled" | "development-bypass" | "disabled-missing-secret";
   webhooks: {
     incomingSms: string;
     incomingVoice: string;
@@ -192,12 +196,38 @@ export default function CrmSettings() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Forward-to Number (Your Cell)</label>
-                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-foreground font-mono">
-                  {phoneStatus?.forwardTo || <span className="text-muted-foreground">Not set</span>}
+                <div className={`px-3 py-2 border rounded-lg text-sm font-mono ${phoneStatus?.configured && !phoneStatus?.forwardConfigured ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-foreground"}`}>
+                  {phoneStatus?.forwardTo || <span className="font-sans font-medium">⚠ Not set — calls won't forward</span>}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Set via <code className="bg-gray-100 px-0.5 rounded">FORWARD_TO_PHONE_NUMBER</code></p>
               </div>
             </div>
+
+            {/* Webhook Security */}
+            {phoneStatus?.configured && (
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <Shield className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground">Webhook Signature Validation</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Protects the CRM from fake SMS/call posts by verifying Twilio's request signature on every inbound webhook.
+                  </p>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 mt-0.5 ${
+                  phoneStatus.webhookSecurityMode === "enabled"
+                    ? "bg-green-100 text-green-700"
+                    : phoneStatus.webhookSecurityMode === "development-bypass"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-red-100 text-red-700"
+                }`}>
+                  {phoneStatus.webhookSecurityMode === "enabled"
+                    ? "Enabled"
+                    : phoneStatus.webhookSecurityMode === "development-bypass"
+                    ? "Dev Bypass"
+                    : "Disabled"}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Webhook URLs */}

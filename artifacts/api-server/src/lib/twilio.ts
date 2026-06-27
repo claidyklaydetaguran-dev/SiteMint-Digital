@@ -1,4 +1,5 @@
 import twilio from "twilio";
+import type { Request, Response, NextFunction } from "express";
 
 export function isTwilioConfigured(): boolean {
   return !!(
@@ -50,4 +51,58 @@ export function isOptOutMessage(body: string): boolean {
 
 export function isOptInMessage(body: string): boolean {
   return ["START", "YES", "UNSTOP"].includes(body.trim().toUpperCase());
+}
+
+// ── Webhook Security ──────────────────────────────────────────────────────────
+
+export type WebhookSecurityMode =
+  | "enabled"
+  | "development-bypass"
+  | "disabled-missing-secret";
+
+export function getWebhookSecurityMode(): WebhookSecurityMode {
+  if (!process.env.TWILIO_AUTH_TOKEN) return "disabled-missing-secret";
+  if (process.env.NODE_ENV !== "production") return "development-bypass";
+  return "enabled";
+}
+
+/**
+ * Express middleware that validates Twilio's X-Twilio-Signature header.
+ *
+ * - NODE_ENV !== "production"  → always bypass (dev/test convenience)
+ * - TWILIO_AUTH_TOKEN missing in production → reject 403
+ * - Production + token present → validate; reject 403 on mismatch
+ *
+ * The full URL is reconstructed from CRM_BASE_URL + req.originalUrl so that
+ * query-string params (e.g. /voice/bridge?leadPhone=…) are included correctly.
+ */
+export function createWebhookValidator() {
+  return function validateTwilioSignature(req: Request, res: Response, next: NextFunction): void {
+    const isDev = process.env.NODE_ENV !== "production";
+
+    if (isDev) { next(); return; }
+
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      res.status(403).type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+      return;
+    }
+
+    const baseUrl = getCrmBaseUrl();
+    if (!baseUrl) {
+      res.status(403).type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+      return;
+    }
+
+    const signature = String(req.headers["x-twilio-signature"] ?? "");
+    const url = `${baseUrl}${req.originalUrl}`;
+    const params = (req.body ?? {}) as Record<string, string>;
+
+    if (!twilio.validateRequest(authToken, signature, url, params)) {
+      res.status(403).type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+      return;
+    }
+
+    next();
+  };
 }

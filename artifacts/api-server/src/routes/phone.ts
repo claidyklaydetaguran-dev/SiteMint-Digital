@@ -5,9 +5,11 @@ import { validateToken } from "../lib/admin-session.js";
 import {
   isTwilioConfigured, getTwilio, getTwilioPhone, getForwardPhone, getCrmBaseUrl,
   normalizePhone, isOptOutMessage, isOptInMessage,
+  createWebhookValidator, getWebhookSecurityMode,
 } from "../lib/twilio.js";
 
 const router: IRouter = Router();
+const validateTwilioWebhook = createWebhookValidator();
 
 // ── Rate limiting state (simple in-memory per number) ─────────────────────────
 const smsRateMap = new Map<string, { count: number; reset: number }>();
@@ -70,12 +72,18 @@ router.get("/crm/phone/status", requireAdmin, async (req: Request, res: Response
     }
   }
 
+  const securityMode = getWebhookSecurityMode();
+
   res.json({
     configured,
     provider: process.env.PHONE_PROVIDER ?? "twilio",
     businessNumber,
     forwardTo,
     accountStatus,
+    forwardConfigured: !!forwardTo,
+    baseUrlMissing: !baseUrl,
+    webhookSecurityEnabled: securityMode === "enabled",
+    webhookSecurityMode: securityMode,
     webhooks: baseUrl ? {
       incomingSms: `${baseUrl}/api/crm/webhooks/twilio/sms`,
       incomingVoice: `${baseUrl}/api/crm/webhooks/twilio/voice`,
@@ -276,7 +284,7 @@ router.patch("/crm/leads/:id/sms-consent", requireAdmin, async (req: Request, re
 // ════════════════════════════════════════════════════════════════════════════════
 
 // ── POST /crm/webhooks/twilio/sms ─────────────────────────────────────────────
-router.post("/crm/webhooks/twilio/sms", async (req: Request, res: Response) => {
+router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Request, res: Response) => {
   try {
     const { Body, From, To, MessageSid, NumMedia } = req.body as Record<string, string>;
 
@@ -340,7 +348,7 @@ router.post("/crm/webhooks/twilio/sms", async (req: Request, res: Response) => {
 });
 
 // ── POST /crm/webhooks/twilio/sms/status ─────────────────────────────────────
-router.post("/crm/webhooks/twilio/sms/status", async (req: Request, res: Response) => {
+router.post("/crm/webhooks/twilio/sms/status", validateTwilioWebhook, async (req: Request, res: Response) => {
   try {
     const { MessageSid, MessageStatus, ErrorCode } = req.body as Record<string, string>;
     if (MessageSid) {
@@ -355,7 +363,7 @@ router.post("/crm/webhooks/twilio/sms/status", async (req: Request, res: Respons
 });
 
 // ── POST /crm/webhooks/twilio/voice ───────────────────────────────────────────
-router.post("/crm/webhooks/twilio/voice", async (req: Request, res: Response) => {
+router.post("/crm/webhooks/twilio/voice", validateTwilioWebhook, async (req: Request, res: Response) => {
   try {
     const { From, To, CallSid } = req.body as Record<string, string>;
     const forwardTo = getForwardPhone();
@@ -412,7 +420,7 @@ router.post("/crm/webhooks/twilio/voice", async (req: Request, res: Response) =>
 
 // ── POST /crm/webhooks/twilio/voice/bridge ────────────────────────────────────
 // Generates TwiML to connect the admin's phone to the lead's number
-router.post("/crm/webhooks/twilio/voice/bridge", async (req: Request, res: Response) => {
+router.post("/crm/webhooks/twilio/voice/bridge", validateTwilioWebhook, async (req: Request, res: Response) => {
   const leadPhone = (req.query.leadPhone as string) ?? "";
   const leadName = (req.query.leadName as string) ?? "lead";
   res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -423,16 +431,44 @@ router.post("/crm/webhooks/twilio/voice/bridge", async (req: Request, res: Respo
 });
 
 // ── POST /crm/webhooks/twilio/voice/status ────────────────────────────────────
-router.post("/crm/webhooks/twilio/voice/status", async (req: Request, res: Response) => {
+router.post("/crm/webhooks/twilio/voice/status", validateTwilioWebhook, async (req: Request, res: Response) => {
   try {
     const { CallSid, CallStatus, CallDuration } = req.body as Record<string, string>;
     if (CallSid) {
+      // Fetch existing row first — needed for leadId and dedup
+      const [existing] = await db.select().from(crmMessages)
+        .where(eq(crmMessages.twilioSid, CallSid)).limit(1);
+
       const updates: Partial<{ callStatus: string; duration: number; status: string }> = {
         callStatus: CallStatus,
         status: CallStatus,
       };
       if (CallDuration) updates.duration = Number(CallDuration);
       await db.update(crmMessages).set(updates).where(eq(crmMessages.twilioSid, CallSid));
+
+      // Log missed-call activity for no-answer / busy / failed
+      const MISSED_STATUSES = ["no-answer", "busy", "failed"];
+      if (MISSED_STATUSES.includes(CallStatus) && existing?.leadId) {
+        // Dedup: search existing call_missed activities for this callSid in metadata
+        const prior = await db.select({ id: crmActivities.id, metadata: crmActivities.metadata })
+          .from(crmActivities)
+          .where(and(eq(crmActivities.leadId, existing.leadId), eq(crmActivities.type, "call_missed")));
+
+        const alreadyLogged = prior.some(
+          a => (a.metadata as Record<string, unknown> | null)?.callSid === CallSid
+        );
+
+        if (!alreadyLogged) {
+          const durationLabel = CallDuration ? ` after ${CallDuration}s` : "";
+          await logActivity(
+            existing.leadId,
+            "call_missed",
+            "Missed call",
+            `Call ${CallStatus}${durationLabel}`,
+            { callSid: CallSid, callStatus: CallStatus, duration: CallDuration ? Number(CallDuration) : null },
+          );
+        }
+      }
     }
     res.sendStatus(204);
   } catch {
