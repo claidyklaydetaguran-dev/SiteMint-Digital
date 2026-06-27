@@ -5,6 +5,7 @@ import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-or
 import { validateToken } from "../lib/admin-session.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
+import { normalizePhone } from "../lib/twilio.js";
 
 const router: IRouter = Router();
 
@@ -144,11 +145,16 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
 
     const data = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    const fields = ["name","company","phone","email","website","source","serviceInterest",
+    const fields = ["name","company","email","website","source","serviceInterest",
       "priority","assignedTo","notes","estimatedValue","packageType",
       "discoveryFormStatus","proposalStatus","sowStatus"];
     for (const f of fields) {
       if (data[f] !== undefined) updates[f] = data[f];
+    }
+    // Normalize phone to E.164 before storing; preserve null/empty as-is
+    if (data.phone !== undefined) {
+      const rawPhone = data.phone as string | null | undefined;
+      updates.phone = rawPhone ? normalizePhone(rawPhone) : rawPhone ?? null;
     }
     if (data.tags !== undefined) updates.tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
     if (data.nextFollowUpAt !== undefined) updates.nextFollowUpAt = data.nextFollowUpAt ? new Date(String(data.nextFollowUpAt)) : null;

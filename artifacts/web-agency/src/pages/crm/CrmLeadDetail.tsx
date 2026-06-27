@@ -320,6 +320,12 @@ export default function CrmLeadDetail() {
   const [editEstValue, setEditEstValue] = useState("");
   const [editPackage, setEditPackage] = useState("");
 
+  // Inline phone edit
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [editPhone, setEditPhone] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
+
   // Note
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
@@ -600,6 +606,30 @@ export default function CrmLeadDetail() {
     load();
   };
 
+  const savePhone = async () => {
+    setSavingPhone(true);
+    setPhoneError("");
+    try {
+      const r = await fetch(`/api/crm/leads/${params.id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: editPhone.trim() || null }),
+      });
+      if (!r.ok) {
+        const d = await r.json() as { error?: string };
+        setPhoneError(d.error || "Failed to save phone number");
+      } else {
+        setEditingPhone(false);
+        showToast("Phone number updated", "success");
+        load();
+      }
+    } catch {
+      setPhoneError("Network error — please try again");
+    } finally {
+      setSavingPhone(false);
+    }
+  };
+
   const completeTask = async (taskId: number) => {
     await fetch(`/api/crm/tasks/${taskId}`, {
       method: "PATCH",
@@ -747,41 +777,98 @@ export default function CrmLeadDetail() {
                 <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                   <Mail className="w-3.5 h-3.5 shrink-0" /> {lead.email}
                 </a>
-                {lead.phone && (
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                        <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
-                      </a>
-                      {lead.smsOptOut && (
-                        <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
+                {/* ── Phone field with inline edit ── */}
+                <div className="flex flex-col gap-1">
+                  {editingPhone ? (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="tel"
+                          value={editPhone}
+                          onChange={e => setEditPhone(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") { setEditingPhone(false); setPhoneError(""); } }}
+                          className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
+                          placeholder="+19498806515"
+                          autoFocus
+                        />
+                        <button
+                          onClick={savePhone}
+                          disabled={savingPhone}
+                          className="text-xs px-2.5 py-1.5 bg-foreground text-white rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0"
+                        >
+                          {savingPhone ? "…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => { setEditingPhone(false); setEditPhone(lead.phone || ""); setPhoneError(""); }}
+                          className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Use E.164 format when possible.{" "}
+                        US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
+                        · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
+                      </p>
+                      {phoneError && (
+                        <p className="text-[10px] text-red-600 font-medium">{phoneError}</p>
                       )}
                     </div>
-                    {(() => {
-                      const digits = lead.phone.replace(/\D/g, "");
-                      const isE164 = lead.phone.startsWith("+");
-                      // PH trunk: 09XXXXXXXXX (11 digits, starts with 0) — will normalize wrong without fix
-                      if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
-                        return (
-                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
-                            <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                            Phone may need country code — suggested: +63{digits.slice(1)}
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {lead.phone ? (
+                          <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                            <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
+                          </a>
+                        ) : (
+                          <span className="flex items-center gap-2 text-sm text-muted-foreground/50">
+                            <Phone className="w-3.5 h-3.5 shrink-0" /> No phone on record
                           </span>
-                        );
-                      }
-                      // Not E.164 and not a standard 10-digit US number
-                      if (!isE164 && digits.length !== 10 && digits.length !== 11) {
-                        return (
-                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
-                            <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                            Phone number may need country code formatting
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                )}
+                        )}
+                        <button
+                          onClick={() => { setEditPhone(lead.phone || ""); setEditingPhone(true); setPhoneError(""); }}
+                          className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded text-muted-foreground hover:bg-gray-100 hover:text-foreground transition-colors"
+                        >
+                          Edit
+                        </button>
+                        {lead.smsOptOut && (
+                          <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
+                        )}
+                      </div>
+                      {lead.phone && (() => {
+                        const digits = lead.phone.replace(/\D/g, "");
+                        const isE164 = lead.phone.startsWith("+");
+                        if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
+                          const suggested = `+63${digits.slice(1)}`;
+                          return (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                Suggested format: {suggested}
+                              </span>
+                              <button
+                                onClick={() => { setEditPhone(suggested); setEditingPhone(true); setPhoneError(""); }}
+                                className="text-[10px] px-1.5 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors self-start font-medium"
+                              >
+                                Use suggested format
+                              </button>
+                            </div>
+                          );
+                        }
+                        if (!isE164 && digits.length !== 10 && digits.length !== 11) {
+                          return (
+                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                              <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                              Phone number may need country code formatting
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </>
+                  )}
+                </div>
                 {lead.website && (
                   <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                     <Globe className="w-3.5 h-3.5 shrink-0" /> {lead.website}

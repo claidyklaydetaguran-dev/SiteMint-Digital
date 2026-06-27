@@ -1,0 +1,112 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17F — Lead Phone Edit + Auto-Normalize on Save
+
+MODULE:
+Lead Detail + CRM Lead API + Phone Utility
+
+IMPORTANT:
+Do not refactor Twilio routes.
+Do not change database schema.
+Do not touch Campaigns.
+Do not touch locked modules.
+Do not modify webhook validation.
+Do not use auto schema sync.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* normalizePhone now supports US and PH mobile formats.
+* Lead Detail shows a warning when phone format looks suspicious.
+* CrmSettings shows forwarding format guidance.
+* Known gap: lead phone numbers are still read-only from Lead Detail and are not auto-normalized when saved.
+
+OBJECTIVE:
+Allow admin to correct a lead phone number from Lead Detail and ensure phone numbers are normalized server-side on save.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect only:
+
+* artifacts/api-server/src/lib/twilio.ts
+* artifacts/api-server/src/routes/crm.ts
+* artifacts/web-agency/src/pages/crm/CrmLeadDetail.tsx
+
+Do not inspect unrelated modules.
+
+TASK 2 — SERVER-SIDE PHONE NORMALIZATION ON LEAD UPDATE
+
+Find the existing PATCH /api/crm/leads/:id endpoint.
+
+When phone is included in the update payload:
+
+* Run normalizePhone(phone)
+* Store the normalized value
+* If phone is empty/null, preserve current behavior
+* Do not normalize unrelated fields
+* Do not change schema
+
+TASK 3 — LEAD DETAIL INLINE PHONE EDIT
+
+In Lead Detail sidebar, add a small “Edit” action near the phone field.
+
+Behavior:
+
+* Clicking Edit turns phone into input field.
+* Show helper text:
+  “Use E.164 format when possible. US: +19498806515 · PH: +639186069624”
+* Save button calls existing PATCH /api/crm/leads/:id with phone.
+* Cancel restores original value.
+* On save success:
+
+  * refresh lead data
+  * show toast
+  * warning disappears if normalized correctly
+* On save error:
+
+  * show inline error
+
+TASK 4 — SUGGESTED FIX BUTTON
+
+If the warning detects a clear suggested format, show:
+“Use suggested format”
+
+Example:
+09186069624 → +639186069624
+
+Clicking it fills the input with the suggested value.
+Do not auto-save without admin confirmation.
+
+TASK 5 — TESTING
+
+Test:
+
+1. Lead Detail loads.
+2. Phone Edit appears.
+3. Edit → Cancel works.
+4. Edit → Save US number stores normalized +1 format.
+5. Edit → Save PH 09XXXXXXXXX stores +639XXXXXXXXX.
+6. Edit → Save +639XXXXXXXXX remains unchanged.
+7. Suspicious warning disappears after valid save.
+8. Invalid/short value does not crash.
+9. Outbound SMS uses normalized saved phone.
+10. Outbound call uses normalized saved phone.
+11. Inbox still works.
+12. No Twilio route refactor.
+13. No schema/database changes.
+14. No locked modules changed.
+15. TypeScript passes except known unrelated issue.
+16. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Server-side normalization behavior
+4. Inline phone edit behavior
+5. Suggested fix behavior
+6. Tests performed
+7. Schema changes if any
+8. Known limitations
+9. Recommended Phase 17G
