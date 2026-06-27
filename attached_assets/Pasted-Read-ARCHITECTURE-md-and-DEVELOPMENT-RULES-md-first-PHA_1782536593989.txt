@@ -1,0 +1,144 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 17 — Telephony Command Center Audit & Integration Plan
+
+MODULE:
+Phone / Twilio + CRM Communications
+
+IMPORTANT:
+This prompt is audit and planning first.
+Do NOT make major code changes yet.
+Do NOT refactor Twilio routes.
+Do NOT break existing SMS, calls, inbox, or Lead Detail command bar.
+Do NOT change database schema yet.
+Do NOT use auto schema sync.
+Stay within change budget.
+Make surgical fixes only if something is clearly broken.
+
+OBJECTIVE:
+Audit the current phone/SMS/call system and produce a safe implementation plan for a Follow Up Boss-style phone experience.
+
+Target future behavior:
+
+* Admin can call directly from CRM.
+* Lead sees the business/Twilio number, not private backend details.
+* When lead calls back, CRM logs the inbound call.
+* The admin’s personal cell phone can ring.
+* Call/SMS history stays inside CRM.
+* All messages/calls appear in Inbox and Lead Detail.
+* Nothing should expose private credentials.
+* Twilio webhook routes remain stable.
+
+TASK 1 — INSPECT ONLY PHONE/COMMUNICATION FILES
+
+Inspect only:
+
+* phone/Twilio routes
+* crm_messages schema
+* CrmInbox.tsx if needed
+* CrmLeadDetail call/SMS command bar if needed
+* CrmSettings Twilio status panel
+* relevant env var usage for Twilio
+
+Do not inspect unrelated modules.
+
+TASK 2 — CURRENT CAPABILITY MAP
+
+Report what currently exists:
+
+* outbound SMS
+* inbound SMS webhook
+* outbound call
+* inbound call webhook
+* voice bridge behavior
+* status callbacks
+* call duration
+* call status
+* crm_messages logging
+* lead matching by phone number
+* opt-out behavior
+* phone status/settings UI
+
+TASK 3 — GAP ANALYSIS
+
+Compare current system against target behavior:
+
+1. Click-to-call from CRM
+2. Admin cell phone rings
+3. Lead receives call from business number
+4. Incoming call to business number rings admin cell
+5. Inbound call logs to CRM
+6. Missed calls log to CRM
+7. Voicemail support
+8. Call outcome/disposition
+9. Call notes
+10. Call recording
+11. Call transcription
+12. SMS opt-out compliance
+13. Phone number formatting
+14. Webhook security / Twilio signature validation
+
+TASK 4 — IMPLEMENTATION PLAN ONLY
+
+Create a staged plan:
+
+Phase 17A — Stabilize Current Telephony
+
+* Verify env vars
+* Improve Twilio status diagnostics
+* Ensure inbound/outbound messages log consistently
+* Ensure phone matching works
+
+Phase 17B — Cell Phone Bridge
+
+* Add/admin configure ADMIN_FORWARDING_PHONE
+* Incoming calls to Twilio number forward to admin cell
+* Outbound CRM call bridges admin cell to lead
+* Log call lifecycle to crm_messages
+
+Phase 17C — Call Outcomes
+
+* Add call disposition UI
+* Outcome: Connected, No Answer, Left Voicemail, Wrong Number, Not Interested, Follow Up
+* Log notes
+
+Phase 17D — Optional Advanced
+
+* Call recording
+* Voicemail
+* Transcription
+* Call summaries
+
+TASK 5 — SAFE SMALL FIXES ONLY
+
+If you find a tiny obvious bug that affects current phone status or logging, fix it.
+
+Allowed:
+
+* missing env var display
+* broken status label
+* phone formatting helper bug
+* missing error state
+
+Not allowed:
+
+* new call routing
+* new DB schema
+* new recording
+* webhook rewrite
+
+TASK 6 — FINAL REPORT
+
+Return:
+
+1. Files inspected
+2. Existing phone/SMS capabilities
+3. Current Twilio env vars used
+4. Current webhook routes
+5. Current CRM message logging behavior
+6. Gaps vs Follow Up Boss-style behavior
+7. Risks
+8. Recommended Phase 17A implementation prompt
+9. Any small fixes made
+10. Confirmation no schema changes
+11. Confirmation Twilio routes not refactored

@@ -201,6 +201,16 @@ export default function CrmSettings() {
           </div>
 
           {/* Webhook URLs */}
+          {phoneStatus?.configured && !phoneStatus?.webhooks && (
+            <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800">
+                <strong>CRM_BASE_URL not set</strong> — webhook URLs cannot be generated.
+                Without this, Twilio cannot deliver inbound SMS or call logs to the CRM.
+                Set <code className="bg-amber-100 px-0.5 rounded">CRM_BASE_URL</code> to your deployed domain (e.g. <code className="bg-amber-100 px-0.5 rounded">https://yourapp.replit.app</code>).
+              </p>
+            </div>
+          )}
           {phoneStatus?.webhooks && (
             <div className="mb-4">
               <p className="text-xs font-semibold text-foreground mb-2">
