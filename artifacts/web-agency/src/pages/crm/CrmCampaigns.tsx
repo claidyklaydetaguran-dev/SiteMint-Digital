@@ -372,7 +372,7 @@ function computeQualityScore(a: CampaignAnalytics): QualityScore {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const STATUSES   = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
+const STATUSES   = ["New Inquiry","Discovery Sent","Discovery Completed","Qualified","Proposal Needed","Proposal Sent","Follow-Up Needed","Won","Lost","On Hold","Client","Maintenance Client"];
 const PRIORITIES = ["Low","Medium","High"];
 const DISC_STYLES: DiscStyle[] = ["Driver","Expressive","Amiable","Analytical"];
 

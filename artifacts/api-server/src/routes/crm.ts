@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES } from "@workspace/db";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
@@ -36,7 +36,7 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
 
     const [total, newLeads, hotLeads, won, lost, followUpToday, overdue, smsSent30d, smsDelivered30d] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).then(r => Number(r[0].count)),
-      db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.status, "New")).then(r => Number(r[0].count)),
+      db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.status, "New Inquiry")).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.priority, "High")).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.status, "Won")).then(r => Number(r[0].count)),
       db.select({ count: sql<number>`count(*)` }).from(crmLeads).where(eq(crmLeads.status, "Lost")).then(r => Number(r[0].count)),
@@ -107,7 +107,7 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
       website: data.website ? String(data.website) : undefined,
       source: data.source ? String(data.source) : "Manual Entry",
       serviceInterest: data.serviceInterest ? String(data.serviceInterest) : undefined,
-      status: data.status ? String(data.status) : "New",
+      status: data.status ? String(data.status) : "New Inquiry",
       priority: data.priority ? String(data.priority) : "Medium",
       assignedTo: data.assignedTo ? String(data.assignedTo) : undefined,
       tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
@@ -297,7 +297,7 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
     const [updated] = await db.update(crmTasks).set(updates).where(eq(crmTasks.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Task not found" }); return; }
 
-    if (data.status === "completed") {
+    if (data.status === "completed" && updated.leadId != null) {
       await logActivity(updated.leadId, "task_completed", `Task completed: ${updated.title}`);
     }
     res.json({ task: updated });
@@ -1293,10 +1293,14 @@ router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => 
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: "No rows provided" }); return; }
 
-    const VALID_STS = new Set(["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"]);
+    const VALID_STS = new Set<string>(CRM_STATUSES);
+    const LEGACY_ST: Record<string, string> = {
+      "new": "New Inquiry", "contacted": "Follow-Up Needed", "follow-up": "Follow-Up Needed",
+      "negotiating": "Qualified", "nurture": "On Hold",
+    };
     const VALID_PRI = new Set(["Low","Medium","High"]);
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const normSt = (s?: string) => { const c = s?.trim(); if (!c) return "New"; if (VALID_STS.has(c)) return c; const l = c.toLowerCase(); return [...VALID_STS].find(x => x.toLowerCase() === l) ?? "New"; };
+    const normSt = (s?: string) => { const c = s?.trim(); if (!c) return "New Inquiry"; if (VALID_STS.has(c)) return c; const l = c.toLowerCase(); if (LEGACY_ST[l]) return LEGACY_ST[l]; return [...VALID_STS].find(x => x.toLowerCase() === l) ?? "New Inquiry"; };
     const normPr = (p?: string) => { const c = p?.trim(); if (!c) return "Medium"; if (VALID_PRI.has(c)) return c; const l = c.toLowerCase(); return [...VALID_PRI].find(x => x.toLowerCase() === l) ?? "Medium"; };
 
     let created = 0, skippedDuplicates = 0, invalid = 0;
@@ -1374,7 +1378,7 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
         phone: sub.phone ?? undefined,
         source: "Discovery Form",
         serviceInterest: sub.serviceInterest ?? undefined,
-        status: sub.status === "New" ? "New" : sub.status,
+        status: sub.status === "New" ? "New Inquiry" : sub.status,
         priority,
         tags: sub.tags,
         notes: sub.internalNotes ?? undefined,
@@ -1430,7 +1434,7 @@ router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res:
       phone: sub.phone ?? undefined,
       source: "Discovery Form",
       serviceInterest: sub.serviceInterest ?? undefined,
-      status: "New",
+      status: "New Inquiry",
       priority,
       tags: sub.tags,
       notes: sub.internalNotes ?? undefined,
@@ -1574,8 +1578,7 @@ router.delete("/crm/deals/:id", requireAdmin, async (req: Request, res: Response
 router.get("/crm/pipeline", requireAdmin, async (req: Request, res: Response) => {
   try {
     const leads = await db.select().from(crmLeads).orderBy(desc(crmLeads.updatedAt));
-    const stages = ["New", "Contacted", "Follow-up", "Proposal Sent", "Negotiating", "Won", "Lost", "Nurture"];
-    const pipeline = Object.fromEntries(stages.map(s => [s, leads.filter(l => l.status === s)]));
+    const pipeline = Object.fromEntries(CRM_STATUSES.map(s => [s, leads.filter(l => l.status === s)]));
     res.json({ pipeline });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch pipeline" });

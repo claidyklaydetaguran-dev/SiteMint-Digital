@@ -8,6 +8,7 @@ import {
   FileText, CheckCircle2, XCircle, RefreshCw,
 } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import { LEAD_STATUSES, LEAD_STATUS_STYLES } from "@/lib/crmTaxonomy";
 import { getSmsStatusInfo } from "@/lib/smsStatus";
 import {
   computeCommunicationStats,
@@ -37,28 +38,18 @@ const token = () => localStorage.getItem("adminToken") || "";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUSES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
+const STATUSES = [...LEAD_STATUSES];
 const PRIORITIES = ["Low","Medium","High"];
 const TASK_TYPES = ["Call","Email","Send Proposal","Follow Up","Check Website","Ask for Decision","Send Contract","Other"];
 const TEAM = ["Claidy Taguran","Shasta Greene","Saisa Lorraigne","Unassigned"];
 
-const statusColor: Record<string,string> = {
-  New:"bg-blue-100 text-blue-700",Contacted:"bg-indigo-100 text-indigo-700",
-  "Follow-up":"bg-yellow-100 text-yellow-700","Proposal Sent":"bg-purple-100 text-purple-700",
-  Negotiating:"bg-orange-100 text-orange-700",Won:"bg-green-100 text-green-700",
-  Lost:"bg-red-100 text-red-700",Nurture:"bg-gray-100 text-gray-600",
-};
+const statusColor: Record<string,string> = Object.fromEntries(
+  LEAD_STATUSES.map(s => [s, LEAD_STATUS_STYLES[s].pill]),
+);
 
-const statusBtnColor: Record<string,string> = {
-  New:"border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100",
-  Contacted:"border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100",
-  "Follow-up":"border-yellow-200 bg-yellow-50 text-yellow-800 hover:bg-yellow-100",
-  "Proposal Sent":"border-purple-200 bg-purple-50 text-purple-800 hover:bg-purple-100",
-  Negotiating:"border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100",
-  Won:"border-green-200 bg-green-50 text-green-800 hover:bg-green-100",
-  Lost:"border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
-  Nurture:"border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100",
-};
+const statusBtnColor: Record<string,string> = Object.fromEntries(
+  LEAD_STATUSES.map(s => [s, `border ${LEAD_STATUS_STYLES[s].pill} hover:opacity-80`]),
+);
 
 const activityIcon: Record<string,string> = {
   lead_created:"🟢",lead_imported:"📥",status_changed:"🔄",note_added:"📝",

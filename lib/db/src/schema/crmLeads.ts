@@ -2,10 +2,21 @@ import { pgTable, serial, text, integer, timestamp, decimal, boolean } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+// Canonical SiteMint Digital agency lead lifecycle statuses.
 export const CRM_STATUSES = [
-  "New", "Contacted", "Follow-up", "Proposal Sent",
-  "Negotiating", "Won", "Lost", "Nurture",
+  "New Inquiry", "Discovery Sent", "Discovery Completed", "Qualified",
+  "Proposal Needed", "Proposal Sent", "Follow-Up Needed", "Won",
+  "Lost", "On Hold", "Client", "Maintenance Client",
 ] as const;
+export type CrmStatus = typeof CRM_STATUSES[number];
+
+// Canonical agency project / service types.
+export const PROJECT_TYPES = [
+  "Website Design", "Website Redesign", "Web Application", "CRM Development",
+  "SEO", "Blog Content", "Maintenance & Support", "AI Automation",
+  "Consultation", "E-commerce", "Landing Page", "Branding", "Website Audit",
+] as const;
+export type ProjectType = typeof PROJECT_TYPES[number];
 
 export const CRM_SOURCES = [
   "Website Form", "Discovery Form", "Referral", "Cold Outreach",
@@ -29,7 +40,7 @@ export const crmLeads = pgTable("crm_leads", {
   // Classification
   source: text("source").default("Manual Entry").notNull(),
   serviceInterest: text("service_interest"),
-  status: text("status").default("New").notNull(),
+  status: text("status").default("New Inquiry").notNull(),
   priority: text("priority").default("Medium").notNull(),
   assignedTo: text("assigned_to"),
   tags: text("tags").array().default([]).notNull(),

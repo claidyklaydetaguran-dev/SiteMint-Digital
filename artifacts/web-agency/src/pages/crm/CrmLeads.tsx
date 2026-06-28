@@ -4,10 +4,12 @@ import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal, List, Mail } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import { LEAD_STATUSES, PROJECT_TYPES } from "@/lib/crmTaxonomy";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
-const STATUSES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
+const STATUSES = [...LEAD_STATUSES];
+const SERVICE_TYPES = [...PROJECT_TYPES];
 const PRIORITIES = ["Low","Medium","High"];
 
 const AVATAR_COLORS = [
@@ -52,7 +54,7 @@ interface NewLeadForm {
 
 const emptyForm: NewLeadForm = {
   name:"", email:"", company:"", phone:"", website:"",
-  source:"Manual Entry", serviceInterest:"", status:"New", priority:"Medium",
+  source:"Manual Entry", serviceInterest:"", status:"New Inquiry", priority:"Medium",
   assignedTo:"", notes:"",
 };
 
@@ -641,10 +643,12 @@ export default function CrmLeads() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Service Interest</label>
-                <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
-                  placeholder="e.g. Website, CRM, SEO"
+                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
                   value={form.serviceInterest}
-                  onChange={e => setForm(f => ({ ...f, serviceInterest: e.target.value }))} />
+                  onChange={e => setForm(f => ({ ...f, serviceInterest: e.target.value }))}>
+                  <option value="">— Select service —</option>
+                  {SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>

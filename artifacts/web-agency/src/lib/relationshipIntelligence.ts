@@ -96,9 +96,10 @@ export function computeRelationshipStrength(
 
   // Deal stage (0-15)
   const stagePoints: Record<string, number> = {
-    Won: 15, Negotiating: 12, "Proposal Sent": 10,
-    "Follow-up": 8, Contacted: 5, New: 3,
-    Lost: 0, Nurture: 2,
+    Client: 15, "Maintenance Client": 15, Won: 15,
+    Qualified: 12, "Proposal Sent": 11, "Proposal Needed": 10,
+    "Discovery Completed": 9, "Discovery Sent": 7, "Follow-Up Needed": 8,
+    "New Inquiry": 3, "On Hold": 2, Lost: 0,
   };
   score += stagePoints[lead.status] ?? 3;
 

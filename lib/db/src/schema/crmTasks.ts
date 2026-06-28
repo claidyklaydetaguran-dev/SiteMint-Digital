@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 
 export const CRM_TASK_TYPES = [
   "Call", "Email", "Send Proposal", "Follow Up", "Check Website",
-  "Ask for Decision", "Send Contract", "Other",
+  "Ask for Decision", "Send Contract", "Project Task", "Other",
 ] as const;
 
 export const CRM_TASK_STATUSES = ["pending", "completed", "overdue"] as const;
@@ -14,7 +14,12 @@ export const crmTasks = pgTable("crm_tasks", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 
-  leadId: integer("lead_id").notNull(),
+  // A task belongs to a lead and/or a delivery project. Both are optional so
+  // project tasks can exist without a lead and vice-versa (reuses this single
+  // table instead of a duplicate project_tasks table).
+  leadId: integer("lead_id"),
+  projectId: integer("project_id"),
+
   type: text("type").default("Follow Up").notNull(),
   title: text("title").notNull(),
   description: text("description"),

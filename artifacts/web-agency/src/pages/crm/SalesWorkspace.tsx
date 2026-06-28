@@ -99,7 +99,7 @@ const STAGES = [
   { label: "Proposal",    check: (l: WorkspaceLead) => l.proposalStatus !== "Not Started" },
   { label: "Sent",        check: (l: WorkspaceLead) => l.status === "Proposal Sent" || l.proposalStatus === "Sent" },
   { label: "Negotiating", check: (l: WorkspaceLead) => l.status === "Negotiating" || l.status === "Won" },
-  { label: "Contract",    check: (l: WorkspaceLead) => l.proposalStatus === "Signed" || l.status === "Won" },
+  { label: "Contract",    check: (l: WorkspaceLead) => l.proposalStatus === "Signed" || l.proposalStatus === "Accepted" || l.status === "Won" },
   { label: "Won 🎉",      check: (l: WorkspaceLead) => l.status === "Won" },
 ];
 
@@ -155,8 +155,13 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     "Not Started": "bg-gray-100 text-gray-500",
     "Draft": "bg-yellow-100 text-yellow-700",
+    "Needs Review": "bg-amber-100 text-amber-700",
     "Sent": "bg-blue-100 text-blue-700",
     "Viewed": "bg-indigo-100 text-indigo-700",
+    "Accepted": "bg-green-100 text-green-700",
+    "Declined": "bg-red-100 text-red-700",
+    "Expired": "bg-gray-200 text-gray-600",
+    // legacy aliases
     "Signed": "bg-green-100 text-green-700",
     "Rejected": "bg-red-100 text-red-700",
   };
@@ -310,7 +315,7 @@ function DocPanel({
     }
   }, [lead.id, kind, onReload]);
 
-  const STATUSES = ["Not Started", "Draft", "Sent", "Signed", "Rejected"];
+  const STATUSES = ["Draft", "Needs Review", "Sent", "Viewed", "Accepted", "Declined", "Expired"];
 
   return (
     <div className="p-5 space-y-5">
@@ -1211,7 +1216,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
     }
     if (lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) < new Date()) score -= 15;
     if (lead.generatedProposal) score += 10;
-    if (lead.proposalStatus === "Signed") score += 20;
+    if (lead.proposalStatus === "Signed" || lead.proposalStatus === "Accepted") score += 20;
     return Math.max(0, Math.min(100, score));
   }, [lead]);
 
@@ -1718,7 +1723,7 @@ function RelationshipTab({ lead, activities, tasks }: {
     }
     if (lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) < new Date()) score -= 15;
     if (lead.generatedProposal) score += 10;
-    if (lead.proposalStatus === "Signed") score += 20;
+    if (lead.proposalStatus === "Signed" || lead.proposalStatus === "Accepted") score += 20;
     return Math.max(0, Math.min(100, score));
   }, [lead]);
 

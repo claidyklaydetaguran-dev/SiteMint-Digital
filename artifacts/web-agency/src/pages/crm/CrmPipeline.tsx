@@ -4,23 +4,19 @@ import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
+import { LEAD_STATUSES, LEAD_STATUS_STYLES, type LeadStatus } from "@/lib/crmTaxonomy";
 
 const token = () => localStorage.getItem("adminToken") || "";
 
-const STAGES = ["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"];
+const STAGES: readonly LeadStatus[] = LEAD_STATUSES;
 
-const stageColors: Record<string,string> = {
-  New:"border-t-blue-500",Contacted:"border-t-indigo-500","Follow-up":"border-t-yellow-500",
-  "Proposal Sent":"border-t-purple-500",Negotiating:"border-t-orange-500",
-  Won:"border-t-green-500",Lost:"border-t-red-500",Nurture:"border-t-gray-400",
-};
+const stageColors: Record<string,string> = Object.fromEntries(
+  LEAD_STATUSES.map(s => [s, LEAD_STATUS_STYLES[s].topBorder]),
+);
 
-const stageHeaderColors: Record<string,string> = {
-  New:"bg-blue-50 text-blue-700",Contacted:"bg-indigo-50 text-indigo-700",
-  "Follow-up":"bg-yellow-50 text-yellow-700","Proposal Sent":"bg-purple-50 text-purple-700",
-  Negotiating:"bg-orange-50 text-orange-700",Won:"bg-green-50 text-green-700",
-  Lost:"bg-red-50 text-red-700",Nurture:"bg-gray-100 text-gray-600",
-};
+const stageHeaderColors: Record<string,string> = Object.fromEntries(
+  LEAD_STATUSES.map(s => [s, LEAD_STATUS_STYLES[s].header]),
+);
 
 const priorityDot: Record<string,string> = { High:"bg-red-500",Medium:"bg-yellow-500",Low:"bg-gray-400" };
 
