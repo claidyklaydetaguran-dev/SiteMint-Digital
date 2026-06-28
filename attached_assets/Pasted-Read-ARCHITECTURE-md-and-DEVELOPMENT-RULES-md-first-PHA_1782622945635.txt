@@ -1,0 +1,211 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 26B — SiteMint Personas + Topic Taxonomy
+
+MODULE:
+Campaigns only.
+
+IMPORTANT:
+Frontend/data-only if possible.
+Do not touch Twilio.
+Do not touch locked modules.
+Do not change database schema.
+Do not refactor Campaigns.
+Do not add OpenAI yet.
+Do not modify scheduler logic.
+Do not modify send execution.
+Make surgical edits only.
+
+CURRENT STATE:
+
+* Campaign builder exists.
+* Campaign sequences exist.
+* Campaign scheduler exists.
+* Behavioral Intelligence exists.
+* DISC personalization exists.
+* SiteMint campaign roadmap exists in ARCHITECTURE.md.
+* Personas/topics are documented but not yet usable in the builder.
+
+OBJECTIVE:
+Create a SiteMint-specific campaign strategy taxonomy and surface it inside the Campaign Builder.
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect:
+
+* CrmCampaigns.tsx
+* CrmCampaignSequence.tsx only if needed
+* campaignPersonalization.ts only if needed
+* ARCHITECTURE.md for the persona/topic lists
+
+Do not inspect unrelated modules.
+
+TASK 2 — CREATE TAXONOMY UTILITY
+
+Create:
+
+artifacts/web-agency/src/lib/campaignTaxonomy.ts
+
+Export:
+
+* SITEMINT_PERSONAS
+* SITEMINT_TOPICS
+* SITEMINT_CAMPAIGN_BLUEPRINTS
+* getTopicsForPersona()
+* getBlueprintForPersona()
+* getCampaignStrategyHints()
+
+Persona objects should include:
+
+* id
+* label
+* category
+* description
+* recommendedTone
+* defaultGoal
+* suggestedTopics
+* recommendedCadence
+* primaryPainPoint
+* bestCTA
+
+Topic objects should include:
+
+* id
+* title
+* category
+* audience
+* funnelStage
+* description
+* suggestedSubjectHooks
+* targetSignals
+* recommendedCTA
+* behavioralLift
+
+Blueprint objects should include:
+
+* id
+* label
+* personaId
+* goal
+* toneProfile
+* suggestedSequenceLength
+* recommendedChannels
+* stopOnReply
+* exampleSteps
+
+Use SiteMint personas:
+
+* New Website Inquiry
+* Website Redesign Lead
+* CRM / Automation Lead
+* SEO Lead
+* Local Business Owner
+* Nonprofit Organization
+* Real Estate Agent
+* Attorney / Law Firm
+* Homecare Business
+* Coach / Consultant
+* E-commerce Lead
+* Cold Prospect
+* Past Client
+* Referral Partner
+* Hot Discovery Form Lead
+* Non-responsive Discovery Lead
+
+Use SiteMint topics:
+
+* Why your website is losing leads
+* Website redesign checklist
+* What a CRM should automate
+* SEO basics for local businesses
+* How AI automation saves admin time
+* Discovery call preparation
+* Proposal follow-up
+* Case study campaign
+* Maintenance plan nurture
+* Website launch checklist
+* Conversion-focused homepage tips
+* Booking system automation
+* Lead routing automation
+* Before/after website audit
+
+TASK 3 — CAMPAIGN BUILDER UI
+
+In CrmCampaigns.tsx, add optional strategy fields in Step 1:
+
+* Persona dropdown
+* Topic dropdown
+* Blueprint dropdown
+* Strategy hints preview card
+
+Behavior:
+
+* Selecting a persona filters/suggests topics.
+* Selecting a blueprint pre-fills:
+
+  * objective
+  * toneProfile
+  * campaign type if safe
+  * stopOnReply if safe
+* Do not overwrite existing text without a confirmation or “Apply blueprint” button.
+* If persistence is not available, store selections in existing fields:
+
+  * objective
+  * toneProfile
+  * description
+    or keep client-side and document limitation.
+
+TASK 4 — TOPIC PREVIEW
+
+When a topic is selected, show:
+
+* suggested subject hooks
+* target behavioral signals
+* recommended CTA
+* behavioral lift
+* why this topic works for this persona
+
+TASK 5 — SAFETY
+
+Do not generate emails yet.
+Do not call AI.
+Do not create scheduled messages automatically.
+Do not enroll contacts automatically.
+This is strategy metadata only.
+
+TASK 6 — TESTING
+
+Test:
+
+1. Campaign builder loads.
+2. Persona dropdown renders.
+3. Topic dropdown renders.
+4. Blueprint dropdown renders.
+5. Persona filters topics.
+6. Blueprint preview appears.
+7. Apply blueprint does not overwrite without user action.
+8. Topic preview appears.
+9. Existing campaign save still works.
+10. Existing sequence builder still works.
+11. Existing queue still works.
+12. No scheduler changes.
+13. No schema changes.
+14. No Twilio changes.
+15. TypeScript passes.
+16. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Taxonomy structure
+4. Personas added
+5. Topics added
+6. Blueprints added
+7. Campaign Builder UI behavior
+8. Persistence behavior
+9. Tests performed
+10. Schema changes if any
+11. Known limitations
+12. Recommended Phase 26C

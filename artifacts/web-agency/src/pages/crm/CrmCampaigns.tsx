@@ -22,6 +22,14 @@ import {
   previewPersonalizedEmail,
   type PersonalizedEmail,
 } from "@/lib/campaignPersonalization";
+import {
+  SITEMINT_PERSONAS,
+  SITEMINT_CAMPAIGN_BLUEPRINTS,
+  getTopicsForPersona,
+  getBlueprintForPersona,
+  getBlueprintById,
+  getCampaignStrategyHints,
+} from "@/lib/campaignTaxonomy";
 
 const tok = () => localStorage.getItem("adminToken") || "";
 const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
@@ -405,6 +413,16 @@ export default function CrmCampaigns() {
   const [baseBody, setBaseBody]             = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
 
+  // ── Step 1 — Strategy (Phase 26B, metadata only) ──
+  const [objective, setObjective]           = useState("");
+  const [toneProfile, setToneProfile]       = useState("");
+  const [strategyNote, setStrategyNote]     = useState(""); // persisted in `description`
+  const [stopOnReply, setStopOnReply]       = useState(true);
+  // Dropdown selections — UI state only (not persisted across reload)
+  const [selectedPersonaId, setSelectedPersonaId]     = useState("");
+  const [selectedTopicId, setSelectedTopicId]         = useState("");
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState("");
+
   // ── Step 2 — Audience ──
   const [filterStatus, setFilterStatus]     = useState("");
   const [filterDisc, setFilterDisc]         = useState("");
@@ -541,6 +559,49 @@ export default function CrmCampaigns() {
     if (t) { setBaseSubject(t.subject); setBaseBody(t.body); setSelectedTemplate(id); setIsDirty(true); }
   };
 
+  // ── Strategy taxonomy (Phase 26B) ──
+  const topicsForPersona = useMemo(() => getTopicsForPersona(selectedPersonaId || null), [selectedPersonaId]);
+  const strategyHints    = useMemo(
+    () => getCampaignStrategyHints(selectedPersonaId || null, selectedTopicId || null),
+    [selectedPersonaId, selectedTopicId],
+  );
+  const selectedBlueprint = useMemo(() => getBlueprintById(selectedBlueprintId || null), [selectedBlueprintId]);
+
+  // Choosing a persona suggests its blueprint and clears a now-irrelevant topic.
+  const onSelectPersona = (id: string) => {
+    setSelectedPersonaId(id);
+    const bp = getBlueprintForPersona(id || null);
+    setSelectedBlueprintId(bp?.id ?? "");
+    if (id) {
+      const stillValid = getTopicsForPersona(id).some(t => t.id === selectedTopicId);
+      if (!stillValid) setSelectedTopicId("");
+    }
+  };
+
+  // Apply a blueprint's strategy metadata. Never overwrites subject/body, and
+  // confirms before replacing objective/tone/notes the user already typed.
+  const applyBlueprint = () => {
+    if (!selectedBlueprint) return;
+    const persona = SITEMINT_PERSONAS.find(p => p.id === selectedBlueprint.personaId);
+    const note = persona
+      ? `Strategy: ${persona.label}\nGoal: ${selectedBlueprint.goal}\nCadence: ${persona.recommendedCadence}`
+      : `Goal: ${selectedBlueprint.goal}`;
+    const hasExisting = objective.trim() || toneProfile.trim() || strategyNote.trim();
+    if (hasExisting && !window.confirm("Apply this blueprint? It will replace the current objective, tone profile, and strategy notes (your subject and body are not changed).")) {
+      return;
+    }
+    setObjective(selectedBlueprint.goal);
+    setToneProfile(selectedBlueprint.toneProfile);
+    setStrategyNote(note);
+    setStopOnReply(selectedBlueprint.stopOnReply);
+    // Pre-fill campaign type only when the blueprint clearly implies a sequence,
+    // and only from the default broadcast (don't override a deliberate choice).
+    if (selectedBlueprint.suggestedSequenceLength > 1 && campaignType === "broadcast") {
+      setCampaignType("nurture");
+    }
+    setIsDirty(true);
+  };
+
   // ── Open a saved campaign ──
   const openCampaign = async (c: Campaign) => {
     setSaveError("");
@@ -554,6 +615,14 @@ export default function CrmCampaigns() {
     setBaseSubject(campaign.subject);
     setBaseBody(campaign.body);
     setCampaignStatus(campaign.status);
+    setObjective(campaign.objective ?? "");
+    setToneProfile(campaign.toneProfile ?? "");
+    setStrategyNote(campaign.description ?? "");
+    setStopOnReply(campaign.stopOnReply ?? true);
+    // Dropdown selections are UI-only and not parsed back from persisted fields.
+    setSelectedPersonaId("");
+    setSelectedTopicId("");
+    setSelectedBlueprintId("");
     setSelectedLeads(new Set(recipients.map((rec: { leadId: number }) => rec.leadId)));
     setSavedAt(new Date(campaign.updatedAt));
     setIsDirty(false);
@@ -595,6 +664,13 @@ export default function CrmCampaigns() {
     setBaseSubject("");
     setBaseBody("");
     setCampaignStatus("draft");
+    setObjective("");
+    setToneProfile("");
+    setStrategyNote("");
+    setStopOnReply(true);
+    setSelectedPersonaId("");
+    setSelectedTopicId("");
+    setSelectedBlueprintId("");
     setSelectedLeads(new Set());
     setSavedAt(null);
     setIsDirty(false);
@@ -638,7 +714,7 @@ export default function CrmCampaigns() {
         const r = await fetch("/api/crm/campaigns", {
           method: "POST",
           headers: authH(),
-          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType }),
+          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType, objective, toneProfile, description: strategyNote, stopOnReply }),
         });
         const d = await r.json();
         if (!r.ok) { setSaveError(d.error ?? "Failed to save"); return; }
@@ -649,7 +725,7 @@ export default function CrmCampaigns() {
         const r = await fetch(`/api/crm/campaigns/${id}`, {
           method: "PATCH",
           headers: authH(),
-          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType }),
+          body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType, objective, toneProfile, description: strategyNote, stopOnReply }),
         });
         const d = await r.json();
         if (!r.ok) { setSaveError(d.error ?? "Failed to save"); return; }
@@ -1895,6 +1971,189 @@ export default function CrmCampaigns() {
                     Save this campaign first, then use <strong>Sequence Builder</strong> to add steps and enroll contacts.
                   </p>
                 )}
+              </div>
+
+              {/* ── Campaign Strategy (Phase 26B — SiteMint taxonomy, metadata only) ── */}
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-indigo-100 flex items-center gap-2 bg-indigo-50">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                  <p className="text-xs font-bold text-indigo-900">Campaign Strategy</p>
+                  <span className="text-[10px] text-indigo-500">— optional SiteMint persona & topic guidance</span>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Persona */}
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Persona</label>
+                      <select
+                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                        value={selectedPersonaId}
+                        onChange={e => onSelectPersona(e.target.value)}
+                      >
+                        <option value="">— Choose persona —</option>
+                        {SITEMINT_PERSONAS.map(p => (
+                          <option key={p.id} value={p.id}>{p.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Topic */}
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Topic</label>
+                      <select
+                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                        value={selectedTopicId}
+                        onChange={e => setSelectedTopicId(e.target.value)}
+                      >
+                        <option value="">{selectedPersonaId ? "— Suggested topics —" : "— Choose topic —"}</option>
+                        {topicsForPersona.map(t => (
+                          <option key={t.id} value={t.id}>{t.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Blueprint */}
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Blueprint</label>
+                      <select
+                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                        value={selectedBlueprintId}
+                        onChange={e => setSelectedBlueprintId(e.target.value)}
+                      >
+                        <option value="">— Choose blueprint —</option>
+                        {SITEMINT_CAMPAIGN_BLUEPRINTS.map(b => (
+                          <option key={b.id} value={b.id}>{b.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Strategy hints preview card */}
+                  {strategyHints && (
+                    <div className="rounded-lg border border-indigo-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                        <p className="text-[11px] font-bold text-foreground">Strategy Hints</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                        <div><span className="text-muted-foreground">Tone: </span><span className="text-foreground font-medium">{strategyHints.recommendedTone}</span></div>
+                        <div><span className="text-muted-foreground">Goal: </span><span className="text-foreground font-medium">{strategyHints.recommendedGoal}</span></div>
+                        <div><span className="text-muted-foreground">Cadence: </span><span className="text-foreground font-medium">{strategyHints.recommendedCadence}</span></div>
+                        <div><span className="text-muted-foreground">CTA: </span><span className="text-foreground font-medium">{strategyHints.recommendedCTA}</span></div>
+                      </div>
+                      {strategyHints.whyItWorks && (
+                        <p className="text-[11px] text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5">
+                          <span className="font-semibold">Why this works: </span>{strategyHints.whyItWorks}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Topic preview card (Task 4) */}
+                  {strategyHints?.topic && (
+                    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-foreground">{strategyHints.topic.title}</p>
+                      <p className="text-[11px] text-muted-foreground">{strategyHints.topic.description}</p>
+                      {strategyHints.subjectHooks.length > 0 && (
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Suggested subject hooks</p>
+                          <ul className="space-y-0.5">
+                            {strategyHints.subjectHooks.map((h, i) => (
+                              <li key={i} className="text-[11px] text-foreground flex items-start gap-1.5">
+                                <span className="text-indigo-400 mt-px">›</span>{h}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-3 text-[11px]">
+                        <div><span className="text-muted-foreground">Recommended CTA: </span><span className="text-foreground font-medium">{strategyHints.topic.recommendedCTA}</span></div>
+                      </div>
+                      {strategyHints.targetSignals.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Target signals:</span>
+                          {strategyHints.targetSignals.map(s => (
+                            <span key={s} className="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 rounded-full px-2 py-0.5">{s}</span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
+                        <span className="font-semibold">Behavioral lift: </span>{strategyHints.topic.behavioralLift}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Blueprint preview + apply (Task 3) */}
+                  {selectedBlueprint && (
+                    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-bold text-foreground">{selectedBlueprint.label}</p>
+                        <button
+                          type="button"
+                          onClick={applyBlueprint}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white text-[11px] font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+                        >
+                          <Zap className="w-3 h-3" /> Apply blueprint
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                        <div><span className="text-muted-foreground">Goal: </span><span className="text-foreground font-medium">{selectedBlueprint.goal}</span></div>
+                        <div><span className="text-muted-foreground">Tone: </span><span className="text-foreground font-medium">{selectedBlueprint.toneProfile}</span></div>
+                        <div><span className="text-muted-foreground">Steps: </span><span className="text-foreground font-medium">{selectedBlueprint.suggestedSequenceLength}</span></div>
+                        <div><span className="text-muted-foreground">Channels: </span><span className="text-foreground font-medium">{selectedBlueprint.recommendedChannels.join(", ")}</span></div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Example steps</p>
+                        {selectedBlueprint.exampleSteps.map((s, i) => (
+                          <div key={i} className="text-[11px] text-foreground flex items-start gap-1.5">
+                            <span className="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 rounded px-1.5 py-px shrink-0">Day {s.day}</span>
+                            <span className="text-muted-foreground shrink-0">{s.channel}</span>
+                            <span>— {s.purpose}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Apply pre-fills objective, tone, and stop-on-reply. Your subject and body are never changed.</p>
+                    </div>
+                  )}
+
+                  {/* Persisted strategy fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Objective</label>
+                      <input
+                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+                        placeholder="e.g. Book a discovery call"
+                        value={objective}
+                        onChange={e => { setObjective(e.target.value); setIsDirty(true); }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Tone Profile</label>
+                      <input
+                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+                        placeholder="e.g. Warm, consultative"
+                        value={toneProfile}
+                        onChange={e => { setToneProfile(e.target.value); setIsDirty(true); }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Strategy Notes</label>
+                    <textarea
+                      className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white min-h-[60px] resize-y"
+                      placeholder="Internal notes on this campaign's strategy (persisted)."
+                      value={strategyNote}
+                      onChange={e => { setStrategyNote(e.target.value); setIsDirty(true); }}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={stopOnReply}
+                      onChange={e => { setStopOnReply(e.target.checked); setIsDirty(true); }}
+                      className="rounded border-gray-300"
+                    />
+                    Stop sequence when a lead replies
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center gap-4">

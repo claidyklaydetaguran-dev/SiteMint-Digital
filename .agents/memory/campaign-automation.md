@@ -22,10 +22,26 @@ schema, or Twilio — extensions are additive only. Full detail lives in ARCHITE
   note instead of creating a `crm_task` or call reminder.
 - **No bulk reschedule** of a lead's future scheduled messages (only per-message queue edits).
 
+## Built (COMPLETE) — Phase 26B
+- SiteMint persona/topic/blueprint taxonomy is now real: `web-agency/src/lib/campaignTaxonomy.ts`
+  (16 personas, 14 topics, 16 blueprints + helpers). Surfaced as optional dropdowns + strategy
+  hints/topic-preview/blueprint cards in the Campaign Builder Step 1.
+- Strategy metadata persists via EXISTING fields — no schema change. The campaign POST/PATCH
+  routes already accept `objective`/`toneProfile`/`description`/`stopOnReply`; the builder maps
+  blueprint goal→objective, tone→toneProfile, a summary→description (strategy notes), stopOnReply.
+- "Apply blueprint" is an explicit action that confirms before replacing existing objective/tone/
+  notes and NEVER touches subject/body. Persona/topic/blueprint dropdown selections are UI-only —
+  not parsed back from persisted fields on reload (documented limitation).
+
 ## MISSING (not built at all)
 - No AI/LLM anywhere — all copy is rule-based DISC personalization (`campaignPersonalization.ts`).
-- No SiteMint persona taxonomy, no topic library, no switch/routing (conditional branch) logic.
+- No switch/routing (conditional branch) logic.
 
 **Why this matters:** earlier audits keep re-discovering these gaps. The personalization is
-DISC-only and deterministic; do not assume any persona/topic/AI machinery exists. Recommended
-persona + topic taxonomies are listed in ARCHITECTURE.md as data-only constants (no schema yet).
+DISC-only and deterministic; do not assume any AI machinery exists.
+
+## Gotcha — builder state reset
+When adding any new Step-1 builder state to `CrmCampaigns.tsx`, you MUST also reset it inside
+`newCampaign()`. It resets fields individually (no single form object), so new state silently
+bleeds from a previously-opened campaign into a fresh one and gets persisted on save. This bit
+Phase 26B (caught in review). Same applies to `openCampaign` rehydration.
