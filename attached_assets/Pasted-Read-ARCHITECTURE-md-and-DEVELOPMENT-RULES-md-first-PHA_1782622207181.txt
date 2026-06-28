@@ -1,0 +1,199 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 26 — SiteMint Campaign Automation Gap Audit
+
+MODULE:
+Campaigns + Behavioral Intelligence only.
+
+IMPORTANT:
+This is an audit and implementation map first.
+Do not rebuild the CRM.
+Do not rebuild Campaigns.
+Do not change schema yet.
+Do not touch Twilio.
+Do not touch locked modules.
+Do not add OpenAI yet.
+Do not build scheduler yet.
+Do not refactor stable modules.
+Make no product changes unless tiny documentation corrections are needed.
+
+CONTEXT:
+We have a reference spec for a real-estate CRM campaign builder, but SiteMint Digital already has a large existing CRM.
+
+SiteMint already has:
+
+* CRM leads
+* Discovery Portal
+* Sales Workspace
+* Campaign Builder
+* Campaign drafts
+* Campaign recipients
+* Campaign steps
+* Scheduled messages
+* Queue
+* Manual send
+* Resend tracking
+* Campaign analytics
+* Behavioral events
+* Lead DNA engine
+* DISC / communication style
+* Sales Intelligence
+* Relationship Intelligence
+* Automation Queue
+* Twilio SMS/calls
+* Inbox
+
+OBJECTIVE:
+Map the reference campaign automation spec into the existing SiteMint CRM and identify exactly what is:
+
+1. Already built
+2. Partially built
+3. Missing
+4. Should be adapted for SiteMint Digital instead of real estate
+5. Should not be built yet
+
+TASK 1 — INSPECT ONLY REQUIRED FILES
+
+Inspect:
+
+* ARCHITECTURE.md
+* DEVELOPMENT_RULES.md
+* crmCampaigns schema
+* crmBehavioralEvents schema
+* campaign routes in crm.ts
+* CrmCampaigns.tsx
+* CrmCampaignSequence.tsx
+* CrmCampaignQueue.tsx
+* campaignPersonalization.ts
+* behavioralIntelligence.ts
+
+Do not inspect unrelated modules.
+
+TASK 2 — FEATURE MATRIX
+
+Create a feature matrix comparing the reference spec against SiteMint current state.
+
+Categories:
+
+* Campaign data model
+* Campaign Builder UI
+* AI generation
+* Topic Library
+* Behavioral Intelligence
+* Lead DNA
+* Enrollment
+* Scheduler
+* Queue
+* Inbound replies
+* Stop-on-reply
+* Switch logic
+* Routing rules
+* Campaign analytics
+* Message send windows
+* Persona/tone system
+* Multi-channel steps
+* Rescheduling enrolled contacts
+
+For each item mark:
+
+* COMPLETE
+* PARTIAL
+* MISSING
+* DEFER
+* NOT APPLICABLE
+
+TASK 3 — SITEMINT ADAPTATION
+
+Rewrite the campaign concept for SiteMint Digital.
+
+Replace real-estate personas with SiteMint personas:
+
+Examples:
+
+* New Website Inquiry
+* Website Redesign Lead
+* CRM / Automation Lead
+* SEO Lead
+* Local Business Owner
+* Nonprofit Organization
+* Real Estate Agent
+* Attorney / Law Firm
+* Homecare Business
+* Coach / Consultant
+* E-commerce Lead
+* Cold Prospect
+* Past Client
+* Referral Partner
+* Hot Discovery Form Lead
+* Non-responsive Discovery Lead
+
+Replace buyer/seller campaign topics with SiteMint topics:
+
+Examples:
+
+* Why your website is losing leads
+* What a CRM should automate
+* Website redesign checklist
+* SEO basics for local businesses
+* How AI automation saves admin time
+* Discovery call preparation
+* Proposal follow-up
+* Case study campaign
+* Maintenance plan nurture
+* Website launch checklist
+* Conversion-focused homepage tips
+* Booking system automation
+* Lead routing automation
+* Before/after website audit
+
+TASK 4 — RECOMMENDED BUILD ROADMAP
+
+Create a safe phased roadmap:
+
+Phase 26A — Safety audit for current sequence/queue system
+Phase 26B — SiteMint personas + topic taxonomy
+Phase 26C — Campaign objective + step intelligence metadata
+Phase 26D — Stop-on-reply enforcement
+Phase 26E — Switch logic / routing rules
+Phase 26F — Scheduler worker
+Phase 26G — AI campaign generator
+Phase 26H — Reschedule enrolled contacts
+Phase 26I — Campaign performance learning loop
+
+For each phase:
+
+* Goal
+* Files likely touched
+* Schema needed or not
+* Risk level
+* Why it comes before/after others
+
+TASK 5 — UPDATE DOCS ONLY IF SAFE
+
+If docs are stale, update:
+
+* ARCHITECTURE.md
+* DEVELOPMENT_RULES.md
+* .agents/memory/MEMORY.md
+
+Add:
+
+* SiteMint Campaign Automation Roadmap
+* SiteMint persona list
+* Current campaign module status
+* Do-not-rebuild note
+
+TASK 6 — FINAL REPORT
+
+Return:
+
+1. Files inspected
+2. Feature matrix
+3. SiteMint adaptation summary
+4. Personas recommended
+5. Topic taxonomy recommended
+6. Roadmap with phases
+7. Docs updated if any
+8. Confirmation no schema changes
+9. Confirmation no Twilio changes
+10. Recommended next implementation prompt

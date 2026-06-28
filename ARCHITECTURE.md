@@ -1,7 +1,7 @@
 # SiteMint Digital CRM — Architecture Guide
 
 > Read this file before every development session.
-> Last updated: 2026-06-27 (Phase 24A+24B)
+> Last updated: 2026-06-28 (Phase 25 complete + Phase 26 campaign automation audit)
 
 ---
 
@@ -107,7 +107,7 @@ scripts/               — Utility scripts (@workspace/scripts)
 | Lead Health Engine | **LOCKED** | `lib/leadScore.ts` | Scoring algorithm; do not modify |
 | Communication Intelligence | **LOCKED** | `lib/communicationIntelligence.ts` | CI sidebar card, comms scoring; do not modify |
 | DISC / Behavioral Intelligence | **LOCKED** | `lib/discEngine.ts` | DISC computation + DISC_META; do not modify |
-| Campaigns | STABLE | `CrmCampaigns.tsx`, `lib/campaignPersonalization.ts`, `crm.ts` campaign section, `schema/crmCampaigns.ts` | All core features complete — see Campaign Feature Inventory below |
+| Campaigns | STABLE | `CrmCampaigns.tsx`, `CrmCampaignSequence.tsx`, `CrmCampaignQueue.tsx`, `lib/campaignPersonalization.ts`, `api lib/campaignScheduler.ts`, `api lib/sequenceReply.ts`, `crm.ts` campaign section, `schema/crmCampaigns.ts` | Broadcast + multi-step nurture/drip sequences, auto-send scheduler, queue, stop-on-reply, and funnel analytics all live — see Campaign Feature Inventory + SiteMint Campaign Automation Roadmap below. Do NOT rebuild. |
 | Behavioral Intelligence | **ACTIVE** | `lib/behavioralIntelligence.ts` (engine), `schema/crmBehavioralEvents.ts` (data), `crm.ts` behavioral routes | Phase 24A+24B complete — data layer + DNA engine live; UI (24C) is next |
 | Inbox | STABLE | `CrmInbox.tsx`, `phone.ts` (read paths) | Unified email + SMS inbox |
 | Reporting | STABLE | `CrmReporting.tsx` | Read-only reporting |
@@ -310,16 +310,58 @@ These files are compute engines with complex, tested logic. Touching them risks 
 | Unique open/click tracking | Deduplication via Set on `campaignRecipientId` in analytics query |
 | Performance insights | `openRate`, `clickRate`, `bounceRate` computed in analytics route |
 | Campaign list polish | Recipient counts, status badges, history view |
+| Multi-step sequences (nurture/drip) | `crm_campaign_steps` + `crm_campaign_scheduled_messages`; per-step email/SMS/call-prompt/task; Phase 25 |
+| Sequence builder UI | `CrmCampaignSequence.tsx` — add/edit/reorder steps, day offset, channel, send-time window |
+| Enrollment | `POST /crm/campaigns/:id/enroll` — schedules one message per step per lead by `dayOffset` |
+| Auto-send scheduler | `lib/campaignScheduler.ts` — 60s tick, sends due messages via Resend/Twilio, completion detection |
+| Message Queue UI | `CrmCampaignQueue.tsx` + queue routes — view/reschedule/cancel/send-now scheduled messages |
+| Stop-on-reply enforcement | `lib/sequenceReply.ts` + scheduler guard; SMS inbound + Resend complaint stamp `enrollmentStatus: stopped` |
+| Sequence funnel analytics | `GET /crm/campaigns/:id/funnel` — enrollment breakdown + per-step reach/drop-off |
+
+### Partial / Gaps (see SiteMint Campaign Automation Roadmap)
+| Feature | Notes |
+|---|---|
+| Send-time windows | `sendTime` (immediate/morning/afternoon/evening) + `businessDaysOnly` stored on steps but scheduler does NOT honor them — sends on the calendar-day tick regardless |
+| Call-prompt / task steps | Scheduler marks them `skipped` with a note; does not create a real `crm_task` or call reminder |
+| Reschedule enrolled contacts | Per-message queue reschedule exists; no bulk "shift all of a lead's future steps" action |
 
 ### Not Yet Built
 | Feature | Notes |
 |---|---|
-| Campaign scheduling | Send at a future date/time |
-| Drip sequences | Multi-step automated email flows |
+| AI campaign generator | No OpenAI/LLM integration anywhere — all copy is rule-based DISC personalization |
+| Persona taxonomy | No SiteMint persona model; only DISC styles drive personalization |
+| Topic library | No reusable campaign-topic/template taxonomy |
+| Switch logic / routing rules | No conditional branching (opened → path A, ignored → path B) |
 | A/B testing | Subject/body variant testing |
 | Segment automation | Auto-enroll leads by filter/tag |
 | Live send progress | Real-time browser progress bar during batch send |
 | Deduplicated webhook DB index | Dedup currently in-memory (Set); no unique DB constraint on `(campaign_recipient_id, event_type)` |
+
+---
+
+## SiteMint Campaign Automation Roadmap
+
+> Adapted from a real-estate campaign reference spec into SiteMint Digital's existing CRM.
+> **Do-not-rebuild note:** the sequence/queue/scheduler/stop-on-reply stack is already built and STABLE.
+> Do NOT rebuild Campaigns, the CRM, the schema, or Twilio. Each phase below is additive.
+
+| Phase | Goal | Files likely touched | Schema? | Risk | Sequencing rationale |
+|---|---|---|---|---|---|
+| 26A — Sequence/queue safety audit | Verify enrollment → schedule → send → stop-on-reply loop end-to-end; document gaps | none (audit) + docs | No | Low | Must confirm current system is sound before extending it |
+| 26B — SiteMint personas + topic taxonomy | Add persona + topic constants (data only, no schema) used to label/seed campaigns | new `lib/campaignTaxonomy.ts`, `CrmCampaigns.tsx` | No | Low | Pure additive metadata; nothing else depends on it |
+| 26C — Campaign objective + step intelligence metadata | Surface `objective`/`toneProfile`/persona on campaign + per-step intent labels | `CrmCampaigns.tsx`, `CrmCampaignSequence.tsx`, campaign routes | Maybe (nullable cols) | Low-Med | Builds on 26B taxonomy |
+| 26D — Stop-on-reply hardening | Add reply-detection for email replies (not just complaints) + audit coverage | `lib/sequenceReply.ts`, scheduler | No | Med | Independent; strengthens an existing guarantee |
+| 26E — Switch logic / routing rules | Conditional next-step (opened → A, ignored → B) | scheduler, `crm_campaign_steps` (+ branch cols), builder UI | Yes | High | Needs 26C metadata + behavioral events as branch inputs |
+| 26F — Send-window enforcement | Make scheduler honor `sendTime` + `businessDaysOnly` (currently ignored) | `lib/campaignScheduler.ts`, `/enroll` route | No | Med | Closes a known PARTIAL; isolated to scheduler |
+| 26G — AI campaign generator | LLM-assisted subject/body/sequence drafting (via Replit AI integration) | new `lib/aiCampaign.ts`, builder UI, new route | No | High | Last because it depends on personas/topics/objectives being defined |
+| 26H — Reschedule enrolled contacts | Bulk shift a lead's future scheduled messages | queue routes, `CrmCampaignQueue.tsx` | No | Med | Builds on send-window logic (26F) for correct re-timing |
+| 26I — Campaign performance learning loop | Feed funnel + behavioral outcomes back into recommended next campaign | reporting/dashboard, analytics routes | Maybe | High | Requires history accumulated from all prior phases |
+
+### SiteMint Personas (recommended taxonomy — data only)
+New Website Inquiry · Website Redesign Lead · CRM / Automation Lead · SEO Lead · Local Business Owner · Nonprofit Organization · Real Estate Agent · Attorney / Law Firm · Homecare Business · Coach / Consultant · E-commerce Lead · Cold Prospect · Past Client · Referral Partner · Hot Discovery Form Lead · Non-responsive Discovery Lead
+
+### SiteMint Campaign Topics (recommended taxonomy — data only)
+Why your website is losing leads · What a CRM should automate · Website redesign checklist · SEO basics for local businesses · How AI automation saves admin time · Discovery call preparation · Proposal follow-up · Case study campaign · Maintenance plan nurture · Website launch checklist · Conversion-focused homepage tips · Booking system automation · Lead routing automation · Before/after website audit
 
 ---
 

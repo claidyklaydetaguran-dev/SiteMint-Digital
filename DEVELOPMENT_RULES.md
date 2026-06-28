@@ -216,6 +216,7 @@ curl -s "http://localhost:80/api/crm/leads" \
 ```
 
 ### Active development area
-Module: **Next phase TBD** — see Suggested Future Phases in ARCHITECTURE.md
-Campaigns module is now STABLE — send execution, analytics, and webhook tracking are all complete.
-Suggested next areas: SMS Consent Management UI, Campaign Scheduling, Drip Sequence Builder.
+Module: **Campaigns — automation extensions** — see SiteMint Campaign Automation Roadmap (Phases 26A–26I) in ARCHITECTURE.md
+Campaigns is STABLE and feature-rich: broadcast + multi-step nurture/drip sequences, enrollment, auto-send scheduler, message queue, stop-on-reply, and funnel analytics are all built. **Do NOT rebuild Campaigns, the CRM, the schema, or Twilio.**
+Known PARTIAL gaps (safe to close next): send-time-window enforcement in the scheduler (26F), call-prompt/task steps creating real CRM tasks, bulk reschedule of enrolled contacts (26H).
+Not-yet-built (larger, additive): SiteMint persona + topic taxonomy (26B), switch/routing logic (26E), AI campaign generator (26G).
