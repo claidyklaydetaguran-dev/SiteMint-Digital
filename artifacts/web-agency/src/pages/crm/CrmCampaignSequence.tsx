@@ -2,12 +2,153 @@ import { useEffect, useState, useCallback } from "react";
 import {
   ArrowLeft, Plus, Trash2, Save, Loader2, Mail, MessageSquare,
   Phone, CheckSquare, Clock, Calendar, Users, Play, Pause, StopCircle,
-  ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
+  ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Wand2,
+  Route, ListOrdered, Target, GitBranch, ShieldCheck, Send, Brain,
 } from "lucide-react";
 import { CrmLayout } from "./CrmLayout";
+import {
+  SITEMINT_CAMPAIGN_BLUEPRINTS,
+  getBlueprintById,
+  getTopicById,
+  getPersonaById,
+  type SitemintCampaignBlueprint,
+} from "../../lib/campaignTaxonomy";
 
 const tok = () => localStorage.getItem("adminToken") || "";
 const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+
+// ── Step Intelligence (embedded metadata) ─────────────────────────────────────
+// crm_campaign_steps has no metadata column, so per-step strategy metadata is
+// stored as a structured, clearly-marked block appended to the step body. This
+// keeps the data persistable with zero schema change. parse/serialize round-trip
+// the block so the editable body stays clean.
+
+export interface StepIntel {
+  objective: string;
+  desiredBehavior: string;
+  targetSignal: string;
+  expectedLift: string;
+  routingHint: string;
+  personaId: string;
+  topicId: string;
+}
+
+const INTEL_MARKER = "[Step Intelligence]";
+
+const EMPTY_INTEL: StepIntel = {
+  objective: "", desiredBehavior: "", targetSignal: "",
+  expectedLift: "", routingHint: "", personaId: "", topicId: "",
+};
+
+const INTEL_LABELS: Array<[keyof StepIntel, string]> = [
+  ["objective", "Objective"],
+  ["desiredBehavior", "Desired behavior"],
+  ["targetSignal", "Target signal"],
+  ["expectedLift", "Expected lift"],
+  ["routingHint", "Routing hint"],
+  ["personaId", "Persona"],
+  ["topicId", "Topic"],
+];
+
+function hasIntel(intel: StepIntel): boolean {
+  return INTEL_LABELS.some(([k]) => String(intel[k]).trim().length > 0);
+}
+
+// Split a stored body into the human-readable body and any embedded intelligence.
+function parseStepBody(raw: string | null | undefined): { cleanBody: string; intel: StepIntel } {
+  const intel: StepIntel = { ...EMPTY_INTEL };
+  if (!raw) return { cleanBody: "", intel };
+  // The marker must sit on its own line so an inline mention in normal copy
+  // (e.g. "see the [Step Intelligence] block") is never mistaken for metadata.
+  const lines = raw.split("\n");
+  const markerIdx = lines.findIndex(l => l.trim() === INTEL_MARKER);
+  if (markerIdx === -1) return { cleanBody: raw, intel };
+  const cleanBody = lines.slice(0, markerIdx).join("\n").trimEnd();
+  for (const line of lines.slice(markerIdx + 1)) {
+    const m = line.match(/^\s*([^:]+):\s*(.*)$/);
+    if (!m) continue;
+    const label = m[1].trim();
+    const value = m[2].trim();
+    const entry = INTEL_LABELS.find(([, l]) => l === label);
+    if (entry) intel[entry[0]] = value;
+  }
+  return { cleanBody, intel };
+}
+
+// Re-attach an intelligence block to a clean body. Empty intel returns body as-is.
+function serializeStepBody(cleanBody: string, intel: StepIntel): string {
+  const base = (cleanBody ?? "").trimEnd();
+  if (!hasIntel(intel)) return base;
+  const lines = INTEL_LABELS
+    .filter(([k]) => String(intel[k]).trim().length > 0)
+    .map(([k, label]) => `${label}: ${String(intel[k]).trim()}`);
+  const blockText = `${INTEL_MARKER}\n${lines.join("\n")}`;
+  return base ? `${base}\n\n${blockText}` : blockText;
+}
+
+// ── Blueprint → draft steps ───────────────────────────────────────────────────
+// Pure transform. Builds the POST payloads for each example step in a blueprint.
+// Generates DRAFT strategy steps only — no AI copy, no send, no enroll.
+
+interface GeneratedStepPayload {
+  stepNumber: number;
+  dayOffset: number;
+  channel: string;
+  subject: string | null;
+  body: string | null;
+  callPrompt: string | null;
+  taskDescription: string | null;
+  sendTime: string;
+  businessDaysOnly: boolean;
+}
+
+function buildStepsFromBlueprint(
+  blueprint: SitemintCampaignBlueprint,
+  startStepNumber: number,
+): GeneratedStepPayload[] {
+  return blueprint.exampleSteps.map((ex, i) => {
+    const topic = getTopicById(ex.topicId);
+    const recommendedCTA = topic?.recommendedCTA ?? "Book a call";
+    const targetSignal = topic?.targetSignals?.[0] ?? "engagement";
+    const expectedLift = topic?.behavioralLift ?? "TBD — measure after first sends";
+
+    const intel: StepIntel = {
+      objective: blueprint.goal,
+      desiredBehavior: ex.purpose,
+      targetSignal,
+      expectedLift,
+      routingHint: "Not configured — review before any routing",
+      personaId: blueprint.personaId,
+      topicId: ex.topicId ?? "",
+    };
+
+    const humanBody =
+      `Purpose: ${ex.purpose}\n` +
+      `Recommended CTA: ${recommendedCTA}\n` +
+      `Behavioral signal tested: ${targetSignal}\n` +
+      `Notes for future AI copy generation: Strategy draft from blueprint "${blueprint.label}". ` +
+      `Topic: ${topic?.title ?? "—"}. No AI copy generated yet — replace with personalized copy before sending.`;
+
+    const subject =
+      ex.channel === "email"
+        ? (topic?.suggestedSubjectHooks?.[0] ?? `Draft: ${topic?.title ?? blueprint.label}`)
+        : null;
+
+    return {
+      stepNumber: startStepNumber + i,
+      dayOffset: ex.day,
+      channel: ex.channel,
+      subject,
+      // Body carries the human strategy notes + embedded intelligence for every channel.
+      body: serializeStepBody(humanBody, intel),
+      callPrompt: ex.channel === "call_prompt" ? ex.purpose : null,
+      taskDescription: ex.channel === "task" ? ex.purpose : null,
+      // Spec asks for 09:00 → nearest supported send window is "morning".
+      sendTime: "morning",
+      businessDaysOnly: true,
+    };
+  });
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,6 +229,13 @@ function StepCard({
 }) {
   const [deleting, setDeleting] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  const { cleanBody, intel } = parseStepBody(step.body);
+  const intelChips: Array<[string, string]> = [
+    ["Objective", intel.objective],
+    ["Behavior", intel.desiredBehavior],
+    ["Signal", intel.targetSignal],
+    ["Lift", intel.expectedLift],
+  ].filter((c): c is [string, string] => Boolean(c[1]));
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -138,13 +286,13 @@ function StepCard({
           )}
         </div>
       </div>
-      <div className="px-4 py-3 space-y-1">
+      <div className="px-4 py-3 space-y-1.5">
         {step.subject && (
           <p className="text-xs font-semibold text-foreground">{step.subject}</p>
         )}
-        {step.body && (
+        {cleanBody && (
           <pre className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans line-clamp-3">
-            {step.body}
+            {cleanBody}
           </pre>
         )}
         {step.callPrompt && (
@@ -152,6 +300,20 @@ function StepCard({
         )}
         {step.taskDescription && (
           <p className="text-xs text-gray-600">Task: {step.taskDescription}</p>
+        )}
+        {intelChips.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {intelChips.map(([label, val]) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100"
+                title={`${label}: ${val}`}
+              >
+                <Brain className="w-2.5 h-2.5 shrink-0" />
+                <span className="truncate max-w-[140px]">{label}: {val}</span>
+              </span>
+            ))}
+          </div>
         )}
         {step.businessDaysOnly && (
           <p className="text-[10px] text-muted-foreground">Business days only</p>
@@ -172,17 +334,22 @@ interface StepFormProps {
 }
 
 function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFormProps) {
+  const parsed = parseStepBody(existing?.body);
   const [stepNumber,       setStepNumber]       = useState(existing?.stepNumber ?? stepCount + 1);
   const [dayOffset,        setDayOffset]        = useState(existing?.dayOffset ?? (stepCount === 0 ? 0 : 3));
   const [channel,          setChannel]          = useState<string>(existing?.channel ?? "email");
   const [subject,          setSubject]          = useState(existing?.subject ?? "");
-  const [body,             setBody]             = useState(existing?.body ?? "");
+  const [body,             setBody]             = useState(parsed.cleanBody);
   const [callPrompt,       setCallPrompt]       = useState(existing?.callPrompt ?? "");
   const [taskDescription,  setTaskDescription]  = useState(existing?.taskDescription ?? "");
   const [sendTime,         setSendTime]         = useState<string>(existing?.sendTime ?? "immediate");
   const [businessDaysOnly, setBusinessDaysOnly] = useState(existing?.businessDaysOnly ?? true);
+  const [intel,            setIntel]            = useState<StepIntel>(parsed.intel);
+  const [showIntel,        setShowIntel]        = useState(hasIntel(parsed.intel));
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
+
+  const setIntelField = (k: keyof StepIntel, v: string) => setIntel(prev => ({ ...prev, [k]: v }));
 
   const save = async () => {
     setError("");
@@ -190,12 +357,14 @@ function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFo
     try {
       const url    = existing ? `/api/crm/campaigns/${campaignId}/steps/${existing.id}` : `/api/crm/campaigns/${campaignId}/steps`;
       const method = existing ? "PATCH" : "POST";
+      // Step Intelligence is embedded back into the body (no metadata column).
+      const mergedBody = serializeStepBody(body, intel);
       const r = await fetch(url, {
         method,
         headers: authH(),
         body: JSON.stringify({
           stepNumber, dayOffset, channel, subject: subject || null,
-          body: body || null,
+          body: mergedBody || null,
           callPrompt: callPrompt || null,
           taskDescription: taskDescription || null,
           sendTime, businessDaysOnly,
@@ -315,6 +484,44 @@ function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFo
           />
         </div>
       )}
+
+      {/* ── Step Intelligence (collapsible) ── */}
+      <div className="border border-indigo-200 rounded-lg overflow-hidden bg-indigo-50/40">
+        <button
+          type="button"
+          onClick={() => setShowIntel(s => !s)}
+          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-indigo-50 transition-colors"
+        >
+          <Brain className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+          <span className="text-xs font-bold text-indigo-900">Step Intelligence</span>
+          <span className="text-[9px] text-indigo-500 font-medium">optional · strategy metadata</span>
+          {showIntel ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-indigo-500" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-indigo-500" />}
+        </button>
+        {showIntel && (
+          <div className="px-3 pb-3 pt-1 space-y-2">
+            {([
+              ["objective", "Objective", "e.g. Test CRM automation interest"],
+              ["desiredBehavior", "Desired behavior", "e.g. Click case study"],
+              ["targetSignal", "Target signal", "e.g. crm_interest"],
+              ["expectedLift", "Expected lift", "e.g. +12 Client Intent"],
+              ["routingHint", "Routing hint", "e.g. If clicked, move to CRM/Automation campaign"],
+            ] as Array<[keyof StepIntel, string, string]>).map(([k, label, ph]) => (
+              <div key={k}>
+                <label className="block text-[10px] font-semibold text-indigo-700/80 mb-0.5">{label}</label>
+                <input
+                  value={intel[k]}
+                  onChange={e => setIntelField(k, e.target.value)}
+                  placeholder={ph}
+                  className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
+                />
+              </div>
+            ))}
+            <p className="text-[9px] text-indigo-500/80 leading-relaxed pt-0.5">
+              Stored inside the step body under a marked <span className="font-mono">[Step Intelligence]</span> block — no schema change. Strategy metadata only; no AI generation yet.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center gap-2">
         <input
@@ -450,6 +657,161 @@ function LeadPicker({
   );
 }
 
+// ── Journey View (read-only timeline grouped by week) ─────────────────────────
+
+function JourneyView({
+  steps,
+  stopOnReply,
+  autoSend,
+}: {
+  steps: CampaignStep[];
+  stopOnReply: boolean | null;
+  autoSend: boolean | null;
+}) {
+  if (steps.length === 0) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+        <Route className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+        <p className="text-sm font-semibold text-muted-foreground">No journey to preview yet</p>
+        <p className="text-xs text-muted-foreground mt-1">Add steps or generate them from a blueprint to see the contact journey.</p>
+      </div>
+    );
+  }
+
+  const ordered = [...steps].sort((a, b) => a.dayOffset - b.dayOffset || a.stepNumber - b.stepNumber);
+  const weeks = new Map<number, CampaignStep[]>();
+  for (const s of ordered) {
+    const w = Math.floor(s.dayOffset / 7) + 1;
+    if (!weeks.has(w)) weeks.set(w, []);
+    weeks.get(w)!.push(s);
+  }
+  const weekKeys = [...weeks.keys()].sort((a, b) => a - b);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Route className="w-4 h-4 text-indigo-500" />
+        <span>Read-only preview of the contact journey. Cadence tapers as the relationship matures — later touches sit further apart.</span>
+      </div>
+
+      <div className="relative pl-4">
+        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-indigo-300 via-indigo-200 to-transparent" />
+        <div className="space-y-5">
+          {weekKeys.map(wk => {
+            const wkSteps = weeks.get(wk)!;
+            return (
+              <div key={wk} className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-indigo-500 border-2 border-white shadow" />
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide">Week {wk}</span>
+                  <span className="text-[10px] text-muted-foreground">· {wkSteps.length} touch{wkSteps.length !== 1 ? "es" : ""}</span>
+                </div>
+                <div className="space-y-2">
+                  {wkSteps.map(s => {
+                    const { cleanBody, intel } = parseStepBody(s.body);
+                    const firstLine = (cleanBody.split("\n").find(l => l.trim()) ?? "").trim();
+                    return (
+                      <div key={s.id} className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-start gap-2 shadow-sm">
+                        <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${CH_COLOR[s.channel] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                          <ChannelIcon ch={s.channel} cls="w-2.5 h-2.5" />
+                          {s.channel.replace("_", " ")}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {s.subject ?? intel.objective ?? firstLine ?? s.channel.replace("_", " ")}
+                          </p>
+                          {intel.desiredBehavior && (
+                            <p className="text-[10px] text-indigo-600 truncate">Goal: {intel.desiredBehavior}</p>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground shrink-0">Day {s.dayOffset}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Journey end marker */}
+      <div className="flex items-center gap-2 pl-4 text-[11px] text-muted-foreground">
+        <GitBranch className="w-3.5 h-3.5 text-gray-400" />
+        <span>
+          Journey ends after the last step{stopOnReply ? ", or earlier if the contact replies" : ""}.
+          {autoSend === false ? " Sending is manual — nothing leaves without queue approval." : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Campaign Ends When… panel ─────────────────────────────────────────────────
+
+function CampaignEndsPanel({
+  stopOnReply,
+  autoSend,
+}: {
+  stopOnReply: boolean | null;
+  autoSend: boolean | null;
+}) {
+  const rows: Array<{ icon: typeof Target; label: string; detail: string; tone: string }> = [
+    {
+      icon: CheckCircle2,
+      label: "All steps completed",
+      detail: "A contact finishes the journey once their final scheduled step has been processed.",
+      tone: "text-emerald-600",
+    },
+    {
+      icon: MessageSquare,
+      label: stopOnReply ? "Contact replies (stop-on-reply ON)" : "Stop-on-reply is OFF",
+      detail: stopOnReply
+        ? "An inbound reply marks the enrollment complete and halts remaining steps."
+        : "Replies do not automatically stop the sequence — exit must be handled manually.",
+      tone: stopOnReply ? "text-emerald-600" : "text-amber-600",
+    },
+    {
+      icon: Send,
+      label: autoSend === false ? "Auto-send is OFF" : autoSend ? "Auto-send is ON" : "Sending via queue",
+      detail: autoSend === false
+        ? "Steps are queued but never sent automatically — the send queue requires manual approval."
+        : "The scheduler queues steps; the send queue still governs what actually goes out.",
+      tone: "text-blue-600",
+    },
+    {
+      icon: GitBranch,
+      label: "Branch / switch logic",
+      detail: "Not configured — contacts follow a single linear path. Cross-campaign routing is a strategy note only.",
+      tone: "text-gray-500",
+    },
+  ];
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Target className="w-4 h-4 text-[#1e293b]" />
+        <p className="text-xs font-bold text-foreground">Campaign ends when…</p>
+      </div>
+      <div className="space-y-2">
+        {rows.map(({ icon: Icon, label, detail, tone }) => (
+          <div key={label} className="flex items-start gap-2.5">
+            <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${tone}`} />
+            <div>
+              <p className="text-[11px] font-semibold text-foreground">{label}</p>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">{detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-start gap-2 text-[10px] text-muted-foreground border-t border-gray-100 pt-2.5">
+        <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px text-emerald-500" />
+        <span>Safety: scheduler behaviour is unchanged. No contact is enrolled and no message is sent without explicit action.</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -466,19 +828,37 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const [error,      setError]      = useState("");
 
   const [activeTab,    setActiveTab]    = useState<"steps" | "enroll" | "recipients">("steps");
+  const [stepView,     setStepView]     = useState<"sequence" | "journey">("sequence");
   const [showStepForm, setShowStepForm] = useState(false);
   const [editingStep,  setEditingStep]  = useState<CampaignStep | null>(null);
   const [updatingRid,  setUpdatingRid]  = useState<number | null>(null);
   const [expandEnroll, setExpandEnroll] = useState(false);
 
+  // Blueprint generation (drafts only — no AI, no send, no enroll)
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState("");
+  const [genConfirm, setGenConfirm] = useState(false);
+  const [genMode,    setGenMode]    = useState<"append" | "replace">("append");
+  const [generating, setGenerating] = useState(false);
+  const [genResult,  setGenResult]  = useState("");
+
+  // Campaign settings (read-only here) for the "Campaign ends when…" panel.
+  const [stopOnReply, setStopOnReply] = useState<boolean | null>(null);
+  const [autoSend,    setAutoSend]    = useState<boolean | null>(null);
+
   const load = useCallback(async () => {
     setError("");
     try {
       const h = { Authorization: `Bearer ${tok()}` };
-      const [sr, rr] = await Promise.all([
+      const [sr, rr, cr] = await Promise.all([
         fetch(`/api/crm/campaigns/${campaignId}/steps`,      { headers: h }).then(r => r.json()),
         fetch(`/api/crm/campaigns/${campaignId}/recipients`, { headers: h }).then(r => r.json()),
+        fetch(`/api/crm/campaigns/${campaignId}`,            { headers: h }).then(r => r.json()).catch(() => null),
       ]);
+      const camp = cr?.campaign ?? cr ?? null;
+      if (camp) {
+        setStopOnReply(typeof camp.stopOnReply === "boolean" ? camp.stopOnReply : null);
+        setAutoSend(typeof camp.autoSend === "boolean" ? camp.autoSend : null);
+      }
       setSteps(sr.steps ?? []);
       // Enrich recipients
       const recs = (rr.recipients ?? rr.campaign?.recipients ?? []);
@@ -518,6 +898,64 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
       headers: authH(),
     });
     setSteps(prev => prev.filter(s => s.id !== id));
+  };
+
+  // Generate DRAFT steps from a blueprint. Appends to the existing sequence.
+  // No AI copy, no auto-send, no auto-enroll — pure strategy scaffold.
+  const generateFromBlueprint = async () => {
+    const blueprint = getBlueprintById(selectedBlueprintId);
+    if (!blueprint) return;
+    // Replace is only ever permitted when no contacts are enrolled — guard again
+    // here so the destructive path can never run on a live sequence.
+    const doReplace = genMode === "replace" && recipients.length === 0;
+    setGenerating(true);
+    setGenResult("");
+    setError("");
+    try {
+      // Clear existing steps first when safely replacing.
+      if (doReplace && steps.length > 0) {
+        for (const s of steps) {
+          await fetch(`/api/crm/campaigns/${campaignId}/steps/${s.id}`, {
+            method: "DELETE",
+            headers: authH(),
+          });
+        }
+        setSteps([]);
+      }
+      const startNum = doReplace ? 1 : steps.reduce((m, s) => Math.max(m, s.stepNumber), 0) + 1;
+      const payloads = buildStepsFromBlueprint(blueprint, startNum);
+      const created: CampaignStep[] = [];
+      let failed = false;
+      for (const p of payloads) {
+        const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+          method: "POST",
+          headers: authH(),
+          body: JSON.stringify(p),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          failed = true;
+          setError(`${d.error ?? "Failed to create a generated step"} — ${created.length} of ${payloads.length} steps were created. Review the sequence and re-run or finish manually.`);
+          break;
+        }
+        created.push(d.step);
+      }
+      if (created.length) {
+        setSteps(prev =>
+          [...(doReplace ? [] : prev), ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset)
+        );
+        if (!failed) {
+          setGenResult(`${doReplace ? "Replaced sequence with" : "Added"} ${created.length} draft step${created.length !== 1 ? "s" : ""} from "${blueprint.label}". Review and personalise before enrolling contacts.`);
+        }
+      }
+    } catch {
+      setError("Network error while generating steps");
+    } finally {
+      setGenerating(false);
+      setGenConfirm(false);
+      setGenMode("append");
+      setSelectedBlueprintId("");
+    }
   };
 
   const updateEnrollmentStatus = async (rid: number, enrollmentStatus: string) => {
@@ -601,6 +1039,140 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
         {/* ── Steps Tab ──────────────────────────────────────────────────────── */}
         {activeTab === "steps" && (
           <div className="space-y-3">
+
+            {/* View toggle + blueprint generator */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                {([["sequence", "Sequence", ListOrdered], ["journey", "Journey", Route]] as const).map(([v, label, Icon]) => (
+                  <button
+                    key={v}
+                    onClick={() => setStepView(v)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      stepView === v ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Blueprint generator */}
+              <div className="flex items-center gap-2 ml-auto">
+                <select
+                  value={selectedBlueprintId}
+                  onChange={e => { setSelectedBlueprintId(e.target.value); setGenConfirm(false); setGenResult(""); }}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 max-w-[220px]"
+                >
+                  <option value="">Start from a blueprint…</option>
+                  {SITEMINT_CAMPAIGN_BLUEPRINTS.map(bp => (
+                    <option key={bp.id} value={bp.id}>{bp.label}</option>
+                  ))}
+                </select>
+                {selectedBlueprintId && !genConfirm && (
+                  <button
+                    onClick={() => setGenConfirm(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    Generate Steps
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Generate confirm panel */}
+            {selectedBlueprintId && genConfirm && (() => {
+              const bp = getBlueprintById(selectedBlueprintId);
+              const persona = bp ? getPersonaById(bp.personaId) : null;
+              // Replace is only offered when there are existing steps AND no one is enrolled.
+              const replaceSafe = recipients.length === 0;
+              const canReplace  = steps.length > 0 && replaceSafe;
+              const effectiveMode = genMode === "replace" && canReplace ? "replace" : "append";
+              return (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Wand2 className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-indigo-900">Generate {bp?.exampleSteps.length ?? 0} draft step{(bp?.exampleSteps.length ?? 0) !== 1 ? "s" : ""} from "{bp?.label}"</p>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                        {bp?.goal}{persona ? ` · Audience: ${persona.label}` : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Append / Replace selector (only when there are existing steps) */}
+                  {steps.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="radio" name="genmode" checked={effectiveMode === "append"}
+                          onChange={() => setGenMode("append")}
+                          className="mt-0.5"
+                        />
+                        <span className="text-[11px] text-indigo-900">
+                          <span className="font-semibold">Append</span> after your existing {steps.length} step{steps.length !== 1 ? "s" : ""} — nothing is removed.
+                        </span>
+                      </label>
+                      <label className={`flex items-start gap-2 ${canReplace ? "cursor-pointer" : "opacity-50 cursor-not-allowed"}`}>
+                        <input
+                          type="radio" name="genmode" checked={effectiveMode === "replace"}
+                          disabled={!canReplace}
+                          onChange={() => setGenMode("replace")}
+                          className="mt-0.5"
+                        />
+                        <span className="text-[11px] text-indigo-900">
+                          <span className="font-semibold">Replace</span> all existing draft steps with this blueprint.
+                          {!replaceSafe && (
+                            <span className="block text-[10px] text-amber-700">Disabled — contacts are enrolled. Replacing is only allowed before anyone is enrolled.</span>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  <ul className="text-[10px] text-indigo-700/90 space-y-1 pl-6 list-disc">
+                    <li>These are <span className="font-semibold">strategy drafts</span> — no AI copy is generated.</li>
+                    <li>No contacts are enrolled and nothing is sent. Review &amp; personalise each step first.</li>
+                  </ul>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={generateFromBlueprint}
+                      disabled={generating}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                    >
+                      {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {generating ? "Generating…" : effectiveMode === "replace" ? "Replace draft steps" : "Append draft steps"}
+                    </button>
+                    <button
+                      onClick={() => { setGenConfirm(false); setGenMode("append"); }}
+                      disabled={generating}
+                      className="px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {genResult && (
+              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> {genResult}
+              </div>
+            )}
+
+            {/* Safety banner */}
+            <div className="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px" />
+              <span>
+                No AI generation yet · Blueprint steps are strategy drafts · Review before enrolling contacts · The send queue controls all sending.
+              </span>
+            </div>
+
+            {stepView === "journey" ? (
+              <JourneyView steps={steps} stopOnReply={stopOnReply} autoSend={autoSend} />
+            ) : (<>
             {steps.length === 0 && !showStepForm && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
                 <Calendar className="w-8 h-8 text-blue-300 mx-auto mb-2" />
@@ -671,6 +1243,10 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 </div>
               </div>
             )}
+            </>)}
+
+            {/* Campaign ends when… */}
+            {steps.length > 0 && <CampaignEndsPanel stopOnReply={stopOnReply} autoSend={autoSend} />}
           </div>
         )}
 

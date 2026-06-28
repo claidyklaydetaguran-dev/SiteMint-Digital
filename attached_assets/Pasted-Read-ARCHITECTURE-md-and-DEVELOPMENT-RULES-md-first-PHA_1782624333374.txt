@@ -1,0 +1,208 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE 26C — SiteMint Campaign Builder Upgrade
+
+MODULE:
+Campaigns only.
+
+GOAL:
+Upgrade the existing SiteMint Campaign Builder so it feels closer to a real AI/nurture automation platform, without adding AI yet.
+
+This phase should connect:
+
+* SiteMint personas
+* topics
+* blueprints
+* sequence steps
+* behavioral intelligence metadata
+* journey preview
+
+IMPORTANT:
+Do not rebuild Campaigns.
+Do not touch Twilio.
+Do not touch locked modules.
+Do not change schema unless already-supported fields cannot store the needed data.
+Do not add OpenAI yet.
+Do not change scheduler behavior.
+Do not auto-enroll leads.
+Do not auto-send anything.
+Make targeted implementation only.
+
+FILES TO INSPECT:
+
+* CrmCampaigns.tsx
+* CrmCampaignSequence.tsx
+* CrmCampaignQueue.tsx only if needed
+* campaignTaxonomy.ts
+* crmCampaigns schema
+* campaign routes in crm.ts only if needed to confirm step fields
+
+TASK 1 — Generate Steps from Blueprint
+
+In CrmCampaignSequence.tsx, add:
+
+“Generate Steps from Blueprint”
+
+Behavior:
+
+* Uses selected SiteMint blueprint from campaignTaxonomy.ts.
+* Converts blueprint.exampleSteps into campaign steps.
+* Creates draft steps through existing campaign step API.
+* Does not send.
+* Does not enroll.
+* Does not schedule messages unless existing API does that by design.
+
+Step mapping:
+
+* dayOffset = example step day
+* channel = example step channel
+* subject = topic hook or “Draft: [Topic Title]”
+* body = placeholder body:
+
+  * Purpose
+  * Recommended CTA
+  * Behavioral signal tested
+  * Notes for future AI copy generation
+* sendTime = 09:00
+* businessDaysOnly = true
+* If metadata JSON is available on campaign_steps, store:
+
+  * personaId
+  * topicId
+  * objective
+  * desiredBehavior
+  * targetSignal
+  * expectedLift
+  * routingHint
+
+If no metadata field exists, store the metadata as a structured note inside body and document limitation.
+
+Safety:
+
+* If campaign already has steps, ask:
+
+  * Append generated steps
+  * Replace existing draft steps only if safe
+  * Cancel
+* Never delete sent/scheduled history.
+* Show clear confirmation:
+  “This creates draft sequence steps only. It will not send or enroll anyone.”
+
+TASK 2 — Step Intelligence Editor
+
+In each step editor/card, add a small collapsible section:
+
+“Step Intelligence”
+
+Fields:
+
+* Objective
+* Desired behavior
+* Target signal
+* Expected lift
+* Routing hint
+
+Examples:
+
+* Objective: “Test CRM automation interest”
+* Desired behavior: “Click case study”
+* Target signal: “crm_interest”
+* Expected lift: “+12 Client Intent”
+* Routing hint: “If clicked, move to CRM/Automation campaign”
+
+Save this data:
+
+* Prefer existing JSON/metadata field if available.
+* Otherwise append it to the step body under a clearly marked:
+  “[Step Intelligence]”
+  section.
+
+TASK 3 — Journey View
+
+Add a toggle in Campaign Sequence:
+
+* Sequence View
+* Journey View
+
+Sequence View:
+
+* Existing editable step list
+
+Journey View:
+
+* Read-only visual timeline grouped by week or month
+* Shows:
+
+  * Day offset
+  * Channel
+  * Topic
+  * Objective
+  * CTA
+  * What behavior this step is testing
+* Tapering feel:
+
+  * Early steps closer together
+  * Later steps spaced out based on dayOffset
+
+No drag-and-drop required.
+
+TASK 4 — Campaign Ends When Summary
+
+Add a compact summary panel:
+
+“Campaign ends when…”
+
+Show:
+
+* Stop on reply: enabled / disabled
+* Auto-send: enabled / disabled
+* Scheduler: active / manual-only based on current known state
+* Switch logic: not configured yet
+* Manual safety note:
+  “Sequences prepare and schedule touches; sending behavior depends on queue/scheduler settings.”
+
+TASK 5 — UX Safety Labels
+
+Add clear labels:
+
+* “No AI generation yet”
+* “Blueprint steps are strategy drafts”
+* “Review before enrolling contacts”
+* “Queue controls sending”
+
+TASK 6 — Testing
+
+Test:
+
+1. Sequence Builder loads.
+2. Generate Steps from Blueprint button appears when blueprint context exists.
+3. Generated steps are created.
+4. Existing steps are not overwritten without confirmation.
+5. Step Intelligence section renders.
+6. Step Intelligence saves or is embedded safely.
+7. Journey View renders.
+8. Journey View groups/labels steps correctly.
+9. Campaign Ends When summary renders.
+10. Queue still works.
+11. Enroll still works.
+12. Scheduler behavior unchanged.
+13. No auto-send occurs from generation.
+14. No Twilio changes.
+15. No locked module changes.
+16. TypeScript passes.
+17. No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Blueprint generation behavior
+4. Step Intelligence behavior
+5. Journey View behavior
+6. Campaign Ends When behavior
+7. Safety guarantees
+8. Tests performed
+9. Schema changes if any
+10. Known limitations
+11. Recommended next phase

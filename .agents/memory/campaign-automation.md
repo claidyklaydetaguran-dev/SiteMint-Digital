@@ -33,9 +33,23 @@ schema, or Twilio — extensions are additive only. Full detail lives in ARCHITE
   notes and NEVER touches subject/body. Persona/topic/blueprint dropdown selections are UI-only —
   not parsed back from persisted fields on reload (documented limitation).
 
+## Built (COMPLETE) — Phase 26C
+- Sequence builder (`CrmCampaignSequence.tsx`) upgraded into a nurture platform feel — NO AI added.
+- **Per-step "Step Intelligence" has NO column.** `crm_campaign_steps` has no metadata field, so
+  per-step strategy metadata (objective/desiredBehavior/targetSignal/expectedLift/routingHint/
+  personaId/topicId) is embedded in the step `body` under a `[Step Intelligence]` marker line and
+  round-tripped via `parseStepBody`/`serializeStepBody`. The marker MUST be alone on its own line
+  (parser matches `line.trim() === marker`) so inline mentions in real copy aren't mis-parsed.
+  **Why:** spec forbade schema changes; embedding keeps it persistable with zero migration.
+- Blueprint→steps generator: appends DRAFT steps (or Replace, gated on `recipients.length===0`)
+  by POSTing each step. No AI copy, no enroll, no send. `sendTime` forced to "morning" (09:00 has
+  no exact window). Partial-failure leaves created steps in place + shows an error count.
+- Sequence/Journey view toggle (Journey = read-only, grouped by week `floor(dayOffset/7)+1`).
+  "Campaign ends when…" panel reads `stopOnReply`/`autoSend` from `GET /crm/campaigns/:id`.
+
 ## MISSING (not built at all)
 - No AI/LLM anywhere — all copy is rule-based DISC personalization (`campaignPersonalization.ts`).
-- No switch/routing (conditional branch) logic.
+- No switch/routing (conditional branch) logic. Routing hints are strategy notes only.
 
 **Why this matters:** earlier audits keep re-discovering these gaps. The personalization is
 DISC-only and deterministic; do not assume any AI machinery exists.
