@@ -47,9 +47,16 @@ schema, or Twilio — extensions are additive only. Full detail lives in ARCHITE
 - Sequence/Journey view toggle (Journey = read-only, grouped by week `floor(dayOffset/7)+1`).
   "Campaign ends when…" panel reads `stopOnReply`/`autoSend` from `GET /crm/campaigns/:id`.
 
+## Built (COMPLETE) — Phase 27: AI Campaign Copilot
+- OpenAI integration provisioned via Replit AI Integrations (`AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY`).
+- Lib: `lib/integrations-openai-ai-server` (copied from skill template; fixed `response.data` strict-null bug in `image/client.ts`).
+- API route: `POST /api/crm/campaigns/copilot/generate` in `artifacts/api-server/src/routes/copilot.ts`. Streams SSE with `gpt-5.4`. System prompt encodes all SiteMint context. Never enrolls, sends, or queues anything.
+- Frontend: `artifacts/web-agency/src/pages/crm/CrmCopilot.tsx`. Streams output in real-time, parses steps via regex from markdown blocks, hands off to `handleCopilotBuildSequence` in `CrmCampaignSequence.tsx` which POSTs each step (with embedded Step Intelligence) and switches to the Sequence tab on success.
+- New `✨ AI Copilot` tab visible in every campaign's sequence view.
+- `api-server/package.json` depends on `@workspace/integrations-openai-ai-server`; root `tsconfig.json` and `api-server/tsconfig.json` reference the new lib.
+
 ## MISSING (not built at all)
-- No AI/LLM anywhere — all copy is rule-based DISC personalization (`campaignPersonalization.ts`).
-- No switch/routing (conditional branch) logic. Routing hints are strategy notes only.
+- Switch/routing (conditional branch) logic. Routing hints are strategy notes only.
 
 **Why this matters:** earlier audits keep re-discovering these gaps. The personalization is
 DISC-only and deterministic; do not assume any AI machinery exists.

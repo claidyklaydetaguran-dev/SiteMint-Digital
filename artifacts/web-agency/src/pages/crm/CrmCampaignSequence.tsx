@@ -3,7 +3,7 @@ import {
   ArrowLeft, Plus, Trash2, Save, Loader2, Mail, MessageSquare,
   Phone, CheckSquare, Clock, Calendar, Users, Play, Pause, StopCircle,
   ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Wand2,
-  Route, ListOrdered, Target, GitBranch, ShieldCheck, Send, Brain,
+  Route, ListOrdered, Target, GitBranch, ShieldCheck, Send, Brain, Sparkles,
 } from "lucide-react";
 import { CrmLayout } from "./CrmLayout";
 import {
@@ -13,6 +13,7 @@ import {
   getPersonaById,
   type SitemintCampaignBlueprint,
 } from "../../lib/campaignTaxonomy";
+import { CrmCopilot, type ParsedStep } from "./CrmCopilot";
 
 const tok = () => localStorage.getItem("adminToken") || "";
 const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
@@ -827,7 +828,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
 
-  const [activeTab,    setActiveTab]    = useState<"steps" | "enroll" | "recipients">("steps");
+  const [activeTab,    setActiveTab]    = useState<"steps" | "enroll" | "recipients" | "copilot">("steps");
   const [stepView,     setStepView]     = useState<"sequence" | "journey">("sequence");
   const [showStepForm, setShowStepForm] = useState(false);
   const [editingStep,  setEditingStep]  = useState<CampaignStep | null>(null);
@@ -958,6 +959,59 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     }
   };
 
+  // Copilot → Sequence: receive AI-generated steps and POST them to the API.
+  // Always appends (never replaces) — enrollments are never touched.
+  const handleCopilotBuildSequence = useCallback(async (parsed: ParsedStep[]) => {
+    const INTEL_MARKER_LOCAL = "[Step Intelligence]";
+    const INTEL_LABELS_LOCAL: Array<[string, string]> = [
+      ["objective",       "Objective"],
+      ["desiredBehavior", "Desired behavior"],
+      ["targetSignal",    "Target signal"],
+      ["expectedLift",    "Expected lift"],
+      ["routingHint",     "Routing hint"],
+      ["personaId",       "Persona"],
+      ["topicId",         "Topic"],
+    ];
+    function serializeIntel(cleanBody: string, intel: ParsedStep["intel"]): string {
+      const base = (cleanBody ?? "").trimEnd();
+      const lines = INTEL_LABELS_LOCAL
+        .filter(([k]) => String(intel[k as keyof ParsedStep["intel"]]).trim().length > 0)
+        .map(([k, lbl]) => `${lbl}: ${String(intel[k as keyof ParsedStep["intel"]]).trim()}`);
+      if (!lines.length) return base;
+      const block = `${INTEL_MARKER_LOCAL}\n${lines.join("\n")}`;
+      return base ? `${base}\n\n${block}` : block;
+    }
+    const created: CampaignStep[] = [];
+    let failed = false;
+    for (const p of parsed) {
+      const mergedBody = serializeIntel(p.body, p.intel);
+      const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+        method: "POST",
+        headers: authH(),
+        body: JSON.stringify({
+          stepNumber:      p.stepNumber,
+          dayOffset:       p.dayOffset,
+          channel:         p.channel,
+          subject:         p.subject,
+          body:            mergedBody || null,
+          callPrompt:      p.callPrompt,
+          taskDescription: p.taskDescription,
+          sendTime:        p.sendTime,
+          businessDaysOnly: p.businessDaysOnly,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) { failed = true; setError(`Failed to save step ${p.stepNumber}: ${d.error ?? "unknown error"}`); break; }
+      created.push(d.step);
+    }
+    if (created.length > 0) {
+      setSteps(prev =>
+        [...prev, ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset)
+      );
+      if (!failed) setActiveTab("steps");
+    }
+  }, [campaignId]);
+
   const updateEnrollmentStatus = async (rid: number, enrollmentStatus: string) => {
     setUpdatingRid(rid);
     try {
@@ -1018,22 +1072,32 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-          {(["steps", "recipients", "enroll"] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === tab
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab === "steps" && `Sequence Steps (${steps.length})`}
-              {tab === "recipients" && `Enrolled (${recipients.length})`}
-              {tab === "enroll" && "Enroll Contacts"}
-            </button>
-          ))}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
+          <button
+            onClick={() => setActiveTab("steps")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "steps" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Sequence Steps ({steps.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("copilot")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "copilot" ? "bg-violet-600 text-white shadow-sm" : "text-violet-600 hover:bg-violet-50"}`}
+          >
+            <Sparkles className="w-3 h-3" />
+            AI Copilot
+          </button>
+          <button
+            onClick={() => setActiveTab("recipients")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "recipients" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Enrolled ({recipients.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("enroll")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "enroll" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Enroll Contacts
+          </button>
         </div>
 
         {/* ── Steps Tab ──────────────────────────────────────────────────────── */}
@@ -1248,6 +1312,16 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             {/* Campaign ends when… */}
             {steps.length > 0 && <CampaignEndsPanel stopOnReply={stopOnReply} autoSend={autoSend} />}
           </div>
+        )}
+
+        {/* ── AI Copilot Tab ──────────────────────────────────────────────────── */}
+        {activeTab === "copilot" && (
+          <CrmCopilot
+            campaignId={campaignId}
+            campaignName={campaignName}
+            existingSteps={steps}
+            onBuildSequence={handleCopilotBuildSequence}
+          />
         )}
 
         {/* ── Enrolled Recipients Tab ─────────────────────────────────────────── */}

@@ -5,6 +5,7 @@ import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
 import phoneRouter from "./phone";
+import copilotRouter from "./copilot";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(adminRouter);
 router.use(contactRouter);
 router.use(crmRouter);
 router.use(phoneRouter);
+router.use(copilotRouter);
 
 export default router;
