@@ -1,0 +1,829 @@
+Update the CRM direction. This is NOT a real estate CRM.
+
+This CRM is for SiteMint Digital at:
+
+https://sitemintdigital.com/
+
+Admin CRM route:
+
+https://sitemintdigital.com/admin/crm/dashboard
+
+Build this as an internal business CRM for SiteMint Digital, a web design / web app / CRM development / SEO / AI automation agency.
+
+The CRM should manage:
+
+Leads
+Clients
+Discovery forms
+Website project requests
+Proposals
+Scope of work generation
+Project pipeline
+Follow-ups
+Email/SMS communication
+Campaign nurturing
+Content/portfolio management
+Landing page leads
+Client onboarding
+Support/maintenance clients
+
+Do not use real estate-specific language, buyer/seller pipeline stages, MLS fields, property fields, escrow, transaction deadlines, CRMLS, IDX, real estate personas, or real estate campaigns.
+
+Replace all real estate CRM concepts with SiteMint Digital agency concepts.
+
+CORE CRM PURPOSE
+
+The CRM should help SiteMint Digital track a lead from first inquiry to discovery questionnaire, proposal, signed project, active build, launch, maintenance, and future upsell.
+
+Primary use cases:
+
+A business owner submits a website or app inquiry.
+The CRM creates/updates the lead.
+The lead is classified by project type.
+The lead is routed into the correct nurture or sales campaign.
+The system can generate a scope of work and proposal from the discovery questionnaire.
+The team can manage the project through design, development, review, launch, and support.
+The CRM tracks all emails, SMS, notes, tasks, campaign activity, and client history.
+
+TECH STACK
+
+Frontend:
+React 18
+Vite
+TypeScript
+Tailwind CSS
+shadcn/ui
+TanStack Query
+dnd-kit
+Recharts
+
+Backend:
+Express 5
+TypeScript
+Pino logging
+PostgreSQL
+Drizzle ORM
+
+AI:
+OpenAI gpt-4o with structured JSON responses
+
+Email:
+Resend for outbound email and inbound reply webhook
+
+SMS:
+Twilio or Telnyx through a provider abstraction layer
+
+Architecture:
+pnpm monorepo with frontend, backend API, shared DB schema, and shared types
+
+Auth:
+Simple admin login for now. Add code comments that auth must be hardened before production.
+
+IMPORTANT RULES
+
+Use Drizzle migrations for all database changes.
+Do not use automatic schema sync in production.
+Use dotenv environment variables.
+Webhook endpoints must bypass API-key auth.
+Public webhook route matching must use req.originalUrl, not req.path.
+Campaign step saves should replace the full step list to preserve ordering.
+Scheduled campaign cadence must advance based on the actual send time.
+Email/SMS sends must respect send windows.
+Messages due outside business hours should reschedule to the next available window.
+SMS/email providers must use a .send() interface and should not be hardcoded throughout the app.
+
+MAIN MODULES
+
+1. Admin CRM Dashboard
+
+Route:
+/admin/crm/dashboard
+
+Build a polished SiteMint Digital command center with:
+
+KPI cards:
+New leads
+Discovery forms submitted
+Proposal drafts
+Proposals sent
+Projects won
+Projects in progress
+Maintenance clients
+Revenue pipeline estimate
+
+Panels:
+Hot leads
+Pending proposal follow-ups
+Projects needing review
+Overdue tasks
+Recent inbound replies
+Campaign performance
+Lead source breakdown
+Project type breakdown
+
+Design should feel sharp, neutral, elegant, modern, and professional.
+
+2. Contacts / Leads
+
+Contacts should support:
+
+Name
+Company
+Email
+Phone
+Website URL
+Business type
+Source
+Lead status
+Project type
+Budget range
+Timeline
+Pain points
+Goals
+Current website status
+Requested services
+Lead score
+Engagement score
+AI summary
+Tone recommendation
+Next best action
+Tags
+Activity timeline
+Email/SMS opt-out
+Consent status
+
+Project types:
+
+Website Design
+Website Redesign
+Web Application
+CRM Development
+SEO
+Blog Content
+Maintenance & Support
+AI Automation
+Consultation
+E-commerce
+Landing Page
+Branding
+Website Audit
+
+Lead statuses:
+
+New Inquiry
+Discovery Sent
+Discovery Completed
+Qualified
+Proposal Needed
+Proposal Sent
+Follow-Up Needed
+Won
+Lost
+On Hold
+Client
+Maintenance Client
+
+3. Discovery Questionnaire CRM
+
+Connect the public SiteMint Digital discovery form to the CRM.
+
+When someone submits the discovery questionnaire:
+
+Create or update contact.
+Save all discovery answers.
+Classify project type.
+Estimate project complexity.
+Estimate budget tier.
+Generate AI summary.
+Generate suggested scope of work.
+Generate proposal draft.
+Create follow-up task.
+Route into correct campaign.
+Notify SiteMint team by email and/or SMS.
+
+Discovery form fields should include:
+
+Business name
+Contact name
+Email
+Phone
+Website URL
+Project type
+Business goals
+Current challenges
+Target audience
+Competitors
+Brand style
+Required pages
+Required features
+Integrations needed
+Content readiness
+Budget range
+Timeline
+Preferred contact method
+Notes
+
+4. Proposal & Scope of Work Generator
+
+Create a proposal generator inside the CRM.
+
+From a discovery form, the system should generate:
+
+Executive summary
+Client goals
+Current challenges
+Recommended solution
+Scope of work
+Pages included
+Features included
+Integrations
+Deliverables
+Timeline
+Investment range
+Optional add-ons
+Maintenance recommendation
+Next steps
+
+Proposal statuses:
+
+Draft
+Needs Review
+Sent
+Viewed
+Accepted
+Declined
+Expired
+
+Allow admin to edit proposal before sending.
+
+Add AI generation endpoint:
+
+POST /api/proposals/generate-from-discovery
+
+Use GPT-4o structured JSON.
+
+Tone:
+Professional
+Warm
+Strategic
+Clear
+Client-friendly
+Confident but not pushy
+
+5. Project Pipeline
+
+Replace real estate pipeline with an agency project pipeline.
+
+Stages:
+
+New Lead
+Discovery
+Proposal
+Contract / Deposit
+Strategy
+Design
+Development
+Content
+Review
+Revision
+Launch Prep
+Launched
+Maintenance
+Completed
+
+Each project should have:
+
+Client
+Project name
+Project type
+Status
+Stage
+Budget
+Start date
+Target launch date
+Assigned team member
+Tasks
+Files/links
+Notes
+Proposal link
+Discovery form link
+Launch checklist
+Maintenance plan
+
+Auto-generate project tasks based on project type.
+
+Example tasks:
+
+Review discovery form
+Prepare proposal
+Collect brand assets
+Collect website copy
+Create sitemap
+Design homepage
+Design inner pages
+Set up backend
+Set up database
+Set up forms
+Set up email notifications
+Connect domain
+Set up SEO basics
+QA test desktop
+QA test mobile
+Client review
+Final revisions
+Launch website
+Post-launch check
+Offer maintenance plan
+
+6. Inbox & Communications
+
+Create unified communication threads for each contact/client.
+
+Thread should include:
+
+Outbound emails
+Inbound email replies
+SMS messages
+Internal notes
+Tasks
+Proposal activity
+Discovery activity
+Project activity
+
+Inbox filters:
+
+Inbox
+Replies
+Drafts
+Sent
+All
+Proposal Replies
+Support Requests
+
+Email:
+
+Use Resend.
+POST /api/contacts/:id/emails
+Outbound emails should use SiteMint Digital branded HTML template.
+Signature should be pulled from app_settings.
+
+Inbound webhook:
+
+POST /api/inbound-email/webhook
+
+Parse Resend replies.
+Link replies to contact by email.
+Detect replies related to proposal, discovery, support, or active project.
+Keep webhook auth-exempt using req.originalUrl.
+
+SMS:
+
+Use Twilio or Telnyx through provider abstraction.
+POST /api/contacts/:id/sms
+Inbound SMS should normalize phone numbers and link to existing contact.
+If unknown, create Unknown Contact.
+
+7. Campaign Builder
+
+Keep the campaign builder concept, but make it for SiteMint Digital agency leads and clients.
+
+Campaigns should support:
+
+Website inquiry nurture
+Discovery form reminder
+Proposal follow-up
+Cold lead reactivation
+SEO nurture
+Maintenance upsell
+Past client referral campaign
+AI automation education campaign
+Abandoned discovery form campaign
+Post-launch review request
+Monthly maintenance check-in
+Website audit follow-up
+
+Campaign data model:
+
+campaigns:
+name
+type
+status
+objective
+toneProfile
+relationshipTone
+leadType
+tonality
+stopOnReply
+switchLogicEnabled
+switchToCampaignId
+schedulePhases JSONB
+
+campaign_steps:
+campaignId
+orderIndex
+channel: email | sms | call_prompt | task | reminder
+subject
+body
+delayValue
+delayUnit
+sendWindowStart
+sendWindowEnd
+weekdaysOnly
+businessHoursOnly
+aiGenerationEnabled
+phaseName
+topicName
+stepIntelligence JSONB
+
+stepIntelligence:
+objective
+desiredBehavior
+targetSignal
+expectedLift
+routingHint
+nextCampaignIfReplied
+nextCampaignIfIgnored
+
+campaign_enrollments:
+contactId
+campaignId
+currentStep
+nextStepAt
+status
+aiStyleOverride
+aiTonalityOverride
+
+Campaign Builder UI:
+
+Header:
+Back navigation
+Editable campaign name
+Save
+Generate Campaign
+Active enrollment count
+
+Left sidebar:
+Campaign name
+Type
+Status
+Tone profile
+Relationship tone
+Lead type
+Tonality
+Stop-on-reply
+Switch logic
+
+Center canvas:
+Phase timeline
+Sequence view
+Journey view
+Drag-and-drop step cards
+Delay connectors
+Step editor
+Merge fields
+
+Merge fields:
+
+%contact_first_name%
+%contact_last_name%
+%company_name%
+%business_name%
+%website_url%
+%project_type%
+%budget_range%
+%timeline%
+%sitemint_phone%
+%sitemint_email%
+%signature%
+
+AI Campaign Generation Dialog:
+
+Persona / lead type picker:
+
+New Website Inquiry
+Website Redesign Lead
+CRM Development Lead
+SEO Lead
+AI Automation Lead
+E-commerce Lead
+Small Business Owner
+Nonprofit Organization
+Law Firm
+Medical / Health Business
+Real Estate Professional
+Restaurant / Local Business
+Service-Based Business
+Startup Founder
+Past Client
+Maintenance Client
+Cold Lead
+Referral Lead
+High Intent Discovery Lead
+Budget-Conscious Lead
+Urgent Launch Lead
+Branding-Heavy Lead
+Technical App Lead
+
+Campaign blueprints:
+
+new_website_inquiry
+discovery_reminder
+proposal_followup
+seo_nurture
+crm_development_nurture
+ai_automation_education
+maintenance_upsell
+post_launch_review
+past_client_referral
+cold_lead_reactivation
+website_audit_followup
+abandoned_form
+nonprofit_website
+law_firm_website
+local_business_website
+ecommerce_build
+technical_app_project
+
+AI must generate campaign steps based on:
+
+Lead type
+Project type
+Intent stage
+Channel preference
+Tone
+Goal
+Tapering schedule
+
+Step 1 must be a high-impact intro.
+Campaign should feel helpful, consultative, and non-pushy.
+Mix educational, proof-based, and personal-touch steps.
+SMS must be under 160 characters.
+
+8. Campaign Automation Engine
+
+campaignRouter:
+
+Route leads based on:
+
+Project type
+Lead source
+Budget range
+Timeline urgency
+Discovery completed
+Tags
+Form type
+Custom fields
+
+Routing examples:
+
+Website redesign lead → Website Redesign Nurture
+Discovery submitted + budget above threshold → Proposal Follow-Up
+SEO interest → SEO Nurture
+Maintenance client → Monthly Maintenance Check-In
+Cold lead → Reactivation Campaign
+
+Scheduler:
+
+Background loop every 60 seconds.
+Scan due campaign enrollments.
+Send email/SMS.
+Respect send windows.
+Resolve merge fields.
+Advance next step based on actual send time.
+
+Inbound handling:
+
+Classify replies into:
+
+high_intent
+pricing_question
+proposal_question
+timeline_question
+support_request
+book_call_request
+stop_contact
+
+DNC/stop contact always wins.
+
+If stopOnReply is enabled, stop campaign.
+If switch logic is enabled, move contact into next campaign.
+
+9. Lead Scoring / Behavior Intelligence
+
+Use a SiteMint Digital lead scoring model.
+
+Behavior events:
+
+discovery_submitted
+proposal_viewed
+proposal_accepted
+proposal_ignored
+email_opened
+email_clicked
+sms_replied
+booked_call
+visited_pricing_page
+visited_services_page
+requested_revision
+support_request
+maintenance_interest
+
+Lead score signals:
+
+Project Intent
+Budget Fit
+Timeline Urgency
+Trust / Relationship
+Engagement
+Technical Complexity
+Retention Potential
+
+Recalculate scores by replaying full event history.
+Cap scores from 0–100.
+
+Lead buckets:
+
+New
+Learning
+Comparing
+Ready for Proposal
+Proposal Sent
+Ready to Close
+Client
+Maintenance
+At Risk
+Dormant
+
+UI:
+LeadScorePanel
+BehaviorTimeline
+Dashboard Behavior Intelligence Panel
+
+10. Content Hub
+
+Create a content topic library for SiteMint Digital.
+
+Categories:
+
+Website Strategy
+SEO
+CRM
+AI Automation
+Web Design
+Website Maintenance
+Conversion Optimization
+Small Business Growth
+Landing Pages
+Branding
+Case Studies
+Portfolio
+
+AI topic generation:
+
+POST /api/content-topics/generate-full
+
+Generate:
+
+3-email nurture sequence
+1 SMS
+Blog idea
+Topic tags
+Best-fit lead type
+
+Allow topics to be reused inside campaigns.
+
+11. Landing Pages
+
+Build landing page manager for SiteMint Digital.
+
+Landing page types:
+
+Website Audit
+Free Consultation
+CRM Build Inquiry
+SEO Assessment
+AI Automation Consultation
+Nonprofit Website Package
+Law Firm Website Package
+Small Business Website Package
+Maintenance Plan
+
+Public route:
+
+/lp/:slug
+
+Form submission route:
+
+POST /api/landing-page-submit
+
+On submit:
+
+Create/update contact.
+Save UTM data.
+Classify project type.
+Route to campaign.
+Notify SiteMint team.
+Create task.
+Generate AI summary.
+
+12. Portfolio / Client Management
+
+Add CRM section for SiteMint Digital portfolio projects.
+
+Track:
+
+Client name
+Website URL
+Project type
+Services provided
+Before/after notes
+Launch date
+Testimonial
+Case study status
+Maintenance status
+Portfolio visibility
+
+Known portfolio examples:
+
+https://shastagreene.com
+https://onefilamcommunity.org
+https://herlindavaldovinos.com
+https://ClaidyTaguranPorfolio.replit.app
+
+13. Support / Maintenance Clients
+
+Create a support module for maintenance clients.
+
+Track:
+
+Support requests
+Priority
+Status
+Client
+Website URL
+Issue description
+Assigned team member
+Resolution notes
+Maintenance plan
+Monthly tasks
+Renewal date
+
+Support statuses:
+
+New
+In Review
+In Progress
+Waiting on Client
+Resolved
+Closed
+
+14. Build Order
+
+Phase 1:
+Fix route direction and branding.
+Make sure CRM lives under /admin/crm/dashboard.
+Remove real estate-specific language.
+Set SiteMint Digital CRM terminology.
+
+Phase 2:
+Database schema
+Contacts/leads
+Discovery forms
+Activity log
+
+Phase 3:
+Dashboard
+Project pipeline
+Proposal generator
+
+Phase 4:
+Inbox
+Email/SMS provider layer
+Inbound webhooks
+
+Phase 5:
+Campaign data model
+Campaign builder UI
+AI campaign generation
+
+Phase 6:
+Scheduler
+Routing rules
+Automation engine
+Reply classification
+
+Phase 7:
+Lead scoring
+Behavior intelligence
+
+Phase 8:
+Content hub
+Landing pages
+Portfolio
+Support/maintenance module
+
+FINAL DIRECTION
+
+This CRM is for SiteMint Digital’s own business operations and client/project management. It should help SiteMint Digital sell, manage, automate, and fulfill web design, CRM, SEO, AI automation, and maintenance services.
+
+Do not build this as a real estate CRM.

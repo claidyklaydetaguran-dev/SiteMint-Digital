@@ -1,0 +1,51 @@
+End with something like this:
+
+IMPORTANT IMPLEMENTATION INSTRUCTIONS
+
+Before writing code, perform a complete audit of the existing SiteMint Digital CRM.
+
+Read the entire project structure.
+Identify existing pages, components, database schema, routes, services, API endpoints, and UI that already exist.
+Reuse and extend existing functionality whenever possible.
+Do not duplicate components, tables, routes, or services.
+Refactor existing modules instead of replacing them unless absolutely necessary.
+Preserve all existing working functionality.
+Produce a detailed implementation plan before making changes.
+Build incrementally according to that plan.
+After each major milestone, verify that the application compiles successfully and that no existing functionality has been broken.
+Run automated testing after each major phase.
+If you encounter conflicting architecture, prefer improving the existing architecture rather than rebuilding from scratch.
+
+The goal is to evolve the current CRM into a production-quality SiteMint Digital platform, not create a second CRM alongside the existing one.
+
+I'd also add these two requirements because they're critical for your project:
+1. Never create duplicate features
+If a module already exists, upgrade it instead of creating another version.
+There should only ever be one Contacts module, one Campaign Builder, one Dashboard, one Inbox, etc.
+2. Preserve design consistency
+Maintain a consistent design system throughout the CRM.
+
+Use the existing SiteMint Digital branding:
+- Sharp, elegant, modern
+- Neutral palette
+- Premium SaaS appearance
+- Consistent spacing
+- Reusable UI components
+- Responsive layouts
+- Dark/light compatibility if already implemented
+What I expect Power mode to do
+
+With a prompt like yours, Power mode should:
+
+✅ Audit the existing CRM
+✅ Identify reusable components
+✅ Generate an implementation plan
+✅ Start building the highest-priority modules
+✅ Update the database schema where needed
+✅ Create or extend APIs
+✅ Refactor rather than duplicate
+✅ Run tests as it progresses
+
+It probably won't finish the entire CRM in one run—that's simply a very large scope—but it should establish the architecture and make substantial progress.
+
+Given how far you've already taken the SiteMint Digital CRM, this is a reasonable use of Power mode. The main thing is to make sure it treats your current codebase as the foundation rather than attempting to rebuild the application from scratch.
