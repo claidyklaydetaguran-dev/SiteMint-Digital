@@ -140,7 +140,26 @@ If you notice something unrelated that "could be improved" while working on a ta
 
 ---
 
-## 12. Reporting (End of Every Session)
+## 12. Product QA Cycle (Mandatory After Each Product Milestone)
+
+After completing a full product milestone (Communications Center, Sales OS, Marketing Hub, etc.), **do not immediately move to the next product**. Follow this cycle:
+
+1. **Build** — complete the product milestone
+2. **QA Pass** — audit the product for regressions, UX inconsistencies, broken routes, type errors, missing data, and console warnings
+3. **Fix** — address all findings from the QA pass (bugs only, not scope additions)
+4. **Freeze** — mark the product as STABLE in ARCHITECTURE.md, then move to the next product
+
+A QA pass covers:
+- All routes in the product load without errors
+- All CRUD operations work end-to-end (create, read, update, delete)
+- TypeScript compiles clean (`tsc --noEmit`)
+- No React console warnings in the browser (key warnings, hook violations, etc.)
+- Nav links are correct and active states match
+- Any generated documents (proposals, SOWs) render correctly in the preview iframe
+
+---
+
+## 13. Reporting (End of Every Session)
 
 Return a structured report with:
 1. Files changed (path + one-line description of change)

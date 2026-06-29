@@ -303,7 +303,7 @@ export function generateProposal(submission: DiscoverySubmission): string {
 
   <div class="section">
     <div class="section-title">Executive Summary</div>
-    <p>Based on your discovery form, we understand that <strong>${eName}</strong> is seeking ${primaryService} to help ${goalStr}. ${eWhy ? `You shared that &#8220;${eWhy}&#8221; — ` : ""}This tells us timing is important and that the right solution will have a meaningful impact on your business.</p>
+    <p>Based on your discovery form, we understand that <strong>${eName}</strong> is seeking ${escapeHtml(primaryService)} to help ${escapeHtml(goalStr)}. ${eWhy ? `You shared that &#8220;${eWhy}&#8221; — ` : ""}This tells us timing is important and that the right solution will have a meaningful impact on your business.</p>
     <p>${eSolve ? `You indicated that the ideal outcome is: &#8220;${eSolve}.&#8221; ` : ""}Our team is prepared to deliver a solution that not only meets your immediate needs but positions ${eName} for sustainable long-term growth.</p>
   </div>
 
@@ -359,7 +359,7 @@ export function generateProposal(submission: DiscoverySubmission): string {
     <ul>${inclPages.map(p => `<li>${p}</li>`).join("")}</ul>
     <p style="margin-top:12px;"><strong>Included Features:</strong></p>
     <ul>${inclFeatures.map(f => `<li>${f}</li>`).join("")}</ul>
-    ${displayIntegrations.length > 0 ? `<p style="margin-top:12px;"><strong>Integrations:</strong></p><ul>${displayIntegrations.map(i => `<li>${i}</li>`).join("")}</ul>` : ""}
+    ${displayIntegrations.length > 0 ? `<p style="margin-top:12px;"><strong>Integrations:</strong></p><ul>${displayIntegrations.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : ""}
     <p style="margin-top:12px;"><strong>Security:</strong></p>
     <ul><li>SSL Configuration</li><li>Security Best Practices</li></ul>
   </div>
@@ -610,7 +610,7 @@ export function generateSOW(submission: DiscoverySubmission): string {
   <div class="section">
     <div class="section-title">5. Features Included</div>
     <ul>${inclFeatures.map(f => `<li>${f}</li>`).join("")}</ul>
-    ${displayIntegrations.length > 0 ? `<p style="margin-top:10px;"><strong>Integrations:</strong></p><ul>${displayIntegrations.map(i => `<li>${i}</li>`).join("")}</ul>` : ""}
+    ${displayIntegrations.length > 0 ? `<p style="margin-top:10px;"><strong>Integrations:</strong></p><ul>${displayIntegrations.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : ""}
   </div>
 
   <div class="section">

@@ -1,0 +1,410 @@
+# SiteMint Digital CRM — Product Architecture Reset
+
+Read **ARCHITECTURE.md** and **DEVELOPMENT_RULES.md** first.
+
+## IMPORTANT
+
+From this point forward, stop thinking in individual UX phases.
+
+Do **not** optimize for completing another page.
+
+Do **not** optimize for adding isolated features.
+
+Instead, build SiteMint Digital CRM like a commercial SaaS platform.
+
+The objective is no longer:
+
+> "Implement another component."
+
+The objective is:
+
+> "Ship complete business products."
+
+Every implementation should leave one entire area of the CRM feeling finished, cohesive, and production-ready.
+
+---
+
+# PRODUCT ARCHITECT ROLE
+
+For the remainder of development, act as:
+
+* Senior Product Architect
+* Senior Full Stack Engineer
+* UX Architect
+* Systems Designer
+
+Before writing code:
+
+* Audit the existing implementation.
+* Identify duplicate systems.
+* Identify overlapping routes.
+* Identify duplicated business logic.
+* Identify inconsistent UX.
+* Consolidate whenever possible.
+* Preserve all working functionality.
+* Never rebuild something that already works.
+
+The CRM should continuously become **smaller architecturally**, while becoming **more powerful functionally**.
+
+---
+
+# CORE PRODUCT PHILOSOPHY
+
+Think in products, not pages.
+
+Each product owns an entire business capability.
+
+Each product has:
+
+* its own navigation
+* its own workflow
+* its own data
+* its own UI language
+* its own lifecycle
+* its own future roadmap
+
+Do not scatter related functionality across unrelated pages.
+
+Everything should have a clear home.
+
+---
+
+# PRODUCT ARCHITECTURE
+
+## HOME
+
+Purpose:
+
+Executive command center.
+
+Contains:
+
+* Dashboard
+* Daily priorities
+* KPIs
+* Notifications
+* Recent activity
+* AI recommendations
+
+---
+
+## SALES OS
+
+Everything related to selling.
+
+Contains:
+
+* Contacts
+* Sales Workspace
+* Pipeline
+* Deals
+* Transactions
+* Offers
+* Buyer Journey
+* Seller Journey
+* Tasks
+* Calendar
+* Documents
+* Follow-up
+* Lead DNA
+* DISC
+* Relationship Intelligence
+* Behavioral Timeline
+* Communication History
+* Next Best Action
+
+Sales Workspace remains the primary command center for an individual client.
+
+---
+
+## COMMUNICATIONS CENTER
+
+This becomes the communication operating system.
+
+Not just an inbox.
+
+Everything communication belongs here.
+
+Contains:
+
+* Inbox
+* Outbox
+* Scheduled
+* Drafts
+* Calls
+* SMS
+* Email
+* Voicemail
+* Attachments
+* Conversation Timeline
+* Templates
+* Sequences
+* Internal Notes
+* AI Conversation Summary
+* Call Recording
+* Delivery Status
+* Open Tracking
+* Reply Tracking
+* Conversation Health
+
+Every communication surface should eventually route here.
+
+---
+
+## MARKETING HUB
+
+Everything outbound marketing.
+
+Contains:
+
+* Campaigns
+* Campaign Builder
+* Campaign Queue
+* Campaign Analytics
+* Email Activity
+* SMS Activity
+* Templates
+* Blueprint Library
+* Topic Library
+* Persona Library
+* Landing Pages
+* Forms
+* Lead Routing
+* Facebook Leads
+* Instagram Leads
+* Social Scheduler
+* Blog Manager
+* AI Content
+
+Campaign Builder, Queue, and Analytics are separate applications with their own URLs.
+
+Do NOT collapse them into one hidden tab.
+
+---
+
+## DELIVERY OS
+
+Everything after the sale.
+
+Contains:
+
+* Discovery
+* Proposal
+* Scope of Work
+* Contracts
+* Invoices
+* Projects
+* Development
+* QA
+* Launch
+* Maintenance
+* Support
+* Client Portal
+* Assets
+* Hosting
+* Domains
+* SEO
+* Analytics
+
+The complete client delivery lifecycle lives here.
+
+---
+
+## INTELLIGENCE CENTER
+
+Separate from Reporting.
+
+Reporting shows numbers.
+
+Intelligence explains why.
+
+Contains:
+
+* Revenue
+* Forecast
+* Lead Sources
+* Campaign ROI
+* Sales Velocity
+* Relationship Intelligence
+* Behavioral Intelligence
+* Lead DNA
+* Developer Workload
+* Company Health
+* AI Recommendations
+
+---
+
+## AUTOMATION CENTER
+
+Visual workflow builder.
+
+Do NOT hide automations throughout the CRM.
+
+Create one Automation Center.
+
+Visual builder similar to Zapier.
+
+Supports:
+
+Trigger
+
+↓
+
+Condition
+
+↓
+
+Delay
+
+↓
+
+Branch
+
+↓
+
+Action
+
+Actions include:
+
+* Email
+* SMS
+* Task
+* Move Pipeline
+* Enroll Campaign
+* Assign User
+* Notification
+
+---
+
+## AI COPILOT
+
+One centralized AI operating system.
+
+Contains:
+
+* Proposal Writer
+* SOW Writer
+* Campaign Writer
+* Email Writer
+* Call Coach
+* Meeting Notes
+* Website Audit
+* SEO Audit
+* CRM Assistant
+* Marketing Assistant
+* Project Assistant
+* CEO Assistant
+
+Do not scatter AI buttons across pages.
+
+Everything AI should feel like one intelligent system.
+
+---
+
+# NAVIGATION PRINCIPLES
+
+Do NOT reduce navigation simply to reduce menu items.
+
+Enterprise software succeeds because users always know where to go.
+
+Prefer clear information architecture over artificially small menus.
+
+Example:
+
+SALES
+
+* Contacts
+* Sales Workspace
+* Pipeline
+* Deals
+* Transactions
+* Offers
+
+is preferable to hiding everything under a single Workspace page.
+
+Likewise:
+
+Campaign Builder
+
+Campaign Queue
+
+Campaign Analytics
+
+should remain separate destinations because they represent different workflows.
+
+Likewise:
+
+Reporting
+
+Intelligence
+
+Automation
+
+should remain distinct products.
+
+---
+
+# DEVELOPMENT STRATEGY
+
+From now on:
+
+Never ask:
+
+"What page should I build?"
+
+Instead ask:
+
+"What product am I completing?"
+
+Each milestone should fully complete one business capability.
+
+Before implementing:
+
+1. Audit existing code.
+2. Reuse existing components.
+3. Remove duplicates.
+4. Preserve existing functionality.
+5. Improve UX consistency.
+6. Expand capability.
+7. Verify routing.
+8. Verify responsiveness.
+9. Verify type safety.
+10. Regression test all related workflows.
+
+---
+
+# IMPLEMENTATION ORDER
+
+Follow this roadmap unless dependencies require adjustment.
+
+1. Communications Center
+2. Sales OS
+3. Marketing Hub
+4. Delivery OS
+5. Intelligence Center
+6. Automation Center
+7. AI Copilot
+
+Each milestone should be treated as a complete product release.
+
+Do not stop midway through a product unless blocked by an architectural dependency.
+
+---
+
+# FINAL REPORT REQUIREMENT
+
+For every milestone, return:
+
+1. Architecture audit
+2. Duplicate systems removed
+3. Files inspected
+4. Files changed
+5. New routes
+6. Updated navigation
+7. UX improvements
+8. Functionality added
+9. Regression testing performed
+10. Remaining gaps
+11. Recommendation for the next product milestone
+
+The objective is to build a cohesive SaaS platform—not a collection of disconnected pages.
