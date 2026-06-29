@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, Fragment } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import CrmCampaignSequence from "./CrmCampaignSequence";
@@ -1723,8 +1723,8 @@ export default function CrmCampaigns() {
                     const isExpanded = expandedId === c.id;
                     const rowA = rowAnalytics.get(c.id);
                     return (
-                      <>
-                        <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                      <Fragment key={c.id}>
+                        <tr className="hover:bg-gray-50/60 transition-colors">
                           {/* Expand chevron */}
                           <td className="pl-4 pr-1 py-3.5">
                             <button
@@ -1830,7 +1830,7 @@ export default function CrmCampaigns() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>

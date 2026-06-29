@@ -33,6 +33,25 @@ export const discoverySubmissions = pgTable("discovery_submissions", {
 
   // Internal
   internalNotes: text("internal_notes"),
+
+  // ── CRM-specific fields ────────────────────────────────────────────────────
+  // Link to the CRM lead (set when imported/synced into CRM)
+  leadId: integer("lead_id"),
+
+  // AI / deterministic classification outputs
+  aiSummary: text("ai_summary"),
+  estimatedComplexity: text("estimated_complexity"), // Low | Medium | High | Enterprise
+  estimatedBudgetTier: text("estimated_budget_tier"), // Essential | Growth | Premium
+  suggestedScope: jsonb("suggested_scope").$type<Record<string, unknown>>(),
+
+  // CRM workflow status (New | Reviewed | Proposal Generated | Archived)
+  crmStatus: text("crm_status").default("New").notNull(),
+
+  // Preferred contact method from the form
+  preferredContactMethod: text("preferred_contact_method"),
+
+  // Project was converted to a crm_project (id stored here to prevent duplicates)
+  convertedProjectId: integer("converted_project_id"),
 });
 
 export const insertDiscoverySubmissionSchema = createInsertSchema(discoverySubmissions).omit({

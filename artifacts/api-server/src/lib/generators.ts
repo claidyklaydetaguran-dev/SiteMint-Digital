@@ -2,6 +2,18 @@ import type { DiscoverySubmission } from "@workspace/db";
 
 type FormData = Record<string, unknown>;
 
+// ── HTML escaping ─────────────────────────────────────────────────────────────
+
+export function escapeHtml(value: unknown): string {
+  const s = value == null ? "" : String(value);
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── Display helpers ────────────────────────────────────────────────────────────
 
 const BUDGET_LABELS: Record<string, string> = {
@@ -155,6 +167,16 @@ export function generateProposal(submission: DiscoverySubmission): string {
   const goals = (d.projectGoals as string[]) || [];
   const pkg = submission.recommendedPackage || "Growth";
 
+  // Pre-escape all user-supplied freeform fields before HTML interpolation
+  const eName    = escapeHtml(d.companyName);
+  const eCt      = escapeHtml(d.contactName);
+  const eInd     = escapeHtml(d.industry);
+  const eEmail   = escapeHtml(d.email);
+  const ePhone   = escapeHtml(d.phone);
+  const eWhy     = d.whyNow     ? escapeHtml(d.whyNow)     : "";
+  const eSolve   = d.solvePerfectly ? escapeHtml(d.solvePerfectly) : "";
+  const eLaunch  = d.launchDate ? escapeHtml(d.launchDate) : "";
+
   const primaryService = services.length > 0 ? labelServices(services) : "website development";
 
   const goalStr = goals.length > 0
@@ -266,12 +288,12 @@ export function generateProposal(submission: DiscoverySubmission): string {
   </div>
 
   <div class="doc-title">Project Proposal</div>
-  <p style="font-size:13px;color:#888;font-family:'Arial',sans-serif;">Confidential — Prepared Exclusively for ${d.companyName}</p>
+  <p style="font-size:13px;color:#888;font-family:'Arial',sans-serif;">Confidential — Prepared Exclusively for ${eName}</p>
 
   <div class="meta-grid">
     <div class="meta-group">
       <h4>Prepared For</h4>
-      <p><strong>${d.contactName}</strong><br>${d.companyName}<br>${d.industry || ""}<br>${d.email}<br>${d.phone || ""}</p>
+      <p><strong>${eCt}</strong><br>${eName}<br>${eInd}<br>${eEmail}<br>${ePhone}</p>
     </div>
     <div class="meta-group">
       <h4>Prepared By</h4>
@@ -281,14 +303,14 @@ export function generateProposal(submission: DiscoverySubmission): string {
 
   <div class="section">
     <div class="section-title">Executive Summary</div>
-    <p>Based on your discovery form, we understand that <strong>${d.companyName}</strong> is seeking ${primaryService} to help ${goalStr}. ${d.whyNow ? `You shared that "${d.whyNow}" — ` : ""}This tells us timing is important and that the right solution will have a meaningful impact on your business.</p>
-    <p>${d.solvePerfectly ? `You indicated that the ideal outcome is: "${d.solvePerfectly}." ` : ""}Our team is prepared to deliver a solution that not only meets your immediate needs but positions ${d.companyName} for sustainable long-term growth.</p>
+    <p>Based on your discovery form, we understand that <strong>${eName}</strong> is seeking ${primaryService} to help ${goalStr}. ${eWhy ? `You shared that &#8220;${eWhy}&#8221; — ` : ""}This tells us timing is important and that the right solution will have a meaningful impact on your business.</p>
+    <p>${eSolve ? `You indicated that the ideal outcome is: &#8220;${eSolve}.&#8221; ` : ""}Our team is prepared to deliver a solution that not only meets your immediate needs but positions ${eName} for sustainable long-term growth.</p>
   </div>
 
   <div class="section">
     <div class="section-title">Current Challenges</div>
     <ul>
-      ${challenges.slice(0, 3).map(c => `<li>${c}</li>`).join("")}
+      ${challenges.slice(0, 3).map(c => `<li>${escapeHtml(c)}</li>`).join("")}
     </ul>
     <p style="margin-top:10px;">Without action, these challenges may result in lost leads, reduced visibility, lower conversion rates, and operational inefficiencies that compound over time.</p>
   </div>
@@ -345,7 +367,7 @@ export function generateProposal(submission: DiscoverySubmission): string {
   <div class="section">
     <div class="section-title">Recommended Timeline</div>
     <p><strong>Estimated Project Duration: ${timelineRec}</strong></p>
-    <p>This estimate is based on your selected services and feature requirements. A detailed project schedule will be provided upon engagement. ${d.launchDate ? `Note: You have indicated a target launch of ${d.launchDate}, which our team will work to accommodate.` : ""}</p>
+    <p>This estimate is based on your selected services and feature requirements. A detailed project schedule will be provided upon engagement. ${eLaunch ? `Note: You have indicated a target launch of ${eLaunch}, which our team will work to accommodate.` : ""}</p>
   </div>
 
   <div class="section">
@@ -426,7 +448,7 @@ export function generateProposal(submission: DiscoverySubmission): string {
 
   <div class="section">
     <div class="section-title">Acceptance</div>
-    <p style="font-family:'Arial',sans-serif;font-size:13px;">By signing below, ${d.contactName} of ${d.companyName} agrees to engage SiteMint Digital Solutions for the project scope described in this proposal.</p>
+    <p style="font-family:'Arial',sans-serif;font-size:13px;">By signing below, ${eCt} of ${eName} agrees to engage SiteMint Digital Solutions for the project scope described in this proposal.</p>
     <div class="acceptance-grid" style="margin-top:24px;">
       <div>
         <div class="sig-line"></div>
@@ -459,6 +481,12 @@ export function generateSOW(submission: DiscoverySubmission): string {
   const d = submission.formData as FormData;
   const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const services = (d.services as string[]) || [];
+
+  // Pre-escape all user-supplied freeform fields before HTML interpolation
+  const eName  = escapeHtml(d.companyName);
+  const eCt    = escapeHtml(d.contactName);
+  const eEmail = escapeHtml(d.email);
+  const ePhone = escapeHtml(d.phone);
   const allFeatures = [
     ...((d.marketingFeatures as string[]) || []),
     ...((d.salesFeatures as string[]) || []),
@@ -541,12 +569,12 @@ export function generateSOW(submission: DiscoverySubmission): string {
   </div>
 
   <div class="doc-title">Scope of Work</div>
-  <p style="font-size:13px;color:#888;font-family:'Arial',sans-serif;">Agreement between SiteMint Digital Solutions and ${d.companyName}</p>
+  <p style="font-size:13px;color:#888;font-family:'Arial',sans-serif;">Agreement between SiteMint Digital Solutions and ${eName}</p>
 
   <div class="meta-grid">
     <div class="meta-group">
       <h4>Client</h4>
-      <p><strong>${d.contactName}</strong><br>${d.companyName}<br>${d.email}<br>${d.phone || ""}</p>
+      <p><strong>${eCt}</strong><br>${eName}<br>${eEmail}<br>${ePhone}</p>
     </div>
     <div class="meta-group">
       <h4>Service Provider</h4>
@@ -556,15 +584,15 @@ export function generateSOW(submission: DiscoverySubmission): string {
 
   <div class="section">
     <div class="section-title">1. Project Overview</div>
-    <p>This Scope of Work outlines the agreed services, deliverables, timeline, and responsibilities for the ${labelServices(services)} project for ${d.companyName}. This document defines the boundaries of the engagement and serves as the foundation for the project agreement.</p>
+    <p>This Scope of Work outlines the agreed services, deliverables, timeline, and responsibilities for the ${labelServices(services)} project for ${eName}. This document defines the boundaries of the engagement and serves as the foundation for the project agreement.</p>
   </div>
 
   <div class="section">
     <div class="section-title">2. Client Goals</div>
     <ul>
-      ${d.topGoals ? `<li>${d.topGoals}</li>` : ""}
-      ${d.measureSuccess ? `<li>Success metric: ${d.measureSuccess}</li>` : ""}
-      ${d.successOutcome ? `<li>Desired outcome: ${d.successOutcome}</li>` : ""}
+      ${d.topGoals ? `<li>${escapeHtml(d.topGoals)}</li>` : ""}
+      ${d.measureSuccess ? `<li>Success metric: ${escapeHtml(d.measureSuccess)}</li>` : ""}
+      ${d.successOutcome ? `<li>Desired outcome: ${escapeHtml(d.successOutcome)}</li>` : ""}
       ${(!d.topGoals && !d.measureSuccess && !d.successOutcome) ? "<li>Build professional online presence</li><li>Generate leads and inquiries</li><li>Establish trust and credibility</li>" : ""}
     </ul>
   </div>
@@ -627,7 +655,7 @@ export function generateSOW(submission: DiscoverySubmission): string {
     <div class="section-title">8. Timeline</div>
     <p><strong>Estimated Duration: ${timelineRec}</strong></p>
     <p>Timeline begins upon receipt of the signed agreement and initial deposit. Delays caused by client review or content delivery may extend the timeline. A detailed milestone schedule will be provided at kickoff.</p>
-    ${d.launchDate ? `<p><strong>Target Launch Date:</strong> ${d.launchDate}</p>` : ""}
+    ${d.launchDate ? `<p><strong>Target Launch Date:</strong> ${escapeHtml(d.launchDate)}</p>` : ""}
   </div>
 
   <div class="section">

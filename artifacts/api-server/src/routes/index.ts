@@ -5,6 +5,7 @@ import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
 import crmProjectsRouter from "./crmProjects";
+import crmDiscoveryRouter from "./crmDiscovery";
 import phoneRouter from "./phone";
 import copilotRouter from "./copilot";
 
@@ -16,6 +17,7 @@ router.use(adminRouter);
 router.use(contactRouter);
 router.use(crmRouter);
 router.use(crmProjectsRouter);
+router.use(crmDiscoveryRouter);
 router.use(phoneRouter);
 router.use(copilotRouter);
 

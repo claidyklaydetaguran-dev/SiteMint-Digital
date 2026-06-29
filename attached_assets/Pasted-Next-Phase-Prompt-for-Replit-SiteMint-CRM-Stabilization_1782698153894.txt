@@ -1,0 +1,216 @@
+Next Phase Prompt for Replit — SiteMint CRM Stabilization + Discovery-to-Proposal Automation
+
+Continue from the completed CRM foundation.
+
+Current completed work:
+
+* /admin/crm/dashboard is the CRM landing page.
+* crm_deals table and deals API are complete.
+* Dashboard stats, charts, and recent deals table are complete.
+* Deals kanban is complete.
+* Canonical lead statuses and project types are implemented.
+* crm_projects table and project delivery kanban are complete.
+* Proposal lifecycle statuses are updated.
+* Typecheck passes.
+* Existing proposal/SOW preview iframe has sandbox protection.
+
+Do NOT rebuild the CRM.
+Do NOT create duplicate modules.
+Do NOT replace working code unless necessary.
+Extend the existing architecture.
+
+PHASE A — Fix Known Warning + Hardening
+
+1. Fix the pre-existing React key warning in the Campaigns list.
+
+* Find the Campaigns list component.
+* Ensure every mapped item has a stable unique key.
+* Avoid using array index if a database id or stable unique value exists.
+
+2. Harden proposal/SOW field interpolation at the source.
+
+* Review generators.ts.
+* Escape user-supplied discovery fields before injecting them into proposal/SOW HTML or previews.
+* Keep iframe sandbox protection.
+* Make sure print/copy still works.
+* Add a small utility if needed, such as escapeHtml().
+* Do not break existing proposal generation.
+
+3. Run full verification:
+
+* Typecheck all packages.
+* Restart API server if needed.
+* Smoke test dashboard, proposals, projects, and campaigns list.
+
+PHASE B — Discovery Questionnaire CRM
+
+Build the Discovery Questionnaire CRM module using the existing SiteMint CRM architecture.
+
+Goal:
+When someone submits the SiteMint discovery questionnaire, the CRM should create/update a lead, save the full discovery answers, classify the project, estimate complexity, and prepare the lead for proposal generation.
+
+Database:
+Create a crm_discovery_submissions table if one does not already exist.
+
+Fields:
+id
+leadId
+businessName
+contactName
+email
+phone
+websiteUrl
+projectType
+businessGoals
+currentChallenges
+targetAudience
+competitors
+brandStyle
+requiredPages JSONB
+requiredFeatures JSONB
+integrationsNeeded JSONB
+contentReadiness
+budgetRange
+timeline
+preferredContactMethod
+notes
+aiSummary
+estimatedComplexity
+estimatedBudgetTier
+suggestedScope JSONB
+status
+createdAt
+updatedAt
+
+Statuses:
+New
+Reviewed
+Proposal Generated
+Archived
+
+API routes:
+GET /api/crm/discovery-submissions
+GET /api/crm/discovery-submissions/:id
+POST /api/crm/discovery-submissions
+PATCH /api/crm/discovery-submissions/:id
+DELETE /api/crm/discovery-submissions/:id
+
+On POST:
+
+* Deduplicate/create lead by email or phone.
+* Link discovery submission to lead.
+* Apply canonical project type.
+* Create an activity log event.
+* Generate initial AI-ready summary fields if OpenAI key exists.
+* If no OpenAI key exists, use deterministic fallback summary.
+* Create a follow-up task.
+* Do not fail the entire submission if AI is unavailable.
+
+Admin UI:
+Create /admin/crm/discovery
+
+Layout:
+
+* List/table of discovery submissions
+* Filters by status, project type, budget range, timeline
+* Detail drawer or detail page
+* Show all discovery answers clearly
+* Show AI summary
+* Show suggested project type, complexity, budget tier
+* Button: Generate Proposal
+* Button: Convert to Project
+* Button: Create Follow-Up Task
+
+PHASE C — Discovery-to-Proposal Generator
+
+Add proposal generation from a discovery submission.
+
+API:
+POST /api/crm/proposals/generate-from-discovery/:submissionId
+
+Behavior:
+
+* Read discovery submission.
+* Read linked lead/contact.
+* Generate proposal draft using existing proposal system.
+* Populate:
+  executive summary
+  client goals
+  current challenges
+  recommended solution
+  scope of work
+  pages included
+  features included
+  integrations
+  deliverables
+  estimated timeline
+  investment range
+  optional add-ons
+  maintenance recommendation
+  next steps
+* Set proposal status to Draft or Needs Review.
+* Link proposal back to discovery submission and lead.
+* Add activity log event.
+
+AI:
+Use OpenAI only if env key exists.
+Use structured JSON output.
+Tone:
+Professional, warm, strategic, clear, confident but not pushy.
+If OpenAI is unavailable, generate a clean deterministic proposal draft based on the form answers.
+
+UI:
+On the discovery detail page/drawer:
+
+* Add Generate Proposal button.
+* Show loading state.
+* After generation, link to proposal preview/edit page.
+* Allow admin to review/edit before sending.
+
+PHASE D — Convert Discovery to Project
+
+Add ability to convert a discovery submission or accepted proposal into a project.
+
+Behavior:
+
+* Create crm_project linked to lead and proposal/discovery submission.
+* Set stage based on status:
+  If proposal accepted: Contract / Deposit or Strategy
+  If discovery only: Proposal or Discovery
+* Auto-generate project tasks using existing task generation logic.
+* Auto-generate launch checklist.
+* Add activity log event.
+* Prevent duplicate project creation from the same discovery/proposal unless admin confirms.
+
+UI:
+
+* Add Convert to Project button in discovery detail.
+* Add Convert to Project button in proposal detail if not already available.
+* Show confirmation modal.
+* After creation, navigate to the project detail or open project drawer.
+
+PHASE E — Verification
+
+After implementation:
+
+* Run typecheck for all packages.
+* Run available tests.
+* Smoke test:
+  /admin/crm/dashboard
+  /admin/crm/deals
+  /admin/crm/projects
+  /admin/crm/discovery
+  proposal generation
+  project conversion
+  campaign list warning
+* Confirm no duplicate routes/modules were created.
+* Confirm old functionality still works.
+
+Final response should include:
+
+* Files changed
+* DB tables added/modified
+* API routes added
+* UI routes added
+* Verification results
+* Known limitations

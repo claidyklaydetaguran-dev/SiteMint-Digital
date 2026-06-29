@@ -31,6 +31,7 @@ import CrmProjects from "@/pages/crm/CrmProjects";
 import CrmReporting from "@/pages/crm/CrmReporting";
 import CrmAdminSettings from "@/pages/crm/CrmAdminSettings";
 import CrmCampaigns from "@/pages/crm/CrmCampaigns";
+import CrmDiscovery from "@/pages/crm/CrmDiscovery";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ function Router() {
       <Route path="/admin/crm/reporting" component={CrmReporting} />
       <Route path="/admin/crm/admin" component={CrmAdminSettings} />
       <Route path="/admin/crm/campaigns" component={CrmCampaigns} />
+      <Route path="/admin/crm/discovery" component={CrmDiscovery} />
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
