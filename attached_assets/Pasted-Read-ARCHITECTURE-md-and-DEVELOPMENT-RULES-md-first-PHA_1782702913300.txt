@@ -1,0 +1,89 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-3 — Fix Lead Detail Blank/Error Crash
+
+MODULE:
+Lead Detail routing + Lead Detail page only.
+
+PRIORITY:
+When clicking a lead, /admin/crm/leads/:id currently goes blank or shows an error. Fix this first.
+
+GOAL:
+Make Lead Detail load reliably without relying on the error boundary.
+
+DO:
+
+* Inspect only:
+
+  * CrmLeadDetail.tsx
+  * SalesWorkspace.tsx only if the crash stack points there
+  * App.tsx only to confirm route params if needed
+  * CrmLeads.tsx only to confirm lead row link if needed
+* Find every bgColor reference.
+* Find any undefined/null style object access.
+* Check lead route param parsing.
+* Check data loading state before rendering cards.
+* Check whether lead, score, DISC, relationship, automation, or status config can be undefined.
+* Fix with the smallest safe changes.
+* Add defensive fallbacks where configs are missing.
+* Preserve all existing Lead Detail functionality.
+
+DO NOT:
+
+* Touch backend.
+* Touch database schema.
+* Touch Twilio.
+* Touch Campaigns.
+* Refactor large files.
+* Rewrite CrmLeadDetail.
+* Start UX-4, UX-5, or UX-6 yet.
+
+SPECIFIC FIX AREAS:
+
+1. bgColor crash:
+
+   * Any config.bgColor access must use a fallback.
+   * Any status/priority/style config lookup must use a safe default.
+
+2. Lead click blank:
+
+   * Confirm /admin/crm/leads/:id route receives id correctly.
+   * Confirm lead fetch handles loading/error/not-found states.
+   * Confirm the page does not render intelligence cards before lead data exists.
+   * Confirm SalesWorkspace only renders when lead exists.
+
+3. Error UI:
+
+   * If lead is not found, show a clean “Lead not found” state with Back to Contacts button.
+   * If API fails, show a clean error state with Retry button.
+   * Loading state should not be blank.
+
+TEST:
+
+* Click a lead from /admin/crm/leads.
+* /admin/crm/leads/:id loads without blank screen.
+* Direct URL /admin/crm/leads/:id loads.
+* Invalid lead ID shows not-found state.
+* Activity timeline renders.
+* SalesWorkspace renders.
+* All SalesWorkspace tabs still work.
+* Call/SMS/Email buttons still work.
+* Phone edit still works.
+* Call history still works.
+* Relationship/Behavior/Automation cards still render.
+* TypeScript clean.
+* No console errors.
+* No backend/schema/Twilio/Campaign changes.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Root cause of bgColor crash
+4. Root cause of blank/error on lead click
+5. Exact fixes
+6. Loading/error/not-found behavior
+7. Tests performed
+8. Confirmation no backend/schema/Twilio/Campaign changes
+9. Recommended next UX phase

@@ -600,8 +600,10 @@ export function computeDiscProfile(
   const raw: DiscRawScores = { ...scores };
   const normalized = normalizeScores(raw);
 
-  // Sort styles by normalized score to find primary/secondary
-  const ranked = (Object.keys(normalized) as DiscStyle[])
+  // Sort styles by normalized score to find primary/secondary.
+  // Use explicit capitalized names — Object.keys() returns lowercase and would break DISC_META lookups.
+  const ranked: DiscStyle[] = (["Driver", "Expressive", "Amiable", "Analytical"] as const)
+    .slice()
     .sort((a, b) => normalized[b.toLowerCase() as keyof DiscNormalized] - normalized[a.toLowerCase() as keyof DiscNormalized]);
 
   const primaryStyle   = ranked[0] as DiscStyle;

@@ -1873,7 +1873,7 @@ export default function CrmLeadDetail() {
                     <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">Signals detected</p>
                     {discProfile.reasons.slice(0, 4).map((r, i) => (
                       <div key={i} className="flex items-start gap-1.5">
-                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style].textColor}`}>{DISC_META[r.style].emoji}</span>
+                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style]?.textColor ?? "text-gray-700"}`}>{DISC_META[r.style]?.emoji ?? "•"}</span>
                         <p className="text-[10px] text-muted-foreground leading-snug">{r.text}</p>
                       </div>
                     ))}
