@@ -113,6 +113,7 @@ function DocModal({ html, title, onClose }: { html: string; title: string; onClo
         <iframe
           ref={iframeRef}
           srcDoc={html}
+          sandbox="allow-same-origin allow-modals"
           className="w-full h-full bg-white rounded-lg shadow-xl"
           title={title}
         />

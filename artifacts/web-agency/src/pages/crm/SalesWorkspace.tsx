@@ -95,10 +95,10 @@ const tk = () => localStorage.getItem("adminToken") || "";
 
 const STAGES = [
   { label: "Discovery",   check: (l: WorkspaceLead) => l.discoveryFormStatus !== "Not Started" },
-  { label: "Qualified",   check: (l: WorkspaceLead) => l.status !== "New" },
+  { label: "Qualified",   check: (l: WorkspaceLead) => l.status !== "New Inquiry" },
   { label: "Proposal",    check: (l: WorkspaceLead) => l.proposalStatus !== "Not Started" },
   { label: "Sent",        check: (l: WorkspaceLead) => l.status === "Proposal Sent" || l.proposalStatus === "Sent" },
-  { label: "Negotiating", check: (l: WorkspaceLead) => l.status === "Negotiating" || l.status === "Won" },
+  { label: "Negotiating", check: (l: WorkspaceLead) => l.status === "Qualified" || l.status === "Won" },
   { label: "Contract",    check: (l: WorkspaceLead) => l.proposalStatus === "Signed" || l.proposalStatus === "Accepted" || l.status === "Won" },
   { label: "Won 🎉",      check: (l: WorkspaceLead) => l.status === "Won" },
 ];
@@ -198,7 +198,7 @@ function DocPreviewModal({ html, title, onClose }: { html: string; title: string
         </div>
       </div>
       <div className="flex-1 overflow-hidden bg-gray-200 p-4">
-        <iframe ref={iframeRef} srcDoc={html} className="w-full h-full bg-white rounded-lg shadow-xl" title={title} />
+        <iframe ref={iframeRef} srcDoc={html} sandbox="allow-same-origin allow-modals" className="w-full h-full bg-white rounded-lg shadow-xl" title={title} />
       </div>
     </div>
   );
@@ -373,6 +373,7 @@ function DocPanel({
           >
             <iframe
               srcDoc={html}
+              sandbox="allow-same-origin"
               className="w-full h-full pointer-events-none"
               style={{ transform: "scale(0.6)", transformOrigin: "top left", width: "167%", height: "167%" }}
               title={`${label} preview`}
