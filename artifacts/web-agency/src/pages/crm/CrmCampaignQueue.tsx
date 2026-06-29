@@ -387,24 +387,33 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
       <div className="p-6 max-w-5xl mx-auto space-y-5">
 
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            {campaignId ? "Campaign" : "All Campaigns"}
-          </button>
-          <span className="text-gray-300">/</span>
-          <h1 className="text-sm font-bold text-foreground">
-            {campaignName ? `${campaignName} — Message Queue` : "Global Message Queue"}
-          </h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              {campaignId ? "Campaign" : "All Campaigns"}
+            </button>
+            <span className="text-gray-300">/</span>
+            <div>
+              <h1 className="text-lg font-bold font-serif text-foreground leading-tight">
+                {campaignName ? `${campaignName} — Queue` : "Message Queue"}
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {campaignName
+                  ? `Scheduled messages for this campaign.`
+                  : "All scheduled campaign and manual messages."}
+              </p>
+            </div>
+          </div>
           <button
             onClick={load}
-            className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
             title="Refresh"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
 

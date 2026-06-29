@@ -9,7 +9,7 @@ import {
   AlertTriangle, CheckCircle2, Info, Zap, RefreshCw, X,
   Plus, Trash2, Clock, FileText, ArrowLeft, Save, Loader2,
   SkipForward, XCircle, BarChart2, Lightbulb, Award, ShieldCheck, AlertCircle, TrendingUp,
-  Layers, Calendar,
+  Layers, Calendar, Search,
 } from "lucide-react";
 import {
   computeSimplifiedDisc,
@@ -447,6 +447,11 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [expandedId, setExpandedId]   = useState<number | null>(null);
   const [rowAnalytics, setRowAnalytics] = useState<Map<number, CampaignAnalytics | "loading" | "error">>(new Map());
 
+  // ── History list: tabs + filters ──
+  const [activeListTab, setActiveListTab]       = useState<"campaigns" | "email-activity">("campaigns");
+  const [listStatusFilter, setListStatusFilter] = useState("");
+  const [listSearch, setListSearch]             = useState("");
+
   // ── Send execution ──
   const [showSendConfirm, setShowSendConfirm]     = useState(false);
   const [sendConfirmChecked, setSendConfirmChecked] = useState(false);
@@ -486,6 +491,15 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     else arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // newest
     return arr;
   }, [campaigns, sortOrder]);
+
+  // ── Filtered campaigns (client-side, for history view) ──
+  const filteredCampaigns = useMemo(() => {
+    return sortedCampaigns.filter(c => {
+      if (listStatusFilter && c.status !== listStatusFilter) return false;
+      if (listSearch && !c.name.toLowerCase().includes(listSearch.toLowerCase())) return false;
+      return true;
+    });
+  }, [sortedCampaigns, listStatusFilter, listSearch]);
 
   // ── Lazy analytics expand for history rows ──
   const toggleExpand = useCallback(async (id: number) => {
@@ -1081,27 +1095,40 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         <div className="p-6 max-w-5xl mx-auto space-y-5">
 
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => setView("history")}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Campaigns
               </button>
               <span className="text-gray-300">/</span>
               <span className="text-sm font-semibold text-foreground truncate max-w-xs">{campaignName}</span>
               <StatusBadge status={campaignStatus} />
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 bg-violet-100 px-2.5 py-0.5 rounded-full border border-violet-200">
-                <BarChart2 className="w-3 h-3" /> Analytics
-              </span>
             </div>
-            <button
-              onClick={() => openCampaign({ id: campaignId!, name: campaignName, subject: "", body: "", status: campaignStatus, createdAt: "", updatedAt: "" })}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              Open Builder
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {analyticsData?.funnelData && (
+                <button
+                  onClick={() => { if (campaignId) openSequence({ id: campaignId, name: campaignName, status: campaignStatus, subject: "", body: "", createdAt: "", updatedAt: "", type: (analyticsData?.funnelData?.campaignType as "nurture"|"drip") ?? "drip" }); }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 px-3 py-1.5 rounded-lg hover:bg-violet-50 border border-violet-200 transition-colors"
+                >
+                  <Layers className="w-3.5 h-3.5" /> Sequence
+                </button>
+              )}
+              <button
+                onClick={() => { if (campaignId) openQueue({ id: campaignId, name: campaignName, status: campaignStatus, subject: "", body: "", createdAt: "", updatedAt: "" }); }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-800 px-3 py-1.5 rounded-lg hover:bg-amber-50 border border-amber-200 transition-colors"
+              >
+                <Calendar className="w-3.5 h-3.5" /> Queue
+              </button>
+              <button
+                onClick={() => openCampaign({ id: campaignId!, name: campaignName, subject: "", body: "", status: campaignStatus, createdAt: "", updatedAt: "" })}
+                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 border border-blue-200 transition-colors"
+              >
+                Edit Campaign
+              </button>
+            </div>
           </div>
 
           {/* Loading / error */}
@@ -1629,30 +1656,35 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   // ════════════════════════════════════════════════════════════════════════════
 
   if (view === "history") {
+    const statusColors: Record<string, string> = {
+      draft:    "bg-gray-100 text-gray-600",
+      ready:    "bg-emerald-100 text-emerald-700",
+      archived: "bg-amber-100 text-amber-700",
+    };
+    const typeColors: Record<string, string> = {
+      broadcast: "bg-blue-50 text-blue-700 border border-blue-200",
+      nurture:   "bg-violet-50 text-violet-700 border border-violet-200",
+      drip:      "bg-amber-50 text-amber-700 border border-amber-200",
+    };
+
     return (
       <CrmLayout>
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <div className="flex flex-col h-full">
 
-          {/* Header */}
-          <div className="flex items-center justify-between">
+          {/* ── Page header ── */}
+          <div className="px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between shrink-0">
             <div>
-              <div className="flex items-center gap-3 mb-1">
-                <Mail className="w-5 h-5 text-muted-foreground" />
-                <h1 className="text-xl font-bold font-serif text-foreground">Email Campaigns</h1>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                  Draft Only
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground ml-8">
-                Compose DISC-personalized email campaigns. No bulk sending — test send only.
+              <h1 className="text-lg font-bold font-serif text-foreground">Campaigns</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Build sequences, enroll contacts, and automate follow-up.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => openQueue()}
+                onClick={() => navigate("/admin/crm/campaign-queue")}
                 className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-sm font-semibold rounded-lg hover:bg-gray-50 text-muted-foreground transition-colors"
               >
-                <Calendar className="w-4 h-4" /> Global Queue
+                <Calendar className="w-4 h-4" /> Queue
               </button>
               <button
                 onClick={newCampaign}
@@ -1663,44 +1695,59 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             </div>
           </div>
 
-          {/* Safety banner */}
-          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-            <Info className="w-4 h-4 text-blue-500 shrink-0" />
-            <p className="text-xs text-blue-800">
-              <strong>Manual sending is enabled.</strong> Open a campaign, add recipients, and use the "Send Campaign" button in Step 3.
-              Scheduling and automation are still disabled. Test send always goes to a manually entered address only.
-            </p>
+          {/* ── Tabs ── */}
+          <div className="flex gap-0 px-6 bg-white border-b border-gray-100 shrink-0">
+            {(["campaigns", "email-activity"] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveListTab(tab)}
+                className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  activeListTab === tab
+                    ? "border-[#1e293b] text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab === "campaigns" ? `Campaigns (${campaigns.length})` : "Email Activity"}
+              </button>
+            ))}
           </div>
 
-          {/* Campaign list */}
-          {campaigns.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-16 text-center">
-              <FileText className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground mb-1">No campaigns yet</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Create your first campaign to start building DISC-personalized emails.
-              </p>
-              <button
-                onClick={newCampaign}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
-              >
-                <Plus className="w-4 h-4" /> New Campaign
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              {/* List header + sort selector */}
-              <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-muted-foreground" />
-                <h2 className="text-sm font-bold text-foreground">Campaign History</h2>
-                <span className="text-xs text-muted-foreground ml-1">({campaigns.length})</span>
+          {/* ══════════════════ CAMPAIGNS TAB ══════════════════ */}
+          {activeListTab === "campaigns" && (
+            <div className="flex-1 overflow-auto">
+              {/* Search + filter bar */}
+              <div className="px-6 py-3 bg-white border-b border-gray-50 flex items-center gap-3 flex-wrap shrink-0">
+                <div className="relative flex-1 min-w-[180px] max-w-[280px]">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <input
+                    className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="Search campaigns…"
+                    value={listSearch}
+                    onChange={e => setListSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {(["", "draft", "ready", "archived"] as const).map(s => (
+                    <button
+                      key={s || "all"}
+                      onClick={() => setListStatusFilter(s)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                        listStatusFilter === s
+                          ? "bg-[#1e293b] text-white"
+                          : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
+                      }`}
+                    >
+                      {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  ))}
+                </div>
                 <div className="ml-auto flex items-center gap-1">
                   <span className="text-[10px] text-muted-foreground mr-1">Sort:</span>
                   {(["newest", "oldest", "name"] as const).map(s => (
                     <button
                       key={s}
                       onClick={() => setSortOrder(s)}
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors ${
+                      className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${
                         sortOrder === s ? "bg-[#1e293b] text-white" : "text-muted-foreground hover:bg-gray-100"
                       }`}
                     >
@@ -1709,134 +1756,190 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   ))}
                 </div>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="w-8 px-3 py-3" />
-                    {["Name","Status","Recipients","Created",""].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {sortedCampaigns.map(c => {
-                    const isExpanded = expandedId === c.id;
-                    const rowA = rowAnalytics.get(c.id);
-                    return (
-                      <Fragment key={c.id}>
-                        <tr className="hover:bg-gray-50/60 transition-colors">
-                          {/* Expand chevron */}
-                          <td className="pl-4 pr-1 py-3.5">
+
+              {/* Campaign cards */}
+              <div className="p-6 space-y-3">
+                {filteredCampaigns.length === 0 ? (
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-16 text-center">
+                    <FileText className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      {campaigns.length === 0 ? "No campaigns yet" : "No campaigns match your filter"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      {campaigns.length === 0
+                        ? "Create your first campaign to start building automated sequences."
+                        : "Try a different status filter or search term."}
+                    </p>
+                    {campaigns.length === 0 && (
+                      <button
+                        onClick={newCampaign}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
+                      >
+                        <Plus className="w-4 h-4" /> New Campaign
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  filteredCampaigns.map(c => (
+                    <div
+                      key={c.id}
+                      className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => openAnalytics(c)}
+                    >
+                      <div className="px-5 py-4 flex items-center gap-4">
+                        {/* Channel icon */}
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center shrink-0">
+                          {c.type === "drip" || c.type === "nurture"
+                            ? <Layers className="w-4.5 h-4.5 text-violet-500" />
+                            : <Mail className="w-4.5 h-4.5 text-blue-500" />}
+                        </div>
+
+                        {/* Name + meta */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-foreground truncate">{c.name}</span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? statusColors.draft}`}>
+                              {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                            </span>
+                            {c.type && (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${typeColors[c.type] ?? ""}`}>
+                                {c.type.charAt(0).toUpperCase() + c.type.slice(1)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Users className="w-3 h-3" /> {c.recipientCount ?? 0} enrolled
+                            </span>
+                            <span className="text-xs text-muted-foreground">Created {fmtDate(c.createdAt)}</span>
+                            {c.objective && (
+                              <span className="text-xs text-muted-foreground italic truncate max-w-[220px]">{c.objective}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions (stop click propagation so card click doesn't fire) */}
+                        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => openCampaign(c)}
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          {(c.type === "nurture" || c.type === "drip") && (
                             <button
-                              onClick={() => toggleExpand(c.id)}
-                              className="text-muted-foreground hover:text-foreground transition-colors"
-                              aria-label={isExpanded ? "Collapse" : "Expand"}
+                              onClick={() => openSequence(c)}
+                              className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2.5 py-1.5 rounded-lg hover:bg-violet-50 transition-colors"
                             >
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`} />
+                              <Layers className="w-3.5 h-3.5" /> Sequence
                             </button>
-                          </td>
-                          <td className="px-4 py-3.5 font-medium text-foreground">{c.name}</td>
-                          <td className="px-4 py-3.5"><StatusBadge status={c.status} /></td>
-                          <td className="px-4 py-3.5 text-muted-foreground text-xs">{c.recipientCount ?? 0} leads</td>
-                          <td className="px-4 py-3.5 text-xs text-muted-foreground">{fmtDate(c.createdAt)}</td>
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => openCampaign(c)}
-                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
-                              >
-                                Open
-                              </button>
-                              {(c.type === "nurture" || c.type === "drip") && (
-                                <button
-                                  onClick={() => openSequence(c)}
-                                  className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors"
-                                >
-                                  <Layers className="w-3 h-3" /> Sequence
-                                </button>
-                              )}
-                              <button
-                                onClick={() => openQueue(c)}
-                                className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 px-2 py-1 rounded-lg hover:bg-amber-50 transition-colors"
-                              >
-                                <Calendar className="w-3 h-3" /> Queue
-                              </button>
-                              <button
-                                onClick={() => openAnalytics(c)}
-                                className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors"
-                              >
-                                <BarChart2 className="w-3 h-3" /> Analytics
-                              </button>
-                              {/* Delete only for draft status */}
-                              {c.status === "draft" && (
-                                <DeleteCampaignBtn
-                                  onConfirm={async () => {
-                                    await fetch(`/api/crm/campaigns/${c.id}`, { method: "DELETE", headers: authH() });
-                                    setCampaigns(prev => prev.filter(x => x.id !== c.id));
-                                    if (expandedId === c.id) setExpandedId(null);
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {/* Lazy-loaded analytics summary row */}
-                        {isExpanded && (
-                          <tr key={`${c.id}-exp`} className="bg-gray-50/60 border-t-0">
-                            <td />
-                            <td colSpan={5} className="px-4 py-3">
-                              {rowA === "loading" && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Loader2 className="w-3 h-3 animate-spin" /> Loading…
-                                </div>
-                              )}
-                              {rowA === "error" && (
-                                <p className="text-xs text-red-600">Failed to load analytics.</p>
-                              )}
-                              {rowA && rowA !== "loading" && rowA !== "error" && (
-                                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-                                  {/* Send-rate micro-bar */}
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-emerald-500 rounded-full transition-all"
-                                        style={{ width: `${rowA.totals.sendRate}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-[10px] font-semibold text-emerald-700">{rowA.totals.sendRate}% sent</span>
-                                  </div>
-                                  {/* Stat pills */}
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {rowA.totals.sent} sent
-                                    {rowA.totals.failed  > 0 && <> · <span className="text-red-600">{rowA.totals.failed} failed</span></>}
-                                    {rowA.totals.skipped > 0 && <> · <span className="text-amber-600">{rowA.totals.skipped} skipped</span></>}
-                                  </span>
-                                  {/* Event tracking badge */}
-                                  {rowA.eventMetrics?.hasEvents ? (
-                                    <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                      <TrendingUp className="w-2.5 h-2.5" /> Events Tracked
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground italic">No event data yet</span>
-                                  )}
-                                  <button
-                                    onClick={() => openAnalytics(c)}
-                                    className="text-[10px] font-semibold text-violet-600 hover:text-violet-800 ml-auto shrink-0"
-                                  >
-                                    Full analytics →
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          )}
+                          <button
+                            onClick={() => openQueue(c)}
+                            className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 px-2.5 py-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+                          >
+                            <Calendar className="w-3.5 h-3.5" /> Queue
+                          </button>
+                          {c.status === "draft" && (
+                            <DeleteCampaignBtn
+                              onConfirm={async () => {
+                                await fetch(`/api/crm/campaigns/${c.id}`, { method: "DELETE", headers: authH() });
+                                setCampaigns(prev => prev.filter(x => x.id !== c.id));
+                                if (expandedId === c.id) setExpandedId(null);
+                              }}
+                            />
+                          )}
+                          <ChevronRight className="w-4 h-4 text-gray-300 ml-1" />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
+
+          {/* ══════════════════ EMAIL ACTIVITY TAB ══════════════════ */}
+          {activeListTab === "email-activity" && (
+            <div className="flex-1 overflow-auto p-6">
+              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <h2 className="text-sm font-bold text-foreground">Email Activity</h2>
+                  <span className="text-xs text-muted-foreground ml-1">— per-campaign send totals</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        {["Campaign", "Type", "Status", "Recipients", "Sent", "Failed", "Open Rate", "Actions"].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {campaigns.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">
+                            No campaigns yet. Create one to see email activity.
+                          </td>
+                        </tr>
+                      ) : campaigns.map(c => {
+                        const ra = rowAnalytics.get(c.id);
+                        const hasData = ra && ra !== "loading" && ra !== "error";
+                        const ad = hasData ? (ra as CampaignAnalytics) : null;
+                        return (
+                          <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                            <td className="px-4 py-3 font-medium text-foreground">
+                              <button
+                                onClick={() => openAnalytics(c)}
+                                className="text-left hover:text-blue-600 transition-colors"
+                              >
+                                {c.name}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{c.type ?? "broadcast"}</td>
+                            <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">{c.recipientCount ?? 0}</td>
+                            <td className="px-4 py-3 text-xs">
+                              {ra === "loading"
+                                ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                : ad
+                                  ? <span className="text-emerald-600 font-semibold">{ad.totals.sent}</span>
+                                  : <button onClick={() => toggleExpand(c.id)} className="text-[10px] text-blue-500 hover:underline">Load</button>}
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {ad
+                                ? ad.totals.failed > 0
+                                  ? <span className="text-red-500 font-semibold">{ad.totals.failed}</span>
+                                  : <span className="text-muted-foreground">0</span>
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {ad?.eventMetrics?.hasEvents
+                                ? <span className="text-violet-600 font-semibold">{ad.eventMetrics.openRate}%</span>
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => openAnalytics(c)}
+                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                              >
+                                View →
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </CrmLayout>
     );
@@ -1852,23 +1955,32 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
         {/* ── Builder top bar ───────────────────────────────────────────────── */}
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setView("history")}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Campaigns
             </button>
-            <span className="text-gray-300">/</span>
-            <span className="text-sm font-semibold text-foreground truncate max-w-[200px]">
-              {campaignName || "New Campaign"}
-            </span>
-            <StatusBadge status={campaignStatus} />
-            {isDirty && (
-              <span className="flex items-center gap-1 text-[10px] text-amber-600 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Unsaved changes
-              </span>
-            )}
+            <span className="text-gray-300 shrink-0">/</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold font-serif text-foreground truncate max-w-[220px]">
+                  {campaignName ? campaignName : "Campaign Builder"}
+                </span>
+                <StatusBadge status={campaignStatus} />
+                {isDirty && (
+                  <span className="flex items-center gap-1 text-[10px] text-amber-600 font-semibold shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Unsaved
+                  </span>
+                )}
+              </div>
+              {!campaignName && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Build a multi-step automated sequence — email, text, calls, and tasks.
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2.5">
             {savedAt && !isDirty && (

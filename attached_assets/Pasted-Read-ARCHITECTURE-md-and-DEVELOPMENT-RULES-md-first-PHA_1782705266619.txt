@@ -1,0 +1,261 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-5 — Campaign Module UX Redesign
+
+MODULE:
+Campaign frontend only.
+
+GOAL:
+Redesign Campaigns, Campaign Detail, Campaign Queue, Email Activity, New Campaign, and Campaign Builder to match the reference screenshots: clean, modern, simple, operational, and easy to understand.
+
+DO:
+
+* Use the uploaded screenshots as visual/UX reference.
+* Keep all existing backend APIs.
+* Keep all routes already created:
+
+  * /admin/crm/campaigns
+  * /admin/crm/campaign-builder
+  * /admin/crm/campaign-queue
+* Keep existing campaign sending, queue, enrollment, analytics, scheduler behavior.
+* Improve frontend structure, labels, spacing, tabs, buttons, and page flow.
+* Make sure every click works.
+
+DO NOT:
+
+* Touch backend.
+* Touch database schema.
+* Touch Twilio.
+* Change campaign send/scheduler logic.
+* Remove existing functionality.
+* Add AI yet.
+
+REFERENCE TARGET UX:
+
+1. Campaigns List Page
+   Route:
+   /admin/crm/campaigns
+
+Should look like screenshot 1:
+
+* Header: “Campaigns”
+* Subtitle: “Build sequences, enroll contacts, and automate follow-up.”
+* Top-right buttons:
+
+  * Queue
+  * New Campaign
+* Tabs:
+
+  * Campaigns
+  * Email Activity
+* Left summary cards:
+
+  * Scheduled Queue
+  * Enrollments
+* Main campaign list:
+
+  * Search
+  * Status filters: All, Active, Draft, Paused, Archived
+  * Campaign cards with:
+
+    * campaign name
+    * active badge
+    * step count
+    * channel icon
+    * enrolled count
+    * sample enrolled contacts
+    * chevron to open detail
+
+2. Campaign Detail Page
+   When clicking a campaign, show campaign detail like screenshot 2:
+
+* Header with back button, campaign name, status badge
+* Top-right actions:
+
+  * Delete
+  * Reschedule Contacts
+  * Edit Campaign
+* Stat cards:
+
+  * Active
+  * Paused
+  * Completed
+  * Stopped
+* Tabs:
+
+  * Steps & Info
+  * Enrolled Leads
+  * Email Report
+  * SMS Automation
+  * Replies
+* Steps & Info tab:
+
+  * Objective card
+  * Sequence timeline
+  * Step list with email/SMS/call/task icons
+* Right sidebar:
+
+  * Enroll Contact
+  * Start-at-step selector
+  * Search contacts
+  * Enroll buttons
+  * warning for previously bounced contacts
+
+3. Campaign Queue Page
+   Route:
+   /admin/crm/campaign-queue
+
+Should look like screenshot 3:
+
+* Header: “Message Queue”
+* Subtitle: “All scheduled campaign and manual messages.”
+* Status tiles:
+
+  * Scheduled
+  * Queued
+  * Sent
+  * Failed
+  * Canceled
+  * Skipped
+* Filter pills
+* Message cards with:
+
+  * contact name
+  * subject
+  * body preview
+  * status badge
+  * source badge
+  * scheduled date/time
+  * edit
+  * send now
+  * delete/cancel
+
+4. Email Activity Page
+   Inside campaigns area or route if already supported:
+
+* Search contact/email/campaign
+* Filters:
+
+  * All
+  * Scheduled
+  * Sent
+  * Delivered
+  * Opened
+  * Clicked
+  * Bounced
+  * Failed
+  * Canceled
+* Table columns:
+
+  * Contact
+  * Campaign
+  * Subject
+  * Status
+  * Sent
+  * Delivered
+  * Opened
+  * Clicked
+  * Action
+
+5. New Campaign Page
+   Route:
+   /admin/crm/campaign-builder
+
+Should look like screenshot 5:
+
+* Header: Campaign Builder
+* Subtitle: Build a multi-step automated sequence — email, text, calls, and tasks.
+* Left settings panel:
+
+  * Campaign name
+  * Type
+  * Status
+  * Objective
+  * Target profile
+  * Internal description
+  * Tone profile
+  * Communication defaults
+* Main sequence canvas:
+
+  * Sequence Timeline
+  * Step cards
+  * Buttons:
+
+    * * Email
+    * * SMS
+    * * Call Prompt
+    * * Task
+  * Campaign ends when summary
+* Toggle:
+
+  * Sequence
+  * Journey
+
+6. Topic Library / AI Generator / Lead Intel
+   If these already exist in Campaign Builder:
+
+* Preserve them.
+* Clean the layout to match screenshot 6.
+* Do not build fake AI if it is not connected.
+* If no backend AI exists, label AI Generator as Draft / Coming Soon / Manual Strategy only.
+
+IMPLEMENTATION PRIORITY:
+
+1. Clean Campaigns list page.
+2. Clean Campaign detail page.
+3. Clean Queue page.
+4. Clean Email Activity tab.
+5. Clean Campaign Builder page.
+6. Make routing and click behavior consistent.
+
+ROUTE/CLICK REQUIREMENTS:
+
+* Clicking Campaigns sidebar → /admin/crm/campaigns
+* Clicking Campaign Builder sidebar → /admin/crm/campaign-builder
+* Clicking Campaign Queue sidebar → /admin/crm/campaign-queue
+* Clicking New Campaign → /admin/crm/campaign-builder
+* Clicking Queue button → /admin/crm/campaign-queue
+* Clicking campaign card → campaign detail view
+* Back from detail → campaign list
+* Edit Campaign → campaign builder/edit mode if supported
+* View full queue → /admin/crm/campaign-queue
+* Email Activity tab works and does not break campaign list
+
+RESPONSIVENESS:
+
+* Desktop: two-column layout where appropriate.
+* Tablet: cards stack cleanly.
+* Mobile: no horizontal clipping; tables become scrollable.
+
+TEST:
+
+* /admin/crm/campaigns loads
+* /admin/crm/campaign-builder loads
+* /admin/crm/campaign-queue loads
+* Campaign card opens detail
+* Back button works
+* New Campaign works
+* Queue button works
+* Email Activity tab works
+* Enroll contact still works
+* Sequence steps still display
+* Queue edit/send now/cancel still work
+* TypeScript clean
+* No backend/schema/Twilio changes
+* No console errors
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Campaigns list UX changes
+4. Campaign detail UX changes
+5. Queue UX changes
+6. Email activity UX changes
+7. Campaign builder UX changes
+8. Route/click tests
+9. Responsive tests
+10. Backend/schema/Twilio confirmation
+11. Known limitations
+12. Recommended next UX phase
