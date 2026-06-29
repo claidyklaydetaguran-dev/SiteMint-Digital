@@ -81,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Sales",
     icon: Users,
     items: [
+      { label: "Sales Workspace", href: "/admin/crm/workspace", icon: LayoutGrid },
       { label: "Contacts",     href: "/admin/crm/leads",    icon: Users },
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },
@@ -93,9 +94,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Marketing",
     icon: Megaphone,
     items: [
-      { label: "Campaigns",        href: "/admin/crm/campaigns",       icon: Zap },
-      { label: "Campaign Builder", href: "/admin/crm/campaigns",       icon: Layers },
-      { label: "Campaign Queue",   href: "/admin/crm/campaigns",       icon: Activity },
+      { label: "Campaigns",        href: "/admin/crm/campaigns",         icon: Zap },
+      { label: "Campaign Builder", href: "/admin/crm/campaign-builder", icon: Layers },
+      { label: "Campaign Queue",   href: "/admin/crm/campaign-queue",   icon: Activity },
       { label: "Email Templates",  href: "/admin/crm/email-templates", icon: MailIcon },
       { label: "Content Hub",      icon: FileText, comingSoon: true },
       { label: "Landing Pages",    icon: Image,    comingSoon: true },
@@ -152,8 +153,8 @@ const NAV_GROUPS: NavGroup[] = [
 function detectGroup(location: string): string {
   if (location === "/admin/dashboard") return "home";
   if (["/admin/crm/dashboard","/admin/crm/tasks","/admin/crm/inbox","/admin/crm/calendar"].some(p => location.startsWith(p))) return "home";
-  if (["/admin/crm/leads","/admin/crm/pipeline","/admin/crm/deals"].some(p => location.startsWith(p))) return "sales";
-  if (["/admin/crm/campaigns","/admin/crm/email-templates"].some(p => location.startsWith(p))) return "marketing";
+  if (["/admin/crm/leads","/admin/crm/pipeline","/admin/crm/deals","/admin/crm/workspace"].some(p => location.startsWith(p))) return "sales";
+  if (["/admin/crm/campaigns","/admin/crm/campaign-builder","/admin/crm/campaign-queue","/admin/crm/email-templates"].some(p => location.startsWith(p))) return "marketing";
   if (["/admin/crm/import"].some(p => location.startsWith(p))) return "social";
   if (["/admin/crm/discovery","/admin/crm/projects"].some(p => location.startsWith(p))) return "operations";
   if (["/admin/crm/reporting"].some(p => location.startsWith(p))) return "intelligence";

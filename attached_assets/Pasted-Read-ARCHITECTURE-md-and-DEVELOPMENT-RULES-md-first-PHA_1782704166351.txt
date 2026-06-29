@@ -1,0 +1,183 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-4 — Sales Workspace Route + Campaign Pages Separation
+
+MODULE:
+CRM frontend routing + navigation only.
+
+GOAL:
+Improve navigation clarity by:
+
+1. Adding a direct Sales Workspace entry point.
+2. Separating Campaigns, Campaign Builder, and Campaign Queue into different pages/routes.
+3. Updating the sidebar so every nav item opens the expected page.
+
+DO:
+
+* Add /admin/crm/workspace.
+* Keep existing /admin/crm/leads/:id behavior unchanged.
+* Split campaign views into separate frontend routes.
+* Keep existing campaign functionality working.
+* Keep all backend APIs unchanged.
+* Keep all database schema unchanged.
+* Keep Twilio untouched.
+* Keep global search and quick actions working.
+
+DO NOT:
+
+* Rebuild Campaigns.
+* Rewrite Campaign logic.
+* Touch backend.
+* Touch database schema.
+* Touch Twilio.
+* Change Campaign send/scheduler behavior.
+* Remove working pages.
+
+PART A — SALES WORKSPACE ENTRY POINT
+
+1. Create lightweight page:
+   CrmWorkspaceLanding.tsx
+
+Route:
+
+* /admin/crm/workspace
+
+Page should show:
+
+* Continue where you left off, using localStorage most recent lead ID if available
+* Recent leads from /api/crm/leads
+* Hot/high-priority leads
+* Search input
+* Empty state
+
+Clicking a lead routes to:
+/admin/crm/leads/:id
+
+Add sidebar item under SALES:
+
+* Sales Workspace → /admin/crm/workspace
+
+PART B — CAMPAIGN PAGE SEPARATION
+
+Current issue:
+Campaigns, Campaign Builder, and Campaign Queue all route to /admin/crm/campaigns, which feels confusing.
+
+Add frontend routes:
+
+* /admin/crm/campaigns
+* /admin/crm/campaign-builder
+* /admin/crm/campaign-queue
+
+Behavior:
+
+1. /admin/crm/campaigns
+   Shows Campaign History/List only:
+
+* campaign list
+* filters/sort
+* open campaign
+* analytics
+* delete draft
+* link to queue
+* link to builder
+
+2. /admin/crm/campaign-builder
+   Shows builder/create mode:
+
+* existing campaign builder UI
+* new campaign setup
+* SiteMint persona/topic/blueprint strategy
+* sequence builder access if campaign is saved
+* save draft
+
+If existing CrmCampaigns.tsx already contains the builder view, extract or route into it safely without duplicating logic.
+
+3. /admin/crm/campaign-queue
+   Shows queue UI:
+
+* global queue by default
+* status filters
+* scheduled/queued/sent/failed/canceled/skipped
+* send now
+* edit queued message
+* cancel message
+
+Use existing CrmCampaignQueue component if possible.
+
+PART C — SIDEBAR UPDATE
+
+Update MARKETING section:
+
+* Campaigns → /admin/crm/campaigns
+* Campaign Builder → /admin/crm/campaign-builder
+* Campaign Queue → /admin/crm/campaign-queue
+* Email Templates → /admin/crm/email-templates
+* Content Hub → Coming Soon
+* Landing Pages → Coming Soon
+
+Do not route all three to the same page anymore.
+
+PART D — ROUTE INTEGRITY
+
+Check App.tsx route registry.
+
+Add only frontend routes needed:
+
+* /admin/crm/workspace
+* /admin/crm/campaign-builder
+* /admin/crm/campaign-queue
+
+Do not create backend routes.
+
+PART E — UX EXPECTATIONS
+
+Campaigns page:
+
+* should feel like the “campaign library/history.”
+
+Campaign Builder page:
+
+* should feel like “create or edit a campaign.”
+
+Campaign Queue page:
+
+* should feel like “scheduled message operations.”
+
+Add helper text at top of each page so users understand the difference.
+
+PART F — TESTING
+
+Test:
+
+* /admin/crm/workspace loads
+* sidebar Sales Workspace item appears
+* recent leads load
+* clicking lead opens /admin/crm/leads/:id
+* /admin/crm/campaigns loads Campaign History/List
+* /admin/crm/campaign-builder loads Builder
+* /admin/crm/campaign-queue loads Queue
+* existing campaign open/edit still works
+* existing sequence builder still works
+* queue send now/cancel/edit still works
+* Campaign sidebar links route to correct pages
+* Global search still works
+* New Contact modal still works
+* Quick actions still work
+* TypeScript clean
+* No backend changes
+* No schema changes
+* No Twilio changes
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Routes added
+4. Sales Workspace behavior
+5. Campaign pages separated
+6. Sidebar updates
+7. Tests performed
+8. Backend/schema/Twilio confirmation
+9. Known limitations
+10. Next UX phase

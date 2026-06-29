@@ -376,7 +376,7 @@ const STATUSES   = ["New Inquiry","Discovery Sent","Discovery Completed","Qualif
 const PRIORITIES = ["Low","Medium","High"];
 const DISC_STYLES: DiscStyle[] = ["Driver","Expressive","Amiable","Analytical"];
 
-export default function CrmCampaigns() {
+export default function CrmCampaigns({ initialView = "history" }: { initialView?: "history" | "builder" }) {
   const [, navigate] = useLocation();
 
   // ── Global data ──
@@ -386,7 +386,7 @@ export default function CrmCampaigns() {
   const [loading, setLoading]       = useState(true);
 
   // ── View ──
-  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics" | "sequence" | "queue">("history");
+  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics" | "sequence" | "queue">(initialView);
 
   // ── Sequence / queue navigation state ──
   const [sequenceCampaignId,   setSequenceCampaignId]   = useState<number | null>(null);

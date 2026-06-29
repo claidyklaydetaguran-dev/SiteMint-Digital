@@ -31,6 +31,9 @@ import CrmProjects from "@/pages/crm/CrmProjects";
 import CrmReporting from "@/pages/crm/CrmReporting";
 import CrmAdminSettings from "@/pages/crm/CrmAdminSettings";
 import CrmCampaigns from "@/pages/crm/CrmCampaigns";
+import CrmCampaignBuilderPage from "@/pages/crm/CrmCampaignBuilderPage";
+import CrmCampaignQueuePage from "@/pages/crm/CrmCampaignQueuePage";
+import CrmWorkspaceLanding from "@/pages/crm/CrmWorkspaceLanding";
 import CrmDiscovery from "@/pages/crm/CrmDiscovery";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
@@ -63,7 +66,10 @@ function Router() {
       <Route path="/admin/crm/pipeline" component={CrmPipeline} />
       <Route path="/admin/crm/reporting" component={CrmReporting} />
       <Route path="/admin/crm/admin" component={CrmAdminSettings} />
-      <Route path="/admin/crm/campaigns" component={CrmCampaigns} />
+      <Route path="/admin/crm/workspace" component={CrmWorkspaceLanding} />
+      <Route path="/admin/crm/campaigns">{() => <CrmCampaigns />}</Route>
+      <Route path="/admin/crm/campaign-builder" component={CrmCampaignBuilderPage} />
+      <Route path="/admin/crm/campaign-queue" component={CrmCampaignQueuePage} />
       <Route path="/admin/crm/discovery" component={CrmDiscovery} />
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
