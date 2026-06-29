@@ -109,7 +109,8 @@ scripts/               — Utility scripts (@workspace/scripts)
 | DISC / Behavioral Intelligence | **LOCKED** | `lib/discEngine.ts` | DISC computation + DISC_META; do not modify |
 | Campaigns | STABLE | `CrmCampaigns.tsx`, `CrmCampaignSequence.tsx`, `CrmCampaignQueue.tsx`, `lib/campaignPersonalization.ts`, `api lib/campaignScheduler.ts`, `api lib/sequenceReply.ts`, `crm.ts` campaign section, `schema/crmCampaigns.ts` | Broadcast + multi-step nurture/drip sequences, auto-send scheduler, queue, stop-on-reply, and funnel analytics all live — see Campaign Feature Inventory + SiteMint Campaign Automation Roadmap below. Do NOT rebuild. |
 | Behavioral Intelligence | **ACTIVE** | `lib/behavioralIntelligence.ts` (engine), `schema/crmBehavioralEvents.ts` (data), `crm.ts` behavioral routes | Phase 24A+24B complete — data layer + DNA engine live; UI (24C) is next |
-| Inbox | STABLE | `CrmInbox.tsx`, `phone.ts` (read paths) | Unified email + SMS inbox |
+| **Communications Center** | **STABLE** | `CrmCommunications.tsx`, `GET /crm/communications/email-activity` (crm.ts), `CrmLayout.tsx` COMMUNICATIONS nav group | Product 1 of 7 — Conversations (SMS/Calls+30s poll), Email Activity feed, Template CRUD; frozen 2026-06-29 |
+| Inbox | STABLE | `CrmInbox.tsx`, `phone.ts` (read paths) | Legacy SMS+Calls inbox — kept at `/admin/crm/inbox` for backward compat; superseded by Communications Center |
 | Reporting | STABLE | `CrmReporting.tsx` | Read-only reporting |
 | Import Leads | STABLE | `CrmImport.tsx`, `crm.ts` lines 587–757 | CSV + Discovery import |
 | Twilio / Phone Routes | **LOCKED** | `routes/phone.ts` (entire file) | SMS, voice, webhooks; never touch |
@@ -132,7 +133,8 @@ All routes live in `artifacts/web-agency/src/App.tsx` and require the `adminToke
 | `/admin/crm/leads/:id` | CrmLeadDetail |
 | `/admin/crm/leads/:id/workspace` | SalesWorkspace |
 | `/admin/crm/pipeline` | CrmPipeline |
-| `/admin/crm/inbox` | CrmInbox |
+| `/admin/crm/communications` | CrmCommunications |
+| `/admin/crm/inbox` | CrmInbox (legacy — backward compat) |
 | `/admin/crm/tasks` | CrmTasks |
 | `/admin/crm/calendar` | CrmCalendar |
 | `/admin/crm/deals` | CrmDeals |

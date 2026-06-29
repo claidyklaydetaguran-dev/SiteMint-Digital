@@ -530,10 +530,8 @@ export default function CrmCommunications() {
                       <p className="text-xs text-muted-foreground truncate">{selected.lead?.phone ?? selected.lead?.email ?? ""}</p>
                     </div>
                     {selected.leadId && (
-                      <Link href={`/admin/crm/leads/${selected.leadId}/workspace`}>
-                        <a className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                          Open Workspace <ExternalLink className="w-3 h-3" />
-                        </a>
+                      <Link href={`/admin/crm/leads/${selected.leadId}/workspace`} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                        Open Workspace <ExternalLink className="w-3 h-3" />
                       </Link>
                     )}
                   </div>
@@ -666,17 +664,13 @@ export default function CrmCommunications() {
                   {selectedLead.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {selectedLead.tags.map((tag, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full">{tag}</span>
+                        <span key={`${tag}-${i}`} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full">{tag}</span>
                       ))}
                     </div>
                   )}
-                  <Link href={`/admin/crm/leads/${selectedLead.id}/workspace`}>
-                    <a className="block">
-                      <Button size="sm" variant="outline" className="w-full text-xs gap-1.5">
-                        <ExternalLink className="w-3 h-3" /> Open Workspace
-                      </Button>
-                    </a>
-                  </Link>
+                  <Button size="sm" variant="outline" className="w-full text-xs gap-1.5" onClick={() => navigate(`/admin/crm/leads/${selectedLead.id}/workspace`)}>
+                    <ExternalLink className="w-3 h-3" /> Open Workspace
+                  </Button>
                 </div>
               ) : selected ? (
                 <div className="flex items-center justify-center h-32">
@@ -760,10 +754,8 @@ export default function CrmCommunications() {
                         </td>
                         <td className="px-5 py-3.5">
                           {e.leadId && (
-                            <Link href={`/admin/crm/leads/${e.leadId}/workspace`}>
-                              <a className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
-                                Workspace <ExternalLink className="w-3 h-3" />
-                              </a>
+                            <Link href={`/admin/crm/leads/${e.leadId}/workspace`} className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                              Workspace <ExternalLink className="w-3 h-3" />
                             </Link>
                           )}
                         </td>
