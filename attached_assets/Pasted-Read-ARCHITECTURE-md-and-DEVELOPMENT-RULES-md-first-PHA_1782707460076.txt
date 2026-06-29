@@ -1,0 +1,117 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-7 — Frontend Regression & Click-Path QA
+
+MODULE:
+CRM frontend only.
+
+GOAL:
+Do a full click-path QA pass after the navigation and campaign UX redesigns. Fix only necessary frontend issues.
+
+DO:
+
+* Test the CRM like a real admin user.
+* Verify every sidebar link.
+* Verify every topbar quick action.
+* Verify every campaign page and tab.
+* Verify discovery → proposal → project flow still works.
+* Verify lead click → lead detail works.
+* Fix broken buttons, broken links, empty states, or obvious UX regressions.
+* Keep fixes surgical.
+
+DO NOT:
+
+* Touch backend unless a frontend call is clearly using the wrong existing endpoint.
+* Change database schema.
+* Touch Twilio.
+* Refactor large files.
+* Add new features.
+* Change campaign send/scheduler behavior.
+
+TEST CLICK PATHS:
+
+1. Admin landing
+
+* /admin login redirects to /admin/dashboard
+* Discovery Portal loads
+
+2. CRM shell
+
+* /admin/crm/dashboard loads
+* Sidebar groups expand/collapse
+* Mobile hamburger works
+* Active nav state works
+* Global search works
+* New Contact modal opens
+* Email/SMS/Phone quick actions open
+* Notifications/profile/logout work
+
+3. Sales
+
+* Contacts page loads
+* Click lead → /admin/crm/leads/:id
+* Lead detail does not crash
+* Sales Workspace tabs work
+* Phone edit works
+* Call/SMS/Email buttons work
+* Activity timeline works
+
+4. Marketing
+
+* Campaigns list loads
+* Campaign card opens detail
+* Campaign detail tabs work
+* Campaign Builder route loads
+* Campaign Queue route loads
+* Email Templates loads
+* New Campaign button works
+* Queue button works
+* Back buttons work
+
+5. Operations
+
+* Discovery CRM loads
+* Generate Proposal works
+* Generate SOW works
+* Convert to Project works
+* Projects page loads
+
+6. Intelligence / Settings
+
+* Reporting loads
+* Settings loads
+* Health Center loads
+* Phone audit works
+* Import Contacts loads
+* Admin Hub loads
+
+7. Responsiveness
+   Test widths:
+
+* 1440
+* 1280
+* 1024
+* 768
+* 390
+
+FIX ONLY:
+
+* broken nav links
+* buttons that do nothing
+* missing loading/error states
+* obvious route mismatch
+* obvious console errors
+* obvious mobile clipping
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Issues found
+3. Files changed
+4. Fixes made
+5. Full click-path test results
+6. Responsive test results
+7. Confirmation no backend/schema/Twilio changes unless explicitly needed
+8. Remaining known limitations
+9. Recommended next UX phase

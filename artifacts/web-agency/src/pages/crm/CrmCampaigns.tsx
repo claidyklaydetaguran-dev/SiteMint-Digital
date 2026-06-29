@@ -676,6 +676,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     setAnalyticsData(null);
     setAnalyticsError("");
     setAnalyticsLoading(true);
+    setDetailTab("steps");
     setView("analytics");
     try {
       const [ar, fr] = await Promise.all([
