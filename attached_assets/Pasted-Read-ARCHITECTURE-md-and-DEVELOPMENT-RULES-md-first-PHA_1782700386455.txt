@@ -1,0 +1,184 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-1 — Full CRM Frontend Audit + Navigation Redesign Plan
+
+MODULE:
+Frontend / CRM UX only.
+
+Goal:
+Before changing code, deeply audit the CRM frontend and propose a cleaner workspace-style navigation inspired by ClickUp/HubSpot/GoHighLevel.
+
+Reference style:
+Use the uploaded ClickUp-style screenshot as navigation inspiration:
+
+* compact icon rail
+* grouped sidebar sections
+* workspaces/spaces style
+* cleaner hierarchy
+* collapsible groups
+* fewer overwhelming nav items
+
+Do NOT rebuild backend.
+Do NOT change database schema.
+Do NOT touch Twilio.
+Do NOT touch Campaign sending.
+Do NOT remove working features.
+Do NOT refactor large files yet.
+
+TASK 1 — Deep Frontend Audit
+
+Audit all CRM/admin frontend areas:
+
+* Admin Dashboard / Discovery Portal
+* CRM Dashboard
+* Leads / Contacts
+* Lead Detail
+* Sales Workspace
+* Campaigns
+* Campaign Builder
+* Campaign Queue
+* Inbox
+* Tasks
+* Calendar
+* Discovery CRM
+* Proposals / SOW / Projects
+* Settings
+* Reporting
+* Navigation / sidebar / topbar
+
+Find:
+
+1. Duplicate pages
+2. Duplicate nav items
+3. Confusing labels
+4. Broken links
+5. Dead routes
+6. Missing routes from nav
+7. Pages that overlap
+8. Inconsistent layouts
+9. Inconsistent buttons/icons
+10. Loading/empty/error state gaps
+11. Mobile/responsive issues
+12. Slow or heavy pages
+13. UX friction points
+14. Features that should be grouped together
+
+TASK 2 — Functionality Smoke Test
+
+Verify expected CRM functionality still works:
+
+* Login redirect
+* Discovery form submissions list
+* Send discovery submission to CRM
+* Generate proposal
+* Generate SOW
+* Convert discovery submission to project
+* Leads list
+* Lead detail page
+* Add/edit lead
+* Inbox
+* SMS send
+* Call button
+* Call logging
+* Campaign list
+* Campaign builder
+* Sequence builder
+* Queue
+* Manual send
+* Reporting
+* Settings health center
+* Phone audit
+* Search
+
+Do not fix unless tiny and safe.
+Report failures clearly.
+
+TASK 3 — Navigation Redesign Proposal
+
+Create a proposed new navigation structure:
+
+Icon Rail:
+
+* Home
+* Sales
+* Marketing
+* Operations
+* Intelligence
+* Settings
+
+Expanded Sidebar Groups:
+
+Home
+
+* Command Center
+* My Day
+* Inbox
+* Tasks
+
+Sales
+
+* Leads
+* Pipeline
+* Lead Detail
+* Calls
+* Calendar
+
+Marketing
+
+* Campaigns
+* Campaign Builder
+* Queue
+* Content Hub
+* Landing Pages
+
+Operations
+
+* Discovery
+* Proposals
+* Scope of Work
+* Projects
+* Clients
+
+Intelligence
+
+* Reporting
+* Relationship Intelligence
+* Behavioral Intelligence
+* Automation Queue
+* Lead DNA
+
+Administration
+
+* Settings
+* Integrations
+* System Health
+* Phone Hygiene
+
+TASK 4 — Produce Implementation Plan
+
+Do not implement yet.
+
+Return:
+
+1. Current nav map
+2. Proposed nav map
+3. Routes to keep
+4. Routes to rename
+5. Routes to hide
+6. Routes to merge
+7. Dead routes
+8. Duplicate systems
+9. Priority frontend fixes
+10. Risk level
+11. Recommended implementation phases
+
+TASK 5 — Final Report
+
+Return a clear audit report with:
+
+* What works
+* What is broken
+* What is duplicated
+* What should be redesigned first
+* Proposed new navbar/sidebar structure
+* Recommended next prompt to implement only the navigation redesign
