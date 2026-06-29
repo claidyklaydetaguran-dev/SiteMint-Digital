@@ -68,12 +68,21 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Home",
     icon: Home,
     items: [
-      { label: "Command Center", href: "/admin/crm/dashboard", icon: LayoutGrid },
-      { label: "My Day / Tasks",  href: "/admin/crm/tasks",    icon: CheckSquare },
-      { label: "Inbox",           href: "/admin/crm/inbox",    icon: Inbox },
-      { label: "Outbox",          icon: Send,    comingSoon: true },
-      { label: "Calendar",        href: "/admin/crm/calendar", icon: CalendarDays },
-      { label: "Discovery Portal",href: "/admin/dashboard",    icon: Globe, exact: true },
+      { label: "Command Center",     href: "/admin/crm/dashboard",        icon: LayoutGrid },
+      { label: "My Day / Tasks",     href: "/admin/crm/tasks",            icon: CheckSquare },
+      { label: "Calendar",           href: "/admin/crm/calendar",         icon: CalendarDays },
+      { label: "Discovery Portal",   href: "/admin/dashboard",            icon: Globe, exact: true },
+    ],
+  },
+  {
+    id: "communications",
+    label: "Communications",
+    icon: MessageSquare,
+    items: [
+      { label: "Communications Center", href: "/admin/crm/communications", icon: Inbox },
+      { label: "Inbox (SMS & Calls)",   href: "/admin/crm/inbox",          icon: PhoneCall },
+      { label: "Email Templates",        href: "/admin/crm/email-templates", icon: MailIcon },
+      { label: "Scheduled Messages",     href: "/admin/crm/campaign-queue",  icon: CalendarDays },
     ],
   },
   {
@@ -152,7 +161,8 @@ const NAV_GROUPS: NavGroup[] = [
 // Map each route prefix to a group id for auto-detection
 function detectGroup(location: string): string {
   if (location === "/admin/dashboard") return "home";
-  if (["/admin/crm/dashboard","/admin/crm/tasks","/admin/crm/inbox","/admin/crm/calendar"].some(p => location.startsWith(p))) return "home";
+  if (["/admin/crm/dashboard","/admin/crm/tasks","/admin/crm/calendar"].some(p => location.startsWith(p))) return "home";
+  if (["/admin/crm/communications","/admin/crm/inbox","/admin/crm/email-templates"].some(p => location.startsWith(p))) return "communications";
   if (["/admin/crm/leads","/admin/crm/pipeline","/admin/crm/deals","/admin/crm/workspace"].some(p => location.startsWith(p))) return "sales";
   if (["/admin/crm/campaigns","/admin/crm/campaign-builder","/admin/crm/campaign-queue","/admin/crm/email-templates"].some(p => location.startsWith(p))) return "marketing";
   if (["/admin/crm/import"].some(p => location.startsWith(p))) return "social";

@@ -427,6 +427,47 @@ router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res
   }
 });
 
+// ── Communications — Email Activity ──────────────────────────────────────────
+router.get("/crm/communications/email-activity", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 200, 500);
+    const activities = await db
+      .select()
+      .from(crmActivities)
+      .where(eq(crmActivities.type, "email_sent"))
+      .orderBy(desc(crmActivities.createdAt))
+      .limit(limit);
+
+    // Batch-fetch leads for all activity leadIds
+    const leadIds = [...new Set(activities.map(a => a.leadId).filter((id): id is number => id != null))];
+    const leads = leadIds.length > 0
+      ? await db.select({ id: crmLeads.id, name: crmLeads.name, email: crmLeads.email })
+          .from(crmLeads).where(inArray(crmLeads.id, leadIds))
+      : [];
+    const leadMap = new Map(leads.map(l => [l.id, l]));
+
+    const emails = activities.map(a => {
+      const lead = a.leadId != null ? leadMap.get(a.leadId) : undefined;
+      const subject = a.title.startsWith("Email sent: ") ? a.title.slice(12) : a.title;
+      return {
+        id: a.id,
+        leadId: a.leadId,
+        leadName: lead?.name ?? "Unknown",
+        leadEmail: lead?.email ?? "",
+        subject,
+        description: a.description,
+        createdAt: a.createdAt,
+        metadata: a.metadata,
+      };
+    });
+
+    res.json({ emails, total: emails.length });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching email activity");
+    res.status(500).json({ error: "Failed to fetch email activity" });
+  }
+});
+
 // ── Campaign CRUD ─────────────────────────────────────────────────────────────
 
 router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
