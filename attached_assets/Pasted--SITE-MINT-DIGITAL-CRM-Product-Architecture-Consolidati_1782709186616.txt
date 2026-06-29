@@ -1,0 +1,418 @@
+# SITE MINT DIGITAL CRM
+
+## Product Architecture Consolidation & Major Milestones
+
+Read **ARCHITECTURE.md** and **DEVELOPMENT_RULES.md** first.
+
+## ROLE
+
+You are no longer acting as a coding assistant.
+
+You are now the **Chief Product Architect** for the SiteMint Digital CRM platform.
+
+Your responsibility is NOT to immediately build features.
+
+Your responsibility is to consolidate the platform into a cohesive SaaS product before implementing the next generation of modules.
+
+---
+
+# CURRENT STATE
+
+The CRM already contains substantial functionality including:
+
+* Lead Management
+* Sales Workspace
+* DISC Engine
+* Behavioral Intelligence
+* Relationship Intelligence
+* Campaign Engine
+* Campaign Builder
+* Campaign Queue
+* Discovery Portal
+* Proposal Generator
+* Scope of Work Generator
+* Project Conversion
+* CRM Dashboard
+* Executive Reporting
+* Phone Integration
+* SMS Integration
+* Email Integration
+* Tasks
+* Calendar
+* Projects
+
+The problem is **not missing features**.
+
+The problem is that many features have been built independently and now need to be organized into complete business systems.
+
+---
+
+# OBJECTIVE
+
+Before implementing additional functionality:
+
+Perform a full architectural audit of the CRM.
+
+Identify:
+
+* duplicate pages
+* duplicate components
+* duplicate API usage
+* duplicate business logic
+* duplicate navigation
+* duplicated UI patterns
+* overlapping modules
+* inconsistent naming
+* modules that should be merged
+* features that belong together
+* missing relationships between systems
+
+Do NOT refactor yet.
+
+Produce the architectural plan first.
+
+---
+
+# TARGET PRODUCT STRUCTURE
+
+Reorganize the CRM around major business systems instead of isolated pages.
+
+## HOME
+
+Executive dashboard
+
+Company overview
+
+Today's priorities
+
+Notifications
+
+---
+
+## SALES OS
+
+Contacts
+
+Sales Workspace
+
+Pipeline
+
+Deals
+
+Offers
+
+Transactions
+
+Documents
+
+Tasks
+
+Calendar
+
+Follow-ups
+
+Buyer Journey
+
+Seller Journey
+
+Lead DNA
+
+Behavior Timeline
+
+Relationship Intelligence
+
+DISC
+
+Next Best Action
+
+---
+
+## COMMUNICATIONS CENTER
+
+Inbox
+
+Outbox
+
+Email
+
+SMS
+
+Calls
+
+Voicemail
+
+Conversation Timeline
+
+Templates
+
+Drafts
+
+Scheduled Messages
+
+Sequences
+
+Delivery Status
+
+Reply Tracking
+
+Open Tracking
+
+Conversation Health
+
+Internal Notes
+
+Attachments
+
+Quick Actions
+
+Everything communication-related should live here.
+
+---
+
+## MARKETING HUB
+
+Campaigns
+
+Campaign Builder
+
+Campaign Queue
+
+Blueprint Library
+
+Topic Library
+
+Email Templates
+
+Landing Pages
+
+Forms
+
+Facebook Leads
+
+Instagram Leads
+
+Lead Sources
+
+Lead Routing
+
+Content Hub
+
+Social Scheduler
+
+Marketing Analytics
+
+Everything marketing-related belongs here.
+
+---
+
+## PROJECT DELIVERY
+
+Discovery
+
+Proposal
+
+Scope of Work
+
+Contracts
+
+Invoices
+
+Projects
+
+Development
+
+QA
+
+Launch
+
+Maintenance
+
+Support
+
+Approvals
+
+Assets
+
+Hosting
+
+Domains
+
+SEO
+
+Analytics
+
+Client Portal
+
+---
+
+## INTELLIGENCE
+
+Behavioral Intelligence
+
+Relationship Intelligence
+
+Executive Reporting
+
+Revenue Forecasting
+
+Campaign ROI
+
+Sales Velocity
+
+Company Health
+
+Automation Analytics
+
+---
+
+## AUTOMATION CENTER
+
+Visual workflow builder.
+
+Examples:
+
+Lead opens email
+
+↓
+
+Wait
+
+↓
+
+No reply
+
+↓
+
+Send SMS
+
+↓
+
+Create Task
+
+↓
+
+Move Pipeline
+
+↓
+
+Enroll Campaign
+
+↓
+
+Notify Agent
+
+---
+
+## AI COPILOT
+
+Proposal Writer
+
+SOW Writer
+
+Campaign Writer
+
+Email Writer
+
+SMS Writer
+
+Website Audit
+
+SEO Audit
+
+Call Coach
+
+Meeting Notes
+
+CRM Assistant
+
+Marketing Assistant
+
+Project Assistant
+
+CEO Assistant
+
+---
+
+## SETTINGS
+
+Users
+
+Roles
+
+Permissions
+
+Integrations
+
+Phone
+
+Email
+
+Automation
+
+API Keys
+
+System Health
+
+Audit Logs
+
+---
+
+# IMPLEMENTATION STRATEGY
+
+Do NOT build everything at once.
+
+Instead:
+
+1. Audit the platform.
+
+2. Identify what already exists.
+
+3. Identify what should be merged.
+
+4. Identify what should become standalone modules.
+
+5. Recommend a new navigation hierarchy.
+
+6. Recommend the implementation order.
+
+7. Break the platform into Major Product Milestones.
+
+Only after the architecture has been approved should implementation begin.
+
+---
+
+# IMPORTANT CONSTRAINTS
+
+Do not touch:
+
+* Backend
+* Database schema
+* Twilio
+* Campaign scheduler
+* Locked modules
+
+unless the audit explicitly concludes they require future work.
+
+Do not rebuild existing working systems.
+
+Prefer consolidation over duplication.
+
+Prefer extension over replacement.
+
+---
+
+# FINAL REPORT
+
+Return:
+
+1. Existing modules inventory
+2. Duplicate systems found
+3. Consolidation recommendations
+4. Navigation redesign
+5. New product architecture
+6. Major Product Milestones
+7. Dependencies between milestones
+8. Risks
+9. Recommended implementation order
+
+Do not begin coding unless a specific milestone is requested afterward.
