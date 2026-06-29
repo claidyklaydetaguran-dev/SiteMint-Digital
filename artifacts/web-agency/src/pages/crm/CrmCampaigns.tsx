@@ -452,6 +452,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [listStatusFilter, setListStatusFilter] = useState("");
   const [listSearch, setListSearch]             = useState("");
 
+  // ── Analytics detail tabs ──
+  const [detailTab, setDetailTab] = useState<"steps" | "enrolled" | "email-report" | "sms" | "replies">("steps");
+
   // ── Send execution ──
   const [showSendConfirm, setShowSendConfirm]     = useState(false);
   const [sendConfirmChecked, setSendConfirmChecked] = useState(false);
@@ -482,6 +485,26 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     const d = await r.json();
     setCampaigns(d.campaigns ?? []);
   }, []);
+
+  // ── Auto-load analytics for all campaigns when Email Activity tab opens ──
+  useEffect(() => {
+    if (activeListTab !== "email-activity" || campaigns.length === 0) return;
+    campaigns.forEach(c => {
+      // Skip already-fetched or in-progress rows (checked via functional updater guard below)
+      setRowAnalytics(prev => {
+        if (prev.has(c.id)) return prev;         // already loaded/loading — skip
+        const next = new Map(prev);
+        next.set(c.id, "loading");
+        // kick off fetch as a side-effect
+        void fetch(`/api/crm/campaigns/${c.id}/analytics`, { headers: { Authorization: `Bearer ${tok()}` } })
+          .then(r => r.json().then(d => ({ ok: r.ok, d })))
+          .then(({ ok, d }) => setRowAnalytics(p => new Map(p).set(c.id, ok ? (d as CampaignAnalytics) : "error")))
+          .catch(()      => setRowAnalytics(p => new Map(p).set(c.id, "error")));
+        return next;
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeListTab, campaigns.length]);
 
   // ── Sorted campaigns (client-side) ──
   const sortedCampaigns = useMemo(() => {
@@ -1010,7 +1033,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
-                    {["Lead","Email","DISC Style","Status","Sent At","Error",""].map(h => (
+                    {["Lead","Email","DISC Style","Status","Sent At","Error","Actions"].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -1079,17 +1102,37 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // ANALYTICS VIEW
+  // ANALYTICS VIEW  (tabbed — UX-6)
   // ════════════════════════════════════════════════════════════════════════════
 
   if (view === "analytics") {
     const a = analyticsData;
+
+    // Helpers hoisted from the funnel IIFE so they can be reused across tabs
+    function ChannelIcon({ ch }: { ch: string }) {
+      if (ch === "email")       return <Mail className="w-3 h-3" />;
+      if (ch === "sms")         return <MessageSquare className="w-3 h-3" />;
+      if (ch === "call_prompt") return <Phone className="w-3 h-3" />;
+      return <CheckSquare className="w-3 h-3" />;
+    }
+    const CH_LABEL: Record<string, string> = {
+      email: "Email", sms: "SMS", call_prompt: "Call", task: "Task",
+    };
     const DISC_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
       Driver:     { bg: "bg-red-50",    text: "text-red-700",    bar: "bg-red-400"    },
       Expressive: { bg: "bg-amber-50",  text: "text-amber-700",  bar: "bg-amber-400"  },
       Amiable:    { bg: "bg-green-50",  text: "text-green-700",  bar: "bg-green-400"  },
       Analytical: { bg: "bg-blue-50",   text: "text-blue-700",   bar: "bg-blue-400"   },
     };
+
+    const DETAIL_TABS: { id: typeof detailTab; label: string }[] = [
+      { id: "steps",        label: "Steps & Info" },
+      { id: "enrolled",     label: `Enrolled Leads${a?.funnelData ? ` (${a.funnelData.enrollmentStats.total})` : a?.recentRecipients ? ` (${a.recentRecipients.length})` : ""}` },
+      { id: "email-report", label: "Email Report" },
+      { id: "sms",          label: "SMS Automation" },
+      { id: "replies",      label: "Replies" },
+    ];
+
     return (
       <CrmLayout>
         <div className="p-6 max-w-5xl mx-auto space-y-5">
@@ -1145,24 +1188,48 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             </div>
           )}
 
+          {/* ── Detail tab nav ── */}
+          {!analyticsLoading && !analyticsError && (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="flex flex-wrap">
+                {DETAIL_TABS.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setDetailTab(t.id)}
+                    className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                      detailTab === t.id
+                        ? "border-[#1e293b] text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-gray-50"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {a && (
             <>
-              {/* ── Sequence Funnel ────────────────────────────────────────────── */}
-              {a.funnelData && a.funnelData.steps.length > 0 && (() => {
-                const f = a.funnelData!;
-                const es = f.enrollmentStats;
-                const maxReach = Math.max(...f.steps.map(s => s.reachRate), 1);
+              {/* ══ STEPS & INFO ══════════════════════════════════════════════ */}
+              {detailTab === "steps" && (
+                <div className="space-y-5">
+                  {/* Objective */}
+                  {objective && (
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-amber-500" />
+                        <h2 className="text-sm font-bold text-foreground">Objective</h2>
+                      </div>
+                      <p className="px-5 py-4 text-sm text-foreground">{objective}</p>
+                    </div>
+                  )}
 
-                function ChannelIcon({ ch }: { ch: string }) {
-                  if (ch === "email")       return <Mail className="w-3 h-3" />;
-                  if (ch === "sms")         return <MessageSquare className="w-3 h-3" />;
-                  if (ch === "call_prompt") return <Phone className="w-3 h-3" />;
-                  return <CheckSquare className="w-3 h-3" />;
-                }
-
-                const CH_LABEL: Record<string, string> = {
-                  email: "Email", sms: "SMS", call_prompt: "Call", task: "Task",
-                };
+                  {/* Sequence Funnel or empty state */}
+                  {a.funnelData && a.funnelData.steps.length > 0 ? (() => {
+                    const f = a.funnelData!;
+                    const es = f.enrollmentStats;
+                    // maxReach kept for potential future use
 
                 return (
                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -1313,10 +1380,50 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     </div>
                   </div>
                 );
-              })()}
+              })() : (
+                /* Steps & Info — no sequence yet */
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-14 text-center">
+                  <GitBranch className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground mb-1">No sequence steps yet</p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    This is a broadcast campaign — or no steps have been added to the sequence.
+                  </p>
+                  {campaignId && (
+                    <button
+                      onClick={() => openSequence({ id: campaignId, name: campaignName, status: campaignStatus, subject: "", body: "", createdAt: "", updatedAt: "", type: "drip" })}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-violet-600 hover:text-violet-800 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors"
+                    >
+                      <Layers className="w-4 h-4" /> Open Sequence Builder
+                    </button>
+                  )}
+                </div>
+              )}
+                </div>
+              )}
 
-              {/* Open/click/bounce tracking — shows real event cards or setup notice */}
-              {a.eventMetrics?.hasEvents ? (
+              {/* ══ EMAIL REPORT ═════════════════════════════════════════════════ */}
+              {detailTab === "email-report" && (
+                <div className="space-y-5">
+
+                  {/* Summary tiles */}
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                    {[
+                      { label: "Recipients", value: a.totals.recipients,  color: "bg-gray-50   border-gray-200  text-gray-700" },
+                      { label: "Sent",       value: a.totals.sent,        color: a.totals.sent       > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                      { label: "Failed",     value: a.totals.failed,      color: a.totals.failed     > 0 ? "bg-red-50   border-red-200   text-red-700"        : "bg-gray-50 border-gray-200 text-gray-400" },
+                      { label: "Skipped",    value: a.totals.skipped,     color: a.totals.skipped    > 0 ? "bg-amber-50 border-amber-200 text-amber-700"      : "bg-gray-50 border-gray-200 text-gray-400" },
+                      { label: "Send Rate",  value: `${a.totals.sendRate}%`,    color: "bg-violet-50 border-violet-200 text-violet-700" },
+                      { label: "Fail Rate",  value: `${a.totals.failureRate}%`, color: a.totals.failureRate > 0 ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
+                        <p className="text-xl font-bold">{value}</p>
+                        <p className="text-[10px] font-semibold mt-0.5 opacity-70 uppercase tracking-wide">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Open/click/bounce tracking */}
+                  {a.eventMetrics?.hasEvents ? (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
@@ -1382,149 +1489,196 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 </div>
               )}
 
-              {/* Summary tiles — 6 cards */}
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {[
-                  { label: "Recipients", value: a.totals.recipients,  color: "bg-gray-50   border-gray-200  text-gray-700" },
-                  { label: "Sent",       value: a.totals.sent,        color: a.totals.sent     > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400" },
-                  { label: "Failed",     value: a.totals.failed,      color: a.totals.failed   > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
-                  { label: "Skipped",    value: a.totals.skipped,     color: a.totals.skipped  > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-400" },
-                  { label: "Send Rate",  value: `${a.totals.sendRate}%`,    color: "bg-violet-50 border-violet-200 text-violet-700" },
-                  { label: "Fail Rate",  value: `${a.totals.failureRate}%`, color: a.totals.failureRate > 0 ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-400" },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
-                    <p className="text-xl font-bold">{value}</p>
-                    <p className="text-[10px] font-semibold mt-0.5 opacity-70 uppercase tracking-wide">{label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* ── Quality Score ───────────────────────────────────────────── */}
-              {(() => {
-                const qs = computeQualityScore(a);
-                const badgeStyles: Record<string, string> = {
-                  Excellent:       "bg-emerald-100 text-emerald-800 border-emerald-200",
-                  Good:            "bg-blue-100 text-blue-800 border-blue-200",
-                  "Needs Cleanup": "bg-amber-100 text-amber-800 border-amber-200",
-                  Risky:           "bg-red-100 text-red-800 border-red-200",
-                };
-                const trackColor: Record<string, string> = {
-                  Excellent: "bg-emerald-500", Good: "bg-blue-500",
-                  "Needs Cleanup": "bg-amber-400", Risky: "bg-red-400",
-                };
-                return (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-                      <Award className="w-4 h-4 text-muted-foreground" />
-                      <h2 className="text-sm font-bold text-foreground">Campaign Quality Score</h2>
-                      <span className="text-[10px] text-muted-foreground ml-auto">Not AI · Rule-based</span>
-                    </div>
-                    <div className="p-5 flex gap-6 items-start">
-                      <div className="shrink-0 text-center">
-                        <p className="text-5xl font-black text-foreground leading-none">{qs.score}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">out of 100</p>
-                        <span className={`mt-2 inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${badgeStyles[qs.badge]}`}>
-                          {qs.badge}
-                        </span>
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${trackColor[qs.badge]}`} style={{ width: `${qs.score}%` }} />
+                  {/* ── Quality Score ── */}
+                  {(() => {
+                    const qs = computeQualityScore(a);
+                    const badgeStyles: Record<string, string> = {
+                      Excellent:       "bg-emerald-100 text-emerald-800 border-emerald-200",
+                      Good:            "bg-blue-100 text-blue-800 border-blue-200",
+                      "Needs Cleanup": "bg-amber-100 text-amber-800 border-amber-200",
+                      Risky:           "bg-red-100 text-red-800 border-red-200",
+                    };
+                    const trackColor: Record<string, string> = {
+                      Excellent: "bg-emerald-500", Good: "bg-blue-500",
+                      "Needs Cleanup": "bg-amber-400", Risky: "bg-red-400",
+                    };
+                    return (
+                      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                          <Award className="w-4 h-4 text-muted-foreground" />
+                          <h2 className="text-sm font-bold text-foreground">Campaign Quality Score</h2>
+                          <span className="text-[10px] text-muted-foreground ml-auto">Not AI · Rule-based</span>
                         </div>
-                        <ul className="space-y-1.5 mt-3">
-                          {qs.reasons.map((r, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                              <TrendingUp className="w-3 h-3 shrink-0 mt-0.5 text-gray-400" />
-                              {r}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* ── Campaign Insights ────────────────────────────────────────── */}
-              {(() => {
-                const insights = generateInsights(a);
-                return (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4 text-amber-500" />
-                      <h2 className="text-sm font-bold text-foreground">Campaign Insights</h2>
-                      <span className="text-[10px] text-muted-foreground ml-auto">Rule-based · Not AI generated</span>
-                    </div>
-                    <div className="p-4">
-                      {insights.length === 0 ? (
-                        <p className="text-xs text-muted-foreground italic">No insights available — send the campaign to see results.</p>
-                      ) : (
-                        <ul className="space-y-2.5">
-                          {insights.map((ins, i) => (
-                            <li key={i} className="flex items-start gap-3 text-xs text-foreground">
-                              <span className="w-5 h-5 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5">
-                                <Lightbulb className="w-2.5 h-2.5 text-amber-600" />
-                              </span>
-                              {ins}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* DISC Performance Cards — enhanced */}
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-muted-foreground" />
-                    <h2 className="text-sm font-bold text-foreground">DISC Performance</h2>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {a.discBreakdown.map(d => {
-                      const dc   = DISC_COLORS[d.style] ?? { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-400" };
-                      const meta = DISC_META[d.style as DiscStyle];
-                      const successRate = d.count > 0 ? Math.round((d.sent / d.count) * 100) : 0;
-                      const skippedRate = d.count > 0 ? Math.round((d.skipped / d.count) * 100) : 0;
-                      const RECO: Record<string, string> = {
-                        Driver:     "Use short copy, direct CTA, clear next step.",
-                        Analytical: "Add proof, pricing details, timelines, and supporting data.",
-                        Amiable:    "Use warmer language, reassurance, and relationship-building.",
-                        Expressive: "Use energetic language, visuals, and big-picture outcomes.",
-                      };
-                      return (
-                        <div key={d.style} className={`rounded-xl p-3 border ${dc.bg} ${d.count === 0 ? "opacity-50" : ""}`} style={{ borderColor: "transparent" }}>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className={`text-xs font-bold ${dc.text} flex items-center gap-1.5`}>
-                              {meta?.emoji ?? ""} {d.style}
+                        <div className="p-5 flex gap-6 items-start">
+                          <div className="shrink-0 text-center">
+                            <p className="text-5xl font-black text-foreground leading-none">{qs.score}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">out of 100</p>
+                            <span className={`mt-2 inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${badgeStyles[qs.badge]}`}>
+                              {qs.badge}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">{d.count} recipient{d.count !== 1 ? "s" : ""}</span>
                           </div>
-                          {d.count === 0 ? (
-                            <p className="text-[10px] text-muted-foreground italic">No recipients with this style</p>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${trackColor[qs.badge]}`} style={{ width: `${qs.score}%` }} />
+                            </div>
+                            <ul className="space-y-1.5 mt-3">
+                              {qs.reasons.map((r, i) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                                  <TrendingUp className="w-3 h-3 shrink-0 mt-0.5 text-gray-400" />
+                                  {r}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Campaign Insights ── */}
+                  {(() => {
+                    const insights = generateInsights(a);
+                    return (
+                      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-amber-500" />
+                          <h2 className="text-sm font-bold text-foreground">Campaign Insights</h2>
+                          <span className="text-[10px] text-muted-foreground ml-auto">Rule-based · Not AI generated</span>
+                        </div>
+                        <div className="p-4">
+                          {insights.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">No insights available — send the campaign to see results.</p>
                           ) : (
-                            <>
-                              {/* Progress bar — success rate */}
-                              <div className="h-1.5 bg-white/60 rounded-full overflow-hidden mb-2">
-                                <div className={`h-full rounded-full ${dc.bar}`} style={{ width: `${successRate}%` }} />
-                              </div>
-                              <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold mb-2">
-                                <span className="text-emerald-700">{d.sent} sent ({successRate}%)</span>
-                                <span className={d.failed > 0 ? "text-red-600" : "text-gray-400"}>{d.failed} failed</span>
-                                <span className={d.skipped > 0 ? "text-amber-600" : "text-gray-400"}>{d.skipped} skipped ({skippedRate}%)</span>
-                              </div>
-                              <p className={`text-[10px] ${dc.text} opacity-80 italic`}>{RECO[d.style] ?? ""}</p>
-                            </>
+                            <ul className="space-y-2.5">
+                              {insights.map((ins, i) => (
+                                <li key={i} className="flex items-start gap-3 text-xs text-foreground">
+                                  <span className="w-5 h-5 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5">
+                                    <Lightbulb className="w-2.5 h-2.5 text-amber-600" />
+                                  </span>
+                                  {ins}
+                                </li>
+                              ))}
+                            </ul>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      </div>
+                    );
+                  })()}
 
-                {/* Reply Estimate */}
+                  {/* ── DISC Performance ── */}
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-muted-foreground" />
+                      <h2 className="text-sm font-bold text-foreground">DISC Performance</h2>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {a.discBreakdown.map(d => {
+                        const dc   = DISC_COLORS[d.style] ?? { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-400" };
+                        const meta = DISC_META[d.style as DiscStyle];
+                        const successRate = d.count > 0 ? Math.round((d.sent / d.count) * 100) : 0;
+                        const skippedRate = d.count > 0 ? Math.round((d.skipped / d.count) * 100) : 0;
+                        const RECO: Record<string, string> = {
+                          Driver:     "Use short copy, direct CTA, clear next step.",
+                          Analytical: "Add proof, pricing details, timelines, and supporting data.",
+                          Amiable:    "Use warmer language, reassurance, and relationship-building.",
+                          Expressive: "Use energetic language, visuals, and big-picture outcomes.",
+                        };
+                        return (
+                          <div key={d.style} className={`rounded-xl p-3 border ${dc.bg} ${d.count === 0 ? "opacity-50" : ""}`} style={{ borderColor: "transparent" }}>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={`text-xs font-bold ${dc.text} flex items-center gap-1.5`}>
+                                {meta?.emoji ?? ""} {d.style}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">{d.count} recipient{d.count !== 1 ? "s" : ""}</span>
+                            </div>
+                            {d.count === 0 ? (
+                              <p className="text-[10px] text-muted-foreground italic">No recipients with this style</p>
+                            ) : (
+                              <>
+                                <div className="h-1.5 bg-white/60 rounded-full overflow-hidden mb-2">
+                                  <div className={`h-full rounded-full ${dc.bar}`} style={{ width: `${successRate}%` }} />
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold mb-2">
+                                  <span className="text-emerald-700">{d.sent} sent ({successRate}%)</span>
+                                  <span className={d.failed > 0 ? "text-red-600" : "text-gray-400"}>{d.failed} failed</span>
+                                  <span className={d.skipped > 0 ? "text-amber-600" : "text-gray-400"}>{d.skipped} skipped ({skippedRate}%)</span>
+                                </div>
+                                <p className={`text-[10px] ${dc.text} opacity-80 italic`}>{RECO[d.style] ?? ""}</p>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* ══ SMS AUTOMATION ═══════════════════════════════════════════════ */}
+              {detailTab === "sms" && (() => {
+                const smsSteps = a.funnelData?.steps.filter(s => s.channel === "sms") ?? [];
+                if (smsSteps.length === 0) {
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-14 text-center">
+                      <MessageSquare className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-foreground mb-1">No SMS steps yet</p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Add SMS steps to this sequence via the Sequence Builder.
+                      </p>
+                      {campaignId && (
+                        <button
+                          onClick={() => openSequence({ id: campaignId, name: campaignName, status: campaignStatus, subject: "", body: "", createdAt: "", updatedAt: "", type: "drip" })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-violet-600 hover:text-violet-800 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors"
+                        >
+                          <Layers className="w-4 h-4" /> Open Sequence Builder
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                      <h2 className="text-sm font-bold text-foreground">SMS Steps</h2>
+                      <span className="text-xs text-muted-foreground ml-1">({smsSteps.length})</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            {["Step","Day","Prompt / Subject","Sent","Failed","Skipped","Pending","Reach"].map(h => (
+                              <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {smsSteps.map(step => (
+                            <tr key={step.stepId} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-4 py-3 font-bold text-foreground text-xs">{step.stepNumber}</td>
+                              <td className="px-4 py-3 text-muted-foreground text-xs">Day {step.dayOffset}</td>
+                              <td className="px-4 py-3 text-foreground text-xs max-w-[200px] truncate" title={step.subject ?? ""}>{step.subject || "—"}</td>
+                              <td className="px-4 py-3 font-semibold text-emerald-700 text-xs">{step.sent}</td>
+                              <td className={`px-4 py-3 font-semibold text-xs ${step.failed  > 0 ? "text-red-600"  : "text-gray-300"}`}>{step.failed}</td>
+                              <td className={`px-4 py-3 font-semibold text-xs ${step.skipped > 0 ? "text-amber-600": "text-gray-300"}`}>{step.skipped}</td>
+                              <td className={`px-4 py-3 font-semibold text-xs ${step.pending > 0 ? "text-blue-600" : "text-gray-300"}`}>{step.pending}</td>
+                              <td className="px-4 py-3 text-xs">
+                                <span className={`font-bold ${step.reachRate >= 60 ? "text-emerald-700" : step.reachRate >= 30 ? "text-amber-600" : "text-red-600"}`}>
+                                  {step.reachRate}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ══ REPLIES ══════════════════════════════════════════════════════ */}
+              {detailTab === "replies" && (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-muted-foreground" />
@@ -1539,9 +1693,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       This is an approximation — messages may not be direct replies to the campaign.
                     </p>
                     {a.totals.sent === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground">
-                        <Mail className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs">No emails sent yet — reply estimate unavailable.</p>
+                      <div className="text-center py-8">
+                        <Mail className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+                        <p className="text-xs text-muted-foreground">No emails sent yet — reply estimate unavailable.</p>
                       </div>
                     ) : (
                       <>
@@ -1552,10 +1706,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                           </span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-violet-400 rounded-full transition-all"
-                            style={{ width: `${a.replyEstimate.rate}%` }}
-                          />
+                          <div className="h-full bg-violet-400 rounded-full transition-all" style={{ width: `${a.replyEstimate.rate}%` }} />
                         </div>
                         {a.replyEstimate.count === 0 && (
                           <p className="text-xs text-muted-foreground italic">
@@ -1566,83 +1717,96 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     )}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Recipient Status Table */}
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <h2 className="text-sm font-bold text-foreground">Recipient Status</h2>
-                  <span className="text-xs text-muted-foreground ml-1">({a.recentRecipients.length})</span>
+              {/* ══ ENROLLED LEADS ═══════════════════════════════════════════════ */}
+              {detailTab === "enrolled" && (
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    <h2 className="text-sm font-bold text-foreground">Enrolled Leads</h2>
+                    <span className="text-xs text-muted-foreground ml-1">({a.recentRecipients.length})</span>
+                  </div>
+                  {a.recentRecipients.length === 0 ? (
+                    <div className="py-14 text-center">
+                      <Users className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-foreground mb-1">No enrolled leads yet</p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Add recipients via the Campaign Builder or enroll contacts through the Sequence Builder.
+                      </p>
+                      {campaignId && (
+                        <button
+                          onClick={() => openCampaign({ id: campaignId, name: campaignName, subject: "", body: "", status: campaignStatus, createdAt: "", updatedAt: "" })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          Open Campaign Builder
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 bg-gray-50">
+                            {["Name","Email","DISC Style","Status","Sent At","Error"].map(h => (
+                              <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {a.recentRecipients.map(rec => {
+                            const style = rec.discStyleUsed as DiscStyle | null;
+                            const meta  = style ? DISC_META[style] : null;
+                            return (
+                              <tr key={rec.leadId} className={`transition-colors ${
+                                rec.status === "sent"    ? "bg-emerald-50/30" :
+                                rec.status === "failed"  ? "bg-red-50/30"     :
+                                rec.status === "skipped" ? "bg-amber-50/20"   : ""
+                              }`}>
+                                <td className="px-4 py-3 font-medium text-xs text-foreground">{rec.name}</td>
+                                <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[140px]">{rec.email || "—"}</td>
+                                <td className="px-4 py-3">
+                                  {meta && style
+                                    ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {style}</span>
+                                    : <span className="text-gray-300 text-xs">—</span>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {rec.status === "sent" && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                      <CheckCircle2 className="w-3 h-3" /> Sent
+                                    </span>
+                                  )}
+                                  {rec.status === "failed" && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                                      <XCircle className="w-3 h-3" /> Failed
+                                    </span>
+                                  )}
+                                  {rec.status === "skipped" && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                      <SkipForward className="w-3 h-3" /> Skipped
+                                    </span>
+                                  )}
+                                  {rec.status === "selected" && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                                      <Clock className="w-3 h-3" /> Pending
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-muted-foreground">
+                                  {rec.sentAt ? new Date(rec.sentAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-red-500 max-w-[160px] truncate" title={rec.lastError ?? ""}>
+                                  {rec.lastError ?? ""}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-                {a.recentRecipients.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground">
-                    <Users className="w-6 h-6 mx-auto mb-2 opacity-20" />
-                    <p className="text-xs">No recipients added to this campaign yet.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-100 bg-gray-50">
-                          {["Name","Email","DISC Style","Status","Sent At","Error"].map(h => (
-                            <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {a.recentRecipients.map(rec => {
-                          const style = rec.discStyleUsed as DiscStyle | null;
-                          const meta  = style ? DISC_META[style] : null;
-                          return (
-                            <tr key={rec.leadId} className={`transition-colors ${
-                              rec.status === "sent"    ? "bg-emerald-50/30" :
-                              rec.status === "failed"  ? "bg-red-50/30"     :
-                              rec.status === "skipped" ? "bg-amber-50/20"   : ""
-                            }`}>
-                              <td className="px-4 py-3 font-medium text-xs text-foreground">{rec.name}</td>
-                              <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[140px]">{rec.email || "—"}</td>
-                              <td className="px-4 py-3">
-                                {meta && style
-                                  ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {style}</span>
-                                  : <span className="text-gray-300 text-xs">—</span>}
-                              </td>
-                              <td className="px-4 py-3">
-                                {rec.status === "sent" && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                                    <CheckCircle2 className="w-3 h-3" /> Sent
-                                  </span>
-                                )}
-                                {rec.status === "failed" && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
-                                    <XCircle className="w-3 h-3" /> Failed
-                                  </span>
-                                )}
-                                {rec.status === "skipped" && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                                    <SkipForward className="w-3 h-3" /> Skipped
-                                  </span>
-                                )}
-                                {rec.status === "selected" && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-                                    <Clock className="w-3 h-3" /> Pending
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-muted-foreground">
-                                {rec.sentAt ? new Date(rec.sentAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-red-500 max-w-[160px] truncate" title={rec.lastError ?? ""}>
-                                {rec.lastError ?? ""}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+              )}
             </>
           )}
 

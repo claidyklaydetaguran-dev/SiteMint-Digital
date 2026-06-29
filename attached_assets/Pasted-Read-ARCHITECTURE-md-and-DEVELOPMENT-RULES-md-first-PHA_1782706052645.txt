@@ -1,0 +1,111 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-6 — Campaign Detail Tabs + Email Activity Auto-Load
+
+MODULE:
+Campaign frontend only.
+
+GOAL:
+Finish the Campaign UX polish by making the campaign detail page easier to navigate and making Email Activity useful without manual per-row loading.
+
+DO:
+
+* Improve Campaign Detail view.
+* Improve Email Activity tab.
+* Keep all backend APIs unchanged.
+* Keep Campaign send/scheduler behavior unchanged.
+* Keep routes unchanged.
+* Keep existing campaign builder, sequence, queue functionality working.
+
+DO NOT:
+
+* Touch backend.
+* Touch database schema.
+* Touch Twilio.
+* Add AI.
+* Refactor unrelated files.
+* Remove existing functionality.
+
+TASK 1 — Campaign Detail Tabs
+
+In CrmCampaigns.tsx, when a campaign is opened/detail view is active, add tab navigation:
+
+Tabs:
+
+* Steps & Info
+* Enrolled Leads
+* Email Report
+* SMS Automation
+* Replies
+
+Behavior:
+
+* Steps & Info: show objective, sequence summary, and step/timeline content if already available.
+* Enrolled Leads: show recipient/enrollment list if already available; otherwise show a clean “No enrolled leads yet” state with link/button to Sequence Builder.
+* Email Report: show analytics metrics already available.
+* SMS Automation: show SMS-related step summary if available; otherwise show “No SMS steps yet.”
+* Replies: show reply/activity data if available; otherwise show “No replies yet.”
+
+Do not create new backend endpoints. Use data already loaded or existing endpoints only.
+
+TASK 2 — Email Activity Auto-Load
+
+When the Email Activity tab is opened:
+
+* Automatically fetch analytics for all visible campaigns in parallel using existing analytics endpoint.
+* Show loading state while fetching.
+* Fill Sent / Failed / Open Rate columns automatically.
+* Remove the manual “Load” link if no longer needed.
+* Handle individual failed analytics calls gracefully.
+
+TASK 3 — Campaign Card Contact Preview
+
+If campaign list data already includes recipient names:
+
+* Show up to 5 initials/name pills on each campaign card.
+  If not available:
+* Do not add backend calls per row.
+* Show “View enrolled leads” only in the campaign detail.
+
+TASK 4 — Responsiveness
+
+Ensure:
+
+* Detail tabs wrap on tablet/mobile.
+* Email Activity table remains horizontally scrollable.
+* Campaign cards do not clip.
+* Detail header actions stack on mobile.
+
+TASK 5 — Testing
+
+Test:
+
+* /admin/crm/campaigns loads.
+* Campaign card opens detail.
+* Detail tabs render.
+* Switching tabs does not crash.
+* Enrolled Leads tab empty/data state works.
+* Email Report tab shows metrics.
+* SMS Automation tab works.
+* Replies tab works.
+* Email Activity tab auto-loads analytics.
+* Search/filter still works.
+* Campaign Builder still works.
+* Campaign Queue still works.
+* TypeScript clean.
+* No backend/schema/Twilio changes.
+* No console errors.
+
+FINAL REPORT:
+Return:
+
+1. Files inspected
+2. Files changed
+3. Campaign detail tabs behavior
+4. Email Activity auto-load behavior
+5. Campaign card preview behavior
+6. Responsive behavior
+7. Tests performed
+8. Backend/schema/Twilio confirmation
+9. Known limitations
+10. Recommended next UX phase
