@@ -1,0 +1,128 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+PHASE UX-2 — Navigation Shell Redesign
+
+MODULE:
+CRM frontend layout only.
+
+GOAL:
+Replace the current flat CRM top navigation with a cleaner ClickUp-style left navigation system.
+
+DO:
+
+* Rebuild CrmLayout.tsx navigation shell.
+* Keep all existing routes unchanged.
+* Keep all existing modals/actions working.
+* Keep global search working.
+* Keep profile/logout working.
+* Keep Email, Phone, SMS, New Person, Bell actions working.
+
+DO NOT:
+
+* Touch backend.
+* Touch database schema.
+* Touch Twilio.
+* Touch Campaign logic.
+* Change routes.
+* Remove working pages.
+* Refactor unrelated files.
+
+IMPLEMENT:
+
+1. Left icon rail
+   Width: compact 48–56px.
+   Icons:
+
+* Home
+* Sales
+* Marketing
+* Operations
+* Intelligence
+* Settings
+
+2. Expanded sidebar
+   Width: around 240px.
+   Grouped navigation:
+
+HOME
+
+* Command Center → /admin/crm/dashboard
+* My Day / Tasks → /admin/crm/tasks
+* Inbox → /admin/crm/inbox
+* Calendar → /admin/crm/calendar
+
+SALES
+
+* Contacts → /admin/crm/leads
+* Pipeline → /admin/crm/pipeline
+* Deals → /admin/crm/deals
+
+MARKETING
+
+* Campaigns → /admin/crm/campaigns
+* Email Templates → /admin/crm/email-templates
+
+OPERATIONS
+
+* Discovery → /admin/crm/discovery
+* Projects → /admin/crm/projects
+* Import Contacts → /admin/crm/import
+
+INTELLIGENCE
+
+* Reporting → /admin/crm/reporting
+
+SETTINGS
+
+* System Settings → /admin/crm/settings
+* Admin Hub → /admin/crm/admin
+
+3. Rename labels
+
+* Dashboard → Command Center
+* People → Contacts
+* Lead Pipeline → Pipeline
+* Deals Kanban → Deals
+* Admin → Admin Hub
+
+4. Topbar
+   Simplify topbar to:
+
+* workspace name / logo
+* global search
+* quick actions
+* notifications
+* profile dropdown
+
+5. Delete dead file
+   Delete CrmDashboard.tsx only if confirmed no route imports it.
+
+6. Polish
+
+* Active state for icon rail and sidebar item.
+* Smooth hover state.
+* Sidebar scroll if needed.
+* Responsive behavior for smaller screens.
+* No nav overflow.
+
+TEST:
+
+* /admin/crm/dashboard
+* /admin/crm/leads
+* /admin/crm/leads/:id
+* /admin/crm/pipeline
+* /admin/crm/deals
+* /admin/crm/inbox
+* /admin/crm/campaigns
+* /admin/crm/discovery
+* /admin/crm/projects
+* /admin/crm/reporting
+* /admin/crm/settings
+* /admin/crm/admin
+* Global search
+* New lead modal
+* Email/SMS/phone quick actions
+* Profile logout
+
+FINAL REPORT:
+Return files changed, routes tested, deleted files, nav behavior, known limitations, and next UX phase.
