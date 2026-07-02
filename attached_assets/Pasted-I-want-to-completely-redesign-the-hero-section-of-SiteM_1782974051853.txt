@@ -1,0 +1,301 @@
+I want to completely redesign the hero section of SiteMint Digital.
+
+DO NOT simply replace the background image.
+
+Instead, build an entire premium hero scene similar to websites from:
+
+• Apple
+• Stripe
+• Linear
+• Framer
+• Vercel
+• HubSpot
+• Webflow
+
+The hero should feel like a $100M SaaS company.
+
+--------------------------------
+
+GENERAL STYLE
+
+Clean.
+Luxury.
+Minimal.
+Premium.
+Modern.
+3D.
+Enterprise software.
+
+NOT generic AI art.
+
+NOT stock photos.
+
+NOT cartoon.
+
+NOT overly futuristic.
+
+Everything should feel realistic.
+
+--------------------------------
+
+LAYOUT
+
+The hero is split into two sections.
+
+LEFT (45%)
+
+Large headline
+
+Supporting paragraph
+
+CTA buttons
+
+Lots of whitespace.
+
+RIGHT (55%)
+
+Large realistic laptop
+
+Tablet
+
+Phone
+
+Floating UI cards
+
+Analytics
+
+CRM dashboard
+
+Automation cards
+
+Connection lines
+
+Soft glowing elements
+
+Everything should feel connected.
+
+--------------------------------
+
+3D PRODUCT MOCKUP
+
+The laptop should be approximately 40% larger than the current one.
+
+It should overlap slightly into the center.
+
+The dashboard should look like a real CRM.
+
+Include:
+
+Pipeline
+
+Charts
+
+Tasks
+
+Revenue
+
+Messages
+
+Calendar
+
+Automation
+
+Lead management
+
+The dashboard must be readable.
+
+No fake lorem ipsum.
+
+No AI gibberish.
+
+Use clean UI blocks.
+
+--------------------------------
+
+FLOATING CARDS
+
+Around the laptop place floating glass cards.
+
+Examples:
+
+AI Automation
+
+CRM Systems
+
+Client Portal
+
+Website Builder
+
+SEO
+
+Google Ads
+
+Analytics
+
+Online Booking
+
+Customer Messaging
+
+These should have subtle shadows and glassmorphism.
+
+They should orbit around the laptop naturally.
+
+--------------------------------
+
+BACKGROUND
+
+Keep the overall background bright.
+
+Mostly white.
+
+Very soft blue gradients.
+
+Large flowing abstract ribbons.
+
+Subtle glowing curves.
+
+Light particle effects.
+
+Fine grid.
+
+Tiny dots.
+
+Very subtle network lines.
+
+Large blurred circles.
+
+Premium lighting.
+
+The background should feel expensive without becoming busy.
+
+--------------------------------
+
+DEPTH
+
+Use multiple depth layers.
+
+Foreground
+
+Midground
+
+Background
+
+Very soft depth-of-field blur.
+
+Everything should have realistic lighting.
+
+--------------------------------
+
+LIGHTING
+
+Use soft daylight.
+
+Blue highlights.
+
+White reflections.
+
+Glass reflections.
+
+Subtle bloom.
+
+Nothing oversaturated.
+
+--------------------------------
+
+COLOR PALETTE
+
+White
+
+#ffffff
+
+Light Blue
+
+#eef6ff
+
+Very Soft Navy
+
+#23395d
+
+Accent Cyan
+
+#27d7ff
+
+Very light gray
+
+No dark background.
+
+--------------------------------
+
+RESPONSIVE
+
+On mobile:
+
+Hide floating cards.
+
+Scale devices.
+
+Center content.
+
+Maintain premium look.
+
+--------------------------------
+
+HEADLINE
+
+Current:
+
+AI-Powered Websites &
+Business Systems
+That Help You Get More Customers.
+
+Animate only the last word.
+
+Rotate every 2 seconds.
+
+Customers
+
+Leads
+
+Appointments
+
+Sales
+
+Clients
+
+Revenue
+
+Growth
+
+Conversions
+
+The animation should:
+
+Fade
+
+Slide vertically
+
+Never move surrounding text
+
+No layout shift.
+
+--------------------------------
+
+PERFORMANCE
+
+Do NOT use a giant raster image.
+
+Instead:
+
+Create the hero using layered SVGs, gradients, CSS shapes, subtle animated particles, and high-resolution transparent PNG/WebP product mockups.
+
+This keeps the hero crisp at any resolution, lightweight, and fully responsive.
+
+--------------------------------
+
+FINAL GOAL
+
+When someone lands on the homepage, the first impression should immediately communicate:
+
+"This company builds premium software, websites, AI automation, and business systems for growing businesses."
+
+The hero should look like it belongs to a company worth tens of millions of dollars—not a typical web design agency.
