@@ -42,15 +42,3 @@ id = "MZ_jNA13rQ9RcCeYxMczD"
 uri = "file://artifacts/web-agency/public/portfolio-claidy.png"
 type = "image"
 title = "claidy developer portfolio website mockup"
-
-[[generated]]
-id = "9pEJdBys3K5GEJ7OrCDdl"
-uri = "file://attached_assets/generated_images/hero_bg_4k.png"
-type = "image"
-title = "SaaS hero background 4k"
-
-[[generated]]
-id = "z-l0eBbP8uwKvFjmpAmpY"
-uri = "file://attached_assets/generated_images/hero_bg_4k_v2.png"
-type = "image"
-title = "SaaS hero devices on desk v2"
