@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Sparkles, Users2, Globe, BarChart3, ArrowRight } from "lucide-react";
 
 const NAV = ["Home", "Services", "Pricing", "Portfolio", "About"];
@@ -9,6 +10,7 @@ const FLOAT_CARDS = [
     desc: "Workflows that save time and increase revenue",
     top: "0%",
     right: "32%",
+    tint: "bg-[#2563EB]",
   },
   {
     icon: Users2,
@@ -16,6 +18,7 @@ const FLOAT_CARDS = [
     desc: "Manage leads, clients & communications",
     top: "15%",
     right: "2%",
+    tint: "bg-[#182b47]",
   },
   {
     icon: Globe,
@@ -23,6 +26,7 @@ const FLOAT_CARDS = [
     desc: "Beautiful, fast & optimized for conversions",
     top: "31%",
     right: "34%",
+    tint: "bg-[#0ea5b8]",
   },
   {
     icon: BarChart3,
@@ -30,15 +34,75 @@ const FLOAT_CARDS = [
     desc: "Track performance and scale with confidence",
     top: "44%",
     right: "10%",
+    tint: "bg-[#182b47]",
   },
 ];
+
+const ROTATING_WORDS = ["Customers", "Clients", "Patients", "Members", "Leads"];
+
+function RotatingWord() {
+  const [index, setIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      const swap = setTimeout(() => {
+        setIndex((i) => (i + 1) % ROTATING_WORDS.length);
+        setVisible(true);
+      }, 320);
+      return () => clearTimeout(swap);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="relative inline-block align-baseline text-[#2563EB]">
+      <span
+        className="inline-block transition-all duration-300 ease-out"
+        style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0px)" : "translateY(8px)",
+        }}
+      >
+        {ROTATING_WORDS[index]}
+      </span>
+    </span>
+  );
+}
+
+function ParticlesOverlay() {
+  const dots = [
+    [120, 40], [220, 90], [340, 50], [420, 130], [180, 160],
+    [300, 200], [60, 120], [400, 30], [260, 140], [140, 210],
+  ];
+  return (
+    <svg className="absolute top-0 right-0 w-[520px] h-[300px] opacity-40 pointer-events-none" viewBox="0 0 460 240">
+      {dots.map(([x, y], i) =>
+        dots.slice(i + 1).map(([x2, y2], j) => {
+          const dist = Math.hypot(x - x2, y - y2);
+          if (dist > 140) return null;
+          return (
+            <line key={`${i}-${j}`} x1={x} y1={y} x2={x2} y2={y2} stroke="#27d7ff" strokeWidth="0.6" opacity={0.5} />
+          );
+        })
+      )}
+      {dots.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 2.6 : 1.6} fill="#2563EB" opacity={0.7} />
+      ))}
+    </svg>
+  );
+}
 
 function LaptopScreen() {
   return (
     <div className="w-full h-full bg-[#182b47] rounded-t-[6px] p-3.5 flex flex-col gap-2.5 overflow-hidden">
-      <div>
-        <div className="text-white font-semibold text-[13px] leading-tight">Elevate Your Business</div>
-        <div className="text-white font-semibold text-[13px] leading-tight">With Smart Digital Solutions</div>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-white font-semibold text-[13px] leading-tight">Elevate Your Business</div>
+          <div className="text-white font-semibold text-[13px] leading-tight">With Smart Digital Solutions</div>
+        </div>
+        <div className="text-[7px] text-[#27d7ff] bg-white/10 rounded px-1.5 py-1">Get Started</div>
       </div>
       <div className="grid grid-cols-4 gap-1.5">
         {[Sparkles, Users2, Globe, BarChart3].map((Icon, i) => (
@@ -132,12 +196,18 @@ export function Reference() {
 
       {/* Background layers */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[60%] h-[110%] bg-gradient-to-bl from-[#eef6ff] via-[#eef6ff]/60 to-transparent" />
-        <div className="absolute -top-32 -left-20 w-[520px] h-[520px] rounded-full bg-[#eef6ff] blur-3xl opacity-70" />
-        <div className="absolute top-40 right-10 w-[420px] h-[420px] rounded-full bg-[#27d7ff]/10 blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[500px] rounded-full bg-[#23395d]/5 blur-3xl" />
+        <img
+          src="/__mockup/images/hero-bg-atmosphere.png"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-white" />
+        {/* light overlay glow */}
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] rounded-full bg-white/60 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[400px] rounded-full bg-[#27d7ff]/10 blur-3xl" />
         {/* fine grid */}
-        <svg className="absolute top-0 right-0 w-full h-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
+        <svg className="absolute top-0 right-0 w-full h-full opacity-[0.05]" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
               <path d="M 36 0 L 0 0 0 36" fill="none" stroke="#23395d" strokeWidth="1" />
@@ -145,14 +215,18 @@ export function Reference() {
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
-        {/* ribbon */}
-        <svg className="absolute top-10 left-1/3 w-[700px] h-[300px] opacity-30" viewBox="0 0 700 300" fill="none">
-          <path d="M0 150 C 150 30, 350 260, 700 90" stroke="#27d7ff" strokeWidth="2" fill="none" />
-        </svg>
+        <ParticlesOverlay />
       </div>
 
+      {/* Plant decoration */}
+      <img
+        src="/__mockup/images/plant-decoration.png"
+        alt=""
+        className="absolute -right-6 bottom-0 h-[420px] w-auto object-contain opacity-95 pointer-events-none z-10 drop-shadow-2xl hidden xl:block"
+      />
+
       {/* Hero content */}
-      <div className="relative z-10 px-10 pt-10 pb-24 grid grid-cols-1 lg:grid-cols-[45fr_55fr] gap-8 items-center">
+      <div className="relative z-20 px-10 pt-10 pb-24 grid grid-cols-1 lg:grid-cols-[45fr_55fr] gap-8 items-center">
         {/* Left 45% */}
         <div className="max-w-xl">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#eef6ff] border border-[#c9e5ff] text-[#23395d] text-xs font-semibold rounded-full mb-7">
@@ -161,7 +235,8 @@ export function Reference() {
           </div>
 
           <h1 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-[#182b47] leading-[1.15] tracking-tight mb-6">
-            AI-Powered Websites &amp; Business Systems That Help You Get More Customers
+            AI-Powered Websites &amp; Business Systems That Help You Get More{" "}
+            <RotatingWord />
           </h1>
 
           <p className="text-base text-gray-500 leading-relaxed mb-9">
@@ -182,20 +257,25 @@ export function Reference() {
 
         {/* Right 55% - device mockup + floating cards */}
         <div className="relative h-[560px] hidden lg:block">
-          {/* Laptop - 40% larger, shifted left so cards + phone/tablet sit clear on the right */}
+          {/* device shadow */}
+          <div className="absolute left-10 bottom-2 w-[380px] h-6 bg-[#182b47]/20 rounded-full blur-2xl" />
+
+          {/* Laptop */}
           <div className="absolute left-0 bottom-0 w-[430px] z-0">
-            <div className="rounded-t-[10px] bg-[#0b1a2e] p-2.5 shadow-2xl">
-              <div className="aspect-[16/10]">
-                <LaptopScreen />
+            <div className="rounded-t-[10px] bg-gradient-to-b from-[#e8ebef] to-[#c7cdd6] p-[3px] shadow-2xl">
+              <div className="rounded-t-[8px] bg-[#0b1a2e] p-2">
+                <div className="aspect-[16/10]">
+                  <LaptopScreen />
+                </div>
               </div>
             </div>
-            <div className="h-3.5 bg-gradient-to-b from-[#1f2f45] to-[#0b1a2e] rounded-b-[6px] mx-[-14px]" />
-            <div className="h-1.5 bg-[#0b1a2e]/80 rounded-b-full mx-10" />
+            <div className="h-[10px] bg-gradient-to-b from-[#d7dce2] to-[#aab1bb] rounded-b-[3px]" />
+            <div className="h-[6px] w-[70%] mx-auto bg-gradient-to-b from-[#c3c9d1] to-[#9aa1ab] rounded-b-[10px]" />
           </div>
 
           {/* Tablet - back-right, raised slightly */}
           <div className="absolute right-2 bottom-10 w-[136px] z-10">
-            <div className="rounded-[16px] bg-[#0b1a2e] p-2 shadow-2xl border border-black/20">
+            <div className="rounded-[16px] bg-gradient-to-b from-[#1a1a1a] to-[#0b0b0b] p-2 shadow-2xl border border-black/30">
               <div className="aspect-[3/4]">
                 <TabletScreen />
               </div>
@@ -204,7 +284,7 @@ export function Reference() {
 
           {/* Phone - front, overlapping laptop's bottom-right corner slightly */}
           <div className="absolute right-[130px] bottom-0 w-[102px] z-20">
-            <div className="rounded-[24px] bg-[#0b1a2e] p-1.5 shadow-2xl border border-black/20">
+            <div className="rounded-[24px] bg-gradient-to-b from-[#1a1a1a] to-[#0b0b0b] p-1.5 shadow-2xl border border-black/30">
               <div className="aspect-[9/19]">
                 <PhoneScreen />
               </div>
@@ -215,16 +295,16 @@ export function Reference() {
           {FLOAT_CARDS.map((c) => (
             <div
               key={c.title}
-              className="absolute w-[178px] rounded-2xl px-3.5 py-3 flex items-start gap-2.5 shadow-xl border border-white/60 z-30"
+              className="absolute w-[178px] rounded-2xl px-3.5 py-3 flex items-start gap-2.5 shadow-xl border border-white/70 z-30"
               style={{
                 top: c.top,
                 right: c.right,
-                background: "rgba(255,255,255,0.72)",
+                background: "rgba(255,255,255,0.78)",
                 backdropFilter: "blur(14px)",
               }}
             >
-              <div className="w-8 h-8 rounded-lg bg-[#eef6ff] flex items-center justify-center flex-shrink-0">
-                <c.icon className="w-4 h-4 text-[#23395d]" />
+              <div className={`w-8 h-8 ${c.title === "AI Automation" ? "rounded-full" : "rounded-lg"} ${c.tint} flex items-center justify-center flex-shrink-0`}>
+                <c.icon className="w-4 h-4 text-white" />
               </div>
               <div>
                 <div className="text-xs font-bold text-[#182b47] leading-tight">{c.title}</div>
@@ -232,9 +312,6 @@ export function Reference() {
               </div>
             </div>
           ))}
-
-          {/* soft glow under devices */}
-          <div className="absolute left-10 bottom-0 w-[380px] h-10 bg-[#23395d]/10 rounded-full blur-2xl -z-10" />
         </div>
       </div>
     </div>

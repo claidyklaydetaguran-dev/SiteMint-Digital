@@ -42,3 +42,15 @@ id = "MZ_jNA13rQ9RcCeYxMczD"
 uri = "file://artifacts/web-agency/public/portfolio-claidy.png"
 type = "image"
 title = "claidy developer portfolio website mockup"
+
+[[generated]]
+id = "0yGJUrHzW2_Eaq0uKcmh7"
+uri = "file://artifacts/mockup-sandbox/public/images/hero-bg-atmosphere.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "Ej44e2rfr1Fz0L-O4Sm0u"
+uri = "file://artifacts/mockup-sandbox/public/images/plant-decoration.png"
+type = "image"
+title = "generated_image"
