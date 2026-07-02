@@ -48,3 +48,9 @@ id = "9pEJdBys3K5GEJ7OrCDdl"
 uri = "file://attached_assets/generated_images/hero_bg_4k.png"
 type = "image"
 title = "SaaS hero background 4k"
+
+[[generated]]
+id = "z-l0eBbP8uwKvFjmpAmpY"
+uri = "file://attached_assets/generated_images/hero_bg_4k_v2.png"
+type = "image"
+title = "SaaS hero devices on desk v2"
