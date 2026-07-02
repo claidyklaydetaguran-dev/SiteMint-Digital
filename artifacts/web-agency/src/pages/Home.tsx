@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { RotatingWord } from "@/components/RotatingWord";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -87,8 +88,18 @@ export default function Home() {
     <div className="w-full">
       {/* Hero Section */}
       <section className="relative pt-20 pb-32 md:pt-32 md:pb-48 overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+        <picture>
+          <source srcSet="/hero-bg-4k.webp" type="image/webp" />
+          <img
+            src="/hero-bg-4k.png"
+            alt=""
+            aria-hidden="true"
+            fetchPriority="high"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+          />
+        </picture>
         <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/60 via-background/30 to-background pointer-events-none" />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-background via-background/70 to-transparent pointer-events-none" />
 
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="max-w-4xl">
@@ -98,7 +109,12 @@ export default function Home() {
                 Now accepting new clients
               </div>
               <h1 className="text-5xl md:text-7xl font-serif font-bold text-foreground leading-[1.1] tracking-tight mb-8">
-                AI-Powered Websites &amp; Business Systems That Help You Get More Customers.
+                AI-Powered Websites &amp; Business Systems That Help You Get More{" "}
+                <RotatingWord
+                  words={["Customers", "Leads", "Bookings", "Sales", "Clients", "Growth"]}
+                  className="text-primary"
+                />
+                .
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mb-10">
                 We build growth-focused websites, CRM systems, automation workflows, client portals, and custom business applications for service businesses, nonprofits, real estate professionals, and growing organizations.
