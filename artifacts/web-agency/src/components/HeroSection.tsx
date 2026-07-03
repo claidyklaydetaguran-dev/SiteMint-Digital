@@ -1129,8 +1129,8 @@ export function HeroSection() {
                 background: "rgba(219,234,254,0.85)",
                 border: "1px solid rgba(147,197,253,0.55)",
                 borderRadius: 100,
-                padding: "6px 14px",
-                marginBottom: 24,
+                padding: "7px 16px",
+                marginBottom: 28,
                 backdropFilter: "blur(8px)",
               }}
             >
@@ -1141,6 +1141,7 @@ export function HeroSection() {
                   borderRadius: "50%",
                   background: "#34d399",
                   display: "inline-block",
+                  flexShrink: 0,
                 }}
                 animate={{
                   boxShadow: [
@@ -1151,7 +1152,7 @@ export function HeroSection() {
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <span style={{ fontSize: 13, fontWeight: 600, color: DEEP_NAVY }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: DEEP_NAVY }}>
                 Now accepting new clients
               </span>
             </motion.div>
@@ -1162,24 +1163,27 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.1 }}
               style={{
-                fontSize: "clamp(26px, 2.6vw, 40px)",
+                fontSize: "clamp(34px, 3.4vw, 54px)",
                 fontWeight: 900,
                 color: "#0F172A",
-                lineHeight: 1.18,
-                letterSpacing: "-0.02em",
-                marginBottom: 18,
+                lineHeight: 1.14,
+                letterSpacing: "-0.025em",
+                marginBottom: 24,
                 fontFamily: "Playfair Display, Georgia, serif",
               }}
             >
-              AI-Powered Websites &amp; Business Systems That Help You Get More{" "}
-              {mounted && (
-                <FlipWords
-                  words={WORDS}
-                  duration={2600}
-                  className="font-black"
-                  style={{ color: DEEP_NAVY } as React.CSSProperties}
-                />
-              )}
+              AI-Powered Websites &amp; Business Systems
+              <span style={{ display: "block", marginTop: 4 }}>
+                That Help You Get More{" "}
+                {mounted && (
+                  <FlipWords
+                    words={WORDS}
+                    duration={2600}
+                    className="font-black"
+                    style={{ color: DEEP_NAVY } as React.CSSProperties}
+                  />
+                )}
+              </span>
             </motion.h1>
 
             {/* Body */}
@@ -1188,11 +1192,11 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               style={{
-                fontSize: 15,
+                fontSize: 17,
                 color: "#475569",
-                lineHeight: 1.72,
-                marginBottom: 28,
-                maxWidth: 440,
+                lineHeight: 1.75,
+                marginBottom: 34,
+                maxWidth: 480,
               }}
             >
               We build growth-focused websites, CRM systems, automation workflows,
@@ -1205,7 +1209,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.28 }}
-              style={{ display: "flex", gap: 12, marginBottom: 26, alignItems: "center", flexWrap: "wrap" }}
+              style={{ display: "flex", gap: 14, marginBottom: 30, alignItems: "center", flexWrap: "wrap" }}
             >
               <Link href="/discovery">
                 <Button
@@ -1213,19 +1217,19 @@ export function HeroSection() {
                   className="!bg-[#062e71] hover:!bg-[#0a3d91] hover:shadow-[0_8px_28px_rgba(6,46,113,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
                   style={{
                     color: "#fff",
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 700,
-                    padding: "12px 18px",
+                    padding: "14px 22px",
                     borderRadius: 10,
                     height: "auto",
                     display: "flex",
                     alignItems: "center",
-                    gap: 7,
+                    gap: 8,
                     whiteSpace: "nowrap",
                   }}
                   data-testid="button-hero-primary"
                 >
-                  Get My Free Business Growth Assessment <ArrowRight size={15} />
+                  Get My Free Business Growth Assessment <ArrowRight size={16} />
                 </Button>
               </Link>
               <Link href="/portfolio">
@@ -1233,9 +1237,9 @@ export function HeroSection() {
                   size="lg"
                   variant="outline"
                   style={{
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 600,
-                    padding: "12px 18px",
+                    padding: "14px 22px",
                     borderRadius: 10,
                     height: "auto",
                     border: "1.5px solid #CBD5E1",
