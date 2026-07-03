@@ -1169,8 +1169,8 @@ export function HeroSection() {
 
             {/* Floating 3D Feature Cards — scattered around the device image */}
             <Feature3DCard card={FEATURE_CARDS[0]} style={{ top: 0,   right: -10 }} />
-            <Feature3DCard card={FEATURE_CARDS[1]} style={{ top: 64,  left: "28%" }} />
-            <Feature3DCard card={FEATURE_CARDS[2]} style={{ bottom: 60, left: 0 }} />
+            <Feature3DCard card={FEATURE_CARDS[1]} style={{ top: 24,  left: "28%" }} />
+            <Feature3DCard card={FEATURE_CARDS[2]} style={{ bottom: 20, left: 0 }} />
             <Feature3DCard card={FEATURE_CARDS[3]} style={{ bottom: 0, right: 0 }} />
 
             {/* Devices — real image with 3D zoom-on-hover */}
