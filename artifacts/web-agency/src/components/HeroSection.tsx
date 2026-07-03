@@ -1003,10 +1003,10 @@ export function HeroSection() {
         style={{
           maxWidth: 1380,
           margin: "0 auto",
-          paddingLeft: 56,
-          paddingRight: 16,
-          paddingTop: 52,
-          paddingBottom: 60,
+          paddingLeft: 64,
+          paddingRight: 24,
+          paddingTop: 64,
+          paddingBottom: 72,
           position: "relative",
           zIndex: 10,
         }}
@@ -1014,7 +1014,7 @@ export function HeroSection() {
         <div style={{ display: "flex", alignItems: "flex-start", gap: 20, minHeight: 560 }}>
 
           {/* ── LEFT column ── */}
-          <div style={{ flex: "0 0 40%", maxWidth: "40%", paddingTop: 24 }}>
+          <div style={{ flex: "0 0 42%", maxWidth: "42%", paddingTop: 32 }}>
 
             {/* Badge */}
             <motion.div
@@ -1028,8 +1028,8 @@ export function HeroSection() {
                 background: "rgba(219,234,254,0.85)",
                 border: "1px solid rgba(147,197,253,0.55)",
                 borderRadius: 100,
-                padding: "6px 14px",
-                marginBottom: 24,
+                padding: "7px 16px",
+                marginBottom: 28,
                 backdropFilter: "blur(8px)",
               }}
             >
@@ -1061,12 +1061,12 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.1 }}
               style={{
-                fontSize: "clamp(26px, 2.6vw, 40px)",
+                fontSize: "clamp(28px, 2.9vw, 46px)",
                 fontWeight: 900,
-                color: "#0F172A",
-                lineHeight: 1.18,
-                letterSpacing: "-0.02em",
-                marginBottom: 18,
+                color: "#0B1220",
+                lineHeight: 1.2,
+                letterSpacing: "-0.025em",
+                marginBottom: 22,
                 fontFamily: "Playfair Display, Georgia, serif",
               }}
             >
@@ -1087,11 +1087,11 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               style={{
-                fontSize: 15,
-                color: "#475569",
-                lineHeight: 1.72,
-                marginBottom: 28,
-                maxWidth: 440,
+                fontSize: 16,
+                color: "#2d3f5c",
+                lineHeight: 1.78,
+                marginBottom: 36,
+                maxWidth: 460,
               }}
             >
               We build growth-focused websites, CRM systems, automation workflows,
@@ -1104,7 +1104,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.28 }}
-              style={{ display: "flex", gap: 12, marginBottom: 26, alignItems: "center", flexWrap: "wrap" }}
+              style={{ display: "flex", gap: 14, marginBottom: 32, alignItems: "center", flexWrap: "wrap" }}
             >
               <Link href="/discovery">
                 <Button
