@@ -97,8 +97,17 @@ function WaveBackground() {
   );
 }
 
-// ── 3D Feature Card — techy dark glass ────────────────────────────────────────
+// ── 3D Feature Card — techy dark glass + scan-line hover ─────────────────────
 function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: React.CSSProperties }) {
+  const [hovered, setHovered] = useState(false);
+
+  const brackets = [
+    { top: 0, left: 0, borderTop: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "14px 0 0 0" },
+    { top: 0, right: 0, borderTop: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 14px 0 0" },
+    { bottom: 0, left: 0, borderBottom: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "0 0 0 14px" },
+    { bottom: 0, right: 0, borderBottom: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 0 14px 0" },
+  ];
+
   return (
     <div
       style={{
@@ -108,70 +117,104 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
         animation: `card-entry 0.55s cubic-bezier(0.23,1,0.32,1) ${card.delay + 0.5}s both`,
       }}
       className="hero-feature-card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <CardContainer containerClassName="p-0" className="">
         <CardBody className="w-[178px]">
           <div
             style={{
-              background: "linear-gradient(135deg,rgba(4,12,44,0.96) 0%,rgba(7,22,66,0.93) 100%)",
+              background: hovered
+                ? `linear-gradient(135deg,rgba(4,14,52,0.98) 0%,rgba(8,26,82,0.96) 100%)`
+                : "linear-gradient(135deg,rgba(4,12,44,0.96) 0%,rgba(7,22,66,0.93) 100%)",
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
-              border: "1px solid rgba(59,130,246,0.26)",
+              border: `1px solid ${hovered ? `${card.color}70` : "rgba(59,130,246,0.26)"}`,
               borderRadius: 14,
               padding: "11px 13px 12px",
-              boxShadow:
-                "0 0 0 1px rgba(6,46,113,0.12), 0 14px 44px rgba(6,46,113,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
+              boxShadow: hovered
+                ? `0 0 0 1px ${card.color}28, 0 18px 52px rgba(6,46,113,0.38), 0 0 32px ${card.color}20, inset 0 1px 0 rgba(255,255,255,0.09)`
+                : "0 0 0 1px rgba(6,46,113,0.12), 0 14px 44px rgba(6,46,113,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
               position: "relative",
               overflow: "hidden",
+              cursor: "pointer",
+              transition: "border 0.28s ease, box-shadow 0.32s ease, background 0.28s ease",
             }}
           >
-            {/* Corner brackets */}
-            {[
-              { top: 0, left: 0, borderTop: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "14px 0 0 0" },
-              { top: 0, right: 0, borderTop: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 14px 0 0" },
-              { bottom: 0, left: 0, borderBottom: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "0 0 0 14px" },
-              { bottom: 0, right: 0, borderBottom: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 0 14px 0" },
-            ].map((s, i) => (
+            {/* Corner brackets — brighten on hover */}
+            {brackets.map((s, i) => (
               <div
                 key={i}
                 style={{
                   position: "absolute", width: 10, height: 10,
-                  borderColor: `rgba(59,130,246,0.65)`,
+                  borderColor: hovered ? `${card.color}cc` : "rgba(59,130,246,0.65)",
+                  transition: "border-color 0.28s ease",
                   ...s,
                   pointerEvents: "none",
                 }}
               />
             ))}
 
-            {/* Ambient glow blob */}
-            <div style={{
-              position: "absolute", top: -24, right: -24, width: 90, height: 90,
-              background: `radial-gradient(circle,${card.color}22 0%,transparent 70%)`,
-              pointerEvents: "none",
-            }} />
+            {/* Scan-line sweep — activates on hover */}
+            <motion.div
+              style={{
+                position: "absolute",
+                left: -2, right: -2,
+                height: 2,
+                background: `linear-gradient(90deg,transparent 0%,${card.color}cc 40%,${card.color} 50%,${card.color}cc 60%,transparent 100%)`,
+                boxShadow: `0 0 10px ${card.color}99`,
+                zIndex: 12,
+                pointerEvents: "none",
+              }}
+              initial={{ top: "-4px", opacity: 0 }}
+              animate={hovered
+                ? { top: ["−4px", "110%"], opacity: [0, 1, 1, 0] }
+                : { top: "-4px", opacity: 0 }}
+              transition={{ duration: 0.72, ease: "linear" }}
+            />
+
+            {/* Ambient glow blob — expands on hover */}
+            <motion.div
+              style={{
+                position: "absolute", top: -24, right: -24, width: 90, height: 90,
+                background: `radial-gradient(circle,${card.color}28 0%,transparent 70%)`,
+                pointerEvents: "none",
+              }}
+              animate={hovered ? { scale: 1.7, opacity: 1 } : { scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
 
             {/* Header: icon + title + live dot */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <CardItem translateZ={44} className="flex-shrink-0">
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8,
-                  background: card.iconBg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(6,46,113,0.4), inset 0 1px 0 rgba(255,255,255,0.16)`,
-                }}>
+                <motion.div
+                  style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: card.iconBg,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  animate={hovered
+                    ? { scale: 1.12, boxShadow: `0 0 22px ${card.color}99, 0 4px 10px rgba(6,46,113,0.45), inset 0 1px 0 rgba(255,255,255,0.22)` }
+                    : { scale: 1,    boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(6,46,113,0.40), inset 0 1px 0 rgba(255,255,255,0.16)` }
+                  }
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                >
                   <card.Icon size={13} color="#fff" strokeWidth={2.5} />
-                </div>
+                </motion.div>
               </CardItem>
 
               <CardItem translateZ={26} style={{ flex: 1 }}>
-                <p style={{ fontSize: 11.5, fontWeight: 700, color: "#E2E8F0", lineHeight: 1.2 }}>
+                <p style={{
+                  fontSize: 11.5, fontWeight: 700, lineHeight: 1.2,
+                  color: hovered ? "#F8FAFC" : "#E2E8F0",
+                  transition: "color 0.25s",
+                }}>
                   {card.title}
                 </p>
               </CardItem>
 
               {/* Pulsing live dot */}
               <div
-                className="live-pulse-dot"
                 style={{
                   width: 6, height: 6, borderRadius: "50%",
                   background: "#34d399",
@@ -194,17 +237,30 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
                 height: 3, borderRadius: 2,
                 background: "rgba(59,130,246,0.12)", overflow: "hidden",
               }}>
-                <div style={{
-                  height: "100%", width: `${card.pct}%`,
-                  background: `linear-gradient(90deg,${card.color},${card.color}bb)`,
-                  borderRadius: 2,
-                  boxShadow: `0 0 6px ${card.color}88`,
-                }} />
+                <motion.div
+                  style={{
+                    height: "100%",
+                    background: `linear-gradient(90deg,${card.color},${card.color}bb)`,
+                    borderRadius: 2,
+                    originX: 0,
+                  }}
+                  animate={hovered
+                    ? { width: `${card.pct}%`, boxShadow: `0 0 12px ${card.color}cc` }
+                    : { width: `${card.pct}%`, boxShadow: `0 0 6px ${card.color}88` }
+                  }
+                  transition={{ duration: 0.35 }}
+                />
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 7.5, color: "#475569" }}>{card.metric}</span>
-              <span style={{ fontSize: 8, color: card.color, fontWeight: 700 }}>{card.pct}%</span>
+              <motion.span
+                style={{ fontSize: 8, fontWeight: 700, color: card.color }}
+                animate={hovered ? { scale: 1.1 } : { scale: 1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                {card.pct}%
+              </motion.span>
             </div>
           </div>
         </CardBody>
