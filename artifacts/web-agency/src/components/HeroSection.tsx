@@ -966,7 +966,7 @@ export function HeroSection() {
     <section
       style={{
         minHeight: "calc(100vh - 68px)",
-        background: `linear-gradient(155deg, #dbeafe 0%, #eff6ff 22%, #f8faff 50%, #e0edff 100%)`,
+        background: `linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 20%, #f2f6fd 50%, #dce8f9 80%, #c8d9f5 100%)`,
         position: "relative",
         overflowX: "clip",
       }}
@@ -985,7 +985,7 @@ export function HeroSection() {
         style={{
           position: "absolute", top: -80, right: -80,
           width: 620, height: 620, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(147,197,253,0.22) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(6,46,113,0.14) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
         }}
       />
