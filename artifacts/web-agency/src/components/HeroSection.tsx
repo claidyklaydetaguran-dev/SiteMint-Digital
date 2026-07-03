@@ -1064,6 +1064,11 @@ export function HeroSection() {
         background: `linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 20%, #f2f6fd 50%, #dce8f9 80%, #c8d9f5 100%)`,
         position: "relative",
         overflowX: "clip",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        paddingTop: 110,
+        paddingBottom: 60,
       }}
     >
       {/* Wave layer */}
@@ -1101,8 +1106,8 @@ export function HeroSection() {
           margin: "0 auto",
           paddingLeft: 56,
           paddingRight: 16,
-          paddingTop: 110,
-          paddingBottom: 60,
+          paddingTop: 0,
+          paddingBottom: 0,
           position: "relative",
           zIndex: 10,
         }}
