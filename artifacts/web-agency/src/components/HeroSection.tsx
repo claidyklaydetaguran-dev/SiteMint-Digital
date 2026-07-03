@@ -1038,14 +1038,14 @@ export function HeroSection() {
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: DEEP_NAVY,
+                  background: "#34d399",
                   display: "inline-block",
                 }}
                 animate={{
                   boxShadow: [
-                    "0 0 0 0 rgba(6,46,113,0.4)",
-                    "0 0 0 6px rgba(6,46,113,0)",
-                    "0 0 0 0 rgba(6,46,113,0)",
+                    "0 0 0 0 rgba(52,211,153,0.5)",
+                    "0 0 0 6px rgba(52,211,153,0)",
+                    "0 0 0 0 rgba(52,211,153,0)",
                   ],
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
