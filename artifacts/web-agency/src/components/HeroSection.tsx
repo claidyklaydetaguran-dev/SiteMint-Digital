@@ -1178,7 +1178,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 40, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.32, ease: [0.23, 1, 0.32, 1] }}
-              style={{ width: "100%", zIndex: 2 }}
+              style={{ width: "100%", zIndex: 2, marginTop: 60 }}
             >
               <DeviceImageHover />
             </motion.div>
