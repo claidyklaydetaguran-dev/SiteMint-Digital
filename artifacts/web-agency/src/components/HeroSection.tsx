@@ -15,30 +15,46 @@ const FEATURE_CARDS = [
   {
     id: "ai",
     Icon: Zap,
-    iconBg: "linear-gradient(135deg, #1d4ed8, #2563eb)",
+    iconBg: "linear-gradient(135deg,#7c3aed,#2563eb)",
     title: "AI Automation",
-    desc: "Workflows that save time and increase revenue",
+    desc: "Workflows that save time and boost revenue",
+    metric: "12 active workflows",
+    pct: 87,
+    color: "#818cf8",
+    delay: 0,
   },
   {
     id: "crm",
     Icon: Layout,
-    iconBg: "linear-gradient(135deg, #0369a1, #1d4ed8)",
+    iconBg: "linear-gradient(135deg,#0369a1,#1d4ed8)",
     title: "CRM Systems",
     desc: "Manage leads, clients & communications",
+    metric: "1,248 leads tracked",
+    pct: 74,
+    color: "#38bdf8",
+    delay: 0.08,
   },
   {
     id: "web",
     Icon: Monitor,
-    iconBg: "linear-gradient(135deg, #0891b2, #1d4ed8)",
+    iconBg: "linear-gradient(135deg,#0f766e,#1d4ed8)",
     title: "Custom Websites",
     desc: "Beautiful, fast & optimized for conversions",
+    metric: "99.9% uptime",
+    pct: 99,
+    color: "#34d399",
+    delay: 0.16,
   },
   {
     id: "analytics",
     Icon: BarChart2,
-    iconBg: "linear-gradient(135deg, #4338ca, #1d4ed8)",
+    iconBg: "linear-gradient(135deg,#c026d3,#4338ca)",
     title: "Analytics & Growth",
     desc: "Track performance and scale with confidence",
+    metric: "+24% growth MoM",
+    pct: 68,
+    color: "#e879f9",
+    delay: 0.24,
   },
 ];
 
@@ -80,57 +96,182 @@ function WaveBackground() {
   );
 }
 
-// ── 3D Feature Card ───────────────────────────────────────────────────────────
+// ── 3D Feature Card — techy dark glass ────────────────────────────────────────
 function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: React.CSSProperties }) {
   return (
-    <div style={{ position: "absolute", ...style, zIndex: 20 }}>
+    <div
+      style={{
+        position: "absolute",
+        ...style,
+        zIndex: 20,
+        animation: `card-entry 0.55s cubic-bezier(0.23,1,0.32,1) ${card.delay + 0.5}s both`,
+      }}
+    >
       <CardContainer containerClassName="p-0" className="">
-        <CardBody className="relative w-44">
+        <CardBody className="w-[178px]">
           <div
             style={{
-              background: "rgba(255,255,255,0.92)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255,255,255,0.88)",
+              background: "linear-gradient(135deg,rgba(4,12,44,0.96) 0%,rgba(7,22,66,0.93) 100%)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              border: "1px solid rgba(59,130,246,0.26)",
               borderRadius: 14,
-              padding: "10px 13px",
+              padding: "11px 13px 12px",
               boxShadow:
-                "0 8px 32px rgba(6,46,113,0.14), 0 2px 8px rgba(6,46,113,0.08), inset 0 1px 0 rgba(255,255,255,0.95)",
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
+                "0 0 0 1px rgba(6,46,113,0.12), 0 14px 44px rgba(6,46,113,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <CardItem translateZ={40} className="flex-shrink-0">
+            {/* Corner brackets */}
+            {[
+              { top: 0, left: 0, borderTop: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "14px 0 0 0" },
+              { top: 0, right: 0, borderTop: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 14px 0 0" },
+              { bottom: 0, left: 0, borderBottom: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "0 0 0 14px" },
+              { bottom: 0, right: 0, borderBottom: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 0 14px 0" },
+            ].map((s, i) => (
               <div
+                key={i}
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: card.iconBg,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 4px 14px rgba(6,46,113,0.38), inset 0 1px 0 rgba(255,255,255,0.18)",
+                  position: "absolute", width: 10, height: 10,
+                  borderColor: `rgba(59,130,246,0.65)`,
+                  ...s,
+                  pointerEvents: "none",
                 }}
-              >
-                <card.Icon size={16} color="#fff" strokeWidth={2.4} />
-              </div>
-            </CardItem>
-            <div>
-              <CardItem translateZ={25}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", marginBottom: 2, lineHeight: 1.2 }}>
+              />
+            ))}
+
+            {/* Ambient glow blob */}
+            <div style={{
+              position: "absolute", top: -24, right: -24, width: 90, height: 90,
+              background: `radial-gradient(circle,${card.color}22 0%,transparent 70%)`,
+              pointerEvents: "none",
+            }} />
+
+            {/* Header: icon + title + live dot */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <CardItem translateZ={44} className="flex-shrink-0">
+                <div style={{
+                  width: 30, height: 30, borderRadius: 8,
+                  background: card.iconBg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(6,46,113,0.4), inset 0 1px 0 rgba(255,255,255,0.16)`,
+                }}>
+                  <card.Icon size={13} color="#fff" strokeWidth={2.5} />
+                </div>
+              </CardItem>
+
+              <CardItem translateZ={26} style={{ flex: 1 }}>
+                <p style={{ fontSize: 11.5, fontWeight: 700, color: "#E2E8F0", lineHeight: 1.2 }}>
                   {card.title}
                 </p>
               </CardItem>
-              <CardItem translateZ={15}>
-                <p style={{ fontSize: 10.5, color: "#64748B", lineHeight: 1.45 }}>{card.desc}</p>
-              </CardItem>
+
+              {/* Pulsing live dot */}
+              <div
+                className="live-pulse-dot"
+                style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: "#34d399",
+                  flexShrink: 0,
+                  animation: "live-pulse 2s ease-in-out infinite",
+                }}
+              />
+            </div>
+
+            {/* Description */}
+            <CardItem translateZ={16}>
+              <p style={{ fontSize: 9.5, color: "#64748B", lineHeight: 1.5, marginBottom: 9 }}>
+                {card.desc}
+              </p>
+            </CardItem>
+
+            {/* Metric progress bar */}
+            <div style={{ marginBottom: 5 }}>
+              <div style={{
+                height: 3, borderRadius: 2,
+                background: "rgba(59,130,246,0.12)", overflow: "hidden",
+              }}>
+                <div style={{
+                  height: "100%", width: `${card.pct}%`,
+                  background: `linear-gradient(90deg,${card.color},${card.color}bb)`,
+                  borderRadius: 2,
+                  boxShadow: `0 0 6px ${card.color}88`,
+                }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 7.5, color: "#475569" }}>{card.metric}</span>
+              <span style={{ fontSize: 8, color: card.color, fontWeight: 700 }}>{card.pct}%</span>
             </div>
           </div>
         </CardBody>
       </CardContainer>
     </div>
+  );
+}
+
+// ── Feature Connectors SVG ─────────────────────────────────────────────────────
+function FeatureConnectors() {
+  // viewBox approximates the right-column (≈700 × 520px)
+  // Card centers estimated from absolute positions:
+  //   Card 0 (top:0,   right:-10) → (618, 44)
+  //   Card 1 (top:64,  left:28%)  → (284, 108)
+  //   Card 2 (bottom:60, left:0)  → (90, 422)
+  //   Card 3 (bottom:0,  right:0) → (618, 478)
+  const paths = [
+    { d: "M 284,108 C 390,78 510,58 618,44",   dur: "2.4s", color: "#818cf8", delay: "0s" },
+    { d: "M 284,108 C 240,210 150,320 90,422",  dur: "2.8s", color: "#38bdf8", delay: "0.5s" },
+    { d: "M 90,422  C 220,444 460,462 618,478", dur: "3.2s", color: "#34d399", delay: "1s" },
+    { d: "M 618,44  C 660,170 660,340 618,478", dur: "2.6s", color: "#e879f9", delay: "1.5s" },
+  ];
+
+  return (
+    <svg
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 15, overflow: "visible" }}
+      viewBox="0 0 700 520"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <defs>
+        {paths.map((p, i) => (
+          <linearGradient key={`lg${i}`} id={`cg${i}`} gradientUnits="userSpaceOnUse"
+            x1={p.d.match(/M\s*([\d.]+)/)?.[1]} y1="0"
+            x2={p.d.match(/(\d+),(\d+)$/)?.[1]} y2="0">
+            <stop offset="0%" stopColor={p.color} stopOpacity="0" />
+            <stop offset="50%" stopColor={p.color} stopOpacity="0.55" />
+            <stop offset="100%" stopColor={p.color} stopOpacity="0" />
+          </linearGradient>
+        ))}
+      </defs>
+
+      {paths.map((p, i) => (
+        <g key={i}>
+          {/* Static faint base path */}
+          <path d={p.d} fill="none" stroke={p.color} strokeWidth="1" strokeOpacity="0.18" strokeDasharray="4 6" />
+          {/* Animated flowing dash */}
+          <path
+            d={p.d} fill="none" stroke={p.color} strokeWidth="1.5" strokeOpacity="0.7"
+            strokeDasharray="18 222"
+            strokeLinecap="round"
+          >
+            <animate attributeName="stroke-dashoffset" from="240" to="-240" dur={p.dur} begin={p.delay} repeatCount="indefinite" />
+          </path>
+          {/* Traveling glow dot */}
+          <circle r="3" fill={p.color} fillOpacity="0.9">
+            <animateMotion dur={p.dur} begin={p.delay} repeatCount="indefinite" rotate="auto">
+              <mpath xlinkHref={`#cp${i}`} />
+            </animateMotion>
+          </circle>
+          <path id={`cp${i}`} d={p.d} fill="none" style={{ display: "none" }} />
+          {/* Larger soft glow behind dot */}
+          <circle r="6" fill={p.color} fillOpacity="0.2">
+            <animateMotion dur={p.dur} begin={p.delay} repeatCount="indefinite" rotate="auto">
+              <mpath xlinkHref={`#cp${i}`} />
+            </animateMotion>
+          </circle>
+        </g>
+      ))}
+    </svg>
   );
 }
 
@@ -1022,6 +1163,9 @@ export function HeroSection() {
 
           {/* ── RIGHT column ── */}
           <div style={{ flex: 1, position: "relative", minHeight: 520, overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center" }}>
+
+            {/* Animated SVG connector lines between cards */}
+            <FeatureConnectors />
 
             {/* Floating 3D Feature Cards — scattered around the device image */}
             <Feature3DCard card={FEATURE_CARDS[0]} style={{ top: 0,   right: -10 }} />
