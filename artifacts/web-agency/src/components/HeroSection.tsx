@@ -1060,7 +1060,7 @@ export function HeroSection() {
   return (
     <section
       style={{
-        minHeight: "calc(100vh - 68px)",
+        minHeight: "100vh",
         background: `linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 20%, #f2f6fd 50%, #dce8f9 80%, #c8d9f5 100%)`,
         position: "relative",
         overflowX: "clip",
@@ -1101,7 +1101,7 @@ export function HeroSection() {
           margin: "0 auto",
           paddingLeft: 56,
           paddingRight: 16,
-          paddingTop: 52,
+          paddingTop: 96,
           paddingBottom: 60,
           position: "relative",
           zIndex: 10,
