@@ -1109,7 +1109,7 @@ export function HeroSection() {
               <Link href="/discovery">
                 <Button
                   size="lg"
-                  className="bg-[#062e71] hover:bg-[#0a3d91] hover:shadow-[0_8px_28px_rgba(6,46,113,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+                  className="!bg-[#062e71] hover:!bg-[#0a3d91] hover:shadow-[0_8px_28px_rgba(6,46,113,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
                   style={{
                     color: "#fff",
                     fontSize: 13,

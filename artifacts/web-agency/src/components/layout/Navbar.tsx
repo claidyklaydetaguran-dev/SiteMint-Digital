@@ -55,7 +55,7 @@ export function Navbar() {
           ))}
           <Link href="/discovery">
             <Button
-              className="bg-[#062e71] hover:bg-[#0a3d91] hover:shadow-[0_6px_22px_rgba(6,46,113,0.50)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+              className="!bg-[#062e71] hover:!bg-[#0a3d91] hover:shadow-[0_6px_22px_rgba(6,46,113,0.50)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
               data-testid="button-nav-contact"
             >
               Start Your Project
