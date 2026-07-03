@@ -964,37 +964,60 @@ function AvatarStack() {
 
 // ── Device Image 3D Hover (zoom + tilt) ───────────────────────────────────────
 function DeviceImageHover() {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const wrapRef    = useRef<HTMLDivElement>(null);
+  const imgRef     = useRef<HTMLImageElement>(null);
+  const spotRef    = useRef<HTMLDivElement>(null);
+  const [hov, setHov] = useState(false);
 
-  const onEnter = () => {
-    if (!imgRef.current) return;
+  const applyEffect = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!wrapRef.current || !imgRef.current || !spotRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;   // 0–1 left→right
+    const py = (e.clientY - rect.top)  / rect.height;  // 0–1 top→bottom
+
+    // Gentle tilt — no scale, no blur
+    const rx = (px - 0.5) * 12;
+    const ry = (py - 0.5) * 7;
     imgRef.current.style.transform =
-      "perspective(1200px) scale(1.06) rotateY(0deg) rotateX(0deg)";
+      `perspective(1100px) rotateY(${rx}deg) rotateX(${-ry}deg)`;
+
+    // Shadow shifts opposite to tilt — simulates real light source
+    const sx = -rx * 2.4;
+    const sy =  ry * 2.4 + 32;
+    imgRef.current.style.filter =
+      `drop-shadow(${sx}px ${sy}px 56px rgba(6,46,113,0.38))
+       drop-shadow(${sx * 0.4}px ${sy * 0.3}px 18px rgba(0,0,0,0.22))`;
+
+    // Spotlight follows cursor
+    spotRef.current.style.background =
+      `radial-gradient(circle 200px at ${px * 100}% ${py * 100}%,
+         rgba(255,255,255,0.22) 0%,
+         rgba(96,165,250,0.10) 35%,
+         transparent 70%)`;
   };
 
-  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!wrapRef.current || !imgRef.current) return;
-    const rect = wrapRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 14;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 8;
-    imgRef.current.style.transform =
-      `perspective(1200px) scale(1.07) rotateY(${x}deg) rotateX(${-y}deg)`;
+  const onEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    setHov(true);
+    applyEffect(e);
   };
 
   const onLeave = () => {
-    if (!imgRef.current) return;
+    setHov(false);
+    if (!imgRef.current || !spotRef.current) return;
     imgRef.current.style.transform =
-      "perspective(1200px) scale(1) rotateY(0deg) rotateX(0deg)";
+      "perspective(1100px) rotateY(0deg) rotateX(0deg)";
+    imgRef.current.style.filter =
+      "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))";
+    spotRef.current.style.background = "transparent";
   };
 
   return (
     <div
       ref={wrapRef}
       onMouseEnter={onEnter}
-      onMouseMove={onMove}
+      onMouseMove={applyEffect}
       onMouseLeave={onLeave}
-      style={{ cursor: "pointer", display: "block", width: "100%" }}
+      style={{ cursor: "pointer", display: "block", width: "100%", position: "relative" }}
     >
       <img
         ref={imgRef}
@@ -1006,9 +1029,23 @@ function DeviceImageHover() {
           display: "block",
           borderRadius: 16,
           transformStyle: "preserve-3d",
-          transition: "transform 0.32s cubic-bezier(0.23,1,0.32,1)",
+          transition: "transform 0.28s cubic-bezier(0.23,1,0.32,1), filter 0.28s ease",
           willChange: "transform",
           filter: "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))",
+        }}
+      />
+
+      {/* Cursor spotlight overlay — no blur, pure light */}
+      <div
+        ref={spotRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: 16,
+          pointerEvents: "none",
+          opacity: hov ? 1 : 0,
+          transition: "opacity 0.3s ease",
+          mixBlendMode: "screen",
         }}
       />
     </div>
