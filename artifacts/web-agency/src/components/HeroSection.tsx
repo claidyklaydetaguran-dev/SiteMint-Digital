@@ -1110,7 +1110,7 @@ export function HeroSection() {
                 <Button
                   size="lg"
                   style={{
-                    background: DEEP_NAVY,
+                    background: "#22345ed9",
                     color: "#fff",
                     fontSize: 13,
                     fontWeight: 700,

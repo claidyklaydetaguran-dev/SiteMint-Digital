@@ -54,7 +54,7 @@ export function Navbar() {
             </Link>
           ))}
           <Link href="/discovery">
-            <Button data-testid="button-nav-contact">Start Your Project</Button>
+            <Button className="bg-[#22345ed9]" data-testid="button-nav-contact">Start Your Project</Button>
           </Link>
         </nav>
 
