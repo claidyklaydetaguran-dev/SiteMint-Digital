@@ -6,6 +6,7 @@ import { ArrowRight, Zap, Layout, Monitor, BarChart2, Star } from "lucide-react"
 import { FlipWords } from "./FlipWords";
 import { CardContainer, CardBody, CardItem } from "./Card3D";
 import Particles from "./Particles";
+import "./HeroResponsive.css";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const WORDS = ["Customers", "Clients", "Leads", "Sales", "Revenue"];
@@ -106,6 +107,7 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
         zIndex: 20,
         animation: `card-entry 0.55s cubic-bezier(0.23,1,0.32,1) ${card.delay + 0.5}s both`,
       }}
+      className="hero-feature-card"
     >
       <CardContainer containerClassName="p-0" className="">
         <CardBody className="w-[178px]">
@@ -1000,6 +1002,7 @@ export function HeroSection() {
 
       {/* ── Content ── */}
       <div
+        className="hero-wrap"
         style={{
           maxWidth: 1380,
           margin: "0 auto",
@@ -1011,10 +1014,10 @@ export function HeroSection() {
           zIndex: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 20, minHeight: 560 }}>
+        <div className="hero-row" style={{ display: "flex", alignItems: "flex-start", gap: 20, minHeight: 560 }}>
 
           {/* ── LEFT column ── */}
-          <div style={{ flex: "0 0 40%", maxWidth: "40%", paddingTop: 24 }}>
+          <div className="hero-left" style={{ flex: "0 0 40%", maxWidth: "40%", paddingTop: 24 }}>
 
             {/* Badge */}
             <motion.div
@@ -1161,7 +1164,7 @@ export function HeroSection() {
           </div>
 
           {/* ── RIGHT column ── */}
-          <div style={{ flex: 1, position: "relative", minHeight: 520, overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="hero-right" style={{ flex: 1, position: "relative", minHeight: 520, overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center" }}>
 
             {/* Animated SVG connector lines between cards */}
             <FeatureConnectors />
@@ -1177,6 +1180,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 40, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.32, ease: [0.23, 1, 0.32, 1] }}
+              className="hero-device"
               style={{ width: "100%", zIndex: 2, marginTop: 60 }}
             >
               <DeviceImageHover />

@@ -1,0 +1,77 @@
+/* ── Hero Section — Responsive Layout ─────────────────────────────────────── */
+
+/* ── Tablet (≤ 1024px) ────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hero-wrap {
+    padding-left: 32px !important;
+    padding-right: 24px !important;
+    padding-top: 40px !important;
+  }
+
+  .hero-left {
+    flex: 0 0 48% !important;
+    max-width: 48% !important;
+  }
+
+  .hero-right {
+    min-height: 440px !important;
+  }
+
+  /* Scale cards down slightly so they don't overlap the device */
+  .hero-feature-card {
+    transform: scale(0.88);
+    transform-origin: top left;
+  }
+}
+
+/* ── Small tablet / large phone (≤ 768px) ────────────────────────────────── */
+@media (max-width: 768px) {
+  .hero-wrap {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    padding-top: 32px !important;
+    padding-bottom: 44px !important;
+  }
+
+  /* Stack columns vertically */
+  .hero-row {
+    flex-direction: column !important;
+    min-height: auto !important;
+    gap: 36px !important;
+  }
+
+  .hero-left {
+    flex: unset !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-top: 0 !important;
+  }
+
+  .hero-right {
+    width: 100% !important;
+    min-height: 300px !important;
+    overflow: visible !important;
+  }
+
+  /* Hide floating cards — they overlap badly when stacked */
+  .hero-feature-card {
+    display: none !important;
+  }
+
+  /* Device image sits flush, no extra top margin */
+  .hero-device {
+    margin-top: 0 !important;
+  }
+}
+
+/* ── Phone (≤ 480px) ─────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .hero-wrap {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .hero-right {
+    min-height: 220px !important;
+  }
+}
