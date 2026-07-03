@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import "./Particles.css";
 
 interface ParticlesProps {
@@ -19,12 +19,6 @@ interface Dot {
   color: string;
 }
 
-interface Line {
-  i: number;
-  j: number;
-}
-
-// Seeded pseudo-random so dots are stable across renders
 function seededRand(seed: number) {
   let s = seed;
   return () => {
@@ -35,67 +29,104 @@ function seededRand(seed: number) {
 
 export default function Particles({
   particleCount = 40,
-  particleColors = ["#1e3a8a", "#1e40af", "#2563eb", "#3b82f6"],
+  particleColors = ["#062e71", "#0a3d91", "#1255c4", "#3b82f6"],
   className = "",
 }: ParticlesProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+  const targetOffset = useRef({ x: 0, y: 0 });
+  const currentOffset = useRef({ x: 0, y: 0 });
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+
   const dots = useMemo<Dot[]>(() => {
     const rand = seededRand(42);
-    return Array.from({ length: particleCount }, (_, i) => ({
+    return Array.from({ length: particleCount }, () => ({
       cx: rand() * 100,
       cy: rand() * 100,
       r: 2 + rand() * 3,
-      opacity: 0.08 + rand() * 0.22,
-      dur: 8 + rand() * 16,
-      dx: (rand() - 0.5) * 6,
-      dy: (rand() - 0.5) * 6,
-      delay: -(rand() * 20),
+      opacity: 0.12 + rand() * 0.26,
+      dur: 10 + rand() * 18,
+      dx: (rand() - 0.5) * 7,
+      dy: (rand() - 0.5) * 7,
+      delay: -(rand() * 22),
       color: particleColors[Math.floor(rand() * particleColors.length)],
     }));
   }, [particleCount, particleColors]);
 
-  const lines = useMemo<Line[]>(() => {
-    const result: Line[] = [];
+  const lines = useMemo(() => {
+    const result: { i: number; j: number; dist: number }[] = [];
     for (let i = 0; i < dots.length; i++) {
       for (let j = i + 1; j < dots.length; j++) {
         const dx = dots[i].cx - dots[j].cx;
         const dy = dots[i].cy - dots[j].cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 22) result.push({ i, j });
+        if (dist < 24) result.push({ i, j, dist });
       }
     }
     return result;
   }, [dots]);
 
+  const animate = useCallback(() => {
+    const lerp = 0.06;
+    currentOffset.current.x += (targetOffset.current.x - currentOffset.current.x) * lerp;
+    currentOffset.current.y += (targetOffset.current.y - currentOffset.current.y) * lerp;
+    setOffset({ x: currentOffset.current.x, y: currentOffset.current.y });
+    rafRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const nx = (e.clientX - rect.left) / rect.width;
+    const ny = (e.clientY - rect.top) / rect.height;
+    targetOffset.current = { x: (nx - 0.5) * 16, y: (ny - 0.5) * 12 };
+    if (!rafRef.current) rafRef.current = requestAnimationFrame(animate);
+  }, [animate]);
+
+  const handleMouseLeave = useCallback(() => {
+    targetOffset.current = { x: 0, y: 0 };
+  }, []);
+
   return (
-    <div className={`particles-container ${className}`} aria-hidden="true">
+    <div
+      ref={containerRef}
+      className={`particles-container ${className}`}
+      aria-hidden="true"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
       <svg
+        ref={svgRef}
         width="100%"
         height="100%"
         viewBox="0 0 100 100"
         preserveAspectRatio="xMidYMid slice"
-        style={{ position: "absolute", inset: 0 }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          transform: `translate(${offset.x}px, ${offset.y}px)`,
+          transition: "transform 0.05s linear",
+        }}
       >
         {/* Connection lines */}
-        {lines.map(({ i, j }) => {
+        {lines.map(({ i, j, dist }) => {
           const a = dots[i];
           const b = dots[j];
-          const dx = a.cx - b.cx;
-          const dy = a.cy - b.cy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const lineOpacity = Math.max(0, (1 - dist / 22) * 0.15);
+          const lineOpacity = Math.max(0, (1 - dist / 24) * 0.25);
           return (
             <line
               key={`l-${i}-${j}`}
               x1={`${a.cx}%`} y1={`${a.cy}%`}
               x2={`${b.cx}%`} y2={`${b.cy}%`}
-              stroke="#1e3a8a"
-              strokeWidth="0.18"
+              stroke="#062e71"
+              strokeWidth="0.22"
               opacity={lineOpacity}
             />
           );
         })}
 
-        {/* Dots with CSS animation */}
+        {/* Dots */}
         {dots.map((d, i) => (
           <circle
             key={i}
@@ -108,7 +139,6 @@ export default function Particles({
             style={{
               animationDuration: `${d.dur}s`,
               animationDelay: `${d.delay}s`,
-              // custom properties for per-dot movement
               ["--dx" as string]: `${d.dx}%`,
               ["--dy" as string]: `${d.dy}%`,
             }}
