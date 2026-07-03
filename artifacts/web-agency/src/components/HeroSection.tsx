@@ -790,49 +790,26 @@ function DeviceImageHover() {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
-      {/* bg behind PNG so transparent areas blend with hero */}
-      <div
+    <div
+      ref={wrapRef}
+      onMouseEnter={onEnter}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{ cursor: "pointer", display: "block", width: "100%" }}
+    >
+      <img
+        ref={imgRef}
+        src="/devices-hero.png"
+        alt="SiteMint Digital on all devices"
         style={{
-          background: "linear-gradient(155deg,#dbeafe 0%,#eff6ff 22%,#f8faff 50%,#e0edff 100%)",
+          width: 620,
+          maxWidth: "100%",
           display: "block",
-          width: "100%",
-        }}
-      >
-        <div
-          ref={wrapRef}
-          onMouseEnter={onEnter}
-          onMouseMove={onMove}
-          onMouseLeave={onLeave}
-          style={{ cursor: "pointer", display: "block", width: "100%" }}
-        >
-          <img
-            ref={imgRef}
-            src="/devices-hero.png"
-            alt="SiteMint Digital on all devices"
-            style={{
-              width: 620,
-              maxWidth: "100%",
-              display: "block",
-              transformStyle: "preserve-3d",
-              transition: "transform 0.32s cubic-bezier(0.23,1,0.32,1)",
-              willChange: "transform",
-            }}
-          />
-        </div>
-      </div>
-      {/* Separate shadow div — no filter isolation issue */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: -12,
-          left: "10%",
-          right: "10%",
-          height: 28,
-          background: "rgba(6,46,113,0.28)",
-          filter: "blur(22px)",
-          borderRadius: "50%",
-          zIndex: -1,
+          borderRadius: 16,
+          transformStyle: "preserve-3d",
+          transition: "transform 0.32s cubic-bezier(0.23,1,0.32,1)",
+          willChange: "transform",
+          filter: "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))",
         }}
       />
     </div>
