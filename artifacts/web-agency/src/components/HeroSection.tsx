@@ -763,37 +763,78 @@ function AvatarStack() {
   );
 }
 
-// ── Device Group 3D Hover ─────────────────────────────────────────────────────
-function DeviceGroup3D({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
+// ── Device Image 3D Hover (zoom + tilt) ───────────────────────────────────────
+function DeviceImageHover() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const onEnter = () => {
+    if (!imgRef.current) return;
+    imgRef.current.style.transform =
+      "perspective(1200px) scale(1.06) rotateY(0deg) rotateX(0deg)";
+  };
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left - rect.width / 2) / 30;
-    const y = (e.clientY - rect.top - rect.height / 2) / 30;
-    ref.current.style.transform = `perspective(1400px) rotateY(${x}deg) rotateX(${-y * 0.5}deg)`;
+    if (!wrapRef.current || !imgRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 14;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 8;
+    imgRef.current.style.transform =
+      `perspective(1200px) scale(1.07) rotateY(${x}deg) rotateX(${-y}deg)`;
   };
 
   const onLeave = () => {
-    if (!ref.current) return;
-    ref.current.style.transform = "perspective(1400px) rotateY(0deg) rotateX(0deg)";
+    if (!imgRef.current) return;
+    imgRef.current.style.transform =
+      "perspective(1200px) scale(1) rotateY(0deg) rotateX(0deg)";
   };
 
   return (
-    <div
-      ref={ref}
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      style={{
-        transformStyle: "preserve-3d",
-        transition: "transform 0.28s cubic-bezier(0.23,1,0.32,1)",
-        display: "flex",
-        alignItems: "flex-end",
-        gap: 0,
-      }}
-    >
-      {children}
+    <div style={{ position: "relative", width: "100%" }}>
+      {/* bg behind PNG so transparent areas blend with hero */}
+      <div
+        style={{
+          background: "linear-gradient(155deg,#dbeafe 0%,#eff6ff 22%,#f8faff 50%,#e0edff 100%)",
+          display: "block",
+          width: "100%",
+        }}
+      >
+        <div
+          ref={wrapRef}
+          onMouseEnter={onEnter}
+          onMouseMove={onMove}
+          onMouseLeave={onLeave}
+          style={{ cursor: "pointer", display: "block", width: "100%" }}
+        >
+          <img
+            ref={imgRef}
+            src="/devices-hero.png"
+            alt="SiteMint Digital on all devices"
+            style={{
+              width: 620,
+              maxWidth: "100%",
+              display: "block",
+              transformStyle: "preserve-3d",
+              transition: "transform 0.32s cubic-bezier(0.23,1,0.32,1)",
+              willChange: "transform",
+            }}
+          />
+        </div>
+      </div>
+      {/* Separate shadow div — no filter isolation issue */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: -12,
+          left: "10%",
+          right: "10%",
+          height: 28,
+          background: "rgba(6,46,113,0.28)",
+          filter: "blur(22px)",
+          borderRadius: "50%",
+          zIndex: -1,
+        }}
+      />
     </div>
   );
 }
@@ -1003,54 +1044,23 @@ export function HeroSection() {
           </div>
 
           {/* ── RIGHT column ── */}
-          <div style={{ flex: 1, position: "relative", minHeight: 560, overflow: "visible" }}>
+          <div style={{ flex: 1, position: "relative", minHeight: 520, overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center" }}>
 
-            {/* Floating 3D Feature Cards — scattered above devices */}
-            <Feature3DCard card={FEATURE_CARDS[0]} style={{ top: 0,   right: 10 }} />
-            <Feature3DCard card={FEATURE_CARDS[1]} style={{ top: 70,  left: "32%" }} />
-            <Feature3DCard card={FEATURE_CARDS[2]} style={{ top: 148, left: "4%" }} />
-            <Feature3DCard card={FEATURE_CARDS[3]} style={{ top: 198, right: 6 }} />
+            {/* Floating 3D Feature Cards — scattered around the device image */}
+            <Feature3DCard card={FEATURE_CARDS[0]} style={{ top: 0,   right: -10 }} />
+            <Feature3DCard card={FEATURE_CARDS[1]} style={{ top: 64,  left: "28%" }} />
+            <Feature3DCard card={FEATURE_CARDS[2]} style={{ bottom: 60, left: 0 }} />
+            <Feature3DCard card={FEATURE_CARDS[3]} style={{ bottom: 0, right: 0 }} />
 
-            {/* Devices group — 3D hover interactive */}
+            {/* Devices — real image with 3D zoom-on-hover */}
             <motion.div
-              initial={{ opacity: 0, y: 36 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.75, delay: 0.38, ease: [0.23, 1, 0.32, 1] }}
-              style={{ position: "absolute", bottom: 0, left: 0 }}
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.32, ease: [0.23, 1, 0.32, 1] }}
+              style={{ width: "100%", zIndex: 2 }}
             >
-              <DeviceGroup3D>
-                <LaptopMockup />
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: 8,
-                    marginLeft: -22,
-                    marginBottom: 22,
-                    position: "relative",
-                    zIndex: 5,
-                  }}
-                >
-                  <PhoneMockup />
-                  <TabletMockup />
-                </div>
-              </DeviceGroup3D>
+              <DeviceImageHover />
             </motion.div>
-
-            {/* Desk reflection */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: -6,
-                left: 0,
-                width: "72%",
-                height: 18,
-                background: "rgba(6,46,113,0.12)",
-                filter: "blur(14px)",
-                borderRadius: "50%",
-                zIndex: 1,
-              }}
-            />
           </div>
         </div>
       </div>
