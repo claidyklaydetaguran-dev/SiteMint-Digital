@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -141,36 +141,22 @@ function LaptopMockup() {
       style={{
         width: 400,
         filter:
-          "drop-shadow(0 32px 60px rgba(6,46,113,0.30)) drop-shadow(0 8px 24px rgba(6,46,113,0.16))",
+          "drop-shadow(0 40px 70px rgba(0,0,0,0.55)) drop-shadow(0 10px 28px rgba(6,46,113,0.28))",
         position: "relative",
         zIndex: 3,
       }}
     >
-      {/* Lid */}
+      {/* Lid — dark space gray like MacBook Pro */}
       <div
         style={{
-          background: "linear-gradient(180deg,#c0c8d4 0%,#b0bac8 100%)",
+          background: "linear-gradient(175deg,#2a2f3e 0%,#1e2230 50%,#1a1e2c 100%)",
           borderRadius: "16px 16px 0 0",
           padding: "10px 9px 0",
-          border: "1px solid #9aa5b4",
+          border: "1px solid #3a404f",
           borderBottom: "none",
-          boxShadow: "inset 0 2px 4px rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.08)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.3)",
         }}
       >
-        {/* Logo notch */}
-        <div
-          style={{
-            position: "absolute",
-            top: 6,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 12,
-            height: 12,
-            opacity: 0.15,
-          }}
-        >
-          ◆
-        </div>
         {/* Camera row */}
         <div
           style={{
@@ -181,17 +167,17 @@ function LaptopMockup() {
             marginBottom: 8,
           }}
         >
-          <div style={{ width: 3, height: 3, borderRadius: "50%", background: "#8a95a3" }} />
+          <div style={{ width: 3, height: 3, borderRadius: "50%", background: "#3a404f" }} />
           <div
             style={{
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "#1a2030",
-              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.6), 0 0 0 1px #374151",
+              background: "#0d1117",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px #2a2f3e",
             }}
           />
-          <div style={{ width: 3, height: 3, borderRadius: "50%", background: "#8a95a3" }} />
+          <div style={{ width: 3, height: 3, borderRadius: "50%", background: "#3a404f" }} />
         </div>
         {/* Screen bezel */}
         <div
@@ -222,23 +208,23 @@ function LaptopMockup() {
       {/* Hinge strip */}
       <div
         style={{
-          height: 6,
-          background: "linear-gradient(180deg,#a8b4c0 0%,#8a95a3 100%)",
-          borderLeft: "1px solid #9aa5b4",
-          borderRight: "1px solid #9aa5b4",
+          height: 5,
+          background: "linear-gradient(180deg,#252a38 0%,#1a1e2c 100%)",
+          borderLeft: "1px solid #3a404f",
+          borderRight: "1px solid #3a404f",
         }}
       />
 
-      {/* Keyboard base */}
+      {/* Keyboard base — dark graphite */}
       <div
         style={{
-          background: "linear-gradient(180deg,#c8d0da 0%,#b8c2cc 100%)",
+          background: "linear-gradient(180deg,#242837 0%,#1c2030 100%)",
           borderRadius: "0 0 12px 12px",
           padding: "8px 14px 10px",
-          border: "1px solid #9aa5b4",
+          border: "1px solid #3a404f",
           borderTop: "none",
           boxShadow:
-            "0 6px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(0,0,0,0.1)",
+            "0 10px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.4)",
         }}
       >
         {/* Key rows */}
@@ -250,9 +236,9 @@ function LaptopMockup() {
                 style={{
                   flex: 1,
                   height: 6,
-                  background: "rgba(0,0,0,0.10)",
+                  background: "rgba(255,255,255,0.07)",
                   borderRadius: 2,
-                  boxShadow: "0 1px 0 rgba(0,0,0,0.12)",
+                  boxShadow: "0 1px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
                 }}
               />
             ))}
@@ -262,10 +248,10 @@ function LaptopMockup() {
         <div
           style={{
             height: 6,
-            background: "rgba(0,0,0,0.10)",
+            background: "rgba(255,255,255,0.07)",
             borderRadius: 2,
             marginBottom: 6,
-            boxShadow: "0 1px 0 rgba(0,0,0,0.12)",
+            boxShadow: "0 1px 0 rgba(0,0,0,0.4)",
           }}
         />
         {/* Trackpad */}
@@ -273,10 +259,10 @@ function LaptopMockup() {
           style={{
             width: 88,
             height: 14,
-            background: "rgba(0,0,0,0.09)",
+            background: "rgba(255,255,255,0.05)",
             borderRadius: 6,
             margin: "0 auto",
-            border: "1px solid rgba(0,0,0,0.07)",
+            border: "1px solid rgba(255,255,255,0.06)",
           }}
         />
       </div>
@@ -777,6 +763,41 @@ function AvatarStack() {
   );
 }
 
+// ── Device Group 3D Hover ─────────────────────────────────────────────────────
+function DeviceGroup3D({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left - rect.width / 2) / 30;
+    const y = (e.clientY - rect.top - rect.height / 2) / 30;
+    ref.current.style.transform = `perspective(1400px) rotateY(${x}deg) rotateX(${-y * 0.5}deg)`;
+  };
+
+  const onLeave = () => {
+    if (!ref.current) return;
+    ref.current.style.transform = "perspective(1400px) rotateY(0deg) rotateX(0deg)";
+  };
+
+  return (
+    <div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{
+        transformStyle: "preserve-3d",
+        transition: "transform 0.28s cubic-bezier(0.23,1,0.32,1)",
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 0,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 // ── Main Hero Section ─────────────────────────────────────────────────────────
 export function HeroSection() {
   const [mounted, setMounted] = useState(false);
@@ -892,33 +913,12 @@ export function HeroSection() {
             >
               AI-Powered Websites &amp; Business Systems That Help You Get More{" "}
               {mounted && (
-                <span style={{ display: "inline-block", position: "relative" }}>
-                  <FlipWords
-                    words={WORDS}
-                    duration={2600}
-                    className="font-black"
-                    style={{ color: DEEP_NAVY } as React.CSSProperties}
-                  />
-                  {/* Blinking cursor */}
-                  <motion.span
-                    style={{
-                      display: "inline-block",
-                      width: 3,
-                      height: "0.82em",
-                      background: DEEP_NAVY,
-                      borderRadius: 2,
-                      marginLeft: 1,
-                      verticalAlign: "middle",
-                    }}
-                    animate={{ opacity: [1, 1, 0, 0] }}
-                    transition={{
-                      duration: 1.1,
-                      repeat: Infinity,
-                      ease: "linear",
-                      times: [0, 0.45, 0.5, 0.95],
-                    }}
-                  />
-                </span>
+                <FlipWords
+                  words={WORDS}
+                  duration={2600}
+                  className="font-black"
+                  style={{ color: DEEP_NAVY } as React.CSSProperties}
+                />
               )}
             </motion.h1>
 
@@ -1011,35 +1011,30 @@ export function HeroSection() {
             <Feature3DCard card={FEATURE_CARDS[2]} style={{ top: 148, left: "4%" }} />
             <Feature3DCard card={FEATURE_CARDS[3]} style={{ top: 198, right: 6 }} />
 
-            {/* Devices group */}
+            {/* Devices group — 3D hover interactive */}
             <motion.div
               initial={{ opacity: 0, y: 36 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.75, delay: 0.38, ease: [0.23, 1, 0.32, 1] }}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                display: "flex",
-                alignItems: "flex-end",
-                gap: 0,
-              }}
+              style={{ position: "absolute", bottom: 0, left: 0 }}
             >
-              <LaptopMockup />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-end",
-                  gap: 8,
-                  marginLeft: -22,
-                  marginBottom: 22,
-                  position: "relative",
-                  zIndex: 5,
-                }}
-              >
-                <PhoneMockup />
-                <TabletMockup />
-              </div>
+              <DeviceGroup3D>
+                <LaptopMockup />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-end",
+                    gap: 8,
+                    marginLeft: -22,
+                    marginBottom: 22,
+                    position: "relative",
+                    zIndex: 5,
+                  }}
+                >
+                  <PhoneMockup />
+                  <TabletMockup />
+                </div>
+              </DeviceGroup3D>
             </motion.div>
 
             {/* Desk reflection */}
