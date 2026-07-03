@@ -1101,7 +1101,7 @@ export function HeroSection() {
           margin: "0 auto",
           paddingLeft: 56,
           paddingRight: 16,
-          paddingTop: 96,
+          paddingTop: 110,
           paddingBottom: 60,
           position: "relative",
           zIndex: 10,
