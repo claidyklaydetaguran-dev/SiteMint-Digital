@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { HeroSection } from "@/components/HeroSection";
 import {
   ArrowRight,
   MonitorSmartphone,
@@ -86,40 +87,7 @@ export default function Home() {
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative pt-20 pb-32 md:pt-32 md:pb-48 overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/hero-bg.png')" }} />
-        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/60 via-background/30 to-background pointer-events-none" />
-
-        <div className="container mx-auto px-4 md:px-6 relative z-10">
-          <div className="max-w-4xl">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm font-medium mb-6">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                Now accepting new clients
-              </div>
-              <h1 className="text-5xl md:text-7xl font-serif font-bold text-foreground leading-[1.1] tracking-tight mb-8">
-                AI-Powered Websites &amp; Business Systems That Help You Get More Customers.
-              </h1>
-              <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mb-10">
-                We build growth-focused websites, CRM systems, automation workflows, client portals, and custom business applications for service businesses, nonprofits, real estate professionals, and growing organizations.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/discovery">
-                  <Button size="lg" className="h-14 px-8 text-base w-full sm:w-auto" data-testid="button-hero-primary">
-                    Get My Free Business Growth Assessment <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </Link>
-                <Link href="/portfolio">
-                  <Button size="lg" variant="outline" className="h-14 px-8 text-base w-full sm:w-auto bg-transparent border-border/50 hover:bg-accent" data-testid="button-hero-secondary">
-                    View Our Work
-                  </Button>
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* Trust Bar */}
       <section className="border-y border-border/40 bg-card/50 py-8 relative" style={{ backgroundImage: "url('/warm-accent-bg.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
