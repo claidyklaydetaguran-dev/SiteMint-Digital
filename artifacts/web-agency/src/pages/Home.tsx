@@ -90,7 +90,7 @@ export default function Home() {
       <HeroSection />
 
       {/* Trust Bar */}
-      <section className="border-y border-border/40 bg-card/50 py-8 relative" style={{ backgroundImage: "url('/warm-accent-bg.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
+      <section className="border-y border-border/40 py-8 relative" style={{ background: "linear-gradient(135deg, #f2f6fd 0%, #e4ecfb 50%, #f2f6fd 100%)" }}>
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-wrap justify-center md:justify-between items-center gap-8 md:gap-4 text-sm font-medium text-muted-foreground">
             <div className="flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Fast Turnaround</div>
@@ -119,9 +119,14 @@ export default function Home() {
               { icon: Code2, title: "Custom Web Apps", desc: "Booking systems, client portals, internal dashboards, and AI-powered tools built for how your business operates." },
               { icon: BarChart3, title: "AI-Assisted Tools", desc: "Chatbots, automated proposals, smart intake forms, and data systems that scale your operations without scaling headcount." },
             ].map((service, i) => (
-              <Card key={i} className="group border-none shadow-sm bg-accent/30 hover:bg-accent/60 transition-colors">
+              <Card
+                key={i}
+                className="group border border-primary/10 shadow-sm bg-white hover:border-primary/40 hover:shadow-[0_12px_32px_rgba(6,46,113,0.12)] hover:-translate-y-1 transition-all duration-300"
+              >
                 <CardHeader>
-                  <service.icon className="w-10 h-10 text-primary mb-4" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)" }}>
+                    <service.icon className="w-6 h-6 text-white" />
+                  </div>
                   <CardTitle className="font-serif text-xl">{service.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -137,9 +142,7 @@ export default function Home() {
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-24 border-y border-border/40 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
-        <div className="absolute inset-0 w-full h-full bg-background/50 pointer-events-none" />
+      <section className="py-24 border-y border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(160deg, #f2f6fd 0%, #dce8f9 50%, #e4ecfb 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
             <div className="max-w-2xl">
@@ -157,7 +160,7 @@ export default function Home() {
               { title: "Lead Generation Website", price: "5,995", desc: "For service businesses ready to convert visitors into leads with a conversion-focused digital presence.", popular: true },
               { title: "Growth Platform", price: "9,995", desc: "For established businesses that need a complete digital system with automation, CRM, and advanced SEO." },
             ].map((tier, i) => (
-              <Card key={i} className={`relative border-border ${(tier as any).popular ? "border-primary shadow-lg" : ""}`}>
+              <Card key={i} className={`relative bg-white ${(tier as any).popular ? "border-primary shadow-xl shadow-primary/10" : "border-primary/10"}`}>
                 {(tier as any).popular && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
                     Best Seller
@@ -184,7 +187,6 @@ export default function Home() {
 
       {/* Process Timeline */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-30" style={{ backgroundImage: "url('/hero-bg.png')" }} />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6">How We Work</h2>
@@ -208,8 +210,7 @@ export default function Home() {
       </section>
 
       {/* Recent Work — real projects */}
-      <section className="py-24 bg-foreground text-background relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-40 pointer-events-none" style={{ backgroundImage: "url('/dark-section-bg.png')" }} />
+      <section className="py-24 text-background relative overflow-hidden" style={{ background: "radial-gradient(ellipse at top, #0a3d91 0%, #062040 45%, #040c2c 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
             <div className="max-w-2xl">
@@ -254,7 +255,6 @@ export default function Home() {
 
       {/* FAQ */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-20" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
         <div className="container mx-auto px-4 md:px-6 max-w-3xl relative z-10">
           <h2 className="text-3xl md:text-5xl font-serif font-bold mb-10 text-center">Common Questions</h2>
           <Accordion type="single" collapsible className="w-full">
@@ -287,9 +287,7 @@ export default function Home() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 border-t border-border/40 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
-        <div className="absolute inset-0 w-full h-full bg-background/50 pointer-events-none" />
+      <section className="py-24 border-t border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 40%, #f2f6fd 70%, #dce8f9 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
           <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">Let's build your business online.</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">

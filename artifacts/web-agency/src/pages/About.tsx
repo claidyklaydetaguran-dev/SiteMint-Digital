@@ -86,9 +86,7 @@ export default function About() {
   return (
     <div className="w-full pb-24">
       {/* Hero Section */}
-      <section className="pt-20 pb-16 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/hero-bg.png')" }} />
-        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/65 via-background/35 to-background pointer-events-none" />
+      <section className="pt-32 pb-16 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 30%, #f2f6fd 60%, #dce8f9 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -123,7 +121,7 @@ export default function About() {
               </div>
             </div>
 
-            <div className="bg-card border border-border p-8 md:p-12 rounded-lg shadow-sm">
+            <div className="bg-card border border-primary/10 p-8 md:p-12 rounded-lg shadow-sm">
               <h3 className="text-2xl font-serif font-bold mb-8 text-center">Our Core Values</h3>
               <div className="space-y-6">
                 {values.map((value, i) => (
@@ -142,9 +140,7 @@ export default function About() {
       </section>
 
       {/* Team Section */}
-      <section className="py-20 border-y border-border/40 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-50" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
-        <div className="absolute inset-0 bg-background/40 pointer-events-none" />
+      <section className="py-20 border-y border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(160deg, #f2f6fd 0%, #dce8f9 50%, #e4ecfb 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-16 max-w-2xl mx-auto">
             <h2 className="text-3xl font-serif font-bold mb-4">Leadership Team</h2>
@@ -180,7 +176,6 @@ export default function About() {
 
       {/* Why Businesses Choose SiteMint */}
       <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-20" style={{ backgroundImage: "url('/hero-bg.png')" }} />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-serif font-bold mb-4">Why Businesses Choose SiteMint</h2>
@@ -199,9 +194,9 @@ export default function About() {
                 viewport={{ once: true }}
                 variants={fadeUp}
               >
-                <div className="bg-card border border-border rounded-xl p-6 h-full hover:border-primary/40 hover:shadow-md transition-all duration-300 group">
-                  <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary/10 transition-colors">
-                    <card.icon className="w-5 h-5 text-primary" />
+                <div className="bg-card border border-primary/10 rounded-xl p-6 h-full hover:border-primary/40 hover:shadow-[0_16px_40px_rgba(6,46,113,0.12)] hover:-translate-y-1 transition-all duration-300 group">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)" }}>
+                    <card.icon className="w-5 h-5 text-white" />
                   </div>
                   <h3 className="font-serif font-bold text-lg text-foreground mb-2">{card.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{card.description}</p>
