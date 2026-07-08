@@ -12,7 +12,7 @@ export default function Home() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <SiteMintLogo />
           <CheckoutButton size="sm" variant="default">
-            Get the Toolkit for $27
+            Get the Toolkit for $23
           </CheckoutButton>
         </div>
       </header>
@@ -32,7 +32,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <CheckoutButton size="lg" className="w-full sm:w-auto text-lg px-8 h-14 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-[0_0_40px_rgba(52,211,153,0.3)]">
-              Get Instant Access - $27
+              Get Instant Access - $23
             </CheckoutButton>
             <p className="text-sm text-muted-foreground">Works with ChatGPT, Claude & Gemini.</p>
           </div>
@@ -168,11 +168,11 @@ export default function Home() {
         <div className="container mx-auto max-w-3xl text-center space-y-8">
           <h2 className="text-4xl md:text-5xl font-serif font-bold">Ready to get your time back?</h2>
           <p className="text-xl text-muted-foreground max-w-xl mx-auto">
-            One-time payment of $27. Lifetime access to the markdown file and PDF. Copy, paste, and execute.
+            One-time payment of $23. Lifetime access to the markdown file and PDF. Copy, paste, and execute.
           </p>
           <div className="pt-8">
             <CheckoutButton size="lg" className="text-lg px-12 h-16 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-[0_0_40px_rgba(52,211,153,0.2)] hover:shadow-[0_0_60px_rgba(52,211,153,0.4)] transition-all duration-300">
-              Buy the Toolkit - $27
+              Buy the Toolkit - $23
             </CheckoutButton>
             <p className="mt-6 text-sm text-muted-foreground flex items-center justify-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-primary" />

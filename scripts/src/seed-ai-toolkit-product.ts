@@ -2,7 +2,7 @@ import { getUncachableStripeClient } from "./stripeClient.js";
 
 const PRODUCT_SLUG = "smb-ai-toolkit";
 const PRODUCT_NAME = "SMB AI Toolkit";
-const UNIT_AMOUNT = 2700;
+const UNIT_AMOUNT = 2300;
 const CURRENCY = "usd";
 
 async function main() {
