@@ -19,7 +19,7 @@ async function initStripeWebhookAndSync(): Promise<void> {
   const webhookBaseUrl = `https://${process.env["REPLIT_DOMAINS"]?.split(",")[0]}`;
   await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`);
 
-  stripeSync.syncBackfill().catch((err) => {
+  stripeSync.syncBackfill({ object: "all" }).catch((err) => {
     logger.error({ err }, "Error syncing Stripe data");
   });
 }
