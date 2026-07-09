@@ -1,0 +1,43 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a verification-only task. No files should need to change. If
+you find a real visual bug, fix it minimally (note it clearly in the
+report), but the default expectation is 0 files changed.
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, behavioralIntelligence.ts,
+workflowEngine.ts, phone.ts) under any circumstances during this task.
+
+Task:
+Log in as admin (via the actual login form or /api/admin/login + storing
+the token in the browser's localStorage, whichever your tooling supports)
+so screenshots reflect a real authenticated session, not the login gate.
+Then screenshot, in order:
+
+1. /admin/crm/intelligence/behavioral (Behavioral Intelligence)
+2. /admin/crm/intelligence/automation-queue (Automation Queue)
+3. /admin/crm/leads/:id/dna for a real lead that has DISC, Health Score,
+   CI, and Behavioral data populated (pick one with existing activity/
+   behavioral-event data if possible, not a blank test lead) — this one
+   matters most, look closely
+4. /admin/crm/leads/:id (Lead Detail) for the same lead, to confirm the
+   three .crm-insight-card markers (Health, Communication, Behavioral
+   Profile) render correctly together in the sidebar
+
+For each screenshot, check specifically:
+- Do the .crm-insight-card / .crm-insight-dot markers render as intended
+  (emerald left border + dot), not broken or invisible?
+- On Lead DNA specifically: do the four composite cards (DISC, Health,
+  CI, Behavioral) have consistent spacing and card heights, or does
+  anything look cramped, overlapping, or misaligned?
+- Does the "DNA Summary" sentence wrap/display correctly, not truncated
+  or overflowing its container?
+- Do empty states (if this lead lacks one signal type) degrade
+  gracefully rather than showing broken/blank space?
+
+Return:
+- One screenshot per page (4 total)
+- Pass/fail note per check above
+- If you made any fix: which file, what was wrong, what changed
+- Confirm 0 locked-engine files were touched
+- TypeScript status
