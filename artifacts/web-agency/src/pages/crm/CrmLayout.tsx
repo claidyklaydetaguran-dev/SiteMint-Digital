@@ -1027,7 +1027,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   const SIDEBAR_W = sidebarExpanded ? "w-60" : "w-0";
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[#f1f3f5]">
+    <div className="h-screen flex flex-col overflow-hidden bg-crm-content">
 
       {/* ── Modals ── */}
       {modal === "email"  && <EmailComposeModal leads={allLeads} templates={templates} onClose={() => setModal(null)} />}
@@ -1035,7 +1035,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
       {modal === "person" && <NewPersonModal leads={allLeads} onClose={() => setModal(null)} onCreated={loadLeads} />}
 
       {/* ── Topbar ── */}
-      <header className="h-11 bg-[#0f172a] flex items-center gap-2 px-3 shrink-0 z-50 relative">
+      <header className="h-11 bg-crm-header flex items-center gap-2 px-3 shrink-0 z-50 relative">
 
         {/* Mobile hamburger */}
         <button onClick={() => setMobileMenuOpen(o => !o)}
@@ -1150,7 +1150,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left Sidebar (desktop/tablet) ── */}
-        <aside className={`hidden lg:flex flex-col bg-[#1a2235] shrink-0 transition-all duration-200 overflow-hidden ${SIDEBAR_W}`}>
+        <aside className={`hidden lg:flex flex-col bg-crm-sidebar shrink-0 transition-all duration-200 overflow-hidden ${SIDEBAR_W}`}>
           <SidebarContent
             location={location}
             expandedGroups={expandedGroups}
@@ -1164,7 +1164,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
             {/* Drawer */}
-            <div className="relative w-72 max-w-[85vw] bg-[#1a2235] h-full flex flex-col z-10 shadow-2xl">
+            <div className="relative w-72 max-w-[85vw] bg-crm-sidebar h-full flex flex-col z-10 shadow-2xl">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                 <SiteMintLogo variant="light" iconSize={18} />
                 <button onClick={() => setMobileMenuOpen(false)} className="text-white/50 hover:text-white transition-colors">

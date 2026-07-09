@@ -84,9 +84,10 @@ function Panel({ title, icon: Icon, tone, signals, onOpen, emptyText }: {
   signals: LeadSignal[]; onOpen: (id: number) => void; emptyText: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50">
         <Icon className={`w-4 h-4 ${tone}`} />
+        <span className="crm-insight-dot" />
         <h3 className="font-semibold text-sm text-foreground">{title}</h3>
         <span className="text-xs text-muted-foreground ml-auto">{signals.length}</span>
       </div>

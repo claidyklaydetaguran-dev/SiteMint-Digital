@@ -1,0 +1,58 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: design tokens and the CRM shell (CrmLayout.tsx).
+This is a styling-only pass — no new features, no new routes, no
+schema changes, no logic changes to any engine.
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, phone.ts) — you may
+reference the class names/colors they already output for badges, but
+do not edit their scoring or computation logic.
+
+Stay within the default change budget (5 files, 300 lines, 1 migration,
+1 utility, 2 components). This needs 0 migrations. If fixing the drift
+below genuinely requires touching more than 5 files, stop and report
+back with a file count before proceeding — do not silently expand
+scope.
+
+Context:
+index.css already defines a full theme token system (--sidebar,
+--background, --primary #0d3a7a navy, chart colors incl. #2ecc8f
+emerald, zero --radius, flat --shadow-* values, Playfair Display +
+Plus Jakarta Sans fonts). But CrmLayout.tsx does not use it — it
+hardcodes raw hex instead: bg-[#1a2235] (sidebar), bg-[#0f172a]
+(header), bg-[#f1f3f5] (content area). Two systems exist side by side
+and have drifted apart. This is the primary thing to fix.
+
+Task:
+1. Replace the hardcoded hex in CrmLayout.tsx (sidebar, header, content
+   background) with the equivalent existing CSS variables from
+   index.css, so the CRM shell and the token system are the same
+   system. If the current hardcoded colors don't map cleanly to an
+   existing token, add the token to index.css rather than inventing a
+   new hardcoded value (e.g. a dedicated --crm-sidebar if the exact
+   shade must be preserved).
+2. Establish one signature visual element and document it as a rule:
+   any card presenting a COMPUTED/derived insight (DISC, Lead Health
+   Score, Communication Intelligence, Behavioral Intelligence, Lead
+   DNA) gets a consistent marker — a 3px left border in the emerald
+   chart-2 token plus a small emerald dot next to its label — that
+   plain CRUD cards (contact info, task lists, deal amounts) do not
+   get. Apply this to the Behavioral Intelligence page built in the
+   prior session as the first real example.
+3. Fix empty states across the Command Center dashboard ("No deals
+   yet", "No revenue data yet" etc.): change from flat apology text to
+   a one-line explanation + a real action button, using the existing
+   button/border tokens (no new colors). Do not rewrite unrelated copy.
+4. Do NOT change: the shadcn component library defaults, the DISC/
+   health-score/CI/behavioral calculation logic, any API route, any
+   database schema, the marketing site (only the CRM under /admin).
+
+Return:
+- Files changed
+- Before/after list of every hardcoded hex value removed and which
+  token replaced it (or which new token was added)
+- TypeScript status
+- Screenshot of Command Center before/after
+- Known limitations (e.g. any hardcoded color you intentionally left
+  because no safe token mapping existed)

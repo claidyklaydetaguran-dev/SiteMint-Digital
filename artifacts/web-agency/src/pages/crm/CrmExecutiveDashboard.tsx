@@ -460,6 +460,9 @@ export default function CrmExecutiveDashboard() {
                 <DollarSign className="w-8 h-8 text-gray-200 mb-2" />
                 <p className="text-sm">No revenue data yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Close deals to see monthly trends</p>
+                <Link href="/admin/crm/deals">
+                  <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700">View pipeline</button>
+                </Link>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
@@ -629,6 +632,11 @@ export default function CrmExecutiveDashboard() {
                 <MessageSquare className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
                 <p className="text-xs text-muted-foreground mt-1">SMS and calls will appear here once Twilio is connected.</p>
+                <Link href="/admin/crm/inbox">
+                  <button className="mt-3 text-sm bg-emerald-600 text-white px-4 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                    Open Inbox
+                  </button>
+                </Link>
               </div>
             ) : (
               <div className="divide-y divide-gray-50">

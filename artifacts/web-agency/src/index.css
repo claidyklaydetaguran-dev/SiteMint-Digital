@@ -57,6 +57,10 @@
   --color-sidebar-accent-border: var(--sidebar-accent-border);
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
+  --color-crm-sidebar: hsl(var(--crm-sidebar));
+  --color-crm-header: hsl(var(--crm-header));
+  --color-crm-content: hsl(var(--crm-content));
+
   --font-sans: var(--app-font-sans);
   --font-serif: var(--app-font-serif);
   --font-mono: var(--app-font-mono);
@@ -143,6 +147,12 @@
   --chart-4: 218 25% 90%;
   --chart-5: 218 15% 80%;
 
+  /* CRM admin shell — fixed dark chrome, does not follow light/dark mode.
+     Dedicated tokens because no existing light-mode token maps to this shade. */
+  --crm-sidebar: 222 34% 15%;
+  --crm-header: 222 47% 11%;
+  --crm-content: 210 17% 95%;
+
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: 'Playfair Display', serif;
   --app-font-mono: Menlo, monospace;
@@ -219,6 +229,11 @@
   --chart-3: 40 10% 70%;
   --chart-4: 220 10% 15%;
   --chart-5: 220 10% 20%;
+
+  /* CRM admin shell keeps the same fixed dark chrome in dark mode. */
+  --crm-sidebar: 222 34% 15%;
+  --crm-header: 222 47% 11%;
+  --crm-content: 210 17% 95%;
 
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
@@ -349,5 +364,26 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+
+  /**
+   * CRM computed-insight marker.
+   * Rule: any card presenting a COMPUTED/derived insight (DISC, Lead Health
+   * Score, Communication Intelligence, Behavioral Intelligence, Lead DNA)
+   * gets this marker. Plain CRUD cards (contact info, task lists, deal
+   * amounts) do not get it. Uses the emerald chart-2 token so it stays in
+   * sync with the theme instead of a hardcoded color.
+   */
+  .crm-insight-card {
+    border-left-width: 3px;
+    border-left-color: hsl(var(--chart-2));
+  }
+
+  .crm-insight-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background-color: hsl(var(--chart-2));
   }
 }
