@@ -269,9 +269,7 @@ export default function Pricing() {
   return (
     <div className="w-full pb-24">
       {/* Header */}
-      <section className="pt-20 pb-16 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
-        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-background/60 via-background/30 to-background pointer-events-none" />
+      <section className="pt-20 pb-16 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #dbeafe 0%, #eff6ff 22%, #f8faff 50%, #e0edff 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
