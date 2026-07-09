@@ -38,6 +38,7 @@ import CrmDiscovery from "@/pages/crm/CrmDiscovery";
 import CrmCommunications from "@/pages/crm/CrmCommunications";
 import CrmBehavioralIntelligence from "@/pages/crm/CrmBehavioralIntelligence";
 import CrmAutomationQueue from "@/pages/crm/CrmAutomationQueue";
+import CrmLeadDna from "@/pages/crm/CrmLeadDna";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ function Router() {
       {/* CRM routes — ErrorBoundary is inside CrmLayout */}
       <Route path="/admin/crm/dashboard" component={CrmExecutiveDashboard} />
       <Route path="/admin/crm" component={CrmHomeRedirect} />
+      <Route path="/admin/crm/leads/:id/dna" component={CrmLeadDna} />
       <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
       <Route path="/admin/crm/leads" component={CrmLeads} />
       <Route path="/admin/crm/communications" component={CrmCommunications} />

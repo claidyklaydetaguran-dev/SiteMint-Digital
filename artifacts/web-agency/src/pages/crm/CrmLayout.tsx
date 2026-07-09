@@ -139,7 +139,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: BarChart2,
     items: [
       { label: "Reporting",                href: "/admin/crm/reporting", icon: TrendingUp },
-      { label: "Lead DNA",                 icon: Dna,            comingSoon: true },
+      { label: "Lead DNA",                 href: "/admin/crm/leads", icon: Dna },
       { label: "Relationship Intelligence",icon: Users,          comingSoon: true },
       { label: "Behavioral Intelligence",  href: "/admin/crm/intelligence/behavioral", icon: BotMessageSquare },
       { label: "Automation Queue",         href: "/admin/crm/intelligence/automation-queue", icon: Cpu },

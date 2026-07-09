@@ -14,3 +14,4 @@
 - [esbuild bundling breaks __dirname](esbuild-bundling-dirname-breaks.md) — a dependency that loads adjacent files via __dirname (e.g. migration SQL) silently breaks in prod if esbuild bundles it; add it to `external` instead.
 - [Stripe connector settings field name](stripe-connector-settings.md) — the stripe integration's connector settings key for the secret key is `secret`, not `secret_key`; there is no separate `webhook_secret` key.
 - [Static assets under BASE_PATH artifacts](base-path-static-assets.md) — absolute `/foo.png` src paths break once an artifact is served under a non-root previewPath; always prefix public/ assets with `import.meta.env.BASE_URL`.
+- [Lead DNA composite page](crm-lead-dna.md) — fuses DISC+health+CI+behavioral engines client-side with zero new API/DB; GET /crm/leads/:id already returns {lead,activities,tasks}, no separate /activities endpoint exists.

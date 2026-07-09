@@ -1,0 +1,62 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: Intelligence section — Lead DNA page + component.
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, phone.ts).
+Do not modify any of the four engines below — this task only composes
+their existing outputs into one view. If any engine is missing an
+export needed for this, stop and report back rather than editing it.
+
+Stay within the default change budget (5 files, 300 lines, 1 migration,
+1 utility, 2 components). This should need 0 migrations.
+
+Task:
+Build "Lead DNA" (currently marked comingSoon, Intelligence nav group) —
+a single composite profile view per lead that fuses signals which
+currently live in separate places:
+  - DISC behavioral type (discEngine.ts)
+  - Lead Health Score + reasons (leadScore.ts)
+  - Communication Intelligence card data (communicationIntelligence.ts)
+  - Behavioral Intelligence signals — reuse the existing
+    GET /crm/behavioral-events endpoint and behavioralIntelligence.ts
+    engine built in the prior session (org-wide dashboard already lives
+    at CrmBehavioralIntelligence.tsx; you're pulling per-lead data from
+    the same source, not duplicating its logic)
+
+1. Live at /admin/crm/leads/:id/dna (new route, linked from
+   CrmLeadDetail.tsx and/or SalesWorkspace.tsx as a "View Lead DNA" link
+   — do not remove or restructure the existing tabs there)
+2. Single page, one lead, that lays out all four signal types together
+   as one profile: DISC type + traits, health score + top reasons,
+   CI summary, behavioral signal trend. Use the existing
+   .crm-insight-card / .crm-insight-dot classes on all four sub-sections
+   — this page is entirely computed content, so the marker applies
+   throughout, not just on one panel
+3. Reuse the same "hot signal spike" heuristic already chosen for the
+   Behavioral Intelligence dashboard (3+ behavioral events in 7 days) —
+   do not define a second, different threshold for the same concept
+4. Add ONE new synthesized element that doesn't exist anywhere yet:
+   a plain-English "DNA Summary" — 2-3 sentences combining all four
+   signals into one read (e.g. "Analytical type, Hot health score,
+   engagement rising but has gone quiet on calls — recommend a
+   data-heavy follow-up email, not a call"). Generate this with simple
+   rule-based logic (if/else on the existing engine outputs), NOT a
+   new AI/LLM call — keep it deterministic and explainable, consistent
+   with how leadScore.ts already works
+5. This is a new read-only page composing existing data — it must not
+   change how DISC, health score, CI, or behavioral data are calculated
+   anywhere else
+6. Update CrmLayout.tsx to remove comingSoon from "Lead DNA"; since
+   this is a per-lead page (not a list), point the nav item at
+   /admin/crm/leads (Contacts) with a note, or make it a picker —
+   your call, keep it simple
+
+Return:
+- Files changed
+- API endpoints added or modified (if any)
+- DB migration run (yes/no)
+- TypeScript status
+- Tests performed
+- Known limitations
+- Confirm no locked-engine files were modified

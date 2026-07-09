@@ -800,6 +800,11 @@ export default function CrmLeadDetail() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Link href={`/admin/crm/leads/${lead.id}/dna`}>
+                    <button className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1">
+                      View Lead DNA
+                    </button>
+                  </Link>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
                     {lead.status}
                   </span>
