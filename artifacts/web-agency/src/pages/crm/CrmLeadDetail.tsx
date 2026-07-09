@@ -1372,9 +1372,12 @@ export default function CrmLeadDetail() {
 
             {/* ── Lead Health Score ──────────────────────────────────────── */}
             {health && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-serif font-bold text-sm text-foreground">Lead Health</h3>
+                  <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
+                    <span className="crm-insight-dot" />
+                    Lead Health
+                  </h3>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${health.bgColor} ${health.color} ${health.borderColor}`}>
                     {health.badge}
                   </span>
@@ -1482,9 +1485,12 @@ export default function CrmLeadDetail() {
 
             {/* ── Communication Intelligence ──────────────────────────────── */}
             {ciStats && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-serif font-bold text-sm text-foreground">Communication</h3>
+                  <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
+                    <span className="crm-insight-dot" />
+                    Communication
+                  </h3>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${ciStats.engagementScore.bgColor} ${ciStats.engagementScore.color} ${ciStats.engagementScore.borderColor}`}>
                     {ciStats.status}
                   </span>
@@ -1808,10 +1814,13 @@ export default function CrmLeadDetail() {
 
             {/* ── DISC Behavioral Profile ──────────────────────────────────── */}
             {discProfile && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <h3 className="font-serif font-bold text-sm text-foreground">Behavioral Profile</h3>
+                  <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
+                    <span className="crm-insight-dot" />
+                    Behavioral Profile
+                  </h3>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${DISC_META[discProfile.primaryStyle].bgColor} ${DISC_META[discProfile.primaryStyle].textColor} ${DISC_META[discProfile.primaryStyle].borderColor}`}>
                     {DISC_META[discProfile.primaryStyle].emoji} {discProfile.primaryStyle}
                   </span>
