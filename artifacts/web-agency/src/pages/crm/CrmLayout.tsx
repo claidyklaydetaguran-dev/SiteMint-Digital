@@ -81,8 +81,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Communications Center", href: "/admin/crm/communications", icon: Inbox },
       { label: "Inbox (SMS & Calls)",   href: "/admin/crm/inbox",          icon: PhoneCall },
-      { label: "Email Templates",        href: "/admin/crm/email-templates", icon: MailIcon },
-      { label: "Scheduled Messages",     href: "/admin/crm/campaign-queue",  icon: CalendarDays },
     ],
   },
   {
@@ -95,7 +93,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },
       { label: "Transactions", icon: CreditCard, comingSoon: true },
-      { label: "Calls & SMS",  href: "/admin/crm/inbox",    icon: PhoneCall },
     ],
   },
   {
@@ -128,9 +125,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: FolderOpen,
     items: [
       { label: "Discovery CRM",  href: "/admin/crm/discovery", icon: ClipboardList },
-      { label: "Proposals & SOW",href: "/admin/crm/discovery", icon: Briefcase },
       { label: "Projects",       href: "/admin/crm/projects",  icon: FolderOpen },
-      { label: "Project Tasks",  href: "/admin/crm/projects",  icon: ListTodo },
     ],
   },
   {
@@ -150,26 +145,25 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Settings",
     icon: Settings,
     items: [
-      { label: "System Settings", href: "/admin/crm/settings", icon: Wrench },
-      { label: "Admin Hub",       href: "/admin/crm/admin",    icon: LayoutDashboard },
-      { label: "Phone Hygiene",   href: "/admin/crm/settings", icon: PhoneCall },
-      { label: "Integrations",    href: "/admin/crm/settings", icon: Plug },
+      { label: "Settings",  href: "/admin/crm/settings", icon: Wrench },
+      { label: "Admin Hub", href: "/admin/crm/admin",    icon: LayoutDashboard },
     ],
   },
 ];
 
-// Map each route prefix to a group id for auto-detection
+// Derived directly from NAV_GROUPS so a URL can only ever map to the single
+// group whose nav item actually links to it — no separately maintained list
+// to drift out of sync.
+const GROUP_LOOKUP: { href: string; exact?: boolean; groupId: string }[] = NAV_GROUPS
+  .flatMap(group => group.items
+    .filter((item): item is NavItem & { href: string } => !!item.href)
+    .map(item => ({ href: item.href, exact: item.exact, groupId: group.id })))
+  .sort((a, b) => b.href.length - a.href.length);
+
 function detectGroup(location: string): string {
-  if (location === "/admin/dashboard") return "home";
-  if (["/admin/crm/dashboard","/admin/crm/tasks","/admin/crm/calendar"].some(p => location.startsWith(p))) return "home";
-  if (["/admin/crm/communications","/admin/crm/inbox","/admin/crm/email-templates"].some(p => location.startsWith(p))) return "communications";
-  if (["/admin/crm/leads","/admin/crm/pipeline","/admin/crm/deals","/admin/crm/workspace"].some(p => location.startsWith(p))) return "sales";
-  if (["/admin/crm/campaigns","/admin/crm/campaign-builder","/admin/crm/campaign-queue","/admin/crm/email-templates"].some(p => location.startsWith(p))) return "marketing";
-  if (["/admin/crm/import"].some(p => location.startsWith(p))) return "social";
-  if (["/admin/crm/discovery","/admin/crm/projects"].some(p => location.startsWith(p))) return "operations";
-  if (["/admin/crm/reporting"].some(p => location.startsWith(p))) return "intelligence";
-  if (["/admin/crm/settings","/admin/crm/admin"].some(p => location.startsWith(p))) return "settings";
-  return "home";
+  const match = GROUP_LOOKUP.find(({ href, exact }) =>
+    exact ? location === href : location.startsWith(href));
+  return match?.groupId ?? "home";
 }
 
 // ── Email Compose Modal ────────────────────────────────────────────────────────

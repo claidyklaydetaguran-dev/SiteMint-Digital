@@ -1,0 +1,52 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: CrmLayout.tsx (nav structure + detectGroup logic).
+Styling/IA only — no new pages, no new routes, no backend changes.
+
+Do not touch locked modules. Stay within the default change budget
+(5 files, 300 lines, 0 migrations) — this should need 1 file.
+
+Context (diagnosed, don't re-derive):
+NAV_GROUPS currently has several items across different groups pointing
+to the identical href with different labels:
+- "Email Templates" (Communications + Marketing) -> /admin/crm/email-templates
+- "Scheduled Messages" (Communications) / "Campaign Queue" (Marketing)
+  -> /admin/crm/campaign-queue
+- "Calls & SMS" (Sales) / "Inbox (SMS & Calls)" (Communications)
+  -> /admin/crm/inbox
+- "Discovery CRM" / "Proposals & SOW" (Operations) -> /admin/crm/discovery
+- "Projects" / "Project Tasks" (Operations) -> /admin/crm/projects
+- "System Settings" / "Phone Hygiene" / "Integrations" (Settings) all
+  -> /admin/crm/settings, no tab/anchor distinguishing them
+Because detectGroup() checks groups in a fixed order, hitting a shared
+URL always highlights the first-matching group, so the active nav state
+doesn't always match the group the user actually clicked from.
+
+Task:
+1. For each duplicate destination, decide which single group is the
+   true home for that page and remove it from the other group(s) —
+   pick based on where the feature conceptually lives (e.g. Email
+   Templates is a Marketing asset used by Communications; Calls & SMS
+   is fundamentally Communications, not Sales). Do not delete any page
+   or route, only the redundant nav entries.
+2. For Settings: if System Settings/Phone Hygiene/Integrations are
+   meant to be distinct sections of one settings page, check whether
+   CrmSettings.tsx already supports tabs/anchors (e.g. ?tab=). If it
+   does, point each nav item at its own ?tab= value. If it doesn't,
+   collapse the three into one "Settings" nav item rather than leaving
+   three identical links — do not build new settings tabs from scratch
+   in this pass.
+3. Fix detectGroup() so it can't produce a mismatch: derive it from a
+   single source of truth (e.g. build the location->group map directly
+   from the deduplicated NAV_GROUPS instead of a separately maintained
+   array), so a URL can only ever belong to one group.
+4. Leave the collapse/expand mechanism (SIDEBAR_W, sidebarExpanded)
+   untouched — it isn't broken.
+
+Return:
+- Files changed
+- Table of every nav item removed/reassigned and why
+- Confirm every existing route still has at least one nav entry
+  pointing to it (no orphaned pages)
+- TypeScript status
+- Screenshot or description of the resulting nav structure
