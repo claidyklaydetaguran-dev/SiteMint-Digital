@@ -1,0 +1,48 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: SalesWorkspace.tsx (tab bar) + CrmLeadDetail.tsx
+(the command bar / progress stepper rows shown clipped in the
+attached screenshot). Layout only, no logic/data changes.
+
+Do not touch locked modules. Stay within budget (5 files, 300 lines,
+0 migrations).
+
+Context (diagnosed, don't re-derive):
+WS_TABS in SalesWorkspace.tsx has 12 tabs in one non-wrapping
+overflow-x-auto row — too many to fit any screen width, and there's no
+visible affordance (fade/arrow) showing more tabs exist off-screen, so
+it now reads as a broken/cut-off page instead of a scrollable strip.
+Separately, in CrmLeadDetail.tsx, the "New Inquiry" badge area and a
+progress/count indicator are being clipped at the right edge at 1440px+
+per the attached screenshot — these need their own fix, likely a
+non-wrapping flex row similar to the email/website issue fixed last
+session.
+
+Task:
+1. Split WS_TABS into "primary" (Overview, Workflow, Communications,
+   Proposal, Notes, History) always rendered inline, and "secondary"
+   (Scope of Work, Documents, Intelligence, Automation, Relationship,
+   Behavior) collapsed into a "More" dropdown button at the end of the
+   tab row. Clicking a secondary tab from the dropdown should set
+   activeTab exactly as before — no change to tab content/logic, only
+   how tabs are exposed. If a secondary tab has a badge count, surface
+   a small indicator dot on the "More" button itself.
+2. Add a visible scroll affordance to the primary tab row in case it's
+   still tight on small windows: a subtle fade/gradient at the trailing
+   edge when scrollable content exists (CSS-only, no new dependency).
+3. In CrmLeadDetail.tsx, find and fix the specific row(s) causing the
+   "New Inquiry" badge and the progress/count indicator to clip at the
+   right edge at 1440px+ (per the attached screenshot) — same category
+   of fix as the email/website min-w-0 fix from the prior session:
+   identify the non-shrinking flex child and make it wrap or shrink
+   properly instead of overflowing.
+4. Re-verify at 375px, 768px, 1440px, 1920px that there is no whole-page
+   horizontal scroll, and that the primary tab row + "More" dropdown
+   both work correctly at each width.
+
+Return:
+- Files changed
+- Before/after for the tab bar structure (primary list vs "More" list)
+- The specific clipped element(s) found in CrmLeadDetail.tsx and their fix
+- Screenshots or Playwright-verified description at all 4 widths
+- TypeScript status

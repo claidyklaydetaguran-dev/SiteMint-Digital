@@ -5,7 +5,7 @@ import {
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
   X, DollarSign, Package, Zap, Bot, ChevronRight, RefreshCw,
   StickyNote, History, Star, GitBranch, MessageSquare, Network,
-  Activity,
+  Activity, ChevronDown,
 } from "lucide-react";
 import {
   computeWorkflowSteps, computeNextBestAction,
@@ -139,7 +139,7 @@ function StageTracker({ lead }: { lead: WorkspaceLead }) {
                 }`}>
                   {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span>{i + 1}</span>}
                 </div>
-                <span className="text-[9px] text-center text-muted-foreground leading-tight max-w-[48px]">{stage.label}</span>
+                <span className="text-[9px] text-center text-muted-foreground leading-tight max-w-[56px] break-words">{stage.label}</span>
               </div>
             );
           })}
@@ -2118,11 +2118,30 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
 
 const WS_TAB_IDS = new Set(WS_TABS.map(t => t.id));
 
+const WS_PRIMARY_TAB_IDS = new Set<WsTab>([
+  "overview", "workflow", "communications", "proposal", "notes", "history",
+]);
+
+const WS_TABS_PRIMARY = WS_TABS.filter(t => WS_PRIMARY_TAB_IDS.has(t.id));
+const WS_TABS_SECONDARY = WS_TABS.filter(t => !WS_PRIMARY_TAB_IDS.has(t.id));
+
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<WsTab>(() => {
     const requested = new URLSearchParams(window.location.search).get("tab");
     return requested && WS_TAB_IDS.has(requested as WsTab) ? (requested as WsTab) : "overview";
   });
+
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [moreOpen]);
 
   const proposalCount = lead.generatedProposal ? 1 : 0;
   const sowCount = lead.generatedSow ? 1 : 0;
@@ -2133,6 +2152,9 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
     if (tab === "history" && activities.length > 0) return activities.length;
     return null;
   }
+
+  const activeSecondaryTab = WS_TABS_SECONDARY.find(t => t.id === activeTab) ?? null;
+  const secondaryHasBadge = WS_TABS_SECONDARY.some(t => getBadge(t.id) !== null);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -2151,32 +2173,90 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
         </div>
 
         {/* Tabs */}
-        <div className="flex overflow-x-auto -mb-px">
-          {WS_TABS.map(tab => {
-            const badge = getBadge(tab.id);
-            const Icon = tab.icon;
-            return (
+        <div className="flex items-stretch min-w-0">
+          <div className="relative min-w-0 flex-1">
+          <div className="flex overflow-x-auto -mb-px min-w-0">
+            {WS_TABS_PRIMARY.map(tab => {
+              const badge = getBadge(tab.id);
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px shrink-0 ${
+                    activeTab === tab.id
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{tab.label}</span>
+                  {badge !== null && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      activeTab === tab.id ? "bg-foreground text-background" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Fade affordance hinting at more scrollable content in the primary row */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent" />
+          </div>
+
+          {WS_TABS_SECONDARY.length > 0 && (
+            <div className="relative shrink-0" ref={moreRef}>
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px shrink-0 ${
-                  activeTab === tab.id
+                onClick={() => setMoreOpen(o => !o)}
+                className={`relative flex items-center gap-1 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+                  activeSecondaryTab
                     ? "border-foreground text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span>{tab.label}</span>
-                {badge !== null && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    activeTab === tab.id ? "bg-foreground text-background" : "bg-gray-100 text-gray-500"
-                  }`}>
-                    {badge}
-                  </span>
+                {activeSecondaryTab ? (
+                  <>
+                    <activeSecondaryTab.icon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{activeSecondaryTab.label}</span>
+                  </>
+                ) : (
+                  <span>More</span>
+                )}
+                <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                {secondaryHasBadge && !activeSecondaryTab && (
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-foreground" />
                 )}
               </button>
-            );
-          })}
+              {moreOpen && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
+                  {WS_TABS_SECONDARY.map(tab => {
+                    const badge = getBadge(tab.id);
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => { setActiveTab(tab.id); setMoreOpen(false); }}
+                        className={`w-full flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-left transition-colors ${
+                          activeTab === tab.id ? "bg-gray-100 text-foreground" : "text-muted-foreground hover:bg-gray-50 hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="flex-1 min-w-0">{tab.label}</span>
+                        {badge !== null && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 shrink-0">
+                            {badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
