@@ -1,0 +1,51 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: Intelligence section — Automation Queue page.
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, phone.ts).
+Do not modify workflowEngine.ts itself — it is a working engine,
+only consume it for read purposes.
+
+Stay within the default change budget (5 files, 300 lines, 1 migration,
+1 utility, 2 components). This should need 0 migrations — this is a
+read/visibility layer, not new automation logic.
+
+Task:
+Build the "Automation Queue" page referenced in CrmLayout.tsx (currently
+marked comingSoon, Intelligence nav group). Today, workflowEngine.ts only
+surfaces its WorkflowStep state per-lead (Sales Workspace). This page
+gives an org-wide, cross-lead view of that same state:
+
+1. Live at /admin/crm/intelligence/automation-queue (new route in App.tsx)
+2. Pull every lead's WorkflowStep list (via workflowEngine.ts, unmodified)
+   and flatten into one queue, grouped by status: active, pending, and
+   recently completed
+3. Sort "active" and "pending" by urgency (overdue next-follow-up first,
+   then soonest due date) — reuse existing lead/task fields, do not
+   invent new urgency scoring
+4. Also fold in campaign-side automation already running (scheduled
+   messages from crm_campaign_scheduled_messages via existing campaign
+   queue routes) so this page is the single place to see ALL automation
+   in flight — both workflow-engine steps and campaign sends — not just
+   one or the other
+5. Each row links to the lead's Sales Workspace (workflow steps) or
+   Campaign Queue (scheduled messages) for action — this page is
+   read-only visibility, not a new place to trigger actions
+6. Update CrmLayout.tsx to remove comingSoon from "Automation Queue"
+   and point it at the new route
+7. If a new aggregate API route is needed, follow the same pattern as
+   GET /crm/behavioral-events from the prior session: a static route
+   placed above the /crm/leads/:id/... group in crm.ts
+8. This page shows operational status, not computed insight — do not
+   apply .crm-insight-card here (reserve that marker for DISC/Health/
+   CI/Behavioral-style scored content, per the design-system rule)
+
+Return:
+- Files changed
+- API endpoints added or modified (if any — likely one new aggregate
+  GET route that joins existing data, no new tables)
+- DB migration run (yes/no)
+- TypeScript status
+- Tests performed
+- Known limitations

@@ -37,6 +37,7 @@ import CrmWorkspaceLanding from "@/pages/crm/CrmWorkspaceLanding";
 import CrmDiscovery from "@/pages/crm/CrmDiscovery";
 import CrmCommunications from "@/pages/crm/CrmCommunications";
 import CrmBehavioralIntelligence from "@/pages/crm/CrmBehavioralIntelligence";
+import CrmAutomationQueue from "@/pages/crm/CrmAutomationQueue";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/admin/crm/leads" component={CrmLeads} />
       <Route path="/admin/crm/communications" component={CrmCommunications} />
       <Route path="/admin/crm/intelligence/behavioral" component={CrmBehavioralIntelligence} />
+      <Route path="/admin/crm/intelligence/automation-queue" component={CrmAutomationQueue} />
       <Route path="/admin/crm/inbox" component={CrmInbox} />
       <Route path="/admin/crm/tasks" component={CrmTasks} />
       <Route path="/admin/crm/calendar" component={CrmCalendar} />

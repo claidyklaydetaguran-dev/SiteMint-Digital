@@ -66,6 +66,74 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+// ── Automation Queue — org-wide, read-only ────────────────────────────────────
+
+// GET /crm/intelligence/automation-queue
+// Bulk data feed for the Automation Queue page: every lead's fields needed by
+// workflowEngine.ts, all activities/tasks (grouped client-side), plus in-flight
+// campaign scheduled messages. The engine itself is not touched — this route
+// only supplies its inputs; step computation happens client-side via the
+// existing pure computeWorkflowSteps(). Static route — must stay above the
+// "/crm/leads/:id" route group.
+router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const leads = await db
+      .select({
+        id: crmLeads.id,
+        name: crmLeads.name,
+        company: crmLeads.company,
+        status: crmLeads.status,
+        source: crmLeads.source,
+        proposalStatus: crmLeads.proposalStatus,
+        sowStatus: crmLeads.sowStatus,
+        generatedProposal: crmLeads.generatedProposal,
+        generatedSow: crmLeads.generatedSow,
+        discoverySubmissionId: crmLeads.discoverySubmissionId,
+        lastContactedAt: crmLeads.lastContactedAt,
+        nextFollowUpAt: crmLeads.nextFollowUpAt,
+        estimatedValue: crmLeads.estimatedValue,
+        createdAt: crmLeads.createdAt,
+        updatedAt: crmLeads.updatedAt,
+      })
+      .from(crmLeads)
+      .orderBy(desc(crmLeads.updatedAt));
+
+    const [activities, tasks, scheduledMessages] = await Promise.all([
+      db.select({
+        id: crmActivities.id, leadId: crmActivities.leadId, type: crmActivities.type,
+        title: crmActivities.title, description: crmActivities.description, createdAt: crmActivities.createdAt,
+      }).from(crmActivities).orderBy(desc(crmActivities.createdAt)),
+      db.select({
+        id: crmTasks.id, leadId: crmTasks.leadId, type: crmTasks.type, title: crmTasks.title,
+        status: crmTasks.status, dueDate: crmTasks.dueDate, completedAt: crmTasks.completedAt, createdAt: crmTasks.createdAt,
+      }).from(crmTasks),
+      db.select({
+        id: crmCampaignScheduledMessages.id,
+        campaignId: crmCampaignScheduledMessages.campaignId,
+        leadId: crmCampaignScheduledMessages.leadId,
+        channel: crmCampaignScheduledMessages.channel,
+        subject: crmCampaignScheduledMessages.subject,
+        status: crmCampaignScheduledMessages.status,
+        scheduledAt: crmCampaignScheduledMessages.scheduledAt,
+        sentAt: crmCampaignScheduledMessages.sentAt,
+        leadName: crmLeads.name,
+        campaignName: crmCampaigns.name,
+      })
+        .from(crmCampaignScheduledMessages)
+        .innerJoin(crmLeads, eq(crmCampaignScheduledMessages.leadId, crmLeads.id))
+        .innerJoin(crmCampaigns, eq(crmCampaignScheduledMessages.campaignId, crmCampaigns.id))
+        .where(inArray(crmCampaignScheduledMessages.status, ["scheduled", "queued", "sent"]))
+        .orderBy(desc(crmCampaignScheduledMessages.scheduledAt))
+        .limit(500),
+    ]);
+
+    res.json({ leads, activities, tasks, scheduledMessages });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching automation queue");
+    res.status(500).json({ error: "Failed to fetch automation queue" });
+  }
+});
+
 // ── Leads list ────────────────────────────────────────────────────────────────
 router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
   try {
