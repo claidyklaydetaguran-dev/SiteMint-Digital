@@ -8,7 +8,6 @@ import crmProjectsRouter from "./crmProjects";
 import crmDiscoveryRouter from "./crmDiscovery";
 import phoneRouter from "./phone";
 import copilotRouter from "./copilot";
-import aiToolkitRouter from "./aiToolkit";
 
 const router: IRouter = Router();
 
@@ -21,6 +20,5 @@ router.use(crmProjectsRouter);
 router.use(crmDiscoveryRouter);
 router.use(phoneRouter);
 router.use(copilotRouter);
-router.use(aiToolkitRouter);
 
 export default router;

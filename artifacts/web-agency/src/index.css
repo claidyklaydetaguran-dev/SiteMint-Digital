@@ -104,44 +104,44 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 218 45% 98%;
-  --foreground: 222 45% 12%;
-  --border: 218 25% 88%;
+  --background: 40 20% 98%;
+  --foreground: 220 10% 10%;
+  --border: 40 10% 85%;
   --card: 0 0% 100%;
-  --card-foreground: 222 45% 12%;
-  --card-border: 218 25% 90%;
+  --card-foreground: 220 10% 10%;
+  --card-border: 40 10% 90%;
 
-  --sidebar: 218 45% 98%;
-  --sidebar-foreground: 222 45% 12%;
-  --sidebar-border: 218 25% 88%;
-  --sidebar-primary: 218 90% 23%;
+  --sidebar: 40 20% 98%;
+  --sidebar-foreground: 220 10% 10%;
+  --sidebar-border: 40 10% 85%;
+  --sidebar-primary: 222 47% 25%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 218 30% 94%;
-  --sidebar-accent-foreground: 222 45% 12%;
-  --sidebar-ring: 218 90% 23%;
+  --sidebar-accent: 40 20% 94%;
+  --sidebar-accent-foreground: 220 10% 10%;
+  --sidebar-ring: 222 47% 25%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 45% 12%;
-  --popover-border: 218 25% 90%;
+  --popover-foreground: 220 10% 10%;
+  --popover-border: 40 10% 90%;
 
-  --primary: 218 90% 23%;
+  --primary: 222 47% 25%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 218 40% 95%;
-  --secondary-foreground: 218 90% 15%;
-  --muted: 218 25% 95%;
-  --muted-foreground: 220 15% 40%;
-  --accent: 218 45% 93%;
-  --accent-foreground: 218 90% 18%;
+  --secondary: 40 25% 94%;
+  --secondary-foreground: 220 10% 10%;
+  --muted: 40 12% 94%;
+  --muted-foreground: 220 5% 40%;
+  --accent: 40 30% 90%;
+  --accent-foreground: 220 10% 10%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 218 20% 85%;
-  --ring: 218 90% 23%;
-  --chart-1: 218 90% 23%;
-  --chart-2: 160 64% 50%;
+  --input: 40 10% 85%;
+  --ring: 222 47% 25%;
+  --chart-1: 222 47% 25%;
+  --chart-2: 40 30% 90%;
   --chart-3: 220 10% 10%;
-  --chart-4: 218 25% 90%;
-  --chart-5: 218 15% 80%;
+  --chart-4: 40 20% 94%;
+  --chart-5: 40 10% 85%;
 
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: 'Playfair Display', serif;

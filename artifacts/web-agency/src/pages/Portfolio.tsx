@@ -14,7 +14,7 @@ const projects = [
     url: "https://shastagreene.com",
     domain: "shastagreene.com",
     category: "Real Estate",
-    categoryColor: "bg-primary/8 text-primary border-primary/20",
+    categoryColor: "bg-blue-50 text-blue-700 border-blue-200",
     image: "/portfolio-shasta.png",
     description:
       "A professional real estate website designed to build trust, showcase services, support lead generation, and strengthen online presence.",
@@ -25,7 +25,7 @@ const projects = [
     url: "https://onefilamcommunity.org",
     domain: "onefilamcommunity.org",
     category: "Nonprofit Organization",
-    categoryColor: "bg-emerald-50/70 text-emerald-700 border-emerald-200/70",
+    categoryColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
     image: "/portfolio-onefilam.png",
     description:
       "A nonprofit community website supporting Filipino-American outreach, events, programs, community engagement, and organizational credibility.",
@@ -36,7 +36,7 @@ const projects = [
     url: "https://herlindavaldovinos.com",
     domain: "herlindavaldovinos.com",
     category: "Professional Services",
-    categoryColor: "bg-secondary text-foreground/80 border-border",
+    categoryColor: "bg-purple-50 text-purple-700 border-purple-200",
     image: "/portfolio-herlinda.png",
     description:
       "A professional website created to establish online credibility, present services clearly, and help generate client inquiries.",
@@ -47,7 +47,7 @@ const projects = [
     url: "https://ClaidyTaguranPorfolio.replit.app",
     domain: "claidytaguranporfolio.replit.app",
     category: "Developer Portfolio",
-    categoryColor: "bg-muted text-muted-foreground border-border",
+    categoryColor: "bg-slate-100 text-slate-700 border-slate-200",
     image: "/portfolio-claidy.png",
     description:
       "A technical portfolio showcasing development projects, web applications, software skills, UI/UX work, and modern web development experience.",
@@ -127,10 +127,12 @@ export default function Portfolio() {
   return (
     <div className="w-full pb-24">
       {/* Header */}
-      <section
-        className="pt-32 pb-16 relative overflow-hidden text-background"
-        style={{ background: "radial-gradient(ellipse at top, #0a3d91 0%, #062040 45%, #040c2c 100%)" }}
-      >
+      <section className="pt-20 pb-16 relative overflow-hidden bg-foreground text-background">
+        <div
+          className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-40"
+          style={{ backgroundImage: "url('/dark-section-bg.png')" }}
+        />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-foreground/80 via-foreground/60 to-foreground pointer-events-none" />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

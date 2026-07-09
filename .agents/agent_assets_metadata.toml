@@ -42,9 +42,3 @@ id = "MZ_jNA13rQ9RcCeYxMczD"
 uri = "file://artifacts/web-agency/public/portfolio-claidy.png"
 type = "image"
 title = "claidy developer portfolio website mockup"
-
-[[generated]]
-id = "tL17FAT3IRuAKf285BsJC"
-uri = "file://artifacts/ai-toolkit/public/product-mockup.png"
-type = "image"
-title = "AI Prompt Toolkit Product Mockup"

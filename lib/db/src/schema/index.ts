@@ -9,4 +9,3 @@ export * from "./crmDeals";
 export * from "./crmProjects";
 export * from "./crmCampaigns";
 export * from "./crmBehavioralEvents";
-export * from "./aiToolkitPurchases";
