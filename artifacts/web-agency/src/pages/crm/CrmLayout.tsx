@@ -141,7 +141,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Reporting",                href: "/admin/crm/reporting", icon: TrendingUp },
       { label: "Lead DNA",                 icon: Dna,            comingSoon: true },
       { label: "Relationship Intelligence",icon: Users,          comingSoon: true },
-      { label: "Behavioral Intelligence",  icon: BotMessageSquare, comingSoon: true },
+      { label: "Behavioral Intelligence",  href: "/admin/crm/intelligence/behavioral", icon: BotMessageSquare },
       { label: "Automation Queue",         icon: Cpu,            comingSoon: true },
     ],
   },

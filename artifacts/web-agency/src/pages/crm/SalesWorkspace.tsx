@@ -2116,8 +2116,13 @@ const WS_TABS: { id: WsTab; label: string; icon: React.ElementType }[] = [
   { id: "behavior",     label: "Behavior",     icon: Activity },
 ];
 
+const WS_TAB_IDS = new Set(WS_TABS.map(t => t.id));
+
 export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<WsTab>("overview");
+  const [activeTab, setActiveTab] = useState<WsTab>(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return requested && WS_TAB_IDS.has(requested as WsTab) ? (requested as WsTab) : "overview";
+  });
 
   const proposalCount = lead.generatedProposal ? 1 : 0;
   const sowCount = lead.generatedSow ? 1 : 0;

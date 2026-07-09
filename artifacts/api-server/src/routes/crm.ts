@@ -1764,6 +1764,34 @@ router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Respo
 
 // ── Behavioral Intelligence — Phase 24A ───────────────────────────────────────
 
+// GET /crm/behavioral-events
+// Org-wide feed of recent behavioral events across all leads, for the
+// Behavioral Intelligence dashboard. Static route — must stay above
+// the "/crm/leads/:id/behavioral-events" route group.
+router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 1000, 2000);
+    const events = await db
+      .select()
+      .from(crmBehavioralEvents)
+      .orderBy(desc(crmBehavioralEvents.occurredAt))
+      .limit(limit);
+
+    const leadIds = Array.from(new Set(events.map(e => e.leadId)));
+    const leads = leadIds.length
+      ? await db
+          .select({ id: crmLeads.id, name: crmLeads.name, company: crmLeads.company, status: crmLeads.status })
+          .from(crmLeads)
+          .where(inArray(crmLeads.id, leadIds))
+      : [];
+
+    res.json({ events, leads });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching org-wide behavioral events");
+    res.status(500).json({ error: "Failed to fetch behavioral events" });
+  }
+});
+
 // GET /crm/leads/:id/behavioral-events
 // Returns all behavioral events for a lead, newest first.
 router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
