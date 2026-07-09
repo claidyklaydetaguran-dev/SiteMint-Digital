@@ -1026,7 +1026,7 @@ function CommunicationsTab({ lead, activities }: {
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
           <div className="bg-white/70 rounded-lg p-2.5">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Engagement</p>
             <p className={`text-2xl font-bold leading-none ${es.color}`}>

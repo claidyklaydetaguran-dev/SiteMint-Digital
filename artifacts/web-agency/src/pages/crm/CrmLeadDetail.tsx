@@ -730,53 +730,53 @@ export default function CrmLeadDetail() {
               onClick={() => setOpenModal("call")}
               disabled={!lead.phone}
               title={!lead.phone ? "No phone number on record" : "Initiate bridge call"}
-              className="flex-1 flex flex-col items-center gap-1 px-3 py-3.5 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
             >
               <PhoneCall className="w-4 h-4 text-green-600 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">Call</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Call</span>
             </button>
             {/* Text */}
             <button
               onClick={() => { setOpenModal("text"); loadMessages(); }}
               disabled={!lead.phone}
               title={!lead.phone ? "No phone number on record" : lead.smsOptOut ? "SMS opted out" : "Send SMS"}
-              className="flex-1 flex flex-col items-center gap-1 px-3 py-3.5 hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
             >
               <MessageSquare className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">Text</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Text</span>
               {lead.smsOptOut && <span className="text-[9px] text-red-600 leading-none">Opted out</span>}
             </button>
             {/* Email */}
             <button
               onClick={() => setOpenModal("email")}
-              className="flex-1 flex flex-col items-center gap-1 px-3 py-3.5 hover:bg-indigo-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-indigo-50 transition-colors group"
             >
               <Mail className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">Email</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Email</span>
             </button>
             {/* Note */}
             <button
               onClick={() => setOpenModal("note")}
-              className="flex-1 flex flex-col items-center gap-1 px-3 py-3.5 hover:bg-yellow-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-yellow-50 transition-colors group"
             >
               <FileText className="w-4 h-4 text-yellow-600 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">Add Note</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Note</span>
             </button>
             {/* Task */}
             <button
               onClick={() => setOpenModal("task")}
-              className="flex-1 flex flex-col items-center gap-1 px-3 py-3.5 hover:bg-purple-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-purple-50 transition-colors group"
             >
               <Plus className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">Add Task</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Task</span>
             </button>
             {/* Status */}
             <button
               onClick={() => setOpenModal("status")}
-              className="flex-1 flex flex-col items-center gap-1 px-3 py-3.5 hover:bg-orange-50 transition-colors group min-w-0"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-orange-50 transition-colors group"
             >
               <RefreshCw className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">Status</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Status</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium leading-tight max-w-full truncate ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
                 {lead.status}
               </span>
@@ -2105,7 +2105,7 @@ export default function CrmLeadDetail() {
             <>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-2">Activity Type</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {LOG_ACTIVITY_TYPES.map(t => (
                     <button
                       key={t.value}
