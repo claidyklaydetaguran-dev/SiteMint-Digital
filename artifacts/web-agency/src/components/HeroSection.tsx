@@ -966,7 +966,7 @@ export function HeroSection() {
     <section
       style={{
         minHeight: "calc(100vh - 68px)",
-        background: `linear-gradient(145deg, #040e2b 0%, #061535 20%, #082458 45%, #071c4a 70%, #030b22 100%)`,
+        background: `linear-gradient(155deg, #dbeafe 0%, #eff6ff 22%, #f8faff 50%, #e0edff 100%)`,
         position: "relative",
         overflowX: "clip",
       }}
@@ -977,31 +977,23 @@ export function HeroSection() {
       {/* Particles — full section, z=0 */}
       <Particles
         particleCount={40}
-        particleColors={["#1e4db7", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"]}
+        particleColors={["#062e71", "#0a3d91", "#1255c4", "#3b82f6"]}
       />
 
-      {/* Radial glows */}
+      {/* Light radial glows */}
       <div
         style={{
           position: "absolute", top: -80, right: -80,
-          width: 680, height: 680, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 70%)",
+          width: 620, height: 620, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(147,197,253,0.22) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
         }}
       />
       <div
         style={{
           position: "absolute", bottom: -40, left: -60,
-          width: 500, height: 500, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(6,46,113,0.30) 0%, transparent 70%)",
-          pointerEvents: "none", zIndex: 1,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute", top: "40%", left: "38%",
-          width: 420, height: 420, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%)",
+          width: 460, height: 460, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(6,46,113,0.08) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
         }}
       />
@@ -1033,8 +1025,8 @@ export function HeroSection() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.16)",
+                background: "rgba(219,234,254,0.85)",
+                border: "1px solid rgba(147,197,253,0.55)",
                 borderRadius: 100,
                 padding: "6px 14px",
                 marginBottom: 24,
@@ -1058,7 +1050,7 @@ export function HeroSection() {
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.88)" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: DEEP_NAVY }}>
                 Now accepting new clients
               </span>
             </motion.div>
@@ -1071,7 +1063,7 @@ export function HeroSection() {
               style={{
                 fontSize: "clamp(26px, 2.6vw, 40px)",
                 fontWeight: 900,
-                color: "#FFFFFF",
+                color: "#0F172A",
                 lineHeight: 1.18,
                 letterSpacing: "-0.02em",
                 marginBottom: 18,
@@ -1084,7 +1076,7 @@ export function HeroSection() {
                   words={WORDS}
                   duration={2600}
                   className="font-black"
-                  style={{ color: "#60a5fa" } as React.CSSProperties}
+                  style={{ color: DEEP_NAVY } as React.CSSProperties}
                 />
               )}
             </motion.h1>
@@ -1096,7 +1088,7 @@ export function HeroSection() {
               transition={{ duration: 0.5, delay: 0.2 }}
               style={{
                 fontSize: 15,
-                color: "rgba(186,207,240,0.85)",
+                color: "#475569",
                 lineHeight: 1.72,
                 marginBottom: 28,
                 maxWidth: 440,
