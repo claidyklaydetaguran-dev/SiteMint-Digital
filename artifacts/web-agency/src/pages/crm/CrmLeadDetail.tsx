@@ -818,8 +818,8 @@ export default function CrmLeadDetail() {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-2 mt-4">
-                <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                  <Mail className="w-3.5 h-3.5 shrink-0" /> {lead.email}
+                <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
+                  <Mail className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.email}</span>
                 </a>
                 {/* ── Phone field with inline edit ── */}
                 <div className="flex flex-col gap-1">
@@ -914,8 +914,8 @@ export default function CrmLeadDetail() {
                   )}
                 </div>
                 {lead.website && (
-                  <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                    <Globe className="w-3.5 h-3.5 shrink-0" /> {lead.website}
+                  <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
+                    <Globe className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.website}</span>
                   </a>
                 )}
                 {lead.nextFollowUpAt && (

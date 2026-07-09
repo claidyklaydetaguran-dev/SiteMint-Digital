@@ -1178,7 +1178,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* ── Main content ── */}
-        <main className="flex-1 overflow-auto min-w-0">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
           <CrmErrorBoundary>
             {children}
           </CrmErrorBoundary>

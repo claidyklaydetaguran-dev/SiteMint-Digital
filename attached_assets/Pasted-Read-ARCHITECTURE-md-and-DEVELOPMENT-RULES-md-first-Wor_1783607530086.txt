@@ -1,0 +1,49 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: CrmLayout.tsx (main content overflow) + whichever of
+CrmLeadDetail.tsx, SalesWorkspace.tsx, CrmTasks.tsx contain the element(s)
+causing horizontal overflow. Layout/Tailwind only, no logic changes.
+
+Do not touch locked modules. Stay within budget (5 files, 300 lines,
+0 migrations).
+
+Context (diagnosed, don't re-derive):
+CrmLayout.tsx line ~1187 has:
+  <main className="flex-1 overflow-auto min-w-0">
+This allows horizontal scroll on the whole content area, masking any
+child element that's wider than the viewport instead of forcing it to
+wrap/shrink. The sidebar already does this correctly one way (line
+~851: overflow-y-auto overflow-x-hidden) — main should follow the same
+pattern. The user confirmed this horizontal-scroll problem happens even
+at 1440px+ desktop width, so it is NOT a small-viewport breakpoint gap —
+some specific element has a fixed width, min-width, or non-wrapping flex
+row wider than the viewport regardless of screen size.
+
+Task:
+1. Change main's className from "overflow-auto" to
+   "overflow-y-auto overflow-x-hidden" in CrmLayout.tsx.
+2. This will likely make the true offending element visually clip or
+   overlap instead of silently scrolling — that's expected and correct,
+   it surfaces the real bug. Load Lead Detail, Sales Workspace, and
+   Tasks at 1440px and 1920px widths and find what now clips/overflows.
+   Look specifically for: fixed px widths (w-[Npx], min-w-[Npx]) that
+   don't scale, flex rows with many non-wrapping children, or any
+   element using width values instead of fluid/fr/percentage sizing.
+3. Fix each offender to be fluid (shrink, wrap to a second row, or
+   use flex-wrap / min-w-0 as appropriate) rather than fixed-width,
+   so no element can ever force the page wider than the viewport again.
+4. Re-check at 375px and 768px too, to confirm this fix doesn't
+   reintroduce the mobile issues already fixed in the prior batch.
+5. Do not add any intentional horizontal-scroll regions (like a tab bar
+   with overflow-x-auto) unless one already existed there before — those
+   are a different, acceptable pattern (contained scroll on one row, not
+   the whole page) and should be left alone if already working.
+
+Return:
+- Files changed
+- The specific element(s) found causing overflow at 1440px+/1920px,
+  with before/after values
+- Confirm no whole-page horizontal scroll remains at 375px, 768px,
+  1440px, and 1920px
+- Confirm existing contained-scroll regions (e.g. tab bars) still work
+- TypeScript status
