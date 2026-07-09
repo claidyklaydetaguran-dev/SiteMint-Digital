@@ -230,8 +230,8 @@ const swotCards = [
   {
     icon: Lightbulb,
     label: "Where We Grow",
-    color: "text-amber-600",
-    bg: "bg-amber-50 border-amber-200",
+    color: "text-primary",
+    bg: "bg-primary/5 border-primary/15",
     items: [
       "Not ideal for enterprise-level software",
       "Complex apps require deeper discovery",
@@ -243,7 +243,7 @@ const swotCards = [
     icon: Target,
     label: "Market Opportunities",
     color: "text-emerald-600",
-    bg: "bg-emerald-50 border-emerald-200",
+    bg: "bg-emerald-50/70 border-emerald-200/70",
     items: [
       "Many small businesses still need better websites",
       "AI and automation are becoming critical for growth",
@@ -254,8 +254,8 @@ const swotCards = [
   {
     icon: AlertTriangle,
     label: "Our Awareness",
-    color: "text-slate-500",
-    bg: "bg-slate-50 border-slate-200",
+    color: "text-muted-foreground",
+    bg: "bg-muted/50 border-border",
     items: [
       "Cheap freelancers undercut on price",
       "DIY website builders are improving",
@@ -269,7 +269,7 @@ export default function Pricing() {
   return (
     <div className="w-full pb-24">
       {/* Header */}
-      <section className="pt-20 pb-16 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #dbeafe 0%, #eff6ff 22%, #f8faff 50%, #e0edff 100%)" }}>
+      <section className="pt-32 pb-16 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 30%, #f2f6fd 60%, #dce8f9 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -304,7 +304,7 @@ export default function Pricing() {
                 variants={fadeUp}
                 className="flex"
               >
-                <Card className={`relative flex flex-col w-full ${tier.popular ? "border-primary shadow-xl" : "border-border bg-card/50"}`}>
+                <Card className={`relative flex flex-col w-full bg-white ${tier.popular ? "border-primary shadow-xl shadow-primary/10" : "border-primary/10"}`}>
                   {tier.popular && (
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
                       Most Popular
@@ -373,9 +373,7 @@ export default function Pricing() {
       </section>
 
       {/* Web App Packages */}
-      <section className="py-20 border-y border-border/40 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-60" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
-        <div className="absolute inset-0 bg-background/50 pointer-events-none" />
+      <section className="py-20 border-y border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(160deg, #f2f6fd 0%, #dce8f9 50%, #e4ecfb 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-4">
@@ -385,7 +383,7 @@ export default function Pricing() {
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 max-w-2xl mx-auto mb-12 text-center">
+            <div className="bg-white/70 backdrop-blur-sm border border-primary/20 rounded-lg p-4 text-sm text-primary max-w-2xl mx-auto mb-12 text-center">
               Web applications require a separate consultation to scope properly. Pricing below reflects starting investment, not a fixed quote.
             </div>
 
@@ -400,7 +398,7 @@ export default function Pricing() {
                   variants={fadeUp}
                   className="flex"
                 >
-                  <Card className={`relative flex flex-col w-full ${pkg.popular ? "border-primary shadow-lg" : "border-border"}`}>
+                  <Card className={`relative flex flex-col w-full bg-white ${pkg.popular ? "border-primary shadow-lg shadow-primary/10" : "border-primary/10"}`}>
                     {pkg.popular && (
                       <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
                         Most Requested
@@ -562,8 +560,7 @@ export default function Pricing() {
       </section>
 
       {/* Market Positioning */}
-      <section className="py-20 bg-foreground text-background relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-40 pointer-events-none" style={{ backgroundImage: "url('/dark-section-bg.png')" }} />
+      <section className="py-20 text-background relative overflow-hidden" style={{ background: "radial-gradient(ellipse at top, #0a3d91 0%, #062040 45%, #040c2c 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-serif font-bold text-background mb-4">Where We Fit In The Market</h2>
@@ -608,7 +605,6 @@ export default function Pricing() {
 
       {/* Why Choose Us (SWOT) */}
       <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-30" style={{ backgroundImage: "url('/warm-accent-bg.png')" }} />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-serif font-bold mb-4">Why Businesses Choose Us</h2>
@@ -648,8 +644,7 @@ export default function Pricing() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="py-20 bg-accent/30 border-t border-border/40 relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-40" style={{ backgroundImage: "url('/hero-bg.png')" }} />
+      <section className="py-20 border-t border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 40%, #f2f6fd 70%, #dce8f9 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
           <h2 className="text-4xl font-serif font-bold mb-4">Not sure which package is right for you?</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">

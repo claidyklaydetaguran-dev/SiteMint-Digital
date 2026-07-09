@@ -169,7 +169,7 @@ export default function Services() {
   return (
     <div className="w-full pb-24">
       {/* Header */}
-      <section className="pt-20 pb-16 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #dbeafe 0%, #eff6ff 22%, #f8faff 50%, #e0edff 100%)" }}>
+      <section className="pt-32 pb-16 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 30%, #f2f6fd 60%, #dce8f9 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -198,9 +198,9 @@ export default function Services() {
                 viewport={{ once: true }}
                 variants={fadeUp}
               >
-                <Card className="h-full border-border shadow-sm flex flex-col hover:border-primary/50 transition-colors duration-300">
+                <Card className="h-full border-primary/10 shadow-sm flex flex-col hover:border-primary/40 hover:shadow-[0_16px_40px_rgba(6,46,113,0.12)] hover:-translate-y-1 transition-all duration-300">
                   <CardHeader className="pb-4">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style={{ background: "#062e71" }}>
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)" }}>
                       <service.icon className="w-6 h-6 text-white" />
                     </div>
                     <div className="text-xs font-semibold text-primary/70 uppercase tracking-widest mb-2">
@@ -267,8 +267,7 @@ export default function Services() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="py-24 bg-foreground text-background relative overflow-hidden border-t border-border/40">
-        <div className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-40 pointer-events-none" style={{ backgroundImage: "url('/dark-section-bg.png')" }} />
+      <section className="py-24 text-background relative overflow-hidden border-t border-border/40" style={{ background: "radial-gradient(ellipse at top, #0a3d91 0%, #062040 45%, #040c2c 100%)" }}>
         <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
           <h2 className="text-4xl md:text-5xl font-serif font-bold text-background mb-6">Not sure where to start?</h2>
           <p className="text-lg text-background/70 max-w-2xl mx-auto mb-10">

@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: ai-toolkit
+    description: SMB AI Toolkit checkout and delivery
 paths:
   /healthz:
     get:
@@ -24,6 +26,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /ai-toolkit/checkout:
+    post:
+      operationId: createAiToolkitCheckout
+      tags: [ai-toolkit]
+      summary: Create a Stripe Checkout session for the SMB AI Toolkit
+      responses:
+        "200":
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiToolkitCheckoutSession"
+  /ai-toolkit/purchases/{sessionId}:
+    get:
+      operationId: getAiToolkitPurchase
+      tags: [ai-toolkit]
+      summary: Get purchase/delivery status for a checkout session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Purchase status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiToolkitPurchaseStatus"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +65,24 @@ components:
           type: string
       required:
         - status
+    AiToolkitCheckoutSession:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+    AiToolkitPurchaseStatus:
+      type: object
+      properties:
+        found:
+          type: boolean
+        delivered:
+          type: boolean
+        email:
+          type: ["string", "null"]
+      required:
+        - found
+        - delivered
+        - email
 

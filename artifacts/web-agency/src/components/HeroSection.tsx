@@ -6,6 +6,7 @@ import { ArrowRight, Zap, Layout, Monitor, BarChart2, Star } from "lucide-react"
 import { FlipWords } from "./FlipWords";
 import { CardContainer, CardBody, CardItem } from "./Card3D";
 import Particles from "./Particles";
+import "./HeroResponsive.css";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const WORDS = ["Customers", "Clients", "Leads", "Sales", "Revenue"];
@@ -96,8 +97,17 @@ function WaveBackground() {
   );
 }
 
-// ── 3D Feature Card — techy dark glass ────────────────────────────────────────
+// ── 3D Feature Card — techy dark glass + scan-line hover ─────────────────────
 function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: React.CSSProperties }) {
+  const [hovered, setHovered] = useState(false);
+
+  const brackets = [
+    { top: 0, left: 0, borderTop: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "14px 0 0 0" },
+    { top: 0, right: 0, borderTop: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 14px 0 0" },
+    { bottom: 0, left: 0, borderBottom: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "0 0 0 14px" },
+    { bottom: 0, right: 0, borderBottom: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 0 14px 0" },
+  ];
+
   return (
     <div
       style={{
@@ -106,70 +116,105 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
         zIndex: 20,
         animation: `card-entry 0.55s cubic-bezier(0.23,1,0.32,1) ${card.delay + 0.5}s both`,
       }}
+      className="hero-feature-card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <CardContainer containerClassName="p-0" className="">
         <CardBody className="w-[178px]">
           <div
             style={{
-              background: "linear-gradient(135deg,rgba(4,12,44,0.96) 0%,rgba(7,22,66,0.93) 100%)",
+              background: hovered
+                ? `linear-gradient(135deg,rgba(4,14,52,0.98) 0%,rgba(8,26,82,0.96) 100%)`
+                : "linear-gradient(135deg,rgba(4,12,44,0.96) 0%,rgba(7,22,66,0.93) 100%)",
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
-              border: "1px solid rgba(59,130,246,0.26)",
+              border: `1px solid ${hovered ? `${card.color}70` : "rgba(59,130,246,0.26)"}`,
               borderRadius: 14,
               padding: "11px 13px 12px",
-              boxShadow:
-                "0 0 0 1px rgba(6,46,113,0.12), 0 14px 44px rgba(6,46,113,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
+              boxShadow: hovered
+                ? `0 0 0 1px ${card.color}28, 0 18px 52px rgba(6,46,113,0.38), 0 0 32px ${card.color}20, inset 0 1px 0 rgba(255,255,255,0.09)`
+                : "0 0 0 1px rgba(6,46,113,0.12), 0 14px 44px rgba(6,46,113,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
               position: "relative",
               overflow: "hidden",
+              cursor: "pointer",
+              transition: "border 0.28s ease, box-shadow 0.32s ease, background 0.28s ease",
             }}
           >
-            {/* Corner brackets */}
-            {[
-              { top: 0, left: 0, borderTop: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "14px 0 0 0" },
-              { top: 0, right: 0, borderTop: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 14px 0 0" },
-              { bottom: 0, left: 0, borderBottom: "1.5px solid", borderLeft: "1.5px solid", borderRadius: "0 0 0 14px" },
-              { bottom: 0, right: 0, borderBottom: "1.5px solid", borderRight: "1.5px solid", borderRadius: "0 0 14px 0" },
-            ].map((s, i) => (
+            {/* Corner brackets — brighten on hover */}
+            {brackets.map((s, i) => (
               <div
                 key={i}
                 style={{
                   position: "absolute", width: 10, height: 10,
-                  borderColor: `rgba(59,130,246,0.65)`,
+                  borderColor: hovered ? `${card.color}cc` : "rgba(59,130,246,0.65)",
+                  transition: "border-color 0.28s ease",
                   ...s,
                   pointerEvents: "none",
                 }}
               />
             ))}
 
-            {/* Ambient glow blob */}
-            <div style={{
-              position: "absolute", top: -24, right: -24, width: 90, height: 90,
-              background: `radial-gradient(circle,${card.color}22 0%,transparent 70%)`,
-              pointerEvents: "none",
-            }} />
+            {/* Scan-line sweep — activates on hover */}
+            <motion.div
+              style={{
+                position: "absolute",
+                left: -2, right: -2,
+                height: 2,
+                background: `linear-gradient(90deg,transparent 0%,${card.color}cc 40%,${card.color} 50%,${card.color}cc 60%,transparent 100%)`,
+                boxShadow: `0 0 10px ${card.color}99`,
+                zIndex: 12,
+                pointerEvents: "none",
+              }}
+              initial={{ top: "-4px", opacity: 0 }}
+              animate={hovered
+                ? { top: ["−4px", "110%"], opacity: [0, 1, 1, 0] }
+                : { top: "-4px", opacity: 0 }}
+              transition={{ duration: 0.72, ease: "linear" }}
+            />
+
+            {/* Ambient glow blob — expands on hover */}
+            <motion.div
+              style={{
+                position: "absolute", top: -24, right: -24, width: 90, height: 90,
+                background: `radial-gradient(circle,${card.color}28 0%,transparent 70%)`,
+                pointerEvents: "none",
+              }}
+              animate={hovered ? { scale: 1.7, opacity: 1 } : { scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
 
             {/* Header: icon + title + live dot */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <CardItem translateZ={44} className="flex-shrink-0">
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8,
-                  background: card.iconBg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(6,46,113,0.4), inset 0 1px 0 rgba(255,255,255,0.16)`,
-                }}>
+                <motion.div
+                  style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: card.iconBg,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  animate={hovered
+                    ? { scale: 1.12, boxShadow: `0 0 22px ${card.color}99, 0 4px 10px rgba(6,46,113,0.45), inset 0 1px 0 rgba(255,255,255,0.22)` }
+                    : { scale: 1,    boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(6,46,113,0.40), inset 0 1px 0 rgba(255,255,255,0.16)` }
+                  }
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                >
                   <card.Icon size={13} color="#fff" strokeWidth={2.5} />
-                </div>
+                </motion.div>
               </CardItem>
 
               <CardItem translateZ={26} style={{ flex: 1 }}>
-                <p style={{ fontSize: 11.5, fontWeight: 700, color: "#E2E8F0", lineHeight: 1.2 }}>
+                <p style={{
+                  fontSize: 11.5, fontWeight: 700, lineHeight: 1.2,
+                  color: hovered ? "#F8FAFC" : "#E2E8F0",
+                  transition: "color 0.25s",
+                }}>
                   {card.title}
                 </p>
               </CardItem>
 
               {/* Pulsing live dot */}
               <div
-                className="live-pulse-dot"
                 style={{
                   width: 6, height: 6, borderRadius: "50%",
                   background: "#34d399",
@@ -192,17 +237,30 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
                 height: 3, borderRadius: 2,
                 background: "rgba(59,130,246,0.12)", overflow: "hidden",
               }}>
-                <div style={{
-                  height: "100%", width: `${card.pct}%`,
-                  background: `linear-gradient(90deg,${card.color},${card.color}bb)`,
-                  borderRadius: 2,
-                  boxShadow: `0 0 6px ${card.color}88`,
-                }} />
+                <motion.div
+                  style={{
+                    height: "100%",
+                    background: `linear-gradient(90deg,${card.color},${card.color}bb)`,
+                    borderRadius: 2,
+                    originX: 0,
+                  }}
+                  animate={hovered
+                    ? { width: `${card.pct}%`, boxShadow: `0 0 12px ${card.color}cc` }
+                    : { width: `${card.pct}%`, boxShadow: `0 0 6px ${card.color}88` }
+                  }
+                  transition={{ duration: 0.35 }}
+                />
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 7.5, color: "#475569" }}>{card.metric}</span>
-              <span style={{ fontSize: 8, color: card.color, fontWeight: 700 }}>{card.pct}%</span>
+              <motion.span
+                style={{ fontSize: 8, fontWeight: 700, color: card.color }}
+                animate={hovered ? { scale: 1.1 } : { scale: 1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                {card.pct}%
+              </motion.span>
             </div>
           </div>
         </CardBody>
@@ -906,37 +964,60 @@ function AvatarStack() {
 
 // ── Device Image 3D Hover (zoom + tilt) ───────────────────────────────────────
 function DeviceImageHover() {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const wrapRef    = useRef<HTMLDivElement>(null);
+  const imgRef     = useRef<HTMLImageElement>(null);
+  const spotRef    = useRef<HTMLDivElement>(null);
+  const [hov, setHov] = useState(false);
 
-  const onEnter = () => {
-    if (!imgRef.current) return;
+  const applyEffect = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!wrapRef.current || !imgRef.current || !spotRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;   // 0–1 left→right
+    const py = (e.clientY - rect.top)  / rect.height;  // 0–1 top→bottom
+
+    // Gentle tilt — no scale, no blur
+    const rx = (px - 0.5) * 12;
+    const ry = (py - 0.5) * 7;
     imgRef.current.style.transform =
-      "perspective(1200px) scale(1.06) rotateY(0deg) rotateX(0deg)";
+      `perspective(1100px) rotateY(${rx}deg) rotateX(${-ry}deg)`;
+
+    // Shadow shifts opposite to tilt — simulates real light source
+    const sx = -rx * 2.4;
+    const sy =  ry * 2.4 + 32;
+    imgRef.current.style.filter =
+      `drop-shadow(${sx}px ${sy}px 56px rgba(6,46,113,0.38))
+       drop-shadow(${sx * 0.4}px ${sy * 0.3}px 18px rgba(0,0,0,0.22))`;
+
+    // Spotlight follows cursor
+    spotRef.current.style.background =
+      `radial-gradient(circle 200px at ${px * 100}% ${py * 100}%,
+         rgba(255,255,255,0.22) 0%,
+         rgba(96,165,250,0.10) 35%,
+         transparent 70%)`;
   };
 
-  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!wrapRef.current || !imgRef.current) return;
-    const rect = wrapRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 14;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 8;
-    imgRef.current.style.transform =
-      `perspective(1200px) scale(1.07) rotateY(${x}deg) rotateX(${-y}deg)`;
+  const onEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    setHov(true);
+    applyEffect(e);
   };
 
   const onLeave = () => {
-    if (!imgRef.current) return;
+    setHov(false);
+    if (!imgRef.current || !spotRef.current) return;
     imgRef.current.style.transform =
-      "perspective(1200px) scale(1) rotateY(0deg) rotateX(0deg)";
+      "perspective(1100px) rotateY(0deg) rotateX(0deg)";
+    imgRef.current.style.filter =
+      "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))";
+    spotRef.current.style.background = "transparent";
   };
 
   return (
     <div
       ref={wrapRef}
       onMouseEnter={onEnter}
-      onMouseMove={onMove}
+      onMouseMove={applyEffect}
       onMouseLeave={onLeave}
-      style={{ cursor: "pointer", display: "block", width: "100%" }}
+      style={{ cursor: "pointer", display: "block", width: "100%", position: "relative" }}
     >
       <img
         ref={imgRef}
@@ -948,9 +1029,23 @@ function DeviceImageHover() {
           display: "block",
           borderRadius: 16,
           transformStyle: "preserve-3d",
-          transition: "transform 0.32s cubic-bezier(0.23,1,0.32,1)",
+          transition: "transform 0.28s cubic-bezier(0.23,1,0.32,1), filter 0.28s ease",
           willChange: "transform",
           filter: "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))",
+        }}
+      />
+
+      {/* Cursor spotlight overlay — no blur, pure light */}
+      <div
+        ref={spotRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: 16,
+          pointerEvents: "none",
+          opacity: hov ? 1 : 0,
+          transition: "opacity 0.3s ease",
+          mixBlendMode: "screen",
         }}
       />
     </div>
@@ -965,10 +1060,15 @@ export function HeroSection() {
   return (
     <section
       style={{
-        minHeight: "calc(100vh - 68px)",
-        background: `linear-gradient(155deg, #dbeafe 0%, #eff6ff 22%, #f8faff 50%, #e0edff 100%)`,
+        minHeight: "100vh",
+        background: `linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 20%, #f2f6fd 50%, #dce8f9 80%, #c8d9f5 100%)`,
         position: "relative",
         overflowX: "clip",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        paddingTop: 110,
+        paddingBottom: 60,
       }}
     >
       {/* Wave layer */}
@@ -985,7 +1085,7 @@ export function HeroSection() {
         style={{
           position: "absolute", top: -80, right: -80,
           width: 620, height: 620, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(147,197,253,0.22) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(6,46,113,0.14) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
         }}
       />
@@ -1000,21 +1100,22 @@ export function HeroSection() {
 
       {/* ── Content ── */}
       <div
+        className="hero-wrap"
         style={{
           maxWidth: 1380,
           margin: "0 auto",
           paddingLeft: 56,
           paddingRight: 16,
-          paddingTop: 52,
-          paddingBottom: 60,
+          paddingTop: 0,
+          paddingBottom: 0,
           position: "relative",
           zIndex: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 20, minHeight: 560 }}>
+        <div className="hero-row" style={{ display: "flex", alignItems: "flex-start", gap: 20, minHeight: 560 }}>
 
           {/* ── LEFT column ── */}
-          <div style={{ flex: "0 0 40%", maxWidth: "40%", paddingTop: 24 }}>
+          <div className="hero-left" style={{ flex: "0 0 40%", maxWidth: "40%", paddingTop: 24 }}>
 
             {/* Badge */}
             <motion.div
@@ -1028,8 +1129,8 @@ export function HeroSection() {
                 background: "rgba(219,234,254,0.85)",
                 border: "1px solid rgba(147,197,253,0.55)",
                 borderRadius: 100,
-                padding: "6px 14px",
-                marginBottom: 24,
+                padding: "7px 16px",
+                marginBottom: 28,
                 backdropFilter: "blur(8px)",
               }}
             >
@@ -1040,6 +1141,7 @@ export function HeroSection() {
                   borderRadius: "50%",
                   background: "#34d399",
                   display: "inline-block",
+                  flexShrink: 0,
                 }}
                 animate={{
                   boxShadow: [
@@ -1050,7 +1152,7 @@ export function HeroSection() {
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <span style={{ fontSize: 13, fontWeight: 600, color: DEEP_NAVY }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: DEEP_NAVY }}>
                 Now accepting new clients
               </span>
             </motion.div>
@@ -1061,24 +1163,27 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.1 }}
               style={{
-                fontSize: "clamp(26px, 2.6vw, 40px)",
+                fontSize: "clamp(34px, 3.4vw, 54px)",
                 fontWeight: 900,
                 color: "#0F172A",
-                lineHeight: 1.18,
-                letterSpacing: "-0.02em",
-                marginBottom: 18,
+                lineHeight: 1.14,
+                letterSpacing: "-0.025em",
+                marginBottom: 24,
                 fontFamily: "Playfair Display, Georgia, serif",
               }}
             >
-              AI-Powered Websites &amp; Business Systems That Help You Get More{" "}
-              {mounted && (
-                <FlipWords
-                  words={WORDS}
-                  duration={2600}
-                  className="font-black"
-                  style={{ color: DEEP_NAVY } as React.CSSProperties}
-                />
-              )}
+              AI-Powered Websites &amp; Business Systems
+              <span style={{ display: "block", marginTop: 4 }}>
+                That Help You Get More{" "}
+                {mounted && (
+                  <FlipWords
+                    words={WORDS}
+                    duration={2600}
+                    className="font-black"
+                    style={{ color: DEEP_NAVY } as React.CSSProperties}
+                  />
+                )}
+              </span>
             </motion.h1>
 
             {/* Body */}
@@ -1087,11 +1192,11 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               style={{
-                fontSize: 15,
+                fontSize: 17,
                 color: "#475569",
-                lineHeight: 1.72,
-                marginBottom: 28,
-                maxWidth: 440,
+                lineHeight: 1.75,
+                marginBottom: 34,
+                maxWidth: 480,
               }}
             >
               We build growth-focused websites, CRM systems, automation workflows,
@@ -1104,7 +1209,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.28 }}
-              style={{ display: "flex", gap: 12, marginBottom: 26, alignItems: "center", flexWrap: "wrap" }}
+              style={{ display: "flex", gap: 14, marginBottom: 30, alignItems: "center", flexWrap: "wrap" }}
             >
               <Link href="/discovery">
                 <Button
@@ -1112,19 +1217,19 @@ export function HeroSection() {
                   className="!bg-[#062e71] hover:!bg-[#0a3d91] hover:shadow-[0_8px_28px_rgba(6,46,113,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
                   style={{
                     color: "#fff",
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 700,
-                    padding: "12px 18px",
+                    padding: "14px 22px",
                     borderRadius: 10,
                     height: "auto",
                     display: "flex",
                     alignItems: "center",
-                    gap: 7,
+                    gap: 8,
                     whiteSpace: "nowrap",
                   }}
                   data-testid="button-hero-primary"
                 >
-                  Get My Free Business Growth Assessment <ArrowRight size={15} />
+                  Get My Free Business Growth Assessment <ArrowRight size={16} />
                 </Button>
               </Link>
               <Link href="/portfolio">
@@ -1132,9 +1237,9 @@ export function HeroSection() {
                   size="lg"
                   variant="outline"
                   style={{
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 600,
-                    padding: "12px 18px",
+                    padding: "14px 22px",
                     borderRadius: 10,
                     height: "auto",
                     border: "1.5px solid #CBD5E1",
@@ -1161,7 +1266,7 @@ export function HeroSection() {
           </div>
 
           {/* ── RIGHT column ── */}
-          <div style={{ flex: 1, position: "relative", minHeight: 520, overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="hero-right" style={{ flex: 1, position: "relative", minHeight: 520, overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center" }}>
 
             {/* Animated SVG connector lines between cards */}
             <FeatureConnectors />
@@ -1177,6 +1282,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 40, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.32, ease: [0.23, 1, 0.32, 1] }}
+              className="hero-device"
               style={{ width: "100%", zIndex: 2, marginTop: 60 }}
             >
               <DeviceImageHover />
