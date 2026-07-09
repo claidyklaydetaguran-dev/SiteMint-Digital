@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/ai-toolkit/"
+previewPath = "/ai-toolkit"
 title = "SMB AI Toolkit"
 version = "1.0.0"
 id = "artifacts/ai-toolkit"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/ai-toolkit/" ]
+paths = [ "/ai-toolkit" ]
 localPort = 25594
 
 [services.development]
