@@ -1,0 +1,99 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a longer, single-feature session — you have extended time and
+no live check-ins partway through. Because of that, work in the
+strict PHASES below, in order. After each phase: run typecheck, run
+whatever verification that phase specifies, and write a short
+checkpoint note (2-4 lines) before starting the next phase. If any
+phase fails verification, STOP there, do not proceed to the next
+phase, and make the final report lead with what failed and why.
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, phone.ts) or
+campaignScheduler.ts under any circumstances.
+
+Scope ceiling for this session (larger than the normal default since
+this is one coherent feature, not several): up to 8 files, 600 lines,
+0 migrations expected (no schema changes needed — this generates
+values for fields that already exist: subject, body, objective,
+toneProfile, dayOffset, channel, intentLabel, branch fields). If you
+find you genuinely need more than that, stop, checkpoint what's done,
+and report the overage rather than silently exceeding it.
+
+Non-negotiable safety rule: this feature ONLY drafts content into the
+existing campaign/sequence builder UI for a human to review, edit, and
+manually save/enroll/send exactly as today. Nothing built in this
+session may auto-send an email/SMS, auto-enroll a lead, or auto-save
+a campaign without an explicit human click. If you're ever unsure
+whether something crosses this line, don't build it — omit it and
+note it in the final report instead.
+
+── PHASE 1 — Generator library ──────────────────────────────────────
+Create lib/aiCampaign.ts (or artifacts/web-agency/src/lib/aiCampaign.ts
+if generation logic belongs client-adjacent — your call based on
+where the existing OpenAI integration lives, check
+lib/integrations-openai-ai-server first). It should expose functions to:
+1. Generate a single campaign draft: given a persona (from
+   campaignTaxonomy.ts), topic, objective, and toneProfile, produce a
+   subject + body draft matching that persona's recommendedTone.
+2. Generate a full sequence draft: given the same inputs plus a
+   desired number of steps, produce an array of steps, each with
+   dayOffset, channel (email/sms/call_prompt/task), subject/body (for
+   email), intentLabel, and sensible spacing (don't front-load all
+   steps on day 0-1).
+Reuse campaignTaxonomy.ts's existing personas/topics/blueprints as
+grounding input to the prompt sent to the model — do not invent a
+parallel taxonomy. Keep prompts to the AI model tightly scoped (no
+open-ended "write anything") and always return structured output
+(subject/body/steps as data, not prose) so the UI can render it into
+form fields directly.
+Verification for this phase: call the function directly (script or
+route) with 2-3 different persona/topic combos, confirm structured
+output every time, confirm it never returns something requesting
+auto-send/auto-enroll action language.
+
+── PHASE 2 — API route ──────────────────────────────────────────────
+Add a new route (e.g. POST /crm/campaigns/ai-generate) that accepts
+persona/topic/objective/toneProfile/mode(single|sequence)/stepCount
+and returns the draft from Phase 1. This route only returns a draft —
+it does not create/save/enroll anything itself.
+Verification: curl the route with a real admin token, confirm shape,
+confirm two different inputs produce meaningfully different output
+(not a static template).
+
+── PHASE 3 — Builder UI integration ─────────────────────────────────
+In CrmCampaigns.tsx and/or CrmCampaignSequence.tsx, add a "Generate
+with AI" action near the existing persona/blueprint selection UI.
+Clicking it calls the Phase 2 route and pre-fills the existing
+subject/body/objective/toneProfile fields (single campaign) or
+populates the step list (sequence) — exactly as if the user had typed
+it themselves. The user must still click the existing Save/Create
+button afterward; generation alone must not persist anything. Show a
+clear "AI-drafted, review before saving" indicator so it's never
+confused with a human-written draft after the fact.
+Verification: generate a draft, confirm nothing was saved to the DB
+until you separately click Save, confirm editing the AI-drafted text
+before saving works normally.
+
+── PHASE 4 — Final regression pass ──────────────────────────────────
+Confirm: creating a campaign/sequence WITHOUT touching the AI feature
+at all still works exactly as before (manual path fully unaffected).
+Confirm existing branch UI (from the prior session) still functions
+alongside the new AI draft button. Full typecheck across web-agency
+and api-server.
+
+Return (at the end, one consolidated report):
+- Checkpoint notes from each phase, in order, including any phase that
+  had to stop early
+- Files changed, total line count, confirm within the 8-file/600-line
+  ceiling (or explain the overage if any)
+- Sample output from at least 2 different persona/topic generations,
+  shown verbatim so it can be judged for quality
+- Confirmation nothing auto-sends/auto-enrolls/auto-saves
+- Confirmation the manual (non-AI) campaign creation path is unaffected
+- Confirmation branch UI from the prior session still works
+- TypeScript status
+- Confirm no locked files or campaignScheduler.ts touched
+- Anything you'd flag for review when the user is back, even if not
+  a hard failure (e.g. "AI-generated subject lines lean generic for
+  the 'referral' persona category, might want tone tuning")

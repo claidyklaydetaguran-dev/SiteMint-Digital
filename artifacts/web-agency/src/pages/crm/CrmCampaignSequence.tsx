@@ -91,6 +91,14 @@ function serializeStepBody(cleanBody: string, intel: StepIntel): string {
 // Pure transform. Builds the POST payloads for each example step in a blueprint.
 // Generates DRAFT strategy steps only — no AI copy, no send, no enroll.
 
+interface AiSequenceStepDraft {
+  dayOffset: number;
+  channel: string;
+  subject: string | null;
+  body: string;
+  intentLabel: string;
+}
+
 interface GeneratedStepPayload {
   stepNumber: number;
   dayOffset: number;
@@ -987,6 +995,14 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const [generating, setGenerating] = useState(false);
   const [genResult,  setGenResult]  = useState("");
 
+  // AI sequence draft generation (Phase 26G) — draft only, added on explicit confirm
+  const [aiStepCount,   setAiStepCount]   = useState(4);
+  const [aiGenerating,  setAiGenerating]  = useState(false);
+  const [aiError,       setAiError]       = useState("");
+  const [aiPreview,     setAiPreview]     = useState<AiSequenceStepDraft[] | null>(null);
+  const [aiAdding,      setAiAdding]      = useState(false);
+  const [aiResult,      setAiResult]      = useState("");
+
   // Campaign settings (read-only here) for the "Campaign ends when…" panel.
   const [stopOnReply, setStopOnReply] = useState<boolean | null>(null);
   const [autoSend,    setAutoSend]    = useState<boolean | null>(null);
@@ -1100,6 +1116,81 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
       setGenConfirm(false);
       setGenMode("append");
       setSelectedBlueprintId("");
+    }
+  };
+
+  // Generate a structured AI sequence draft (Phase 26G). Only stored in local
+  // preview state until the user explicitly clicks "Add these draft steps" —
+  // nothing is created, enrolled, or sent by generation alone.
+  const generateSequenceWithAi = async () => {
+    setAiGenerating(true);
+    setAiError("");
+    setAiResult("");
+    try {
+      const blueprint = getBlueprintById(selectedBlueprintId);
+      const persona = blueprint ? getPersonaById(blueprint.personaId) : null;
+      const res = await fetch("/api/crm/campaigns/ai-generate", {
+        method: "POST",
+        headers: authH(),
+        body: JSON.stringify({
+          mode: "sequence",
+          personaId: persona?.id,
+          personaLabel: persona?.label,
+          personaDescription: persona?.description,
+          personaPainPoint: persona?.primaryPainPoint,
+          personaBestCTA: persona?.bestCTA,
+          objective: blueprint?.goal ?? "",
+          toneProfile: blueprint?.toneProfile ?? "",
+          stepCount: aiStepCount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAiError(data.error ?? "Generation failed — please try again."); return; }
+      setAiPreview(data.draft.steps as AiSequenceStepDraft[]);
+    } catch {
+      setAiError("Network error — please check your connection and try again.");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  // Human explicitly confirmed the AI draft — now (and only now) persist the
+  // steps, always appending after existing steps (never replaces/enrolls).
+  const addAiDraftSteps = async () => {
+    if (!aiPreview || aiPreview.length === 0) return;
+    setAiAdding(true);
+    setAiError("");
+    try {
+      const startNum = steps.reduce((m, s) => Math.max(m, s.stepNumber), 0) + 1;
+      const created: CampaignStep[] = [];
+      let failed = false;
+      for (let i = 0; i < aiPreview.length; i++) {
+        const s = aiPreview[i];
+        const bodyWithIntel = s.intentLabel ? `${s.body}\n\n${INTEL_MARKER}\nObjective: ${s.intentLabel}` : s.body;
+        const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+          method: "POST",
+          headers: authH(),
+          body: JSON.stringify({
+            stepNumber: startNum + i,
+            dayOffset: s.dayOffset,
+            channel: s.channel,
+            subject: s.subject,
+            body: bodyWithIntel,
+            sendTime: "morning",
+            businessDaysOnly: true,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) { failed = true; setAiError(`${d.error ?? "Failed to save step"} — ${created.length} of ${aiPreview.length} steps were added.`); break; }
+        created.push(d.step);
+      }
+      if (created.length) {
+        setSteps(prev => [...prev, ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset));
+        if (!failed) setAiResult(`Added ${created.length} AI-drafted step${created.length !== 1 ? "s" : ""}. Review and personalise before enrolling contacts.`);
+      }
+      if (!failed) setAiPreview(null);
+    } finally {
+      setAiAdding(false);
     }
   };
 
@@ -1286,8 +1377,84 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                     Generate Steps
                   </button>
                 )}
+                <select
+                  value={aiStepCount}
+                  onChange={e => setAiStepCount(Number(e.target.value))}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  title="Number of AI-drafted steps to generate"
+                >
+                  {[3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} steps</option>)}
+                </select>
+                <button
+                  onClick={generateSequenceWithAi}
+                  disabled={aiGenerating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                >
+                  {aiGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  {aiGenerating ? "Generating…" : "Generate with AI"}
+                </button>
               </div>
             </div>
+
+            {aiError && (
+              <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {aiError}
+              </div>
+            )}
+
+            {/* AI sequence draft preview — nothing is saved until explicitly confirmed */}
+            {aiPreview && (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-violet-900">
+                      AI-drafted, review before saving — {aiPreview.length} step{aiPreview.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-[11px] text-violet-700 mt-0.5">
+                      Nothing is created, enrolled, or sent yet. Review the copy below, then confirm to append these as draft steps.
+                    </p>
+                  </div>
+                </div>
+                <ul className="space-y-2">
+                  {aiPreview.map((s, i) => (
+                    <li key={i} className="bg-white rounded-lg border border-violet-100 p-2.5 text-xs">
+                      <div className="flex items-center gap-2 text-[10px] font-semibold text-violet-700 mb-1">
+                        <span>Day {s.dayOffset}</span>
+                        <span className="text-violet-300">·</span>
+                        <span className="capitalize">{s.channel}</span>
+                        {s.intentLabel && <><span className="text-violet-300">·</span><span className="text-muted-foreground font-normal">{s.intentLabel}</span></>}
+                      </div>
+                      {s.subject && <p className="font-semibold text-foreground mb-0.5">{s.subject}</p>}
+                      <p className="text-muted-foreground whitespace-pre-line">{s.body}</p>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addAiDraftSteps}
+                    disabled={aiAdding}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                  >
+                    {aiAdding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {aiAdding ? "Adding…" : "Add these draft steps"}
+                  </button>
+                  <button
+                    onClick={() => setAiPreview(null)}
+                    disabled={aiAdding}
+                    className="px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {aiResult && (
+              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> {aiResult}
+              </div>
+            )}
 
             {/* Generate confirm panel */}
             {selectedBlueprintId && genConfirm && (() => {
@@ -1374,7 +1541,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             <div className="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px" />
               <span>
-                No AI generation yet · Blueprint steps are strategy drafts · Review before enrolling contacts · The send queue controls all sending.
+                AI and blueprint steps are drafts only · Nothing is enrolled or sent automatically · Review before enrolling contacts · The send queue controls all sending.
               </span>
             </div>
 

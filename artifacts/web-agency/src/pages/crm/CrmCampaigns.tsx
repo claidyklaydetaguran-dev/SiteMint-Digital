@@ -26,6 +26,7 @@ import {
   SITEMINT_PERSONAS,
   SITEMINT_CAMPAIGN_BLUEPRINTS,
   getTopicsForPersona,
+  getTopicById,
   getBlueprintForPersona,
   getBlueprintById,
   getCampaignStrategyHints,
@@ -423,6 +424,11 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [selectedTopicId, setSelectedTopicId]         = useState("");
   const [selectedBlueprintId, setSelectedBlueprintId] = useState("");
 
+  // ── AI draft generation (Phase 26G) — draft only, never auto-saved ──
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError]           = useState("");
+  const [aiDrafted, setAiDrafted]       = useState(false);
+
   // ── Step 2 — Audience ──
   const [filterStatus, setFilterStatus]     = useState("");
   const [filterDisc, setFilterDisc]         = useState("");
@@ -594,6 +600,46 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const loadTemplate = (id: string) => {
     const t = templates.find(t => String(t.id) === id);
     if (t) { setBaseSubject(t.subject); setBaseBody(t.body); setSelectedTemplate(id); setIsDirty(true); }
+  };
+
+  // ── AI draft generation (Phase 26G) ──
+  // Fills the subject/body fields with a draft only. Nothing is persisted —
+  // the user must still click Save Draft / Next to keep it, same as any
+  // manual edit. Editing the fields afterward clears the "AI-drafted" badge.
+  const generateWithAi = async () => {
+    setAiGenerating(true);
+    setAiError("");
+    try {
+      const persona = selectedPersonaId ? SITEMINT_PERSONAS.find(p => p.id === selectedPersonaId) : undefined;
+      const topic   = getTopicById(selectedTopicId || null);
+      const res = await fetch("/api/crm/campaigns/ai-generate", {
+        method: "POST",
+        headers: authH(),
+        body: JSON.stringify({
+          mode: "single",
+          personaId: persona?.id,
+          personaLabel: persona?.label,
+          personaDescription: persona?.description,
+          personaPainPoint: persona?.primaryPainPoint,
+          personaBestCTA: persona?.bestCTA,
+          topicId: topic?.id,
+          topicTitle: topic?.title,
+          topicDescription: topic?.description,
+          objective,
+          toneProfile,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAiError(data.error ?? "Generation failed — please try again."); return; }
+      setBaseSubject(data.draft.subject);
+      setBaseBody(data.draft.body);
+      setIsDirty(true);
+      setAiDrafted(true);
+    } catch {
+      setAiError("Network error — please check your connection and try again.");
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   // ── Strategy taxonomy (Phase 26B) ──
@@ -2463,6 +2509,31 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 )}
               </div>
 
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={generateWithAi}
+                    disabled={aiGenerating}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                  >
+                    {aiGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                    {aiGenerating ? "Generating…" : "Generate with AI"}
+                  </button>
+                  <span className="text-[10px] text-muted-foreground">Drafts subject + body from your persona/topic/objective above.</span>
+                </div>
+                {aiDrafted && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-1">
+                    <Zap className="w-3 h-3" /> AI-drafted, review before saving
+                  </span>
+                )}
+              </div>
+              {aiError && (
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {aiError}
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
                   Base Subject Line <span className="text-red-500">*</span>
@@ -2471,7 +2542,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   placeholder="e.g. Let's talk about growing your business online"
                   value={baseSubject}
-                  onChange={e => mark(setBaseSubject)(e.target.value)}
+                  onChange={e => { mark(setBaseSubject)(e.target.value); setAiDrafted(false); }}
                 />
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Personalized per DISC style (Driver: trimmed · Analytical: "Details: …" · Expressive: "🚀 …")
@@ -2486,7 +2557,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 min-h-[160px] resize-y font-mono"
                   placeholder={"Write your core message here.\n\nThe personalization engine wraps this with a DISC-appropriate greeting, tone, and CTA for each lead."}
                   value={baseBody}
-                  onChange={e => mark(setBaseBody)(e.target.value)}
+                  onChange={e => { mark(setBaseBody)(e.target.value); setAiDrafted(false); }}
                 />
               </div>
 

@@ -17,3 +17,4 @@
 - [Lead DNA composite page](crm-lead-dna.md) — fuses DISC+health+CI+behavioral engines client-side with zero new API/DB; GET /crm/leads/:id already returns {lead,activities,tasks}, no separate /activities endpoint exists.
 - [Campaign sequence recipients endpoint](crm-campaign-recipients-endpoint.md) — there is no GET /crm/campaigns/:id/recipients route; recipients are embedded in GET /crm/campaigns/:id's response.
 - [QA'ing branch/conditional UI fields](qa-branch-conditional-fields.md) — when two sibling dropdowns/inputs share near-identical option sets, verify independently (DB state, not just screenshot) before trusting a single browser-agent run reporting they collided.
+- [AI campaign draft generator](crm-ai-campaign-draft.md) — draft-only AI generation pattern: separate lib+route from dense crm.ts, preview-then-explicit-confirm before any persistence, matches existing blueprint-generator convention.
