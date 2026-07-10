@@ -92,7 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Contacts",     href: "/admin/crm/leads",    icon: Users },
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },
-      { label: "Transactions", icon: CreditCard, comingSoon: true },
+      { label: "Transactions", href: "/admin/crm/transactions", icon: CreditCard },
     ],
   },
   {

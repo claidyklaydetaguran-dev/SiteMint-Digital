@@ -1,10 +1,27 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
-import { Plus, X, Trash2, Edit2, Check, DollarSign, Calendar, User } from "lucide-react";
+import { Plus, X, Trash2, Edit2, Check, DollarSign, Calendar, User, CreditCard, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const token = () => localStorage.getItem("adminToken") || "";
+
+const TXN_METHODS = [
+  { value: "manual_cash", label: "Cash" },
+  { value: "manual_check", label: "Check" },
+  { value: "manual_transfer", label: "Transfer" },
+  { value: "manual_other", label: "Other" },
+];
+
+interface Transaction {
+  id: number;
+  amount: string;
+  method: string;
+  status: string;
+  receivedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+}
 
 const STAGES = ["Lead", "Qualified", "Proposal", "Won", "Lost"] as const;
 type Stage = typeof STAGES[number];
@@ -109,6 +126,84 @@ export default function CrmDealsPage() {
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
   const savingRef = useRef(false);
 
+  const [txns, setTxns] = useState<Transaction[]>([]);
+  const [txnsLoading, setTxnsLoading] = useState(false);
+  const [showPayForm, setShowPayForm] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("manual_cash");
+  const [payReceivedAt, setPayReceivedAt] = useState("");
+  const [payNotes, setPayNotes] = useState("");
+  const [payError, setPayError] = useState("");
+  const [paySaving, setPaySaving] = useState(false);
+  const [stripeUrl, setStripeUrl] = useState("");
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const loadTxns = useCallback(async (dealId: number) => {
+    setTxnsLoading(true);
+    try {
+      const r = await fetch(`/api/crm/deals/${dealId}/transactions`, { headers: { Authorization: `Bearer ${token()}` } });
+      const d = await r.json() as { transactions: Transaction[] };
+      setTxns(d.transactions || []);
+    } finally {
+      setTxnsLoading(false);
+    }
+  }, []);
+
+  const totalReceived = txns.filter(t => t.status === "completed").reduce((s, t) => s + Number(t.amount), 0);
+
+  const recordPayment = async () => {
+    if (!editDeal) return;
+    if (!payAmount || Number(payAmount) <= 0) { setPayError("Enter a positive amount."); return; }
+    setPaySaving(true);
+    setPayError("");
+    try {
+      const res = await fetch(`/api/crm/deals/${editDeal.id}/transactions/manual`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: payAmount, method: payMethod,
+          receivedAt: payReceivedAt || undefined,
+          notes: payNotes || undefined,
+        }),
+      });
+      const d = await res.json().catch(() => ({})) as { error?: string; transaction?: Transaction };
+      if (!res.ok) { setPayError(d.error || "Failed to record payment."); return; }
+      setTxns(prev => [d.transaction as Transaction, ...prev]);
+      setShowPayForm(false);
+      setPayAmount(""); setPayNotes(""); setPayReceivedAt(""); setPayMethod("manual_cash");
+    } finally {
+      setPaySaving(false);
+    }
+  };
+
+  const createStripeLink = async () => {
+    if (!editDeal) return;
+    setStripeLoading(true);
+    setPayError("");
+    try {
+      const res = await fetch(`/api/crm/deals/${editDeal.id}/transactions/stripe-checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json().catch(() => ({})) as { error?: string; url?: string; transaction?: Transaction };
+      if (!res.ok || !d.url) { setPayError(d.error || "Failed to create payment link."); return; }
+      setStripeUrl(d.url);
+      setTxns(prev => [d.transaction as Transaction, ...prev]);
+    } finally {
+      setStripeLoading(false);
+    }
+  };
+
+  const copyStripeUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(stripeUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* ignore */ }
+  };
+
   const load = useCallback(async () => {
     if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
@@ -145,6 +240,11 @@ export default function CrmDealsPage() {
     });
     setFormError("");
     setShowCreate(true);
+    setTxns([]);
+    setShowPayForm(false);
+    setStripeUrl("");
+    setPayError("");
+    loadTxns(deal.id);
   };
 
   const saveDeal = async () => {
@@ -332,7 +432,7 @@ export default function CrmDealsPage() {
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
           onClick={() => { setShowCreate(false); setEditDeal(null); }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-foreground">{editDeal ? "Edit Deal" : "New Deal"}</h2>
               <button onClick={() => { setShowCreate(false); setEditDeal(null); }} className="text-muted-foreground hover:text-foreground">
@@ -404,6 +504,127 @@ export default function CrmDealsPage() {
                   placeholder="Optional notes…"
                 />
               </div>
+
+              {editDeal && (
+                <div className="pt-3 border-t border-gray-100 space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-1.5">
+                    <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-muted-foreground" /> Payments
+                    </p>
+                    {!txnsLoading && (
+                      <p className="text-xs font-bold text-emerald-700">
+                        Total received: {`$${totalReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      </p>
+                    )}
+                  </div>
+
+                  {payError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{payError}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button" variant="outline" size="sm" className="gap-1.5"
+                      onClick={() => setShowPayForm(v => !v)}
+                    >
+                      <DollarSign className="w-3.5 h-3.5" /> Record Payment
+                    </Button>
+                    <Button
+                      type="button" variant="outline" size="sm" className="gap-1.5"
+                      onClick={createStripeLink} disabled={stripeLoading}
+                    >
+                      {stripeLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                      Send Stripe payment link
+                    </Button>
+                  </div>
+
+                  {stripeUrl && (
+                    <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                      <input
+                        readOnly value={stripeUrl}
+                        className="flex-1 min-w-0 bg-transparent text-xs text-blue-800 focus:outline-none truncate"
+                        onFocus={e => e.currentTarget.select()}
+                      />
+                      <button type="button" onClick={copyStripeUrl} className="shrink-0 text-blue-700 hover:text-blue-900">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      {copied && <span className="text-[10px] text-blue-700 shrink-0">Copied!</span>}
+                    </div>
+                  )}
+
+                  {showPayForm && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Amount ($)</label>
+                          <input
+                            type="number" min="0" value={payAmount}
+                            onChange={e => setPayAmount(e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Method</label>
+                          <select
+                            value={payMethod}
+                            onChange={e => setPayMethod(e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                          >
+                            {TXN_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Received On</label>
+                        <input
+                          type="date" value={payReceivedAt}
+                          onChange={e => setPayReceivedAt(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Notes</label>
+                        <input
+                          value={payNotes}
+                          onChange={e => setPayNotes(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                          placeholder="Optional…"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => setShowPayForm(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button" size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                          onClick={recordPayment} disabled={paySaving}
+                        >
+                          {paySaving ? "Saving…" : "Save Payment"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!txnsLoading && txns.length > 0 && (
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {txns.map(t => (
+                        <div key={t.id} className="flex items-center justify-between text-[11px] px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg">
+                          <span className="text-muted-foreground truncate">
+                            {t.method === "stripe" ? "Stripe" : TXN_METHODS.find(m => m.value === t.method)?.label || t.method}
+                          </span>
+                          <span className="font-semibold text-foreground">${Number(t.amount).toLocaleString()}</span>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-full font-semibold ${
+                            t.status === "completed" ? "bg-emerald-100 text-emerald-700"
+                              : t.status === "pending" ? "bg-amber-100 text-amber-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}>{t.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-2 px-5 pb-5">
               <Button variant="outline" className="flex-1" onClick={() => { setShowCreate(false); setEditDeal(null); }}>

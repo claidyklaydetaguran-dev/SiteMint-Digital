@@ -1,0 +1,53 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Backend from the prior session is done: crm_transactions table,
+POST .../transactions/manual, POST .../transactions/stripe-checkout,
+GET .../transactions, and /crm/deals/stats now sums real completed
+transactions for Total Revenue. This task is UI-only — do not touch
+routes, schema, or webhookHandlers.ts again.
+
+Do not touch locked modules. Stay within budget (5 files, 300 lines,
+0 migrations).
+
+Task:
+1. Build the "Transactions" page (currently "soon" in the Sales nav
+   group per CrmLayout.tsx) at /admin/crm/transactions:
+   - Table of all transactions: deal name, lead name, amount, method,
+     status, receivedAt (or "pending" if not yet received), notes
+   - Filter by status (completed/pending/failed/refunded) and by date
+     range
+   - Each row links to the parent deal
+2. On the Deal detail view (wherever deals are currently viewed/edited
+   — check the Pipeline/Deals page and Sales Workspace for where deal
+   detail already lives), add:
+   - "Record Payment" button opening a small form (amount, method,
+     receivedAt, notes) that posts to the existing manual-transaction
+     route
+   - "Send Stripe payment link" button that calls the existing
+     stripe-checkout route and displays/copies the resulting URL (does
+     not need to email it automatically — showing a copyable link is
+     enough, sending it is the human's job via existing
+     email/SMS tools)
+   - A running "Total received" figure for that deal if it has any
+     completed transactions, so partial/deposit payments are visible
+     at a glance
+3. Update CrmLayout.tsx to remove "soon" from the Transactions nav
+   item and point it at the new route.
+4. Follow the established visual pattern: this is operational/
+   transactional data (not a computed insight), so do NOT apply
+   .crm-insight-card here — plain cards/table styling consistent with
+   other operational pages like Automation Queue.
+5. Respect the responsiveness/spacing work from earlier sessions —
+   check the new page and the deal-detail additions at 375px, 768px,
+   and 1440px before calling this done, given how much effort went
+   into fixing overflow/spacing already.
+
+Return:
+- Files changed
+- Confirm nav updated (soon removed) and route works
+- Confirm Record Payment button actually creates a transaction and
+  updates the deal's "Total received" figure live
+- Confirm Stripe payment link generation returns a real usable URL
+- Confirm no whole-page horizontal overflow at any of the 3 widths
+- TypeScript status
+- Confirm no locked files or backend routes/schema modified

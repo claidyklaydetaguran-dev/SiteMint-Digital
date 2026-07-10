@@ -27,6 +27,7 @@ import CrmSettings from "@/pages/crm/CrmSettings";
 import CrmInbox from "@/pages/crm/CrmInbox";
 import CrmCalendar from "@/pages/crm/CrmCalendar";
 import CrmDeals from "@/pages/crm/CrmDeals";
+import CrmTransactions from "@/pages/crm/CrmTransactions";
 import CrmProjects from "@/pages/crm/CrmProjects";
 import CrmReporting from "@/pages/crm/CrmReporting";
 import CrmAdminSettings from "@/pages/crm/CrmAdminSettings";
@@ -70,6 +71,7 @@ function Router() {
       <Route path="/admin/crm/tasks" component={CrmTasks} />
       <Route path="/admin/crm/calendar" component={CrmCalendar} />
       <Route path="/admin/crm/deals" component={CrmDeals} />
+      <Route path="/admin/crm/transactions" component={CrmTransactions} />
       <Route path="/admin/crm/projects" component={CrmProjects} />
       <Route path="/admin/crm/pipeline" component={CrmPipeline} />
       <Route path="/admin/crm/reporting" component={CrmReporting} />
