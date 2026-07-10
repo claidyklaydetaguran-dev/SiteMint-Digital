@@ -805,6 +805,12 @@ export default function CrmLeadDetail() {
                       View Lead DNA
                     </button>
                   </Link>
+                  <button
+                    onClick={() => navigate(`/admin/crm/campaigns?view=builder&leadId=${lead.id}`)}
+                    className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1"
+                  >
+                    Generate for this lead
+                  </button>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
                     {lead.status}
                   </span>

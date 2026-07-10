@@ -1,0 +1,65 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside: aiCampaign.ts, aiCampaignGenerate.ts, and the two
+builder UI files from the prior session (CrmCampaigns.tsx,
+CrmCampaignSequence.tsx) — only to pass through new optional fields,
+not to change layout.
+
+Do not touch locked modules or campaignScheduler.ts. Stay within
+budget (5 files, 300 lines, 0 migrations).
+
+Context (diagnosed from real generated samples, don't re-derive):
+Current output has three problems: (1) zero lead-specific
+personalization — every draft opens "Hi," with no name and signs
+"Best, SiteMint Digital" with no sender name; (2) a 5-step sequence
+draft repeats the identical CTA and sign-off in every step instead of
+varying strategy across the sequence; (3) prose leans on generic
+AI-marketing stock phrases repeated near-verbatim across calls.
+
+Task:
+1. Add an optional leadId parameter to the generate route/functions.
+   When provided, fetch that lead's name/company (already available
+   via existing lead routes) and, if present, their DISC primary
+   style and Lead Health status (via the same read-only calls the
+   Lead DNA page already makes — do not touch discEngine.ts/
+   leadScore.ts themselves, only read their existing output). Pass
+   this into the generation prompt so the draft can open with the
+   lead's actual first name and adjust tone slightly to their DISC
+   style if known (e.g. more data/detail-forward for an Analytical
+   type, more direct/outcome-forward for a Driver type) — this must
+   remain a draft suggestion the human can edit, not a hidden
+   automatic decision.
+2. When no leadId is provided (persona-level draft, no specific lead
+   yet), keep working as today but drop the hardcoded "Best, SiteMint
+   Digital" sign-off in favor of a generic, editable placeholder like
+   "[Your name]" — so it's obviously meant to be filled in, not left
+   impersonal.
+3. For sequence generation, explicitly instruct the model (in the
+   system prompt) to vary strategy across steps, not just topic
+   phrasing: e.g. step 1 = acknowledge + introduce value, a middle
+   step = a different angle or reframe (not the same CTA restated),
+   the SMS step = genuinely short and distinct in tone from the
+   emails (not a shrunk email), and the final step = a lower-friction
+   close (e.g. "reply with one word" or an easy yes/no) instead of
+   repeating "book a discovery call" verbatim in every single step.
+4. Tighten the system prompt to explicitly discourage generic AI-
+   marketing stock phrases (give 3-4 example phrases to avoid, based
+   on what showed up repeatedly: "silent conversion killers," "should
+   do more than look good," and similar hedge-heavy corporate phrasing)
+   and ask for more concrete, specific language instead.
+5. Add a "Generate for this lead" entry point in the UI wherever a
+   draft is initiated from a specific lead's context (e.g. from Lead
+   Detail or Sales Workspace), passing leadId through. Keep the
+   existing persona-only generation path working exactly as before
+   when no lead context exists.
+
+Return:
+- Files changed
+- Before/after: regenerate the SAME single-campaign input from the
+  audit (new-website-inquiry + why-website-losing-leads) with a real
+  test lead's name/DISC type passed in, shown verbatim, so it can be
+  compared directly against the earlier generic sample
+- Before/after: regenerate the same 5-step sequence input, shown
+  verbatim, to confirm CTA/strategy actually varies step to step now
+- Confirm the no-leadId path still works unchanged
+- TypeScript status

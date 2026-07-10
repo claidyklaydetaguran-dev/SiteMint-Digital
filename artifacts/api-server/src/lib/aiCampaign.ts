@@ -17,6 +17,12 @@ export interface AiCampaignGenerateInput {
   topicDescription?: string;
   objective: string;
   toneProfile: string;
+  // Optional lead context (Phase: per-lead personalization). All optional —
+  // when absent, generation behaves exactly as the persona-only path did before.
+  leadFirstName?: string;
+  leadCompany?: string;
+  discStyle?: "Driver" | "Expressive" | "Amiable" | "Analytical";
+  healthBadge?: string;
 }
 
 export interface AiSequenceGenerateInput extends AiCampaignGenerateInput {
@@ -46,8 +52,34 @@ const SAFETY_RULES = `SAFETY RULES (never break these):
 - Do not invent client names, statistics, or pricing that weren't provided.
 - Return ONLY valid JSON matching the requested shape — no markdown, no commentary, no code fences.`;
 
+const STYLE_RULES = `STYLE RULES:
+- Sign off with the placeholder "[Your name]" — never invent or default to a company/agency sign-off like "Best, SiteMint Digital".
+- If a lead's first name is given in the context below, open with it (e.g. "Hi {name},") instead of a generic "Hi,". If no lead name is given, a generic opener is fine.
+- If a DISC style is given, let it lightly inform tone as noted — this is a suggestion for a human to accept or edit, not a rigid script.
+- Avoid generic AI-marketing stock phrasing. Do NOT use phrases like "silent conversion killers", "should do more than look good", "quietly costing you leads", or other hedge-heavy corporate filler. Use concrete, specific language grounded in the actual pain point and topic instead.`;
+
+const SEQUENCE_STRATEGY_RULES = `STRATEGY VARIATION (do not skip this — every step must earn its place):
+- Step 1: acknowledge + introduce value.
+- A middle step: use a genuinely different angle or reframe of the same topic — do NOT restate the same CTA in different words.
+- The sms step (if included): must be short and distinct in tone from the emails, not a shrunk-down email.
+- The final step: use a lower-friction close (e.g. "reply with one word" or a simple yes/no) instead of repeating the same "book a discovery call" CTA verbatim in every step.
+Each step's CTA, opening line, and framing must be distinct from every other step — do not repeat the same call-to-action wording or sign-off across steps.`;
+
+const DISC_TONE_HINTS: Record<string, string> = {
+  Driver: "be direct and outcome-forward — lead with the bottom-line result, skip preamble",
+  Analytical: "be data- and detail-forward — reference specifics and back claims with concrete detail",
+  Expressive: "be warm and energetic — lean into vision and possibility, keep it personable",
+  Amiable: "be warm and relationship-forward — reassure, avoid pressure, emphasize partnership",
+};
+
 function personaContext(input: AiCampaignGenerateInput): string {
   const lines: string[] = [];
+  if (input.leadFirstName) lines.push(`- Lead's first name: ${input.leadFirstName}`);
+  if (input.leadCompany) lines.push(`- Lead's company: ${input.leadCompany}`);
+  if (input.discStyle && DISC_TONE_HINTS[input.discStyle]) {
+    lines.push(`- Lead's DISC style: ${input.discStyle} — ${DISC_TONE_HINTS[input.discStyle]}`);
+  }
+  if (input.healthBadge) lines.push(`- Lead engagement health: ${input.healthBadge}`);
   if (input.personaLabel) lines.push(`- Persona: ${input.personaLabel}`);
   if (input.personaDescription) lines.push(`- Persona description: ${input.personaDescription}`);
   if (input.personaPainPoint) lines.push(`- Primary pain point: ${input.personaPainPoint}`);
@@ -71,6 +103,8 @@ export async function generateCampaignDraft(input: AiCampaignGenerateInput): Pro
   const systemPrompt = `You are a senior email copywriter for SiteMint Digital, a web design/SEO/CRM/automation agency.
 Write a single marketing email draft matching the persona's recommended tone.
 Keep the body under 180 words. Never exceed it.
+
+${STYLE_RULES}
 
 ${SAFETY_RULES}
 
@@ -109,6 +143,10 @@ day 0, then roughly +2 to +5 days between subsequent steps, tapering the interva
 Prefer "email" for most steps; use "sms" for a quick nudge, "call_prompt" for a suggested phone call, and
 "task" for an internal reminder — vary channels only when it makes sense, most sequences should be mostly email.
 Each email step's body must stay under 180 words. Each sms body must stay under 160 characters.
+
+${SEQUENCE_STRATEGY_RULES}
+
+${STYLE_RULES}
 
 ${SAFETY_RULES}
 

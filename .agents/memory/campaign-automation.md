@@ -14,6 +14,18 @@ schema, or Twilio — extensions are additive only. Full detail lives in ARCHITE
 - Sequence builder UI, enrollment (`/enroll` schedules one msg per step by `dayOffset`).
 - Auto-send scheduler (60s tick, Resend/Twilio), message queue UI, stop-on-reply, funnel analytics.
 
+## AI draft generator personalization (audit follow-up, complete)
+- `ai-generate` route accepts optional `leadId`/`discStyle`/`healthBadge`; when leadId is
+  present the route fetches name/company server-side and passes them into the prompt —
+  client never sends raw lead PII beyond the id + precomputed disc style.
+- Sign-off is always the literal placeholder `[Your name]`, never a hardcoded brand name,
+  regardless of lead context.
+- "Generate for this lead" entry point lives on Lead Detail and deep-links to
+  `/admin/crm/campaigns?view=builder&leadId=...`; CrmCampaigns reads that query string
+  directly (no route prop) and looks up discStyle from its existing discMap.
+- Sequence-mode system prompt enforces per-step strategy variation (ack → reframe → short
+  SMS check-in → new angle → low-friction close) so steps no longer repeat the same CTA.
+
 ## Known PARTIAL gaps
 - **Send-time windows are stored but ignored.** Steps carry `sendTime`
   (immediate/morning/afternoon/evening) and `businessDaysOnly`, but the scheduler sends on

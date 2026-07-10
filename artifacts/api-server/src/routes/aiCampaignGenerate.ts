@@ -1,6 +1,10 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { eq } from "drizzle-orm";
+import { db, crmLeads } from "@workspace/db";
 import { validateToken } from "../lib/admin-session.js";
 import { generateCampaignDraft, generateSequenceDraft } from "../lib/aiCampaign.js";
+
+const DISC_STYLES = new Set(["Driver", "Expressive", "Amiable", "Analytical"]);
 
 const router: IRouter = Router();
 
@@ -25,7 +29,24 @@ router.post("/crm/campaigns/ai-generate", requireAdmin, async (req: Request, res
       personaId, personaLabel, personaDescription, personaPainPoint, personaBestCTA,
       topicId, topicTitle, topicDescription,
       objective, toneProfile, stepCount,
+      leadId, discStyle, healthBadge,
     } = req.body as Record<string, unknown>;
+
+    // Optional per-lead personalization context (all optional — when leadId is
+    // absent, generation behaves exactly as the persona-only path did before).
+    let leadFirstName: string | undefined;
+    let leadCompany: string | undefined;
+    if (leadId) {
+      const idNum = Number(leadId);
+      if (Number.isFinite(idNum)) {
+        const [lead] = await db.select({ name: crmLeads.name, company: crmLeads.company })
+          .from(crmLeads).where(eq(crmLeads.id, idNum));
+        if (lead) {
+          leadFirstName = lead.name?.split(" ")[0];
+          leadCompany = lead.company ?? undefined;
+        }
+      }
+    }
 
     const input = {
       personaId: personaId ? String(personaId) : undefined,
@@ -38,6 +59,12 @@ router.post("/crm/campaigns/ai-generate", requireAdmin, async (req: Request, res
       topicDescription: topicDescription ? String(topicDescription) : undefined,
       objective: objective ? String(objective) : "",
       toneProfile: toneProfile ? String(toneProfile) : "",
+      leadFirstName,
+      leadCompany,
+      discStyle: discStyle && DISC_STYLES.has(String(discStyle))
+        ? (String(discStyle) as "Driver" | "Expressive" | "Amiable" | "Analytical")
+        : undefined,
+      healthBadge: healthBadge ? String(healthBadge) : undefined,
     };
 
     if (mode === "sequence") {

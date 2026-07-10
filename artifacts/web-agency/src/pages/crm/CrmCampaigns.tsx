@@ -380,6 +380,15 @@ const DISC_STYLES: DiscStyle[] = ["Driver","Expressive","Amiable","Analytical"];
 export default function CrmCampaigns({ initialView = "history" }: { initialView?: "history" | "builder" }) {
   const [, navigate] = useLocation();
 
+  // ── Lead context from URL (e.g. "Generate for this lead" from Lead Detail) ──
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const contextLeadId = useMemo(() => {
+    const raw = urlParams.get("leadId");
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  }, [urlParams]);
+  const urlView = urlParams.get("view") === "builder" ? "builder" : null;
+
   // ── Global data ──
   const [allLeads, setAllLeads]     = useState<Lead[]>([]);
   const [templates, setTemplates]   = useState<EmailTemplate[]>([]);
@@ -387,7 +396,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [loading, setLoading]       = useState(true);
 
   // ── View ──
-  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics" | "sequence" | "queue">(initialView);
+  const [view, setView] = useState<"history" | "builder" | "execution" | "analytics" | "sequence" | "queue">(urlView ?? initialView);
 
   // ── Sequence / queue navigation state ──
   const [sequenceCampaignId,   setSequenceCampaignId]   = useState<number | null>(null);
@@ -612,6 +621,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     try {
       const persona = selectedPersonaId ? SITEMINT_PERSONAS.find(p => p.id === selectedPersonaId) : undefined;
       const topic   = getTopicById(selectedTopicId || null);
+      const contextLead = contextLeadId ? allLeads.find(l => l.id === contextLeadId) : undefined;
       const res = await fetch("/api/crm/campaigns/ai-generate", {
         method: "POST",
         headers: authH(),
@@ -627,6 +637,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           topicDescription: topic?.description,
           objective,
           toneProfile,
+          // Optional lead context — only present when arriving via "Generate for
+          // this lead" from Lead Detail. Persona-only path is unaffected.
+          ...(contextLead ? { leadId: contextLead.id, discStyle: discMap.get(contextLead.id) } : {}),
         }),
       });
       const data = await res.json();
@@ -2522,6 +2535,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   </button>
                   <span className="text-[10px] text-muted-foreground">Drafts subject + body from your persona/topic/objective above.</span>
                 </div>
+                {contextLeadId && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1">
+                    {allLeads.find(l => l.id === contextLeadId)
+                      ? `Personalizing for ${allLeads.find(l => l.id === contextLeadId)!.name}`
+                      : "Loading lead context…"}
+                  </span>
+                )}
                 {aiDrafted && (
                   <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-1">
                     <Zap className="w-3 h-3" /> AI-drafted, review before saving
