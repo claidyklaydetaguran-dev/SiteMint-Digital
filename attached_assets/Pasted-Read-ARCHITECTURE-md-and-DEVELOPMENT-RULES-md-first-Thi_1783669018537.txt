@@ -1,0 +1,60 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is primarily an audit task, not a feature build. Expect 0-1 files
+changed unless you find a genuine bug in the enrollment/scheduling/
+sending/stop-on-reply loop — if you do, fix it minimally and flag it
+clearly as a deviation from "audit only."
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, phone.ts) even to fix
+a bug — if the issue traces into one of these, stop and report back
+rather than editing it.
+
+Stay within the default change budget (5 files, 300 lines, 0 migrations
+expected).
+
+Task (per ARCHITECTURE.md Phase 26A):
+Verify the full campaign lifecycle end-to-end and document any gaps:
+
+1. Enrollment: when a lead is enrolled in a campaign/sequence, confirm
+   scheduled messages are created correctly (right lead, right step
+   order, right initial timing) — trace the actual code path, don't
+   assume from reading names.
+2. Scheduling: confirm the scheduler correctly picks up due messages
+   and doesn't double-send, skip, or send out of order. Check what
+   happens on scheduler restart/redeploy — are in-flight schedules
+   durable (DB-backed) or could a restart lose/duplicate sends?
+3. Sending: confirm actual send (email/SMS via Resend/Twilio) is
+   correctly tied to the right lead/campaign/step, and that a failed
+   send is retried or at least clearly logged/flagged, not silently
+   dropped.
+4. Stop-on-reply: confirm that if a lead replies (or unsubscribes/
+   marks spam), their remaining scheduled messages in that sequence
+   are actually cancelled — trace this specific path carefully, this
+   is the most important safety guarantee in the whole system since a
+   failure here means contacting someone after they've opted out.
+5. Known gaps already flagged elsewhere in the codebase: check whether
+   send-window enforcement (sendTime/businessDaysOnly) is honored or
+   ignored by the scheduler (ARCHITECTURE.md flags this as PARTIAL/
+   ignored) — confirm current behavior precisely, do not fix it in
+   this task (that's 26F, separate).
+
+Do NOT fix send-window enforcement in this pass even if confirmed
+broken — just document it precisely (what's ignored, what the impact
+is). Do NOT add new features, taxonomy, or routing logic — this is
+audit and documentation only.
+
+Return:
+- A gap report: for each of the 4 checks above, state PASS / PARTIAL /
+  FAIL with the specific code path traced (file + function names) as
+  evidence, not assumptions
+- Any bug found and fixed (should be rare) — file, what was wrong,
+  what changed, why it was safe to fix now rather than defer
+- Explicit confirmation on stop-on-reply: is it airtight, or are there
+  edge cases (e.g. reply detected after a message is already queued
+  for send within the next few minutes) where a message could still
+  go out after a reply?
+- TypeScript status
+- Recommended next step given what was found (should generally point
+  to 26F send-window enforcement next, per the existing roadmap, unless
+  something more urgent surfaced)
