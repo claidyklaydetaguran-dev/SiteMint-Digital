@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES } from "@workspace/db";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
@@ -9,6 +9,7 @@ import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
 import { getSchedulerStatus, processScheduledMessages } from "../lib/campaignScheduler.js";
 import { stampReplyAndStop } from "../lib/sequenceReply.js";
+import { getUncachableStripeClient } from "../lib/stripeClient.js";
 
 const router: IRouter = Router();
 
@@ -1578,10 +1579,14 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
     const wonDeals = deals.filter(d => d.stage === "Won");
     const lostDeals = deals.filter(d => d.stage === "Lost");
     const openDeals = deals.filter(d => !["Won", "Lost"].includes(d.stage));
-    const totalRevenue = wonDeals.reduce((s, d) => s + Number(d.value), 0);
     const winRate = (wonDeals.length + lostDeals.length) > 0
       ? Math.round((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100)
       : 0;
+
+    // Total Revenue reflects real money in (crm_transactions), not the deal
+    // stage flip — a deal marked "Won" with no completed transaction contributes $0.
+    const completedTxns = await db.select().from(crmTransactions).where(eq(crmTransactions.status, "completed"));
+    const totalRevenue = completedTxns.reduce((s, t) => s + Number(t.amount), 0);
 
     const stageOrder = ["Lead", "Qualified", "Proposal", "Won", "Lost"];
     const pipeline = stageOrder.map(stage => {
@@ -1591,9 +1596,10 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
     });
 
     const monthlyMap = new Map<string, number>();
-    wonDeals.forEach(d => {
-      const m = new Date(d.createdAt).toISOString().substring(0, 7);
-      monthlyMap.set(m, (monthlyMap.get(m) || 0) + Number(d.value));
+    completedTxns.forEach(t => {
+      const at = t.receivedAt ?? t.createdAt;
+      const m = new Date(at).toISOString().substring(0, 7);
+      monthlyMap.set(m, (monthlyMap.get(m) || 0) + Number(t.amount));
     });
     const now = new Date();
     const monthly = Array.from({ length: 6 }, (_, i) => {
@@ -1680,6 +1686,99 @@ router.delete("/crm/deals/:id", requireAdmin, async (req: Request, res: Response
   } catch (err) {
     req.log.error({ err }, "Error deleting deal");
     res.status(500).json({ error: "Failed to delete deal" });
+  }
+});
+
+// ── Deal Transactions (real money in — never inferred from stage) ────────────
+const MANUAL_METHODS = TRANSACTION_METHODS.filter(m => m !== "stripe");
+
+router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const dealId = Number(req.params.id);
+    const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
+    if (!deal) { res.status(404).json({ error: "Deal not found" }); return; }
+
+    const { amount, method, receivedAt, notes } = req.body as Record<string, string | number | undefined>;
+    if (!amount || Number(amount) <= 0) { res.status(400).json({ error: "A positive amount is required" }); return; }
+    if (!method || !MANUAL_METHODS.includes(method as (typeof MANUAL_METHODS)[number])) {
+      res.status(400).json({ error: `method must be one of: ${MANUAL_METHODS.join(", ")}` });
+      return;
+    }
+
+    const [txn] = await db.insert(crmTransactions).values({
+      dealId,
+      leadId: deal.leadId ?? null,
+      amount: String(amount),
+      method: String(method),
+      status: "completed",
+      receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
+      notes: notes ? String(notes) : null,
+    }).returning();
+
+    res.json({ transaction: txn });
+  } catch (err) {
+    req.log.error({ err }, "Error recording manual transaction");
+    res.status(500).json({ error: "Failed to record transaction" });
+  }
+});
+
+router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const dealId = Number(req.params.id);
+    const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
+    if (!deal) { res.status(404).json({ error: "Deal not found" }); return; }
+
+    const { amount } = req.body as Record<string, string | number | undefined>;
+    const chargeAmount = amount ? Number(amount) : Number(deal.value);
+    if (!chargeAmount || chargeAmount <= 0) { res.status(400).json({ error: "A positive amount is required" }); return; }
+
+    const stripe = await getUncachableStripeClient();
+    const domain = process.env["REPLIT_DOMAINS"]?.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : `${req.protocol}://${req.get("host")}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          unit_amount: Math.round(chargeAmount * 100),
+          product_data: { name: `${deal.name} — payment` },
+        },
+        quantity: 1,
+      }],
+      success_url: `${baseUrl}/admin/crm/deals/${dealId}?payment=success`,
+      cancel_url: `${baseUrl}/admin/crm/deals/${dealId}?payment=cancelled`,
+      metadata: { dealId: String(dealId) },
+    });
+
+    if (!session.url) { throw new Error("Stripe did not return a checkout URL"); }
+
+    const [txn] = await db.insert(crmTransactions).values({
+      dealId,
+      leadId: deal.leadId ?? null,
+      amount: chargeAmount.toFixed(2),
+      method: "stripe",
+      status: "pending",
+      stripePaymentIntentId: session.id,
+    }).returning();
+
+    res.json({ url: session.url, transaction: txn });
+  } catch (err) {
+    req.log.error({ err }, "Error creating deal checkout session");
+    res.status(500).json({ error: "Failed to create checkout session" });
+  }
+});
+
+router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const dealId = Number(req.params.id);
+    const transactions = await db.select().from(crmTransactions)
+      .where(eq(crmTransactions.dealId, dealId))
+      .orderBy(desc(crmTransactions.createdAt));
+    res.json({ transactions });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching deal transactions");
+    res.status(500).json({ error: "Failed to fetch transactions" });
   }
 });
 

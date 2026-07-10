@@ -26,6 +26,18 @@ schema, or Twilio — extensions are additive only. Full detail lives in ARCHITE
 - Sequence-mode system prompt enforces per-step strategy variation (ack → reframe → short
   SMS check-in → new angle → low-friction close) so steps no longer repeat the same CTA.
 
+## Deal revenue is transaction-backed, not stage-derived
+- `crm_transactions` table (dealId, leadId, amount, method, stripePaymentIntentId, status,
+  receivedAt) is the source of truth for "real money in." Deal `stage` (Won/Lost) is still a
+  manual, independent field — flipping a deal to "Won" does NOT create a transaction and does
+  NOT move Total Revenue; only a transaction with status='completed' does.
+- Dashboard Total Revenue / monthly revenue sum `crm_transactions` where status='completed',
+  not `crm_deals.value` of Won deals — check this file's route before re-deriving deal stats.
+- Stripe checkout sessions for deals reuse `getUncachableStripeClient()`; the session id is
+  stored in `stripePaymentIntentId` while pending (real payment_intent overwrites it once the
+  webhook fires). Reconciliation piggybacks on the existing `/api/stripe/webhook` route/
+  `WebhookHandlers` (via `getStripeWebhookSecret()`) rather than adding a second endpoint.
+
 ## Known PARTIAL gaps
 - **Send-time windows are stored but ignored.** Steps carry `sendTime`
   (immediate/morning/afternoon/evening) and `businessDaysOnly`, but the scheduler sends on

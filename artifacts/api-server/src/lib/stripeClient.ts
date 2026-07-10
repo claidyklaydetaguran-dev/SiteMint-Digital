@@ -60,6 +60,18 @@ export async function getUncachableStripeClient(): Promise<Stripe> {
 }
 
 /**
+ * Returns the Stripe webhook signing secret for manual event verification
+ * (e.g. to inspect an event for CRM-specific side effects alongside stripe-replit-sync).
+ */
+export async function getStripeWebhookSecret(): Promise<string> {
+  const { webhookSecret } = await getStripeCredentials();
+  if (!webhookSecret) {
+    throw new Error("Stripe webhook secret not configured on the connection.");
+  }
+  return webhookSecret;
+}
+
+/**
  * Returns a fresh StripeSync instance for webhook processing and data sync.
  * Not cached -- fetches credentials on every call so rotated keys are picked up.
  */

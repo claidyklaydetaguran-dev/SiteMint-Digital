@@ -1,0 +1,61 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Do not touch locked modules. Stay within budget (5 files, 300 lines,
+1 migration).
+
+Context (confirmed, don't re-derive):
+crm_deals has a `stage` field (Lead/Qualified/Proposal/Won/Lost) but
+no linked payment record — marking a deal "Won" today is just a
+status flip with nothing behind it. The dashboard's Total Revenue/
+Win Rate/Won Deals KPIs are effectively fake because there's nothing
+to sum. A working Stripe checkout-session pattern already exists in
+aiToolkit.ts (used for the $23 toolkit storefront) — reuse that
+pattern rather than inventing a new one. getUncachableStripeClient()
+in lib/stripeClient.ts is the existing way to get an authenticated
+Stripe client; remember settings.secret (not secret_key) per
+.agents/memory/stripe-connector-settings.md if you touch connector
+code directly.
+
+Task:
+1. Add crm_transactions table: id, dealId (FK to crm_deals), leadId
+   (denormalized for easier querying), amount (decimal), method
+   ('stripe' | 'manual_cash' | 'manual_check' | 'manual_transfer' |
+   'manual_other'), stripePaymentIntentId (nullable text), status
+   ('pending' | 'completed' | 'failed' | 'refunded'), receivedAt
+   (timestamp, nullable until completed), notes (nullable text),
+   createdAt/updatedAt.
+2. Add a route to record a MANUAL transaction against a deal (amount,
+   method, receivedAt, notes) — this is for cash/check/bank-transfer
+   payments that don't go through Stripe. On creation with
+   status='completed', this is what should make a deal "real money in,"
+   not just the stage flip.
+3. Add a route to generate a Stripe checkout session for a deal
+   (amount pre-filled from the deal's value, but editable in case of
+   partial/deposit payments), reusing the pattern from aiToolkit.ts.
+   Store the resulting session/payment intent id on a pending
+   crm_transactions row.
+4. Add or extend a webhook handler so a completed Stripe payment
+   updates the matching crm_transactions row to status='completed'
+   with receivedAt set — check whether stripe-replit-sync's existing
+   webhook plumbing (used elsewhere) can be reused here rather than
+   building a second webhook endpoint from scratch.
+5. Do NOT auto-change a deal's stage to "Won" when a transaction
+   completes — that's a human's call (a deposit might land before
+   the deal is actually "won"). Just record the transaction; stage
+   management stays manual as today.
+6. Update whatever dashboard query currently feeds Total Revenue/
+   Won Deals to actually sum from crm_transactions where
+   status='completed', instead of whatever it does today (check
+   crm.ts/CrmExecutiveDashboard's data source first — don't guess).
+
+No builder UI in this task — a follow-up prompt adds the Transactions
+page. This is schema + backend only.
+
+Return:
+- Migration applied (columns/table)
+- Files changed
+- Confirm: recording a manual transaction actually changes the
+  dashboard's Total Revenue number (trace/test this specifically)
+- Confirm: existing deal stage-flip behavior (Won/Lost) is unchanged
+- Confirm no locked files touched
+- TypeScript status
