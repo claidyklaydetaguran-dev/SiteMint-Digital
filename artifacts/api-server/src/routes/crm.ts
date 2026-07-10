@@ -1968,9 +1968,13 @@ router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: 
     const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
     if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
 
-    const { stepNumber, dayOffset, channel, subject, body, callPrompt, taskDescription, sendTime, businessDaysOnly } = req.body as Record<string, unknown>;
+    const {
+      stepNumber, dayOffset, channel, subject, body, callPrompt, taskDescription, sendTime, businessDaysOnly,
+      intentLabel, branchOnEvent, branchWindowHours, branchTrueNextStepId, branchFalseNextStepId,
+    } = req.body as Record<string, unknown>;
     const allowedChannels  = ["email","sms","call_prompt","task"];
     const allowedSendTimes = ["immediate","morning","afternoon","evening"];
+    const allowedBranchEvents = ["opened","clicked","no_reply"];
     if (!channel || !allowedChannels.includes(String(channel))) {
       res.status(400).json({ error: "channel must be one of: email, sms, call_prompt, task" }); return;
     }
@@ -1986,6 +1990,11 @@ router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: 
       taskDescription: taskDescription ? String(taskDescription) : null,
       sendTime:        sendTime && allowedSendTimes.includes(String(sendTime)) ? String(sendTime) : "immediate",
       businessDaysOnly: businessDaysOnly !== undefined ? Boolean(businessDaysOnly) : true,
+      intentLabel:      intentLabel ? String(intentLabel) : null,
+      branchOnEvent:    branchOnEvent && allowedBranchEvents.includes(String(branchOnEvent)) ? String(branchOnEvent) : null,
+      branchWindowHours: branchWindowHours !== undefined && branchWindowHours !== null ? Number(branchWindowHours) : null,
+      branchTrueNextStepId: branchTrueNextStepId !== undefined && branchTrueNextStepId !== null ? Number(branchTrueNextStepId) : null,
+      branchFalseNextStepId: branchFalseNextStepId !== undefined && branchFalseNextStepId !== null ? Number(branchFalseNextStepId) : null,
     }).returning();
     res.status(201).json({ step });
   } catch (err) {
@@ -1999,9 +2008,13 @@ router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Reque
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
     if (isNaN(id) || isNaN(stepId)) { res.status(400).json({ error: "Invalid ID" }); return; }
-    const { stepNumber, dayOffset, channel, subject, body, callPrompt, taskDescription, sendTime, businessDaysOnly } = req.body as Record<string, unknown>;
+    const {
+      stepNumber, dayOffset, channel, subject, body, callPrompt, taskDescription, sendTime, businessDaysOnly,
+      intentLabel, branchOnEvent, branchWindowHours, branchTrueNextStepId, branchFalseNextStepId,
+    } = req.body as Record<string, unknown>;
     const allowedChannels  = ["email","sms","call_prompt","task"];
     const allowedSendTimes = ["immediate","morning","afternoon","evening"];
+    const allowedBranchEvents = ["opened","clicked","no_reply"];
     const updates: Record<string, unknown> = {};
     if (stepNumber      !== undefined) updates.stepNumber      = Number(stepNumber);
     if (dayOffset       !== undefined) updates.dayOffset       = Number(dayOffset);
@@ -2012,6 +2025,11 @@ router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Reque
     if (callPrompt      !== undefined) updates.callPrompt      = callPrompt      ? String(callPrompt)      : null;
     if (taskDescription !== undefined) updates.taskDescription = taskDescription ? String(taskDescription) : null;
     if (businessDaysOnly !== undefined) updates.businessDaysOnly = Boolean(businessDaysOnly);
+    if (intentLabel      !== undefined) updates.intentLabel      = intentLabel ? String(intentLabel) : null;
+    if (branchOnEvent    !== undefined) updates.branchOnEvent    = branchOnEvent && allowedBranchEvents.includes(String(branchOnEvent)) ? String(branchOnEvent) : null;
+    if (branchWindowHours !== undefined) updates.branchWindowHours = branchWindowHours !== null ? Number(branchWindowHours) : null;
+    if (branchTrueNextStepId !== undefined) updates.branchTrueNextStepId = branchTrueNextStepId !== null ? Number(branchTrueNextStepId) : null;
+    if (branchFalseNextStepId !== undefined) updates.branchFalseNextStepId = branchFalseNextStepId !== null ? Number(branchFalseNextStepId) : null;
     if (!Object.keys(updates).length) { res.status(400).json({ error: "No fields to update" }); return; }
     const [step] = await db.update(crmCampaignSteps)
       .set(updates)

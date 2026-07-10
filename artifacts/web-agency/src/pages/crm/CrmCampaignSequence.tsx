@@ -166,6 +166,23 @@ export interface CampaignStep {
   sendTime: string;
   businessDaysOnly: boolean;
   createdAt: string;
+  intentLabel?: string | null;
+  branchOnEvent?: string | null;
+  branchWindowHours?: number | null;
+  branchTrueNextStepId?: number | null;
+  branchFalseNextStepId?: number | null;
+}
+
+const BRANCH_EVENTS = [
+  { value: "opened", label: "Opened" },
+  { value: "clicked", label: "Clicked" },
+  { value: "no_reply", label: "No reply" },
+] as const;
+
+function stepPreviewLabel(s: CampaignStep): string {
+  const { intel } = parseStepBody(s.body);
+  const desc = s.subject ?? intel.objective ?? s.channel.replace("_", " ");
+  return `Step ${s.stepNumber} — ${desc}`;
 }
 
 interface EnrolledRecipient {
@@ -219,12 +236,24 @@ function fmtDate(iso: string) {
 
 // ── Step Card ─────────────────────────────────────────────────────────────────
 
+function branchSummary(step: CampaignStep, allSteps: CampaignStep[]): string | null {
+  if (!step.branchOnEvent) return null;
+  const evLabel = BRANCH_EVENTS.find(e => e.value === step.branchOnEvent)?.label ?? step.branchOnEvent;
+  const trueStep = allSteps.find(s => s.id === step.branchTrueNextStepId);
+  const falseStep = allSteps.find(s => s.id === step.branchFalseNextStepId);
+  const trueLabel = trueStep ? `Step ${trueStep.stepNumber}` : "—";
+  const falseLabel = falseStep ? `Step ${falseStep.stepNumber}` : "—";
+  return `${evLabel} -> ${trueLabel}, else ${falseLabel}`;
+}
+
 function StepCard({
   step,
+  allSteps,
   onEdit,
   onDelete,
 }: {
   step: CampaignStep;
+  allSteps: CampaignStep[];
   onEdit: (s: CampaignStep) => void;
   onDelete: (id: number) => void;
 }) {
@@ -237,6 +266,7 @@ function StepCard({
     ["Signal", intel.targetSignal],
     ["Lift", intel.expectedLift],
   ].filter((c): c is [string, string] => Boolean(c[1]));
+  const branchLine = branchSummary(step, allSteps);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -319,6 +349,12 @@ function StepCard({
         {step.businessDaysOnly && (
           <p className="text-[10px] text-muted-foreground">Business days only</p>
         )}
+        {branchLine && (
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <GitBranch className="w-3 h-3 text-emerald-600 shrink-0" />
+            <span className="text-[10px] font-medium text-emerald-700">{branchLine}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -330,11 +366,12 @@ interface StepFormProps {
   campaignId: number;
   existing?: CampaignStep | null;
   stepCount: number;
+  allSteps: CampaignStep[];
   onSaved: (s: CampaignStep) => void;
   onCancel: () => void;
 }
 
-function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFormProps) {
+function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel }: StepFormProps) {
   const parsed = parseStepBody(existing?.body);
   const [stepNumber,       setStepNumber]       = useState(existing?.stepNumber ?? stepCount + 1);
   const [dayOffset,        setDayOffset]        = useState(existing?.dayOffset ?? (stepCount === 0 ? 0 : 3));
@@ -347,13 +384,37 @@ function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFo
   const [businessDaysOnly, setBusinessDaysOnly] = useState(existing?.businessDaysOnly ?? true);
   const [intel,            setIntel]            = useState<StepIntel>(parsed.intel);
   const [showIntel,        setShowIntel]        = useState(hasIntel(parsed.intel));
+  const [intentLabel,      setIntentLabel]      = useState(existing?.intentLabel ?? "");
+  const [showBranch,       setShowBranch]       = useState(Boolean(existing?.branchOnEvent));
+  const [branchOnEvent,    setBranchOnEvent]    = useState<string>(existing?.branchOnEvent ?? "opened");
+  const [branchWindowHours, setBranchWindowHours] = useState<number>(existing?.branchWindowHours ?? 48);
+  const [branchTrueNextStepId,  setBranchTrueNextStepId]  = useState<number | "">(existing?.branchTrueNextStepId ?? "");
+  const [branchFalseNextStepId, setBranchFalseNextStepId] = useState<number | "">(existing?.branchFalseNextStepId ?? "");
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
+
+  // Only already-saved OTHER steps can be branch targets — never self, never
+  // a step that doesn't exist yet in this (possibly unsaved) sequence.
+  const branchTargetOptions = allSteps.filter(s => s.id !== existing?.id);
 
   const setIntelField = (k: keyof StepIntel, v: string) => setIntel(prev => ({ ...prev, [k]: v }));
 
   const save = async () => {
     setError("");
+    if (showBranch) {
+      if (branchTrueNextStepId !== "" && existing && branchTrueNextStepId === existing.id) {
+        setError("A step can't branch to itself (true path)."); return;
+      }
+      if (branchFalseNextStepId !== "" && existing && branchFalseNextStepId === existing.id) {
+        setError("A step can't branch to itself (else path)."); return;
+      }
+      if (branchTrueNextStepId !== "" && !branchTargetOptions.some(s => s.id === branchTrueNextStepId)) {
+        setError("Selected 'then go to' step no longer exists in this sequence."); return;
+      }
+      if (branchFalseNextStepId !== "" && !branchTargetOptions.some(s => s.id === branchFalseNextStepId)) {
+        setError("Selected 'else go to' step no longer exists in this sequence."); return;
+      }
+    }
     setSaving(true);
     try {
       const url    = existing ? `/api/crm/campaigns/${campaignId}/steps/${existing.id}` : `/api/crm/campaigns/${campaignId}/steps`;
@@ -369,6 +430,11 @@ function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFo
           callPrompt: callPrompt || null,
           taskDescription: taskDescription || null,
           sendTime, businessDaysOnly,
+          intentLabel: intentLabel || null,
+          branchOnEvent: showBranch ? branchOnEvent : null,
+          branchWindowHours: showBranch ? branchWindowHours : null,
+          branchTrueNextStepId: showBranch && branchTrueNextStepId !== "" ? branchTrueNextStepId : null,
+          branchFalseNextStepId: showBranch && branchFalseNextStepId !== "" ? branchFalseNextStepId : null,
         }),
       });
       const d = await r.json();
@@ -520,6 +586,81 @@ function StepForm({ campaignId, existing, stepCount, onSaved, onCancel }: StepFo
             <p className="text-[9px] text-indigo-500/80 leading-relaxed pt-0.5">
               Stored inside the step body under a marked <span className="font-mono">[Step Intelligence]</span> block — no schema change. Strategy metadata only; no AI generation yet.
             </p>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Intent Label <span className="font-normal">(optional)</span></label>
+        <input
+          value={intentLabel}
+          onChange={e => setIntentLabel(e.target.value)}
+          placeholder="e.g. re-engagement nudge"
+          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+        />
+      </div>
+
+      {/* ── Branch (collapsible) ── */}
+      <div className="border border-emerald-200 rounded-lg overflow-hidden bg-emerald-50/40">
+        <button
+          type="button"
+          onClick={() => setShowBranch(s => !s)}
+          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-50 transition-colors"
+        >
+          <GitBranch className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span className="text-xs font-bold text-emerald-900">Add a branch after this step</span>
+          <span className="text-[9px] text-emerald-600 font-medium">optional</span>
+          {showBranch ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-emerald-500" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-emerald-500" />}
+        </button>
+        {showBranch && (
+          <div className="px-3 pb-3 pt-1 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-emerald-700/80 mb-0.5">On event</label>
+                <select
+                  value={branchOnEvent}
+                  onChange={e => setBranchOnEvent(e.target.value)}
+                  className="w-full border border-emerald-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+                >
+                  {BRANCH_EVENTS.map(ev => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-emerald-700/80 mb-0.5">Window (hours)</label>
+                <input
+                  type="number" min={1} value={branchWindowHours}
+                  onChange={e => setBranchWindowHours(Number(e.target.value))}
+                  className="w-full border border-emerald-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-emerald-700/80 mb-0.5">Then go to (event matched)</label>
+              <select
+                value={branchTrueNextStepId}
+                onChange={e => setBranchTrueNextStepId(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full border border-emerald-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+              >
+                <option value="">— Select step —</option>
+                {branchTargetOptions.map(s => <option key={s.id} value={s.id}>{stepPreviewLabel(s)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-emerald-700/80 mb-0.5">Else go to (not matched)</label>
+              <select
+                value={branchFalseNextStepId}
+                onChange={e => setBranchFalseNextStepId(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full border border-emerald-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+              >
+                <option value="">— Select step —</option>
+                {branchTargetOptions.map(s => <option key={s.id} value={s.id}>{stepPreviewLabel(s)}</option>)}
+              </select>
+            </div>
+            {branchTargetOptions.length === 0 && (
+              <p className="text-[9px] text-emerald-600/80 leading-relaxed pt-0.5">
+                No other steps exist yet in this sequence — save more steps first, then come back to wire up the branch targets.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -1259,6 +1400,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                   campaignId={campaignId}
                   existing={editingStep}
                   stepCount={steps.length}
+                  allSteps={steps}
                   onSaved={onStepSaved}
                   onCancel={() => setEditingStep(null)}
                 />
@@ -1266,6 +1408,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <StepCard
                   key={step.id}
                   step={step}
+                  allSteps={steps}
                   onEdit={s => { setEditingStep(s); setShowStepForm(false); }}
                   onDelete={deleteStep}
                 />
@@ -1277,6 +1420,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 campaignId={campaignId}
                 existing={null}
                 stepCount={steps.length}
+                allSteps={steps}
                 onSaved={onStepSaved}
                 onCancel={() => setShowStepForm(false)}
               />
@@ -1296,14 +1440,25 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-muted-foreground mb-2">SEQUENCE TIMELINE</p>
                 <div className="flex flex-col gap-1">
-                  {steps.map((s, i) => (
-                    <div key={s.id} className="flex items-center gap-2 text-xs text-foreground">
-                      <span className="w-6 h-6 rounded-full bg-[#1e293b] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</span>
-                      <ChannelIcon ch={s.channel} cls="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="font-medium">{s.subject ?? s.channel.replace("_", " ")}</span>
-                      <span className="text-muted-foreground ml-auto shrink-0">Day {s.dayOffset}</span>
-                    </div>
-                  ))}
+                  {steps.map((s, i) => {
+                    const branchLine = branchSummary(s, steps);
+                    return (
+                      <div key={s.id} className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2 text-xs text-foreground">
+                          <span className="w-6 h-6 rounded-full bg-[#1e293b] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</span>
+                          <ChannelIcon ch={s.channel} cls="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{s.subject ?? s.channel.replace("_", " ")}</span>
+                          <span className="text-muted-foreground ml-auto shrink-0">Day {s.dayOffset}</span>
+                        </div>
+                        {branchLine && (
+                          <div className="flex items-center gap-1.5 pl-8 text-[10px] text-emerald-700">
+                            <GitBranch className="w-3 h-3 shrink-0" />
+                            <span>{branchLine}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -1,0 +1,49 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Backend/schema for branching landed in the prior session:
+crm_campaign_steps now has intentLabel, branchOnEvent, branchWindowHours,
+branchTrueNextStepId, branchFalseNextStepId (all nullable). The
+scheduler already evaluates these correctly and is fully backward-
+compatible with steps that don't set them. This task is UI-only —
+do not touch campaignScheduler.ts or the schema again.
+
+Work only inside: CrmCampaignSequence.tsx (the step editor, around the
+existing step-add/edit form near stepNumber/dayOffset state, and the
+step list/timeline rendering).
+
+Do not touch locked modules. Stay within budget (5 files, 300 lines,
+0 migrations — schema already exists).
+
+Task:
+1. In the step editor form (where stepNumber/dayOffset/channel/subject
+   are currently set), add optional fields:
+   - intentLabel: short free-text input (e.g. "re-engagement nudge")
+   - "Add a branch after this step" toggle, which when enabled reveals:
+     - branchOnEvent: select (Opened / Clicked / No reply)
+     - branchWindowHours: number input (default 48)
+     - branchTrueNextStepId: select, populated from the OTHER existing
+       steps in this sequence (by stepNumber + subject preview)
+     - branchFalseNextStepId: same
+   All of this must remain optional/collapsed by default — a step
+   editor with the toggle off should look exactly like it does today.
+2. In the step list/timeline view (~line 682 area, the ordered-by-
+   dayOffset rendering), visually indicate which steps have a branch
+   configured — e.g. a small branch icon + "Opened -> Step 4, else
+   Step 6" summary line under the step, so the sequence's logic is
+   readable at a glance without opening each step's editor.
+3. Validation: prevent a step from branching to itself, and prevent
+   selecting a branchTrueNextStepId/branchFalseNextStepId that doesn't
+   exist in the current steps list (can't target a step not yet created
+   in an unsaved sequence — either save-order the validation or disable
+   invalid options in the select).
+4. Do not change stepNumber/dayOffset logic, linear step creation, or
+   any existing save/submit behavior for steps that don't use branching.
+
+Return:
+- Files changed
+- Screenshot or description of: (a) the branch toggle collapsed/default
+  state looking unchanged from before, (b) the branch toggle expanded
+  showing the new fields, (c) the timeline view showing a branch summary
+- Confirm a plain linear sequence (no branches used) saves/renders
+  identically to before this change
+- TypeScript status
