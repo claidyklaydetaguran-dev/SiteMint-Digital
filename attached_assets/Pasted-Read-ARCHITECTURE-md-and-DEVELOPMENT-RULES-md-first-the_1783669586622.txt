@@ -1,0 +1,76 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first, then read the
+26A audit findings below — they are ground truth for this task, do
+not re-derive them.
+
+Do not touch locked modules (discEngine.ts, leadScore.ts,
+communicationIntelligence.ts, workflowEngine.ts, phone.ts). phone.ts
+calls stampReplyAndStop but is not itself being modified here.
+
+Stay within budget (5 files, 300 lines, 1 migration max — this task
+may need one nullable-column migration for send-window fields if they
+aren't already on the right table; check crm_campaign_steps first,
+per ARCHITECTURE.md they may already exist).
+
+Confirmed findings from the 26A audit (do not re-verify, just fix):
+
+1. Send-window enforcement ignored: crm_campaign_steps.sendTime and
+   .businessDaysOnly are stored and settable in the builder, but the
+   enroll route (crm.ts ~2094-2095) only uses dayOffset, and the
+   scheduler's due-message query (campaignScheduler.ts) only checks
+   scheduledAt <= now, with no reference to sendTime/businessDaysOnly
+   anywhere.
+2. Missing ORDER BY: the scheduler's batch query (campaignScheduler.ts
+   ~131-165) has no .orderBy() on scheduledAt/stepId before .limit(),
+   so if >30 messages are due at once for a recipient, they may
+   process out of step order.
+3. Crash-duplicate window: if the process crashes/redeploys between
+   the external send call (Resend/Twilio) and markMessageSent(), the
+   message row stays status:"scheduled" and gets resent on next tick.
+   No idempotency/outbox guard exists.
+4. Reply-race window: between the scheduler's hasReplied() check
+   (~line 176) and the actual send call, there's no re-check or DB
+   lock. A reply arriving in that window can still result in a send,
+   and markMessageSent() unconditionally overwrites the row to "sent"
+   even if stampReplyAndStop already marked it canceled moments earlier.
+
+Task:
+1. Send-window enforcement: when computing whether a message is
+   actually due to send (not just scheduledAt <= now), also check
+   sendTime (time-of-day) and businessDaysOnly (skip Sat/Sun) for that
+   step. If a message's calendar-day arrives but it's outside the
+   window, defer it to the next valid send moment rather than sending
+   immediately or dropping it — do not silently skip it forever.
+2. Fix batch ordering: add .orderBy(scheduledAt, stepId) (or equivalent)
+   to the due-message query so processing is deterministic and
+   respects intended step order.
+3. Close the crash-duplicate window: use a conditional DB update
+   (e.g. UPDATE ... SET status = 'sending' WHERE status = 'scheduled'
+   RETURNING id) to claim a message BEFORE the external send call, not
+   after. Only proceed to send if the claim succeeded (row returned).
+   This single guard should also close the reply-race window in most
+   cases, IF stampReplyAndStop's cancellation also uses a conditional
+   update (WHERE status IN ('scheduled')) so the two can't race each
+   other silently — check sequenceReply.ts and align it with the same
+   pattern if it isn't already using one.
+4. Do not change the "always stop everything on any reply" behavior
+   in stampReplyAndStop — that's confirmed as intended, not a bug.
+   Only make its cancellation update itself race-safe per point 3.
+5. If markMessageSent()/markMessageFailed() currently do unconditional
+   writes, make them conditional too (e.g. only transition from
+   'sending' to 'sent'/'failed', not overwrite any status
+   unconditionally) so a canceled message can never be flipped back to
+   sent by a late-arriving write.
+
+Return:
+- Files changed (and migration, if any — should be one small nullable
+  addition at most, only if send-window columns need adjustment)
+- Confirm each of the 4 numbered findings above is now fixed, with the
+  specific code change for each
+- A test or trace showing: a message scheduled outside business hours/
+  send-window now defers correctly instead of sending immediately
+- A test or trace showing: the claim-before-send pattern actually
+  prevents a double-send in a simulated crash/race scenario (describe
+  how you verified this, e.g. concurrent request test or code trace)
+- TypeScript status
+- Confirm no locked-engine files were modified
+- Confirm "always stop on any reply" behavior is unchanged

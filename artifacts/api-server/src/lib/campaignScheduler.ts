@@ -3,10 +3,11 @@ import {
   crmCampaignScheduledMessages,
   crmCampaignRecipients,
   crmCampaigns,
+  crmCampaignSteps,
   crmLeads,
   crmCampaignEvents,
 } from "@workspace/db/schema";
-import { eq, and, lte, count, inArray } from "drizzle-orm";
+import { eq, and, lte, count, inArray, asc } from "drizzle-orm";
 import { getResend } from "./email.js";
 import { getTwilio, getTwilioPhone, isTwilioConfigured } from "./twilio.js";
 import { logger } from "./logger.js";
@@ -26,6 +27,7 @@ export interface SchedulerStatus {
   totalProcessed: number;
   totalErrors: number;
   totalSkipped: number;
+  totalDeferred: number;
 }
 
 const _status: SchedulerStatus = {
@@ -36,7 +38,37 @@ const _status: SchedulerStatus = {
   totalProcessed: 0,
   totalErrors: 0,
   totalSkipped: 0,
+  totalDeferred: 0,
 };
+
+// ── Send-window enforcement ───────────────────────────────────────────────────
+// sendTime: immediate | morning | afternoon | evening (hour in server-local time)
+const SEND_WINDOW_HOUR: Record<string, number> = { morning: 9, afternoon: 13, evening: 17 };
+
+function computeEffectiveSendAt(scheduledAt: Date, sendTime: string, businessDaysOnly: boolean): Date {
+  const effective = new Date(scheduledAt);
+  const hour = SEND_WINDOW_HOUR[sendTime];
+  if (hour !== undefined) effective.setHours(hour, 0, 0, 0);
+  if (businessDaysOnly) {
+    while (effective.getDay() === 0 || effective.getDay() === 6) {
+      effective.setDate(effective.getDate() + 1);
+      if (hour !== undefined) effective.setHours(hour, 0, 0, 0);
+    }
+  }
+  return effective;
+}
+
+// Atomically claim a scheduled message before acting on it, so a crash/restart
+// between the external send call and the status write can't cause a resend,
+// and a late-arriving stop-on-reply cancellation can't race a send.
+async function claimMessage(msgId: number): Promise<boolean> {
+  const claimed = await db
+    .update(crmCampaignScheduledMessages)
+    .set({ status: "sending" })
+    .where(and(eq(crmCampaignScheduledMessages.id, msgId), eq(crmCampaignScheduledMessages.status, "scheduled")))
+    .returning({ id: crmCampaignScheduledMessages.id });
+  return claimed.length > 0;
+}
 
 export function getSchedulerStatus(): SchedulerStatus {
   return { ..._status };
@@ -55,6 +87,9 @@ async function hasReplied(recipientId: number): Promise<boolean> {
   return (row?.n ?? 0) > 0;
 }
 
+// All terminal transitions below only apply FROM "sending" (the status set by
+// claimMessage). This guarantees a message already canceled/sent/failed by a
+// concurrent writer (e.g. stampReplyAndStop) can never be flipped back.
 async function markMessageSent(
   msgId: number,
   resendEmailId: string | null,
@@ -62,14 +97,14 @@ async function markMessageSent(
   await db
     .update(crmCampaignScheduledMessages)
     .set({ status: "sent", sentAt: new Date(), resendEmailId, lastError: null })
-    .where(eq(crmCampaignScheduledMessages.id, msgId));
+    .where(and(eq(crmCampaignScheduledMessages.id, msgId), eq(crmCampaignScheduledMessages.status, "sending")));
 }
 
 async function markMessageFailed(msgId: number, error: string): Promise<void> {
   await db
     .update(crmCampaignScheduledMessages)
     .set({ status: "failed", lastError: error })
-    .where(eq(crmCampaignScheduledMessages.id, msgId));
+    .where(and(eq(crmCampaignScheduledMessages.id, msgId), eq(crmCampaignScheduledMessages.status, "sending")));
 }
 
 async function markMessageSkipped(
@@ -84,7 +119,7 @@ async function markMessageSkipped(
       lastError: null,
       metadata: { skipReason: reason },
     })
-    .where(eq(crmCampaignScheduledMessages.id, msgId));
+    .where(and(eq(crmCampaignScheduledMessages.id, msgId), eq(crmCampaignScheduledMessages.status, "sending")));
 }
 
 async function checkAndCompleteRecipient(recipientId: number): Promise<void> {
@@ -114,16 +149,18 @@ export async function processScheduledMessages(): Promise<{
   processed: number;
   errors: number;
   skipped: number;
+  deferred: number;
 }> {
   if (_status.running) {
     logger.debug("Campaign scheduler already running — skipping tick");
-    return { processed: 0, errors: 0, skipped: 0 };
+    return { processed: 0, errors: 0, skipped: 0, deferred: 0 };
   }
 
   _status.running = true;
   let processed = 0;
   let errors = 0;
   let skipped = 0;
+  let deferred = 0;
 
   try {
     const now = new Date();
@@ -140,6 +177,8 @@ export async function processScheduledMessages(): Promise<{
         leadEmail: crmLeads.email,
         leadPhone: crmLeads.phone,
         leadName: crmLeads.name,
+        sendTime: crmCampaignSteps.sendTime,
+        businessDaysOnly: crmCampaignSteps.businessDaysOnly,
       })
       .from(crmCampaignScheduledMessages)
       .innerJoin(
@@ -154,6 +193,10 @@ export async function processScheduledMessages(): Promise<{
         crmLeads,
         eq(crmCampaignScheduledMessages.leadId, crmLeads.id),
       )
+      .innerJoin(
+        crmCampaignSteps,
+        eq(crmCampaignScheduledMessages.stepId, crmCampaignSteps.id),
+      )
       .where(
         and(
           eq(crmCampaignScheduledMessages.status, "scheduled"),
@@ -162,6 +205,7 @@ export async function processScheduledMessages(): Promise<{
           eq(crmCampaignRecipients.enrollmentStatus, "active"),
         ),
       )
+      .orderBy(asc(crmCampaignScheduledMessages.scheduledAt), asc(crmCampaignScheduledMessages.stepId))
       .limit(BATCH_SIZE);
 
     if (messages.length > 0) {
@@ -169,9 +213,39 @@ export async function processScheduledMessages(): Promise<{
     }
 
     for (const row of messages) {
-      const { msg, recipientId, stopOnReply, leadEmail, leadPhone, leadName, campaignName } = row;
+      const { msg, recipientId, stopOnReply, leadEmail, leadPhone, leadName, campaignName, sendTime, businessDaysOnly } = row;
 
       try {
+        // ── Send-window enforcement ──────────────────────────────────────────
+        // The calendar day may have arrived, but the step may require a
+        // specific time-of-day and/or business days only. Defer (reschedule)
+        // rather than sending early or dropping the message.
+        if (msg.scheduledAt) {
+          const effectiveAt = computeEffectiveSendAt(msg.scheduledAt, sendTime, businessDaysOnly);
+          if (effectiveAt.getTime() > now.getTime()) {
+            await db
+              .update(crmCampaignScheduledMessages)
+              .set({ scheduledAt: effectiveAt })
+              .where(
+                and(
+                  eq(crmCampaignScheduledMessages.id, msg.id),
+                  eq(crmCampaignScheduledMessages.status, "scheduled"),
+                ),
+              );
+            deferred++;
+            _status.totalDeferred++;
+            continue;
+          }
+        }
+
+        // ── Claim (crash-duplicate + reply-race guard) ───────────────────────
+        // Atomically flip scheduled → sending. If another writer (e.g. a
+        // stop-on-reply cancellation) already moved this row out of
+        // "scheduled", the claim fails and we skip it — never send.
+        if (!(await claimMessage(msg.id))) {
+          continue;
+        }
+
         // ── stopOnReply guard ────────────────────────────────────────────────
         if (stopOnReply && (await hasReplied(recipientId))) {
           await markMessageSkipped(msg.id, "Lead has replied — sequence stopped");
@@ -284,7 +358,7 @@ export async function processScheduledMessages(): Promise<{
     _status.lastRunErrors = errors;
   }
 
-  return { processed, errors, skipped };
+  return { processed, errors, skipped, deferred };
 }
 
 export function startScheduler(intervalMs = 60_000): ReturnType<typeof setInterval> {
