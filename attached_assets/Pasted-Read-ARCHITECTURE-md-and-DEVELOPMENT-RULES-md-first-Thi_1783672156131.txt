@@ -1,0 +1,45 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a verification-only task. Expect 0 files changed unless you
+find a genuine visual bug — if so, fix it minimally and flag clearly.
+
+Do not touch locked modules or campaignScheduler.ts/schema — this is
+about CrmCampaignSequence.tsx rendering only.
+
+Task:
+Log in as admin via a real authenticated Playwright session (as done
+in the prior Lead DNA QA pass — /api/admin/login or the login form,
+persisting the session, not the static screenshot tool which can't
+authenticate). Then navigate to the Campaign Builder's sequence editor
+and check:
+
+1. Open the step editor for an existing step with no branch configured
+   — confirm the "Add a branch after this step" toggle is collapsed by
+   default and the form looks identical to how it did before this
+   feature existed (no layout shift, no stray empty fields).
+2. Expand the branch toggle — confirm all four fields render cleanly:
+   event select (Opened/Clicked/No reply), window-hours number input,
+   and both next-step selects populated with the OTHER steps in the
+   sequence (not including itself).
+3. Actually configure a real branch on a test step (or a copy of an
+   existing sequence, don't corrupt real campaign data) — pick an
+   event, set hours, choose true/false targets — and save it.
+4. Confirm the StepCard now shows the emerald branch chip + summary
+   text, and the sequence timeline shows the branch summary sub-line
+   under that step.
+5. Confirm a step WITHOUT a branch still renders with no chip/summary
+   line at all (not an empty/placeholder one).
+6. Check this at both 768px and 1440px widths given the sidebar/spacing
+   work from earlier sessions — confirm the branch UI doesn't reintroduce
+   any horizontal overflow.
+7. Try to save a step branching to itself, or with an invalid target —
+   confirm the validation actually blocks it in the UI (not just
+   theoretically present in code).
+
+Return:
+- Pass/fail per check above, described precisely (what you saw, not
+  just "looks fine")
+- Any bug found and fixed: file, what was wrong, what changed
+- Confirm no locked files or scheduler/schema touched
+- TypeScript status
+- Clean up any test branch/sequence data created for this check

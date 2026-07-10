@@ -238,12 +238,13 @@ function fmtDate(iso: string) {
 
 function branchSummary(step: CampaignStep, allSteps: CampaignStep[]): string | null {
   if (!step.branchOnEvent) return null;
-  const evLabel = BRANCH_EVENTS.find(e => e.value === step.branchOnEvent)?.label ?? step.branchOnEvent;
   const trueStep = allSteps.find(s => s.id === step.branchTrueNextStepId);
   const falseStep = allSteps.find(s => s.id === step.branchFalseNextStepId);
-  const trueLabel = trueStep ? `Step ${trueStep.stepNumber}` : "—";
-  const falseLabel = falseStep ? `Step ${falseStep.stepNumber}` : "—";
-  return `${evLabel} -> ${trueLabel}, else ${falseLabel}`;
+  // A branch isn't meaningfully configured unless BOTH targets resolve to real
+  // steps — otherwise treat it as unset rather than rendering placeholder "—".
+  if (!trueStep || !falseStep) return null;
+  const evLabel = BRANCH_EVENTS.find(e => e.value === step.branchOnEvent)?.label ?? step.branchOnEvent;
+  return `${evLabel} -> Step ${trueStep.stepNumber}, else Step ${falseStep.stepNumber}`;
 }
 
 function StepCard({
@@ -402,16 +403,19 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
   const save = async () => {
     setError("");
     if (showBranch) {
-      if (branchTrueNextStepId !== "" && existing && branchTrueNextStepId === existing.id) {
+      if (branchTrueNextStepId === "" || branchFalseNextStepId === "") {
+        setError("Choose both a 'then go to' and an 'else go to' step, or collapse the branch section to leave this step linear."); return;
+      }
+      if (existing && branchTrueNextStepId === existing.id) {
         setError("A step can't branch to itself (true path)."); return;
       }
-      if (branchFalseNextStepId !== "" && existing && branchFalseNextStepId === existing.id) {
+      if (existing && branchFalseNextStepId === existing.id) {
         setError("A step can't branch to itself (else path)."); return;
       }
-      if (branchTrueNextStepId !== "" && !branchTargetOptions.some(s => s.id === branchTrueNextStepId)) {
+      if (!branchTargetOptions.some(s => s.id === branchTrueNextStepId)) {
         setError("Selected 'then go to' step no longer exists in this sequence."); return;
       }
-      if (branchFalseNextStepId !== "" && !branchTargetOptions.some(s => s.id === branchFalseNextStepId)) {
+      if (!branchTargetOptions.some(s => s.id === branchFalseNextStepId)) {
         setError("Selected 'else go to' step no longer exists in this sequence."); return;
       }
     }
@@ -991,10 +995,9 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     setError("");
     try {
       const h = { Authorization: `Bearer ${tok()}` };
-      const [sr, rr, cr] = await Promise.all([
-        fetch(`/api/crm/campaigns/${campaignId}/steps`,      { headers: h }).then(r => r.json()),
-        fetch(`/api/crm/campaigns/${campaignId}/recipients`, { headers: h }).then(r => r.json()),
-        fetch(`/api/crm/campaigns/${campaignId}`,            { headers: h }).then(r => r.json()).catch(() => null),
+      const [sr, cr] = await Promise.all([
+        fetch(`/api/crm/campaigns/${campaignId}/steps`, { headers: h }).then(r => r.json()),
+        fetch(`/api/crm/campaigns/${campaignId}`,       { headers: h }).then(r => r.json()).catch(() => null),
       ]);
       const camp = cr?.campaign ?? cr ?? null;
       if (camp) {
@@ -1002,8 +1005,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
         setAutoSend(typeof camp.autoSend === "boolean" ? camp.autoSend : null);
       }
       setSteps(sr.steps ?? []);
-      // Enrich recipients
-      const recs = (rr.recipients ?? rr.campaign?.recipients ?? []);
+      // Enrich recipients (embedded in the campaign detail response, not a separate endpoint)
+      const recs = (cr?.recipients ?? []);
       setRecipients(
         recs.map((r: EnrolledRecipient & { leadName?: string; leadEmail?: string; name?: string; email?: string }) => ({
           ...r,
