@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, boolean, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { crmLeads } from "./crmLeads";
@@ -109,6 +109,17 @@ export const crmCampaignSteps = pgTable("crm_campaign_steps", {
   taskDescription: text("task_description"),
   sendTime: text("send_time").notNull().default("immediate"),
   businessDaysOnly: boolean("business_days_only").notNull().default(true),
+
+  // Phase 26C/26D — per-step intent label (free text, no UI yet)
+  intentLabel: text("intent_label"),
+
+  // Phase 26D — branch evaluation (all nullable; unset = linear step, unchanged behavior)
+  // branchOnEvent: opened | clicked | no_reply (reuses crm_campaign_events event_type values;
+  // "no_reply" means "no replied_estimated event occurred within the window")
+  branchOnEvent: text("branch_on_event"),
+  branchWindowHours: integer("branch_window_hours"),
+  branchTrueNextStepId: integer("branch_true_next_step_id").references((): AnyPgColumn => crmCampaignSteps.id, { onDelete: "set null" }),
+  branchFalseNextStepId: integer("branch_false_next_step_id").references((): AnyPgColumn => crmCampaignSteps.id, { onDelete: "set null" }),
 });
 
 export const insertCrmCampaignStepSchema = createInsertSchema(crmCampaignSteps).omit({

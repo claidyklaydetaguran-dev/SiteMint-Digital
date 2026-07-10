@@ -1,0 +1,58 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Note: ARCHITECTURE.md's roadmap table is stale on 26B/26C — both are
+already substantially built (campaignTaxonomy.ts exists with personas/
+topics/blueprints; objective/toneProfile are real columns wired through
+the builder). Do not rebuild these. The one real gap from 26C is: no
+per-step intent label exists on crm_campaign_steps — fold in a small
+nullable `intentLabel` text column while you're already migrating this
+table, but do not build any UI for it in this task (UI is a separate
+follow-up prompt).
+
+Work only inside: crm_campaign_steps schema + campaignScheduler.ts
+(branch evaluation logic). No builder UI changes in this prompt.
+
+Do not touch locked modules. Stay within budget (5 files, 300 lines,
+1 migration).
+
+Task:
+1. Add nullable columns to crm_campaign_steps:
+   - intentLabel (text, nullable) — free-text step intent, no UI yet
+   - branchOnEvent (text, nullable) — allowed values: 'opened',
+     'clicked', 'no_reply' (check against crm_campaign_events'
+     existing event_type values: opened/clicked/bounced/
+     replied_estimated — reuse those exact strings, don't invent new
+     event types)
+   - branchWindowHours (integer, nullable) — how long to wait after
+     this step sends before evaluating the branch
+   - branchTrueNextStepId (integer, nullable, FK to crm_campaign_steps.id)
+   - branchTrueNextStepId (integer, nullable, FK to crm_campaign_steps.id)
+   - branchFalseNextStepId (integer, nullable, FK to crm_campaign_steps.id)
+   All nullable, all optional — a step with none of these set must
+   behave exactly as it does today (linear by dayOffset/stepNumber).
+2. In campaignScheduler.ts, when a recipient finishes a step that HAS
+   branchOnEvent set:
+   - Do not advance currentStep immediately. Wait until
+     branchWindowHours has elapsed since that step's send.
+   - After the window elapses, query crm_campaign_events for that
+     recipient/lead to check whether branchOnEvent occurred within
+     the window.
+   - Route to branchTrueNextStepId if it occurred, branchFalseNextStepId
+     if not (or fall through to normal next-step-by-order if either
+     target is null).
+   - Steps without branchOnEvent set continue exactly as today —
+     zero behavior change for existing linear campaigns.
+3. Do not build any builder UI for setting these fields in this task —
+   this is backend/schema only. A follow-up prompt will add the UI.
+4. Do not change stampReplyAndStop / stop-on-reply behavior — a reply
+   still halts everything regardless of any branch in progress.
+
+Return:
+- Migration applied (list new columns)
+- Files changed
+- Trace/test showing: a step WITHOUT branch fields behaves identically
+  to before (regression check — this matters most)
+- Trace/test showing: a simulated branch (e.g. manually flip an event
+  row, advance the window) correctly routes to the true/false next step
+- TypeScript status
+- Confirm no locked-engine files were modified

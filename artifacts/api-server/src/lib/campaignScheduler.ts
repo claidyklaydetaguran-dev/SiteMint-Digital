@@ -7,7 +7,7 @@ import {
   crmLeads,
   crmCampaignEvents,
 } from "@workspace/db/schema";
-import { eq, and, lte, count, inArray, asc } from "drizzle-orm";
+import { eq, and, lte, gte, or, count, inArray, asc } from "drizzle-orm";
 import { getResend } from "./email.js";
 import { getTwilio, getTwilioPhone, isTwilioConfigured } from "./twilio.js";
 import { logger } from "./logger.js";
@@ -72,6 +72,108 @@ async function claimMessage(msgId: number): Promise<boolean> {
 
 export function getSchedulerStatus(): SchedulerStatus {
   return { ..._status };
+}
+
+// ── Branch evaluation (Phase 26D) ─────────────────────────────────────────────
+// A step's message is only gated if it is the branchTrue/FalseNextStepId of
+// some OTHER step in the same campaign. Steps with no incoming branch pointer
+// (i.e. every step in a today's linear campaign) are completely unaffected.
+type BranchVerdict = "proceed" | "deferred" | "canceled";
+
+async function evaluateBranchGate(
+  msg: typeof crmCampaignScheduledMessages.$inferSelect,
+  recipientId: number,
+  now: Date,
+): Promise<BranchVerdict> {
+  const [sourceStep] = await db
+    .select()
+    .from(crmCampaignSteps)
+    .where(
+      and(
+        eq(crmCampaignSteps.campaignId, msg.campaignId),
+        or(
+          eq(crmCampaignSteps.branchTrueNextStepId, msg.stepId ?? -1),
+          eq(crmCampaignSteps.branchFalseNextStepId, msg.stepId ?? -1),
+        ),
+      ),
+    )
+    .limit(1);
+
+  if (!sourceStep || !sourceStep.branchOnEvent) return "proceed";
+
+  const [sourceMsg] = await db
+    .select({ sentAt: crmCampaignScheduledMessages.sentAt })
+    .from(crmCampaignScheduledMessages)
+    .where(
+      and(
+        eq(crmCampaignScheduledMessages.recipientId, recipientId),
+        eq(crmCampaignScheduledMessages.stepId, sourceStep.id),
+        eq(crmCampaignScheduledMessages.status, "sent"),
+      ),
+    )
+    .limit(1);
+
+  if (!sourceMsg?.sentAt) {
+    // Source step hasn't sent yet — nothing to evaluate. Check back later.
+    await rescheduleIfStillScheduled(msg.id, new Date(now.getTime() + 60 * 60 * 1000));
+    return "deferred";
+  }
+
+  const windowMs = (sourceStep.branchWindowHours ?? 0) * 60 * 60 * 1000;
+  const deadline = new Date(sourceMsg.sentAt.getTime() + windowMs);
+  if (now.getTime() < deadline.getTime()) {
+    await rescheduleIfStillScheduled(msg.id, deadline);
+    return "deferred";
+  }
+
+  let matched: boolean;
+  if (sourceStep.branchOnEvent === "no_reply") {
+    const [reply] = await db
+      .select({ id: crmCampaignEvents.id })
+      .from(crmCampaignEvents)
+      .where(
+        and(
+          eq(crmCampaignEvents.campaignRecipientId, recipientId),
+          eq(crmCampaignEvents.eventType, "replied_estimated"),
+          gte(crmCampaignEvents.occurredAt, sourceMsg.sentAt),
+          lte(crmCampaignEvents.occurredAt, deadline),
+        ),
+      )
+      .limit(1);
+    matched = !reply;
+  } else {
+    const [evt] = await db
+      .select({ id: crmCampaignEvents.id })
+      .from(crmCampaignEvents)
+      .where(
+        and(
+          eq(crmCampaignEvents.campaignRecipientId, recipientId),
+          eq(crmCampaignEvents.eventType, sourceStep.branchOnEvent),
+          gte(crmCampaignEvents.occurredAt, sourceMsg.sentAt),
+          lte(crmCampaignEvents.occurredAt, deadline),
+        ),
+      )
+      .limit(1);
+    matched = !!evt;
+  }
+
+  const isTrueTarget = sourceStep.branchTrueNextStepId === msg.stepId;
+  const isFalseTarget = sourceStep.branchFalseNextStepId === msg.stepId;
+  const proceed = (matched && isTrueTarget) || (!matched && isFalseTarget);
+  if (proceed) return "proceed";
+
+  await db
+    .update(crmCampaignScheduledMessages)
+    .set({ status: "canceled", lastError: `Branch not taken (branchOnEvent=${sourceStep.branchOnEvent}, matched=${matched})` })
+    .where(and(eq(crmCampaignScheduledMessages.id, msg.id), eq(crmCampaignScheduledMessages.status, "scheduled")));
+  return "canceled";
+}
+
+async function rescheduleIfStillScheduled(msgId: number, scheduledAt: Date): Promise<void> {
+  await db
+    .update(crmCampaignScheduledMessages)
+    .set({ scheduledAt })
+    .where(and(eq(crmCampaignScheduledMessages.id, msgId), eq(crmCampaignScheduledMessages.status, "scheduled")));
 }
 
 async function hasReplied(recipientId: number): Promise<boolean> {
@@ -216,6 +318,21 @@ export async function processScheduledMessages(): Promise<{
       const { msg, recipientId, stopOnReply, leadEmail, leadPhone, leadName, campaignName, sendTime, businessDaysOnly } = row;
 
       try {
+        // ── Branch gate (Phase 26D) ───────────────────────────────────────────
+        // Only affects messages whose step is the branchTrue/FalseNextStepId
+        // of some other step. Everything else falls straight through.
+        const branchVerdict = await evaluateBranchGate(msg, recipientId, now);
+        if (branchVerdict === "deferred") {
+          deferred++;
+          _status.totalDeferred++;
+          continue;
+        }
+        if (branchVerdict === "canceled") {
+          skipped++;
+          _status.totalSkipped++;
+          continue;
+        }
+
         // ── Send-window enforcement ──────────────────────────────────────────
         // The calendar day may have arrived, but the step may require a
         // specific time-of-day and/or business days only. Defer (reschedule)
