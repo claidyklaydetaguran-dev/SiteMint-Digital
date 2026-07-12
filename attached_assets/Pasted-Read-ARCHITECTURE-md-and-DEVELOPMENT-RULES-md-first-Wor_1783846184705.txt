@@ -1,0 +1,52 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+ 
+Work only inside the 3 landing pages (LandingLawyers.tsx, LandingRealtors.tsx,
+LandingReceptionist.tsx) and a new, dedicated analytics route. Do not touch
+locked modules. Do not touch /api/contact/submit, Contact.tsx, or the
+existing landing-test submit route's core logic — this is additive only.
+ 
+Stay within budget (5 files, 250 lines, 1 new small DB table, 0 migrations
+beyond that one table's push).
+ 
+Context: we can currently count signups per landing page but not visits, so
+we can't compute a real conversion rate (signups ÷ visits) or compare
+channels fairly. A page that gets 2 signups from 10 visits is a much
+stronger result than one that gets 3 signups from 300 visits — right now we
+can't see that difference. This is needed before we seriously evaluate the
+traffic test results.
+ 
+Task:
+1. Add one new, minimal table via Drizzle in lib/db/src/schema — e.g.
+   landingPageViews: id, createdAt, page (text — "lawyers" | "realtors" |
+   "receptionist"), utmSource, utmMedium, utmCampaign (all nullable text).
+   Keep it intentionally simple — this is a counter, not an analytics
+   platform. Run the one allowed migration (`pnpm --filter @workspace/db
+   run push`) after adding it.
+2. Add a lightweight POST /api/landing-test/view route (new file or append
+   to landingTest.ts — your call, whichever keeps it cleanest) that inserts
+   one row per call. No auth required (same as the submit route — public
+   marketing page). No rate limiting needed for this smoke-test volume.
+3. On each of the 3 landing pages, fire one call to this route on mount
+   (once per page load, not on every render), passing the page name and
+   the same UTM values already being read for the submit handler — reuse
+   that existing UTM-reading logic, don't duplicate it.
+4. Add a small read-only summary endpoint, GET /api/landing-test/stats,
+   requireAdmin-protected, that returns per-page: total views, total
+   submits (join against the existing formSubmissions "Landing Test — X"
+   rows by form_name), and computed conversion rate. Also break it down by
+   utmSource within each page if that's a small addition — skip if it
+   pushes past budget, the per-page totals are the priority.
+5. No new frontend page is required for viewing this — returning clean JSON
+   from /stats is enough for now; we'll look at it via curl or Postman,
+   not build a dashboard yet.
+ 
+Return:
+- Files changed
+- Confirm the new table was created (schema + 1 migration push, describe
+  the push output)
+- Confirm a page view is recorded once per page load for all 3 pages (curl
+  or direct test simulating a page load)
+- Confirm GET /api/landing-test/stats returns accurate view/submit/
+  conversion-rate numbers matching what's actually in the DB
+- TypeScript status
+- Confirm no locked files, contact.ts, or Contact.tsx were touched

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,20 @@ export default function LandingReceptionist() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    fetch("/api/landing-test/view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        page:        "receptionist",
+        utmSource:   qs.get("utm_source")   ?? null,
+        utmMedium:   qs.get("utm_medium")   ?? null,
+        utmCampaign: qs.get("utm_campaign") ?? null,
+      }),
+    }).catch(() => { /* tracking fire-and-forget */ });
+  }, []);
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
