@@ -1,0 +1,73 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Also note: ARCHITECTURE.md is stale in one respect — Phases 26B (persona/topic
+taxonomy), 26D/26E (branch logic), and 26F (send-window enforcement) are
+already implemented in campaignScheduler.ts and campaignTaxonomy.ts even
+though the doc lists them as future work. Do not redo them. After this task,
+update the "Module Status" and roadmap tables in ARCHITECTURE.md to reflect
+that 26B/26D/26E/26F are DONE — that's an explicit exception to rule #11
+(no scope creep), scoped only to updating that doc's status table.
+
+Work only inside Campaigns (specifically the scheduler's handling of
+call_prompt/task steps).
+
+Do not touch locked modules (discEngine, leadScore, communicationIntelligence,
+workflowEngine, phone.ts).
+
+Stay within the default change budget (5 files, 300 lines, 1 migration max,
+1 utility, 2 components). This task should need 0 migrations — crm_tasks
+already has every column required.
+
+Make surgical edits only.
+
+Task:
+In artifacts/api-server/src/lib/campaignScheduler.ts, the branch that handles
+channel === "call_prompt" or "task" (around the "Call prompt / Task — manual;
+mark skipped with note" comment) currently just calls markMessageSkipped and
+advances the recipient's step. It never surfaces the action anywhere a human
+will see it.
+
+1. In that branch, before marking the message skipped, insert a real row into
+   crm_tasks:
+   - leadId: the recipient's lead id (already available in this loop —
+     confirm the exact variable name by reading the surrounding rows/joins)
+   - type: "Call" when channel === "call_prompt", "Follow Up" when
+     channel === "task"
+   - title: for call_prompt use something like `Call ${fullName} — ${campaignName}`;
+     for task use `${campaignName}: ` + a short slice of taskDescription
+     (or a sensible fallback if empty)
+   - description: the step's callPrompt or taskDescription text (the full
+     script/instructions), plus a note identifying which campaign/step it
+     came from, e.g. "From campaign: {campaignName}, step {stepNumber}"
+   - dueDate: the message's effective scheduled time (same value already
+     computed for scheduling this step — do not recompute send-window logic)
+   - status: "pending"
+   - createdBy: "campaign-automation" (or similar — check CRM_TASK_TYPES /
+     any existing convention for system-created records before inventing one)
+2. Keep the existing markMessageSkipped call and currentStep advancement as
+   they are — the message row itself should still show a clear reason (e.g.
+   "Call prompt — task created (id {taskId})") instead of the current generic
+   "manual action required" text, so it's traceable end-to-end from campaign
+   queue to task.
+3. Do not create duplicate tasks if the scheduler processes the same message
+   more than once (check whatever idempotency guard already exists for the
+   send paths — email/sms use markMessageSent to prevent reprocessing; make
+   sure task creation only happens once per message, not once per scheduler
+   tick).
+4. No frontend changes should be required — the created task should just
+   appear in the existing Tasks module (CrmTasks.tsx) and on the lead's
+   timeline/task list wherever crm_tasks rows already render. Confirm this by
+   testing, don't assume.
+
+Return:
+- Files changed
+- Confirm no DB schema/migration was needed
+- Confirm a call_prompt step and a task step each produce a real crm_tasks
+  row with correct leadId, title, description, dueDate when the scheduler
+  processes them (curl or direct test, not just code review)
+- Confirm no duplicate task is created if the scheduler is invoked twice for
+  the same message
+- Confirm the task appears in the Tasks module UI without further changes
+- TypeScript status (api-server)
+- Confirm no locked files modified
+- Confirm ARCHITECTURE.md status table updated for 26B/26D/26E/26F as DONE

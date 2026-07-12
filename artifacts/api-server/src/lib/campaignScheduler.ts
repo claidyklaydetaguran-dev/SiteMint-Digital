@@ -6,6 +6,7 @@ import {
   crmCampaignSteps,
   crmLeads,
   crmCampaignEvents,
+  crmTasks,
 } from "@workspace/db/schema";
 import { eq, and, lte, gte, or, count, inArray, asc } from "drizzle-orm";
 import { getResend } from "./email.js";
@@ -437,12 +438,33 @@ export async function processScheduledMessages(): Promise<{
           _status.totalProcessed++;
         }
 
-        // ── Call prompt / Task — manual; mark skipped with note ──────────────
+        // ── Call prompt / Task — create a crm_tasks row, then skip ──────────
         else {
-          const reason =
-            channel === "call_prompt"
-              ? "Call prompt — manual action required"
-              : "Task — manual action required";
+          const isCall = channel === "call_prompt";
+          const taskBody = (msg.body ?? "").trim();
+          const taskTitle = isCall
+            ? `Call ${fullName} — ${campaignName}`
+            : `${campaignName}: ${taskBody.slice(0, 60) || "Complete task"}`;
+          const taskDesc =
+            (taskBody ? taskBody + "\n\n" : "") +
+            `From campaign: ${campaignName}, step ${msg.stepId ?? "?"}`;
+
+          const [createdTask] = await db.insert(crmTasks).values({
+            leadId: msg.leadId ?? null,
+            type: isCall ? "Call" : "Follow Up",
+            title: taskTitle,
+            description: taskDesc,
+            dueDate: msg.scheduledAt ?? new Date(),
+            status: "pending",
+            createdBy: "campaign-automation",
+          }).returning({ id: crmTasks.id });
+
+          const taskId = createdTask?.id ?? null;
+          logger.info({ taskId, msgId: msg.id, channel }, "Campaign scheduler: created task for manual step");
+
+          const reason = isCall
+            ? `Call prompt — task created (id ${taskId})`
+            : `Task — task created (id ${taskId})`;
           await markMessageSkipped(msg.id, reason);
           await db
             .update(crmCampaignRecipients)
