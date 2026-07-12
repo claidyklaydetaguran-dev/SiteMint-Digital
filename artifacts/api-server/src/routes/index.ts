@@ -10,6 +10,7 @@ import phoneRouter from "./phone";
 import copilotRouter from "./copilot";
 import aiCampaignGenerateRouter from "./aiCampaignGenerate";
 import aiToolkitRouter from "./aiToolkit";
+import landingTestRouter from "./landingTest";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(phoneRouter);
 router.use(copilotRouter);
 router.use(aiCampaignGenerateRouter);
 router.use(aiToolkitRouter);
+router.use(landingTestRouter);
 
 export default router;

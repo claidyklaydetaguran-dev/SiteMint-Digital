@@ -1,0 +1,118 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+BUDGET EXCEPTION (explicitly approved): this task is a new feature spanning
+3 new landing pages + 1 new backend route. Expect roughly 5-6 files touched
+and 600-900 lines, well over the default 5-file/300-line budget. This is
+approved because it's additive-only (new files + one small App.tsx edit),
+touches zero existing stable/locked logic, and needs no DB migration.
+
+Do not touch locked modules (discEngine, leadScore, communicationIntelligence,
+workflowEngine, phone.ts). Do not modify the existing /api/contact/submit
+route or Contact.tsx — build a separate, dedicated capture route instead so
+the live contact form has zero risk of regression.
+
+Context: this is a market-validation smoke test, not the real product yet.
+We're testing which of 3 target verticals (law firms, realtors, local service
+businesses) responds best to an "AI answers every call/lead instantly"
+pitch, before committing engineering time to building the actual AI voice/
+SMS agent. These pages will get paid traffic or direct outreach links. Goal
+is maximum signal on which page converts visitors into signups — clean,
+fast-loading, single clear CTA, no distracting site navigation.
+
+Task:
+
+1. Create 3 new standalone page components (no Navbar/Footer — same pattern
+   as the existing /discovery and /thank-you routes, which render outside
+   the <Layout> wrapper in App.tsx):
+
+   a) artifacts/web-agency/src/pages/LandingLawyers.tsx — route /ai-for-lawyers
+      Headline: "Every Slow Callback Is a Case You Just Lost to Another Firm"
+      Subhead: "An AI intake assistant that answers within seconds, asks the
+      right questions about injury, liability, and timing, and hands your
+      team a pre-qualified case file — not a blank voicemail."
+      3 short pain-point cards: (1) Manual intake loses viable cases to
+      slower response times, (2) Unqualified leads waste attorney hours,
+      (3) Competing firms already answer faster than you do.
+      CTA section: "See how it qualifies a call" — form fields: Full Name,
+      Law Firm Name, Email, Phone, and a select for "Approx. leads per
+      month" (Under 20 / 20-50 / 50-100 / 100+). Submit button: "Get Early
+      Access".
+
+   b) artifacts/web-agency/src/pages/LandingRealtors.tsx — route /ai-for-realtors
+      Headline: "The Agent Who Calls Back First Wins the Client. Every Time."
+      Subhead: "AI that texts and calls every new lead within 60 seconds —
+      from Zillow, Facebook, or your own site — qualifies them, and books
+      the showing before you've finished your coffee."
+      3 pain-point cards: (1) Leads cost $150-400+ and go cold within
+      minutes, (2) Most agents respond in hours, not seconds, (3) A missed
+      follow-up is a client for a competing agent.
+      CTA section: "Reserve early access" — same form field pattern
+      (Full Name, Brokerage/Team Name, Email, Phone, "Approx. leads per
+      month" select). Submit button: "Reserve My Spot".
+
+   c) artifacts/web-agency/src/pages/LandingReceptionist.tsx — route
+      /ai-receptionist
+      Headline: "You're Losing Jobs to Voicemail. Stop."
+      Subhead: "When you miss a call, this AI answers instantly by text,
+      answers basic questions, and books the appointment — so a busy
+      signal never costs you a job again."
+      3 pain-point cards: (1) Businesses miss 60-80% of inbound calls,
+      (2) Each missed call is a missed job, (3) A human receptionist costs
+      $2,800-4,500/month — this doesn't.
+      CTA section: "Join the waitlist" — form fields: Full Name, Business
+      Name, Email, Phone, and a select for "Business type" (free text or a
+      short list — Home Services, Salon/Spa, Medical/Dental, Other). Submit
+      button: "Join the Waitlist".
+
+   Shared requirements for all 3 pages:
+   - Reuse existing shadcn/ui components (Button, Input, Select, Card,
+     Badge — check components.json / src/components/ui for what's already
+     available, don't add new UI dependencies)
+   - Reuse SiteMintLogo component in a minimal header (logo only, no nav
+     links, so there's nothing to click except the CTA)
+   - Single scrolling page: hero → pain points → CTA form → simple footer
+     line (just a copyright line, not the full site Footer component)
+   - On successful submit, show an inline success state (checkmark +
+     "We'll be in touch shortly") instead of navigating away — do not
+     redirect to /thank-you (that page is Discovery-specific)
+   - Mobile-first — test at 375px, 768px, 1440px before calling this done
+
+2. Add a new backend route for capturing these signups without touching
+   contact.ts. Create artifacts/api-server/src/routes/landingTest.ts:
+   - POST /api/landing-test/submit
+   - Body: { vertical: "lawyers" | "realtors" | "receptionist", name,
+     businessName, email, phone, extra (the volume/business-type select
+     value) }
+   - Validate vertical is one of the 3 allowed values; validate name/email
+     required (same pattern as contact.ts)
+   - Insert into the existing formSubmissions table with formName set to
+     `Landing Test — ${vertical}` (capitalize appropriately, e.g. "Landing
+     Test — Lawyers"), reusing the existing formSubmissions columns (name,
+     email, phone, company → businessName, service → the extra field,
+     formData → full raw body, status: "New")
+   - Call the existing sendFormEmails helper (same as contact.ts does) so
+     you get an immediate email notification per signup — reuse it exactly
+     as contact.ts does, don't reimplement
+   - Register the route in routes/index.ts alongside the other route files
+
+3. In App.tsx, add the 3 new routes (/ai-for-lawyers, /ai-for-realtors,
+   /ai-receptionist) in the same "no main layout" section as /discovery and
+   /thank-you — above the Layout-wrapped public site block. Do NOT add them
+   to the Navbar or any site navigation — these are unlisted pages only
+   reachable via direct link.
+
+Return:
+- Files changed
+- Confirm all 3 routes load and render correctly (screenshot or described
+  visual check at 375px/768px/1440px)
+- Confirm POST /api/landing-test/submit works for all 3 vertical values via
+  curl, and that a corresponding formSubmissions row with the right
+  formName appears
+- Confirm the existing /api/contact/submit route and Contact.tsx were not
+  touched
+- Confirm existing admin submissions dashboard (AdminDashboard.tsx) shows
+  these new "Landing Test — X" entries without any dashboard code changes
+  (it should, since it reads formSubmissions generically — verify, don't
+  assume)
+- TypeScript status (api-server and web-agency)
+- Confirm no locked files modified, no DB migration performed
