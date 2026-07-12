@@ -29,6 +29,12 @@ router.post("/landing-test/submit", async (req: Request, res: Response) => {
     const phone        = data.phone        ? String(data.phone).trim()        : null;
     const businessName = data.businessName ? String(data.businessName).trim() : null;
     const extra        = data.extra        ? String(data.extra).trim()        : null;
+    // UTM fields land in formData automatically (data = full body); no new columns needed
+    // Destructure here so they're explicit for readers of this route
+    const _utmSource   = data.utmSource   ?? null;
+    const _utmMedium   = data.utmMedium   ?? null;
+    const _utmCampaign = data.utmCampaign ?? null;
+    void _utmSource; void _utmMedium; void _utmCampaign;
 
     if (!name || !email) {
       res.status(400).json({ error: "Name and email are required" });

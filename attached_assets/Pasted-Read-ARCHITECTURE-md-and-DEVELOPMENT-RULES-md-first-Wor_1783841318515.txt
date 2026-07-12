@@ -1,0 +1,43 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside the 3 landing pages and the landing-test submit route
+added in the prior session (LandingLawyers.tsx, LandingRealtors.tsx,
+LandingReceptionist.tsx, routes/landingTest.ts).
+
+Do not touch locked modules. Do not touch /api/contact/submit or
+Contact.tsx. Stay within budget (4 files, 150 lines, 0 migrations).
+
+Context: traffic to these 3 pages will come from 3 different channels
+(paid ads, direct outreach to existing CRM leads, and organic/personal
+network) at the same time. Without knowing which channel a signup came
+from, the results are unreadable — a page could look like a "winner" just
+because it got more warm-network traffic rather than genuine cold-audience
+interest. This task adds lightweight UTM capture so signups can be filtered
+by channel afterward.
+
+Task:
+1. On each of the 3 landing pages, on mount, read utm_source, utm_medium,
+   and utm_campaign from the URL query string (e.g.
+   ?utm_source=google&utm_medium=cpc&utm_campaign=lawyers-test). Store them
+   in component state (or read directly at submit time — whichever is
+   simpler given how the form submit handler is structured).
+2. Include those 3 values in the POST body to /api/landing-test/submit
+   alongside the existing fields. Default each to "direct" (or null) if
+   not present in the URL, so manually-shared links without UTM params
+   still work.
+3. In routes/landingTest.ts, accept utmSource, utmMedium, utmCampaign in
+   the request body (all optional) and store them inside the existing
+   formData jsonb field (do not add new columns — formData already accepts
+   arbitrary JSON, confirm this before assuming and use it instead of a
+   schema change).
+4. No visual/UI changes — this is purely tracking, invisible to the user.
+
+Return:
+- Files changed
+- Confirm a test submit with ?utm_source=test_google&utm_medium=cpc in the
+  URL results in a formSubmissions row with those values present inside
+  form_data (curl or direct DB check)
+- Confirm a submit with no UTM params in the URL still succeeds (defaults
+  applied, no error)
+- TypeScript status
+- Confirm no locked files or the live contact form were touched

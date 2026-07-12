@@ -58,6 +58,7 @@ export default function LandingReceptionist() {
     }
     setSubmitting(true);
     try {
+      const qs = new URLSearchParams(window.location.search);
       const r = await fetch("/api/landing-test/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,6 +69,9 @@ export default function LandingReceptionist() {
           email:        form.email,
           phone:        form.phone,
           extra:        form.businessType,
+          utmSource:    qs.get("utm_source")   ?? "direct",
+          utmMedium:    qs.get("utm_medium")   ?? "direct",
+          utmCampaign:  qs.get("utm_campaign") ?? null,
         }),
       });
       const d = await r.json();
