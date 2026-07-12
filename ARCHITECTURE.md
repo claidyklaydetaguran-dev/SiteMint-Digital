@@ -356,7 +356,7 @@ These files are compute engines with complex, tested logic. Touching them risks 
 | 26E — Switch logic / routing rules | ~~Conditional next-step (opened → A, ignored → B)~~ **DONE** | scheduler, `crm_campaign_steps` (branch cols) | Yes | High | Implemented — branch gate (`evaluateBranchGate`) live in scheduler; branch cols in `crm_campaign_steps` |
 | 26F — Send-window enforcement | ~~Make scheduler honor `sendTime` + `businessDaysOnly` (currently ignored)~~ **DONE** | `lib/campaignScheduler.ts` | No | Med | Implemented — `computeEffectiveSendAt` enforces send-window + business-days; deferred counter tracks reschedules |
 | 26G — AI campaign generator | LLM-assisted subject/body/sequence drafting (via Replit AI integration) | new `lib/aiCampaign.ts`, builder UI, new route | No | High | Last because it depends on personas/topics/objectives being defined |
-| 26H — Reschedule enrolled contacts | Bulk shift a lead's future scheduled messages | queue routes, `CrmCampaignQueue.tsx` | No | Med | Builds on send-window logic (26F) for correct re-timing |
+| 26H — Reschedule enrolled contacts | **DONE** Bulk shift a lead's future scheduled messages | `POST /crm/campaigns/leads/:leadId/reschedule` (crm.ts ~L732); Calendar icon in MessageRow triggers inline confirmation panel in `CrmCampaignQueue.tsx` | No | Med | Builds on send-window logic (26F) for correct re-timing |
 | 26I — Campaign performance learning loop | Feed funnel + behavioral outcomes back into recommended next campaign | reporting/dashboard, analytics routes | Maybe | High | Requires history accumulated from all prior phases |
 
 ### SiteMint Personas (recommended taxonomy — data only)

@@ -140,12 +140,14 @@ function MessageRow({
   onSendNow,
   onCancel,
   onEdited,
+  onReschedule,
   busy,
 }: {
   msg: ScheduledMessage;
   onSendNow: (id: number) => void;
   onCancel: (id: number) => void;
   onEdited: (id: number, updates: Partial<ScheduledMessage>) => void;
+  onReschedule: (leadId: number, leadName: string) => void;
   busy: boolean;
 }) {
   const [editing, setEditing]       = useState(false);
@@ -200,6 +202,13 @@ function MessageRow({
         <div className="flex items-center gap-1 shrink-0">
           {canAct && (
             <>
+              <button
+                onClick={() => onReschedule(msg.leadId, msg.leadName)}
+                title="Shift all upcoming messages for this contact"
+                className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+              </button>
               <button
                 onClick={() => setEditing(x => !x)}
                 title="Edit"
@@ -283,6 +292,9 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
   const [feedback,   setFeedback]   = useState<{ ok: boolean; text: string } | null>(null);
   const [scheduler,  setScheduler]  = useState<SchedulerStatus | null>(null);
   const [runningNow, setRunningNow] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<{ leadId: number; leadName: string } | null>(null);
+  const [shiftDays,        setShiftDays]        = useState("7");
+  const [rescheduling,     setRescheduling]     = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -374,6 +386,33 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
     setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
   };
 
+  const rescheduleAll = useCallback(async () => {
+    if (!rescheduleTarget) return;
+    const days = Number(shiftDays);
+    if (!Number.isFinite(days) || days === 0) {
+      setFeedback({ ok: false, text: "Enter a non-zero number of days to shift." }); return;
+    }
+    setRescheduling(true);
+    try {
+      const r = await fetch(`/api/crm/campaigns/leads/${rescheduleTarget.leadId}/reschedule`, {
+        method: "POST",
+        headers: authH(),
+        body: JSON.stringify({ shiftDays: days }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setFeedback({ ok: false, text: d.error ?? "Reschedule failed" }); return; }
+      const updated: ScheduledMessage[] = d.messages;
+      setMessages(prev => prev.map(m => updated.find(u => u.id === m.id) ?? m));
+      const sign = days > 0 ? "+" : "";
+      setFeedback({ ok: true, text: `Shifted ${d.updated} message${d.updated !== 1 ? "s" : ""} for ${rescheduleTarget.leadName} by ${sign}${days} day${Math.abs(days) !== 1 ? "s" : ""}.` });
+      setRescheduleTarget(null);
+    } catch {
+      setFeedback({ ok: false, text: "Network error — reschedule failed." });
+    } finally {
+      setRescheduling(false);
+    }
+  }, [rescheduleTarget, shiftDays]);
+
   // Summary counts
   const counts = messages.reduce<Record<string, number>>((acc, m) => {
     acc[m.status] = (acc[m.status] ?? 0) + 1;
@@ -427,6 +466,40 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
             {feedback.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
             {feedback.text}
             <button onClick={() => setFeedback(null)} className="ml-auto"><X className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
+
+        {/* Bulk reschedule confirmation panel */}
+        {rescheduleTarget && (
+          <div className="flex flex-wrap items-center gap-3 text-xs rounded-xl px-4 py-3 border border-amber-200 bg-amber-50">
+            <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="font-semibold text-amber-800">
+              Shift all upcoming messages for <em>{rescheduleTarget.leadName}</em>?
+            </span>
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              <input
+                type="number"
+                value={shiftDays}
+                onChange={e => setShiftDays(e.target.value)}
+                className="w-16 text-center border border-gray-300 rounded px-1.5 py-1 text-xs"
+                aria-label="Days to shift"
+              />
+              <span className="text-amber-700">days (negative = earlier)</span>
+              <button
+                onClick={rescheduleAll}
+                disabled={rescheduling}
+                className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-semibold transition-colors"
+              >
+                {rescheduling ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                Confirm shift
+              </button>
+              <button
+                onClick={() => setRescheduleTarget(null)}
+                className="px-2 py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -538,6 +611,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
                 onSendNow={sendNow}
                 onCancel={cancelMsg}
                 onEdited={onEdited}
+                onReschedule={(leadId, leadName) => { setRescheduleTarget({ leadId, leadName }); setShiftDays("7"); }}
                 busy={busyId === msg.id}
               />
             ))}

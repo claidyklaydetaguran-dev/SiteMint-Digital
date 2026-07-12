@@ -726,6 +726,51 @@ router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reque
   }
 });
 
+// ── Bulk reschedule: shift all scheduled/queued messages for a lead ───────────
+// Static path (/leads/:leadId/reschedule) — placed before /:id group per rule #8
+router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const leadId = Number(req.params.leadId);
+    if (isNaN(leadId)) { res.status(400).json({ error: "Invalid leadId" }); return; }
+
+    const { shiftDays } = req.body as { shiftDays?: number };
+    if (shiftDays === undefined || !Number.isFinite(shiftDays)) {
+      res.status(400).json({ error: "shiftDays (number) is required" }); return;
+    }
+
+    const shiftMs = Math.round(shiftDays * 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select()
+      .from(crmCampaignScheduledMessages)
+      .where(
+        and(
+          eq(crmCampaignScheduledMessages.leadId, leadId),
+          inArray(crmCampaignScheduledMessages.status, ["scheduled", "queued"]),
+        ),
+      );
+
+    if (!rows.length) { res.json({ updated: 0, messages: [] }); return; }
+
+    const updated = await Promise.all(
+      rows.map(r => {
+        const newAt = new Date((r.scheduledAt ?? new Date()).getTime() + shiftMs);
+        return db
+          .update(crmCampaignScheduledMessages)
+          .set({ scheduledAt: newAt })
+          .where(eq(crmCampaignScheduledMessages.id, r.id))
+          .returning()
+          .then(([m]) => m);
+      }),
+    );
+
+    req.log.info({ leadId, shiftDays, count: updated.length }, "Bulk rescheduled lead messages");
+    res.json({ updated: updated.length, messages: updated.filter(Boolean) });
+  } catch (err) {
+    req.log.error({ err }, "Error bulk-rescheduling lead messages");
+    res.status(500).json({ error: "Failed to reschedule messages" });
+  }
+});
+
 // ── Campaign CRUD (parameterized routes) ──────────────────────────────────────
 
 router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {

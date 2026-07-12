@@ -1,0 +1,74 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Prior session (this one just landed): call_prompt/task campaign steps now
+create real crm_tasks rows when the scheduler processes them, and 26B/26D/
+26E/26F are marked DONE in ARCHITECTURE.md. Do not touch that code path
+again — it's tested and working.
+
+Work only inside Campaigns — specifically the scheduled-message queue
+(crm_campaign_scheduled_messages) and CrmCampaignQueue.tsx.
+
+Do not touch locked modules (discEngine, leadScore, communicationIntelligence,
+workflowEngine, phone.ts).
+
+Stay within the default change budget (5 files, 300 lines, 0 migrations,
+1 utility, 2 components). No schema change is expected — every field needed
+(scheduledAt, status, leadId, campaignId) already exists on
+crm_campaign_scheduled_messages.
+
+Make surgical edits only. Reuse the existing single-message PATCH logic
+pattern at POST/PATCH /crm/campaigns/queue/:messageId in crm.ts — do not
+duplicate its update logic, extract or call into it if practical.
+
+Context: there is currently no way to shift a lead's upcoming campaign
+messages in bulk. If a call gets rescheduled or a lead asks to pause for two
+weeks, the only option today is editing each scheduled message one at a time
+in the Queue page. This is Phase 26H from the SiteMint Campaign Automation
+Roadmap in ARCHITECTURE.md.
+
+Task:
+1. Add a new route, e.g. POST /crm/campaigns/leads/:leadId/reschedule
+   (confirm this doesn't collide with existing route ordering rules — check
+   rule #8 in DEVELOPMENT_RULES.md and place it correctly relative to any
+   /:id-style routes already in this file).
+   - Body: { shiftDays: number } OR { newStartDate: string } — support
+     whichever is simpler given the existing scheduling helpers; a relative
+     shift (shiftDays, positive or negative) is probably the more useful
+     primitive since it preserves the relative spacing between a lead's
+     remaining steps.
+   - Only affects messages for that leadId where status is "scheduled" or
+     "queued" (never touch sent/canceled/failed/skipped rows).
+   - Shifts scheduledAt on each matching row by shiftDays (or recomputes from
+     newStartDate, preserving each message's offset from the earliest
+     upcoming message).
+   - Returns { updated: number, messages: [...] } — the updated rows, so the
+     frontend can refresh without a second fetch.
+2. In CrmCampaignQueue.tsx, add a way to trigger this per-lead. Two
+   reasonable approaches — pick whichever fits the existing UI better without
+   a large redesign:
+   a) A "Reschedule all for this lead" action next to a lead's messages when
+      the queue is grouped/filterable by lead, or
+   b) A lightweight modal/inline control (shift by N days, or pick a new
+      start date) reachable from a message row's existing action area.
+   Keep it consistent with the existing minimal styling in this file (plain
+   buttons, no new design system).
+3. Show a confirmation before applying (this affects multiple messages at
+   once) and a success/error toast or inline message reusing the existing
+   feedback pattern already in this file (see the `feedback` state near the
+   scheduler-run button).
+
+Return:
+- Files changed
+- New route + method + path
+- Confirm only scheduled/queued messages for the target lead were shifted —
+  test with a lead that has a mix of statuses and verify sent/canceled rows
+  are untouched (curl test showing before/after scheduledAt values per
+  message id, not just a screenshot)
+- Confirm relative spacing between the lead's remaining steps is preserved
+  after a shift
+- Confirm route ordering is correct (no conflicts with existing /:id routes)
+- TypeScript status (api-server and web-agency)
+- Confirm no locked files modified
+- Confirm no DB migration was needed
+- Update ARCHITECTURE.md roadmap table: mark 26H DONE with a one-line note
+  on where it's implemented
