@@ -1,0 +1,53 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a verification task, not a build task. No new files, no schema
+changes expected. Only touch code if the tests below reveal an actual bug —
+if so, fix it minimally within the existing intakeScoring.ts /
+intakeAgent.ts files, note exactly what was wrong and what changed.
+
+Context: the last session's report covered 3 of 5 scoring tiers with real
+end-to-end conversation tests (Hot, Warm, Disqualified/prior-attorney) but
+only claimed the other 2 tiers were "logic verified" — meaning the
+scoreIntakeCase function was checked directly, not proven through an actual
+LLM conversation. Those 2 paths depend on the LLM's date reasoning being
+either absent or clearly outside a window, which is less predictable than a
+yes/no question like "do you have a lawyer." This task closes that gap.
+
+Task:
+1. Run a real multi-turn test conversation via the sms-webhook route (same
+   method as prior sessions — curl simulating Twilio's payload) designed to
+   produce a genuinely ambiguous/unextractable incident date. Example: a
+   caller who never gives a clear timeframe even when asked, e.g. answers
+   "it's been a while" or "I don't remember exactly" if pressed. Confirm:
+   - incidentDateNormalized ends up null (not a guessed date)
+   - tier ends up "Needs Review"
+   - the notification email still sends (a firm should still be told about
+     a case even if the date is unclear — confirm this wasn't silently
+     skipped)
+
+2. Run a second real multi-turn test conversation designed to produce an
+   incident date clearly outside the seeded test firm's
+   statuteOfLimitationsDays window (730 days / ~2 years for the seeded
+   "AI for Lawyers (Test)" firm) — e.g. a caller who says the incident
+   happened "about 4 years ago." Confirm:
+   - incidentDateNormalized is extracted and is in fact >730 days in the
+     past
+   - tier ends up "Disqualified"
+   - disqualifyReason correctly says something about statute of
+     limitations, not one of the other disqualify reasons
+
+3. If either test does NOT produce the expected result, investigate why
+   (e.g. the LLM's date reasoning behaving differently than expected, an
+   off-by-one in the days calculation, the notification email actually
+   being skipped for one tier) and make the smallest possible fix. If both
+   pass as expected, no code changes are needed — say so plainly, don't
+   invent changes to justify the session.
+
+Return:
+- The two test conversations in full (each message exchange)
+- The resulting intakeCases row for each (all fields, especially
+  incidentDateNormalized, tier, disqualifyReason)
+- Confirmation of whether both matched expectations, or what was wrong and
+  what was fixed
+- TypeScript status
+- Confirm no locked files were touched
