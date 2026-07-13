@@ -1,0 +1,54 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a pure frontend addition — no backend route, no schema change, no
+migration. The proposal/SOW HTML is already available client-side wherever
+it's currently viewed (passed as a prop or held in component state), so
+"download" just means writing that existing string to a Blob and triggering
+a browser download — nothing needs to be fetched that isn't already there.
+
+Do not touch locked modules. Do not touch the generation logic in
+lib/generators.ts (generateProposal / generateSOW) or the POST routes that
+call them — this task only adds a new way to save what's already generated,
+it does not change how it's generated.
+
+Stay within budget (3 files, 150 lines, 0 migrations).
+
+Task:
+Add a "Download" button next to the existing "Print / PDF" and "Copy Text"
+buttons in each of the 3 places that render generated Proposal/SOW HTML in
+an iframe:
+
+1. artifacts/web-agency/src/pages/AdminSubmissionDetail.tsx — the DocModal
+   component (has handlePrint/handleCopy already)
+2. artifacts/web-agency/src/pages/crm/SalesWorkspace.tsx — the
+   DocPreviewModal component (same pattern)
+3. artifacts/web-agency/src/pages/crm/CrmDiscovery.tsx — the inline preview
+   view around the `previewDoc` state (currently has no Copy/Print buttons
+   at all, only a close button — add a Download button there; Print/Copy
+   are out of scope for this task, just Download)
+
+Implementation for each: a handleDownload function that creates a Blob from
+the raw HTML string (`new Blob([html], { type: "text/html" })`), generates
+an object URL, creates a temporary `<a>` element with `download` set to a
+sensible filename, clicks it, then revokes the object URL. Filename pattern:
+`{Proposal|SOW}-{company name, slugified — lowercase, spaces to hyphens,
+strip special characters}.html`. Use whatever company/name field is already
+available in that component's scope (e.g. sub.companyName, lead.company —
+check each file for the exact field name, don't assume it's identical
+across all three).
+
+Button placement/style: match the existing Print/Copy button style in each
+component exactly (same Button variant/size/className pattern) so it looks
+like it was always there, not bolted on.
+
+Return:
+- Files changed
+- Confirm each of the 3 download buttons produces a valid .html file
+  containing the correct document content (test by triggering a download
+  and checking the file — describe how you verified this, e.g. reading the
+  downloaded file's contents back)
+- Confirm filenames are sensible and don't break on company names with
+  spaces/special characters
+- TypeScript status
+- Confirm lib/generators.ts and the proposal/SOW generation POST routes
+  were not touched

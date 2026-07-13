@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft, FileText, ClipboardList, Save, Printer, Copy, LogOut,
+  ArrowLeft, FileText, ClipboardList, Save, Printer, Copy, LogOut, Download,
   Star, Tag, Package, Clock, DollarSign, User, Building, Mail, Phone,
   CheckCircle2, AlertCircle, ExternalLink, Loader2,
 } from "lucide-react";
@@ -79,7 +79,7 @@ function FormSection({ title, children }: { title: string; children: React.React
 
 // ── Document Modal ────────────────────────────────────────────────────────────
 
-function DocModal({ html, title, onClose }: { html: string; title: string; onClose: () => void }) {
+function DocModal({ html, title, company, onClose }: { html: string; title: string; company: string; onClose: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const handlePrint = () => {
@@ -91,6 +91,18 @@ function DocModal({ html, title, onClose }: { html: string; title: string; onClo
     navigator.clipboard.writeText(text).then(() => alert("Copied to clipboard!"));
   };
 
+  const handleDownload = () => {
+    const prefix = title.includes("Proposal") ? "Proposal" : "SOW";
+    const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${prefix}-${slug}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
       {/* Toolbar */}
@@ -99,6 +111,9 @@ function DocModal({ html, title, onClose }: { html: string; title: string; onClo
         <div className="flex items-center gap-2">
           <Button onClick={handleCopy} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1">
             <Copy className="w-3.5 h-3.5" /> Copy Text
+          </Button>
+          <Button onClick={handleDownload} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1">
+            <Download className="w-3.5 h-3.5" /> Download
           </Button>
           <Button onClick={handlePrint} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1">
             <Printer className="w-3.5 h-3.5" /> Print / Save PDF
@@ -136,7 +151,7 @@ export default function AdminSubmissionDetail() {
   const [saveMsg, setSaveMsg] = useState("");
   const [generatingProp, setGeneratingProp] = useState(false);
   const [generatingSOW, setGeneratingSOW] = useState(false);
-  const [docModal, setDocModal] = useState<{ html: string; title: string } | null>(null);
+  const [docModal, setDocModal] = useState<{ html: string; title: string; company: string } | null>(null);
   const [toast, setToast] = useState("");
   const [crmLeadId, setCrmLeadId] = useState<number | null>(null);
   const [sendingToCrm, setSendingToCrm] = useState(false);
@@ -217,7 +232,7 @@ export default function AdminSubmissionDetail() {
       const data = await res.json() as { proposal: string };
       setSubmission(prev => prev ? { ...prev, generatedProposal: data.proposal, status: "Proposal Generated" } : prev);
       setStatus("Proposal Generated");
-      setDocModal({ html: data.proposal, title: "Project Proposal" });
+      setDocModal({ html: data.proposal, title: "Project Proposal", company: submission?.companyName ?? "" });
       showToast("Proposal generated and saved.");
     } catch {
       showToast("Failed to generate proposal.");
@@ -236,7 +251,7 @@ export default function AdminSubmissionDetail() {
       if (!res.ok) throw new Error();
       const data = await res.json() as { sow: string };
       setSubmission(prev => prev ? { ...prev, generatedSow: data.sow } : prev);
-      setDocModal({ html: data.sow, title: "Scope of Work" });
+      setDocModal({ html: data.sow, title: "Scope of Work", company: submission?.companyName ?? "" });
       showToast("Scope of Work generated and saved.");
     } catch {
       showToast("Failed to generate SOW.");
@@ -284,7 +299,7 @@ export default function AdminSubmissionDetail() {
   return (
     <>
       {/* Document modal */}
-      {docModal && <DocModal html={docModal.html} title={docModal.title} onClose={() => setDocModal(null)} />}
+      {docModal && <DocModal html={docModal.html} title={docModal.title} company={docModal.company} onClose={() => setDocModal(null)} />}
 
       {/* Toast */}
       {toast && (
@@ -494,7 +509,7 @@ export default function AdminSubmissionDetail() {
 
                 {submission.generatedProposal && (
                   <Button
-                    onClick={() => setDocModal({ html: submission.generatedProposal!, title: "Project Proposal" })}
+                    onClick={() => setDocModal({ html: submission.generatedProposal!, title: "Project Proposal", company: submission.companyName })}
                     variant="ghost"
                     className="w-full gap-2 mb-2 text-primary hover:text-primary"
                     size="sm"
@@ -516,7 +531,7 @@ export default function AdminSubmissionDetail() {
 
                 {submission.generatedSow && (
                   <Button
-                    onClick={() => setDocModal({ html: submission.generatedSow!, title: "Scope of Work" })}
+                    onClick={() => setDocModal({ html: submission.generatedSow!, title: "Scope of Work", company: submission.companyName })}
                     variant="ghost"
                     className="w-full gap-2 text-primary hover:text-primary"
                     size="sm"

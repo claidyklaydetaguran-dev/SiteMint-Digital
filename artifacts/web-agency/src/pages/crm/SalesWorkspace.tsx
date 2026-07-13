@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  FileText, ClipboardList, Printer, Copy, Edit3, Loader2,
+  FileText, ClipboardList, Printer, Copy, Edit3, Loader2, Download,
   CheckCircle2, Clock, AlertCircle, Plus, Search, Folder,
   X, DollarSign, Package, Zap, Bot, ChevronRight, RefreshCw,
   StickyNote, History, Star, GitBranch, MessageSquare, Network,
@@ -174,12 +174,23 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Doc Preview Modal ─────────────────────────────────────────────────────────
 
-function DocPreviewModal({ html, title, onClose }: { html: string; title: string; onClose: () => void }) {
+function DocPreviewModal({ html, title, company, onClose }: { html: string; title: string; company?: string; onClose: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const handlePrint = () => iframeRef.current?.contentWindow?.print();
   const handleCopy = () => {
     const text = iframeRef.current?.contentDocument?.body?.innerText || "";
     navigator.clipboard.writeText(text);
+  };
+  const handleDownload = () => {
+    const prefix = title.toLowerCase().includes("proposal") ? "Proposal" : "SOW";
+    const slug = (company ?? "document").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${prefix}-${slug}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
@@ -188,6 +199,9 @@ function DocPreviewModal({ html, title, onClose }: { html: string; title: string
         <div className="flex items-center gap-2">
           <Button onClick={handleCopy} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1.5">
             <Copy className="w-3.5 h-3.5" /> Copy Text
+          </Button>
+          <Button onClick={handleDownload} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1.5">
+            <Download className="w-3.5 h-3.5" /> Download
           </Button>
           <Button onClick={handlePrint} variant="ghost" size="sm" className="text-background/70 hover:text-background hover:bg-white/10 gap-1.5">
             <Printer className="w-3.5 h-3.5" /> Print / PDF
@@ -409,7 +423,7 @@ function DocPanel({
         </div>
       )}
 
-      {previewOpen && html && <DocPreviewModal html={html} title={label} onClose={() => setPreviewOpen(false)} />}
+      {previewOpen && html && <DocPreviewModal html={html} title={label} company={lead.company ?? ""} onClose={() => setPreviewOpen(false)} />}
       {editOpen && html && (
         <EditHtmlModal html={html} title={label} saving={savingHtml} onSave={saveHtml} onClose={() => setEditOpen(false)} />
       )}

@@ -3,7 +3,7 @@ import { CrmLayout } from "./CrmLayout";
 import {
   Search, Filter, FileText, ArrowRight, RefreshCw, Trash2, X,
   ChevronDown, ExternalLink, Zap, Clock, DollarSign, User,
-  CheckCircle, AlertCircle, Eye, FolderOpen,
+  CheckCircle, AlertCircle, Eye, FolderOpen, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -186,6 +186,17 @@ function DiscoveryDrawer({
 
   if (previewDoc) {
     const html = previewDoc === "proposal" ? sub.generatedProposal : sub.generatedSow;
+    const handleDownload = () => {
+      const prefix = previewDoc === "proposal" ? "Proposal" : "SOW";
+      const slug = sub.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const blob = new Blob([html || ""], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${prefix}-${slug}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
     return (
       <div className="fixed inset-0 z-[200] bg-white flex flex-col">
         <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-200">
@@ -193,6 +204,11 @@ function DiscoveryDrawer({
             <X className="w-4 h-4" />
           </button>
           <span className="font-semibold text-sm">{previewDoc === "proposal" ? "Proposal" : "SOW"} — {sub.companyName}</span>
+          <div className="ml-auto">
+            <Button onClick={handleDownload} variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
+              <Download className="w-3.5 h-3.5" /> Download
+            </Button>
+          </div>
         </div>
         <div className="flex-1 overflow-hidden bg-gray-100 p-4">
           <iframe srcDoc={html || ""} sandbox="allow-same-origin allow-modals" className="w-full h-full bg-white rounded-lg shadow" title="Document preview" />
