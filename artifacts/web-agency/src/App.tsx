@@ -43,6 +43,7 @@ import CrmCommunications from "@/pages/crm/CrmCommunications";
 import CrmBehavioralIntelligence from "@/pages/crm/CrmBehavioralIntelligence";
 import CrmAutomationQueue from "@/pages/crm/CrmAutomationQueue";
 import CrmLeadDna from "@/pages/crm/CrmLeadDna";
+import CrmIntakeCases from "@/pages/crm/CrmIntakeCases";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/admin/crm/campaign-builder" component={CrmCampaignBuilderPage} />
       <Route path="/admin/crm/campaign-queue" component={CrmCampaignQueuePage} />
       <Route path="/admin/crm/discovery" component={CrmDiscovery} />
+      <Route path="/admin/crm/intake-cases" component={CrmIntakeCases} />
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />

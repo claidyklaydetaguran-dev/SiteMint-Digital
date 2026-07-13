@@ -50,17 +50,20 @@ export const intakeMessages = pgTable("intake_messages", {
 // incidentDate stored as text so it can hold approximate values like "March 2024".
 
 export const intakeCases = pgTable("intake_cases", {
-  id:               serial("id").primaryKey(),
-  createdAt:        timestamp("created_at",  { withTimezone: true }).defaultNow().notNull(),
-  updatedAt:        timestamp("updated_at",  { withTimezone: true }).defaultNow().notNull(),
-  conversationId:   integer("conversation_id").notNull().unique(),
-  firmId:           integer("firm_id").notNull(),
-  incidentType:     text("incident_type"),
-  incidentDate:     text("incident_date"),
-  injurySeverity:   text("injury_severity"),
-  faultDescription: text("fault_description"),
-  priorAttorney:    boolean("prior_attorney"),
-  summary:          text("summary"),
+  id:                      serial("id").primaryKey(),
+  createdAt:               timestamp("created_at",  { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:               timestamp("updated_at",  { withTimezone: true }).defaultNow().notNull(),
+  conversationId:          integer("conversation_id").notNull().unique(),
+  firmId:                  integer("firm_id").notNull(),
+  incidentType:            text("incident_type"),
+  incidentDate:            text("incident_date"),
+  incidentDateNormalized:  text("incident_date_normalized"),
+  injurySeverity:          text("injury_severity"),
+  faultDescription:        text("fault_description"),
+  priorAttorney:           boolean("prior_attorney"),
+  summary:                 text("summary"),
+  tier:                    text("tier"),
+  disqualifyReason:        text("disqualify_reason"),
 });
 
 // ── Insert schemas (drizzle-zod) ──────────────────────────────────────────────

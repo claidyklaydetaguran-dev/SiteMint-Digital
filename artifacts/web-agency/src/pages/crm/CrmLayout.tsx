@@ -124,8 +124,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     icon: FolderOpen,
     items: [
-      { label: "Discovery CRM",  href: "/admin/crm/discovery", icon: ClipboardList },
-      { label: "Projects",       href: "/admin/crm/projects",  icon: FolderOpen },
+      { label: "Discovery CRM",  href: "/admin/crm/discovery",    icon: ClipboardList },
+      { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
+      { label: "AI Intake Cases",href: "/admin/crm/intake-cases",  icon: BotMessageSquare },
     ],
   },
   {

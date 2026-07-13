@@ -1,0 +1,93 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+BUDGET EXCEPTION (explicitly approved): continuing the AI intake agent
+product from Phase 1/webhook-security. Expect ~4-5 files, 350-450 lines.
+Approved for the same reason as before — additive, isolated from the CRM
+and locked modules.
+
+Do not touch locked modules, lib/twilio.ts, or routes/phone.ts. Do not
+touch existing crm_* tables/routes. Do not modify the webhook signature
+validation added in the prior session (intakeTwilio.ts) — this task only
+adds what happens after a conversation completes, not how the webhook is
+authenticated.
+
+Context: Phase 1 built the SMS conversation loop (extracts incidentType,
+incidentDate, injurySeverity, faultDescription, priorAttorney, marks
+conversation "completed"). This phase adds what happens next: scoring,
+notifying the firm, and a simple internal page to review cases. Per the
+product spec, scoring must be a deterministic, explainable function of
+extracted facts — NOT an LLM judgment call. The LLM's job stays limited to
+fact extraction (already built) plus one addition below (date
+normalization), which is still fact extraction, not a decision.
+
+Task:
+
+1. Schema addition: add one nullable column to intakeCases —
+   incidentDateNormalized (date or text storing an ISO date, nullable).
+   Extend the existing LLM extraction prompt/response contract in
+   intakeAgent.ts (the Phase 1 webhook route) to also attempt extracting
+   this as a best-guess ISO date from whatever the caller said (e.g. "last
+   week", "March 3rd") — if it can't confidently determine a date, it
+   should return null for this field rather than guess. This is the only
+   schema change; run the one allowed migration push after adding it.
+
+2. New file artifacts/api-server/src/lib/intakeScoring.ts — a pure,
+   synchronous, deterministic function `scoreIntakeCase(case, firm)` that
+   returns one of: "Hot" | "Warm" | "Cold" | "Disqualified" | "Needs Review",
+   plus an optional disqualifyReason string. Logic:
+   - priorAttorney === true → "Disqualified", reason: "Already has counsel"
+   - incidentType present but doesn't match any of firm.practiceAreas
+     (case-insensitive substring match is fine for MVP) → "Disqualified",
+     reason: "Outside firm's practice areas"
+   - incidentDateNormalized present AND days-since-incident >
+     firm.statuteOfLimitationsDays → "Disqualified", reason: "Outside
+     statute of limitations window"
+   - incidentDateNormalized is null (couldn't be determined) → "Needs
+     Review" (do not auto-disqualify on missing/uncertain date data)
+   - Otherwise: injurySeverity mentions of significant injury (keyword
+     check is fine — e.g. "broken", "surgery", "hospital", "concussion" vs.
+     minor/no mention) → "Hot"; anything else that passed the above checks
+     → "Warm"
+   Keep the keyword logic simple and commented — this is a first-pass
+   heuristic, not final, and should be easy for a human to read and adjust
+   later without needing to understand the whole file.
+
+3. In the webhook route (intakeAgent.ts), when a conversation transitions
+   to "completed": call scoreIntakeCase, persist tier + disqualifyReason
+   onto the intakeCases row, then send a notification email to the firm's
+   notifyEmail (reuse getResend/FROM_ADDRESS pattern from lib/email.ts,
+   same as other transactional emails in this codebase — do not
+   reimplement email sending). Email should include: tier (prominently),
+   the AI-generated summary, and the key extracted fields. Subject line
+   should make the tier immediately visible, e.g. "[Hot] New case:
+   {incidentType} — {callerPhone}".
+
+4. New minimal internal review page:
+   - Backend: GET /api/intake/cases (requireAdmin — follow the same local
+     requireAdmin-via-validateToken pattern already used in crm.ts, don't
+     assume a shared exported middleware exists) returning all cases
+     joined with conversation + firm info, most recent first.
+   - Frontend: new page artifacts/web-agency/src/pages/crm/CrmIntakeCases.tsx
+     (or wherever fits best alongside other Crm* pages) — a simple table:
+     tier (color-coded badge — reuse existing badge/color patterns from
+     other Crm pages, don't invent a new visual language), caller phone,
+     incident type, summary, created date. No filters/search needed yet,
+     just a clean list. Add a route in App.tsx following the existing
+     /admin/crm/* pattern and a nav entry in CrmLayout.tsx if that's where
+     other CRM nav items live — keep it a single added line, don't
+     reorganize the nav.
+
+Return:
+- Files changed
+- Confirm the migration ran (1 column added, nothing else touched)
+- Run a new end-to-end test conversation (multi-turn, like before) and
+  show: the normalized date extraction result, the computed tier and
+  reasoning, and confirm the notification email was attempted (test mode
+  is fine — confirm it would have sent, same convention as other email
+  test-mode behavior in this codebase)
+- Test at least one case that should score "Disqualified" (e.g. caller
+  says they already have an attorney) and confirm the reason is correct
+- Confirm the new review page loads and displays real data
+- TypeScript status (api-server and web-agency)
+- Confirm no locked files, lib/twilio.ts, routes/phone.ts, or intakeTwilio.ts
+  were touched
