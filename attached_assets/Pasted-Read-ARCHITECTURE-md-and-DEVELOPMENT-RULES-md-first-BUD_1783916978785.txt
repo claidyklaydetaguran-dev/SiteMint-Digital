@@ -1,0 +1,122 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+BUDGET EXCEPTION (explicitly approved): this is a net-new product feature,
+not an incremental CRM change. Expect ~6-8 new files and 500-700 lines.
+This is approved because it's fully additive (new schema tables, new route
+file(s), zero changes to existing tables/routes) and represents a distinct
+product from the CRM itself — see the attached spec doc for context.
+
+Do not touch locked modules (discEngine, leadScore, communicationIntelligence,
+workflowEngine, phone.ts). Do NOT reuse or modify lib/twilio.ts or import
+from routes/phone.ts — this new product needs its own, separate Twilio
+credentials and webhook handling, entirely isolated from the CRM's existing
+phone system. Mixing them risks the CRM's own working sales pipeline for
+the sake of a new, unproven feature — not an acceptable trade.
+
+Do not touch existing crm_* tables or routes. This is a new, isolated
+system that happens to live in the same codebase.
+
+Context: this is Phase 1 of a new product — an AI SMS intake agent for law
+firms. Full spec is below. This phase builds the core mechanism only: no
+scoring, no notifications, no UI. Just prove the conversation loop works:
+inbound SMS → LLM extracts structured facts across multiple exchanges →
+reply sent back → data persisted. Testable entirely via curl simulating
+Twilio's webhook payload format — no real Twilio number needs to be
+provisioned yet.
+
+--- SPEC SUMMARY ---
+A law firm's intake line receives a text. An AI conversationally interviews
+the sender to extract: incidentType, incidentDate, injurySeverity,
+faultDescription, priorAttorney (bool), and confirms contact info. It
+replies naturally over multiple SMS exchanges (this is not a rigid form —
+use the LLM to hold a natural conversation while extracting structured data
+as a side effect of that conversation). Once enough fields are known or the
+sender indicates they're done, the conversation is marked complete. Scoring
+and notification are Phase 2, not this task.
+--- END SPEC SUMMARY ---
+
+Task:
+
+1. New schema file lib/db/src/schema/intakeAgent.ts with 4 tables:
+   - intakeFirms: id, name, practiceAreas (text array), statesServed (text
+     array), statuteOfLimitationsDays (integer, simplified single value for
+     MVP), notifyEmail (text), twilioNumber (text), createdAt
+   - intakeConversations: id, firmId (FK), callerPhone (text), status (text,
+     default "in_progress" — in_progress | completed | abandoned), createdAt,
+     lastMessageAt (timestamptz)
+   - intakeMessages: id, conversationId (FK), direction (text — inbound |
+     outbound), body (text), createdAt
+   - intakeCases: id, conversationId (FK, unique — one case per
+     conversation), firmId (FK), incidentType (text, nullable),
+     incidentDate (text or date, nullable — store as reported, don't force
+     parsing yet), injurySeverity (text, nullable), faultDescription (text,
+     nullable), priorAttorney (boolean, nullable), summary (text, nullable),
+     createdAt, updatedAt
+   Export insert schemas via drizzle-zod following the existing convention
+   in other schema files (e.g. crmTasks.ts). Register exports in
+   lib/db/src/schema/index.ts. Run `pnpm --filter @workspace/db run push`
+   after.
+
+2. Seed exactly one test firm row via a small one-off script or direct
+   insert (your call on the cleanest way) — name: "AI for Lawyers (Test)",
+   practiceAreas: ["Personal Injury"], statesServed: ["CA"],
+   statuteOfLimitationsDays: 730 (2 years, typical CA PI statute — this is
+   a placeholder, not legal advice, note that in a comment), notifyEmail:
+   the existing admin/team notification email already used elsewhere in
+   this codebase (check lib/email.ts or wherever FROM_ADDRESS/team email is
+   configured for the existing convention), twilioNumber: a placeholder
+   string like "+15550000000" (no real number yet).
+
+3. New route file artifacts/api-server/src/routes/intakeAgent.ts:
+   - POST /api/intake/sms-webhook — accepts Twilio's standard webhook body
+     shape (From, To, Body as form-encoded fields — mirror the shape
+     Twilio actually sends, check routes/phone.ts for reference on the
+     expected field names, but do not import from or modify that file).
+     No signature validation yet (Phase 1 explicitly defers this — add a
+     code comment noting it must be added before any real firm goes live).
+   - Logic: look up or create an intakeConversations row for this
+     callerPhone (match against the seeded test firm's twilioNumber in
+     `To`, or just default to the one seeded firm for now since there's
+     only one). Store the inbound message. Load full message history for
+     this conversation. Call the LLM (use @workspace/integrations-openai-ai-server
+     — check its README/exports for the chat completions pattern already
+     used elsewhere in this codebase, e.g. in the campaign AI copilot
+     route, and follow that same pattern) with a system prompt instructing
+     it to: (a) hold a natural, empathetic conversation gathering the
+     required fields one or two at a time, not as a rigid interrogation,
+     and (b) return structured JSON with whatever fields it was able to
+     extract so far, alongside the natural reply text. Use
+     response_format json_object or the equivalent structured-output
+     pattern already used elsewhere in this codebase.
+   - Persist any newly extracted fields onto the intakeCases row (create it
+     on first message if it doesn't exist for this conversation).
+   - Send the natural reply back via Twilio SMS using a NEW, small helper
+     (do not reuse lib/twilio.ts) that reads INTAKE_TWILIO_ACCOUNT_SID,
+     INTAKE_TWILIO_AUTH_TOKEN, INTAKE_TWILIO_PHONE_NUMBER from env — if
+     these aren't set (expected in this dev phase), log the reply instead
+     of sending and still return a valid TwiML/JSON response so the flow
+     is testable without real Twilio credentials.
+   - When the LLM signals the conversation is complete (add a
+     `conversationComplete: boolean` field to its structured output
+     contract), set intakeConversations.status = "completed".
+   - Register this route in routes/index.ts.
+
+4. No frontend changes in this phase.
+
+Return:
+- Files changed
+- Confirm the DB push succeeded and all 4 tables exist with correct columns
+- Confirm the test firm was seeded
+- Simulate a short multi-turn conversation via curl (at least 3 exchanges)
+  showing: each POST to /api/intake/sms-webhook, the LLM's reply each time,
+  and the intakeCases row's fields filling in progressively across the
+  exchanges — paste the actual before/after field values
+- Confirm the conversation is marked "completed" once enough fields are
+  gathered
+- Confirm this works with no INTAKE_TWILIO_* env vars set (logs the reply
+  instead of failing)
+- TypeScript status
+- Confirm no locked files, lib/twilio.ts, routes/phone.ts, or any existing
+  crm_* table/route was touched
+- Known limitations (should include: no signature validation, single
+  hardcoded firm, no scoring, no notifications — all expected, all Phase 2)
