@@ -1,12 +1,11 @@
 /**
- * AI SMS Intake Agent — Phase 1
+ * AI SMS Intake Agent
  *
  * Inbound Twilio webhook → LLM conversation → structured case extraction.
  *
- * SECURITY NOTE: Twilio webhook signature validation is NOT implemented here.
- * It MUST be added (using Twilio's X-Twilio-Signature header + the webhook
- * URL + sorted params) before any real firm goes live. Phase 1 defers this
- * to keep the dev loop fast and testable with plain curl.
+ * Webhook signature validation is handled by validateIntakeTwilioSignature
+ * (see lib/intakeTwilio.ts). In dev/test NODE_ENV it bypasses automatically
+ * so plain curl testing continues to work without real Twilio credentials.
  *
  * LIMITATIONS (all expected — Phase 2 scope):
  * - Single hardcoded test firm; firm looked up by `To` number, falls back
@@ -18,6 +17,7 @@
  */
 
 import { Router, type IRouter, type Request, type Response } from "express";
+import { validateIntakeTwilioSignature } from "../lib/intakeTwilio.js";
 import { eq, and, asc } from "drizzle-orm";
 import {
   db,
@@ -149,10 +149,7 @@ async function sendIntakeSms(
 // Twilio sends form-encoded fields: From, To, Body (plus others we ignore).
 // express.urlencoded() in app.ts already parses these — no extra middleware needed.
 
-router.post("/intake/sms-webhook", async (req: Request, res: Response) => {
-  // SECURITY: Twilio webhook signature validation must be added here before
-  // any real firm goes live. See: https://www.twilio.com/docs/usage/webhooks/webhooks-security
-
+router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Request, res: Response) => {
   try {
     const { From, To, Body } = req.body as Record<string, string>;
 

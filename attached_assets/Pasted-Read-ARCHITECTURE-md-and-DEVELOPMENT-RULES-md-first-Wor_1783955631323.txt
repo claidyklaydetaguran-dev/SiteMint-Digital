@@ -1,0 +1,60 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Work only inside the intake agent route (artifacts/api-server/src/routes/intakeAgent.ts)
+plus one new small helper file. Do not touch locked modules. Do NOT modify
+lib/twilio.ts or routes/phone.ts — this must remain fully isolated from the
+CRM's existing Twilio setup, same reasoning as Phase 1: this is a separate,
+unproven product and must not risk the CRM's working phone system.
+
+Stay within budget (2 files, 120 lines, 0 migrations).
+
+Context: Phase 1 of the AI intake agent (POST /api/intake/sms-webhook) has
+no request validation — anyone who discovers the URL can POST fake payloads
+to it, which would waste OpenAI API calls and fill intake_messages/
+intake_cases with garbage data once a real Twilio number is wired to it.
+Twilio signs every real webhook request with an X-Twilio-Signature header;
+this task adds validation of that signature before the webhook logic runs.
+
+There is already a working example of this exact pattern in lib/twilio.ts —
+the createWebhookValidator function, used by the CRM's own phone routes.
+Do not import or reuse it directly (it reads process.env.TWILIO_AUTH_TOKEN,
+which is the CRM's credential, not this product's). Instead, replicate the
+same logic in a new file, parameterized for this product's own credential.
+
+Task:
+1. Create artifacts/api-server/src/lib/intakeTwilio.ts with a
+   validateIntakeTwilioSignature Express middleware, following the same
+   shape as createWebhookValidator in lib/twilio.ts:
+   - Reads INTAKE_TWILIO_AUTH_TOKEN (not TWILIO_AUTH_TOKEN)
+   - Dev bypass: if NODE_ENV !== "production", call next() immediately
+     (same convenience behavior as the existing pattern, so local testing
+     via curl still works without a real signature)
+   - In production: if INTAKE_TWILIO_AUTH_TOKEN is missing, reject with a
+     403 and an empty TwiML response (`<Response></Response>`) — mirror the
+     existing safe-rejection behavior exactly
+   - Reconstruct the full request URL from CRM_BASE_URL (the same base URL
+     env var already used for the CRM's own webhook validation — this
+     product runs on the same public domain) + req.originalUrl
+   - Validate using twilio.validateRequest(authToken, signature, url, params),
+     same as the existing pattern
+   - On mismatch, reject 403 with the same empty TwiML response
+2. In routes/intakeAgent.ts, apply this middleware to the
+   POST /intake/sms-webhook route (add it as router-level middleware on
+   that specific route, not globally).
+3. Update the existing "SECURITY: Twilio webhook signature validation must
+   be added here" comment left in Phase 1 — remove it since it's now
+   addressed, or update it to point at the new middleware.
+
+Return:
+- Files changed
+- Confirm the dev-bypass still allows curl testing to work exactly as it
+  did in Phase 1 (re-run the same style of multi-turn curl test from Phase
+  1 and confirm it still works with NODE_ENV unset/development)
+- Confirm that if you simulate production mode with a wrong/missing
+  signature, the route now rejects with 403 (describe how you tested this
+  — e.g. temporarily setting NODE_ENV=production for one test call)
+- TypeScript status
+- Confirm lib/twilio.ts and routes/phone.ts were not touched
+- Note: this does not require a real Twilio number to verify — signature
+  validation can be tested by constructing a request with a deliberately
+  wrong X-Twilio-Signature header and confirming rejection
