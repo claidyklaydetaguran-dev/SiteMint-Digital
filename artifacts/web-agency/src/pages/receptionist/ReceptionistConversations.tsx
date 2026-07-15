@@ -14,6 +14,8 @@ interface Conversation {
   callerPhone: string;
   status: string;
   isOverCap?: boolean;
+  tier: string | null;
+  disqualifyReason: string | null;
 }
 
 interface Message {
@@ -27,8 +29,8 @@ interface Message {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string): string {
-  const d    = new Date(iso);
-  const now  = new Date();
+  const d     = new Date(iso);
+  const now   = new Date();
   const diffH = (now.getTime() - d.getTime()) / (1000 * 60 * 60);
   if (diffH < 24) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   if (diffH < 48) return "Yesterday";
@@ -39,6 +41,34 @@ function statusColor(status: string): string {
   if (status === "in_progress") return "#16a34a";
   if (status === "completed")   return "#2563eb";
   return "#9ca3af";
+}
+
+// ── TierBadge ─────────────────────────────────────────────────────────────────
+// Reused in both the ConversationListItem and the MessageThread header.
+// Returns null when tier is null (in-progress conversation, not yet scored).
+
+const TIER_STYLES: Record<string, { bg: string; color: string; border: string }> = {
+  "Hot":           { bg: "rgba(239,68,68,0.10)",   color: "#dc2626", border: "rgba(239,68,68,0.30)"   },
+  "Warm":          { bg: "rgba(245,158,11,0.10)",  color: "#b45309", border: "rgba(245,158,11,0.30)"  },
+  "Cold":          { bg: "rgba(59,130,246,0.10)",  color: "#1d4ed8", border: "rgba(59,130,246,0.28)"  },
+  "Disqualified":  { bg: "rgba(107,114,128,0.10)", color: "#374151", border: "rgba(107,114,128,0.25)" },
+  "Needs Review":  { bg: "rgba(139,92,246,0.10)",  color: "#7c3aed", border: "rgba(139,92,246,0.28)"  },
+};
+
+function TierBadge({ tier }: { tier: string | null }) {
+  if (!tier) return null;
+  const s = TIER_STYLES[tier] ?? TIER_STYLES["Needs Review"]!;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      fontSize: 10, fontWeight: 700,
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      borderRadius: 100, padding: "1px 7px",
+      lineHeight: "16px", flexShrink: 0,
+    }}>
+      {tier}
+    </span>
+  );
 }
 
 // ── Trial limit badge ──────────────────────────────────────────────────────────
@@ -67,7 +97,10 @@ function SkeletonRow() {
         <div style={{ width: 120, height: 12, borderRadius: 6, background: "#e5e7eb" }} />
         <div style={{ width: 36, height: 10, borderRadius: 6, background: "#e5e7eb" }} />
       </div>
-      <div style={{ width: 64, height: 10, borderRadius: 6, background: "#f3f4f6" }} />
+      <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ width: 48, height: 10, borderRadius: 6, background: "#f3f4f6" }} />
+        <div style={{ width: 36, height: 10, borderRadius: 6, background: "#f3f4f6" }} />
+      </div>
     </div>
   );
 }
@@ -85,13 +118,11 @@ function ConversationList({
 }) {
   if (conversations.length === 0) {
     return (
-      <div
-        style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", height: "100%", textAlign: "center",
-          padding: "32px 24px", color: "#9ca3af",
-        }}
-      >
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", height: "100%", textAlign: "center",
+        padding: "32px 24px", color: "#9ca3af",
+      }}>
         <Inbox size={40} strokeWidth={1.2} style={{ marginBottom: 12, color: "#cbd5e1" }} />
         <p style={{ fontWeight: 600, fontSize: 13.5, color: "#6b7280", marginBottom: 4 }}>
           No conversations yet
@@ -124,7 +155,8 @@ function ConversationList({
             if (selectedId !== c.id) e.currentTarget.style.background = "transparent";
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          {/* Row 1: phone + timestamp */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <Phone size={13} style={{ color: "#6b7280" }} />
               <span style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>
@@ -133,6 +165,8 @@ function ConversationList({
             </div>
             <span style={{ fontSize: 11, color: "#9ca3af" }}>{fmtDate(c.lastMessageAt)}</span>
           </div>
+
+          {/* Row 2: status dot + tier badge + over-cap badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{
               display: "inline-flex", alignItems: "center", gap: 4,
@@ -145,6 +179,8 @@ function ConversationList({
               }} />
               {c.status.replace("_", " ")}
             </span>
+            {/* TierBadge — only rendered when tier is non-null (scored conversations) */}
+            <TierBadge tier={c.tier} />
             {c.isOverCap && <TrialLimitBadge />}
           </div>
         </div>
@@ -193,6 +229,8 @@ function MessageThread({
             }}>
               {conversation.status.replace("_", " ")}
             </span>
+            {/* TierBadge in thread header — same component, consistent styling */}
+            <TierBadge tier={conversation.tier} />
             {conversation.isOverCap && <TrialLimitBadge />}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>

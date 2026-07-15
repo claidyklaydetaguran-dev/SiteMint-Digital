@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { intakeFirms, intakeConversations, intakeMessages } from "@workspace/db/schema";
+import { intakeFirms, intakeConversations, intakeMessages, intakeCases } from "@workspace/db/schema";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 
 const router = Router();
@@ -10,9 +10,13 @@ const router = Router();
 
 // ── GET /api/receptionist/conversations ───────────────────────────────────────
 // Returns all conversations for the logged-in firm.
-// Each conversation includes `isOverCap` computed dynamically from creation-order
-// rank vs. the firm's trialConversationsLimit. No static flag stored — if a
-// firm upgrades their plan, the flag disappears automatically without migration.
+// Each conversation includes:
+//   - `isOverCap` — computed dynamically from creation-order rank vs. the
+//     firm's trialConversationsLimit. No static flag stored — if a firm
+//     upgrades their plan, the flag disappears automatically without migration.
+//   - `tier` / `disqualifyReason` — from the related intake_cases row via
+//     LEFT JOIN. null means no case has been scored yet (still in progress),
+//     which is a distinct and real state — not defaulted to "Needs Review".
 
 router.get(
   "/receptionist/conversations",
@@ -28,16 +32,28 @@ router.get(
         .from(intakeFirms)
         .where(eq(intakeFirms.id, req.firmId!));
 
+      // LEFT JOIN intake_cases to include tier + disqualifyReason per conversation.
+      // Conversations with no case yet (still in-progress) return null for both fields.
       const rows = await db
-        .select()
+        .select({
+          id:               intakeConversations.id,
+          createdAt:        intakeConversations.createdAt,
+          lastMessageAt:    intakeConversations.lastMessageAt,
+          firmId:           intakeConversations.firmId,
+          callerPhone:      intakeConversations.callerPhone,
+          status:           intakeConversations.status,
+          tier:             intakeCases.tier,
+          disqualifyReason: intakeCases.disqualifyReason,
+        })
         .from(intakeConversations)
+        .leftJoin(intakeCases, eq(intakeCases.conversationId, intakeConversations.id))
         .where(eq(intakeConversations.firmId, req.firmId!))
         .orderBy(desc(intakeConversations.lastMessageAt));
 
       const isTrialFirm = (firm?.planTier ?? "trial") !== "paid";
       const limit       = firm?.trialConversationsLimit ?? 20;
 
-      // Sort by creation order to determine rank
+      // Sort by creation order to determine rank for over-cap computation
       const byCreation = [...rows].sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
@@ -58,6 +74,8 @@ router.get(
 // ── GET /api/receptionist/conversations/:id ───────────────────────────────────
 // Returns a single conversation + its messages — ONLY if it belongs to req.firmId.
 // Attempting to access another firm's conversation returns 404 (no information leak).
+// Also returns tier + disqualifyReason from the related intake_cases row (null if
+// no case has been scored yet).
 
 router.get(
   "/receptionist/conversations/:id",
@@ -91,6 +109,15 @@ router.get(
         .where(eq(intakeMessages.conversationId, id))
         .orderBy(asc(intakeMessages.createdAt));
 
+      // Fetch tier from intake_cases (null if not yet scored)
+      const [caseRow] = await db
+        .select({ tier: intakeCases.tier, disqualifyReason: intakeCases.disqualifyReason })
+        .from(intakeCases)
+        .where(eq(intakeCases.conversationId, id));
+
+      const tier             = caseRow?.tier             ?? null;
+      const disqualifyReason = caseRow?.disqualifyReason ?? null;
+
       // Compute isOverCap for this conversation's detail view
       const [firm] = await db
         .select({
@@ -112,11 +139,17 @@ router.get(
               sql`created_at <= ${conversation.createdAt}`,
             ),
           );
-        const rank = Number(count);
+        const rank  = Number(count);
         const limit = firm?.trialConversationsLimit ?? 20;
-        res.json({ conversation: { ...conversation, isOverCap: rank > limit }, messages });
+        res.json({
+          conversation: { ...conversation, isOverCap: rank > limit, tier, disqualifyReason },
+          messages,
+        });
       } else {
-        res.json({ conversation: { ...conversation, isOverCap: false }, messages });
+        res.json({
+          conversation: { ...conversation, isOverCap: false, tier, disqualifyReason },
+          messages,
+        });
       }
     } catch (err) {
       req.log.error({ err }, "[receptionist] GET conversation/:id error");

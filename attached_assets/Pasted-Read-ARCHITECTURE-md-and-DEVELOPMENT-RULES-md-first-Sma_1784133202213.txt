@@ -1,0 +1,45 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Small, targeted fix. Stay within budget (2 files, ~120 lines, 0 migrations
+— no schema change needed, this is a query + response shape fix).
+
+Context: the visual-polish pass on the AI Receptionist app flagged that
+the conversations list (GET /api/receptionist/conversations) doesn't
+return each conversation's tier (Hot/Warm/Cold/Disqualified/Needs Review),
+even though that data already exists on the related intakeCases row —
+it's currently only visible once you open a conversation's thread detail.
+This closes that gap.
+
+Do not touch locked modules. Do not touch scoring logic in
+intakeScoring.ts or the sms-webhook's extraction/scoring flow — this is a
+read-side query fix, not a scoring change. Do not touch billing, auth, or
+the trial-cap logic.
+
+Task:
+
+1. In receptionistConversations.ts, update the list query (GET
+   /api/receptionist/conversations) to LEFT JOIN intakeCases on
+   conversationId and include `tier` (and `disqualifyReason` if present)
+   in each returned conversation object. A conversation without a case yet
+   (still in progress, not scored) should return tier: null — do not
+   default it to a fake value like "Needs Review", null means "no case
+   yet," which is a different and real state.
+
+2. Keep the existing isOverCap dynamic computation exactly as-is alongside
+   this — both fields live on the same response object.
+
+3. In ReceptionistConversations.tsx, render the TierBadge in each
+   ConversationListItem using this new field. When tier is null, show
+   nothing (no badge) rather than a placeholder — an in-progress
+   conversation legitimately doesn't have a tier yet, and implying one
+   would be misleading. Match TierBadge's colors already established in
+   the thread-detail view (reuse that same badge component rather than
+   building a second one).
+
+Return:
+- Confirm the list response now includes tier for scored conversations and
+  null for unscored ones (show a real example of both from a test account)
+- Confirm the list UI shows the correct badge per tier and shows none when
+  null
+- Confirm scoring logic, trial-cap enforcement, and billing were untouched
+- TypeScript status
