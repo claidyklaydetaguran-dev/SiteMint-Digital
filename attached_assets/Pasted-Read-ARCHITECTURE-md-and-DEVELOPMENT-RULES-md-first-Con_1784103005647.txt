@@ -1,0 +1,107 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Context: phase 1 (customer accounts, login, conversations page, trial usage
+banner) is live and verified — cross-firm isolation confirmed, TypeScript
+clean. This phase does two hardening fixes on that foundation, then two new
+features on top. Do all four in this session since they touch the same
+files, but report on each separately.
+
+Do not touch locked modules (routes/phone.ts, lib/discEngine.ts,
+lib/leadScore.ts, lib/communicationIntelligence.ts, lib/workflowEngine.ts).
+Do not touch the CRM's existing admin Bearer-token auth. Do not touch
+/api/landing-test/* routes.
+
+BUDGET EXCEPTION (explicitly approved): schema migration + session storage
+change + webhook logic change + new admin page. Expect several hundred
+lines across multiple files.
+
+---
+
+FIX 1 — real unique constraint on intakeFirms.email
+
+The phase 1 migration added `email` as nullable with an application-layer
+duplicate check only — no DB-level uniqueness. Add an actual unique index
+(partial index where email IS NOT NULL, since the seeded test firm has a
+null email and multiple nulls must be allowed). Keep the existing
+application-layer check for a clean error message, but the DB constraint
+is now the real guarantee — catch the DB unique-violation error code as a
+fallback in case of a race and return the same clean "account already
+exists" error rather than a 500.
+
+FIX 2 — persist sessions instead of in-memory
+
+New table, e.g. receptionistSessions: token (text, primary key or unique),
+firmId (references intakeFirms), createdAt, expiresAt (e.g. 30 days out).
+Update receptionistAuth.ts's requireReceptionistAuth middleware and the
+login/signup handlers to read/write this table instead of the in-memory
+store. On logout, delete the row. This means sessions now survive a
+server restart/redeploy — test this explicitly (see Return section).
+
+FEATURE 1 — enforce the trial cap
+
+In the intake SMS webhook (routes/intakeAgent.ts, POST /intake/sms-webhook):
+when an inbound message is the FIRST message for a given callerPhone+firmId
+pair (i.e. it would create a brand new intakeConversations row, not
+continue an existing one), check the firm's planTier and
+trialConversationsLimit against a live count of that firm's existing
+conversations:
+- If planTier is 'paid', no limit — proceed as normal.
+- If planTier is 'trial' and the existing conversation count is BELOW the
+  limit, proceed as normal (this new conversation counts toward the total).
+- If planTier is 'trial' and the count has already reached the limit: still
+  create the conversation and log the inbound message (never silently drop
+  a lead), but do NOT run the full AI extraction/scoring loop or send an
+  automated reply back to the caller. Compute "over cap" dynamically at
+  read time (e.g. conversation's creation-order rank among the firm's
+  conversations, compared against the limit at query time) rather than
+  storing a static flag — this way if the firm later upgrades, older
+  conversations correctly stop showing as over-cap without a data migration.
+
+IMPORTANT: an existing, already-in-progress conversation must NEVER be cut
+off mid-conversation just because the firm's total later crosses the
+limit — the cap only applies to whether a NEW conversation is allowed to
+start the automated flow.
+
+In ReceptionistConversations.tsx, visually mark over-cap conversations
+(e.g. a muted "Trial limit reached" badge) and if the trial banner's count
+has reached the limit, add a clear "Upgrade to respond automatically to new
+conversations" CTA — this can link to a placeholder /app/settings anchor
+for now, real Stripe checkout is a separate future task, do not build it
+here.
+
+FEATURE 2 — CRM admin oversight of AI Receptionist customers
+
+New internal page under the CRM, e.g.
+artifacts/web-agency/src/pages/crm/CrmReceptionistAccounts.tsx, added to
+CrmLayout's Operations nav group (alongside the existing AI Intake Cases
+entry — rename that existing entry to something that distinguishes it from
+this new one if the naming is now ambiguous, your call, note what you
+chose).
+
+New admin-gated route (reuse the CRM's existing requireAdmin Bearer-token
+middleware, NOT the new receptionist customer auth), e.g.
+GET /api/admin/receptionist-accounts — returns all intakeFirms rows that
+have a real email (i.e. real signups, not the old admin-configured test
+firm pattern), each with: business name, email, industry, planTier,
+conversation count, trial limit, signup date. Read-only list view, sortable
+by signup date. No edit/delete actions needed in this pass.
+
+Return:
+- Confirm the unique index exists and test it: attempt two signups with
+  the same email, confirm the second is cleanly rejected (not a 500)
+- Confirm sessions now persist: log in, restart the dev server (or
+  equivalent), confirm the session is still valid afterward without
+  re-logging in
+- Confirm trial cap enforcement with a real test: seed or use a test firm
+  with trialConversationsLimit set low (e.g. 2) via direct DB update, send
+  3 distinct new conversations via curl to the sms-webhook, confirm the
+  1st and 2nd get normal AI responses and the 3rd gets logged but no
+  automated reply, and confirm the 3rd shows the "trial limit" badge in
+  the UI
+- Confirm an existing in-progress conversation is never interrupted by the
+  cap being reached elsewhere
+- Confirm the new CRM admin page lists real signups (use the test accounts
+  from phase 1) and is only reachable with a valid admin Bearer token, not
+  a receptionist customer session
+- TypeScript status
+- Confirm no locked files or CRM admin auth logic were touched

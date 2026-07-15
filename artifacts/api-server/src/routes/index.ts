@@ -14,6 +14,7 @@ import landingTestRouter from "./landingTest";
 import intakeAgentRouter from "./intakeAgent";
 import receptionistAuthRouter from "./receptionistAuth";
 import receptionistConversationsRouter from "./receptionistConversations";
+import receptionistAdminRouter from "./receptionistAdmin";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(landingTestRouter);
 router.use(intakeAgentRouter);
 router.use(receptionistAuthRouter);
 router.use(receptionistConversationsRouter);
+router.use(receptionistAdminRouter);
 
 export default router;

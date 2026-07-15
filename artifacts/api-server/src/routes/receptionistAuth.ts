@@ -7,6 +7,7 @@ import {
   createSession,
   destroySession,
   requireReceptionistAuth,
+  purgeExpiredSessions,
   COOKIE_NAME,
   COOKIE_OPTIONS,
 } from "../lib/receptionistAuth.js";
@@ -35,7 +36,7 @@ router.post("/receptionist/auth/signup", async (req: Request, res: Response) => 
       return;
     }
 
-    // Check for duplicate email
+    // Check for duplicate email (application-layer fast path before DB insert)
     const [existing] = await db
       .select({ id: intakeFirms.id })
       .from(intakeFirms)
@@ -48,30 +49,44 @@ router.post("/receptionist/auth/signup", async (req: Request, res: Response) => 
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const [firm] = await db
-      .insert(intakeFirms)
-      .values({
-        name:                    businessName?.trim() || fullName.trim(),
-        email:                   email.toLowerCase().trim(),
-        passwordHash,
-        practiceAreas:           industry ? [industry] : [],
-        statesServed:            [],
-        statuteOfLimitationsDays: 0,
-        notifyEmail:             email.toLowerCase().trim(),
-        twilioNumber:            phone?.trim() || "",
-        planTier:                "trial",
-        trialConversationsLimit: 20,
-      })
-      .returning({
-        id:         intakeFirms.id,
-        name:       intakeFirms.name,
-        email:      intakeFirms.email,
-        planTier:   intakeFirms.planTier,
-        trialConversationsLimit: intakeFirms.trialConversationsLimit,
-        createdAt:  intakeFirms.createdAt,
-      });
+    let firm: { id: number; name: string; email: string | null; planTier: string; trialConversationsLimit: number; createdAt: Date };
+    try {
+      const [inserted] = await db
+        .insert(intakeFirms)
+        .values({
+          name:                    businessName?.trim() || fullName.trim(),
+          email:                   email.toLowerCase().trim(),
+          passwordHash,
+          practiceAreas:           industry ? [industry] : [],
+          statesServed:            [],
+          statuteOfLimitationsDays: 0,
+          notifyEmail:             email.toLowerCase().trim(),
+          twilioNumber:            phone?.trim() || "",
+          planTier:                "trial",
+          trialConversationsLimit: 20,
+        })
+        .returning({
+          id:         intakeFirms.id,
+          name:       intakeFirms.name,
+          email:      intakeFirms.email,
+          planTier:   intakeFirms.planTier,
+          trialConversationsLimit: intakeFirms.trialConversationsLimit,
+          createdAt:  intakeFirms.createdAt,
+        });
+      firm = inserted;
+    } catch (dbErr: unknown) {
+      // DB-level unique constraint violation (race condition between check and insert)
+      if ((dbErr as { code?: string }).code === "23505") {
+        res.status(409).json({ error: "An account with that email already exists." });
+        return;
+      }
+      throw dbErr;
+    }
 
-    const token = createSession(firm.id, firm.email!);
+    // Opportunistically clear expired sessions on signup (lightweight housekeeping)
+    purgeExpiredSessions().catch(() => {});
+
+    const token = await createSession(firm.id, firm.email!);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
 
     res.status(201).json({ firm });
@@ -108,7 +123,7 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
       return;
     }
 
-    const token = createSession(firm.id, firm.email!);
+    const token = await createSession(firm.id, firm.email!);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
 
     res.json({
@@ -129,9 +144,9 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
 
 // ── POST /api/receptionist/auth/logout ────────────────────────────────────────
 
-router.post("/receptionist/auth/logout", (req: Request, res: Response) => {
+router.post("/receptionist/auth/logout", async (req: Request, res: Response) => {
   const token = req.cookies?.[COOKIE_NAME] as string | undefined;
-  if (token) destroySession(token);
+  if (token) await destroySession(token);
   res.clearCookie(COOKIE_NAME, { path: "/" });
   res.json({ ok: true });
 });

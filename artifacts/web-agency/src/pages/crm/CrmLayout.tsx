@@ -12,7 +12,7 @@ import {
   Image, Layers, Facebook, Instagram, Activity, Download,
   ClipboardList, Briefcase, ListTodo, TrendingUp, Dna, Brain,
   BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft,
-  ExternalLink,
+  ExternalLink, Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -126,7 +126,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Discovery CRM",  href: "/admin/crm/discovery",    icon: ClipboardList },
       { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
-      { label: "AI Intake Cases",href: "/admin/crm/intake-cases",  icon: BotMessageSquare },
+      { label: "AI Intake Scoring",      href: "/admin/crm/intake-cases",          icon: BotMessageSquare },
+      { label: "Receptionist Accounts",  href: "/admin/crm/receptionist-accounts", icon: Building2 },
     ],
   },
   {

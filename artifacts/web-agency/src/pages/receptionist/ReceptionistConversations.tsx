@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import ReceptionistAppShell from "./ReceptionistAppShell";
-import { MessageSquare, Phone, Clock, ArrowLeft, Inbox } from "lucide-react";
+import { MessageSquare, Phone, Clock, ArrowLeft, Inbox, Lock } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -13,6 +13,7 @@ interface Conversation {
   firmId: number;
   callerPhone: string;
   status: string;
+  isOverCap?: boolean;
 }
 
 interface Message {
@@ -28,8 +29,7 @@ interface Message {
 function fmtDate(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffH  = diffMs / (1000 * 60 * 60);
+  const diffH = (now.getTime() - d.getTime()) / (1000 * 60 * 60);
   if (diffH < 24) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   if (diffH < 48) return "Yesterday";
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -39,6 +39,23 @@ function statusColor(status: string): string {
   if (status === "in_progress") return "#16a34a";
   if (status === "completed")   return "#2563eb";
   return "#9ca3af";
+}
+
+// ── Trial limit badge ──────────────────────────────────────────────────────────
+
+function TrialLimitBadge() {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 3,
+      fontSize: 10, fontWeight: 600, color: "#9ca3af",
+      background: "rgba(156,163,175,0.12)",
+      border: "1px solid rgba(156,163,175,0.25)",
+      borderRadius: 100, padding: "1px 6px",
+    }}>
+      <Lock size={8} />
+      Trial limit reached
+    </span>
+  );
 }
 
 // ── List panel ─────────────────────────────────────────────────────────────────
@@ -74,6 +91,7 @@ function ConversationList({
             borderBottom: "1px solid rgba(6,46,113,0.06)",
             background: selectedId === c.id ? "rgba(6,46,113,0.06)" : "transparent",
             transition: "background 0.12s",
+            opacity: c.isOverCap ? 0.75 : 1,
           }}
           onMouseEnter={(e) => {
             if (selectedId !== c.id) e.currentTarget.style.background = "rgba(6,46,113,0.03)";
@@ -91,7 +109,7 @@ function ConversationList({
             </div>
             <span style={{ fontSize: 11, color: "#9ca3af" }}>{fmtDate(c.lastMessageAt)}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{
               display: "inline-flex", alignItems: "center", gap: 4,
               fontSize: 10.5, fontWeight: 600, color: statusColor(c.status),
@@ -103,6 +121,7 @@ function ConversationList({
               }} />
               {c.status.replace("_", " ")}
             </span>
+            {c.isOverCap && <TrialLimitBadge />}
           </div>
         </div>
       ))}
@@ -138,7 +157,7 @@ function MessageThread({
           <ArrowLeft size={18} />
         </button>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <Phone size={14} style={{ color: "#6b7280" }} />
             <span style={{ fontSize: 14.5, fontWeight: 700, color: "#111827" }}>
               {conversation.callerPhone}
@@ -150,6 +169,7 @@ function MessageThread({
             }}>
               {conversation.status.replace("_", " ")}
             </span>
+            {conversation.isOverCap && <TrialLimitBadge />}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
             <Clock size={11} style={{ color: "#9ca3af" }} />
@@ -159,6 +179,25 @@ function MessageThread({
           </div>
         </div>
       </div>
+
+      {/* Over-cap notice */}
+      {conversation.isOverCap && (
+        <div style={{
+          background: "rgba(156,163,175,0.08)",
+          borderBottom: "1px solid rgba(156,163,175,0.18)",
+          padding: "8px 20px",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <Lock size={12} style={{ color: "#9ca3af", flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: "#6b7280" }}>
+            This conversation was logged but did not receive an automated AI reply —
+            your trial limit was reached.{" "}
+            <a href="/app/settings#upgrade" style={{ color: "#062e71", fontWeight: 600, textDecoration: "underline" }}>
+              Upgrade to respond automatically
+            </a>
+          </span>
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px" }}>
@@ -220,9 +259,8 @@ export default function ReceptionistConversations() {
   const [detail,        setDetail]        = useState<{ conversation: Conversation; messages: Message[] } | null>(null);
   const [loadingList,   setLoadingList]   = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [showThread,    setShowThread]    = useState(!!urlId); // mobile: show thread panel
+  const [showThread,    setShowThread]    = useState(!!urlId);
 
-  // Load conversations list
   useEffect(() => {
     fetch("/api/receptionist/conversations", { credentials: "include" })
       .then((r) => r.json() as Promise<{ conversations: Conversation[] }>)
@@ -231,7 +269,6 @@ export default function ReceptionistConversations() {
       .finally(() => setLoadingList(false));
   }, []);
 
-  // Load detail when selected changes
   useEffect(() => {
     if (!selectedId) { setDetail(null); return; }
     setLoadingDetail(true);
@@ -263,7 +300,6 @@ export default function ReceptionistConversations() {
             overflow: "hidden",
           }}
         >
-          {/* Panel header */}
           <div style={{
             padding: "16px 16px 12px",
             borderBottom: "1px solid rgba(6,46,113,0.07)",

@@ -85,9 +85,10 @@ export default function ReceptionistAppShell({ children }: ReceptionistAppShellP
 
   if (!me) return null;
 
-  const used  = me.conversationCount;
-  const limit = me.firm.trialConversationsLimit;
-  const pct   = Math.min(100, Math.round((used / limit) * 100));
+  const used     = me.conversationCount;
+  const limit    = me.firm.trialConversationsLimit;
+  const pct      = Math.min(100, Math.round((used / limit) * 100));
+  const atOrOver = me.firm.planTier !== "paid" && used >= limit;
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <aside
@@ -223,6 +224,24 @@ export default function ReceptionistAppShell({ children }: ReceptionistAppShellP
             transition: "width 0.4s ease",
           }} />
         </div>
+        {atOrOver && (
+          <a
+            href="/app/settings#upgrade"
+            style={{
+              marginLeft: 4,
+              fontSize: 11.5, fontWeight: 700, color: "#fff",
+              background: "rgba(255,255,255,0.20)",
+              border: "1px solid rgba(255,255,255,0.35)",
+              borderRadius: 100, padding: "2px 10px",
+              textDecoration: "none", flexShrink: 0,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.30)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.20)"; }}
+          >
+            Upgrade →
+          </a>
+        )}
       </div>
 
       {/* ── Body ── */}

@@ -90,6 +90,18 @@ export const insertIntakeCaseSchema = createInsertSchema(intakeCases).omit({
   id: true, createdAt: true, updatedAt: true,
 });
 
+// ── receptionist_sessions ─────────────────────────────────────────────────────
+// Persistent cookie sessions for AI Receptionist customer logins.
+// Separate from CRM admin auth (Bearer token in localStorage — no cookies).
+
+export const receptionistSessions = pgTable("receptionist_sessions", {
+  token:     text("token").primaryKey(),
+  firmId:    integer("firm_id").notNull(),
+  email:     text("email").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type IntakeFirm         = typeof intakeFirms.$inferSelect;

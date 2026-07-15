@@ -12,7 +12,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { validateIntakeTwilioSignature } from "../lib/intakeTwilio.js";
 import { validateToken } from "../lib/admin-session.js";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import {
   db,
   intakeFirms,
@@ -298,7 +298,9 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
       ))
       .limit(1);
 
+    let isNewConversation = false;
     if (!conversation) {
+      isNewConversation = true;
       const rows = await db.insert(intakeConversations).values({
         firmId:        firm.id,
         callerPhone:   From,
@@ -321,6 +323,27 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
       direction:      "inbound",
       body:           Body,
     });
+
+    // ── 3.5. Trial cap check (new conversations only) ────────────────────────
+    // Existing in-progress conversations are NEVER interrupted — cap only gates
+    // whether a brand-new conversation starts the automated AI loop.
+    // We still create the conversation row + log the inbound message above so
+    // the lead is never silently dropped.
+    if (isNewConversation && firm.planTier !== "paid") {
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(intakeConversations)
+        .where(eq(intakeConversations.firmId, firm.id));
+      const total = Number(countRow?.count ?? 0);
+      if (total > firm.trialConversationsLimit) {
+        req.log.info(
+          { firmId: firm.id, total, limit: firm.trialConversationsLimit },
+          "[intake] Trial cap reached — conversation logged but AI reply suppressed",
+        );
+        res.type("text/xml").send("<Response></Response>");
+        return;
+      }
+    }
 
     // ── 4. Load message history and existing case ─────────────────────────────
     const history = await db.select().from(intakeMessages)
