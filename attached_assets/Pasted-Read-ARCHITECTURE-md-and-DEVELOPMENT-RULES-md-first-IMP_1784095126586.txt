@@ -1,0 +1,132 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+ 
+IMPORTANT CONTEXT: /ai-receptionist already exists as a route — it's
+LandingReceptionist.tsx, built during an earlier smoke-test phase, wired to:
+- page-view tracking (POST /api/landing-test/view, vertical="receptionist")
+- UTM capture (utm_source/utm_medium/utm_campaign read from the URL)
+- signup capture (POST /api/landing-test/submit, vertical="receptionist"),
+  which inserts into the existing formSubmissions table
+ 
+This task REPLACES/REDESIGNS the visual content and copy of that existing
+page — it does NOT create a new project, a new route, or a new artifact.
+Do not touch /api/landing-test/submit, /api/landing-test/view, or any other
+backend route. Preserve the existing page-view and UTM tracking calls
+exactly as they are (reuse the same fetch calls already in the file) — only
+the visual design, layout, and copy should change. If any real signups
+already exist in formSubmissions for this vertical, confirm before/after
+that the submit flow still works identically post-redesign.
+ 
+Do not touch locked modules. Do not touch /api/contact/submit or Contact.tsx.
+ 
+BUDGET EXCEPTION (explicitly approved): this is a full visual redesign of
+one existing page. Expect significant line changes to LandingReceptionist.tsx
+itself; do not touch other files beyond what's needed for shared UI
+components already used elsewhere in web-agency (prefer reusing existing
+shadcn/ui components over adding new dependencies).
+ 
+---
+ 
+Build a modern, responsive one-page landing site for the "AI Receptionist"
+product offered by SiteMint Digital. Use the existing React + Tailwind CSS
+stack already in this codebase — do not introduce a separate build system.
+Match SiteMint Digital's ACTUAL existing brand as already implemented in
+Home.tsx and index.css: deep navy blue (primary token, ~hsl(218 90% 23%)),
+blue/indigo accents, Plus Jakarta Sans for body and Playfair Display for
+display headings (both already loaded), rounded-xl/2xl cards with soft
+shadows, subtle gradients — reuse existing Tailwind theme tokens
+(bg-primary, text-foreground, etc.) rather than hardcoding new hex values,
+so this page stays in sync if the theme ever changes.
+ 
+Sections, top to bottom:
+ 
+1. Sticky nav — logo left (reuse the existing SiteMintLogo component, don't
+   rebuild it), center links (Features, How It Works, Pricing, FAQ), right:
+   secondary outline "See a demo" button + primary "Talk to us" button.
+   (Not "Try Demo" / "Start Your Project" — see honesty note below on CTAs.)
+ 
+2. Hero — two columns. Left: eyebrow tag, bold headline about an AI
+   receptionist that answers instantly so businesses stop losing jobs to
+   voicemail, short subheadline, 3 trust bullets that are true today (e.g.
+   "answers by text in seconds," "asks the right questions for your
+   business," "you review every conversation before anything is missed") —
+   do NOT claim a free trial, a customer cap, or "no card required," since
+   there's no self-serve signup or billing built yet. CTA row: primary
+   "Talk to us about your business" + secondary "See it in action" with a
+   play-style icon that scrolls to the interactive demo, not an actual
+   video (none exists yet). Right: a phone/chat mockup card showing an
+   "AI Receptionist — Online" badge and a sample exchange.
+ 
+3. Industry selector strip — pill row (Real Estate, Law Firm, Home
+   Services, Med Spa, Restaurant, Retail). Make this FUNCTIONAL, not
+   decorative: clicking a pill swaps the sample conversation shown in the
+   hero or an adjacent demo card to one written for that industry (3-4
+   exchanges each, distinct qualifying questions per industry — e.g. Home
+   Services asks about the issue and urgency, Med Spa asks about the
+   treatment of interest, Law Firm asks what happened and when). This is a
+   real differentiator — showing configurability instead of just claiming
+   it. Frame copy so it's clear these are configurable, not implying every
+   industry already has a fully deployed live agent.
+ 
+4. Stats bar — 3 numbers grounded in real industry research, not invented:
+   "60-80% of calls go unanswered," "<15 sec average response time,"
+   "$150-1,200+ typical value of one qualified lead." Cite these as
+   industry figures, not SiteMint's own results (no results exist yet).
+ 
+5. Benefits — 4 feature blocks (capturing leads that would otherwise go
+   cold, guiding conversations toward booking, automating follow-up so
+   nothing falls through, staying on-brand and consistent 24/7) + a chat
+   transcript mockup card styled like iMessage bubbles. Skip the "listen to
+   a sample call" audio widget for now — no voice capability exists yet;
+   revisit once ConversationRelay is built.
+ 
+6. How it works — 3 steps: "Tell us about your business," "We connect your
+   calendar and tools," "Your AI receptionist goes live" — matches the
+   actual onboarding flow (currently white-glove/internal-configured, not
+   self-serve, so keep copy honest that "we" set it up, not "you" configure
+   it yourself).
+ 
+7. Integrations — short blurb + icon row: Google Calendar, email, SMS,
+   website chat. Only show integrations that are real or realistically
+   near-term — don't include ones with no plan behind them.
+ 
+8. Testimonials — build the section structurally, but use clearly marked
+   placeholder content (e.g. a subtle "example" tag) rather than fabricated
+   named quotes, until there's a real pilot client to quote. Swap in real
+   testimonials the moment one exists.
+ 
+9. Pricing — do NOT reuse the existing website-package tiers (Essential
+   Presence / Growth Platform / etc. — those are one-time web design
+   packages, wrong product entirely). Write dedicated pricing for this
+   product: a one-time setup fee ($500-1,500, positioned as "customized to
+   your business") and a monthly plan ($99-299/mo depending on volume).
+   Simple 1-2 card layout, not a full 3-tier grid unless there's a real
+   reason to split it.
+ 
+10. FAQ accordion — 5-6 questions: what is it, does it replace my staff or
+    work alongside them, can it handle calls (be honest: currently text-
+    based, voice coming), is setup really fast, what happens after
+    onboarding, can it connect to tools I already use.
+ 
+11. Final CTA banner — full-width dark navy, headline encouraging a
+    conversation, primary button "Talk to us."
+ 
+12. Footer — logo, tagline, nav links, contact info, copyright. Reuse the
+    existing Footer component if the visual style fits, or a simplified
+    version consistent with it.
+ 
+Design details: rounded-xl/2xl cards, soft shadows, generous whitespace,
+smooth hover states, subtle scroll-reveal animations (reuse framer-motion,
+already a dependency). Fully responsive — test and confirm no horizontal
+overflow at 375px, 768px, and 1440px before calling this done, same
+standard as prior sessions in this codebase.
+ 
+Return:
+- Confirm the existing page-view tracking, UTM capture, and signup submit
+  calls still work identically after the redesign (test via the same
+  method prior sessions used — curl or direct verification, not just code
+  review)
+- Confirm /api/contact/submit, Contact.tsx, and all locked files were
+  untouched
+- Confirm responsiveness at all 3 breakpoints
+- TypeScript status
+- Files changed
