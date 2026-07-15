@@ -64,6 +64,8 @@ router.post("/receptionist/auth/signup", async (req: Request, res: Response) => 
           twilioNumber:            phone?.trim() || "",
           planTier:                "trial",
           trialConversationsLimit: 20,
+          industry:                industry?.trim() || null,
+          qualifyingQuestions:     [],
         })
         .returning({
           id:         intakeFirms.id,

@@ -1,12 +1,12 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 // ── intake_firms ──────────────────────────────────────────────────────────────
-// One row per law firm using the AI intake product.
-// statuteOfLimitationsDays is a simplified single value for MVP purposes.
-// NOTE: This is a placeholder for demo/testing only — not legal advice. Real
-// statute of limitations depends on claim type, state, and individual facts.
+// One row per business using the AI Receptionist product.
+// NOTE: law-firm-specific fields (statuteOfLimitationsDays, practiceAreas,
+// statesServed) are retained for backward compat with seeded test data.
+// New firms use industry + businessDescription + qualifyingQuestions instead.
 
 export const intakeFirms = pgTable("intake_firms", {
   id:                        serial("id").primaryKey(),
@@ -18,7 +18,6 @@ export const intakeFirms = pgTable("intake_firms", {
   notifyEmail:               text("notify_email").notNull(),
   twilioNumber:              text("twilio_number").notNull(),
   // ── Account auth columns (nullable so seeded test rows are unaffected) ──────
-  // Application layer enforces not-null for new signups.
   email:                     text("email").unique(),
   passwordHash:              text("password_hash"),
   planTier:                  text("plan_tier").notNull().default("trial"),
@@ -26,11 +25,18 @@ export const intakeFirms = pgTable("intake_firms", {
   // ── Stripe billing (nullable until firm upgrades) ────────────────────────
   stripeCustomerId:          text("stripe_customer_id"),
   stripeSubscriptionId:      text("stripe_subscription_id"),
+  // ── Agent configuration (Phase 4) ─────────────────────────────────────────
+  // industry: determines conversation style + scoring rules
+  // greetingMessage: literal first SMS the AI sends to a new caller
+  // businessDescription: 1-2 sentence context the AI uses in its system prompt
+  // qualifyingQuestions: ordered list of topics the AI should ask about (max 6)
+  industry:                  text("industry"),
+  greetingMessage:           text("greeting_message"),
+  businessDescription:       text("business_description"),
+  qualifyingQuestions:       jsonb("qualifying_questions").$type<string[]>(),
 });
 
 // ── intake_conversations ──────────────────────────────────────────────────────
-// One row per caller × firm conversation thread.
-// status: "in_progress" | "completed" | "abandoned"
 
 export const intakeConversations = pgTable("intake_conversations", {
   id:            serial("id").primaryKey(),
@@ -42,8 +48,6 @@ export const intakeConversations = pgTable("intake_conversations", {
 });
 
 // ── intake_messages ───────────────────────────────────────────────────────────
-// Individual SMS messages in a conversation.
-// direction: "inbound" | "outbound"
 
 export const intakeMessages = pgTable("intake_messages", {
   id:             serial("id").primaryKey(),
@@ -54,9 +58,10 @@ export const intakeMessages = pgTable("intake_messages", {
 });
 
 // ── intake_cases ──────────────────────────────────────────────────────────────
-// Structured case data extracted from a conversation (one per conversation).
-// Fields are nullable — populated incrementally as the AI extracts them.
-// incidentDate stored as text so it can hold approximate values like "March 2024".
+// Structured data extracted from a conversation (one per conversation).
+// For law firms: law-specific fields are populated.
+// For other industries: incidentType = topic, injurySeverity = engagement level,
+// faultDescription = Q&A summary text, law-specific fields are null.
 
 export const intakeCases = pgTable("intake_cases", {
   id:                      serial("id").primaryKey(),
@@ -94,8 +99,6 @@ export const insertIntakeCaseSchema = createInsertSchema(intakeCases).omit({
 });
 
 // ── receptionist_sessions ─────────────────────────────────────────────────────
-// Persistent cookie sessions for AI Receptionist customer logins.
-// Separate from CRM admin auth (Bearer token in localStorage — no cookies).
 
 export const receptionistSessions = pgTable("receptionist_sessions", {
   token:     text("token").primaryKey(),

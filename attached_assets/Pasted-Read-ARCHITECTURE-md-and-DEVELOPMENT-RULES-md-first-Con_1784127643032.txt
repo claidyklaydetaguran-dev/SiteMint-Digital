@@ -1,0 +1,107 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Context: phases 1-3 built real multi-tenant customer accounts, trial-cap
+enforcement, and Stripe upgrade billing for the AI Receptionist product.
+There is a real gap underneath all of it: the conversation engine
+(routes/intakeAgent.ts, POST /intake/sms-webhook) is still hardcoded to
+law-firm-specific questions and scoring (incident date, prior attorney,
+statute of limitations) regardless of what industry a signed-up firm
+actually is. A realtor or restaurant account today would still get asked
+lawyer questions. This phase fixes that AND builds the real Agent Config
+page (currently a "coming soon" placeholder).
+
+Do not touch locked modules (routes/phone.ts, lib/discEngine.ts,
+lib/leadScore.ts, lib/communicationIntelligence.ts, lib/workflowEngine.ts).
+Do not touch CRM admin auth, Stripe billing routes/webhook from phase 3,
+or /api/landing-test/*.
+
+BUDGET EXCEPTION (explicitly approved): schema change + conversation
+engine generalization + scoring generalization + new settings UI. Expect
+significant changes to intakeAgent.ts and intakeScoring.ts specifically —
+be careful and surgical there, these are the most business-critical files
+in the product.
+
+---
+
+1. SCHEMA — add to intakeFirms:
+   - greetingMessage (text, nullable) — the AI's opening line
+   - businessDescription (text, nullable) — 1-2 sentences the AI uses as
+     context about what this business does
+   - qualifyingQuestions (jsonb, default '[]') — array of short strings,
+     each a thing the AI should try to find out during the conversation
+     (e.g. "What type of property are they looking for?", "What's their
+     budget range?", "How soon do they want to move?")
+   - industry (if not already a column post-signup — check first; it may
+     already be captured at signup time and just need surfacing here)
+
+   For the existing seeded law-firm test data AND any real firms that
+   signed up with industry = "Law Firm" before this change, backfill
+   sensible defaults so nothing breaks: greetingMessage referencing legal
+   help, qualifyingQuestions populated with the existing hardcoded
+   questions (what happened, when, injury severity, prior attorney).
+
+2. GENERALIZE THE CONVERSATION ENGINE (routes/intakeAgent.ts)
+
+   Build the LLM system prompt dynamically per firm using
+   businessDescription + greetingMessage + qualifyingQuestions instead of
+   the hardcoded law-firm prompt. The AI's job becomes generic: have a
+   natural conversation, work through the firm's configured questions
+   (doesn't have to be rigid order), and extract answers.
+
+   The existing law-specific hard rules (prior attorney → disqualify,
+   outside statute of limitations → disqualify) must become CONDITIONAL —
+   only apply them when the firm's industry is "Law Firm" AND those
+   specific fields are still present/configured. Do not silently apply
+   legal-specific disqualification logic to a restaurant or realtor's
+   conversations. Structure this so it's extendable to other
+   industry-specific rules later without another full rewrite (e.g. a
+   simple switch/lookup by industry for any industry-specific hard rules,
+   defaulting to none for industries without special rules yet).
+
+3. GENERALIZE SCORING (lib/intakeScoring.ts)
+
+   Keep the existing Hot/Warm/Cold/Disqualified/Needs Review tiers, but
+   make the default (non-law) scoring generic and explainable: e.g. Hot =
+   all configured qualifying questions got clear answers and no
+   disengagement signals; Warm = some answered; Cold = caller went quiet
+   or gave only vague answers. Keep this deterministic and rule-based per
+   the existing pattern in this file — do NOT let the LLM decide the
+   final tier, same principle as the original build. Law Firm keeps its
+   existing specific rules layered on top of (not replacing) this generic
+   base.
+
+4. AGENT CONFIG PAGE (ReceptionistAgentConfig.tsx)
+
+   Replace the "coming soon" placeholder with a real editable form:
+   - Business description (textarea)
+   - Greeting message (textarea, with a note this is literally the AI's
+     first message to a new caller)
+   - Qualifying questions — a repeatable list (add/remove/reorder rows),
+     each a short text input. Cap at a reasonable max (e.g. 6) so the
+     conversation doesn't become an interrogation — enforce this in the UI
+     and the API.
+   - Save button → PATCH /api/receptionist/agent-config (new route, gated
+     by requireReceptionistAuth, updates only the logged-in firm's own
+     row — same firmId-scoping discipline as the conversations routes).
+   - Show a brief live preview of how the greeting will look as the first
+     message bubble, reusing the existing chat-bubble styling from
+     elsewhere in this product if available.
+
+Return:
+- Confirm the seeded law-firm test data still produces correct
+  Hot/Warm/Disqualified results end-to-end after this change (rerun the
+  same test conversations used in earlier phases if still available, or
+  equivalent new ones) — this is the highest-risk regression, verify it
+  directly, don't just claim it
+- Create a NEW test firm with industry other than "Law Firm" (e.g. Real
+  Estate) with 2-3 custom qualifying questions, run a real conversation
+  through the sms-webhook, and confirm: the AI actually asks about the
+  configured topics (not legal questions), extracts answers, and produces
+  a sensible generic tier — show the full conversation and resulting row
+  - Confirm the Agent Config page saves correctly and the next
+  conversation for that firm reflects the updated greeting/questions
+- Confirm PATCH /api/receptionist/agent-config cannot be used to edit
+  another firm's config (same cross-firm isolation test as earlier phases)
+- TypeScript status
+- Confirm no locked files, CRM admin auth, or Stripe billing code were
+  touched
