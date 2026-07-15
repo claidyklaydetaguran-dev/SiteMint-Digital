@@ -9,8 +9,8 @@ import Inbox from "@/pages/Inbox";
 import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
 import NewTicket from "@/pages/NewTicket";
-import Agents from "@/pages/Agents";
 import Settings from "@/pages/Settings";
+import Deploy from "@/pages/Deploy";
 import Billing from "@/pages/Billing";
 
 const queryClient = new QueryClient();
@@ -23,7 +23,7 @@ function Router() {
         <Route path="/contacts" component={Contacts} />
         <Route path="/contacts/:id" component={ContactDetail} />
         <Route path="/tickets/new" component={NewTicket} />
-        <Route path="/agents" component={Agents} />
+        <Route path="/deploy" component={Deploy} />
         <Route path="/settings" component={Settings} />
         <Route path="/billing" component={Billing} />
         <Route component={NotFound} />
