@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, type Variants } from "framer-motion";
-import { Navbar } from "@/components/layout/Navbar";
+import { ReceptionistNav } from "@/components/layout/ReceptionistNav";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -281,7 +281,7 @@ export default function LandingReceptionist() {
     <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
 
       {/* ── Real Navbar ────────────────────────────────────────────────────── */}
-      <Navbar />
+      <ReceptionistNav />
 
       {/* spacer so content clears the fixed Navbar (~78px tall) */}
       <div className="h-[82px]" />

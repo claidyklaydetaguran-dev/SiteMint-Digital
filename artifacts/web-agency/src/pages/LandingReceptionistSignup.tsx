@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { SiteMintLogo } from "@/components/SiteMintLogo";
+import { ReceptionistNav } from "@/components/layout/ReceptionistNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,17 +86,20 @@ export default function LandingReceptionistSignup() {
 
   return (
     <div className="min-h-screen bg-background font-sans overflow-x-hidden">
-      <div className="min-h-screen flex flex-col md:flex-row">
+      <ReceptionistNav />
+      {/* spacer for fixed nav */}
+      <div className="h-[82px]" />
+
+      <div className="min-h-[calc(100vh-82px)] flex flex-col md:flex-row">
 
         {/* ── Left — form ────────────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col px-6 py-10 md:px-12 md:py-16 max-w-xl w-full mx-auto md:mx-0 md:max-w-none md:basis-[480px] md:shrink-0">
-          {/* Back link + logo */}
-          <div className="flex items-center justify-between mb-10">
+          {/* Back link */}
+          <div className="flex items-center mb-10">
             <Link href="/ai-receptionist" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="w-3.5 h-3.5" />
               Back
             </Link>
-            <SiteMintLogo variant="dark" iconSize={26} />
           </div>
 
           {success ? (

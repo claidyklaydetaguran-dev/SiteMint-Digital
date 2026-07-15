@@ -1,0 +1,41 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Small, targeted fix. Stay within budget (2 files, 150 lines, 0 migrations).
+
+Context: the last session reused the main site's <Navbar /> component
+as-is on /ai-receptionist — same visual style is correct, but it carries
+the main agency's nav links (Services, Portfolio, About, Contact) and
+"Start Your Project" CTA, which don't belong on a product-specific landing
+page. This task creates a product-specific nav with the SAME visual style
+(floating pill, scroll shadow, hover animation, mobile hamburger with
+AnimatePresence — copy the styling/motion approach from Navbar.tsx) but
+different content.
+
+Do not touch the real Navbar.tsx (still used correctly on the main site).
+Do not touch locked files or /api/landing-test/* routes.
+
+Task:
+1. New component, e.g. src/components/layout/ReceptionistNav.tsx — same
+   floating-pill visual treatment as Navbar.tsx, but:
+   - Logo/wordmark area: keep SiteMintLogo but consider a small
+     "AI Receptionist" label/badge next to it so it's clear this is a
+     product page, not the main site (your call on exact treatment —
+     keep it subtle, not a full rebrand)
+   - Center links: Features, How It Works, Pricing, FAQ — these should
+     scroll-link to the matching sections already present on
+     LandingReceptionist.tsx (check the section ids/anchors that exist,
+     add them if missing)
+   - Right side: single primary CTA, "Get early access" → links to
+     /ai-receptionist/signup (same route already built)
+2. Use ReceptionistNav on both /ai-receptionist and
+   /ai-receptionist/signup, replacing the current <Navbar /> usage on
+   those two pages only. Do not change any other page's nav.
+
+Return:
+- Files changed
+- Confirm /ai-receptionist and /ai-receptionist/signup now show the new
+  nav, and no other page's nav changed
+- Confirm scroll-link anchors actually work (clicking "Pricing" scrolls to
+  the pricing section, etc.)
+- Responsiveness at 375px/768px/1440px
+- TypeScript status
