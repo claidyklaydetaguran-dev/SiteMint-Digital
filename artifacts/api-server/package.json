@@ -13,6 +13,7 @@
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
@@ -26,6 +27,7 @@
     "twilio": "^6.0.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

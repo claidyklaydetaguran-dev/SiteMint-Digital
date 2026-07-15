@@ -1,0 +1,129 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+CONTEXT — this is a scope change, read carefully before starting.
+
+Up to now, the AI Receptionist signup form (/ai-receptionist/signup) only
+captured a lead via POST /api/landing-test/submit — no real account was
+created, and the confirmation was intentionally "you're on the list," not a
+real login. That was correct for a smoke test. It no longer is: we're now
+building the AI Receptionist as a real multi-tenant SaaS product with its
+own customer accounts, completely separate from the internal CRM's admin
+login. This task builds that foundation. It does NOT build Stripe billing,
+hard trial-limit enforcement, or the CRM's admin oversight view of all
+customers — those are separate, later tasks. Do not attempt them here.
+
+Do not touch locked modules (routes/phone.ts, lib/discEngine.ts,
+lib/leadScore.ts, lib/communicationIntelligence.ts, lib/workflowEngine.ts).
+Do not touch the CRM's existing admin auth/session logic — this is a NEW,
+separate auth system for AI Receptionist customers, not a change to how
+SiteMint's own team logs into the CRM. Do not touch
+/api/landing-test/view or page-view tracking.
+
+BUDGET EXCEPTION (explicitly approved): schema migration + new auth routes
++ new middleware + new customer-facing pages. Expect several hundred lines
+across multiple files.
+
+---
+
+1. SCHEMA — extend intakeFirms for real accounts (lib/db/src/schema/intakeAgent.ts)
+
+Add columns to the existing intakeFirms table:
+- email (text, unique, not null) — the account's login email
+- passwordHash (text, not null) — bcrypt hash, never store plaintext
+- planTier (text, not null, default 'trial') — 'trial' | 'paid'
+- trialConversationsLimit (integer, not null, default 20)
+- createdAt (timestamp, default now) — if not already present
+
+Any existing test firm rows (e.g. the seeded "AI for Lawyers (Test)" firm)
+won't have email/passwordHash — either backfill a placeholder for that one
+seeded row so the migration doesn't fail, or make the columns nullable and
+enforce "not null" at the application layer for new signups only. Note
+which approach you took in the Return report.
+
+2. NEW AUTH — separate from CRM admin auth entirely
+
+New file, e.g. artifacts/api-server/src/lib/receptionistAuth.ts:
+- Session mechanism scoped to this product only — different cookie name
+  than whatever the CRM admin session uses (check lib/auth or wherever the
+  CRM admin session lives first, so there's no collision), e.g.
+  "receptionist_session".
+- requireReceptionistAuth middleware — validates the session, attaches the
+  authenticated firmId to the request. A logged-in receptionist customer
+  should only ever be able to query their OWN firmId's data — enforce this
+  server-side in every new route below, not just in the UI.
+
+New routes, e.g. artifacts/api-server/src/routes/receptionistAuth.ts:
+- POST /api/receptionist/auth/signup — body: fullName, businessName, email,
+  phone, industry, password. Creates the intakeFirms row (hash the
+  password with bcrypt), sets the session cookie, returns the new account.
+  Reject if email already exists (clear error, not a 500).
+- POST /api/receptionist/auth/login — email + password, bcrypt compare,
+  sets session cookie.
+- POST /api/receptionist/auth/logout — clears session cookie.
+- GET /api/receptionist/auth/me — returns the logged-in account's firm
+  record (minus passwordHash) plus a count of their conversations so far
+  (for the trial usage banner in step 4). 401 if not logged in.
+
+3. WIRE UP THE EXISTING SIGNUP FORM
+
+Update LandingReceptionistSignup.tsx: on submit, call the new
+POST /api/receptionist/auth/signup instead of (or in addition to —
+your call, but real account creation is the important part now)
+POST /api/landing-test/submit. On success, redirect into the new
+logged-in app (step 4) rather than showing the old static "you're on the
+list" confirmation — the account is now real, so the visitor should
+actually land inside the product.
+
+4. NEW CUSTOMER APP SHELL — separate from CrmLayout entirely
+
+New route, e.g. /app (confirm this doesn't collide with anything existing
+in App.tsx's route list first). Gated by requireReceptionistAuth — redirect
+to a login page if no valid session.
+
+New login page, e.g. ReceptionistLogin.tsx, at /app/login — simple email +
+password form, calls POST /api/receptionist/auth/login.
+
+New shell component, e.g. ReceptionistAppShell.tsx — its own nav, visually
+distinct from BOTH the main site nav and the CrmLayout dark sidebar (this
+is the customer's product, give it its own identity per earlier design
+direction — reuse SiteMint's navy/blue palette, not a copy of CrmLayout's
+exact dark theme). Nav items: Conversations (build this one for real),
+Agent config (placeholder page, "coming soon" is fine), Settings
+(placeholder page, "coming soon" is fine).
+
+Conversations page — reuse the existing intakeConversations/intakeMessages
+query pattern from routes/intakeAgent.ts, but build a NEW customer-scoped
+endpoint (e.g. GET /api/receptionist/conversations, GET
+/api/receptionist/conversations/:id) gated by requireReceptionistAuth that
+filters by req.firmId — do NOT reuse the existing requireAdmin-gated
+/intake/cases route for this, that one is for SiteMint's internal team and
+returns data across all firms, which a customer must never see. List +
+detail view, same visual pattern already used in earlier mockups (list on
+left, message thread on right).
+
+Trial usage banner — at the top of the app shell, show "{count}/{limit}
+conversations used this trial" using the data from GET
+/api/receptionist/auth/me. Purely informational for now — do NOT block or
+gate anything when the count reaches the limit yet, that enforcement is
+the next task once this foundation is confirmed working. Just make the
+number accurate and visible.
+
+Return:
+- Files changed, including the exact migration applied
+- Confirm a real signup creates an intakeFirms row with a hashed password
+  (show the row minus the actual hash value) and sets a session cookie
+- Confirm login/logout work (test both) and use a cookie name that does
+  NOT collide with the CRM admin session
+- Confirm GET /api/receptionist/auth/me returns 401 when logged out and the
+  correct account when logged in
+- Confirm the Conversations list/detail page only ever returns data for
+  the logged-in account's own firmId — test by creating two different
+  accounts and confirming account A cannot see account B's conversations
+  even by guessing an ID
+- Confirm the seeded test firm ("AI for Lawyers (Test)") still works
+  end-to-end for the existing internal /intake/cases admin flow (i.e. this
+  change didn't break the existing admin review path)
+- Confirm no locked files, CRM admin auth/session code, or
+  /api/landing-test/view were touched
+- TypeScript status
+- Responsiveness of the new login page and app shell at 375px/768px/1440px

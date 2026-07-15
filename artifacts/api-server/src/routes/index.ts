@@ -12,6 +12,8 @@ import aiCampaignGenerateRouter from "./aiCampaignGenerate";
 import aiToolkitRouter from "./aiToolkit";
 import landingTestRouter from "./landingTest";
 import intakeAgentRouter from "./intakeAgent";
+import receptionistAuthRouter from "./receptionistAuth";
+import receptionistConversationsRouter from "./receptionistConversations";
 
 const router: IRouter = Router();
 
@@ -28,5 +30,7 @@ router.use(aiCampaignGenerateRouter);
 router.use(aiToolkitRouter);
 router.use(landingTestRouter);
 router.use(intakeAgentRouter);
+router.use(receptionistAuthRouter);
+router.use(receptionistConversationsRouter);
 
 export default router;

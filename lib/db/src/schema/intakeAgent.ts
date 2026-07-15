@@ -17,6 +17,12 @@ export const intakeFirms = pgTable("intake_firms", {
   statuteOfLimitationsDays:  integer("statute_of_limitations_days").notNull(),
   notifyEmail:               text("notify_email").notNull(),
   twilioNumber:              text("twilio_number").notNull(),
+  // ── Account auth columns (nullable so seeded test rows are unaffected) ──────
+  // Application layer enforces not-null for new signups.
+  email:                     text("email").unique(),
+  passwordHash:              text("password_hash"),
+  planTier:                  text("plan_tier").notNull().default("trial"),
+  trialConversationsLimit:   integer("trial_conversations_limit").notNull().default(20),
 });
 
 // ── intake_conversations ──────────────────────────────────────────────────────
