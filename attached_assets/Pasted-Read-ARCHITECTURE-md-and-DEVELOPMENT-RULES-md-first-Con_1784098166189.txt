@@ -1,0 +1,104 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Context: the AI Receptionist landing page (/ai-receptionist,
+LandingReceptionist.tsx) was just redesigned but feedback was that it feels
+static and generic. This task does three specific things to fix that — do
+not do a fresh redesign, make targeted changes to what exists.
+
+Do not touch locked modules, /api/contact/submit, or Contact.tsx. Do not
+touch /api/landing-test/view or the existing page-view tracking logic.
+
+BUDGET EXCEPTION (explicitly approved): new signup page/route + interactive
+demo rewrite + nav swap. Expect several hundred lines across a few files.
+
+---
+
+1. NAVBAR — use the real one, not a custom one.
+
+Replace whatever custom nav currently exists on LandingReceptionist.tsx
+with the SAME Navbar component used on the main site (Home.tsx, Services.tsx,
+etc.) — check src/components/layout/Navbar.tsx and reuse it directly rather
+than rebuilding nav markup. If this page currently renders outside the
+<Layout> wrapper (it does, per the earlier "no main layout" pattern used
+for /discovery), either bring it inside <Layout> now that it needs the real
+nav, or import and render <Navbar /> directly at the top of the page —
+whichever causes less disruption to the existing page-view tracking
+useEffect. Confirm the real nav's existing links/behavior (mobile menu,
+scroll behavior, etc.) all work unchanged on this page.
+
+2. INDUSTRY DEMO — make it actually interactive, not a tab switcher.
+
+Currently, clicking an industry pill swaps in a different static
+conversation. Replace this with a real input: a text field where a visitor
+can type a message and press send, and the demo responds — reuse the same
+pattern already prototyped (a small canned-response cycle keyed to the
+selected industry, not a live LLM call — this stays purely client-side
+and free to run, no backend needed). Each industry should have its own
+short sequence of realistic responses so what a visitor experiences
+actually differs by industry, not just the opening line. Keep the pill
+selector to choose industry, but the demo card itself must accept real
+typed input from the visitor, not just display pre-written text.
+
+3. "GET EARLY ACCESS" — new signup screen, real capture, honest ending.
+
+Add a prominent "Get early access" button in the nav (replacing "Talk to
+us" if that's redundant, your call) and as a stronger hero CTA. Clicking it
+navigates to a new signup screen — either a new route (/ai-receptionist/signup)
+or a full-screen modal, whichever fits the existing routing pattern better.
+
+Visual layout: split screen. Left side: a form. Right side: a colored panel
+(use SiteMint's primary navy/blue, not purple/indigo) with a headline like
+"Never miss a customer moment" and 3-4 short feature highlight cards (reuse
+copy themes already established for this product — instant response,
+qualifies the caller, keeps your team in sync).
+
+Form fields — keep this simple and honest, do NOT replicate a full OTP/
+password flow:
+- Full name
+- Business name
+- Email
+- Phone
+- Industry (dropdown, reuse the same 6 options as the pill selector)
+- A "Continue with Google" button IS fine to include visually (matches the
+  reference look) but it has no real OAuth behind it yet — clicking it
+  should NOT do nothing silently (that reads as broken). Either scroll/
+  focus down to the manual form with a small note like "Google sign-in is
+  coming soon — use the form below for now," or disable it with a visible
+  "coming soon" label. Do not build fake Google authentication.
+- DO NOT include password or confirm-password fields, and do NOT include a
+  phone verification/OTP code step. There is no real account system behind
+  this yet, so collecting and pretending to secure a password would be
+  actively misleading — worse than not having the field at all. This is a
+  deliberate simplification, not a corner cut.
+
+Submit behavior: POST to the existing /api/landing-test/submit route,
+vertical="receptionist" (reuse exactly as-is, do not modify the route).
+Add "source": "get-early-access" into the existing extra/formData payload
+so these higher-intent signups are distinguishable later from general page-
+view-only visitors, without needing a schema change (formData is already
+flexible JSON).
+
+On success, do NOT imply the visitor is now logged into a real product.
+Show an honest confirmation: something like "You're on the list — we'll
+reach out personally to get your AI receptionist set up." No dashboard, no
+"logged in" state, no fake product tour — that would be dishonest about
+what currently exists (this is intentional, matches an earlier decision
+that account creation/login is a bigger, separate build for later, not
+this task).
+
+Return:
+- Files changed
+- Confirm the real Navbar renders and behaves correctly on this page
+- Confirm the industry demo accepts typed input and responds per-industry
+  (show at least 2 industries tested)
+- Confirm the signup screen matches the split-layout description, the
+  Google button doesn't silently no-op, and there are no password/OTP
+  fields
+- Confirm a real submit through this new form creates a formSubmissions row
+  with source: "get-early-access" inside form_data (curl or DB check)
+- Confirm existing page-view tracking (view count) still increments
+  correctly
+- Responsiveness at 375px, 768px, 1440px
+- TypeScript status
+- Confirm no locked files, /api/contact/submit, Contact.tsx, or
+  /api/landing-test/view were touched

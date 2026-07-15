@@ -16,6 +16,7 @@ import ThankYou from "@/pages/ThankYou";
 import LandingLawyers from "@/pages/LandingLawyers";
 import LandingRealtors from "@/pages/LandingRealtors";
 import LandingReceptionist from "@/pages/LandingReceptionist";
+import LandingReceptionistSignup from "@/pages/LandingReceptionistSignup";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
@@ -99,6 +100,7 @@ function Router() {
       {/* Landing test pages — no main layout, unlisted */}
       <Route path="/ai-for-lawyers" component={LandingLawyers} />
       <Route path="/ai-for-realtors" component={LandingRealtors} />
+      <Route path="/ai-receptionist/signup" component={LandingReceptionistSignup} />
       <Route path="/ai-receptionist" component={LandingReceptionist} />
 
       {/* Public site — with main layout */}
