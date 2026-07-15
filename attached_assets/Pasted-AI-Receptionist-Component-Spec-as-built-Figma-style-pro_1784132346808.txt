@@ -1,0 +1,145 @@
+AI Receptionist — Component Spec (as-built)
+
+Figma-style props/states spec for the screens that actually exist and have
+real backend behind them today (phases 1-4). Nothing in this document
+describes a feature without working code behind it. Convention: variant
+= enum property, bool = toggle, text = editable string, instance =
+nested component, state = required interaction states.
+
+Design tokens (SiteMint's real tokens — not a new palette)
+
+
+Primary navy: hsl(218 90% 23%) (~#0d3572) — CTAs, active nav, headers
+Accent light blue: hsl(218 45% 93%) (~#e6f1fb) — soft fills, badges
+Background: hsl(218 45% 98%)
+Fonts: Plus Jakarta Sans (body/UI), Playfair Display (marketing headlines only — never inside the app shell, that's UI not editorial)
+Radius: rounded-xl/rounded-2xl on cards, soft shadows, per Home.tsx's actual usage (not the base --radius: 0rem token, which the marketing pages already override)
+Tier colors: Hot = red/coral, Warm = amber, Cold = gray, Disqualified = gray-strong, Needs Review = blue, Trial-limit = amber-muted
+
+
+
+1. Atoms
+
+TierBadge
+Props: tier (variant: hot | warm | cold | disqualified | needs-review), size (sm | md)
+States: Default only (non-interactive)
+
+PlanBadge
+Props: plan (variant: trial | pro)
+States: Default
+
+TrialLimitBadge
+Props: none (single-purpose: "Trial limit reached")
+States: Default
+
+ProgressBar
+Props: value (number), max (number), thresholdWarn (number, default 80%)
+States: Default (under threshold) / Warning (amber, ≥80%) / Full (100%)
+
+CharCounterTextarea
+Props: value (text), maxLength (number), placeholder (text)
+States: Default / Focus / Near-limit (amber, ~90%) / Over-limit (red, blocks save) / Disabled
+
+PasswordField
+Props: value (text), visible (bool, eye-toggle state)
+States: Hidden / Visible / Focus / Error
+
+PillButton
+Props: label (text), urgency (variant: default | upgrade)
+States: Default / Hover / Focus — upgrade variant always uses accent color regardless of surrounding context
+
+ChatBubble
+Props: text (text), speaker (variant: caller | ai), isPreview (bool)
+States: Default — isPreview renders with a dashed border + "Preview" microlabel, used only in Agent Config's live preview
+
+IndustrySelect
+Props: value (variant: one of the 6 signup industries), options (array)
+States: Closed / Open / Selected
+
+
+2. Molecules
+
+TrialUsageBanner
+Props: used (number), limit (number), plan (variant: trial | pro)
+Instance: ProgressBar, PillButton (upgrade, shown only when plan=trial and used ≥ limit×0.8)
+States: Normal / Near-limit / At-limit (shows upgrade pill) / Hidden (plan=pro)
+
+ConversationListItem
+Props: callerPhone (text), tier (instance: TierBadge), previewText (text), timestamp (text), overCap (instance: TrialLimitBadge, conditional), selected (bool)
+States: Default / Hover / Selected / Unread
+
+QualifyingQuestionRow
+Props: text (text, ≤200 chars), index (number), canMoveUp (bool), canMoveDown (bool)
+States: Default / Editing / Reordering (brief highlight on move) — max 6 rows enforced by parent, "+ Add question" hidden at cap
+
+UpgradeInlineNotice
+Props: context (variant: over-cap-thread | settings-cap-reached), ctaHref (text)
+States: Default only
+
+IndustryDemoPill
+Props: label (text), selected (bool)
+States: Default / Hover / Selected — used on landing page industry selector
+
+DemoInputBar
+Props: value (text), placeholder (text)
+States: Empty / Typing / Sent (message appears in the demo thread above) — genuinely interactive per the earlier fix, not a static tab switcher
+
+StatCard / BenefitCard / FAQAccordionItem / TestimonialCard(placeholder-tagged)
+Standard marketing molecules, unchanged from what's live on /ai-receptionist today — no new states needed, listed here for completeness of the page template below.
+
+SidebarNavItem
+Props: label (text), icon (instance), href (text), badge (text, optional — e.g. "new")
+States: Default / Hover / Active
+
+
+3. Organisms
+
+ReceptionistNav (public, marketing pages only)
+Props: ctaLabel (text, always "Get early access")
+States: Default / Scrolled (shadow appears) / Mobile-menu-open
+
+SignupForm
+Props: fields (fullName, businessName, email, phone, industry, password), googleButtonEnabled (bool, currently always false → "coming soon" label), submitState (variant: idle | submitting | error)
+States: Default / Field-error (per-field, e.g. duplicate email from the real API) / Submitting / Success (redirects to /app, no fake "logged in" flash — the account is real by the time this fires)
+
+LoginForm
+Props: submitState (variant: idle | submitting | error)
+States: Default / Invalid-credentials (real API error, not generic) / Submitting
+
+ReceptionistAppShell
+Props: activeRoute (text), firm (instance data: name, plan, usage), mobileDrawerOpen (bool)
+Instance: SidebarNavItem[] (Conversations, Agent config, Settings), TrialUsageBanner
+States: Desktop / Mobile-collapsed / Mobile-drawer-open / Unauthenticated (redirects to /app/login before rendering — verified behavior, not a placeholder)
+
+ConversationsListPanel
+Props: conversations (array of ConversationListItem data), loading (bool)
+States: Loaded / Loading / Empty ("No conversations yet")
+
+ConversationThreadPanel
+Props: messages (array of ChatBubble data), tier (instance: TierBadge), overCap (instance: UpgradeInlineNotice, conditional)
+States: Loaded / Loading / Over-cap (notice shown, no further auto-replies will be sent — UI should say so, not imply the AI is still responding)
+
+AgentConfigForm
+Props: businessDescription (instance: CharCounterTextarea, ≤1000), greetingMessage (instance: CharCounterTextarea, ≤500), questions (instance: QualifyingQuestionRow[], max 6), preview (instance: ChatBubble, isPreview=true, live-bound to greetingMessage), saveState (variant: idle | dirty | saving | saved)
+States: idle (Save disabled) / dirty (Save enabled — unsaved changes) / saving / saved (brief confirmation, matches real PATCH response)
+
+BillingPanel
+Props: plan (variant: trial | pro), usage (instance: TrialUsageBanner data), upgradeState (variant: idle | redirecting | just-upgraded)
+States: Trial (Upgrade to Pro button → real Stripe Checkout redirect) / Pro ("You're on the Pro plan", no cap messaging) / Just-upgraded (post ?upgraded=1 redirect — shows "activating, this can take a moment" until /auth/me confirms plan=pro, not an instant assumption)
+
+CrmReceptionistAccountsTable (internal, admin-gated — not customer-facing)
+Props: accounts (array: businessName, email, industry, plan, conversationCount, limit, signupDate), sortField (text)
+States: Loaded / Empty / Unauthorized (401 — Bearer-gated, never reachable via a receptionist customer session)
+
+
+4. Page templates
+
+RouteOrganisms composedAuth/ai-receptionistReceptionistNav, Hero+DemoInputBar, IndustryDemoPill row, Stats, Benefits, HowItWorks, Pricing, FAQPublic/ai-receptionist/signupReceptionistNav, SignupForm (split layout, navy panel + feature highlights)Public/app/loginLoginFormPublic (redirects to /app if already authenticated)/app (Conversations)ReceptionistAppShell → ConversationsListPanel + ConversationThreadPanelReceptionist session/app/agent-configReceptionistAppShell → AgentConfigFormReceptionist session/app/settingsReceptionistAppShell → BillingPanelReceptionist session/admin/crm/receptionist-accountsCrmLayout (existing dark sidebar) → CrmReceptionistAccountsTableCRM admin Bearer token
+
+What's deliberately excluded from this spec
+
+Live chat widget, softphone/dialer, batch outbound calling, MCP access
+keys, seat-based team billing, presence/online-status — all real
+components in the earlier Solvea-scale spec, none with backend today.
+Kept in OMNICHANNEL-HELPDESK-VISION-NOTES.md as future reference, not
+included here so this document stays trustworthy as a build spec.

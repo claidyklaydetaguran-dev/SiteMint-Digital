@@ -1,0 +1,91 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a VISUAL/UX POLISH PASS ONLY. No backend, schema, route, or
+business-logic changes of any kind — not to trial-cap enforcement, scoring,
+Stripe billing, auth, or any API contract. If a screen needs a new prop or
+field from the backend to support something in the spec below, do NOT add
+it — skip that specific item and list it in the Return report as a gap for
+a future task. This session touches component/page files (.tsx) and
+styling only.
+
+A component spec document is attached/pasted alongside this prompt
+(AI-RECEPTIONIST-COMPONENT-SPEC.md) — treat it as the source of truth for
+what states and variants each component should support. It documents ONLY
+what's actually built (phases 1-4), not the larger future-vision system —
+do not pull in anything from OMNICHANNEL-HELPDESK-VISION-NOTES.md, that
+stays out of scope.
+
+Do not touch locked modules. Do not touch any route handler logic, any
+schema file, receptionistAuth.ts, the Stripe billing routes/webhook, or
+intakeScoring.ts / intakeAgent.ts's server-side logic. If a .tsx file needs
+a data-fetching call adjusted only to support a genuinely missing UI state
+(e.g. a loading flag that already exists in the response but isn't being
+read), that's fine — inventing new backend data is not.
+
+BUDGET EXCEPTION (explicitly approved): touches all 6 customer-facing
+screens for visual consistency. Expect moderate changes across many files,
+but each file's changes should be visual/structural, not logical.
+
+---
+
+Six screens in scope:
+1. /ai-receptionist (Landing)
+2. /ai-receptionist/signup (Signup)
+3. /app/login (Login)
+4. /app (Conversations — list + thread)
+5. /app/agent-config (Agent Config)
+6. /app/settings (Settings/Billing)
+
+For EACH screen:
+
+A. Cross-check against the component spec's states for that screen's
+   organisms/molecules. Implement any state that's genuinely missing but
+   IS backed by real data already available from the API (e.g. if
+   AgentConfigForm's "dirty" state — Save button enabled only when there
+   are unsaved changes — isn't wired yet, wire it; the data needed is
+   already local form state, not a backend gap).
+
+B. If a spec'd state has NO real data behind it anywhere in the current
+   API responses (e.g. ConversationListItem's "Unread" state — check
+   whether any existing field like a readAt/isRead column or equivalent
+   already exists; if not, do NOT fake it with a hardcoded true/false).
+   Remove that state from consideration and note it in the Return report
+   rather than building a decorative element with no real meaning behind
+   it.
+
+C. Consistency pass: these 6 screens were built across 4 separate
+   sessions and may have small drift in spacing, radius, shadow depth, or
+   color usage. Align them to the same tokens: primary navy
+   (~hsl(218 90% 23%)), accent light blue (~hsl(218 45% 93%)), rounded-xl/
+   2xl cards with soft shadows (matching Home.tsx's actual established
+   style, not the base --radius:0rem token), Plus Jakarta Sans for all UI
+   text. Playfair Display stays reserved for marketing headlines on the
+   Landing page only — never inside the /app shell, which is a product UI,
+   not editorial.
+
+D. Empty/loading/error states — confirm every list/data view (Conversations
+   list, Agent Config save, Settings billing panel) has a real empty state,
+   a real loading state (skeleton or spinner, not a blank flash), and a
+   real error state (not a silent failure) — per the spec's documented
+   states for each.
+
+E. Responsive check at 375px / 768px / 1440px — confirm no horizontal
+   overflow and that the mobile drawer (ReceptionistAppShell) and
+   split-layout (SignupForm) both degrade sensibly at the smallest
+   breakpoint.
+
+Return, per screen (6 short sections, not one giant undifferentiated list):
+- What was changed (visual/structural only)
+- Which spec'd states were implemented vs. already present vs. explicitly
+  skipped for lacking real data (name the specific state and why)
+- Confirm responsiveness at all 3 breakpoints
+- Screenshot or clear description of the before/after for anything
+  non-trivial
+
+Plus overall:
+- Confirm zero backend/schema/route files were touched — list every file
+  changed and confirm each is a .tsx/.css/component file
+- TypeScript status
+- Confirm trial-cap enforcement, scoring, and Stripe billing still behave
+  identically post-polish (a quick smoke test of each, not a full re-test
+  of earlier phases — just confirm nothing regressed)

@@ -17,7 +17,7 @@ interface MeResponse {
 
 function BillingSection({ firm, conversationCount }: { firm: FirmData; conversationCount: number }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
 
   const handleUpgrade = async () => {
     setLoading(true);
@@ -72,10 +72,10 @@ function BillingSection({ firm, conversationCount }: { firm: FirmData; conversat
     );
   }
 
-  const used    = Math.min(conversationCount, firm.trialConversationsLimit);
-  const limit   = firm.trialConversationsLimit;
-  const pct     = Math.min(100, Math.round((used / limit) * 100));
-  const isAtCap = conversationCount >= limit;
+  const used     = Math.min(conversationCount, firm.trialConversationsLimit);
+  const limit    = firm.trialConversationsLimit;
+  const pct      = Math.min(100, Math.round((used / limit) * 100));
+  const isAtCap  = conversationCount >= limit;
   const barColor = isAtCap ? "#ef4444" : pct >= 80 ? "#f59e0b" : "#3b82f6";
 
   return (
@@ -134,8 +134,7 @@ function BillingSection({ firm, conversationCount }: { firm: FirmData; conversat
       )}
 
       <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 16, lineHeight: 1.5 }}>
-        Upgrade to unlock unlimited conversations, priority support, and advanced intake
-        analytics.
+        Upgrade to unlock unlimited conversations, priority support, and advanced intake analytics.
       </div>
 
       {error && (
@@ -173,7 +172,7 @@ function BillingSection({ firm, conversationCount }: { firm: FirmData; conversat
       >
         {loading ? (
           <>
-            <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+            <Loader2 size={14} className="animate-spin" />
             Redirecting to checkout…
           </>
         ) : (
@@ -191,12 +190,13 @@ function BillingSection({ firm, conversationCount }: { firm: FirmData; conversat
 
 export default function ReceptionistSettings() {
   const [location] = useLocation();
-  const [data, setData]         = useState<MeResponse | null>(null);
+  const [data,     setData]     = useState<MeResponse | null>(null);
   const [fetchErr, setFetchErr] = useState<string | null>(null);
-  const [polling, setPolling]   = useState(false);
+  const [polling,  setPolling]  = useState(false);
 
   const justUpgraded =
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgraded") === "1";
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("upgraded") === "1";
 
   useEffect(() => {
     let cancelled = false;
@@ -232,8 +232,6 @@ export default function ReceptionistSettings() {
 
   return (
     <ReceptionistAppShell>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "32px 16px" }}>
 
         {/* Page header */}
@@ -242,12 +240,12 @@ export default function ReceptionistSettings() {
             width: 44, height: 44, borderRadius: 11,
             background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 14px rgba(6,46,113,0.22)",
+            boxShadow: "0 4px 14px rgba(6,46,113,0.22)", flexShrink: 0,
           }}>
             <Settings size={22} color="#fff" strokeWidth={1.6} />
           </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>Account Settings</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#062e71" }}>Account Settings</div>
             <div style={{ fontSize: 12, color: "#6b7280" }}>Billing, plan, and preferences</div>
           </div>
         </div>
@@ -256,18 +254,28 @@ export default function ReceptionistSettings() {
         {justUpgraded && (
           <div style={{
             display: "flex", alignItems: "flex-start", gap: 10,
-            background: data?.firm.planTier === "paid" ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)" : "#fffbeb",
+            background: data?.firm.planTier === "paid"
+              ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+              : "#fffbeb",
             border: `1px solid ${data?.firm.planTier === "paid" ? "#86efac" : "#fde68a"}`,
             borderRadius: 10,
             padding: "12px 14px",
             marginBottom: 20,
           }}>
             {polling ? (
-              <Loader2 size={15} color="#b45309" style={{ marginTop: 1, flexShrink: 0, animation: "spin 1s linear infinite" }} />
+              <Loader2 size={15} color="#b45309" className="animate-spin" style={{ marginTop: 1, flexShrink: 0 }} />
             ) : (
-              <CheckCircle2 size={15} color={data?.firm.planTier === "paid" ? "#16a34a" : "#b45309"} style={{ marginTop: 1, flexShrink: 0 }} />
+              <CheckCircle2
+                size={15}
+                color={data?.firm.planTier === "paid" ? "#16a34a" : "#b45309"}
+                style={{ marginTop: 1, flexShrink: 0 }}
+              />
             )}
-            <span style={{ fontSize: 13, color: data?.firm.planTier === "paid" ? "#15803d" : "#92400e", lineHeight: 1.5 }}>
+            <span style={{
+              fontSize: 13,
+              color: data?.firm.planTier === "paid" ? "#15803d" : "#92400e",
+              lineHeight: 1.5,
+            }}>
               {data?.firm.planTier === "paid"
                 ? "Your account has been upgraded to Pro. Welcome!"
                 : polling
@@ -277,16 +285,27 @@ export default function ReceptionistSettings() {
           </div>
         )}
 
-        {/* Loading */}
+        {/* Loading state */}
         {!data && !fetchErr && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#6b7280", fontSize: 14, padding: "32px 0", justifyContent: "center" }}>
-            <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            color: "#6b7280", fontSize: 14,
+            padding: "40px 0", justifyContent: "center",
+          }}>
+            <Loader2 size={16} className="animate-spin" style={{ color: "#062e71" }} />
             Loading account…
           </div>
         )}
 
+        {/* Error state */}
         {fetchErr && (
-          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "#dc2626" }}>
+          <div style={{
+            background: "#fef2f2", border: "1px solid #fecaca",
+            borderRadius: 10, padding: "12px 14px",
+            fontSize: 13, color: "#dc2626",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <AlertCircle size={14} />
             {fetchErr}
           </div>
         )}
@@ -294,7 +313,10 @@ export default function ReceptionistSettings() {
         {/* Billing section */}
         {data && (
           <section>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10,
+            }}>
               Billing &amp; Plan
             </div>
             <BillingSection firm={data.firm} conversationCount={data.conversationCount} />
