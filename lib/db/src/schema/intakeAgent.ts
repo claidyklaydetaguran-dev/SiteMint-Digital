@@ -23,6 +23,9 @@ export const intakeFirms = pgTable("intake_firms", {
   passwordHash:              text("password_hash"),
   planTier:                  text("plan_tier").notNull().default("trial"),
   trialConversationsLimit:   integer("trial_conversations_limit").notNull().default(20),
+  // ── Stripe billing (nullable until firm upgrades) ────────────────────────
+  stripeCustomerId:          text("stripe_customer_id"),
+  stripeSubscriptionId:      text("stripe_subscription_id"),
 });
 
 // ── intake_conversations ──────────────────────────────────────────────────────

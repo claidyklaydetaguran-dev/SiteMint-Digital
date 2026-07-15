@@ -54,6 +54,9 @@ app.post(
 
 // Capture raw body for Resend webhook sig verification BEFORE json() runs
 app.use("/api/crm/webhooks/resend", express.raw({ type: "application/json" }));
+
+// Capture raw body for receptionist Stripe billing webhook BEFORE json() runs
+app.use("/api/receptionist/billing/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

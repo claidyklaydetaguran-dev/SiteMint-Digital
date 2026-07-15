@@ -1,0 +1,104 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+Context: phases 1-2 built real customer accounts, DB-persisted sessions,
+and trial-cap enforcement (20 conversations, over-cap conversations get
+logged but not auto-answered) for the AI Receptionist product. This phase
+wires the "Upgrade" CTAs already present in the UI (trial banner, over-cap
+thread notice) to a REAL Stripe subscription checkout — no fake gate, no
+"coming soon."
+
+FIRST — investigate before building. This codebase already has Stripe
+integrated for the agency's own billing (per ARCHITECTURE.md / existing
+`stripe` and `stripe-replit-sync` packages). Find and read the existing
+Stripe client setup (likely something like lib/stripe.ts or similar) and
+any existing webhook route before writing any new code. Reuse the existing
+Stripe client instance — do not instantiate a second one. If the existing
+Stripe usage is structured only for one-time payments (e.g. website
+project invoices) and doesn't cleanly support a recurring subscription for
+a different product, say so plainly in your Return report and propose the
+smallest addition rather than restructuring the existing billing code.
+
+Do not touch locked modules. Do not touch the CRM's existing admin auth.
+Do not touch anything related to the agency's own existing Stripe billing
+flow beyond reusing its client instance — this is a new, separate
+subscription product, not a change to how SiteMint bills its own clients.
+
+BUDGET EXCEPTION (explicitly approved): new billing routes + webhook
+handler + schema columns + Settings page build-out.
+
+---
+
+1. SCHEMA — add to intakeFirms: stripeCustomerId (text, nullable),
+   stripeSubscriptionId (text, nullable).
+
+2. NEW ENV VAR — STRIPE_RECEPTIONIST_PRICE_ID. This will be set by the
+   account owner after creating a recurring Price in their Stripe
+   dashboard; do not hardcode a price or product ID anywhere. If it's
+   missing at runtime, the upgrade endpoint should return a clear 500
+   error message ("Billing is not configured yet") rather than crashing
+   unhandled.
+
+3. NEW ROUTE — POST /api/receptionist/billing/create-checkout-session
+   (gated by requireReceptionistAuth). Creates a Stripe Checkout Session
+   in subscription mode for the logged-in firm:
+   - mode: 'subscription', line_items: [{ price:
+     process.env.STRIPE_RECEPTIONIST_PRICE_ID, quantity: 1 }]
+   - If the firm doesn't yet have a stripeCustomerId, create a Stripe
+     customer first (email = firm's email) and save the id back to the
+     intakeFirms row before creating the session; reuse it on subsequent
+     checkouts.
+   - success_url: back to /app/settings with a query param indicating
+     success (e.g. ?upgraded=1); cancel_url: back to /app/settings.
+   - Returns the Checkout Session URL for the frontend to redirect to.
+
+4. WEBHOOK — find the existing Stripe webhook route if one exists and add
+   a handler there; otherwise create a new one at, e.g.,
+   /api/receptionist/billing/webhook. Must verify the Stripe signature
+   using the raw request body and STRIPE_WEBHOOK_SECRET (same rigor as the
+   existing Twilio signature validation elsewhere in this codebase — do
+   not skip verification even in development). Handle:
+   - checkout.session.completed (or customer.subscription.created) →
+     look up the firm by stripeCustomerId, set planTier = 'paid', store
+     stripeSubscriptionId.
+   - customer.subscription.deleted (cancellation) → set that firm's
+     planTier back to 'trial'. This is a real requirement, not scope
+     creep — a canceled subscription must actually lose paid access.
+   - Make the handler idempotent — Stripe can redeliver the same event;
+     do not double-process (e.g. check current planTier before writing,
+     or track processed event ids).
+
+5. SETTINGS PAGE — replace the "coming soon" placeholder in
+   ReceptionistSettings.tsx with a real Billing section:
+   - If planTier is 'trial': show current usage (reuse the same
+     count/limit data already used in the trial banner), and an "Upgrade
+     to Pro" button that calls the new create-checkout-session endpoint
+     and redirects the browser to the returned Stripe URL.
+   - If planTier is 'paid': show "You're on the Pro plan" with no cap
+     messaging, and a "Manage billing" link if a Stripe customer portal
+     is easy to wire from the existing Stripe setup (billingPortal
+     sessions) — if that's non-trivial given what's already in place,
+     skip it for this pass and note it as a follow-up rather than forcing
+     it in.
+   - Handle the ?upgraded=1 success redirect with a brief confirmation
+     message (the webhook may take a few seconds to land — don't assume
+     planTier is already 'paid' the instant they land back here; either
+     poll /api/receptionist/auth/me briefly or just show a generic "Thanks
+     — this can take a moment to activate" message).
+
+Return:
+- What the existing Stripe setup looked like and whether it needed
+  restructuring or just an addition
+- Confirm a real test checkout session can be created (use Stripe test
+  mode) and returns a valid Checkout URL
+- Confirm the webhook signature verification is real (test with an
+  invalid signature and confirm it's rejected)
+- Confirm a simulated checkout.session.completed event actually flips the
+  test firm's planTier to 'paid' in the DB
+- Confirm a simulated customer.subscription.deleted event reverts it to
+  'trial'
+- Confirm the webhook handler doesn't double-process a redelivered event
+- Confirm the Settings page shows the correct state for both trial and
+  paid firms
+- TypeScript status
+- Confirm no locked files or the agency's own existing Stripe billing
+  flow were altered beyond reusing the client instance

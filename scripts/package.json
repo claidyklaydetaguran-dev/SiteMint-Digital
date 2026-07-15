@@ -6,6 +6,7 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "seed-ai-toolkit-product": "tsx ./src/seed-ai-toolkit-product.ts",
+    "test-receptionist-billing": "tsx ./src/test-receptionist-billing.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
