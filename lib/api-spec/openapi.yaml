@@ -12,6 +12,16 @@ tags:
     description: Health operations
   - name: ai-toolkit
     description: SMB AI Toolkit checkout and delivery
+  - name: helpdesk-tickets
+    description: Helpdesk ticket management
+  - name: helpdesk-messages
+    description: Helpdesk ticket messages
+  - name: helpdesk-contacts
+    description: Helpdesk contact management
+  - name: helpdesk-agents
+    description: Helpdesk agent management
+  - name: helpdesk-stats
+    description: Helpdesk dashboard stats
 paths:
   /healthz:
     get:
@@ -26,6 +36,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
   /ai-toolkit/checkout:
     post:
       operationId: createAiToolkitCheckout
@@ -38,6 +49,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AiToolkitCheckoutSession"
+
   /ai-toolkit/purchases/{sessionId}:
     get:
       operationId: getAiToolkitPurchase
@@ -56,6 +68,271 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AiToolkitPurchaseStatus"
+
+  # ── Helpdesk Tickets ──────────────────────────────────────────────────────
+
+  /helpdesk/tickets:
+    get:
+      operationId: listHelpdeskTickets
+      tags: [helpdesk-tickets]
+      summary: List tickets with optional filters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: assigneeId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: view
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HelpdeskTicket"
+    post:
+      operationId: createHelpdeskTicket
+      tags: [helpdesk-tickets]
+      summary: Create a new ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpdeskTicketInput"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskTicket"
+
+  /helpdesk/tickets/{id}:
+    get:
+      operationId: getHelpdeskTicket
+      tags: [helpdesk-tickets]
+      summary: Get a ticket by ID with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ticket detail with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskTicketDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateHelpdeskTicket
+      tags: [helpdesk-tickets]
+      summary: Update ticket (status, assignee, priority, etc.)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpdeskTicketUpdate"
+      responses:
+        "200":
+          description: Updated ticket
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskTicket"
+        "404":
+          description: Not found
+
+  # ── Helpdesk Messages ─────────────────────────────────────────────────────
+
+  /helpdesk/tickets/{ticketId}/messages:
+    get:
+      operationId: listHelpdeskMessages
+      tags: [helpdesk-messages]
+      summary: List messages for a ticket
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HelpdeskMessage"
+    post:
+      operationId: createHelpdeskMessage
+      tags: [helpdesk-messages]
+      summary: Add a message to a ticket
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpdeskMessageInput"
+      responses:
+        "201":
+          description: Message created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskMessage"
+
+  # ── Helpdesk Contacts ─────────────────────────────────────────────────────
+
+  /helpdesk/contacts:
+    get:
+      operationId: listHelpdeskContacts
+      tags: [helpdesk-contacts]
+      summary: List all contacts
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HelpdeskContact"
+    post:
+      operationId: createHelpdeskContact
+      tags: [helpdesk-contacts]
+      summary: Create a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpdeskContactInput"
+      responses:
+        "201":
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskContact"
+
+  /helpdesk/contacts/{id}:
+    get:
+      operationId: getHelpdeskContact
+      tags: [helpdesk-contacts]
+      summary: Get a contact by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contact detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskContact"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateHelpdeskContact
+      tags: [helpdesk-contacts]
+      summary: Update a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpdeskContactUpdate"
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskContact"
+        "404":
+          description: Not found
+
+  # ── Helpdesk Agents ───────────────────────────────────────────────────────
+
+  /helpdesk/agents:
+    get:
+      operationId: listHelpdeskAgents
+      tags: [helpdesk-agents]
+      summary: List all agents
+      responses:
+        "200":
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HelpdeskAgent"
+
+  # ── Helpdesk Stats ────────────────────────────────────────────────────────
+
+  /helpdesk/stats:
+    get:
+      operationId: getHelpdeskStats
+      tags: [helpdesk-stats]
+      summary: Get inbox counts and SLA metrics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskStats"
+
 components:
   schemas:
     HealthStatus:
@@ -65,6 +342,7 @@ components:
           type: string
       required:
         - status
+
     AiToolkitCheckoutSession:
       type: object
       properties:
@@ -72,6 +350,7 @@ components:
           type: string
       required:
         - url
+
     AiToolkitPurchaseStatus:
       type: object
       properties:
@@ -86,3 +365,294 @@ components:
         - delivered
         - email
 
+    # ── Helpdesk Schemas ─────────────────────────────────────────────────────
+
+    HelpdeskTicket:
+      type: object
+      required:
+        - id
+        - subject
+        - status
+        - priority
+        - channel
+        - ticketNumber
+        - contactId
+        - contactName
+        - contactInitials
+        - contactAvatarColor
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        channel:
+          type: string
+        ticketNumber:
+          type: string
+        contactId:
+          type: integer
+        contactName:
+          type: string
+        contactInitials:
+          type: string
+        contactAvatarColor:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        assigneeName:
+          type: ["string", "null"]
+        assigneeInitials:
+          type: ["string", "null"]
+        teamName:
+          type: ["string", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        firstReplySlaBreached:
+          type: boolean
+        resolutionSlaDeadline:
+          type: ["string", "null"]
+        snippetText:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        closedAt:
+          type: ["string", "null"]
+
+    HelpdeskTicketDetail:
+      type: object
+      required:
+        - ticket
+        - messages
+        - contact
+      properties:
+        ticket:
+          $ref: "#/components/schemas/HelpdeskTicket"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/HelpdeskMessage"
+        contact:
+          $ref: "#/components/schemas/HelpdeskContact"
+
+    HelpdeskTicketInput:
+      type: object
+      required:
+        - subject
+        - contactId
+        - channel
+        - priority
+      properties:
+        subject:
+          type: string
+        contactId:
+          type: integer
+        channel:
+          type: string
+        priority:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+
+    HelpdeskTicketUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        priority:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+
+    HelpdeskMessage:
+      type: object
+      required:
+        - id
+        - ticketId
+        - authorType
+        - authorName
+        - authorInitials
+        - authorAvatarColor
+        - body
+        - isInternalNote
+        - createdAt
+      properties:
+        id:
+          type: integer
+        ticketId:
+          type: integer
+        authorType:
+          type: string
+        authorName:
+          type: string
+        authorInitials:
+          type: string
+        authorAvatarColor:
+          type: string
+        body:
+          type: string
+        isInternalNote:
+          type: boolean
+        attachmentName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    HelpdeskMessageInput:
+      type: object
+      required:
+        - body
+        - authorType
+        - authorName
+      properties:
+        body:
+          type: string
+        authorType:
+          type: string
+        authorName:
+          type: string
+        isInternalNote:
+          type: boolean
+        attachmentName:
+          type: ["string", "null"]
+
+    HelpdeskContact:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - initials
+        - avatarColor
+        - tier
+        - createdAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        initials:
+          type: string
+        avatarColor:
+          type: string
+        tier:
+          type: string
+        openTickets:
+          type: integer
+        totalTickets:
+          type: integer
+        lastContactedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    HelpdeskContactInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        tier:
+          type: string
+
+    HelpdeskContactUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        tier:
+          type: string
+
+    HelpdeskAgent:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - initials
+        - avatarColor
+        - role
+        - status
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        initials:
+          type: string
+        avatarColor:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        teamName:
+          type: ["string", "null"]
+
+    HelpdeskStats:
+      type: object
+      required:
+        - allOpen
+        - assignedToMe
+        - unassigned
+        - snoozed
+        - closed
+        - slaBreached
+        - avgResolutionHours
+        - resolvedToday
+      properties:
+        allOpen:
+          type: integer
+        assignedToMe:
+          type: integer
+        unassigned:
+          type: integer
+        snoozed:
+          type: integer
+        closed:
+          type: integer
+        slaBreached:
+          type: integer
+        avgResolutionHours:
+          type: number
+        resolvedToday:
+          type: integer

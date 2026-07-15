@@ -20,3 +20,157 @@ export interface AiToolkitPurchaseStatus {
   email: string | null;
 }
 
+export interface HelpdeskTicket {
+  id: number;
+  subject: string;
+  status: string;
+  priority: string;
+  channel: string;
+  ticketNumber: string;
+  contactId: number;
+  contactName: string;
+  contactInitials: string;
+  contactAvatarColor: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  assigneeName?: string | null;
+  /** @nullable */
+  assigneeInitials?: string | null;
+  /** @nullable */
+  teamName?: string | null;
+  tags?: string[];
+  firstReplySlaBreached?: boolean;
+  /** @nullable */
+  resolutionSlaDeadline?: string | null;
+  /** @nullable */
+  snippetText?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  closedAt?: string | null;
+}
+
+export interface HelpdeskMessage {
+  id: number;
+  ticketId: number;
+  authorType: string;
+  authorName: string;
+  authorInitials: string;
+  authorAvatarColor: string;
+  body: string;
+  isInternalNote: boolean;
+  /** @nullable */
+  attachmentName?: string | null;
+  createdAt: string;
+}
+
+export interface HelpdeskContact {
+  id: number;
+  name: string;
+  email: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  company?: string | null;
+  initials: string;
+  avatarColor: string;
+  tier: string;
+  openTickets?: number;
+  totalTickets?: number;
+  /** @nullable */
+  lastContactedAt?: string | null;
+  createdAt: string;
+}
+
+export interface HelpdeskTicketDetail {
+  ticket: HelpdeskTicket;
+  messages: HelpdeskMessage[];
+  contact: HelpdeskContact;
+}
+
+export interface HelpdeskTicketInput {
+  subject: string;
+  contactId: number;
+  channel: string;
+  priority: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  tags?: string[];
+}
+
+export interface HelpdeskTicketUpdate {
+  status?: string;
+  priority?: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  tags?: string[];
+}
+
+export interface HelpdeskMessageInput {
+  body: string;
+  authorType: string;
+  authorName: string;
+  isInternalNote?: boolean;
+  /** @nullable */
+  attachmentName?: string | null;
+}
+
+export interface HelpdeskContactInput {
+  name: string;
+  email: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  company?: string | null;
+  tier?: string;
+}
+
+export interface HelpdeskContactUpdate {
+  name?: string;
+  email?: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  company?: string | null;
+  tier?: string;
+}
+
+export interface HelpdeskAgent {
+  id: number;
+  name: string;
+  email: string;
+  initials: string;
+  avatarColor: string;
+  role: string;
+  status: string;
+  /** @nullable */
+  teamName?: string | null;
+}
+
+export interface HelpdeskStats {
+  allOpen: number;
+  assignedToMe: number;
+  unassigned: number;
+  snoozed: number;
+  closed: number;
+  slaBreached: number;
+  avgResolutionHours: number;
+  resolvedToday: number;
+}
+
+export type ListHelpdeskTicketsParams = {
+status?: string;
+priority?: string;
+/**
+ * @nullable
+ */
+assigneeId?: number | null;
+search?: string;
+view?: string;
+};
+
+export type ListHelpdeskContactsParams = {
+search?: string;
+};
+

@@ -13,3 +13,7 @@ export * from "./crmBehavioralEvents";
 export * from "./aiToolkitPurchases";
 export * from "./landingPageViews";
 export * from "./intakeAgent";
+export * from "./helpdeskContacts";
+export * from "./helpdeskAgents";
+export * from "./helpdeskTickets";
+export * from "./helpdeskMessages";

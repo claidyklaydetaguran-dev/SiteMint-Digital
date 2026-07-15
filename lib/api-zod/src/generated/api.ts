@@ -39,3 +39,311 @@ export const GetAiToolkitPurchaseResponse = zod.object({
 })
 
 
+/**
+ * @summary List tickets with optional filters
+ */
+export const ListHelpdeskTicketsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "priority": zod.coerce.string().optional(),
+  "assigneeId": zod.coerce.number().nullish(),
+  "search": zod.coerce.string().optional(),
+  "view": zod.coerce.string().optional()
+})
+
+export const ListHelpdeskTicketsResponseItem = zod.object({
+  "id": zod.number(),
+  "subject": zod.string(),
+  "status": zod.string(),
+  "priority": zod.string(),
+  "channel": zod.string(),
+  "ticketNumber": zod.string(),
+  "contactId": zod.number(),
+  "contactName": zod.string(),
+  "contactInitials": zod.string(),
+  "contactAvatarColor": zod.string(),
+  "assigneeId": zod.number().nullish(),
+  "assigneeName": zod.string().nullish(),
+  "assigneeInitials": zod.string().nullish(),
+  "teamName": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "firstReplySlaBreached": zod.boolean().optional(),
+  "resolutionSlaDeadline": zod.string().nullish(),
+  "snippetText": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+export const ListHelpdeskTicketsResponse = zod.array(ListHelpdeskTicketsResponseItem)
+
+
+/**
+ * @summary Create a new ticket
+ */
+export const CreateHelpdeskTicketBody = zod.object({
+  "subject": zod.string(),
+  "contactId": zod.number(),
+  "channel": zod.string(),
+  "priority": zod.string(),
+  "assigneeId": zod.number().nullish(),
+  "tags": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Get a ticket by ID with messages
+ */
+export const GetHelpdeskTicketParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetHelpdeskTicketResponse = zod.object({
+  "ticket": zod.object({
+  "id": zod.number(),
+  "subject": zod.string(),
+  "status": zod.string(),
+  "priority": zod.string(),
+  "channel": zod.string(),
+  "ticketNumber": zod.string(),
+  "contactId": zod.number(),
+  "contactName": zod.string(),
+  "contactInitials": zod.string(),
+  "contactAvatarColor": zod.string(),
+  "assigneeId": zod.number().nullish(),
+  "assigneeName": zod.string().nullish(),
+  "assigneeInitials": zod.string().nullish(),
+  "teamName": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "firstReplySlaBreached": zod.boolean().optional(),
+  "resolutionSlaDeadline": zod.string().nullish(),
+  "snippetText": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+}),
+  "messages": zod.array(zod.object({
+  "id": zod.number(),
+  "ticketId": zod.number(),
+  "authorType": zod.string(),
+  "authorName": zod.string(),
+  "authorInitials": zod.string(),
+  "authorAvatarColor": zod.string(),
+  "body": zod.string(),
+  "isInternalNote": zod.boolean(),
+  "attachmentName": zod.string().nullish(),
+  "createdAt": zod.string()
+})),
+  "contact": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "company": zod.string().nullish(),
+  "initials": zod.string(),
+  "avatarColor": zod.string(),
+  "tier": zod.string(),
+  "openTickets": zod.number().optional(),
+  "totalTickets": zod.number().optional(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Update ticket (status, assignee, priority, etc.)
+ */
+export const UpdateHelpdeskTicketParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateHelpdeskTicketBody = zod.object({
+  "status": zod.string().optional(),
+  "priority": zod.string().optional(),
+  "assigneeId": zod.number().nullish(),
+  "tags": zod.array(zod.string()).optional()
+})
+
+export const UpdateHelpdeskTicketResponse = zod.object({
+  "id": zod.number(),
+  "subject": zod.string(),
+  "status": zod.string(),
+  "priority": zod.string(),
+  "channel": zod.string(),
+  "ticketNumber": zod.string(),
+  "contactId": zod.number(),
+  "contactName": zod.string(),
+  "contactInitials": zod.string(),
+  "contactAvatarColor": zod.string(),
+  "assigneeId": zod.number().nullish(),
+  "assigneeName": zod.string().nullish(),
+  "assigneeInitials": zod.string().nullish(),
+  "teamName": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "firstReplySlaBreached": zod.boolean().optional(),
+  "resolutionSlaDeadline": zod.string().nullish(),
+  "snippetText": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary List messages for a ticket
+ */
+export const ListHelpdeskMessagesParams = zod.object({
+  "ticketId": zod.coerce.number()
+})
+
+export const ListHelpdeskMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "ticketId": zod.number(),
+  "authorType": zod.string(),
+  "authorName": zod.string(),
+  "authorInitials": zod.string(),
+  "authorAvatarColor": zod.string(),
+  "body": zod.string(),
+  "isInternalNote": zod.boolean(),
+  "attachmentName": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListHelpdeskMessagesResponse = zod.array(ListHelpdeskMessagesResponseItem)
+
+
+/**
+ * @summary Add a message to a ticket
+ */
+export const CreateHelpdeskMessageParams = zod.object({
+  "ticketId": zod.coerce.number()
+})
+
+export const CreateHelpdeskMessageBody = zod.object({
+  "body": zod.string(),
+  "authorType": zod.string(),
+  "authorName": zod.string(),
+  "isInternalNote": zod.boolean().optional(),
+  "attachmentName": zod.string().nullish()
+})
+
+
+/**
+ * @summary List all contacts
+ */
+export const ListHelpdeskContactsQueryParams = zod.object({
+  "search": zod.coerce.string().optional()
+})
+
+export const ListHelpdeskContactsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "company": zod.string().nullish(),
+  "initials": zod.string(),
+  "avatarColor": zod.string(),
+  "tier": zod.string(),
+  "openTickets": zod.number().optional(),
+  "totalTickets": zod.number().optional(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListHelpdeskContactsResponse = zod.array(ListHelpdeskContactsResponseItem)
+
+
+/**
+ * @summary Create a contact
+ */
+export const CreateHelpdeskContactBody = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "company": zod.string().nullish(),
+  "tier": zod.string().optional()
+})
+
+
+/**
+ * @summary Get a contact by ID
+ */
+export const GetHelpdeskContactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetHelpdeskContactResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "company": zod.string().nullish(),
+  "initials": zod.string(),
+  "avatarColor": zod.string(),
+  "tier": zod.string(),
+  "openTickets": zod.number().optional(),
+  "totalTickets": zod.number().optional(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a contact
+ */
+export const UpdateHelpdeskContactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateHelpdeskContactBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().nullish(),
+  "company": zod.string().nullish(),
+  "tier": zod.string().optional()
+})
+
+export const UpdateHelpdeskContactResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "company": zod.string().nullish(),
+  "initials": zod.string(),
+  "avatarColor": zod.string(),
+  "tier": zod.string(),
+  "openTickets": zod.number().optional(),
+  "totalTickets": zod.number().optional(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List all agents
+ */
+export const ListHelpdeskAgentsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "initials": zod.string(),
+  "avatarColor": zod.string(),
+  "role": zod.string(),
+  "status": zod.string(),
+  "teamName": zod.string().nullish()
+})
+export const ListHelpdeskAgentsResponse = zod.array(ListHelpdeskAgentsResponseItem)
+
+
+/**
+ * @summary Get inbox counts and SLA metrics
+ */
+export const GetHelpdeskStatsResponse = zod.object({
+  "allOpen": zod.number(),
+  "assignedToMe": zod.number(),
+  "unassigned": zod.number(),
+  "snoozed": zod.number(),
+  "closed": zod.number(),
+  "slaBreached": zod.number(),
+  "avgResolutionHours": zod.number(),
+  "resolvedToday": zod.number()
+})
+
+

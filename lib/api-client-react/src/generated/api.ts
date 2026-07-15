@@ -22,11 +22,24 @@ import type {
 import type {
   AiToolkitCheckoutSession,
   AiToolkitPurchaseStatus,
-  HealthStatus
+  HealthStatus,
+  HelpdeskAgent,
+  HelpdeskContact,
+  HelpdeskContactInput,
+  HelpdeskContactUpdate,
+  HelpdeskMessage,
+  HelpdeskMessageInput,
+  HelpdeskStats,
+  HelpdeskTicket,
+  HelpdeskTicketDetail,
+  HelpdeskTicketInput,
+  HelpdeskTicketUpdate,
+  ListHelpdeskContactsParams,
+  ListHelpdeskTicketsParams
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -250,6 +263,917 @@ export function useGetAiToolkitPurchase<TData = Awaited<ReturnType<typeof getAiT
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAiToolkitPurchaseQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListHelpdeskTicketsUrl = (params?: ListHelpdeskTicketsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/helpdesk/tickets?${stringifiedParams}` : `/api/helpdesk/tickets`
+}
+
+/**
+ * @summary List tickets with optional filters
+ */
+export const listHelpdeskTickets = async (params?: ListHelpdeskTicketsParams, options?: RequestInit): Promise<HelpdeskTicket[]> => {
+
+  return customFetch<HelpdeskTicket[]>(getListHelpdeskTicketsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHelpdeskTicketsQueryKey = (params?: ListHelpdeskTicketsParams,) => {
+    return [
+    `/api/helpdesk/tickets`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListHelpdeskTicketsQueryOptions = <TData = Awaited<ReturnType<typeof listHelpdeskTickets>>, TError = ErrorType<unknown>>(params?: ListHelpdeskTicketsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskTickets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHelpdeskTicketsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHelpdeskTickets>>> = ({ signal }) => listHelpdeskTickets(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskTickets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHelpdeskTicketsQueryResult = NonNullable<Awaited<ReturnType<typeof listHelpdeskTickets>>>
+export type ListHelpdeskTicketsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List tickets with optional filters
+ */
+
+export function useListHelpdeskTickets<TData = Awaited<ReturnType<typeof listHelpdeskTickets>>, TError = ErrorType<unknown>>(
+ params?: ListHelpdeskTicketsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskTickets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHelpdeskTicketsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateHelpdeskTicketUrl = () => {
+
+
+
+
+  return `/api/helpdesk/tickets`
+}
+
+/**
+ * @summary Create a new ticket
+ */
+export const createHelpdeskTicket = async (helpdeskTicketInput: HelpdeskTicketInput, options?: RequestInit): Promise<HelpdeskTicket> => {
+
+  return customFetch<HelpdeskTicket>(getCreateHelpdeskTicketUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      helpdeskTicketInput,)
+  }
+);}
+
+
+
+
+export const getCreateHelpdeskTicketMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskTicket>>, TError,{data: BodyType<HelpdeskTicketInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskTicket>>, TError,{data: BodyType<HelpdeskTicketInput>}, TContext> => {
+
+const mutationKey = ['createHelpdeskTicket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createHelpdeskTicket>>, {data: BodyType<HelpdeskTicketInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createHelpdeskTicket(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateHelpdeskTicketMutationResult = NonNullable<Awaited<ReturnType<typeof createHelpdeskTicket>>>
+    export type CreateHelpdeskTicketMutationBody = BodyType<HelpdeskTicketInput>
+    export type CreateHelpdeskTicketMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new ticket
+ */
+export const useCreateHelpdeskTicket = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskTicket>>, TError,{data: BodyType<HelpdeskTicketInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createHelpdeskTicket>>,
+        TError,
+        {data: BodyType<HelpdeskTicketInput>},
+        TContext
+      > => {
+      return useMutation(getCreateHelpdeskTicketMutationOptions(options));
+    }
+
+export const getGetHelpdeskTicketUrl = (id: number,) => {
+
+
+
+
+  return `/api/helpdesk/tickets/${id}`
+}
+
+/**
+ * @summary Get a ticket by ID with messages
+ */
+export const getHelpdeskTicket = async (id: number, options?: RequestInit): Promise<HelpdeskTicketDetail> => {
+
+  return customFetch<HelpdeskTicketDetail>(getGetHelpdeskTicketUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHelpdeskTicketQueryKey = (id: number,) => {
+    return [
+    `/api/helpdesk/tickets/${id}`
+    ] as const;
+    }
+
+
+export const getGetHelpdeskTicketQueryOptions = <TData = Awaited<ReturnType<typeof getHelpdeskTicket>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskTicket>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHelpdeskTicketQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHelpdeskTicket>>> = ({ signal }) => getHelpdeskTicket(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskTicket>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHelpdeskTicketQueryResult = NonNullable<Awaited<ReturnType<typeof getHelpdeskTicket>>>
+export type GetHelpdeskTicketQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a ticket by ID with messages
+ */
+
+export function useGetHelpdeskTicket<TData = Awaited<ReturnType<typeof getHelpdeskTicket>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskTicket>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHelpdeskTicketQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateHelpdeskTicketUrl = (id: number,) => {
+
+
+
+
+  return `/api/helpdesk/tickets/${id}`
+}
+
+/**
+ * @summary Update ticket (status, assignee, priority, etc.)
+ */
+export const updateHelpdeskTicket = async (id: number,
+    helpdeskTicketUpdate: HelpdeskTicketUpdate, options?: RequestInit): Promise<HelpdeskTicket> => {
+
+  return customFetch<HelpdeskTicket>(getUpdateHelpdeskTicketUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      helpdeskTicketUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateHelpdeskTicketMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHelpdeskTicket>>, TError,{id: number;data: BodyType<HelpdeskTicketUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHelpdeskTicket>>, TError,{id: number;data: BodyType<HelpdeskTicketUpdate>}, TContext> => {
+
+const mutationKey = ['updateHelpdeskTicket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHelpdeskTicket>>, {id: number;data: BodyType<HelpdeskTicketUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateHelpdeskTicket(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateHelpdeskTicketMutationResult = NonNullable<Awaited<ReturnType<typeof updateHelpdeskTicket>>>
+    export type UpdateHelpdeskTicketMutationBody = BodyType<HelpdeskTicketUpdate>
+    export type UpdateHelpdeskTicketMutationError = ErrorType<void>
+
+    /**
+ * @summary Update ticket (status, assignee, priority, etc.)
+ */
+export const useUpdateHelpdeskTicket = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHelpdeskTicket>>, TError,{id: number;data: BodyType<HelpdeskTicketUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateHelpdeskTicket>>,
+        TError,
+        {id: number;data: BodyType<HelpdeskTicketUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateHelpdeskTicketMutationOptions(options));
+    }
+
+export const getListHelpdeskMessagesUrl = (ticketId: number,) => {
+
+
+
+
+  return `/api/helpdesk/tickets/${ticketId}/messages`
+}
+
+/**
+ * @summary List messages for a ticket
+ */
+export const listHelpdeskMessages = async (ticketId: number, options?: RequestInit): Promise<HelpdeskMessage[]> => {
+
+  return customFetch<HelpdeskMessage[]>(getListHelpdeskMessagesUrl(ticketId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHelpdeskMessagesQueryKey = (ticketId: number,) => {
+    return [
+    `/api/helpdesk/tickets/${ticketId}/messages`
+    ] as const;
+    }
+
+
+export const getListHelpdeskMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listHelpdeskMessages>>, TError = ErrorType<unknown>>(ticketId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHelpdeskMessagesQueryKey(ticketId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHelpdeskMessages>>> = ({ signal }) => listHelpdeskMessages(ticketId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(ticketId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHelpdeskMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listHelpdeskMessages>>>
+export type ListHelpdeskMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List messages for a ticket
+ */
+
+export function useListHelpdeskMessages<TData = Awaited<ReturnType<typeof listHelpdeskMessages>>, TError = ErrorType<unknown>>(
+ ticketId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHelpdeskMessagesQueryOptions(ticketId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateHelpdeskMessageUrl = (ticketId: number,) => {
+
+
+
+
+  return `/api/helpdesk/tickets/${ticketId}/messages`
+}
+
+/**
+ * @summary Add a message to a ticket
+ */
+export const createHelpdeskMessage = async (ticketId: number,
+    helpdeskMessageInput: HelpdeskMessageInput, options?: RequestInit): Promise<HelpdeskMessage> => {
+
+  return customFetch<HelpdeskMessage>(getCreateHelpdeskMessageUrl(ticketId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      helpdeskMessageInput,)
+  }
+);}
+
+
+
+
+export const getCreateHelpdeskMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskMessage>>, TError,{ticketId: number;data: BodyType<HelpdeskMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskMessage>>, TError,{ticketId: number;data: BodyType<HelpdeskMessageInput>}, TContext> => {
+
+const mutationKey = ['createHelpdeskMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createHelpdeskMessage>>, {ticketId: number;data: BodyType<HelpdeskMessageInput>}> = (props) => {
+          const {ticketId,data} = props ?? {};
+
+          return  createHelpdeskMessage(ticketId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateHelpdeskMessageMutationResult = NonNullable<Awaited<ReturnType<typeof createHelpdeskMessage>>>
+    export type CreateHelpdeskMessageMutationBody = BodyType<HelpdeskMessageInput>
+    export type CreateHelpdeskMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a message to a ticket
+ */
+export const useCreateHelpdeskMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskMessage>>, TError,{ticketId: number;data: BodyType<HelpdeskMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createHelpdeskMessage>>,
+        TError,
+        {ticketId: number;data: BodyType<HelpdeskMessageInput>},
+        TContext
+      > => {
+      return useMutation(getCreateHelpdeskMessageMutationOptions(options));
+    }
+
+export const getListHelpdeskContactsUrl = (params?: ListHelpdeskContactsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/helpdesk/contacts?${stringifiedParams}` : `/api/helpdesk/contacts`
+}
+
+/**
+ * @summary List all contacts
+ */
+export const listHelpdeskContacts = async (params?: ListHelpdeskContactsParams, options?: RequestInit): Promise<HelpdeskContact[]> => {
+
+  return customFetch<HelpdeskContact[]>(getListHelpdeskContactsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHelpdeskContactsQueryKey = (params?: ListHelpdeskContactsParams,) => {
+    return [
+    `/api/helpdesk/contacts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListHelpdeskContactsQueryOptions = <TData = Awaited<ReturnType<typeof listHelpdeskContacts>>, TError = ErrorType<unknown>>(params?: ListHelpdeskContactsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskContacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHelpdeskContactsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHelpdeskContacts>>> = ({ signal }) => listHelpdeskContacts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskContacts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHelpdeskContactsQueryResult = NonNullable<Awaited<ReturnType<typeof listHelpdeskContacts>>>
+export type ListHelpdeskContactsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all contacts
+ */
+
+export function useListHelpdeskContacts<TData = Awaited<ReturnType<typeof listHelpdeskContacts>>, TError = ErrorType<unknown>>(
+ params?: ListHelpdeskContactsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskContacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHelpdeskContactsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateHelpdeskContactUrl = () => {
+
+
+
+
+  return `/api/helpdesk/contacts`
+}
+
+/**
+ * @summary Create a contact
+ */
+export const createHelpdeskContact = async (helpdeskContactInput: HelpdeskContactInput, options?: RequestInit): Promise<HelpdeskContact> => {
+
+  return customFetch<HelpdeskContact>(getCreateHelpdeskContactUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      helpdeskContactInput,)
+  }
+);}
+
+
+
+
+export const getCreateHelpdeskContactMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskContact>>, TError,{data: BodyType<HelpdeskContactInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskContact>>, TError,{data: BodyType<HelpdeskContactInput>}, TContext> => {
+
+const mutationKey = ['createHelpdeskContact'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createHelpdeskContact>>, {data: BodyType<HelpdeskContactInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createHelpdeskContact(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateHelpdeskContactMutationResult = NonNullable<Awaited<ReturnType<typeof createHelpdeskContact>>>
+    export type CreateHelpdeskContactMutationBody = BodyType<HelpdeskContactInput>
+    export type CreateHelpdeskContactMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a contact
+ */
+export const useCreateHelpdeskContact = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHelpdeskContact>>, TError,{data: BodyType<HelpdeskContactInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createHelpdeskContact>>,
+        TError,
+        {data: BodyType<HelpdeskContactInput>},
+        TContext
+      > => {
+      return useMutation(getCreateHelpdeskContactMutationOptions(options));
+    }
+
+export const getGetHelpdeskContactUrl = (id: number,) => {
+
+
+
+
+  return `/api/helpdesk/contacts/${id}`
+}
+
+/**
+ * @summary Get a contact by ID
+ */
+export const getHelpdeskContact = async (id: number, options?: RequestInit): Promise<HelpdeskContact> => {
+
+  return customFetch<HelpdeskContact>(getGetHelpdeskContactUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHelpdeskContactQueryKey = (id: number,) => {
+    return [
+    `/api/helpdesk/contacts/${id}`
+    ] as const;
+    }
+
+
+export const getGetHelpdeskContactQueryOptions = <TData = Awaited<ReturnType<typeof getHelpdeskContact>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskContact>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHelpdeskContactQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHelpdeskContact>>> = ({ signal }) => getHelpdeskContact(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskContact>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHelpdeskContactQueryResult = NonNullable<Awaited<ReturnType<typeof getHelpdeskContact>>>
+export type GetHelpdeskContactQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a contact by ID
+ */
+
+export function useGetHelpdeskContact<TData = Awaited<ReturnType<typeof getHelpdeskContact>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskContact>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHelpdeskContactQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateHelpdeskContactUrl = (id: number,) => {
+
+
+
+
+  return `/api/helpdesk/contacts/${id}`
+}
+
+/**
+ * @summary Update a contact
+ */
+export const updateHelpdeskContact = async (id: number,
+    helpdeskContactUpdate: HelpdeskContactUpdate, options?: RequestInit): Promise<HelpdeskContact> => {
+
+  return customFetch<HelpdeskContact>(getUpdateHelpdeskContactUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      helpdeskContactUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateHelpdeskContactMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHelpdeskContact>>, TError,{id: number;data: BodyType<HelpdeskContactUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHelpdeskContact>>, TError,{id: number;data: BodyType<HelpdeskContactUpdate>}, TContext> => {
+
+const mutationKey = ['updateHelpdeskContact'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHelpdeskContact>>, {id: number;data: BodyType<HelpdeskContactUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateHelpdeskContact(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateHelpdeskContactMutationResult = NonNullable<Awaited<ReturnType<typeof updateHelpdeskContact>>>
+    export type UpdateHelpdeskContactMutationBody = BodyType<HelpdeskContactUpdate>
+    export type UpdateHelpdeskContactMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a contact
+ */
+export const useUpdateHelpdeskContact = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHelpdeskContact>>, TError,{id: number;data: BodyType<HelpdeskContactUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateHelpdeskContact>>,
+        TError,
+        {id: number;data: BodyType<HelpdeskContactUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateHelpdeskContactMutationOptions(options));
+    }
+
+export const getListHelpdeskAgentsUrl = () => {
+
+
+
+
+  return `/api/helpdesk/agents`
+}
+
+/**
+ * @summary List all agents
+ */
+export const listHelpdeskAgents = async ( options?: RequestInit): Promise<HelpdeskAgent[]> => {
+
+  return customFetch<HelpdeskAgent[]>(getListHelpdeskAgentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHelpdeskAgentsQueryKey = () => {
+    return [
+    `/api/helpdesk/agents`
+    ] as const;
+    }
+
+
+export const getListHelpdeskAgentsQueryOptions = <TData = Awaited<ReturnType<typeof listHelpdeskAgents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskAgents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHelpdeskAgentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHelpdeskAgents>>> = ({ signal }) => listHelpdeskAgents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskAgents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHelpdeskAgentsQueryResult = NonNullable<Awaited<ReturnType<typeof listHelpdeskAgents>>>
+export type ListHelpdeskAgentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all agents
+ */
+
+export function useListHelpdeskAgents<TData = Awaited<ReturnType<typeof listHelpdeskAgents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHelpdeskAgents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHelpdeskAgentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetHelpdeskStatsUrl = () => {
+
+
+
+
+  return `/api/helpdesk/stats`
+}
+
+/**
+ * @summary Get inbox counts and SLA metrics
+ */
+export const getHelpdeskStats = async ( options?: RequestInit): Promise<HelpdeskStats> => {
+
+  return customFetch<HelpdeskStats>(getGetHelpdeskStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHelpdeskStatsQueryKey = () => {
+    return [
+    `/api/helpdesk/stats`
+    ] as const;
+    }
+
+
+export const getGetHelpdeskStatsQueryOptions = <TData = Awaited<ReturnType<typeof getHelpdeskStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHelpdeskStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHelpdeskStats>>> = ({ signal }) => getHelpdeskStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHelpdeskStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getHelpdeskStats>>>
+export type GetHelpdeskStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get inbox counts and SLA metrics
+ */
+
+export function useGetHelpdeskStats<TData = Awaited<ReturnType<typeof getHelpdeskStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHelpdeskStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHelpdeskStatsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
