@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants, useInView, useMotionValue, useSpring } from "framer-motion";
 import { ReceptionistNav } from "@/components/layout/ReceptionistNav";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,18 @@ import {
   Users,
   RefreshCw,
   ShieldCheck,
+  Phone,
+  PhoneOff,
+  Star,
+  TrendingUp,
+  Clock,
 } from "lucide-react";
 
 // ── Industry interactive demo scripts ────────────────────────────────────────
 
 interface IndustryScript {
   label: string;
+  emoji: string;
   greeting: string;
   responses: string[];
 }
@@ -48,6 +54,7 @@ interface IndustryScript {
 const INDUSTRY_SCRIPTS: IndustryScript[] = [
   {
     label: "Real Estate",
+    emoji: "🏠",
     greeting: "Hi! I'm the AI receptionist for this real estate team. Are you looking to buy, sell, or rent?",
     responses: [
       "Got it! Are you pre-approved for financing, or would you like help connecting with a lender first?",
@@ -58,6 +65,7 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
   },
   {
     label: "Law Firm",
+    emoji: "⚖️",
     greeting: "Hello! You've reached the intake line for this law firm. What kind of legal matter can we help you with today?",
     responses: [
       "I'm sorry to hear that. Were you injured, and do you know who was at fault?",
@@ -68,6 +76,7 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
   },
   {
     label: "Home Services",
+    emoji: "🔧",
     greeting: "Hi, you've reached our home services team. What issue are you dealing with today?",
     responses: [
       "Got it — is this urgent, or is it something that can be scheduled in the next few days?",
@@ -78,6 +87,7 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
   },
   {
     label: "Med Spa",
+    emoji: "💆",
     greeting: "Hello! Welcome to our med spa. Are you interested in booking a treatment, or do you have a question for us?",
     responses: [
       "Great choice! Is this your first time with this treatment, or have you had it done before?",
@@ -88,6 +98,7 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
   },
   {
     label: "Restaurant",
+    emoji: "🍽️",
     greeting: "Thanks for reaching out! Are you looking to make a reservation, or do you have a question about our menu?",
     responses: [
       "Happy to help with that. How many guests will be joining you, and what date were you thinking?",
@@ -98,6 +109,7 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
   },
   {
     label: "Retail",
+    emoji: "🛍️",
     greeting: "Hi there! Looking for something specific, or just browsing today?",
     responses: [
       "Good call — that's one of our most popular items. Do you have a size or color preference?",
@@ -110,30 +122,17 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
-const STATS = [
-  { icon: MessageSquare, number: "60–80%", label: "of inbound calls go unanswered", source: "BrightLocal / Google SMB research" },
-  { icon: Zap,           number: "<15 sec", label: "average AI response time via SMS", source: "Industry benchmark" },
-  { icon: DollarSign,    number: "$150–1,200+", label: "typical value of one qualified lead", source: "Varies by industry" },
-];
-
 const BENEFITS = [
-  { icon: Users,    title: "Capture leads that would otherwise go cold",       body: "Most callers don't leave voicemails. When an AI replies within seconds, they stay engaged — and you get the lead instead of the competitor who answers next." },
-  { icon: Calendar, title: "Guide conversations toward booking",                body: "The AI asks the right qualifying questions for your business, collects the information you need, and moves toward scheduling." },
-  { icon: RefreshCw, title: "Automate follow-up so nothing falls through",     body: "Every conversation is logged. Unanswered leads can be followed up automatically by text so a busy day never means a lost opportunity." },
-  { icon: ShieldCheck, title: "Stay consistent and on-brand, 24/7",            body: "The AI represents your business the way you want — with your tone, your service list, your booking process. No off-script answers, no bad days." },
+  { icon: Users,      color: "#6366f1", bg: "rgba(99,102,241,0.12)", title: "Capture leads that go cold",            body: "Most callers don't leave voicemails. When an AI replies in seconds, they stay engaged — and you get the lead instead of the competitor who answers next." },
+  { icon: Calendar,   color: "#10b981", bg: "rgba(16,185,129,0.12)", title: "Guide conversations toward booking",     body: "The AI asks the right qualifying questions for your business, collects the information you need, and moves toward scheduling." },
+  { icon: RefreshCw,  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  title: "Automate follow-up on every lead",      body: "Every conversation is logged. Unanswered leads can be followed up automatically so a busy day never means a lost opportunity." },
+  { icon: ShieldCheck, color: "#06b6d4", bg: "rgba(6,182,212,0.12)", title: "Consistent and on-brand, 24/7",          body: "The AI represents your business the way you want — with your tone, your service list, your booking process. No off-script answers, no bad days." },
 ];
 
 const HOW_IT_WORKS = [
-  { step: "01", title: "Tell us about your business",       body: "We start with a conversation: how you work, what your customers typically ask, what a qualified lead looks like for you." },
-  { step: "02", title: "We connect your calendar and tools", body: "We configure the AI, connect it to your scheduling or CRM, and test it against real scenarios before anything goes live." },
-  { step: "03", title: "Your AI receptionist goes live",    body: "We handle the rollout. Your team gets a review dashboard. You see every conversation and can step in at any point." },
-];
-
-const INTEGRATIONS = [
-  { icon: Calendar, label: "Google Calendar" },
-  { icon: Mail,     label: "Email" },
-  { icon: MessageSquare, label: "SMS" },
-  { icon: Globe,    label: "Website Chat" },
+  { step: "01", icon: MessageSquare, title: "Tell us about your business",       body: "We start with a conversation: how you work, what your customers typically ask, what a qualified lead looks like for you." },
+  { step: "02", icon: Zap,           title: "We connect your calendar and tools", body: "We configure the AI, connect it to your scheduling or CRM, and test it against real scenarios before anything goes live." },
+  { step: "03", icon: TrendingUp,    title: "Your AI receptionist goes live",    body: "We handle the rollout. Your team gets a review dashboard. You see every conversation and can step in at any point." },
 ];
 
 const FAQS = [
@@ -159,13 +158,195 @@ const empty: FormState = { name: "", businessName: "", email: "", phone: "", bus
 // ── Animation helpers ─────────────────────────────────────────────────────────
 
 const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 24 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+  hidden: { opacity: 0, y: 28 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
 };
 const stagger: Variants = {
   hidden: {},
-  show:   { transition: { staggerChildren: 0.1 } },
+  show:   { transition: { staggerChildren: 0.09 } },
 };
+const fadeIn: Variants = {
+  hidden: { opacity: 0 },
+  show:   { opacity: 1, transition: { duration: 0.5 } },
+};
+
+// ── Animated counter ──────────────────────────────────────────────────────────
+
+function AnimatedCounter({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const motionVal = useMotionValue(0);
+  const spring = useSpring(motionVal, { stiffness: 60, damping: 20 });
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (inView) motionVal.set(value);
+  }, [inView, value, motionVal]);
+
+  useEffect(() => {
+    const unsub = spring.on("change", (v) => setDisplay(Math.round(v)));
+    return unsub;
+  }, [spring]);
+
+  return <span ref={ref}>{prefix}{display.toLocaleString()}{suffix}</span>;
+}
+
+// ── Hero phone mockup with animated conversation ──────────────────────────────
+
+function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
+  const script = INDUSTRY_SCRIPTS[industryIdx];
+  const [visibleMessages, setVisibleMessages] = useState<Array<{ from: "ai" | "user"; text: string }>>([]);
+  const [phase, setPhase] = useState(0);
+
+  const conversation = [
+    { from: "ai" as const, text: script.greeting },
+    { from: "user" as const, text: "Hi, I need some help with that." },
+    { from: "ai" as const, text: script.responses[0] },
+    { from: "user" as const, text: "Yes, please!" },
+    { from: "ai" as const, text: script.responses[1] },
+  ];
+
+  useEffect(() => {
+    setVisibleMessages([]);
+    setPhase(0);
+  }, [industryIdx]);
+
+  useEffect(() => {
+    if (phase >= conversation.length) return;
+    const delay = phase === 0 ? 400 : 900;
+    const timer = setTimeout(() => {
+      setVisibleMessages((prev) => [...prev, conversation[phase]]);
+      setPhase((p) => p + 1);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [phase, industryIdx]);
+
+  return (
+    <div style={{
+      width: 280,
+      background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)",
+      borderRadius: 36,
+      padding: "12px 6px",
+      boxShadow: "0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.12)",
+      position: "relative",
+    }}>
+      {/* Notch */}
+      <div style={{
+        width: 100, height: 28, background: "#0d1117",
+        borderRadius: "0 0 20px 20px", margin: "0 auto 8px",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+      }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#1a1a2e" }} />
+        <div style={{ width: 50, height: 6, borderRadius: 3, background: "#1a1a2e" }} />
+      </div>
+
+      {/* Screen */}
+      <div style={{
+        background: "#f2f2f7",
+        borderRadius: 26,
+        overflow: "hidden",
+        minHeight: 420,
+        display: "flex",
+        flexDirection: "column",
+      }}>
+        {/* SMS Header */}
+        <div style={{
+          background: "linear-gradient(180deg, #f7f7f7 0%, #efefef 100%)",
+          padding: "10px 14px",
+          borderBottom: "1px solid #e0e0e0",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%",
+            background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14,
+          }}>
+            🤖
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>AI Receptionist</div>
+            <div style={{ fontSize: 10, color: "#10b981", fontWeight: 600 }}>● Online now</div>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div style={{ padding: "12px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}>
+          {visibleMessages.map((msg, i) => (
+            <motion.div
+              key={`${industryIdx}-${i}`}
+              initial={{ opacity: 0, y: 8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              style={{ display: "flex", justifyContent: msg.from === "user" ? "flex-end" : "flex-start" }}
+            >
+              <div style={{
+                maxWidth: "80%",
+                background: msg.from === "user"
+                  ? "linear-gradient(135deg, #062e71 0%, #1249a8 100%)"
+                  : "#fff",
+                color: msg.from === "user" ? "#fff" : "#1a1a1a",
+                borderRadius: msg.from === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                padding: "8px 11px",
+                fontSize: 11,
+                lineHeight: 1.5,
+                boxShadow: msg.from === "user"
+                  ? "0 2px 8px rgba(6,46,113,0.35)"
+                  : "0 1px 4px rgba(0,0,0,0.12)",
+              }}>
+                {msg.text}
+              </div>
+            </motion.div>
+          ))}
+
+          {phase < conversation.length && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: "flex", justifyContent: "flex-start" }}>
+              <div style={{
+                background: "#fff", borderRadius: "16px 16px 16px 4px",
+                padding: "10px 14px", display: "flex", gap: 4, alignItems: "center",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+              }}>
+                {[0,1,2].map((i) => (
+                  <motion.div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: "#9ca3af" }}
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.15 }} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Input bar */}
+        <div style={{
+          background: "#f7f7f7", borderTop: "1px solid #e0e0e0",
+          padding: "8px 10px", display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <div style={{
+            flex: 1, background: "#fff", borderRadius: 16, padding: "6px 12px",
+            fontSize: 10, color: "#9ca3af", border: "1px solid #e5e7eb",
+          }}>
+            Text message
+          </div>
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Send style={{ width: 12, height: 12, color: "#fff" }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Home indicator */}
+      <div style={{
+        width: 100, height: 4, background: "rgba(255,255,255,0.2)",
+        borderRadius: 2, margin: "10px auto 0",
+      }} />
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -184,7 +365,6 @@ export default function LandingReceptionist() {
   const [demoTyping, setDemoTyping] = useState(false);
   const demoEndRef = useRef<HTMLDivElement>(null);
   const demoInputRef = useRef<HTMLInputElement>(null);
-
   const demoRef = useRef<HTMLElement>(null);
 
   // ── Page-view tracking (preserve exactly) ──
@@ -278,234 +458,337 @@ export default function LandingReceptionist() {
   const scrollToContact = () => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
+    <div style={{ minHeight: "100vh", background: "#f8f9ff", overflowX: "hidden", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
 
-      {/* ── Real Navbar ────────────────────────────────────────────────────── */}
       <ReceptionistNav />
+      <div style={{ height: 82 }} />
 
-      {/* spacer so content clears the fixed Navbar (~78px tall) */}
-      <div className="h-[82px]" />
+      {/* ═══════════════════════════════════════════════════════════════════════
+          HERO — full-viewport dark immersive section
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{
+        background: "linear-gradient(135deg, #020c1f 0%, #041630 40%, #061e48 100%)",
+        position: "relative",
+        overflow: "hidden",
+        padding: "72px 24px 80px",
+      }}>
+        {/* Grid dot pattern */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          backgroundImage: "radial-gradient(circle, rgba(99,102,241,0.18) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+          maskImage: "radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%)",
+        }} />
 
-      {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <section className="bg-primary text-primary-foreground px-4 md:px-6 py-16 md:py-24">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-          {/* Left */}
-          <motion.div className="space-y-6" initial="hidden" animate="show" variants={stagger}>
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold tracking-widest uppercase bg-white/10 border border-white/20 text-primary-foreground/80 px-3 py-1 rounded-full">
-              AI Receptionist · SiteMint Digital
-            </motion.span>
-            <motion.h1 variants={fadeUp} className="font-serif text-3xl md:text-5xl font-bold leading-tight">
-              Stop losing jobs<br />to voicemail.
-            </motion.h1>
-            <motion.p variants={fadeUp} className="text-primary-foreground/75 text-base md:text-lg leading-relaxed max-w-md">
-              Your AI receptionist answers by text in seconds, asks the right qualifying questions,
-              and keeps every lead warm — even when you're on a job.
-            </motion.p>
-            <motion.ul variants={fadeUp} className="space-y-2.5 text-sm">
-              {[
-                "Answers by text in seconds — no voicemail, no lost caller",
-                "Asks the right questions for your specific business",
-                "You review every conversation before anything is missed",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
-                  <span className="text-primary-foreground/80">{item}</span>
-                </li>
-              ))}
-            </motion.ul>
-            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Link href="/ai-receptionist/signup">
-                <Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold w-full sm:w-auto">
-                  Get early access <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
-              <Button size="lg" variant="outline" onClick={scrollToDemo}
-                className="border-white/30 text-primary-foreground hover:bg-white/10 gap-2">
-                <Play className="w-4 h-4" />
-                See it in action
-              </Button>
-            </motion.div>
-          </motion.div>
+        {/* Glow blobs */}
+        <div style={{ position: "absolute", top: "-10%", left: "5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,46,113,0.45) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-5%", right: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
 
-          {/* Right — hero chat mockup (shows active industry preview) */}
-          <motion.div
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0, transition: { duration: 0.6, delay: 0.2 } }}
-            className="flex justify-center md:justify-end"
-          >
-            <div className="w-full max-w-sm bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/10">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="text-xs font-semibold text-primary-foreground/80">AI Receptionist — Online</span>
-              </div>
-              <div className="space-y-3 text-xs">
-                {INDUSTRY_SCRIPTS[activeIndustry].responses.slice(0, 1).map((r, i) => (
-                  <div key={i} className="flex justify-start">
-                    <div className="max-w-[85%] bg-white/15 text-primary-foreground/90 rounded-2xl rounded-bl-sm px-3.5 py-2.5 leading-relaxed">
-                      {INDUSTRY_SCRIPTS[activeIndustry].greeting}
-                    </div>
-                  </div>
+        <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+
+            {/* ── Left copy ── */}
+            <motion.div initial="hidden" animate="show" variants={stagger} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <motion.div variants={fadeUp}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)",
+                  color: "#a5b4fc", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+                  textTransform: "uppercase", padding: "5px 12px", borderRadius: 100,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
+                  AI Receptionist · SiteMint Digital
+                </span>
+              </motion.div>
+
+              <motion.h1 variants={fadeUp} style={{
+                fontSize: "clamp(2.4rem, 5vw, 3.6rem)",
+                fontFamily: "Playfair Display, serif",
+                fontWeight: 700, lineHeight: 1.1,
+                color: "#fff", margin: 0,
+                letterSpacing: "-0.02em",
+              }}>
+                Stop losing jobs<br />
+                to{" "}
+                <span style={{
+                  background: "linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #34d399 100%)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                }}>voicemail</span>.
+              </motion.h1>
+
+              <motion.p variants={fadeUp} style={{ fontSize: 17, color: "rgba(255,255,255,0.65)", lineHeight: 1.65, margin: 0, maxWidth: 460 }}>
+                Your AI receptionist answers by text in seconds, asks the right qualifying questions,
+                and keeps every lead warm — even when you're on a job.
+              </motion.p>
+
+              <motion.ul variants={fadeUp} style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  "Answers by text in seconds — no voicemail, no lost caller",
+                  "Asks the right questions for your specific business",
+                  "You review every conversation before anything is missed",
+                ].map((item) => (
+                  <li key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <CheckCircle2 style={{ width: 17, height: 17, color: "#34d399", flexShrink: 0, marginTop: 2 }} />
+                    <span style={{ fontSize: 14, color: "rgba(255,255,255,0.72)", lineHeight: 1.5 }}>{item}</span>
+                  </li>
                 ))}
-                <div className="flex justify-end">
-                  <div className="max-w-[75%] bg-white text-primary rounded-2xl rounded-br-sm px-3.5 py-2.5 leading-relaxed">
-                    Hi, I need some help…
-                  </div>
-                </div>
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] bg-white/15 text-primary-foreground/90 rounded-2xl rounded-bl-sm px-3.5 py-2.5 leading-relaxed">
-                    {INDUSTRY_SCRIPTS[activeIndustry].responses[0]}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-white/10 text-[10px] text-primary-foreground/40 text-center">
-                Try the live demo below ↓
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+              </motion.ul>
 
-      {/* ── Industry selector + interactive demo ───────────────────────────── */}
-      <section ref={demoRef as React.RefObject<HTMLElement>} id="demo" className="px-4 md:px-6 py-16 bg-muted/40">
-        <div className="max-w-5xl mx-auto">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} variants={stagger}
-            className="text-center mb-8 space-y-3">
-            <motion.p variants={fadeUp} className="text-xs font-bold uppercase tracking-widest text-primary/70">Interactive Demo</motion.p>
-            <motion.h2 variants={fadeUp} className="font-serif text-2xl md:text-3xl font-bold">
-              Try it yourself — pick your industry
-            </motion.h2>
-            <motion.p variants={fadeUp} className="text-muted-foreground text-sm max-w-xl mx-auto">
-              Type a message and see how the AI responds. Each industry has its own conversation flow —
-              questions and tone are configured specifically for your business.
-            </motion.p>
-          </motion.div>
-
-          {/* Industry pills */}
-          <div className="flex flex-wrap justify-center gap-2 mb-8">
-            {INDUSTRY_SCRIPTS.map((ind, i) => (
-              <button
-                key={ind.label}
-                onClick={() => setActiveIndustry(i)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  i === activeIndustry
-                    ? "bg-primary text-primary-foreground shadow"
-                    : "bg-background border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                }`}
-              >
-                {ind.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Demo chat card */}
-          <div className="max-w-md mx-auto bg-background border border-border rounded-2xl shadow-md overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-xs font-semibold text-muted-foreground">
-                AI Receptionist — {INDUSTRY_SCRIPTS[activeIndustry].label}
-              </span>
-            </div>
-
-            {/* Messages */}
-            <div className="h-72 overflow-y-auto p-4 space-y-3 scroll-smooth">
-              {demoMessages.map((msg, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className={`flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}
+              <motion.div variants={fadeUp} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <Link href="/ai-receptionist/signup">
+                  <button style={{
+                    background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                    color: "#fff", fontSize: 15, fontWeight: 700,
+                    padding: "14px 28px", borderRadius: 12, border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 8,
+                    boxShadow: "0 4px 24px rgba(99,102,241,0.5), 0 0 0 1px rgba(99,102,241,0.4)",
+                    transition: "transform 0.15s, box-shadow 0.15s",
+                    letterSpacing: "-0.01em",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(99,102,241,0.65), 0 0 0 1px rgba(99,102,241,0.4)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(99,102,241,0.5), 0 0 0 1px rgba(99,102,241,0.4)"; }}
+                  >
+                    Get early access <ArrowRight style={{ width: 16, height: 16 }} />
+                  </button>
+                </Link>
+                <button onClick={scrollToDemo} style={{
+                  background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 15, fontWeight: 600,
+                  padding: "14px 24px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.16)",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                  backdropFilter: "blur(8px)", transition: "background 0.2s",
+                  letterSpacing: "-0.01em",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.14)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)"; }}
                 >
-                  <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                    msg.from === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-muted text-foreground rounded-bl-sm"
-                  }`}>
-                    {msg.text}
-                  </div>
-                </motion.div>
-              ))}
+                  <Play style={{ width: 15, height: 15 }} />
+                  See it in action
+                </button>
+              </motion.div>
 
-              {demoTyping && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                  <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
-                    {[0, 1, 2].map((i) => (
-                      <motion.span key={i} className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full"
-                        animate={{ y: [0, -4, 0] }}
-                        transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} />
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-              <div ref={demoEndRef} />
-            </div>
+              {/* Social proof micro-strip */}
+              <motion.div variants={fadeUp} style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 8 }}>
+                <div style={{ display: "flex" }}>
+                  {["🏠", "⚖️", "🔧", "💆", "🍽️"].map((emoji, i) => (
+                    <div key={i} style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: "rgba(255,255,255,0.12)", border: "2px solid rgba(255,255,255,0.15)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13, marginLeft: i === 0 ? 0 : -6,
+                    }}>{emoji}</div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>
+                  Built for <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>6+ industries</span> · Setup in &lt;2 weeks
+                </div>
+              </motion.div>
+            </motion.div>
 
-            {/* Input row */}
-            <div className="border-t border-border p-3 flex gap-2 bg-background">
-              <input
-                ref={demoInputRef}
-                type="text"
-                value={demoInput}
-                onChange={(e) => setDemoInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") sendDemoMessage(); }}
-                placeholder="Type a message…"
-                className="flex-1 text-xs bg-muted rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
-                disabled={demoTyping}
-              />
-              <button
-                onClick={sendDemoMessage}
-                disabled={demoTyping || !demoInput.trim()}
-                className="bg-primary text-primary-foreground rounded-xl px-3 py-2 disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                aria-label="Send"
+            {/* ── Right: Phone mockup ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 32, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] } }}
+              style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 20 }}
+            >
+              {/* Missed call card (left accent) */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0, transition: { delay: 0.9, duration: 0.5 } }}
+                style={{
+                  background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)",
+                  borderRadius: 16, padding: "14px 16px",
+                  display: "flex", flexDirection: "column", gap: 8, width: 160,
+                  backdropFilter: "blur(12px)",
+                  alignSelf: "flex-start", marginTop: 60,
+                }}
               >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <PhoneOff style={{ width: 13, height: 13, color: "#f87171" }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#f87171", letterSpacing: "0.04em", textTransform: "uppercase" }}>Without AI</span>
+                </div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>Caller hangs up after 4 rings…</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Lead value: <span style={{ color: "#f87171", fontWeight: 700 }}>$0</span></div>
+              </motion.div>
 
-          <p className="text-center text-[11px] text-muted-foreground mt-4">
-            Client-side demo only — actual conversations are configured for your specific business
-          </p>
+              <HeroPhoneMockup industryIdx={activeIndustry} />
+
+              {/* Captured lead card (right accent) */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0, transition: { delay: 1.1, duration: 0.5 } }}
+                style={{
+                  background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)",
+                  borderRadius: 16, padding: "14px 16px",
+                  display: "flex", flexDirection: "column", gap: 8, width: 160,
+                  backdropFilter: "blur(12px)",
+                  alignSelf: "flex-end", marginBottom: 60,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <CheckCircle2 style={{ width: 13, height: 13, color: "#34d399" }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#34d399", letterSpacing: "0.04em", textTransform: "uppercase" }}>With AI</span>
+                </div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>Lead captured, follow-up scheduled ✓</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Responded in <span style={{ color: "#34d399", fontWeight: 700 }}>&lt;12 sec</span></div>
+              </motion.div>
+            </motion.div>
+
+          </div>
         </div>
       </section>
 
-      {/* ── Stats bar ──────────────────────────────────────────────────────── */}
-      <section className="bg-primary px-4 md:px-6 py-12">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
-          {STATS.map((stat) => (
-            <motion.div key={stat.number} initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="text-center">
-              <div className="text-3xl md:text-4xl font-black font-serif text-primary-foreground mb-1">{stat.number}</div>
-              <div className="text-sm text-primary-foreground/75 mb-1">{stat.label}</div>
-              <div className="text-[10px] text-primary-foreground/40">{stat.source}</div>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          STATS BAR — bold numbers on near-black
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{ background: "#041230", padding: "48px 24px" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 32 }}>
+          {[
+            { num: 70, suffix: "%+", label: "of inbound calls go unanswered", sub: "BrightLocal / Google SMB research", icon: Phone, color: "#f87171" },
+            { num: 15, prefix: "<", suffix: " sec", label: "average AI response time via SMS", sub: "Industry benchmark", icon: Zap, color: "#fbbf24" },
+            { num: 1200, prefix: "$", suffix: "+", label: "typical value of one qualified lead", sub: "Varies by industry", icon: DollarSign, color: "#34d399" },
+          ].map(({ num, prefix, suffix, label, sub, icon: Icon, color }) => (
+            <motion.div key={label} initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}
+              style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 4 }}>
+                <Icon style={{ width: 18, height: 18, color }} />
+              </div>
+              <div style={{ fontSize: "clamp(2rem,4vw,2.8rem)", fontWeight: 900, fontFamily: "Playfair Display, serif", color: "#fff", lineHeight: 1 }}>
+                {prefix}<AnimatedCounter value={num} />{suffix}
+              </div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>{label}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>{sub}</div>
             </motion.div>
           ))}
         </div>
       </section>
 
-      {/* ── Benefits ───────────────────────────────────────────────────────── */}
-      <section id="features" className="px-4 md:px-6 py-20">
-        <div className="max-w-7xl mx-auto">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="text-center mb-12 space-y-3">
-            <motion.p variants={fadeUp} className="text-xs font-bold uppercase tracking-widest text-primary/70">Features</motion.p>
-            <motion.h2 variants={fadeUp} className="font-serif text-2xl md:text-3xl font-bold">Built to handle what you can't</motion.h2>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          INDUSTRY DEMO — interactive chat
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section ref={demoRef as React.RefObject<HTMLElement>} id="demo" style={{ padding: "96px 24px", background: "#f8f9ff" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} variants={stagger}
+            style={{ textAlign: "center", marginBottom: 48, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+            <motion.span variants={fadeUp} style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+              color: "#6366f1", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100,
+            }}>Interactive Demo</motion.span>
+            <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
+              Try it yourself — pick your industry
+            </motion.h2>
+            <motion.p variants={fadeUp} style={{ fontSize: 15, color: "#64748b", maxWidth: 520, lineHeight: 1.6, margin: 0 }}>
+              Type a message and see how the AI responds. Each industry has its own conversation flow —
+              questions and tone configured specifically for your business.
+            </motion.p>
           </motion.div>
-          <div className="grid md:grid-cols-2 gap-6 lg:gap-8 items-start">
-            <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {BENEFITS.map((b) => (
-                <motion.div key={b.title} variants={fadeUp} className="bg-background border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                    <b.icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <h3 className="font-semibold text-sm mb-2 leading-snug">{b.title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{b.body}</p>
-                </motion.div>
-              ))}
-            </motion.div>
-            <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0, transition: { duration: 0.5 } }} viewport={{ once: true }}
-              className="bg-muted/50 border border-border rounded-2xl p-5 shadow-sm">
-              <div className="text-xs font-semibold text-muted-foreground mb-4 text-center">Real conversation example</div>
-              <div className="space-y-3">
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "start" }}>
+
+            {/* Left: industry pills + demo chat */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {INDUSTRY_SCRIPTS.map((ind, i) => (
+                  <button key={ind.label} onClick={() => setActiveIndustry(i)} style={{
+                    padding: "8px 16px", borderRadius: 100, fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", transition: "all 0.2s",
+                    background: i === activeIndustry
+                      ? "linear-gradient(135deg, #062e71 0%, #1249a8 100%)"
+                      : "#fff",
+                    color: i === activeIndustry ? "#fff" : "#475569",
+                    border: i === activeIndustry ? "1px solid transparent" : "1px solid #e2e8f0",
+                    boxShadow: i === activeIndustry
+                      ? "0 4px 16px rgba(6,46,113,0.3)"
+                      : "0 1px 3px rgba(0,0,0,0.06)",
+                  }}>
+                    {ind.emoji} {ind.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat card */}
+              <div style={{
+                background: "#fff", borderRadius: 20,
+                boxShadow: "0 4px 40px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)",
+                overflow: "hidden",
+              }}>
+                {/* Header */}
+                <div style={{
+                  background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+                  padding: "14px 18px", display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+                    {INDUSTRY_SCRIPTS[activeIndustry].emoji} AI Receptionist — {INDUSTRY_SCRIPTS[activeIndustry].label}
+                  </span>
+                </div>
+
+                {/* Messages */}
+                <div style={{ height: 280, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {demoMessages.map((msg, i) => (
+                    <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+                      style={{ display: "flex", justifyContent: msg.from === "user" ? "flex-end" : "flex-start" }}>
+                      <div style={{
+                        maxWidth: "80%", borderRadius: msg.from === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                        padding: "10px 14px", fontSize: 13, lineHeight: 1.55,
+                        background: msg.from === "user"
+                          ? "linear-gradient(135deg, #062e71 0%, #1249a8 100%)"
+                          : "#f1f5f9",
+                        color: msg.from === "user" ? "#fff" : "#1e293b",
+                        boxShadow: msg.from === "user" ? "0 2px 8px rgba(6,46,113,0.25)" : "none",
+                      }}>{msg.text}</div>
+                    </motion.div>
+                  ))}
+                  {demoTyping && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: "flex", justifyContent: "flex-start" }}>
+                      <div style={{ background: "#f1f5f9", borderRadius: "16px 16px 16px 4px", padding: "12px 16px", display: "flex", gap: 4, alignItems: "center" }}>
+                        {[0,1,2].map((i) => (
+                          <motion.div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "#94a3b8" }}
+                            animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                  <div ref={demoEndRef} />
+                </div>
+
+                {/* Input row */}
+                <div style={{ borderTop: "1px solid #f1f5f9", padding: "12px 14px", display: "flex", gap: 10, background: "#fff" }}>
+                  <input ref={demoInputRef} type="text" value={demoInput}
+                    onChange={(e) => setDemoInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") sendDemoMessage(); }}
+                    placeholder="Type a message…" disabled={demoTyping}
+                    style={{
+                      flex: 1, fontSize: 13, background: "#f8fafc", border: "1px solid #e2e8f0",
+                      borderRadius: 12, padding: "10px 14px", outline: "none", color: "#1e293b",
+                    }}
+                  />
+                  <button onClick={sendDemoMessage} disabled={demoTyping || !demoInput.trim()}
+                    style={{
+                      background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+                      color: "#fff", border: "none", borderRadius: 12, padding: "10px 14px",
+                      cursor: demoInput.trim() ? "pointer" : "not-allowed", opacity: demoInput.trim() ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                    <Send style={{ width: 14, height: 14 }} />
+                  </button>
+                </div>
+              </div>
+              <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", margin: 0 }}>
+                Client-side demo — actual conversations are configured for your specific business
+              </p>
+            </div>
+
+            {/* Right: real conversation showcase */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{
+                background: "linear-gradient(135deg, #020c1f 0%, #061e48 100%)",
+                borderRadius: 20, padding: 24,
+                boxShadow: "0 20px 60px rgba(2,12,31,0.25)",
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 16 }}>
+                  Real conversation — HVAC emergency
+                </div>
                 {[
                   { from: "visitor", text: "Hi, I saw your ad. Do you do emergency HVAC calls?" },
                   { from: "ai",      text: "Yes, we do! Is your system not heating or cooling right now?" },
@@ -514,204 +797,463 @@ export default function LandingReceptionist() {
                   { from: "visitor", text: "Now please, yes." },
                   { from: "ai",      text: "Perfect. I've flagged this as urgent. Can I get your address so we can dispatch someone?" },
                 ].map((msg, i) => (
-                  <div key={i} className={`flex ${msg.from === "visitor" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] px-3.5 py-2.5 text-xs leading-relaxed rounded-2xl ${
-                      msg.from === "visitor"
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
-                        : "bg-background border border-border text-foreground rounded-bl-sm"
-                    }`}>{msg.text}</div>
+                  <motion.div key={i} initial={{ opacity: 0, x: msg.from === "visitor" ? 12 : -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
+                    style={{ display: "flex", justifyContent: msg.from === "visitor" ? "flex-end" : "flex-start", marginBottom: 10 }}>
+                    <div style={{
+                      maxWidth: "78%", borderRadius: msg.from === "visitor" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+                      padding: "9px 13px", fontSize: 12, lineHeight: 1.55,
+                      background: msg.from === "visitor" ? "rgba(255,255,255,0.12)" : "rgba(99,102,241,0.2)",
+                      color: msg.from === "visitor" ? "rgba(255,255,255,0.85)" : "#c7d2fe",
+                      border: msg.from === "visitor" ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(99,102,241,0.3)",
+                    }}>{msg.text}</div>
+                  </motion.div>
+                ))}
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <CheckCircle2 style={{ width: 14, height: 14, color: "#34d399" }} />
+                    <span style={{ fontSize: 12, color: "#34d399", fontWeight: 600 }}>Lead captured. Would've gone to voicemail.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Metric cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[
+                  { icon: Clock, color: "#fbbf24", label: "Response time", value: "< 12 sec" },
+                  { icon: TrendingUp, color: "#34d399", label: "Lead outcome", value: "Booked" },
+                  { icon: Phone, color: "#60a5fa", label: "Missed calls rescued", value: "100%" },
+                  { icon: Star, color: "#a78bfa", label: "Available", value: "24 / 7" },
+                ].map(({ icon: Icon, color, label, value }) => (
+                  <div key={label} style={{
+                    background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16,
+                    padding: "16px", display: "flex", flexDirection: "column", gap: 8,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon style={{ width: 13, height: 13, color }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>{label}</span>
+                    </div>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: "#0f1729", letterSpacing: "-0.02em" }}>{value}</span>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground text-center mt-4">This lead would have gone to voicemail. Instead, it's booked.</p>
-            </motion.div>
+            </div>
+
           </div>
         </div>
       </section>
 
-      {/* ── How it works ───────────────────────────────────────────────────── */}
-      <section id="how-it-works" className="bg-muted/40 px-4 md:px-6 py-20">
-        <div className="max-w-4xl mx-auto">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="text-center mb-12 space-y-3">
-            <motion.p variants={fadeUp} className="text-xs font-bold uppercase tracking-widest text-primary/70">Process</motion.p>
-            <motion.h2 variants={fadeUp} className="font-serif text-2xl md:text-3xl font-bold">From conversation to live in weeks</motion.h2>
-            <motion.p variants={fadeUp} className="text-muted-foreground text-sm max-w-xl mx-auto">We handle the full setup — no technical work on your end.</motion.p>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          BENEFITS — colored icon cards
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="features" style={{ padding: "96px 24px", background: "#fff" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} variants={stagger}
+            style={{ textAlign: "center", marginBottom: 56, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+            <motion.span variants={fadeUp} style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "#6366f1",
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100,
+            }}>Features</motion.span>
+            <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
+              Built to handle what you can't
+            </motion.h2>
           </motion.div>
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger} className="grid md:grid-cols-3 gap-6">
-            {HOW_IT_WORKS.map((step) => (
-              <motion.div key={step.step} variants={fadeUp} className="bg-background border border-border rounded-2xl p-6 shadow-sm text-center">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-xs font-black text-primary">{step.step}</span>
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
+            style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
+            {BENEFITS.map((b) => (
+              <motion.div key={b.title} variants={fadeUp}
+                style={{
+                  background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20,
+                  padding: "28px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                  transition: "box-shadow 0.2s, transform 0.2s", cursor: "default",
+                }}
+                whileHover={{ y: -4, boxShadow: "0 12px 40px rgba(0,0,0,0.1)" }}
+              >
+                <div style={{
+                  width: 44, height: 44, borderRadius: 14, background: b.bg,
+                  border: `1px solid ${b.color}25`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16,
+                }}>
+                  <b.icon style={{ width: 20, height: 20, color: b.color }} />
                 </div>
-                <h3 className="font-semibold text-sm mb-2">{step.title}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{step.body}</p>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f1729", margin: "0 0 10px", lineHeight: 1.3 }}>{b.title}</h3>
+                <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.65, margin: 0 }}>{b.body}</p>
               </motion.div>
             ))}
           </motion.div>
         </div>
       </section>
 
-      {/* ── Integrations ───────────────────────────────────────────────────── */}
-      <section className="px-4 md:px-6 py-14 border-b border-border">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary/70 mb-3">Integrations</p>
-          <p className="text-muted-foreground text-sm mb-8 max-w-md mx-auto">Connects with the tools your business already runs on.</p>
-          <div className="flex flex-wrap justify-center gap-4">
-            {INTEGRATIONS.map((int) => (
-              <div key={int.label} className="flex items-center gap-2.5 bg-background border border-border rounded-xl px-4 py-2.5 shadow-sm text-sm font-medium">
-                <int.icon className="w-4 h-4 text-primary" />
-                {int.label}
-              </div>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          HOW IT WORKS — numbered steps with connectors
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="how-it-works" style={{ padding: "96px 24px", background: "linear-gradient(180deg, #f8f9ff 0%, #eef0ff 100%)" }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} variants={stagger}
+            style={{ textAlign: "center", marginBottom: 56, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+            <motion.span variants={fadeUp} style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "#6366f1",
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100,
+            }}>Process</motion.span>
+            <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
+              Live in under two weeks
+            </motion.h2>
+            <motion.p variants={fadeUp} style={{ fontSize: 15, color: "#64748b", maxWidth: 420, lineHeight: 1.6, margin: 0 }}>
+              We handle the full setup — no technical work on your end.
+            </motion.p>
+          </motion.div>
+
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0, position: "relative" }}>
+            {/* Connector line */}
+            <div style={{
+              position: "absolute", top: 44, left: "calc(16.5% + 22px)", right: "calc(16.5% + 22px)",
+              height: 2, background: "linear-gradient(90deg, #6366f1 0%, #a78bfa 100%)",
+              zIndex: 0,
+            }} />
+            {HOW_IT_WORKS.map((step, i) => (
+              <motion.div key={step.step} variants={fadeUp}
+                style={{ textAlign: "center", padding: "0 24px", position: "relative", zIndex: 1 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: "50%",
+                  background: i === 1 ? "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" : "#fff",
+                  border: `2px solid ${i === 1 ? "transparent" : "#e2e8f0"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px",
+                  boxShadow: i === 1 ? "0 8px 24px rgba(99,102,241,0.4)" : "0 4px 12px rgba(0,0,0,0.08)",
+                }}>
+                  <step.icon style={{ width: 22, height: 22, color: i === 1 ? "#fff" : "#6366f1" }} />
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#6366f1", letterSpacing: "0.06em", marginBottom: 8 }}>STEP {step.step}</div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f1729", margin: "0 0 10px", lineHeight: 1.3 }}>{step.title}</h3>
+                <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.65, margin: 0 }}>{step.body}</p>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Testimonials ───────────────────────────────────────────────────── */}
-      <section className="px-4 md:px-6 py-20 bg-muted/40">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-10 space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-primary/70">Testimonials</p>
-            <h2 className="font-serif text-2xl md:text-3xl font-bold">What clients are saying</h2>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TESTIMONIALS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{ padding: "96px 24px", background: "#fff" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <span style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "#6366f1",
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100, marginBottom: 16,
+            }}>Testimonials</span>
+            <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.4rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
+              What clients are saying
+            </h2>
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
             {[
-              { quote: "We used to miss 3–4 calls a day when we were on jobs. Those were jobs we never knew we lost. Now every inquiry gets an immediate response.", role: "Home Services Business Owner" },
-              { quote: "The first week it was live, it captured two leads that came in after 9pm. Both became paying clients. Setup was fast — we were live in under two weeks.", role: "Med Spa Manager" },
+              { quote: "We used to miss 3–4 calls a day when we were on jobs. Those were jobs we never knew we lost. Now every inquiry gets an immediate response.", role: "Home Services Business Owner", stars: 5 },
+              { quote: "The first week it was live, it captured two leads that came in after 9pm. Both became paying clients. Setup was fast — we were live in under two weeks.", role: "Med Spa Manager", stars: 5 },
             ].map((t, i) => (
-              <div key={i} className="bg-background border border-border rounded-2xl p-6 shadow-sm relative">
-                <div className="absolute top-3 right-4 text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider">Example</div>
-                <p className="text-sm leading-relaxed text-foreground/80 mb-4 italic">"{t.quote}"</p>
-                <p className="text-xs font-semibold text-muted-foreground">— {t.role}</p>
-              </div>
+              <motion.div key={i} initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}
+                style={{
+                  background: "linear-gradient(135deg, #020c1f 0%, #061e48 100%)",
+                  borderRadius: 20, padding: "28px",
+                  boxShadow: "0 16px 48px rgba(2,12,31,0.2)",
+                  position: "relative", overflow: "hidden",
+                }}>
+                <div style={{ position: "absolute", top: 0, right: 0, width: 120, height: 120, background: "radial-gradient(circle at top right, rgba(99,102,241,0.2) 0%, transparent 70%)" }} />
+                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Example</div>
+                <div style={{ display: "flex", gap: 2, marginBottom: 16 }}>
+                  {Array.from({ length: t.stars }).map((_, j) => (
+                    <Star key={j} style={{ width: 14, height: 14, color: "#fbbf24", fill: "#fbbf24" }} />
+                  ))}
+                </div>
+                <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.8)", margin: "0 0 20px", fontStyle: "italic" }}>"{t.quote}"</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.45)", margin: 0 }}>— {t.role}</p>
+              </motion.div>
             ))}
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-6">Placeholder quotes — real client testimonials will appear here as pilots are completed.</p>
+          <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 24 }}>
+            Placeholder quotes — real client testimonials will appear here as pilots are completed.
+          </p>
         </div>
       </section>
 
-      {/* ── Pricing ────────────────────────────────────────────────────────── */}
-      <section id="pricing" className="px-4 md:px-6 py-20">
-        <div className="max-w-4xl mx-auto">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="text-center mb-12 space-y-3">
-            <motion.p variants={fadeUp} className="text-xs font-bold uppercase tracking-widest text-primary/70">Pricing</motion.p>
-            <motion.h2 variants={fadeUp} className="font-serif text-2xl md:text-3xl font-bold">Simple, honest pricing</motion.h2>
-            <motion.p variants={fadeUp} className="text-muted-foreground text-sm max-w-md mx-auto">No per-message fees, no surprise costs. One setup, one monthly rate.</motion.p>
-          </motion.div>
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger} className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            <motion.div variants={fadeUp} className="bg-background border border-border rounded-2xl p-7 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">One-Time Setup</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="font-serif text-4xl font-black text-foreground">$500</span>
-                <span className="text-muted-foreground text-sm mb-1">– $1,500</span>
-              </div>
-              <p className="text-xs text-muted-foreground mb-5">Depends on scope and integrations needed</p>
-              <ul className="space-y-2.5 text-xs text-muted-foreground">
-                {["Custom AI configuration for your business", "Calendar and tool integrations", "Full testing before launch", "Onboarding and review dashboard access"].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />{item}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-            <motion.div variants={fadeUp} className="bg-primary text-primary-foreground rounded-2xl p-7 shadow-lg">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary-foreground/60 mb-4">Monthly Plan</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="font-serif text-4xl font-black">$99</span>
-                <span className="text-primary-foreground/60 text-sm mb-1">– $299/mo</span>
-              </div>
-              <p className="text-xs text-primary-foreground/60 mb-5">Based on conversation volume</p>
-              <ul className="space-y-2.5 text-xs text-primary-foreground/80">
-                {["AI receptionist active 24/7", "Conversation review dashboard", "Ongoing tuning as your business evolves", "Email and SMS support"].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300 shrink-0 mt-0.5" />{item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/ai-receptionist/signup">
-                <Button className="w-full mt-6 bg-white text-primary hover:bg-white/90 font-semibold">
-                  Get early access <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
-              </Link>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── FAQ ────────────────────────────────────────────────────────────── */}
-      <section id="faq" className="bg-muted/40 px-4 md:px-6 py-20">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-10 space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-primary/70">FAQ</p>
-            <h2 className="font-serif text-2xl md:text-3xl font-bold">Common questions</h2>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          INTEGRATIONS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{ padding: "56px 24px", background: "#f8f9ff", borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6366f1", marginBottom: 8 }}>Integrations</p>
+          <p style={{ fontSize: 14, color: "#64748b", marginBottom: 32 }}>Connects with the tools your business already runs on.</p>
+          <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+            {[
+              { icon: Calendar, label: "Google Calendar", color: "#4285f4" },
+              { icon: Mail,     label: "Email",           color: "#ea4335" },
+              { icon: MessageSquare, label: "SMS",        color: "#10b981" },
+              { icon: Globe,    label: "Website Chat",    color: "#6366f1" },
+            ].map(({ icon: Icon, label, color }) => (
+              <motion.div key={label} whileHover={{ y: -2, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14,
+                  padding: "12px 20px", fontSize: 14, fontWeight: 600, color: "#1e293b",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)", cursor: "default",
+                  transition: "box-shadow 0.2s",
+                }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}12`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon style={{ width: 16, height: 16, color }} />
+                </div>
+                {label}
+              </motion.div>
+            ))}
           </div>
-          <Accordion type="single" collapsible className="space-y-2">
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          PRICING — premium cards
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="pricing" style={{ padding: "96px 24px", background: "#fff" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} variants={stagger}
+            style={{ textAlign: "center", marginBottom: 56, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+            <motion.span variants={fadeUp} style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "#6366f1",
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100,
+            }}>Pricing</motion.span>
+            <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
+              Simple, honest pricing
+            </motion.h2>
+            <motion.p variants={fadeUp} style={{ fontSize: 15, color: "#64748b", maxWidth: 400, lineHeight: 1.6, margin: 0 }}>
+              No per-message fees, no surprise costs. One setup, one monthly rate.
+            </motion.p>
+          </motion.div>
+
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 720, margin: "0 auto" }}>
+
+            {/* Setup */}
+            <motion.div variants={fadeUp} style={{
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 24, padding: "36px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+            }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", margin: "0 0 20px" }}>One-Time Setup</p>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginBottom: 4 }}>
+                <span style={{ fontSize: 44, fontWeight: 900, color: "#0f1729", fontFamily: "Playfair Display, serif", lineHeight: 1 }}>$500</span>
+                <span style={{ fontSize: 16, color: "#94a3b8", marginBottom: 6 }}>– $1,500</span>
+              </div>
+              <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 24px" }}>Depends on scope and integrations</p>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                {["Custom AI configuration for your business", "Calendar and tool integrations", "Full testing before launch", "Onboarding and review dashboard access"].map((item) => (
+                  <li key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <CheckCircle2 style={{ width: 15, height: 15, color: "#10b981", flexShrink: 0, marginTop: 2 }} />
+                    <span style={{ fontSize: 13, color: "#475569", lineHeight: 1.4 }}>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            {/* Monthly — hero card */}
+            <motion.div variants={fadeUp} style={{
+              background: "linear-gradient(135deg, #020c1f 0%, #062e71 100%)",
+              borderRadius: 24, padding: "36px",
+              boxShadow: "0 20px 60px rgba(6,46,113,0.35), 0 0 0 1px rgba(99,102,241,0.25)",
+              position: "relative", overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: -30, right: -30, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)" }} />
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", margin: 0 }}>Monthly Plan</p>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(52,211,153,0.2)", color: "#34d399", border: "1px solid rgba(52,211,153,0.3)", padding: "2px 8px", borderRadius: 100 }}>MOST POPULAR</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginBottom: 4 }}>
+                  <span style={{ fontSize: 44, fontWeight: 900, color: "#fff", fontFamily: "Playfair Display, serif", lineHeight: 1 }}>$99</span>
+                  <span style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", marginBottom: 6 }}>– $299/mo</span>
+                </div>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 24px" }}>Based on conversation volume</p>
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {["AI receptionist active 24/7", "Conversation review dashboard", "Ongoing tuning as your business evolves", "Email and SMS support"].map((item) => (
+                    <li key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <CheckCircle2 style={{ width: 15, height: 15, color: "#34d399", flexShrink: 0, marginTop: 2 }} />
+                      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.78)", lineHeight: 1.4 }}>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/ai-receptionist/signup">
+                  <button style={{
+                    width: "100%", background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                    color: "#fff", fontSize: 14, fontWeight: 700, border: "none",
+                    borderRadius: 12, padding: "14px", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    boxShadow: "0 4px 16px rgba(99,102,241,0.5)",
+                    transition: "transform 0.15s, box-shadow 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; }}
+                  >
+                    Get early access <ArrowRight style={{ width: 15, height: 15 }} />
+                  </button>
+                </Link>
+              </div>
+            </motion.div>
+
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          FAQ
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="faq" style={{ padding: "96px 24px", background: "linear-gradient(180deg, #f8f9ff 0%, #eef0ff 100%)" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <span style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "#6366f1",
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100, marginBottom: 16,
+            }}>FAQ</span>
+            <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.4rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
+              Common questions
+            </h2>
+          </div>
+          <Accordion type="single" collapsible className="space-y-3">
             {FAQS.map((faq, i) => (
-              <AccordionItem key={i} value={`faq-${i}`} className="bg-background border border-border rounded-xl px-5 py-1 shadow-sm">
-                <AccordionTrigger className="text-sm font-semibold text-left hover:no-underline py-4">{faq.q}</AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4">{faq.a}</AccordionContent>
+              <AccordionItem key={i} value={`faq-${i}`}
+                className="bg-white border border-slate-200 rounded-2xl px-6 py-1 shadow-sm">
+                <AccordionTrigger className="text-sm font-semibold text-left hover:no-underline py-5 text-slate-800">
+                  {faq.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-slate-500 leading-relaxed pb-5">
+                  {faq.a}
+                </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
         </div>
       </section>
 
-      {/* ── Final CTA banner ───────────────────────────────────────────────── */}
-      <section className="bg-primary text-primary-foreground px-4 md:px-6 py-20">
-        <div className="max-w-2xl mx-auto text-center space-y-5">
-          <h2 className="font-serif text-2xl md:text-4xl font-bold">Ready to stop missing calls?</h2>
-          <p className="text-primary-foreground/70 text-base max-w-md mx-auto leading-relaxed">
-            Tell us about your business and we'll show you exactly how an AI receptionist would work for your industry.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/ai-receptionist/signup">
-              <Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold px-8">
-                Get early access <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-            <Button size="lg" variant="outline" onClick={scrollToContact}
-              className="border-white/30 text-primary-foreground hover:bg-white/10">
-              Talk to us directly
-            </Button>
-          </div>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          FINAL CTA — dark with glow
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{
+        background: "linear-gradient(135deg, #020c1f 0%, #041630 50%, #061e48 100%)",
+        padding: "96px 24px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(99,102,241,0.15) 1px, transparent 1px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 65%)", pointerEvents: "none" }} />
+
+        <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
+            style={{ display: "flex", flexDirection: "column", gap: 20, alignItems: "center" }}>
+            <motion.div variants={fadeUp} style={{
+              width: 64, height: 64, borderRadius: 20,
+              background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 8px 32px rgba(99,102,241,0.5)",
+            }}>
+              <Phone style={{ width: 28, height: 28, color: "#fff" }} />
+            </motion.div>
+            <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(2rem,4vw,3rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.15, letterSpacing: "-0.02em" }}>
+              Ready to stop<br />missing calls?
+            </motion.h2>
+            <motion.p variants={fadeUp} style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", maxWidth: 440, lineHeight: 1.65, margin: 0 }}>
+              Tell us about your business and we'll show you exactly how an AI receptionist would work for your industry.
+            </motion.p>
+            <motion.div variants={fadeUp} style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link href="/ai-receptionist/signup">
+                <button style={{
+                  background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                  color: "#fff", fontSize: 15, fontWeight: 700,
+                  padding: "16px 32px", borderRadius: 14, border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                  boxShadow: "0 4px 24px rgba(99,102,241,0.55)",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  letterSpacing: "-0.01em",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 36px rgba(99,102,241,0.7)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(99,102,241,0.55)"; }}
+                >
+                  Get early access <ArrowRight style={{ width: 16, height: 16 }} />
+                </button>
+              </Link>
+              <button onClick={scrollToContact} style={{
+                background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 15, fontWeight: 600,
+                padding: "16px 28px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.16)",
+                cursor: "pointer", backdropFilter: "blur(8px)", transition: "background 0.2s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.14)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)"; }}
+              >
+                Talk to us directly
+              </button>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Contact / inquiry form ─────────────────────────────────────────── */}
-      <section id="contact" className="px-4 md:px-6 py-20">
-        <div className="max-w-lg mx-auto">
-          <div className="text-center mb-8 space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-primary/70">Get in touch</p>
-            <h2 className="font-serif text-2xl md:text-3xl font-bold">Let's talk about your business</h2>
-            <p className="text-muted-foreground text-sm">We'll reach out within one business day.</p>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          CONTACT FORM
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="contact" style={{ padding: "96px 24px", background: "#fff" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 40 }}>
+            <span style={{
+              display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "#6366f1",
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              padding: "4px 12px", borderRadius: 100, marginBottom: 16,
+            }}>Get in touch</span>
+            <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.4rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: "0 0 10px", color: "#0f1729", letterSpacing: "-0.02em" }}>
+              Let's talk about your business
+            </h2>
+            <p style={{ fontSize: 14, color: "#64748b", margin: 0 }}>We'll reach out within one business day.</p>
           </div>
+
           {success ? (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center gap-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-10 text-center">
-              <CheckCircle2 className="w-12 h-12 text-emerald-500" />
-              <p className="text-lg font-bold text-emerald-800">We'll be in touch shortly!</p>
-              <p className="text-sm text-emerald-700">Thanks for reaching out. A member of our team will contact you within one business day.</p>
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
+                background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                border: "1px solid #bbf7d0", borderRadius: 20, padding: "48px 32px", textAlign: "center",
+              }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <CheckCircle2 style={{ width: 28, height: 28, color: "#059669" }} />
+              </div>
+              <p style={{ fontSize: 20, fontWeight: 800, color: "#065f46", margin: 0 }}>We'll be in touch shortly!</p>
+              <p style={{ fontSize: 14, color: "#047857", margin: 0, lineHeight: 1.6 }}>Thanks for reaching out. A member of our team will contact you within one business day.</p>
             </motion.div>
           ) : (
-            <form onSubmit={submit} className="space-y-4 bg-background border border-border rounded-2xl p-8 shadow-md">
+            <form onSubmit={submit} style={{
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 24, padding: "40px",
+              boxShadow: "0 8px 40px rgba(0,0,0,0.07)",
+              display: "flex", flexDirection: "column", gap: 18,
+            }}>
               <div>
-                <Label htmlFor="name" className="text-sm font-semibold">Full Name *</Label>
+                <Label htmlFor="name" className="text-sm font-semibold text-slate-700">Full Name *</Label>
                 <Input id="name" value={form.name} onChange={set("name")} placeholder="Chris Rivera" className="mt-1.5" required />
               </div>
               <div>
-                <Label htmlFor="businessName" className="text-sm font-semibold">Business Name</Label>
+                <Label htmlFor="businessName" className="text-sm font-semibold text-slate-700">Business Name</Label>
                 <Input id="businessName" value={form.businessName} onChange={set("businessName")} placeholder="Rivera Plumbing & Heating" className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="email" className="text-sm font-semibold">Email *</Label>
+                <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email *</Label>
                 <Input id="email" type="email" value={form.email} onChange={set("email")} placeholder="chris@riveraplumbing.com" className="mt-1.5" required />
               </div>
               <div>
-                <Label htmlFor="phone" className="text-sm font-semibold">Phone</Label>
+                <Label htmlFor="phone" className="text-sm font-semibold text-slate-700">Phone</Label>
                 <Input id="phone" type="tel" value={form.phone} onChange={set("phone")} placeholder="(555) 000-0000" className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="businessType" className="text-sm font-semibold">Industry</Label>
+                <Label htmlFor="businessType" className="text-sm font-semibold text-slate-700">Industry</Label>
                 <Select value={form.businessType} onValueChange={(v) => setForm((f) => ({ ...f, businessType: v }))}>
                   <SelectTrigger id="businessType" className="mt-1.5 w-full"><SelectValue placeholder="Select your industry…" /></SelectTrigger>
                   <SelectContent>
@@ -726,21 +1268,32 @@ export default function LandingReceptionist() {
                 </Select>
               </div>
               {error && (
-                <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px" }}>
+                  <AlertCircle style={{ width: 15, height: 15, color: "#dc2626", flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: "#b91c1c" }}>{error}</span>
                 </div>
               )}
-              <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 rounded-xl">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              <button type="submit" disabled={submitting}
+                style={{
+                  background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+                  color: "#fff", fontSize: 15, fontWeight: 700, border: "none",
+                  borderRadius: 12, padding: "15px", cursor: submitting ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  boxShadow: "0 4px 16px rgba(6,46,113,0.35)", opacity: submitting ? 0.7 : 1,
+                  transition: "transform 0.15s",
+                }}
+                onMouseEnter={e => { if (!submitting) (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; }}
+              >
+                {submitting ? <Loader2 style={{ width: 16, height: 16 }} className="animate-spin" /> : null}
                 Send my details
-              </Button>
-              <p className="text-[11px] text-muted-foreground text-center">No spam. No sales pressure. Just a conversation about your business.</p>
+              </button>
+              <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", margin: 0 }}>No spam. No sales pressure. Just a conversation about your business.</p>
             </form>
           )}
         </div>
       </section>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <Footer />
     </div>
   );
