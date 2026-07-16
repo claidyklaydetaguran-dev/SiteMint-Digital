@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/helpdesk/"
+previewPath = "/ai-receptionist/dashboard"
 title = "SiteMint Helpdesk"
 version = "1.0.0"
 id = "artifacts/helpdesk"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/helpdesk/" ]
+paths = [ "/ai-receptionist/dashboard" ]
 localPort = 21622
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "21622"
-BASE_PATH = "/helpdesk/"
+BASE_PATH = "/ai-receptionist/dashboard"
