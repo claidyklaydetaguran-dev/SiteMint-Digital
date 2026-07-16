@@ -5,10 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "@/components/layout/AppLayout";
 
+import Login from "@/pages/Login";
 import Inbox from "@/pages/Inbox";
 import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
-import NewTicket from "@/pages/NewTicket";
 import Settings from "@/pages/Settings";
 import Deploy from "@/pages/Deploy";
 import Billing from "@/pages/Billing";
@@ -17,18 +17,22 @@ const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <AppLayout>
-      <Switch>
-        <Route path="/" component={Inbox} />
-        <Route path="/contacts" component={Contacts} />
-        <Route path="/contacts/:id" component={ContactDetail} />
-        <Route path="/tickets/new" component={NewTicket} />
-        <Route path="/deploy" component={Deploy} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/billing" component={Billing} />
-        <Route component={NotFound} />
-      </Switch>
-    </AppLayout>
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route>
+        <AppLayout>
+          <Switch>
+            <Route path="/" component={Inbox} />
+            <Route path="/contacts" component={Contacts} />
+            <Route path="/contacts/:id" component={ContactDetail} />
+            <Route path="/deploy" component={Deploy} />
+            <Route path="/settings" component={Settings} />
+            <Route path="/billing" component={Billing} />
+            <Route component={NotFound} />
+          </Switch>
+        </AppLayout>
+      </Route>
+    </Switch>
   );
 }
 

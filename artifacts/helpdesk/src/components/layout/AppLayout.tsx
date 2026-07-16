@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   MessageSquare,
@@ -6,13 +6,22 @@ import {
   Globe2,
   CreditCard,
   Phone,
-  Settings,
   Bot,
+  LogOut,
 } from "lucide-react";
 import { ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { CallDialer } from "./CallDialer";
+import { useSession, useLogout } from "@/hooks/useSession";
+
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 const TOP_NAV = [
   { href: "/", label: "Inbox", icon: MessageSquare },
@@ -22,11 +31,35 @@ const TOP_NAV = [
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const [dialerOpen, setDialerOpen] = useState(false);
+  const [location, navigate] = useLocation();
+  const { data: me, isLoading, isError } = useSession();
+  const logout = useLogout();
+
+  useEffect(() => {
+    if (!isLoading && isError) {
+      navigate("/login");
+    }
+  }, [isLoading, isError, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 bg-indigo-600 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
+  if (isError || !me) {
+    return null;
+  }
 
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans">
@@ -69,19 +102,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Bottom nav */}
         <div className="flex flex-col gap-1 w-full px-2 items-center">
-          {/* Phone / Call */}
+          {/* Phone — coming soon */}
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
-              <button
-                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                  dialerOpen ? "bg-emerald-50 text-emerald-600" : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
-                }`}
-                onClick={() => setDialerOpen((o) => !o)}
-              >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-300 cursor-not-allowed">
                 <Phone className="h-5 w-5" />
-              </button>
+              </div>
             </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs">Call</TooltipContent>
+            <TooltipContent side="right" className="text-xs">
+              Call Dialer — coming soon
+            </TooltipContent>
           </Tooltip>
 
           {/* Billing */}
@@ -90,32 +120,40 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <Link href="/billing">
                 <div
                   className={`w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                    isActive("/billing") ? "bg-indigo-50 text-indigo-600" : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+                    isActive("/billing")
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
                   }`}
                 >
                   <CreditCard className="h-5 w-5" />
                 </div>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs">Billing</TooltipContent>
+            <TooltipContent side="right" className="text-xs">
+              Billing
+            </TooltipContent>
           </Tooltip>
 
-          {/* Avatar */}
-          <div className="mt-2 cursor-pointer">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-semibold">
-                SA
-              </AvatarFallback>
-            </Avatar>
-          </div>
+          {/* Avatar — click to sign out */}
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <button className="mt-2 cursor-pointer" onClick={handleLogout}>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                    {initials(me.firm.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs flex items-center gap-1">
+              <LogOut className="h-3 w-3" /> Sign out
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
       {/* Main content */}
       <main className="flex-1 overflow-hidden flex flex-col min-w-0">{children}</main>
-
-      {/* Floating call dialer */}
-      {dialerOpen && <CallDialer onClose={() => setDialerOpen(false)} />}
     </div>
   );
 }

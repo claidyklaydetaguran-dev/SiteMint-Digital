@@ -1,0 +1,119 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+CONTEXT: artifacts/helpdesk is a well-built, disconnected UI — its own
+ticket/contact/agent schema, zero auth, not reading any real AI
+Receptionist data. artifacts/web-agency's /app/* routes are the real,
+tested product (phases 1-4: real customer accounts, trial-cap enforcement,
+Stripe billing, per-firm agent config) that was just restored after being
+accidentally deleted. The decision has been made to merge these: keep
+helpdesk's UI (it's the better design), but make it read and write REAL
+data instead of its fake schema, with real customer auth.
+
+This task does NOT delete or touch the old /app/* pages/routes in
+web-agency — they stay exactly as they are, fully working, as a fallback
+until the new merged dashboard is verified equivalent. That decision (when
+to deprecate the old ones) is a separate future task, do not act on it
+here. This lesson is directly from what just went wrong: nothing gets
+deleted until its replacement is proven working.
+
+Do not touch locked modules. Do not touch CRM admin auth. Do not touch
+Stripe billing route logic itself (routes/receptionistBilling.ts) — this
+task changes the FRONTEND's data source, not the backend contracts.
+
+BUDGET EXCEPTION (explicitly approved): rewires an entire artifact's data
+layer plus adds real auth. Expect substantial changes within
+artifacts/helpdesk specifically; artifacts/web-agency and the backend
+routes should need minimal to no changes beyond what's listed.
+
+---
+
+1. REAL AUTH — gate the whole helpdesk app
+
+Add a login page to artifacts/helpdesk (new, in its own visual style —
+this is a separate Vite bundle from web-agency, it can't import
+web-agency's React components directly, so build a new one calling the
+same backend API). Call the existing POST /api/receptionist/auth/login —
+do not build a second auth system. Gate AppLayout.tsx behind a session
+check (GET /api/receptionist/auth/me), same pattern as
+ReceptionistAppShell.tsx already uses in web-agency. No route in this
+app should be reachable without a valid receptionist session.
+
+2. INBOX → real conversations, not fake tickets
+
+Replace every call to /api/helpdesk/tickets and /api/helpdesk/messages in
+Inbox.tsx (and any related components) with the real, existing
+GET /api/receptionist/conversations and
+GET /api/receptionist/conversations/:id endpoints — these are already
+firmId-scoped and already return tier, isOverCap, and message history.
+Map real conversation status (in_progress / completed) to whatever
+category rail states have a real equivalent — do not keep "Pending" or
+"AI Processing" as categories unless you find a real, distinct backend
+state for them; if there isn't one, remove those categories rather than
+leaving them wired to nothing. Show the real TierBadge (Hot/Warm/Cold/
+Disqualified/Needs Review) using the tier field already in the API
+response.
+
+The message composer has no real backend today — the AI Receptionist
+product has never had a "business owner manually replies" feature, only
+automated AI responses the owner reviews. Do NOT wire the Send button to
+anything fake. Leave the composer visually present but disabled with a
+"Manual replies coming soon" note, OR hide it entirely — your call on
+which reads better, but it must not appear to send a message that goes
+nowhere. This is a real product gap worth flagging back, not something to
+paper over.
+
+3. BILLING → real plan/trial data
+
+Replace Billing.tsx's data source with the real
+GET /api/receptionist/auth/me (plan, usage) and wire the upgrade button to
+the real POST /api/receptionist/billing/create-checkout-session, matching
+exactly what ReceptionistSettings.tsx in web-agency already does. Reuse
+that existing logic/pattern rather than reinventing it.
+
+4. AGENT CONFIG → real config data
+
+Wire a config screen (reuse Agents.tsx's layout/shell if it fits, or note
+if it doesn't) to the real GET/PATCH /api/receptionist/agent-config
+endpoints — greeting, business description, qualifying questions — same
+data ReceptionistAgentConfig.tsx in web-agency already manages.
+
+5. WHAT STAYS "COMING SOON" — no real backend exists for these yet, do
+   not fake them:
+   - Contacts (no real per-contact model beyond conversations exists yet
+     — if grouping conversations by caller phone is cheap to add as a
+     real, honest view, fine; otherwise mark coming soon)
+   - Deploy/channel integrations (no integrations exist)
+   - Call/phone dialer (no voice channel exists — ConversationRelay isn't
+     built)
+   - Any agent/team-assignment features (no multi-user-per-account model
+     exists — one login per business today)
+   Keep these visible in the nav with a clear "coming soon" treatment
+   (matches the pattern already used for Google sign-in and other
+   not-yet-built features elsewhere in this product) rather than removing
+   them outright — they're real future direction, just not today.
+
+6. FIX THE BROKEN DEPLOYMENT
+
+dist/public doesn't exist for artifacts/helpdesk — its artifact.toml
+declares it should serve at /ai-receptionist/dashboard but it's never
+been built, so that path is currently either 404ing or broken in
+production. Confirm `pnpm --filter helpdesk build` succeeds and produces
+dist/public, and confirm the deployed path actually serves the app after
+this task's changes.
+
+Return:
+- Confirm login is required and works with a real test account
+- Confirm the Inbox shows that account's real conversations, tiers, and
+  over-cap states — pull up a real example
+- Confirm Billing shows real plan/usage and the upgrade button reaches
+  real Stripe checkout
+- Confirm Agent Config loads and saves real data
+- What you did with the composer (disabled vs hidden) and why
+- Confirm Contacts/Deploy/Call/team features are clearly marked
+  coming-soon, not connected to fake data
+- Confirm dist/public now builds and /ai-receptionist/dashboard serves
+  correctly
+- Confirm /app/* in web-agency was NOT touched and still works as a
+  fallback
+- TypeScript status
+- Confirm no locked files touched
