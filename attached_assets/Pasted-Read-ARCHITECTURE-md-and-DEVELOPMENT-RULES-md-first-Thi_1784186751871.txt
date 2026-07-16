@@ -1,0 +1,49 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+This is a VERIFICATION-ONLY task. No new features, no code changes unless
+something below reveals an actual bug — if so, fix it minimally and say
+exactly what was wrong. The last session's report claimed several things
+worked but didn't show evidence, and skipped the deployment check
+entirely. Close those gaps with real output, not restated claims.
+
+1. DEPLOYMENT — this was Task 6 in the merge prompt and wasn't addressed
+   at all in the last report.
+   - Run `pnpm --filter helpdesk build` and confirm it succeeds and
+     produces dist/public.
+   - Confirm the deployed path /ai-receptionist/dashboard actually serves
+     the app (not a 404, not a stale build) — check this against the real
+     deployment, not just the local dev workflow.
+   - If it's still broken, say so plainly and fix it.
+
+2. REAL DATA — show actual evidence, not a restated claim:
+   - Log in with a real test account. Show the actual GET
+     /api/receptionist/conversations response for that account (or a
+     screenshot of the Inbox rendering it) with a real tier badge and, if
+     available, a real over-cap conversation.
+   - Show the actual GET /api/receptionist/auth/me response used by
+     Billing.tsx, and confirm the numbers on screen match it exactly.
+   - In Agent Config, change the greeting message, save, reload the page
+     (full reload, not just component state), and confirm the new value
+     persisted — show the before/after.
+
+3. Confirm artifacts/web-agency was NOT touched in the merge session —
+   list any files changed there, or confirm zero. Confirm /app/* in
+   web-agency still works exactly as it did after the previous session's
+   fix (quick smoke test, not a full re-verification).
+
+4. Confirm no locked files were touched across both sessions combined.
+
+5. Production status check: what commit is currently deployed to
+   production right now? The prior session found production was still
+   running the unauthenticated helpdesk API (commit 9973014) and flagged
+   that a manual redeploy was needed to close that gap — confirm whether
+   that redeploy has actually happened, and if not, say so clearly so it
+   doesn't get missed.
+
+Return:
+- Deployment build/serve status with real confirmation
+- The real API responses/evidence requested above
+- web-agency touch confirmation
+- Locked files confirmation
+- Current production deployment status re: the auth fix
+- TypeScript status
