@@ -254,7 +254,7 @@ function MessageThread({
           <span style={{ fontSize: 12, color: "#6b7280" }}>
             This conversation was logged but the AI did not reply — your trial limit was reached.
             New callers will not receive automated replies until you{" "}
-            <a href="/app/settings#upgrade" style={{ color: "#062e71", fontWeight: 600, textDecoration: "underline" }}>
+            <a href="/ai-receptionist/dashboard/settings#upgrade" style={{ color: "#062e71", fontWeight: 600, textDecoration: "underline" }}>
               upgrade to Pro
             </a>
             .
@@ -314,7 +314,7 @@ function MessageThread({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ReceptionistConversations() {
-  const [, params]        = useRoute("/app/conversations/:id");
+  const [, params]        = useRoute("/ai-receptionist/dashboard/conversations/:id");
   const [, navigate]      = useLocation();
   const urlId             = params?.id ? parseInt(params.id, 10) : null;
 
@@ -345,12 +345,12 @@ export default function ReceptionistConversations() {
       .then((d) => { setDetail(d); setShowThread(true); })
       .catch(() => setDetail(null))
       .finally(() => setLoadingDetail(false));
-    navigate(`/app/conversations/${selectedId}`, { replace: true });
+    navigate(`/ai-receptionist/dashboard/conversations/${selectedId}`, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   const handleSelect = (id: number) => setSelectedId(id);
-  const handleBack   = () => { setShowThread(false); setSelectedId(null); navigate("/app", { replace: true }); };
+  const handleBack   = () => { setShowThread(false); setSelectedId(null); navigate("/ai-receptionist/dashboard", { replace: true }); };
 
   return (
     <ReceptionistAppShell>

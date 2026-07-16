@@ -32,7 +32,7 @@ export default function ReceptionistLogin() {
       });
       const d = await r.json() as { error?: string };
       if (!r.ok) { setError(d.error ?? "Login failed — please try again."); return; }
-      navigate("/app");
+      navigate("/ai-receptionist/dashboard");
     } catch {
       setError("Network error — please try again.");
     } finally {

@@ -35,9 +35,9 @@ interface ReceptionistAppShellProps {
 // ── Nav items ──────────────────────────────────────────────────────────────────
 
 const NAV = [
-  { label: "Conversations", href: "/app",              icon: MessageSquare },
-  { label: "Agent Config",  href: "/app/agent-config", icon: Bot },
-  { label: "Settings",      href: "/app/settings",     icon: Settings },
+  { label: "Conversations", href: "/ai-receptionist/dashboard",              icon: MessageSquare },
+  { label: "Agent Config",  href: "/ai-receptionist/dashboard/agent-config", icon: Bot },
+  { label: "Settings",      href: "/ai-receptionist/dashboard/settings",     icon: Settings },
 ];
 
 // ── Context (simple prop-drill — no additional context library needed) ─────────
@@ -57,18 +57,18 @@ export default function ReceptionistAppShell({ children }: ReceptionistAppShellP
   useEffect(() => {
     fetch("/api/receptionist/auth/me", { credentials: "include" })
       .then(async (r) => {
-        if (r.status === 401) { navigate("/app/login"); return; }
+        if (r.status === 401) { navigate("/ai-receptionist/login"); return; }
         const d = await r.json() as MeResponse;
         setMe(d);
       })
-      .catch(() => navigate("/app/login"))
+      .catch(() => navigate("/ai-receptionist/login"))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const logout = async () => {
     await fetch("/api/receptionist/auth/logout", { method: "POST", credentials: "include" });
-    navigate("/app/login");
+    navigate("/ai-receptionist/login");
   };
 
   if (loading) {
@@ -124,7 +124,7 @@ export default function ReceptionistAppShell({ children }: ReceptionistAppShellP
 
       {/* Nav links */}
       {NAV.map(({ label, href, icon: Icon }) => {
-        const active = location === href || (href !== "/app" && location.startsWith(href));
+        const active = location === href || (href !== "/ai-receptionist/dashboard" && location.startsWith(href));
         return (
           <Link key={href} href={href} onClick={() => setSideOpen(false)}>
             <div
@@ -232,7 +232,7 @@ export default function ReceptionistAppShell({ children }: ReceptionistAppShellP
           {/* Upgrade pill — shown from 80% onward (near-limit + at-limit) */}
           {nearLimit && (
             <a
-              href="/app/settings#upgrade"
+              href="/ai-receptionist/dashboard/settings#upgrade"
               style={{
                 marginLeft: 4,
                 fontSize: 11.5, fontWeight: 700, color: "#fff",

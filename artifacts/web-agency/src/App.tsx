@@ -110,11 +110,11 @@ function Router() {
       <Route path="/ai-receptionist" component={LandingReceptionist} />
 
       {/* ── AI Receptionist customer app ── */}
-      <Route path="/app/login" component={ReceptionistLogin} />
-      <Route path="/app/agent-config" component={ReceptionistAgentConfig} />
-      <Route path="/app/settings" component={ReceptionistSettings} />
-      <Route path="/app/conversations/:id" component={ReceptionistConversations} />
-      <Route path="/app" component={ReceptionistConversations} />
+      <Route path="/ai-receptionist/login" component={ReceptionistLogin} />
+      <Route path="/ai-receptionist/dashboard/agent-config" component={ReceptionistAgentConfig} />
+      <Route path="/ai-receptionist/dashboard/settings" component={ReceptionistSettings} />
+      <Route path="/ai-receptionist/dashboard/conversations/:id" component={ReceptionistConversations} />
+      <Route path="/ai-receptionist/dashboard" component={ReceptionistConversations} />
 
       {/* Public site — with main layout */}
       <Route>
