@@ -17,6 +17,10 @@ import LandingLawyers from "@/pages/LandingLawyers";
 import LandingRealtors from "@/pages/LandingRealtors";
 import LandingReceptionist from "@/pages/LandingReceptionist";
 import LandingReceptionistSignup from "@/pages/LandingReceptionistSignup";
+import ReceptionistLogin from "@/pages/receptionist/ReceptionistLogin";
+import ReceptionistConversations from "@/pages/receptionist/ReceptionistConversations";
+import ReceptionistAgentConfig from "@/pages/receptionist/ReceptionistAgentConfig";
+import ReceptionistSettings from "@/pages/receptionist/ReceptionistSettings";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
@@ -104,6 +108,13 @@ function Router() {
       <Route path="/ai-for-realtors" component={LandingRealtors} />
       <Route path="/ai-receptionist/signup" component={LandingReceptionistSignup} />
       <Route path="/ai-receptionist" component={LandingReceptionist} />
+
+      {/* ── AI Receptionist customer app ── */}
+      <Route path="/app/login" component={ReceptionistLogin} />
+      <Route path="/app/agent-config" component={ReceptionistAgentConfig} />
+      <Route path="/app/settings" component={ReceptionistSettings} />
+      <Route path="/app/conversations/:id" component={ReceptionistConversations} />
+      <Route path="/app" component={ReceptionistConversations} />
 
 
       {/* Public site — with main layout */}

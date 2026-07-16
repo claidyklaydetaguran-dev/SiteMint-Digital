@@ -1,5 +1,6 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { eq, desc, ilike, or, and, sql } from "drizzle-orm";
+import { validateToken } from "../lib/admin-session.js";
 import { db } from "@workspace/db";
 import {
   helpdeskContactsTable,
@@ -25,6 +26,14 @@ import {
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const token = auth.substring(7);
+  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
+  next();
+}
 
 function initials(name: string): string {
   return name
@@ -67,7 +76,7 @@ function ticketWithContact(
 
 // ── Tickets ──────────────────────────────────────────────────────────────────
 
-router.get("/helpdesk/tickets", async (req, res): Promise<void> => {
+router.get("/helpdesk/tickets", requireAdmin, async (req, res): Promise<void> => {
   const params = ListHelpdeskTicketsQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -125,7 +134,7 @@ router.get("/helpdesk/tickets", async (req, res): Promise<void> => {
   res.json(tickets.map((t) => ticketWithContact(t, contactMap[t.contactId], t.assigneeId ? agentMap[t.assigneeId] : undefined)));
 });
 
-router.post("/helpdesk/tickets", async (req, res): Promise<void> => {
+router.post("/helpdesk/tickets", requireAdmin, async (req, res): Promise<void> => {
   const parsed = CreateHelpdeskTicketBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -153,7 +162,7 @@ router.post("/helpdesk/tickets", async (req, res): Promise<void> => {
   res.status(201).json(ticketWithContact(ticket, contact, undefined));
 });
 
-router.get("/helpdesk/tickets/:id", async (req, res): Promise<void> => {
+router.get("/helpdesk/tickets/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = GetHelpdeskTicketParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -198,7 +207,7 @@ router.get("/helpdesk/tickets/:id", async (req, res): Promise<void> => {
   });
 });
 
-router.patch("/helpdesk/tickets/:id", async (req, res): Promise<void> => {
+router.patch("/helpdesk/tickets/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateHelpdeskTicketParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -240,7 +249,7 @@ router.patch("/helpdesk/tickets/:id", async (req, res): Promise<void> => {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-router.get("/helpdesk/tickets/:ticketId/messages", async (req, res): Promise<void> => {
+router.get("/helpdesk/tickets/:ticketId/messages", requireAdmin, async (req, res): Promise<void> => {
   const params = ListHelpdeskMessagesParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -261,7 +270,7 @@ router.get("/helpdesk/tickets/:ticketId/messages", async (req, res): Promise<voi
   );
 });
 
-router.post("/helpdesk/tickets/:ticketId/messages", async (req, res): Promise<void> => {
+router.post("/helpdesk/tickets/:ticketId/messages", requireAdmin, async (req, res): Promise<void> => {
   const params = CreateHelpdeskMessageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -311,7 +320,7 @@ router.post("/helpdesk/tickets/:ticketId/messages", async (req, res): Promise<vo
 
 // ── Contacts ─────────────────────────────────────────────────────────────────
 
-router.get("/helpdesk/contacts", async (req, res): Promise<void> => {
+router.get("/helpdesk/contacts", requireAdmin, async (req, res): Promise<void> => {
   const params = ListHelpdeskContactsQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -350,7 +359,7 @@ router.get("/helpdesk/contacts", async (req, res): Promise<void> => {
   );
 });
 
-router.post("/helpdesk/contacts", async (req, res): Promise<void> => {
+router.post("/helpdesk/contacts", requireAdmin, async (req, res): Promise<void> => {
   const parsed = CreateHelpdeskContactBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -381,7 +390,7 @@ router.post("/helpdesk/contacts", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/helpdesk/contacts/:id", async (req, res): Promise<void> => {
+router.get("/helpdesk/contacts/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = GetHelpdeskContactParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -407,7 +416,7 @@ router.get("/helpdesk/contacts/:id", async (req, res): Promise<void> => {
   });
 });
 
-router.patch("/helpdesk/contacts/:id", async (req, res): Promise<void> => {
+router.patch("/helpdesk/contacts/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateHelpdeskContactParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -451,7 +460,7 @@ router.patch("/helpdesk/contacts/:id", async (req, res): Promise<void> => {
 
 // ── Agents ────────────────────────────────────────────────────────────────────
 
-router.get("/helpdesk/agents", async (_req, res): Promise<void> => {
+router.get("/helpdesk/agents", requireAdmin, async (_req, res): Promise<void> => {
   const agents = await db.select().from(helpdeskAgentsTable).orderBy(helpdeskAgentsTable.name);
   res.json(
     agents.map((a) => ({
@@ -464,7 +473,7 @@ router.get("/helpdesk/agents", async (_req, res): Promise<void> => {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
-router.get("/helpdesk/stats", async (_req, res): Promise<void> => {
+router.get("/helpdesk/stats", requireAdmin, async (_req, res): Promise<void> => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 

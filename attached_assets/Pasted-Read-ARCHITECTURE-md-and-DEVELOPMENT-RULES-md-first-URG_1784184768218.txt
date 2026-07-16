@@ -1,0 +1,87 @@
+Read ARCHITECTURE.md and DEVELOPMENT_RULES.md first.
+
+URGENT — this fixes a real security gap and restores access to the tested
+AI Receptionist product. Do this before anything else, regardless of what
+gets decided about the new helpdesk artifact's long-term fate.
+
+CONTEXT: an audit of the current codebase found two problems.
+
+1. /api/helpdesk/* routes (routes/helpdesk.ts — tickets, contacts, agents,
+   messages, full CRUD) have NO authentication middleware at all and are
+   wired live into the shared api-server via router.use(helpdeskRouter) in
+   routes/index.ts. If the api-server is deployed (it is, since it also
+   serves the real receptionist/CRM APIs), these endpoints are reachable
+   by anyone right now with zero login required.
+
+2. The real, tested AI Receptionist customer product — /app, /app/login,
+   /app/conversations/:id, /app/agent-config, /app/settings — has no route
+   pointing to it anymore in artifacts/web-agency/src/App.tsx. The page
+   components (ReceptionistAppShell.tsx, ReceptionistLogin.tsx,
+   ReceptionistConversations.tsx, ReceptionistAgentConfig.tsx,
+   ReceptionistSettings.tsx) and their backend routes
+   (receptionistAuth.ts, receptionistConversations.ts,
+   receptionistAgentConfig.ts, receptionistBilling.ts, receptionistAdmin.ts)
+   all still exist and are intact, but are currently unreachable from the
+   live site. LandingReceptionistSignup.tsx still redirects to /app on a
+   successful signup, which right now is a dead end for any real customer
+   who signs up.
+
+Do not touch locked modules. Do not delete anything in this task — this
+is about re-securing and re-connecting what already exists, not removing
+the new helpdesk work (that's a separate decision, do not act on it here).
+
+TASK 1 — lock down the helpdesk API immediately
+
+Add authentication middleware to every route in routes/helpdesk.ts. Use
+the CRM's existing requireAdmin Bearer-token middleware (the same one
+guarding /api/admin/receptionist-accounts and other internal CRM routes)
+— this is internal support tooling, not customer-facing, so it should
+require the same admin login the CRM already uses. Confirm every helpdesk
+endpoint returns 401 without a valid admin token.
+
+TASK 2 — restore routing to the real AI Receptionist product
+
+In artifacts/web-agency/src/App.tsx, re-add the routes that are currently
+missing: /app/login, /app (Conversations), /app/conversations/:id,
+/app/agent-config, /app/settings — pointing to the existing page
+components (do not recreate these files, they already exist and work,
+just check the exact import paths/names used in phases 1-4 and restore
+matching Route entries). Confirm LandingReceptionistSignup.tsx's redirect
+to /app now correctly lands on a working, auth-gated page again.
+
+Before restoring, check git history/recent commits if accessible to
+understand HOW these routes were removed (accidental deletion during the
+helpdesk scaffolding session, an intentional-but-incomplete replacement
+attempt, etc.) — note what you find, this matters for knowing whether
+anything else was touched at the same time.
+
+TASK 3 — confirm what's actually live at the URLs in question
+
+Check the actual deployed/live routing configuration (not just the code)
+for:
+- https://sitemintdigital.com/ai-receptionist/dashboard/ — this path
+  matches no route in web-agency's App.tsx as currently coded, and the
+  helpdesk artifact's own routes don't use an "/ai-receptionist" prefix
+  either. Determine what is actually serving this URL right now — is it
+  404ing, is it somehow reaching the helpdesk artifact via a deployment
+  path rule, or something else. Report exactly what you find.
+- Confirm whether the helpdesk artifact (artifacts/helpdesk) is actually
+  part of the current run/build/deploy pipeline at all — it wasn't found
+  wired into any workflow, Procfile, or dev script during the audit. If
+  it's not currently served anywhere, say so plainly.
+
+Return:
+- Confirm every /api/helpdesk/* route now requires a valid admin token
+  (test at least 3 endpoints unauthenticated → 401, then with a valid
+  token → 200)
+- Confirm /app/login, /app, /app/conversations/:id, /app/agent-config,
+  /app/settings all render correctly again and require a valid
+  receptionist session (not the CRM admin session)
+- Confirm a fresh signup end-to-end: create an account, land on /app
+  successfully, see real data
+- What you found about how the /app routes were removed in the first
+  place
+- What's actually serving sitemintdigital.com/ai-receptionist/dashboard/
+  right now, and whether artifacts/helpdesk is live anywhere
+- TypeScript status
+- Confirm no locked files touched, nothing deleted
