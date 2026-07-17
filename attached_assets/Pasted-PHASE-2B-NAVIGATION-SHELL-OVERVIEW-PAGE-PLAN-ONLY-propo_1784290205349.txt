@@ -1,0 +1,76 @@
+PHASE 2B — NAVIGATION SHELL + OVERVIEW PAGE (PLAN ONLY — propose, do not implement)
+
+PRECONDITION: Phase 2A frozen (committed). Report current SHA and clean tree.
+
+CONTEXT
+SiteMint AI Receptionist, helpdesk SPA (artifacts/helpdesk, base
+/ai-receptionist/dashboard). This phase is FRONTEND-ONLY within the helpdesk
+artifact. Any backend, schema, or web-agency change is out of scope — if you
+believe one is needed, STOP and report instead.
+
+GOAL — plan these changes per the approved PRD (PHASE2B_PRD.md content
+provided by the owner; mirror it exactly):
+
+1. AppLayout.tsx: replace the icon rail with a grouped labeled sidebar
+   (~210px): Overview / RECEPTIONIST: AI Receptionist, Conversations,
+   Contacts / ACCOUNT: Billing, Settings. Bottom: trial-usage chip
+   ("N of M free conversations used" + progress bar, hidden when
+   planTier==="paid", links to /billing) above the existing
+   avatar/sign-out. Remove the disabled phone icon. Keep the current
+   indigo/slate visual language and the existing auth-redirect behavior.
+   Data for the chip comes from the EXISTING useSession() hook.
+
+2. App.tsx routes:
+   "/" → new Overview page; "/conversations" → existing Inbox component;
+   "/receptionist" → new AgentConfig page; "/deploy" → in-SPA redirect to
+   "/receptionist" and DELETE pages/Deploy.tsx; /contacts, /billing,
+   /settings unchanged.
+
+3. New pages/Overview.tsx:
+   - Extract the useConversations hook from Inbox.tsx into
+     src/hooks/useConversations.ts; both pages import it (identical query
+     key so the cache is shared).
+   - 4 KPI cards: conversations this week (createdAt last 7 days),
+     Hot leads (tier==="Hot"), Active now (in_progress), Trial usage
+     (from session; "Paid plan" when paid).
+   - Recent 5 conversations by lastMessageAt (phone, tier badge, relative
+     time) linking to /conversations + "View all".
+   - Getting-started card when firm has no greeting AND no qualifying
+     questions (needs the agent-config query — reuse the existing
+     /receptionist/agent-config GET; do not add endpoints), linking to
+     /receptionist, dismissable (in-memory state only).
+   - Loading skeletons, empty, error (with retry), success states — all four.
+
+4. New pages/AgentConfig.tsx: move the AgentConfigPanel JSX/logic OUT of
+   Settings.tsx into this page unchanged in behavior (same fields,
+   validation, PATCH). Tab bar: "Configure" (active) and "Test" (disabled,
+   "Coming soon" tooltip, no content). Header line: "Your AI Receptionist
+   is live on SMS."
+
+5. Settings.tsx: remove Agent Configuration panel + nav entry; remove
+   "MCP Access", "Product Guide", "Download Mobile App" panels; KEEP
+   Members (coming soon) and Language (coming soon).
+
+HARD CONSTRAINTS
+- Files touched ONLY inside artifacts/helpdesk/src (App.tsx, AppLayout.tsx,
+  Inbox.tsx [hook extraction only], Settings.tsx, new Overview.tsx, new
+  AgentConfig.tsx, new hooks/useConversations.ts, optional small
+  lib/conversationUi.ts, DELETE Deploy.tsx) + docs/ai-receptionist/
+  SESSION_HANDOFF.md and CURRENT_STATE.md.
+- ZERO backend changes, ZERO schema changes, ZERO new dependencies,
+  ZERO web-agency changes, no new API endpoints.
+- Wouter base path (/ai-receptionist/dashboard) must keep working — use
+  relative Link hrefs exactly as the current code does.
+
+YOUR PLAN MUST INCLUDE
+- Component tree + exact file list with per-file change summaries
+- The KPI computation definitions (exact filter logic per card)
+- How the four UI states of Overview will each be demonstrated in testing
+- Test plan mapped 1:1 to PRD acceptance criteria (a)–(h), including SQL
+  verification of the KPI numbers, the planTier flip-and-restore for the
+  trial-chip test (record original value), throwaway-firm usage/cleanup,
+  helpdesk typecheck AND production build, git-diff proof that api-server
+  and web-agency are untouched, and 1A/1C regression spot-checks
+- Risk list + single-commit rollback plan
+
+Return the plan for approval. Do not write any code until approved.

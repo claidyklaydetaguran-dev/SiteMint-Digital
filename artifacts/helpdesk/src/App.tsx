@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,14 +7,21 @@ import NotFound from "@/pages/not-found";
 import { AppLayout } from "@/components/layout/AppLayout";
 
 import Login from "@/pages/Login";
+import Overview from "@/pages/Overview";
 import Inbox from "@/pages/Inbox";
+import AgentConfig from "@/pages/AgentConfig";
 import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
 import Settings from "@/pages/Settings";
-import Deploy from "@/pages/Deploy";
 import Billing from "@/pages/Billing";
 
 const queryClient = new QueryClient();
+
+function InSpaRedirect({ to }: { to: string }) {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate(to, { replace: true }); }, []);
+  return null;
+}
 
 function Router() {
   return (
@@ -22,10 +30,14 @@ function Router() {
       <Route>
         <AppLayout>
           <Switch>
-            <Route path="/" component={Inbox} />
+            <Route path="/" component={Overview} />
+            <Route path="/conversations" component={Inbox} />
+            <Route path="/receptionist" component={AgentConfig} />
             <Route path="/contacts" component={Contacts} />
             <Route path="/contacts/:id" component={ContactDetail} />
-            <Route path="/deploy" component={Deploy} />
+            <Route path="/deploy">
+              {() => <InSpaRedirect to="/receptionist" />}
+            </Route>
             <Route path="/settings" component={Settings} />
             <Route path="/billing" component={Billing} />
             <Route component={NotFound} />

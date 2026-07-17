@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { Conversation, useConversations } from "@/hooks/useConversations";
+import { relativeTime, TIER_STYLES, phoneInitials, phoneColor, PHONE_COLORS } from "@/lib/conversationUi";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,17 +18,6 @@ import {
 } from "lucide-react";
 
 // ─── types ────────────────────────────────────────────────────────────────────
-
-interface Conversation {
-  id: number;
-  createdAt: string;
-  lastMessageAt: string;
-  callerPhone: string;
-  status: "in_progress" | "completed" | "opted_out";
-  isOverCap?: boolean;
-  tier: "Hot" | "Warm" | "Cold" | "Disqualified" | "Needs Review" | null;
-  disqualifyReason: string | null;
-}
 
 interface Message {
   id: number;
@@ -45,16 +36,6 @@ type CategoryView = "all" | "active" | "completed" | "opted_out";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
-
 function formatDateTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString("en-US", {
     month: "short",
@@ -65,42 +46,7 @@ function formatDateTime(dateStr: string): string {
   });
 }
 
-function phoneInitials(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.slice(-2).toUpperCase() || "??";
-}
-
-const PHONE_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b",
-  "#3b82f6", "#10b981", "#ef4444",
-];
-
-function phoneColor(phone: string): string {
-  let hash = 0;
-  for (const c of phone) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
-  return PHONE_COLORS[Math.abs(hash) % PHONE_COLORS.length];
-}
-
-const TIER_STYLES: Record<string, string> = {
-  Hot: "bg-rose-100 text-rose-700",
-  Warm: "bg-amber-100 text-amber-700",
-  Cold: "bg-blue-100 text-blue-700",
-  Disqualified: "bg-slate-100 text-slate-500",
-  "Needs Review": "bg-yellow-100 text-yellow-700",
-};
-
 // ─── hooks ────────────────────────────────────────────────────────────────────
-
-function useConversations() {
-  return useQuery<Conversation[]>({
-    queryKey: ["conversations"],
-    queryFn: () =>
-      apiFetch<{ conversations: Conversation[] }>("/receptionist/conversations").then(
-        (d) => d.conversations,
-      ),
-    refetchInterval: 30_000,
-  });
-}
 
 function useConversationDetail(id: number | null) {
   return useQuery<ConversationDetail>({

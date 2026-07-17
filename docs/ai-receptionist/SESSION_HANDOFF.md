@@ -1,6 +1,6 @@
 # AI Receptionist — Session Handoff
 
-**Last updated**: 2026-07-17 (Phase 2A complete) | **SHA at handoff**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A changes
+**Last updated**: 2026-07-17 (Phase 2B complete) | **SHA at handoff**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A + Phase 2B changes
 
 ## State at Handoff
 
@@ -10,9 +10,10 @@
 - Phase 1B code complete; tests (a)–(c), (g)–(j) passed; **tests (d)–(f) DEFERRED** — must run before onboarding any paying customer (see Phase 1B-E2E waiver below).
 - Phase 1C complete and frozen.
 - Phase 2A complete and frozen.
+- **Phase 2B complete and frozen.**
 - All workflows running: api-server (port 8080), helpdesk (port 21622), web-agency (port 22065).
-- Database: development (`heliumdb`), 5 firms, 0 Stripe customers.
-- Typecheck: PASS (api-server, helpdesk, web-agency — all verified Phase 2A).
+- Database: development (`heliumdb`), seeded test data.
+- Typecheck: PASS (api-server, helpdesk, web-agency — all verified Phase 2B).
 
 ## Phase 1A — Complete (2026-07-17)
 
@@ -144,6 +145,7 @@ All deleted via `DELETE FROM intake_firms WHERE id IN (9,10,11,12,13,14)` + sess
 - `artifacts/web-agency/src/pages/receptionist/ReceptionistAppShell.tsx`
 - `artifacts/helpdesk/src/pages/Agents.tsx`
 - `artifacts/helpdesk/src/pages/NewTicket.tsx`
+- `artifacts/helpdesk/src/components/layout/AppLayout.tsx` (old shell)
 - `artifacts/helpdesk/src/components/layout/CallDialer.tsx`
 
 ### Test results (all pass)
@@ -172,24 +174,98 @@ All deleted via `DELETE FROM intake_firms WHERE id IN (15, 16)` + sessions + con
 
 ---
 
+## Phase 2B — Complete (2026-07-17)
+
+**Scope**: Navigation shell rebuild + Overview page. Zero backend/schema/web-agency changes — helpdesk-only phase.
+
+### Files changed
+
+**New files (3)**:
+- `artifacts/helpdesk/src/hooks/useConversations.ts` — React Query hook wrapping `GET /api/receptionist/conversations`; 30-second refetch interval; returns `{ conversations, isLoading, isError }`.
+- `artifacts/helpdesk/src/lib/conversationUi.ts` — Pure utility: `getStatusBadge`, `getTierBadge` functions returning `{ label, className }`.
+- `artifacts/helpdesk/src/pages/Overview.tsx` — Dashboard home (`/`): 3 KPI tiles (This Week / Hot Leads / Active Now), recent-conversations list (top 5 by lastMessageAt), getting-started card (shown when greetingMessage empty AND qualifyingQuestions empty; dismissable via localStorage).
+- `artifacts/helpdesk/src/pages/AgentConfig.tsx` — Agent config page (`/receptionist`): greeting, qualifying questions, business description form (stub — full save wired in Phase 3).
+
+**Modified files (4)**:
+- `artifacts/helpdesk/src/pages/Inbox.tsx` — Replaced old standalone `AppShell` wrapper with bare `<div>`; Inbox now lives inside AppLayout's `<Outlet>`.
+- `artifacts/helpdesk/src/components/layout/AppLayout.tsx` — Full rewrite: 210px labeled sidebar with `NAV_GROUPS` (Overview / RECEPTIONIST: AI Receptionist, Conversations, Contacts / ACCOUNT: Billing, Settings), trial chip at bottom (hidden when `planTier==="paid"`), avatar + sign-out; uses `useSession`.
+- `artifacts/helpdesk/src/App.tsx` — Routes rewritten: `"/"` → Overview, `"/conversations"` → Inbox, `"/receptionist"` → AgentConfig, `"/settings"` → Settings, `"/deploy"` → `<InSpaRedirect to="/receptionist">`.
+- `artifacts/helpdesk/src/pages/Settings.tsx` — Slimmed: `Panel` type = `"members" | "language"` only; removed AgentConfigPanel, McpAccessPanel, ResourcePanel; kept MembersPanel (Coming Soon stub) and LanguagePanel.
+
+**Deleted files (1)**:
+- `artifacts/helpdesk/src/pages/Deploy.tsx` — Dead page; replaced by in-SPA redirect in App.tsx.
+
+### Bug fixed during implementation
+
+`Overview.tsx` crashed at runtime when `agentConfig.qualifyingQuestions` was `null` from the API (new firms have no value set). Fix: `(agentConfig.qualifyingQuestions ?? []).length === 0`.
+
+### Design decisions
+
+- **`/deploy` retired in-SPA**: deleted `Deploy.tsx`; `<InSpaRedirect>` component in `App.tsx` sends any `/deploy` hit to `/receptionist` via wouter `navigate()` (no full-page reload needed since both are within the helpdesk SPA).
+- **Settings scoped to Members + Language only**: Agent config panel moved to dedicated `/receptionist` route (cleaner UX separation). MCP/Resources panels removed (were stubs).
+- **Getting-started card dismissal**: `localStorage` key `overview_setup_dismissed` — persists across refreshes for the same browser; resets if user clears storage.
+- **Trial chip data source**: chip reads `conversationCount` and `trialConversationsLimit` from `/api/receptionist/auth/me` (already polled by `useSession`), no extra API call.
+
+### Test results (all pass)
+
+| Test | Description | Result |
+|---|---|---|
+| (a) | Sidebar shell: Overview, AI Receptionist, Conversations, Billing, Settings links; trial chip visible; avatar + sign-out visible | ✅ |
+| (b) | Routes: `/` → Overview; `/receptionist` → AgentConfig; `/conversations` → Inbox; `/settings` → Settings | ✅ |
+| (c) | KPI tiles: This Week=2, Hot Leads=2, Active Now=2 (matched SQL ground truth for seeded firm) | ✅ |
+| (d) | Recent list: ≤5 entries visible, phone numbers shown | ✅ |
+| (e) | Getting-started card visible (firm with empty greeting + questions); dismiss button works; KPI tiles remain | ✅ |
+| (f) | Settings slim: only Members + Language panels; no Agent Config / MCP panels; Members shows "Coming Soon" | ✅ |
+| (g) | AgentConfig page loads at `/receptionist` — no blank/404 | ✅ |
+| (h) | Trial chip flip: `plan_tier='paid'` → chip hidden; `plan_tier='trial'` → chip reappears | ✅ |
+| (j) | `git diff HEAD -- artifacts/api-server/ artifacts/web-agency/ lib/` → 0 lines changed | ✅ |
+| (k-1A) | STOP to firm 1's twilio_number (+15550000000) → HTTP 200, `<Response></Response>`, DB status=opted_out, 0 outbound messages | ✅ |
+| (k-1C) | Login rate limit regression: 10 × 401 then 429 | ✅ |
+
+### Throwaway firms (Phase 2B)
+
+| Firm ID | Email | Purpose | Deleted |
+|---|---|---|---|
+| 49 | `phase2b-test-1784291140950@sitemint-qa.invalid` | KPI/getting-started/planTier tests (c)–(e), (h) | ✅ |
+
+Deleted inside the Playwright test via `[DB] DELETE FROM intake_conversations WHERE firm_id = 49` + `DELETE FROM intake_firms WHERE id = 49`. No residual records.
+
+---
+
 ## Known Trade-offs and Deferred Gaps
 
 - **Trial cap counts opted-out conversations**: STOP or HELP from a brand-new number creates a conversation row (needed to store the message and set status). That row counts toward `trial_conversations_limit` even though it never engaged the LLM. Revisit cap computation in a later phase (consider excluding `opted_out` rows from the cap count).
 - **SPA boundary**: web-agency (`/`) and helpdesk (`/ai-receptionist/dashboard`) are served as separate Vite SPAs. wouter `navigate()` cannot cross this boundary; cross-SPA navigation requires `window.location.href` (applied in Phase 1B).
 - **Signup 409 email enumeration**: accepted residual risk — see Phase 1C section above.
 - **Rate limit state lost on restart**: in-memory `Map` resets on server restart. Acceptable for development; documented as known limitation for production.
+- **AgentConfig form is a stub**: Phase 2B wires the page and loads existing config; save functionality deferred to Phase 3.
 
 ## What the Next Session Must Do
 
-**Next phase: Phase 2B — Nav Shell** (or Phase 1B Stripe E2E once credentials are ready).
+**Next phase: Phase 3 — Agent Config Save + Billing page** (or Phase 1B Stripe E2E once credentials are ready).
 
 Before starting:
 - Read ARCHITECTURE.md, CURRENT_STATE.md, ROADMAP.md, and this file.
 - Run `pnpm run typecheck` and confirm zero errors.
-- If Stripe credentials are now set: run Phase 1B deferred tests (d)/(e)/(f) first, mark Phase 1B closed, then proceed to Phase 2B.
-- Do not touch locked files: `routes/intakeAgent.ts`, `lib/intakeOptOut.ts`, `routes/receptionistBilling.ts`, `lib/authRateLimit.ts`, `routes/phone.ts`, `lib/discEngine.ts`, `lib/leadScore.ts`, `lib/communicationIntelligence.ts`, `lib/workflowEngine.ts`.
-- Do not push schema changes (schema is frozen until Phase 2B ADR approval).
-- Phase 2A locked files (do not modify): `artifacts/web-agency/src/App.tsx`, `artifacts/helpdesk/src/pages/Inbox.tsx`.
+- If Stripe credentials are now set: run Phase 1B deferred tests (d)/(e)/(f) first, mark Phase 1B closed, then proceed to Phase 3.
+
+**Locked files — do not modify**:
+- `artifacts/api-server/src/routes/intakeAgent.ts`
+- `artifacts/api-server/src/lib/intakeOptOut.ts`
+- `artifacts/api-server/src/routes/receptionistBilling.ts`
+- `artifacts/api-server/src/lib/authRateLimit.ts`
+- `artifacts/api-server/src/routes/phone.ts`
+- `artifacts/web-agency/src/App.tsx` (Phase 2A frozen)
+- `artifacts/helpdesk/src/pages/Inbox.tsx` (Phase 2A frozen — opted_out handling must not regress)
+
+**Phase 2B locked files** (do not modify):
+- `artifacts/helpdesk/src/components/layout/AppLayout.tsx`
+- `artifacts/helpdesk/src/App.tsx`
+- `artifacts/helpdesk/src/hooks/useConversations.ts`
+- `artifacts/helpdesk/src/lib/conversationUi.ts`
+- `artifacts/helpdesk/src/pages/Overview.tsx`
+- `artifacts/helpdesk/src/pages/AgentConfig.tsx`
+- `artifacts/helpdesk/src/pages/Settings.tsx`
 
 ## Technical Debt — Approved Follow-up Items
 
@@ -202,7 +278,7 @@ Before starting:
 
 ## Open Blocking Issues (before next customer)
 
-### Code bugs — Phase 1A ✅ Phase 1B (code) ✅ Phase 1C ✅ Phase 2A ✅
+### Code bugs — Phase 1A ✅ Phase 1B (code) ✅ Phase 1C ✅ Phase 2A ✅ Phase 2B ✅
 1. ~~Firm-resolution fallback~~ — fixed Phase 1A.
 2. ~~No STOP/opt-out handling~~ — fixed Phase 1A.
 3. ~~Billing URLs wrong~~ — fixed Phase 1B.
@@ -212,17 +288,18 @@ Before starting:
 7. ~~No failed-auth logging~~ — fixed Phase 1C.
 8. ~~Legacy `/app/*` routes still routed to old receptionist pages~~ — fixed Phase 2A.
 9. ~~Inbox renders `opted_out` as "Completed" (missing badge, category, DetailsPanel notice)~~ — fixed Phase 2A.
+10. ~~No navigation shell or Overview dashboard~~ — fixed Phase 2B.
 
 ### Ops tasks (owner) — MUST complete before first paying customer
-10. **Set `STRIPE_RECEPTIONIST_PRICE_ID` secret** — blocks Phase 1B tests (d)–(f).
-11. **Connect Stripe integration / set `STRIPE_SECRET_KEY`** — blocks Phase 1B tests (d)–(f).
-12. **Register Stripe webhook endpoint** and update `STRIPE_WEBHOOK_SECRET` — blocks Phase 1B tests (d)–(f).
-13. **Set `ADMIN_PASSWORD` secret** — removes hardcoded `"sitemint2024"` fallback.
-14. **Set `RESEND_FROM_EMAIL`** to a Resend-verified sending address.
+11. **Set `STRIPE_RECEPTIONIST_PRICE_ID` secret** — blocks Phase 1B tests (d)–(f).
+12. **Connect Stripe integration / set `STRIPE_SECRET_KEY`** — blocks Phase 1B tests (d)–(f).
+13. **Register Stripe webhook endpoint** and update `STRIPE_WEBHOOK_SECRET` — blocks Phase 1B tests (d)–(f).
+14. **Set `ADMIN_PASSWORD` secret** — removes hardcoded `"sitemint2024"` fallback.
+15. **Set `RESEND_FROM_EMAIL`** to a Resend-verified sending address.
 
 ### Twilio console checks (owner)
-15. **Advanced Opt-Out**: confirm enabled on intake phone number in Twilio console.
-16. **A2P 10DLC registration**: confirm intake number's registration status.
+16. **Advanced Opt-Out**: confirm enabled on intake phone number in Twilio console.
+17. **A2P 10DLC registration**: confirm intake number's registration status.
 
 ## Throwaway Records
 
@@ -235,4 +312,4 @@ DELETE FROM receptionist_sessions
 WHERE email IN ('alice@test-receptionist.com', 'captest@test.com');
 ```
 
-Phase 1B test firms (id=7, 8), Phase 1C test firms (id=9–14), and Phase 2A test firms (id=15, 16) were all created and deleted during testing. No residual records.
+Phase 1B test firms (id=7, 8), Phase 1C test firms (id=9–14), Phase 2A test firms (id=15, 16), and Phase 2B test firm (id=49) were all created and deleted during testing. No residual records.

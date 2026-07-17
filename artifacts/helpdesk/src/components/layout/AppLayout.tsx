@@ -1,18 +1,46 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
+  LayoutDashboard,
   MessageSquare,
   Users2,
-  Globe2,
   CreditCard,
-  Phone,
   Bot,
   LogOut,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession, useLogout } from "@/hooks/useSession";
+
+// ─── Nav structure ────────────────────────────────────────────────────────────
+
+const NAV_GROUPS: {
+  label: string | null;
+  items: { href: string; label: string; icon: React.ElementType }[];
+}[] = [
+  {
+    label: null,
+    items: [{ href: "/", label: "Overview", icon: LayoutDashboard }],
+  },
+  {
+    label: "RECEPTIONIST",
+    items: [
+      { href: "/receptionist",  label: "AI Receptionist", icon: Bot },
+      { href: "/conversations", label: "Conversations",    icon: MessageSquare },
+      { href: "/contacts",      label: "Contacts",         icon: Users2 },
+    ],
+  },
+  {
+    label: "ACCOUNT",
+    items: [
+      { href: "/billing",  label: "Billing",  icon: CreditCard },
+      { href: "/settings", label: "Settings", icon: SettingsIcon },
+    ],
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function initials(name: string): string {
   return name
@@ -23,12 +51,7 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-const TOP_NAV = [
-  { href: "/", label: "Inbox", icon: MessageSquare },
-  { href: "/contacts", label: "Contacts", icon: Users2 },
-  { href: "/deploy", label: "Deploy", icon: Globe2 },
-  { href: "/settings", label: "Settings", icon: Bot },
-];
+// ─── Layout ───────────────────────────────────────────────────────────────────
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
@@ -61,94 +84,96 @@ export function AppLayout({ children }: { children: ReactNode }) {
     navigate("/login");
   };
 
+  const isPaid     = me.firm.planTier === "paid";
+  const usedCount  = me.conversationCount;
+  const capCount   = me.firm.trialConversationsLimit;
+  const trialPct   = Math.min(100, capCount > 0 ? Math.round((usedCount / capCount) * 100) : 0);
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans">
-      {/* Icon-only nav rail */}
-      <div className="w-[56px] flex-shrink-0 border-r border-slate-200 bg-white flex flex-col items-center py-3 z-20">
+      {/* Sidebar */}
+      <div className="w-[210px] flex-shrink-0 border-r border-slate-200 bg-white flex flex-col z-20">
         {/* Logo */}
-        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-base mb-4 cursor-pointer select-none">
-          S
+        <div className="flex items-center gap-2.5 px-4 py-4 border-b border-slate-100">
+          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            S
+          </div>
+          <span className="text-sm font-semibold text-slate-900 truncate">SiteMint</span>
         </div>
 
-        {/* Top nav items */}
-        <div className="flex flex-col gap-1 flex-1 w-full px-2 mt-1">
-          {TOP_NAV.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Tooltip key={item.href} delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link href={item.href}>
+        {/* Nav groups */}
+        <div className="flex-1 overflow-y-auto py-3 px-2">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={gi} className={gi > 0 ? "mt-4" : ""}>
+              {group.label && (
+                <div className="px-2 mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    {group.label}
+                  </span>
+                </div>
+              )}
+              {group.items.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link key={item.href} href={item.href}>
                     <div
-                      className={`relative w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
+                      className={`flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
                         active
-                          ? "bg-indigo-50 text-indigo-600"
-                          : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+                          ? "bg-indigo-50 text-indigo-700 font-semibold"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
-                      {active && (
-                        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-indigo-600 rounded-r-full -ml-2" />
-                      )}
-                      <item.icon className="h-5 w-5" />
+                      <item.icon
+                        className={`h-4 w-4 flex-shrink-0 ${
+                          active ? "text-indigo-600" : "text-slate-400"
+                        }`}
+                      />
+                      <span className="truncate">{item.label}</span>
                     </div>
                   </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
         </div>
 
-        {/* Bottom nav */}
-        <div className="flex flex-col gap-1 w-full px-2 items-center">
-          {/* Phone — coming soon */}
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-300 cursor-not-allowed">
-                <Phone className="h-5 w-5" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs">
-              Call Dialer — coming soon
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Billing */}
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <Link href="/billing">
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                    isActive("/billing")
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  <CreditCard className="h-5 w-5" />
+        {/* Bottom — trial chip + avatar */}
+        <div className="border-t border-slate-100 pb-3 pt-2">
+          {/* Trial chip (hidden when paid) */}
+          {!isPaid && (
+            <Link href="/billing">
+              <div className="mx-2 mb-2 p-3 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                <p className="text-[11px] text-slate-600 leading-snug mb-1.5">
+                  {usedCount} of {capCount} free conversations used
+                </p>
+                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all"
+                    style={{ width: `${trialPct}%` }}
+                  />
                 </div>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs">
-              Billing
-            </TooltipContent>
-          </Tooltip>
+              </div>
+            </Link>
+          )}
 
-          {/* Avatar — click to sign out */}
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <button className="mt-2 cursor-pointer" onClick={handleLogout}>
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-semibold">
-                    {initials(me.firm.name)}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs flex items-center gap-1">
-              <LogOut className="h-3 w-3" /> Sign out
-            </TooltipContent>
-          </Tooltip>
+          {/* Avatar + sign out */}
+          <div className="flex items-center gap-2.5 px-3">
+            <Avatar className="h-7 w-7 flex-shrink-0">
+              <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                {initials(me.firm.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-xs text-slate-700 font-medium truncate flex-1 min-w-0">
+              {me.firm.name}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0"
+              title="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
