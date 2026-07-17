@@ -1,6 +1,6 @@
 # AI Receptionist — Session Handoff
 
-**Last updated**: 2026-07-17 (Phase 1C complete) | **SHA at handoff**: `5b5d7fb4af85f3e46792fc34cb2c2001297b1293` + Phase 1C changes
+**Last updated**: 2026-07-17 (Phase 2A complete) | **SHA at handoff**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A changes
 
 ## State at Handoff
 
@@ -9,9 +9,10 @@
 - Phase 1A complete and frozen.
 - Phase 1B code complete; tests (a)–(c), (g)–(j) passed; **tests (d)–(f) DEFERRED** — must run before onboarding any paying customer (see Phase 1B-E2E waiver below).
 - Phase 1C complete and frozen.
+- Phase 2A complete and frozen.
 - All workflows running: api-server (port 8080), helpdesk (port 21622), web-agency (port 22065).
 - Database: development (`heliumdb`), 5 firms, 0 Stripe customers.
-- Typecheck: PASS (api-server, verified Phase 1C).
+- Typecheck: PASS (api-server, helpdesk, web-agency — all verified Phase 2A).
 
 ## Phase 1A — Complete (2026-07-17)
 
@@ -116,28 +117,92 @@ Stripe checkout / cancel / downgrade tests (d)/(e)/(f) deferred — no Stripe ac
 
 All deleted via `DELETE FROM intake_firms WHERE id IN (9,10,11,12,13,14)` + sessions. No residual records.
 
+## Phase 2A — Complete (2026-07-17)
+
+**Scope**: Legacy route retirement, dead code deletion, `opted_out` Inbox fix. Zero backend changes — frontend-only phase.
+
+### Files changed
+
+**web-agency `App.tsx`**:
+- Removed 4 legacy imports (`ReceptionistLogin`, `ReceptionistConversations`, `ReceptionistAgentConfig`, `ReceptionistSettings`, `ReceptionistAppShell`).
+- Added `LegacyRedirect` component (inline — calls `window.location.replace(to)` inside `useEffect`, renders `null`).
+- Replaced 5 legacy `<Route>` entries with `<LegacyRedirect>` calls:
+  - `/app/login` → `/ai-receptionist/dashboard/login`
+  - `/app`, `/app/agent-config`, `/app/settings`, `/app/conversations/:id` → `/ai-receptionist/dashboard/`
+
+**helpdesk `Inbox.tsx`**:
+- Expanded `Conversation["status"]` union from `"in_progress" | "completed"` to include `"opted_out"`.
+- Added "Opted Out" category to `CategoryRail` (count + filter).
+- Added "Opted out" badge (grey pill `bg-slate-200 text-slate-600`) in `ConversationCard` and `ThreadPanel` header.
+- Added `CallerUnsubscribedBox` component in `DetailsPanel` — rendered when `status === "opted_out"`.
+
+**Deleted files** (8 total, zero external imports verified before deletion):
+- `artifacts/web-agency/src/pages/receptionist/ReceptionistLogin.tsx`
+- `artifacts/web-agency/src/pages/receptionist/ReceptionistConversations.tsx`
+- `artifacts/web-agency/src/pages/receptionist/ReceptionistAgentConfig.tsx`
+- `artifacts/web-agency/src/pages/receptionist/ReceptionistSettings.tsx`
+- `artifacts/web-agency/src/pages/receptionist/ReceptionistAppShell.tsx`
+- `artifacts/helpdesk/src/pages/Agents.tsx`
+- `artifacts/helpdesk/src/pages/NewTicket.tsx`
+- `artifacts/helpdesk/src/components/layout/CallDialer.tsx`
+
+### Test results (all pass)
+
+| Test | Description | Result |
+|---|---|---|
+| (a) | `/app/login` → screenshot shows helpdesk login page; `/app`, `/app/agent-config`, `/app/settings`, `/app/conversations/123` all redirect to `/ai-receptionist/dashboard/login` (correct — unauthenticated users reach the login page) | ✅ |
+| (b) | Signup E2E curl: firm 16 created (HTTP 201), deleted after test | ✅ |
+| (c) | Inbox opted_out: Opted Out count=1, +15559990001 card with "Opted out" badge, ThreadPanel badge, DetailsPanel "Caller Unsubscribed" box — all verified via Playwright | ✅ |
+| (d) | `pnpm --filter @workspace/helpdesk run typecheck` → EXIT 0 | ✅ |
+| (d) | `pnpm --filter @workspace/web-agency run typecheck` → EXIT 0 | ✅ |
+| (e) | `PORT=21622 BASE_PATH=/ai-receptionist/dashboard pnpm --filter @workspace/helpdesk run build` → EXIT 0 | ✅ |
+| (e) | `PORT=22065 BASE_PATH=/ pnpm --filter @workspace/web-agency run build` → EXIT 0 | ✅ |
+| (f) | `git diff HEAD -- artifacts/api-server/src/routes/receptionistBilling.ts artifacts/api-server/src/lib/authRateLimit.ts` → 0 lines | ✅ |
+| (g-1A) | STOP → `<Response></Response>` HTTP 200 | ✅ |
+| (g-1C) | 10 × 401 then 429 on login rate limit | ✅ |
+
+### Throwaway firms (Phase 2A)
+
+| Firm ID | Email | Purpose | Deleted |
+|---|---|---|---|
+| 15 | `ratetest-178*@sitemint-qa.invalid` | Signup E2E (test b) | ✅ |
+| 16 | `inbox-test-1784288644@sitemint-qa.invalid` | Inbox opted_out render (test c) | ✅ |
+
+All deleted via `DELETE FROM intake_firms WHERE id IN (15, 16)` + sessions + conversations. No residual records.
+
+---
+
 ## Known Trade-offs and Deferred Gaps
 
 - **Trial cap counts opted-out conversations**: STOP or HELP from a brand-new number creates a conversation row (needed to store the message and set status). That row counts toward `trial_conversations_limit` even though it never engaged the LLM. Revisit cap computation in a later phase (consider excluding `opted_out` rows from the cap count).
-- **Inbox renders `opted_out` as "Completed"**: The `Conversation` TypeScript interface in `Inbox.tsx` only unions `"in_progress" | "completed"`. Opted-out conversations appear in "All" but not in either "Active" or "Completed" category views (sub-counts won't sum to total). Scheduled for Phase 2: add `"opted_out"` to the union, distinct badge, "Opted Out" category filter.
 - **SPA boundary**: web-agency (`/`) and helpdesk (`/ai-receptionist/dashboard`) are served as separate Vite SPAs. wouter `navigate()` cannot cross this boundary; cross-SPA navigation requires `window.location.href` (applied in Phase 1B).
 - **Signup 409 email enumeration**: accepted residual risk — see Phase 1C section above.
 - **Rate limit state lost on restart**: in-memory `Map` resets on server restart. Acceptable for development; documented as known limitation for production.
 
 ## What the Next Session Must Do
 
-**Next phase: Phase 2 — Legacy Retirement + Nav Shell** (or Phase 1B Stripe E2E once credentials are ready).
+**Next phase: Phase 2B — Nav Shell** (or Phase 1B Stripe E2E once credentials are ready).
 
 Before starting:
 - Read ARCHITECTURE.md, CURRENT_STATE.md, ROADMAP.md, and this file.
 - Run `pnpm run typecheck` and confirm zero errors.
-- If Stripe credentials are now set: run Phase 1B deferred tests (d)/(e)/(f) first, mark Phase 1B closed, then proceed to Phase 2.
+- If Stripe credentials are now set: run Phase 1B deferred tests (d)/(e)/(f) first, mark Phase 1B closed, then proceed to Phase 2B.
 - Do not touch locked files: `routes/intakeAgent.ts`, `lib/intakeOptOut.ts`, `routes/receptionistBilling.ts`, `lib/authRateLimit.ts`, `routes/phone.ts`, `lib/discEngine.ts`, `lib/leadScore.ts`, `lib/communicationIntelligence.ts`, `lib/workflowEngine.ts`.
-- Do not push schema changes (schema is frozen until Phase 2 ADR approval).
+- Do not push schema changes (schema is frozen until Phase 2B ADR approval).
+- Phase 2A locked files (do not modify): `artifacts/web-agency/src/App.tsx`, `artifacts/helpdesk/src/pages/Inbox.tsx`.
+
+## Technical Debt — Approved Follow-up Items
+
+### web-agency `vite.config.ts` — PORT/BASE_PATH required at config-load time
+`artifacts/web-agency/vite.config.ts` calls `process.env.PORT` at config-load time and throws if it is absent, making bare `pnpm run build` fail in any shell without workflow-injected env vars (confirmed Phase 2A: `PORT=22065 BASE_PATH=/ pnpm run build` succeeds; bare `pnpm run build` fails). The production deployment system supplies these vars from `artifact.toml [services.env]`, so production builds are unaffected. However, this makes shell-level build verification fragile.
+
+**Fix**: Port the `isServing` guard from helpdesk's `vite.config.ts` (commit `06fff00` — "Fix build process to not require port on build") to web-agency's `vite.config.ts`. Only read PORT/BASE_PATH when `isServing` is true; use safe fallback for build mode.
+
+**Do NOT fix until approved in a future session.**
 
 ## Open Blocking Issues (before next customer)
 
-### Code bugs — Phase 1A ✅ Phase 1B (code) ✅ Phase 1C ✅
+### Code bugs — Phase 1A ✅ Phase 1B (code) ✅ Phase 1C ✅ Phase 2A ✅
 1. ~~Firm-resolution fallback~~ — fixed Phase 1A.
 2. ~~No STOP/opt-out handling~~ — fixed Phase 1A.
 3. ~~Billing URLs wrong~~ — fixed Phase 1B.
@@ -145,17 +210,19 @@ Before starting:
 5. ~~Signup "Sign in" link wrong~~ — fixed Phase 1B.
 6. ~~No rate limiting on login/signup~~ — fixed Phase 1C.
 7. ~~No failed-auth logging~~ — fixed Phase 1C.
+8. ~~Legacy `/app/*` routes still routed to old receptionist pages~~ — fixed Phase 2A.
+9. ~~Inbox renders `opted_out` as "Completed" (missing badge, category, DetailsPanel notice)~~ — fixed Phase 2A.
 
 ### Ops tasks (owner) — MUST complete before first paying customer
-8. **Set `STRIPE_RECEPTIONIST_PRICE_ID` secret** — blocks Phase 1B tests (d)–(f).
-9. **Connect Stripe integration / set `STRIPE_SECRET_KEY`** — blocks Phase 1B tests (d)–(f).
-10. **Register Stripe webhook endpoint** and update `STRIPE_WEBHOOK_SECRET` — blocks Phase 1B tests (d)–(f).
-11. **Set `ADMIN_PASSWORD` secret** — removes hardcoded `"sitemint2024"` fallback.
-12. **Set `RESEND_FROM_EMAIL`** to a Resend-verified sending address.
+10. **Set `STRIPE_RECEPTIONIST_PRICE_ID` secret** — blocks Phase 1B tests (d)–(f).
+11. **Connect Stripe integration / set `STRIPE_SECRET_KEY`** — blocks Phase 1B tests (d)–(f).
+12. **Register Stripe webhook endpoint** and update `STRIPE_WEBHOOK_SECRET` — blocks Phase 1B tests (d)–(f).
+13. **Set `ADMIN_PASSWORD` secret** — removes hardcoded `"sitemint2024"` fallback.
+14. **Set `RESEND_FROM_EMAIL`** to a Resend-verified sending address.
 
 ### Twilio console checks (owner)
-13. **Advanced Opt-Out**: confirm enabled on intake phone number in Twilio console.
-14. **A2P 10DLC registration**: confirm intake number's registration status.
+15. **Advanced Opt-Out**: confirm enabled on intake phone number in Twilio console.
+16. **A2P 10DLC registration**: confirm intake number's registration status.
 
 ## Throwaway Records
 
@@ -168,4 +235,4 @@ DELETE FROM receptionist_sessions
 WHERE email IN ('alice@test-receptionist.com', 'captest@test.com');
 ```
 
-Phase 1B test firms (id=7, 8) and Phase 1C test firms (id=9–14) were all created and deleted during testing. No residual records.
+Phase 1B test firms (id=7, 8), Phase 1C test firms (id=9–14), and Phase 2A test firms (id=15, 16) were all created and deleted during testing. No residual records.
