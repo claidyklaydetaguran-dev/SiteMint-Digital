@@ -1,0 +1,51 @@
+PHASE 2C — VERIFICATION RUN REQUIRED BEFORE FREEZE (no new features)
+
+Your report lists files changed but omits most completion gates. Run and
+report ALL of the following. Where something was already done, show the
+evidence; where it wasn't, say NOT DONE — do not silently backfill code
+changes without listing them.
+
+1. SCOPE QUESTIONS (answer first):
+   a. Billing.tsx is absent from your files-changed table but was in the
+      spec (Section 2: plan cards, usage bar, friendly not-configured
+      notice). Was it restyled? If not: NOT DONE + estimate.
+   b. The tier chip list omits "Opted out". Spec required it. Present?
+   c. Mobile: Conversations stacked view with back button at <768px, and
+      the overall 375px no-horizontal-overflow requirement — done?
+   d. Accessibility pass (aria-labels on icon buttons, chips as <button>,
+      focus-visible rings, slate-400→500 contrast bumps) — done?
+   e. Overview shows 4 KPI tiles; 2B recorded 3 as the approved deviation.
+      What is the 4th tile and what does it link to?
+
+2. EVIDENCE RUN:
+   a. Screenshots: every page (Login, Overview, Conversations incl. an open
+      thread, AI Receptionist, Contacts, Billing, Settings) at desktop AND
+      375px width.
+   b. Four-state evidence for Overview and Conversations (loading via
+      network throttle/intercept, empty via throwaway firm, error via 500
+      intercept, success).
+   c. Quick wins with SQL ground truth (throwaway or seeded test firm):
+      - Tier chip counts match:
+        SELECT tier, COUNT(*) FROM intake_conversations ic
+        LEFT JOIN intake_cases c ON c.conversation_id = ic.id
+        WHERE ic.firm_id=<id> GROUP BY tier;
+      - "Why this tier" renders disqualifyReason for a Disqualified conv.
+      - Template apply: pick Law Firm template on a THROWAWAY firm →
+        fields fill → Save → GET confirms persisted → delete firm.
+   d. PORT=21622 BASE_PATH=/ai-receptionist/dashboard
+      pnpm --filter @workspace/helpdesk run build → EXIT 0 (typecheck alone
+      is not sufficient).
+   e. Isolation proof: git diff <pre-2C-sha>..HEAD --stat for
+      artifacts/api-server, artifacts/web-agency, lib/ → all empty.
+   f. Regressions:
+      - STOP: POST /api/intake/sms-webhook, To = a real seeded firm's
+        twilioNumber → 200, <Response></Response>, conversation status
+        'opted_out' in DB, zero outbound rows (clean up after).
+      - Login limiter: 10×401 then 429 (throwaway email).
+      - Happy path: login → Overview → Conversations → open thread →
+        /receptionist → edit + save + revert greeting (throwaway firm).
+
+3. If any scope item from 1 is NOT DONE, list it with an estimate and STOP —
+   we will decide whether it completes 2C or moves to a 2C-followup.
+
+Report format: deviations/not-done items at the TOP, then evidence.
