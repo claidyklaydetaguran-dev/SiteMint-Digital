@@ -16,7 +16,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { validateIntakeTwilioSignature } from "../lib/intakeTwilio.js";
 import { validateToken } from "../lib/admin-session.js";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, sql, gte } from "drizzle-orm";
 import {
   db,
   intakeFirms,
@@ -28,6 +28,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import type { IntakeFirm, IntakeCase } from "@workspace/db";
 import { scoreIntakeCase } from "../lib/intakeScoring.js";
 import { getResend } from "../lib/email.js";
+import { isOptOut, isOptIn, isHelp, normalizeKeyword } from "../lib/intakeOptOut.js";
 
 const router: IRouter = Router();
 
@@ -391,17 +392,13 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
     }
 
     // ── 1. Resolve firm ───────────────────────────────────────────────────────
-    let [firm] = await db.select().from(intakeFirms)
+    const [firm] = await db.select().from(intakeFirms)
       .where(eq(intakeFirms.twilioNumber, To ?? ""))
       .limit(1);
 
     if (!firm) {
-      const all = await db.select().from(intakeFirms).limit(1);
-      firm = all[0];
-    }
-
-    if (!firm) {
-      req.log.error({ To }, "[intake] No firm found — seed the test firm first");
+      const maskedFrom = From ? `***${String(From).slice(-4)}` : "unknown";
+      req.log.error({ To, From: maskedFrom }, "[intake] Unmatched To-number — no firm found, rejecting silently");
       res.type("text/xml").send("<Response></Response>");
       return;
     }
@@ -426,6 +423,97 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
       conversation = rows[0];
     }
 
+    // ── 3. Keyword handling ───────────────────────────────────────────────────
+    const normalizedBody = normalizeKeyword(Body);
+
+    // 3a. Opt-out: STOP / STOPALL / UNSUBSCRIBE / CANCEL / END / QUIT
+    if (isOptOut(normalizedBody)) {
+      await db.update(intakeConversations)
+        .set({ status: "opted_out", lastMessageAt: new Date() })
+        .where(eq(intakeConversations.id, conversation.id));
+      await db.insert(intakeMessages).values({
+        conversationId: conversation.id,
+        direction:      "inbound",
+        body:           Body,
+      });
+      req.log.info(
+        { firmId: firm.id, conversationId: conversation.id, keyword: normalizedBody },
+        "[intake] Opt-out keyword — conversation set to opted_out, no reply sent",
+      );
+      res.type("text/xml").send("<Response></Response>");
+      return;
+    }
+
+    // 3b. Re-opt-in: START / YES / UNSTOP — ONLY when currently opted_out
+    if (isOptIn(normalizedBody) && conversation.status === "opted_out") {
+      await db.update(intakeConversations)
+        .set({ status: "in_progress", lastMessageAt: new Date() })
+        .where(eq(intakeConversations.id, conversation.id));
+      await db.insert(intakeMessages).values({
+        conversationId: conversation.id,
+        direction:      "inbound",
+        body:           Body,
+      });
+      const resubBody = firm.greetingMessage?.trim()
+        ?? `You've been re-subscribed. Welcome back to ${firm.name}. How can we help you today?`;
+      await db.insert(intakeMessages).values({
+        conversationId: conversation.id,
+        direction:      "outbound",
+        body:           resubBody,
+      });
+      await db.update(intakeConversations)
+        .set({ lastMessageAt: new Date() })
+        .where(eq(intakeConversations.id, conversation.id));
+      await sendIntakeSms(req, { to: From, from: firm.twilioNumber, body: resubBody });
+      req.log.info(
+        { firmId: firm.id, conversationId: conversation.id },
+        "[intake] Re-opt-in keyword — conversation restored to in_progress, greeting sent",
+      );
+      res.type("text/xml").send("<Response></Response>");
+      return;
+    }
+
+    // 3c. Any message from an opted-out caller — store silently, no reply (includes HELP)
+    if (conversation.status === "opted_out") {
+      await db.insert(intakeMessages).values({
+        conversationId: conversation.id,
+        direction:      "inbound",
+        body:           Body,
+      });
+      req.log.info(
+        { firmId: firm.id, conversationId: conversation.id },
+        "[intake] Message from opted-out caller — stored silently, no reply",
+      );
+      res.type("text/xml").send("<Response></Response>");
+      return;
+    }
+
+    // 3d. HELP: static identification reply, no LLM call
+    if (isHelp(normalizedBody)) {
+      await db.insert(intakeMessages).values({
+        conversationId: conversation.id,
+        direction:      "inbound",
+        body:           Body,
+      });
+      const helpBody = `${firm.name} uses an automated AI assistant for SMS intake. Reply STOP to unsubscribe.`;
+      await db.insert(intakeMessages).values({
+        conversationId: conversation.id,
+        direction:      "outbound",
+        body:           helpBody,
+      });
+      await db.update(intakeConversations)
+        .set({ lastMessageAt: new Date() })
+        .where(eq(intakeConversations.id, conversation.id));
+      await sendIntakeSms(req, { to: From, from: firm.twilioNumber, body: helpBody });
+      req.log.info(
+        { firmId: firm.id, conversationId: conversation.id },
+        "[intake] HELP keyword — static reply sent, no LLM call",
+      );
+      res.type("text/xml").send("<Response></Response>");
+      return;
+    }
+
+    // ── 4. Completed conversation guard ───────────────────────────────────────
     if (conversation.status === "completed") {
       const closedReply = "Your intake is already complete. Our team will be in touch soon. Thank you!";
       await sendIntakeSms(req, { to: From, from: firm.twilioNumber, body: closedReply });
@@ -433,7 +521,7 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
       return;
     }
 
-    // ── 3. Store inbound message ──────────────────────────────────────────────
+    // ── 5. Store inbound message ──────────────────────────────────────────────
     await db.insert(intakeMessages).values({
       conversationId: conversation.id,
       direction:      "inbound",
@@ -476,7 +564,40 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
       return;
     }
 
-    // ── 4. Load message history and existing case ─────────────────────────────
+    // ── 3.7. Rate guard — max 30 inbound messages per 60-minute window ──────────
+    const windowStart = new Date(Date.now() - 60 * 60 * 1000);
+    const [rateRow] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(intakeMessages)
+      .where(and(
+        eq(intakeMessages.conversationId, conversation.id),
+        eq(intakeMessages.direction, "inbound"),
+        gte(intakeMessages.createdAt, windowStart),
+      ));
+    const inboundInWindow = Number(rateRow?.count ?? 0);
+
+    if (inboundInWindow > 30) {
+      req.log.warn(
+        { firmId: firm.id, conversationId: conversation.id, inboundInWindow },
+        "[intake] Rate guard triggered — LLM suppressed",
+      );
+      if (inboundInWindow === 31) {
+        const noticeBody = "You're sending messages too quickly. Please wait a moment before trying again.";
+        await db.insert(intakeMessages).values({
+          conversationId: conversation.id,
+          direction:      "outbound",
+          body:           noticeBody,
+        });
+        await db.update(intakeConversations)
+          .set({ lastMessageAt: new Date() })
+          .where(eq(intakeConversations.id, conversation.id));
+        await sendIntakeSms(req, { to: From, from: firm.twilioNumber, body: noticeBody });
+      }
+      res.type("text/xml").send("<Response></Response>");
+      return;
+    }
+
+    // ── 6. Load message history and existing case ─────────────────────────────
     const history = await db.select().from(intakeMessages)
       .where(eq(intakeMessages.conversationId, conversation.id))
       .orderBy(asc(intakeMessages.createdAt));

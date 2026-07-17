@@ -1,6 +1,6 @@
 # AI Receptionist — Session Handoff
 
-**Last updated**: 2026-07-17 | **SHA at handoff**: `6c4ff48e11bb746a704dbdfc793d281dec3f4c55`
+**Last updated**: 2026-07-17 (Phase 1A complete) | **SHA at handoff**: `6c4ff48e11bb746a704dbdfc793d281dec3f4c55` → see Phase 1A commit
 
 ## State at Handoff
 
@@ -12,9 +12,18 @@
 - Helpdesk build: PASS (`dist/public/` present, built 2026-07-16 07:29 UTC).
 - API server build: PASS (`dist/index.mjs` present, built by running workflow).
 
+## Phase 1A — Complete (2026-07-17)
+
+Files changed: `artifacts/api-server/src/routes/intakeAgent.ts` (firm-resolution fix, keyword handling, rate guard), `artifacts/api-server/src/lib/intakeOptOut.ts` (new). Typecheck: PASS. All acceptance criteria (a)–(i) verified.
+
+## Known Trade-offs and Deferred Gaps
+
+- **Trial cap counts opted-out conversations**: STOP or HELP from a brand-new number creates a conversation row (needed to store the message and set status). That row counts toward `trial_conversations_limit` even though it never engaged the LLM. Revisit cap computation in a later phase (consider excluding `opted_out` rows from the cap count).
+- **Inbox renders `opted_out` as "Completed"**: The `Conversation` TypeScript interface in `Inbox.tsx` (line 25) only unions `"in_progress" | "completed"`. At runtime, `status: "opted_out"` from the DB passes through and renders with a misleading "Completed" badge. Opted-out conversations appear in "All" but not in either "Active" or "Completed" category views (sub-counts won't sum to total). Scheduled for Phase 1B/2: add `"opted_out"` to the union, add a distinct badge style, and add an "Opted Out" category filter.
+
 ## What the Next Session Must Do
 
-**Next phase: 1A — Tenant Isolation + SMS Opt-Out Compliance** (see ROADMAP.md for full scope).
+**Next phase: 1B — Billing & Entry-Point Repair** (see ROADMAP.md for full scope).
 
 Before starting:
 - Read ARCHITECTURE.md, CURRENT_STATE.md, ROADMAP.md, and this file.

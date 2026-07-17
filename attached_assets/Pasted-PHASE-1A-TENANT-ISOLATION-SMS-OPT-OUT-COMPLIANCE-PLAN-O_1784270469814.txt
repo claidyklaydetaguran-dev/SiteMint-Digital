@@ -1,0 +1,63 @@
+PHASE 1A — TENANT ISOLATION + SMS OPT-OUT COMPLIANCE (PLAN ONLY — propose, do not implement)
+
+CONTEXT
+SiteMint AI Receptionist monorepo, main @ 6c4ff48e (or later — report current SHA).
+The inbound SMS webhook is POST /api/intake/sms-webhook in
+artifacts/api-server/src/routes/intakeAgent.ts. Phase 0 confirmed two defects:
+(1) unmatched To-numbers silently fall back to the first firm (LIMIT 1);
+(2) no STOP/opt-out keyword handling exists at the application level.
+
+GOAL
+Produce an implementation plan (no code changes in this session) for exactly
+these changes, all confined to intakeAgent.ts plus at most ONE new lib file
+(artifacts/api-server/src/lib/intakeOptOut.ts):
+
+1. FIRM RESOLUTION: remove the LIMIT 1 fallback. Unmatched To → ERROR log
+   ({To, From with last-4 masking}), return empty TwiML, create no rows,
+   send no reply.
+2. OPT-OUT: exact-match STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT
+   (trimmed, uppercased) → persist opt-out by setting the conversation
+   status to "opted_out" (create the conversation row if none exists),
+   store the inbound message, send no reply, and suppress ALL future AI
+   processing/replies for that caller while opted out (messages still stored).
+3. RE-OPT-IN: START, YES, UNSTOP — ONLY when current status is "opted_out" →
+   set status "in_progress", send the firm greeting (or a neutral
+   re-subscribed message if no greeting), no LLM call that turn.
+4. HELP: static reply identifying the firm's automated assistant + "Reply
+   STOP to unsubscribe", no LLM call.
+5. RATE GUARD: before any LLM call, count inbound intake_messages for this
+   conversation in the trailing 60 minutes; if over 30, store the message,
+   send at most one rate-limit notice per window, skip the LLM, WARN log.
+6. ORDERING: signature validation → firm resolution → keyword handling →
+   store inbound → trial cap → greeting short-circuit → rate guard → LLM.
+
+HARD CONSTRAINTS
+- NO schema changes, NO drizzle push, NO new tables/columns. Opt-out state =
+  status value "opted_out" on intake_conversations.status (text column).
+- Do NOT modify or import from routes/phone.ts or any locked CRM module.
+  Define keyword constants locally.
+- Do NOT touch: receptionistAuth/Conversations/AgentConfig/Billing routes,
+  any frontend file, any schema file, any other route module.
+- No dependency changes.
+
+YOUR PLAN MUST INCLUDE
+- Exact insertion points (line ranges) in intakeAgent.ts for each change
+- The full proposed keyword-handling flow as pseudocode
+- How the Inbox UI currently renders a conversation with status "opted_out"
+  (read artifacts/helpdesk/src/pages/Inbox.tsx and report — do not change it)
+- A test plan mapped 1:1 to these acceptance criteria:
+  (a) unknown To → 200 empty TwiML, zero new rows, ERROR logged
+  (b) STOP from new number → opted_out conversation created, message stored,
+      no outbound SMS, no OpenAI call
+  (c) STOP mid-conversation → future messages stored, never answered
+  (d) START after STOP → in_progress + greeting; normal flow resumes
+  (e) "YES" during a normal conversation → routed to the LLM as a normal
+      answer, NOT treated as re-opt-in
+  (f) 31st inbound in 60 min → one notice, then silence, no LLM
+  (g) two seeded firms: firm A's GET /api/receptionist/conversations never
+      contains firm B's data, before and after unmatched-number tests
+  (h) matched-number happy path unchanged
+  (i) pnpm run typecheck clean
+- Risk list + single-file rollback plan
+
+Return the plan for approval. Do not write any code until the plan is approved.
