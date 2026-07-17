@@ -1,0 +1,40 @@
+PHASE 2C GAP RULINGS — complete these, then freeze:
+
+GAP 2 — RULED: spec error (owner side). Tier and status are orthogonal;
+the tier-chip row is correct as built. Record in SESSION_HANDOFF.md as a
+spec correction, 0 changes.
+
+GAP 1 — FIX NOW (~15 min): Billing.tsx to bg-slate-50 container consistent
+with other pages; replace the raw upgradeError string with the friendly
+static notice card ("Billing isn't live yet — contact us to upgrade")
+when the API returns the not-configured error; keep real error handling
+for other failures.
+
+GAP 3 — FIX NOW (~60 min): Conversations responsive stacked view:
+- <768px: hide CategoryRail and DetailsPanel; show ConversationList
+  full-width; selecting a conversation switches to ThreadPanel full-width
+  with a back button in its header returning to the list.
+- Expose the category + tier filters on mobile via a compact filter bar or
+  sheet (simplest premium option — your call, declare it).
+- Verify at 375px with REAL content visible, not clipped: screenshot the
+  list view, the thread view with back button, and DetailsPanel content
+  accessible (e.g. behind a details toggle or stacked below thread —
+  declare your choice).
+
+GAP 4 — FIX NOW (~20 min): finish the accessibility pass:
+- focus-visible ring audit on all inputs/selects/buttons
+- secondary text slate-400 → slate-500 where on white/slate-50 backgrounds
+- role="navigation" on the sidebar, role="main" on the content area
+
+ALSO OUTSTANDING FROM THE EVIDENCE RUN:
+- Four-state evidence for Overview AND Conversations (loading via
+  intercept/throttle, empty via fresh throwaway firm, error via 500
+  intercept with Retry working, success). Screenshots or Playwright logs.
+- ANSWER 1e: Overview has 4 KPI tiles but Phase 2B recorded 3 as the
+  approved deviation. Name the 4th tile, its data source, and where it
+  links. If it's Trial Usage returned as a tile, that's fine — just
+  record that the 2B deviation was reversed.
+
+THEN: typecheck + production build (both EXIT 0), updated 375px screenshots,
+SESSION_HANDOFF.md + CURRENT_STATE.md final update, single summary of all
+2C commits for the rollback range. Report with any deviations at top.

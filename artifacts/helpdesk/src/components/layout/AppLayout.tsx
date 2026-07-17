@@ -82,7 +82,7 @@ function SidebarInner({ location, me, onNavClick, onLogout }: SidebarProps) {
         </div>
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900 leading-tight truncate">SiteMint</div>
-          <div className="text-[10px] text-slate-400 leading-tight truncate">AI Receptionist</div>
+          <div className="text-[10px] text-slate-500 leading-tight truncate">AI Receptionist</div>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ function SidebarInner({ location, me, onNavClick, onLogout }: SidebarProps) {
           <div key={gi} className={gi > 0 ? "mt-5" : ""}>
             {group.label && (
               <div className="px-2 mb-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                   {group.label}
                 </span>
               </div>
@@ -218,7 +218,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans">
       {/* ── Desktop sidebar ── */}
-      <div className="hidden md:flex w-[232px] flex-shrink-0 border-r border-slate-200 bg-white flex-col z-20 shadow-sm">
+      <div role="navigation" aria-label="Main navigation" className="hidden md:flex w-[232px] flex-shrink-0 border-r border-slate-200 bg-white flex-col z-20 shadow-sm">
         <SidebarInner location={location} me={me} onLogout={handleLogout} />
       </div>
 
@@ -247,7 +247,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative flex flex-col w-[232px] h-full bg-white border-r border-slate-200 shadow-xl">
+          <div role="navigation" aria-label="Main navigation" className="relative flex flex-col w-[232px] h-full bg-white border-r border-slate-200 shadow-xl">
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
@@ -266,7 +266,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* ── Main content ── */}
-      <main className="flex-1 overflow-hidden flex flex-col min-w-0 md:mt-0 mt-12">
+      <main role="main" className="flex-1 overflow-hidden flex flex-col min-w-0 md:mt-0 mt-12">
         {children}
       </main>
     </div>

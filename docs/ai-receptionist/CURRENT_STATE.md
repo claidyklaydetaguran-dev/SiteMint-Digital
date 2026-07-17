@@ -1,6 +1,6 @@
 # AI Receptionist — Current State
 
-**As of**: 2026-07-17 | **Phase 2A complete** | **Git SHA**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A changes
+**As of**: 2026-07-17 | **Phase 2C + gap-fix pass complete** | **Pre-2C SHA**: `981be92` | **Post-2C base SHA**: `7e0cc4a` | Gap fixes on top of `7e0cc4a`
 
 ## What Works
 

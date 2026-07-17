@@ -327,3 +327,7 @@
     inset: -1px;
   }
 }
+
+/* Hide scrollbar for horizontal filter rows while keeping scroll behaviour */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

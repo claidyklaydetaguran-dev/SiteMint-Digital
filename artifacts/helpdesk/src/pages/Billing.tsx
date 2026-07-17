@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { apiFetch } from "@/lib/api";
+
 import { useSession, SESSION_KEY } from "@/hooks/useSession";
 import type { SessionFirm } from "@/hooks/useSession";
 import {
@@ -22,6 +22,7 @@ export default function Billing() {
   const { data: me, isLoading } = useSession();
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState("");
+  const [notConfigured, setNotConfigured] = useState(false);
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -40,13 +41,18 @@ export default function Billing() {
   const handleUpgrade = async () => {
     setUpgrading(true);
     setUpgradeError("");
+    setNotConfigured(false);
     try {
-      const data = await apiFetch<{ url?: string; error?: string }>(
-        "/receptionist/billing/create-checkout-session",
-        { method: "POST" }
-      );
+      const res = await fetch("/api/receptionist/billing/create-checkout-session", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json() as { url?: string; error?: string };
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.error?.toLowerCase().includes("not configured")) {
+        setNotConfigured(true);
       } else {
         setUpgradeError(data.error ?? "Failed to start checkout");
       }
@@ -71,7 +77,7 @@ export default function Billing() {
   const usagePct = Math.min(100, Math.round((conversationCount / trialLimit) * 100));
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-200">
         <h1 className="text-lg font-semibold text-slate-900">Billing</h1>
         <p className="text-sm text-slate-500 mt-0.5">Manage your plan and usage</p>
@@ -101,6 +107,7 @@ export default function Billing() {
                 isPaid={isPaid}
                 upgrading={upgrading}
                 upgradeError={upgradeError}
+                notConfigured={notConfigured}
                 onUpgrade={handleUpgrade}
               />
             </TabsContent>
@@ -126,12 +133,14 @@ function PlanTab({
   isPaid,
   upgrading,
   upgradeError,
+  notConfigured,
   onUpgrade,
 }: {
   firm: SessionFirm;
   isPaid: boolean;
   upgrading: boolean;
   upgradeError: string;
+  notConfigured: boolean;
   onUpgrade: () => void;
 }) {
   return (
@@ -193,7 +202,25 @@ function PlanTab({
               </div>
             ))}
           </div>
-          {upgradeError && (
+          {notConfigured && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 flex items-start gap-2.5">
+              <Clock className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-amber-900">Billing isn&apos;t live yet</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Contact us at{" "}
+                  <a
+                    href="mailto:hello@sitemint.com"
+                    className="underline hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded"
+                  >
+                    hello@sitemint.com
+                  </a>{" "}
+                  to upgrade your account.
+                </p>
+              </div>
+            </div>
+          )}
+          {upgradeError && !notConfigured && (
             <p className="text-xs text-rose-600 mb-3 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
               {upgradeError}
             </p>

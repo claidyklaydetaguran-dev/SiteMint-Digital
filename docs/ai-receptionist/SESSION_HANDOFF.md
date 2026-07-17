@@ -1,6 +1,6 @@
 # AI Receptionist — Session Handoff
 
-**Last updated**: 2026-07-17 (Phase 2C complete) | **SHA at handoff**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A + Phase 2B + Phase 2C changes
+**Last updated**: 2026-07-17 (Phase 2C + gap-fix pass complete) | **Pre-2C SHA**: `981be92` | **Post-2C base SHA**: `7e0cc4a` | Gap fixes applied on top of `7e0cc4a`
 
 ## State at Handoff
 
@@ -277,6 +277,56 @@ Firm 49 deleted inside Playwright test (DB steps). Firm 50 deleted inside Playwr
 
 ---
 
+## Phase 2C — Gap-Fix Pass (2026-07-17)
+
+**Trigger**: Post-build review identified 4 gaps vs. spec. GAP 2 ruled spec error (no code change). GAPs 1, 3, 4 fixed in the same session immediately after freeze.
+
+### Gap rulings
+
+| GAP | Description | Ruling | Disposition |
+|---|---|---|---|
+| GAP 1 | Billing page `bg-white` instead of `bg-slate-50`; no friendly "not configured" card | FIX | Fixed |
+| GAP 2 | CategoryRail "Opted Out" tier chip missing | SPEC ERROR | `"Opted Out"` is a `status`, not a `tier`; CategoryRail already handles it via the status-based opted_out filter. No code change. |
+| GAP 3 | Conversations page not mobile-responsive at <768px | FIX | Fixed |
+| GAP 4 | Accessibility: no `role="navigation"`, low-contrast `slate-400`, no focus-visible rings | FIX | Fixed |
+
+### Files changed (gap fixes)
+
+| File | Change |
+|---|---|
+| `artifacts/helpdesk/src/pages/Billing.tsx` | Outer div `bg-white` → `bg-slate-50`; `notConfigured` state detected from 500 response body; friendly amber "Billing isn't live yet" card shown instead of raw error; `handleUpgrade` switched from `apiFetch` (throws before reading body on non-2xx) to raw `fetch` so 500 body can be parsed; unused `apiFetch` import removed |
+| `artifacts/helpdesk/src/pages/Inbox.tsx` | Full mobile/desktop two-branch layout: `flex md:hidden` mobile branch (ConversationList full-width → tap → ThreadPanel full-width with `← Conversations` back button); `hidden md:flex` desktop branch (three-column unchanged); `MobileFilterBar` component (search input + All/Active/Completed/Opted Out pills + tier chips, horizontal scroll); `ThreadPanel` updated with `onBack` / `showDetails` / `onToggleDetails` props; `DetailsPanel` gets `embedded` prop for inline <45vh mobile rendering; `slate-400` → `slate-500` throughout; `focus-visible` rings on all interactive elements; `ArrowLeft` import from lucide-react |
+| `artifacts/helpdesk/src/components/layout/AppLayout.tsx` | `role="navigation" aria-label="Main navigation"` on desktop sidebar div AND mobile drawer div; `<main role="main">`; brand subtitle `slate-400` → `slate-500`; nav group labels `slate-400` → `slate-500` |
+| `artifacts/helpdesk/src/index.css` | Added `.no-scrollbar` utility (`-webkit-scrollbar: none`, `-ms-overflow-style: none`, `scrollbar-width: none`) needed by `MobileFilterBar` horizontal scroll |
+
+### Root cause note — `apiFetch` throws on non-2xx
+
+`artifacts/helpdesk/src/lib/api.ts` line 9–11: `apiFetch` constructs and throws a bare `Error("API {status}")` without reading the response body. When `POST /receptionist/billing/create-checkout-session` returns HTTP 500 `{"error":"Billing is not configured yet"}`, the `catch` block in `handleUpgrade` fired before the JSON could be read, causing the raw "Failed to start checkout" message to appear instead of the friendly card. Fix: raw `fetch` in `handleUpgrade` reads the body regardless of HTTP status before branching.
+
+### Typecheck and build (post gap fixes)
+
+- `pnpm --filter @workspace/helpdesk run typecheck` → EXIT 0
+- `PORT=21622 BASE_PATH=/ai-receptionist/dashboard pnpm --filter @workspace/helpdesk run build` → EXIT 0 (1800 modules, 10.44s)
+
+### Verification evidence
+
+**KPI tiles (confirmed by Playwright)**: "3 Conversations this week" / "1 Hot leads" / "0 Active now" / "3/20 Trial usage" — 4th tile confirmed as `Trial usage` (icon: BarChart2, href: `/billing`). This resolves the Phase 2B deviation (only 3 tiles shown; Trial Usage was in sidebar chip). Phase 2C adds it back as the 4th tile.
+
+**Back button (confirmed by code inspection)**: `Inbox.tsx` line 17 `import { ArrowLeft, … }`, line 212–214 `<ArrowLeft className="h-4 w-4" />` in mobile list (when thread is open, back to list), line 768–775 `{onBack && <button aria-label="Back to conversations list"><ArrowLeft /></button>}` in `ThreadPanel`. Playwright accessibility scan did not pick it up by label but the DOM element and handler are present.
+
+**Isolation**: `git diff 981be92..HEAD -- artifacts/api-server/ artifacts/web-agency/ lib/` → 0 lines changed.
+
+### Throwaway firms (Phase 2C gap fixes)
+
+| Firm ID | Email | Purpose | Deleted |
+|---|---|---|---|
+| 51 | (created and deleted intra-session) | Quick smoke-test | ✅ |
+| 52 | `2c-evidence-1784295972195@sitemint-qa.invalid` | Four-state Playwright evidence | ✅ |
+
+All seeded data (intake_conversations 35–37, intake_cases 28–30, intake_messages 199–204) deleted before firm deletion. DB is clean.
+
+---
+
 ## Known Trade-offs and Deferred Gaps
 
 - **Trial cap counts opted-out conversations**: STOP or HELP from a brand-new number creates a conversation row (needed to store the message and set status). That row counts toward `trial_conversations_limit` even though it never engaged the LLM. Revisit cap computation in a later phase (consider excluding `opted_out` rows from the cap count).
@@ -318,6 +368,7 @@ Before starting:
 - `artifacts/helpdesk/src/pages/Login.tsx`
 - `artifacts/helpdesk/src/pages/Contacts.tsx`
 - `artifacts/helpdesk/src/pages/Settings.tsx`
+- `artifacts/helpdesk/src/pages/Billing.tsx` (gap-fix: bg-slate-50 + not-configured card)
 
 ## Technical Debt — Approved Follow-up Items
 
