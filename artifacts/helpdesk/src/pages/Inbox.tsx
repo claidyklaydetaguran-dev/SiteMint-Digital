@@ -22,7 +22,7 @@ interface Conversation {
   createdAt: string;
   lastMessageAt: string;
   callerPhone: string;
-  status: "in_progress" | "completed";
+  status: "in_progress" | "completed" | "opted_out";
   isOverCap?: boolean;
   tier: "Hot" | "Warm" | "Cold" | "Disqualified" | "Needs Review" | null;
   disqualifyReason: string | null;
@@ -41,7 +41,7 @@ interface ConversationDetail {
   messages: Message[];
 }
 
-type CategoryView = "all" | "active" | "completed";
+type CategoryView = "all" | "active" | "completed" | "opted_out";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,13 +121,15 @@ export default function Inbox() {
   const { data: conversations, isLoading } = useConversations();
   const { data: detail, isLoading: isLoadingDetail } = useConversationDetail(selectedId);
 
-  const activeCount = conversations?.filter((c) => c.status === "in_progress").length ?? 0;
+  const activeCount    = conversations?.filter((c) => c.status === "in_progress").length ?? 0;
   const completedCount = conversations?.filter((c) => c.status === "completed").length ?? 0;
+  const optedOutCount  = conversations?.filter((c) => c.status === "opted_out").length ?? 0;
 
   const filtered = conversations
     ?.filter((c) => {
-      if (activeCategory === "active") return c.status === "in_progress";
+      if (activeCategory === "active")    return c.status === "in_progress";
       if (activeCategory === "completed") return c.status === "completed";
+      if (activeCategory === "opted_out") return c.status === "opted_out";
       return true;
     })
     .filter((c) => !search || c.callerPhone.includes(search));
@@ -140,6 +142,7 @@ export default function Inbox() {
         totalCount={conversations?.length ?? 0}
         activeCount={activeCount}
         completedCount={completedCount}
+        optedOutCount={optedOutCount}
         search={search}
         onSearch={setSearch}
       />
@@ -181,6 +184,7 @@ function CategoryRail({
   totalCount,
   activeCount,
   completedCount,
+  optedOutCount,
   search,
   onSearch,
 }: {
@@ -189,6 +193,7 @@ function CategoryRail({
   totalCount: number;
   activeCount: number;
   completedCount: number;
+  optedOutCount: number;
   search: string;
   onSearch: (s: string) => void;
 }) {
@@ -229,6 +234,12 @@ function CategoryRail({
               count={completedCount}
               active={active === "completed"}
               onClick={() => onSelect("completed")}
+            />
+            <NavItem
+              label="Opted Out"
+              count={optedOutCount}
+              active={active === "opted_out"}
+              onClick={() => onSelect("opted_out")}
             />
           </div>
         </div>
@@ -306,11 +317,10 @@ function ConversationList({
   activeCategory: CategoryView;
 }) {
   const label =
-    activeCategory === "active"
-      ? "Active"
-      : activeCategory === "completed"
-      ? "Completed"
-      : "All Conversations";
+    activeCategory === "active"    ? "Active"      :
+    activeCategory === "completed" ? "Completed"   :
+    activeCategory === "opted_out" ? "Opted Out"   :
+    "All Conversations";
 
   return (
     <div className="w-[300px] flex-shrink-0 border-r border-slate-200 bg-slate-50 flex flex-col">
@@ -411,10 +421,12 @@ function ConversationCard({
           className={`border-transparent rounded-full px-2 py-0 text-xs h-4 ${
             c.status === "in_progress"
               ? "bg-emerald-100 text-emerald-700"
+              : c.status === "opted_out"
+              ? "bg-slate-200 text-slate-600"
               : "bg-slate-100 text-slate-500"
           }`}
         >
-          {c.status === "in_progress" ? "Active" : "Completed"}
+          {c.status === "in_progress" ? "Active" : c.status === "opted_out" ? "Opted out" : "Completed"}
         </Badge>
         {c.tier && (
           <Badge
@@ -458,10 +470,12 @@ function ThreadPanel({ detail }: { detail: ConversationDetail }) {
             className={`border-transparent rounded-full px-2 py-0 text-xs ${
               c.status === "in_progress"
                 ? "bg-emerald-100 text-emerald-700"
+                : c.status === "opted_out"
+                ? "bg-slate-200 text-slate-600"
                 : "bg-slate-100 text-slate-500"
             }`}
           >
-            {c.status === "in_progress" ? "Active" : "Completed"}
+            {c.status === "in_progress" ? "Active" : c.status === "opted_out" ? "Opted out" : "Completed"}
           </Badge>
           {c.tier && (
             <Badge
@@ -577,6 +591,19 @@ function DetailsPanel({ detail }: { detail: ConversationDetail }) {
             {c.disqualifyReason && (
               <p className="text-xs text-slate-500 mt-1.5">{c.disqualifyReason}</p>
             )}
+          </div>
+        )}
+
+        {/* Opted-out notice */}
+        {c.status === "opted_out" && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <div className="flex items-center gap-1.5 text-slate-600 mb-1">
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span className="text-xs font-semibold">Caller Unsubscribed</span>
+            </div>
+            <p className="text-xs text-slate-500">
+              This caller unsubscribed via SMS. The AI will not reply unless they text START.
+            </p>
           </div>
         )}
 

@@ -1,0 +1,59 @@
+PHASE 2A — LEGACY RETIREMENT + DEAD CODE + INBOX OPTED-OUT FIX (PLAN ONLY)
+
+PRECONDITIONS (verify and report): Phases 1A and 1C frozen (committed);
+Phase 1B code committed with Stripe E2E deferred by recorded waiver
+(SESSION_HANDOFF.md). Report current SHA. If uncommitted 1B/1C changes
+exist, STOP and report.
+
+GOAL — plan exactly three workstreams:
+
+1. LEGACY ROUTE RETIREMENT (artifacts/web-agency):
+   - In src/App.tsx replace the five receptionist routes with a redirect
+     component using window.location.replace (full page load — these
+     targets live in a DIFFERENT SPA; wouter navigate() cannot reach them):
+       /app/login → /ai-receptionist/dashboard/login
+       /app, /app/agent-config, /app/settings, /app/conversations/:id
+         → /ai-receptionist/dashboard/
+   - Delete src/pages/receptionist/{ReceptionistLogin,
+     ReceptionistConversations, ReceptionistAgentConfig,
+     ReceptionistSettings, ReceptionistAppShell}.tsx — but FIRST grep the
+     whole repo for imports/references to each; if any file outside this
+     deletion set references them, STOP and report instead of deleting.
+   - Do NOT touch LandingReceptionist.tsx, LandingReceptionistSignup.tsx,
+     ReceptionistNav.tsx (marketing) — but verify their links target only
+     /ai-receptionist/signup and the new dashboard, and report.
+
+2. DEAD CODE (artifacts/helpdesk):
+   - Delete src/pages/Agents.tsx, src/pages/NewTicket.tsx,
+     src/components/layout/CallDialer.tsx after re-confirming zero imports.
+   - Report whether AppLayout.tsx's disabled phone icon references
+     CallDialer; if yes remove the icon, if no leave it and note for 2B.
+
+3. INBOX OPTED_OUT FIX (artifacts/helpdesk/src/pages/Inbox.tsx ONLY):
+   - status union += "opted_out"
+   - "Opted out" badge (distinct muted style) in ConversationCard +
+     ThreadPanel; DetailsPanel note: "This caller unsubscribed via SMS.
+     The AI will not reply unless they text START."
+   - optedOutCount + "Opted out" category filter; All = Active + Completed
+     + Opted out.
+
+HARD CONSTRAINTS
+- ZERO backend changes (nothing under artifacts/api-server), no schema,
+  no dependencies, no other frontend files beyond those named (App.tsx,
+  Inbox.tsx, AppLayout.tsx-conditional, deletions) + the two docs
+  (SESSION_HANDOFF.md, CURRENT_STATE.md).
+- routes/helpdesk.ts and helpdesk_* tables are OUT OF SCOPE (data decision
+  pending — do not delete, do not modify).
+
+YOUR PLAN MUST INCLUDE
+- The redirect component code and exact App.tsx diff
+- Grep evidence plan for every deletion
+- Exact Inbox.tsx change list (interfaces, badges, counts, filter)
+- Test plan mapped to acceptance criteria (a)–(g) of the PRD, including:
+  browser click-through of all five legacy URLs, signup E2E (throwaway,
+  deleted after), an opted_out conversation render check, typecheck AND
+  full build of BOTH SPAs, and regression spot-checks for 1A (STOP),
+  1C (rate-limit 429), 1B (receptionistBilling.ts diff = 0)
+- Risk list + single-commit rollback plan
+
+Return the plan for approval. Do not write any code until approved.
