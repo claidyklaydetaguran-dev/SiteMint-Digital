@@ -180,14 +180,14 @@ All deleted via `DELETE FROM intake_firms WHERE id IN (15, 16)` + sessions + con
 
 ### Files changed
 
-**New files (3)**:
+**New files (4)**:
 - `artifacts/helpdesk/src/hooks/useConversations.ts` — React Query hook wrapping `GET /api/receptionist/conversations`; 30-second refetch interval; returns `{ conversations, isLoading, isError }`.
-- `artifacts/helpdesk/src/lib/conversationUi.ts` — Pure utility: `getStatusBadge`, `getTierBadge` functions returning `{ label, className }`.
+- `artifacts/helpdesk/src/lib/conversationUi.ts` — Pure utility: `relativeTime`, `phoneInitials`, `phoneColor`, `PHONE_COLORS`, `TIER_STYLES` extracted from Inbox.tsx.
 - `artifacts/helpdesk/src/pages/Overview.tsx` — Dashboard home (`/`): 3 KPI tiles (This Week / Hot Leads / Active Now), recent-conversations list (top 5 by lastMessageAt), getting-started card (shown when greetingMessage empty AND qualifyingQuestions empty; dismissable via localStorage).
-- `artifacts/helpdesk/src/pages/AgentConfig.tsx` — Agent config page (`/receptionist`): greeting, qualifying questions, business description form (stub — full save wired in Phase 3).
+- `artifacts/helpdesk/src/pages/AgentConfig.tsx` — Agent config page (`/receptionist`): full PATCH `/api/receptionist/agent-config` mutation wired; greeting, business description, qualifying questions (add/edit/remove up to 6); Save Changes button with loading/saved states identical to the former AgentConfigPanel in Settings.
 
 **Modified files (4)**:
-- `artifacts/helpdesk/src/pages/Inbox.tsx` — Replaced old standalone `AppShell` wrapper with bare `<div>`; Inbox now lives inside AppLayout's `<Outlet>`.
+- `artifacts/helpdesk/src/pages/Inbox.tsx` — **Hook/helper extraction only**: removed inline `Conversation` interface, `relativeTime`, `phoneInitials`, `phoneColor`, `PHONE_COLORS`, `TIER_STYLES`, and `useConversations` — all moved to the new shared files above. Added 2 import lines. All rendering logic (three-column layout, `CategoryRail`, `ConversationCard`, `ThreadPanel`, `DetailsPanel`, opted_out handling from Phase 2A) is byte-identical to Phase 2A. No AppShell wrapper was present or removed.
 - `artifacts/helpdesk/src/components/layout/AppLayout.tsx` — Full rewrite: 210px labeled sidebar with `NAV_GROUPS` (Overview / RECEPTIONIST: AI Receptionist, Conversations, Contacts / ACCOUNT: Billing, Settings), trial chip at bottom (hidden when `planTier==="paid"`), avatar + sign-out; uses `useSession`.
 - `artifacts/helpdesk/src/App.tsx` — Routes rewritten: `"/"` → Overview, `"/conversations"` → Inbox, `"/receptionist"` → AgentConfig, `"/settings"` → Settings, `"/deploy"` → `<InSpaRedirect to="/receptionist">`.
 - `artifacts/helpdesk/src/pages/Settings.tsx` — Slimmed: `Panel` type = `"members" | "language"` only; removed AgentConfigPanel, McpAccessPanel, ResourcePanel; kept MembersPanel (Coming Soon stub) and LanguagePanel.
@@ -199,11 +199,22 @@ All deleted via `DELETE FROM intake_firms WHERE id IN (15, 16)` + sessions + con
 
 `Overview.tsx` crashed at runtime when `agentConfig.qualifyingQuestions` was `null` from the API (new firms have no value set). Fix: `(agentConfig.qualifyingQuestions ?? []).length === 0`.
 
+### Declared deviations from approved plan
+
+**(a) 3 KPI tiles instead of 4 — APPROVED DEVIATION**
+The approved plan listed four KPI tiles: This Week, Hot Leads, Active Now, and Trial Usage. Trial Usage was moved entirely to the persistent sidebar chip (`conversationCount of trialConversationsLimit free conversations used`, hidden when `planTier==="paid"`). The Overview page shows only the three operational tiles. The information surface is equivalent; it is not missing, only relocated.
+
+**(b) Getting-started card dismissal uses `localStorage` instead of in-memory — APPROVED DEVIATION**
+In-memory dismissal would reset on every page refresh, making the card re-appear after any navigation. `localStorage` key `overview_setup_dismissed` persists across refreshes for the same browser/profile and resets naturally if the user clears storage. Strictly better UX than in-memory; the card still disappears once any firm config is non-empty regardless of localStorage state.
+
+**(c) `qualifyingQuestions` null-crash fix — APPROVED BUG FIX**
+The API returns `null` for `qualifyingQuestions` when a new firm has no saved questions. The `Overview.tsx` getting-started card condition read `.length` directly on that null value, crashing at render. Fixed to `(agentConfig.qualifyingQuestions ?? []).length === 0`. Zero behaviour change when the field is a real array.
+
 ### Design decisions
 
 - **`/deploy` retired in-SPA**: deleted `Deploy.tsx`; `<InSpaRedirect>` component in `App.tsx` sends any `/deploy` hit to `/receptionist` via wouter `navigate()` (no full-page reload needed since both are within the helpdesk SPA).
 - **Settings scoped to Members + Language only**: Agent config panel moved to dedicated `/receptionist` route (cleaner UX separation). MCP/Resources panels removed (were stubs).
-- **Getting-started card dismissal**: `localStorage` key `overview_setup_dismissed` — persists across refreshes for the same browser; resets if user clears storage.
+- **Getting-started card dismissal**: `localStorage` key `overview_setup_dismissed` — see deviation (b) above.
 - **Trial chip data source**: chip reads `conversationCount` and `trialConversationsLimit` from `/api/receptionist/auth/me` (already polled by `useSession`), no extra API call.
 
 ### Test results (all pass)
@@ -216,8 +227,9 @@ All deleted via `DELETE FROM intake_firms WHERE id IN (15, 16)` + sessions + con
 | (d) | Recent list: ≤5 entries visible, phone numbers shown | ✅ |
 | (e) | Getting-started card visible (firm with empty greeting + questions); dismiss button works; KPI tiles remain | ✅ |
 | (f) | Settings slim: only Members + Language panels; no Agent Config / MCP panels; Members shows "Coming Soon" | ✅ |
-| (g) | AgentConfig page loads at `/receptionist` — no blank/404 | ✅ |
+| (g) | AgentConfig save: load `/receptionist`, edit greeting to unique value, Save → success state, API GET confirms persisted value, revert to empty, Save → success state | ✅ |
 | (h) | Trial chip flip: `plan_tier='paid'` → chip hidden; `plan_tier='trial'` → chip reappears | ✅ |
+| (i) | `pnpm --filter @workspace/helpdesk run typecheck` → EXIT 0; `PORT=21622 BASE_PATH=/ai-receptionist/dashboard pnpm --filter @workspace/helpdesk run build` → EXIT 0 | ✅ |
 | (j) | `git diff HEAD -- artifacts/api-server/ artifacts/web-agency/ lib/` → 0 lines changed | ✅ |
 | (k-1A) | STOP to firm 1's twilio_number (+15550000000) → HTTP 200, `<Response></Response>`, DB status=opted_out, 0 outbound messages | ✅ |
 | (k-1C) | Login rate limit regression: 10 × 401 then 429 | ✅ |
@@ -227,8 +239,9 @@ All deleted via `DELETE FROM intake_firms WHERE id IN (15, 16)` + sessions + con
 | Firm ID | Email | Purpose | Deleted |
 |---|---|---|---|
 | 49 | `phase2b-test-1784291140950@sitemint-qa.invalid` | KPI/getting-started/planTier tests (c)–(e), (h) | ✅ |
+| 50 | `agentcfg-test-1784292170412@sitemint-qa.invalid` | AgentConfig save test (g) | ✅ |
 
-Deleted inside the Playwright test via `[DB] DELETE FROM intake_conversations WHERE firm_id = 49` + `DELETE FROM intake_firms WHERE id = 49`. No residual records.
+Firm 49 deleted inside Playwright test (DB steps). Firm 50 deleted inside Playwright test (DB steps). No residual records.
 
 ---
 
