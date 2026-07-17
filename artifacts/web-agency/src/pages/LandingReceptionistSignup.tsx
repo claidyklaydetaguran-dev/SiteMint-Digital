@@ -99,7 +99,7 @@ export default function LandingReceptionistSignup() {
         }),
       }).catch(() => {});
 
-      navigate("/app");
+      window.location.href = "/ai-receptionist/dashboard/";
     } catch {
       setError("Network error — please try again.");
     } finally {
@@ -250,7 +250,7 @@ export default function LandingReceptionistSignup() {
 
               <p className="text-[11px] text-muted-foreground text-center">
                 Already have an account?{" "}
-                <Link href="/app/login" className="text-primary hover:underline">Sign in</Link>
+                <Link href="/ai-receptionist/dashboard/login" className="text-primary hover:underline">Sign in</Link>
               </p>
             </form>
           </div>

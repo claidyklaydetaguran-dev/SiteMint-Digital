@@ -1,0 +1,63 @@
+PHASE 1B — BILLING & ENTRY-POINT REPAIR (PLAN ONLY — propose, do not implement)
+
+CONTEXT
+SiteMint AI Receptionist. Phase 1A is complete and frozen. Two confirmed
+defects remain from Phase 0:
+1. artifacts/api-server/src/routes/receptionistBilling.ts sets
+   success_url/cancel_url to ${base}/app/settings — the LEGACY frontend.
+   The new dashboard Billing page (artifacts/helpdesk/src/pages/Billing.tsx)
+   polls for ?upgraded=1 at /ai-receptionist/dashboard/billing.
+2. artifacts/web-agency/src/pages/LandingReceptionistSignup.tsx navigates to
+   "/app" after signup and links "Sign in" to /app/login — the legacy app.
+
+PRECONDITION CHECK (report first)
+- Is STRIPE_RECEPTIONIST_PRICE_ID now SET? Is it a test-mode price
+  (do not print the value; state test vs live if determinable via the Stripe
+  API from the connected credentials, else UNKNOWN)?
+- Is a Stripe webhook endpoint registered for
+  /api/receptionist/billing/webhook on the current domain (verify via
+  Stripe API if possible; else mark UNKNOWN and plan test (d) accordingly)?
+If STRIPE_RECEPTIONIST_PRICE_ID is missing, STOP and report — the phase is
+blocked on an owner ops task.
+
+GOAL — plan exactly these changes (2 files):
+1. receptionistBilling.ts:
+   success_url: `${base}/ai-receptionist/dashboard/billing?upgraded=1`
+   cancel_url:  `${base}/ai-receptionist/dashboard/billing`
+2. LandingReceptionistSignup.tsx:
+   - Post-signup redirect → FULL PAGE navigation to
+     "/ai-receptionist/dashboard/" (window.location.href, NOT wouter
+     navigate() — web-agency and helpdesk are separate SPAs).
+   - "Sign in" link → "/ai-receptionist/dashboard/login".
+3. Doc notes only: update docs/ai-receptionist/CURRENT_STATE.md (billing
+   status once verified) and SESSION_HANDOFF.md (Phase 1B completion).
+
+HARD CONSTRAINTS
+- Do NOT touch: app.ts /api/stripe/webhook block, lib/stripeClient.ts,
+  lib/webhookHandlers.ts, routes/crm.ts, routes/phone.ts, any schema file,
+  any helpdesk frontend file, anything from Phase 1A (intakeAgent.ts,
+  intakeOptOut.ts).
+- No schema changes, no dependency changes, no new env vars.
+- No pricing/product changes in Stripe beyond creating NOTHING — use the
+  existing configured test price.
+
+YOUR PLAN MUST INCLUDE
+- Verbatim before/after diffs for both files
+- The E2E test plan mapped to these acceptance criteria:
+  (a) exact URL strings in code
+  (b) signup → lands authenticated on /ai-receptionist/dashboard/
+  (c) signup page "Sign in" → /ai-receptionist/dashboard/login
+  (d) test-mode checkout (4242 card) → returns to
+      /ai-receptionist/dashboard/billing?upgraded=1 → UI shows paid within
+      ~10s → DB planTier='paid', stripeSubscriptionId set
+  (e) cancelled checkout → returns to /billing, still trial
+  (f) subscription deletion event → firm back to 'trial' (state how you will
+      trigger it: Stripe dashboard cancel or stripe CLI trigger)
+  (g) bogus-signature webhook POST → 400
+  (h) git diff confirms CRM Stripe stack untouched
+  (i) pnpm run typecheck clean
+  (j) 1A regression: STOP still silent; unmatched To still rejected
+- Which throwaway firm/account will be used for (b) and (d), and cleanup SQL
+- Risk list + single-commit rollback plan
+
+Return the plan for approval. Do not write any code until approved.

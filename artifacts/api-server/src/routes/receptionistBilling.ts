@@ -13,7 +13,7 @@ const router = Router();
 function getAppBaseUrl(): string {
   const domain = process.env["REPLIT_DOMAINS"]?.split(",")[0];
   if (domain) return `https://${domain}`;
-  return "http://localhost:" + (process.env["PORT"] ?? "5000");
+  return "http://localhost:" + (process.env["PORT"] ?? "8080");
 }
 
 // ── POST /api/receptionist/billing/create-checkout-session ────────────────────
@@ -69,8 +69,8 @@ router.post(
         customer:   stripeCustomerId,
         mode:       "subscription",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${base}/app/settings?upgraded=1`,
-        cancel_url:  `${base}/app/settings`,
+        success_url: `${base}/ai-receptionist/dashboard/billing?upgraded=1`,
+        cancel_url:  `${base}/ai-receptionist/dashboard/billing`,
       });
 
       res.json({ url: session.url });

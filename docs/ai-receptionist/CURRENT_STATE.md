@@ -1,6 +1,6 @@
 # AI Receptionist — Current State
 
-**As of**: 2026-07-17 | **Git SHA**: `6c4ff48e11bb746a704dbdfc793d281dec3f4c55`
+**As of**: 2026-07-17 | **Phase 1B PARTIAL** | **Git SHA**: `404bd4e4a34fbb21c19366179b89a6d16281c3aa` + Phase 1B changes
 
 ## What Works
 
@@ -8,17 +8,15 @@
 - **Inbox**: Conversation list with `isOverCap` computation (computed at read time, not stored). Conversation detail with full message thread.
 - **Agent config**: GET/PATCH for greeting message, business description, qualifying questions — persists to `intake_firms` row.
 - **SMS intake pipeline**: Twilio webhook → LLM extraction → case scoring → Resend email notification. Trial cap enforcement suppresses AI replies beyond `trial_conversations_limit`.
-- **Stripe webhook handler**: Signature verification functional (`STRIPE_WEBHOOK_SECRET` is SET); upgrades `plan_tier` to `paid` on `checkout.session.completed`.
+- **Stripe webhook handler**: Signature verification functional (`STRIPE_WEBHOOK_SECRET` is SET in process environment); upgrades `plan_tier` to `paid` on `checkout.session.completed`.
+- **SMS opt-out / keyword handling** (Phase 1A): STOP → `opted_out` conversation, empty TwiML reply; START → re-opt-in; HELP → sent only when not opted out; rate guard (30 msg / 60 min).
+- **Billing redirect URLs** (Phase 1B): `success_url` → `/ai-receptionist/dashboard/billing?upgraded=1`; `cancel_url` → `/ai-receptionist/dashboard/billing`.
+- **Signup entry-point** (Phase 1B): Post-signup navigates to `/ai-receptionist/dashboard/` via `window.location.href` (full-page cross-SPA navigation); "Sign in" link → `/ai-receptionist/dashboard/login`.
 
-## What Is Broken
+## What Is Broken / Incomplete
 
-- **Billing**: Broken on two independent counts:
-  1. `STRIPE_RECEPTIONIST_PRICE_ID` not configured — route returns `500 "Billing is not configured yet"` immediately; checkout cannot be initiated at all.
-  2. `success_url` and `cancel_url` are hardcoded to `/app/settings` (legacy web-agency frontend) — even if the price ID were set, a successful Stripe checkout would redirect the customer to the wrong product.
-- **Signup flow**: `LandingReceptionistSignup.tsx` navigates to `/app` after account creation — new users land on the legacy frontend instead of `/ai-receptionist/dashboard`.
-- **Signup "Sign in" link**: Points to `/app/login` (legacy) instead of `/ai-receptionist/dashboard/login`.
-- **STOP/opt-out**: No application-level detection. Twilio handles carrier-level opt-out, but the conversation is never marked `completed` in the DB and no acknowledgment is sent.
-- **Firm-resolution fallback**: If an inbound SMS arrives on an unknown Twilio number, the code silently assigns it to the first firm in the DB by insertion order (`SELECT … LIMIT 1`) — a data corruption risk.
+- **Billing checkout cannot be initiated**: `STRIPE_RECEPTIONIST_PRICE_ID` not configured — route returns `500 "Billing is not configured yet"`. Redirect URLs are now correct; the route itself will work once the price ID and Stripe connection are set. Tests (d)–(f) deferred.
+- **Stripe integration not connected**: 0 Stripe connector connections; `getUncachableStripeClient()` will throw on any checkout attempt. Owner must connect the Stripe Replit integration or set `STRIPE_SECRET_KEY`.
 
 ## Stub / Coming Soon Pages
 
@@ -37,6 +35,8 @@ Deletion deferred to Phase 2.
 
 | Variable | Status | Impact |
 |---|---|---|
-| `STRIPE_RECEPTIONIST_PRICE_ID` | MISSING | Billing checkout 500s |
+| `STRIPE_RECEPTIONIST_PRICE_ID` | **MISSING** | Billing checkout 500s; tests (d)–(f) blocked |
+| `STRIPE_SECRET_KEY` / Stripe connector | **NOT CONNECTED** | `getUncachableStripeClient()` throws on checkout |
+| `STRIPE_WEBHOOK_SECRET` | SET (process env) | Webhook signature verification live |
 | `RESEND_FROM_EMAIL` | MISSING | Notification email uses hardcoded fallback from-address |
 | `ADMIN_PASSWORD` | MISSING | Admin routes use hardcoded default `"sitemint2024"` |

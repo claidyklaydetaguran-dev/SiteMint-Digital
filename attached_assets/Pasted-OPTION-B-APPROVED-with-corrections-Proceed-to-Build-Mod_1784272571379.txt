@@ -1,0 +1,36 @@
+OPTION B APPROVED — with corrections. Proceed to Build Mode as follows:
+
+CORRECTIONS TO YOUR ASSESSMENT
+1. Tests (b) and (c) do NOT require Stripe — they are signup-redirect tests
+   (account creation + navigation + cookie session). Run them in this build.
+   Only (d), (e), (f) are deferred pending Stripe credentials.
+2. Discrepancy: the Phase 0 audit reported STRIPE_WEBHOOK_SECRET as SET; you
+   now report it NOT SET with zero Stripe connections. Investigate and report
+   which was true: did the environment change, or did Phase 0 misreport?
+   (Check both account secrets and app/deployment secrets scopes.)
+3. Terminology: test-mode price IDs are "price_..." (no "price_test_"
+   prefix); mode is determined by the API key.
+
+BUILD SCOPE (exactly 2 code files + docs)
+1. receptionistBilling.ts:
+   - success_url: `${base}/ai-receptionist/dashboard/billing?upgraded=1`
+   - cancel_url:  `${base}/ai-receptionist/dashboard/billing`
+   - getAppBaseUrl() localhost fallback port: "5000" → "8080" (approved)
+2. LandingReceptionistSignup.tsx:
+   - Post-signup: FULL PAGE navigation via window.location.href =
+     "/ai-receptionist/dashboard/" (NOT wouter navigate — separate SPAs)
+   - "Sign in" link href → "/ai-receptionist/dashboard/login"
+3. docs/ai-receptionist/SESSION_HANDOFF.md + CURRENT_STATE.md: record Phase 1B
+   as PARTIAL — code complete, tests (a),(b),(c),(g),(h),(i),(j) run;
+   (d),(e),(f) DEFERRED pending Stripe ops (list the four owner tasks).
+
+RUN NOW: tests (a), (b), (c), (g), (h), (i), (j).
+DEFER: (d), (e), (f) — do not attempt without credentials.
+
+CONSTRAINTS UNCHANGED: no schema changes, no dependency changes, do not touch
+the CRM Stripe stack (app.ts webhook block, stripeClient.ts,
+webhookHandlers.ts, crm.ts), phone.ts, any Phase 1A file, any helpdesk file.
+
+COMPLETION REPORT: verbatim diffs, test outputs for the 7 runnable tests, the
+STRIPE_WEBHOOK_SECRET discrepancy finding, and confirmation that Phase 1B
+stays OPEN (not frozen) until (d),(e),(f) pass.
