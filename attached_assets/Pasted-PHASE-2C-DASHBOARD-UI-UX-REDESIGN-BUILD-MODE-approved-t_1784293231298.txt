@@ -1,0 +1,49 @@
+PHASE 2C — DASHBOARD UI/UX REDESIGN (BUILD MODE — approved to implement directly)
+
+PROCESS NOTE (approved owner decision): this phase intentionally skips Plan
+Mode. It is a large frontend-only redesign of artifacts/helpdesk with
+single-commit rollback. Work in checkpoints: commit after each major page so
+progress is never lost. If you hit ANYTHING requiring a backend, schema,
+dependency, or web-agency change — STOP and report instead of doing it.
+
+GOAL
+Redesign the entire AI Receptionist dashboard to a light, premium business-
+SaaS standard AND ship the approved frontend-only quick wins. Follow the
+design spec below precisely; where the spec is silent, choose the simplest
+premium option and declare the choice in your report header.
+
+[PASTE SECTIONS 1–5 OF THIS DOCUMENT HERE — the design system, per-page
+spec, accessibility bar, hard constraints, and completion gates are the
+authoritative requirements.]
+
+BUILD ORDER (commit after each)
+1. Design tokens in index.css + shared UI polish (badges, cards, buttons,
+   skeleton components, empty-state component, focus states)
+2. AppLayout (sidebar polish, trial chip states, mobile drawer, top bar
+   pattern)
+3. Overview redesign (incl. clickable KPI tiles + getting-started checklist)
+4. Conversations redesign + tier filter chips + "why this tier" +
+   date separators + per-filter empty states + mobile stacked view
+5. AgentConfig redesign + src/lib/agentTemplates.ts (6 templates) +
+   template apply flow + phone-preview card + sticky save bar +
+   character counters
+6. Login, Billing, Contacts, Settings restyles
+7. Accessibility + responsive pass across all pages (keyboard, aria-labels,
+   contrast, 375px)
+8. Full completion-gate run (Section 5) + docs update
+
+TESTING NOTES
+- Use a throwaway firm for any write-path test (template apply → save →
+  revert; delete the firm after). Never mutate firm id=1 config permanently.
+- Tier-chip counts must be verified against SQL ground truth for the test
+  firm, same method as Phase 2B test (c).
+- 1A regression: POST /api/intake/sms-webhook with Body=STOP and To set to a
+  REAL seeded firm's twilioNumber; assert 200 + <Response></Response> + DB
+  status 'opted_out' + zero outbound rows. (The unmatched-number path
+  returns the same body — the DB assertion is what proves the right path.)
+
+COMPLETION REPORT
+Deviations declared up top (if any); per-page desktop + 375px screenshots;
+four-state evidence; quick-win test outputs with SQL; typecheck + build
+output; git-diff isolation proof; regression outputs; files-changed table;
+docs updated; single rollback commit range.
