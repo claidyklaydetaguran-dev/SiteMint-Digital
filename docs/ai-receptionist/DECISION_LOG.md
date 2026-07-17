@@ -34,6 +34,19 @@ exact decision dates and discussion context are not available.
 - Phase sequence approved: **0.5 docs → 1A tenant/SMS safety → 1B billing/entry-points → 1C auth hardening → 2 legacy retirement + nav shell**.
 - All five locked files (`routes/phone.ts`, `lib/discEngine.ts`, `lib/leadScore.ts`, `lib/communicationIntelligence.ts`, `lib/workflowEngine.ts`) confirmed byte-for-byte unchanged across the full session range.
 
+## 2026-07-17 — Phase 1B-E2E waiver (owner decision)
+
+- Stripe checkout / cancel / downgrade E2E tests (d)/(e)/(f) deferred because no Stripe account exists yet.
+- Phase 1B code is complete and verified; tests (a)–(c), (g)–(j) passed.
+- **These tests MUST run before onboarding any paying customer.**
+- Phase 1C proceeds on this basis; Phase 1B remains OPEN until (d)/(e)/(f) pass.
+
+## 2026-07-17 — Phase 1C: login IP limiter tracks failed attempts only
+
+- **Decision**: `loginIpLimiter.record()` is called only on failed login attempts (unknown account or wrong password), never on success.
+- **Rationale**: The PRD specifies "30 attempts/IP/15min" but recording successful logins would penalise shared-IP offices (e.g. a law firm on a corporate NAT) — 30 normal logins from one building would lock everyone out. Tracking only failures achieves the anti-credential-stuffing goal without that side effect.
+- **Deviation from PRD wording**: intentional and owner-approved; recorded here as the authoritative reference.
+
 ## 2026-07-17 — Process model established
 
 - **Planning and PRDs**: Claude (external) in Plan Mode — inspection, audit, PRD authoring, reconciliation between phases.

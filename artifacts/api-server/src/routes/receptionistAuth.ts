@@ -11,6 +11,13 @@ import {
   COOKIE_NAME,
   COOKIE_OPTIONS,
 } from "../lib/receptionistAuth.js";
+import {
+  loginEmailLimiter,
+  loginIpLimiter,
+  signupIpLimiter,
+  getClientIp,
+  maskEmail,
+} from "../lib/authRateLimit.js";
 
 const router = Router();
 
@@ -26,6 +33,16 @@ router.post("/receptionist/auth/signup", async (req: Request, res: Response) => 
       industry?: string;
       password?: string;
     };
+
+    // ── Signup IP rate limit (5/hour) — check before recording ────────────────
+    // 5 signups allowed; 6th attempt from the same IP within the window → 429.
+    const signupIp = getClientIp(req);
+    if (signupIpLimiter.isOverLimit(signupIp)) {
+      req.log.warn({ ip: signupIp }, "[receptionist] signup rate limit exceeded");
+      res.status(429).json({ error: "Too many attempts. Try again later." });
+      return;
+    }
+    signupIpLimiter.record(signupIp);
 
     if (!fullName?.trim() || !email?.trim() || !password?.trim()) {
       res.status(400).json({ error: "Full name, email, and password are required." });
@@ -109,21 +126,55 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
       return;
     }
 
+    const emailNorm = email.toLowerCase().trim();
+    const ip        = getClientIp(req);
+
+    // ── Pre-check both limiters — no recording, no DB query if limited ────────
+    // IP limiter tracks only FAILED attempts (successful logins never record),
+    // which avoids penalising shared-IP offices for normal login activity.
+    // Semantics: 10 failures all return 401; the 11th ATTEMPT returns 429.
+    if (loginIpLimiter.isOverLimit(ip) || loginEmailLimiter.isOverLimit(emailNorm)) {
+      req.log.warn(
+        { ip, masked: maskEmail(emailNorm) },
+        "[receptionist] login rate limit exceeded",
+      );
+      res.status(429).json({ error: "Too many attempts. Try again later." });
+      return;
+    }
+
     const [firm] = await db
       .select()
       .from(intakeFirms)
-      .where(eq(intakeFirms.email, email.toLowerCase().trim()));
+      .where(eq(intakeFirms.email, emailNorm));
 
+    // ── Failure: unknown account ───────────────────────────────────────────────
     if (!firm || !firm.passwordHash) {
+      loginIpLimiter.record(ip);
+      loginEmailLimiter.record(emailNorm);
+      req.log.warn(
+        { ip, masked: maskEmail(emailNorm), failCount: loginEmailLimiter.count(emailNorm) },
+        "[receptionist] login failed — unknown account",
+      );
       res.status(401).json({ error: "Invalid email or password." });
       return;
     }
 
     const valid = await bcrypt.compare(password, firm.passwordHash);
+
+    // ── Failure: wrong password ────────────────────────────────────────────────
     if (!valid) {
+      loginIpLimiter.record(ip);
+      loginEmailLimiter.record(emailNorm);
+      req.log.warn(
+        { ip, masked: maskEmail(emailNorm), failCount: loginEmailLimiter.count(emailNorm) },
+        "[receptionist] login failed — wrong password",
+      );
       res.status(401).json({ error: "Invalid email or password." });
       return;
     }
+
+    // ── Success: reset email counter, issue new session ────────────────────────
+    loginEmailLimiter.reset(emailNorm);
 
     const token = await createSession(firm.id, firm.email!);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);

@@ -1,0 +1,57 @@
+PHASE 1C — AUTHENTICATION HARDENING (PLAN ONLY — propose, do not implement)
+
+PRECONDITION WAIVER (owner decision, 2026-07-17): Phase 1B remains OPEN —
+its code is complete and verified, but Stripe E2E tests (d)/(e)/(f) are
+DEFERRED because no Stripe account exists yet. Accept this waiver and proceed
+with 1C planning. As part of this session, update
+docs/ai-receptionist/SESSION_HANDOFF.md and DECISION_LOG.md to record:
+"Phase 1B-E2E (Stripe checkout/cancel/downgrade tests) deferred pending
+Stripe account setup — MUST run before onboarding any paying customer."
+
+CONTEXT
+SiteMint AI Receptionist. Auth routes live in
+artifacts/api-server/src/routes/receptionistAuth.ts with session logic in
+lib/receptionistAuth.ts. Confirmed gaps: no rate limiting on login/signup,
+signup 409 enables email enumeration, no failed-auth logging.
+
+GOAL — plan exactly these changes:
+1. NEW lib artifacts/api-server/src/lib/authRateLimit.ts — in-memory
+   sliding-window limiter (Map + periodic purge), keyed by client IP and by
+   email. NO new dependencies unless you justify why in-memory is not viable;
+   any dependency requires explicit owner approval.
+2. receptionistAuth.ts — apply limiters:
+   - Login: 10 failed/email/15min AND 30 attempts/IP/15min → 429
+     {"error":"Too many attempts. Try again later."}; success resets the
+     email counter.
+   - Signup: 5/IP/hour → 429 (generic message).
+   - WARN logs on every failure and every 429 with MASKED email
+     (a***@domain.com), client IP, and consecutive-failure count. Never log
+     passwords or full emails.
+3. Client IP derivation: state exactly how you will obtain the real client
+   IP behind Replit's proxy (X-Forwarded-For handling or a single
+   app.set("trust proxy", ...) line in app.ts — if the latter, show the
+   exact line and its side effects on other routes).
+4. SESSION SECURITY CHECKLIST (report only, no changes unless a defect is
+   found — if found, list it for approval, do not fix silently):
+   cookie flags in production; expired-session 401 + row deletion; logout
+   destroys session; new token per login; purgeExpiredSessions behavior.
+5. Doc note: signup 409 enumeration is rate-limited but not eliminated —
+   record as accepted residual risk in SESSION_HANDOFF.md (full fix needs
+   email verification, deferred).
+
+HARD CONSTRAINTS
+- NO schema changes, NO new tables. Failure logging via pino only.
+- Files: authRateLimit.ts (new), receptionistAuth.ts, optionally ONE line in
+  app.ts (trust proxy), SESSION_HANDOFF.md note. Nothing else. Do not touch
+  Phase 1A/1B files, CRM/admin auth, phone.ts, any frontend, any schema.
+- Limits exactly as specified; make windows/limits named constants.
+
+YOUR PLAN MUST INCLUDE
+- Limiter data-structure design and purge strategy (memory bound)
+- Exact insertion points in receptionistAuth.ts
+- Client-IP derivation decision with evidence from app.ts
+- Test plan mapped 1:1 to acceptance criteria (a)–(i) from the PRD, using a
+  throwaway account (delete after; report ids)
+- Risk list + single-commit rollback plan
+
+Return the plan for approval. Do not write any code until approved.
