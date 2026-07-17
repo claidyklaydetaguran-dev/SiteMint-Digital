@@ -22,8 +22,23 @@
 
 ## Stub / Coming Soon Pages
 
-- **Contacts**: Full "Coming Soon" overlay — no data shown.
-- **Deploy**: Channel status display — SMS shown as Active, Email and Web Chat shown as Coming Soon.
+- **Contacts** (`/contacts`): page header + honest empty state (icon card, copy, CTA to
+  `/conversations`). `/contacts/:id` is a bare stub. No data shown.
+- **Settings** (`/settings`): Members panel is "Coming Soon"; Language panel is
+  non-functional decorative UI.
+- **Deploy**: page deleted in Phase 2B — `/deploy` is an in-SPA redirect to `/receptionist`.
+- **Inbox reply composer**: explicit "coming soon" notice; conversations are read-only
+  from the dashboard.
+- **AgentConfig "Test" tab**: disabled placeholder.
+
+## Voice Platform (approved 2026-07-17)
+
+Milestone 1 (foundation + first working assistant) is approved and in progress on branch
+`claude/audit-receptionist-repo-268pla`: dark/light design system + new shell, versioned
+migrations for `voice_assistants`/`provider_webhook_events`/`voice_issues`, the
+`VoiceProvider` abstraction with Vapi + fake adapters, assistant CRUD/templates/publish,
+and browser test calls — behind `VOICE_PLATFORM_ENABLED` (off in production). See
+DECISION_LOG.md (2026-07-17 entries) and VOICE_PLATFORM.md.
 
 ## Dead Code — RETIRED (Phase 2A)
 

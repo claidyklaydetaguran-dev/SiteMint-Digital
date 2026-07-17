@@ -1,55 +1,49 @@
-# AI Receptionist — Roadmap
+# AI Receptionist / SiteMint Voice Platform — Roadmap
 
-Phases are sequenced; each must be QA-verified and frozen before the next begins.
-One PRD per phase; planning (Claude/Plan Mode) precedes each Build Mode session.
-
----
-
-## Phase 1A — Tenant Isolation + SMS Opt-Out Compliance (NEXT)
-
-- **Remove unsafe firm-resolution fallback**: replace the `SELECT … LIMIT 1` fallback for unmatched Twilio numbers with a hard rejection — log the unknown `To` number as an error and return an empty `<Response>` with no side effects.
-- **Safe rejection of unmatched numbers**: ensure no conversation row is created, no message is stored, and no LLM call is made when the destination number matches no firm.
-- **STOP/opt-out keyword handling**: detect `STOP`, `STOPALL`, `UNSUBSCRIBE`, `CANCEL`, `END`, `QUIT` in the inbound `Body`; mark the corresponding conversation as `completed`; do not send an AI reply (Twilio handles the carrier-level acknowledgment).
-- **Re-opt-in handling**: detect `START`, `YES`, `UNSTOP`; create or reopen the conversation as appropriate.
-- **Per-caller message-rate guard**: prevent a single caller phone number from generating unbounded LLM calls within a short window (e.g., more than N messages per hour).
-- **Cross-firm isolation tests**: verify that a caller on firm A's Twilio number cannot reach firm B's conversation data under any code path.
+> Updated 2026-07-17. Phases 1A–2C of the original receptionist roadmap are COMPLETE
+> and frozen (see SESSION_HANDOFF.md for per-phase scope and test evidence).
+> The roadmap now continues as the approved voice-platform milestone plan
+> (DECISION_LOG.md, 2026-07-17 entries).
 
 ---
 
-## Phase 1B — Billing & Entry-Point Repair
+## Completed phases (frozen)
 
-- **Fix billing redirect URLs**: change `success_url` and `cancel_url` in `receptionistBilling.ts` from `/app/settings` to `/ai-receptionist/dashboard/billing` (or the approved billing return path).
-- **Fix signup redirect**: change `LandingReceptionistSignup.tsx` post-signup `navigate("/app")` to `navigate("/ai-receptionist/dashboard")`.
-- **Fix signup "Sign in" link**: change `/app/login` to `/ai-receptionist/dashboard/login`.
-- **Owner ops prerequisite**: `STRIPE_RECEPTIONIST_PRICE_ID` must be set before this phase is testable end-to-end.
-- **Test-mode E2E**: verify full Stripe test-mode checkout → webhook → `plan_tier = "paid"` → dashboard upgrade indicator flow.
+| Phase | Scope | Status |
+|---|---|---|
+| 1A | Tenant isolation (firm-resolution hard-reject) + STOP/START/HELP + rate guard | ✅ Complete |
+| 1B | Billing/signup redirect repair | ✅ Code complete — Stripe E2E tests (d)–(f) DEFERRED until owner ops (see below) |
+| 1C | Auth hardening (rate limiting, failure logging) | ✅ Complete |
+| 2A | Legacy `/app/*` retirement + dead-code deletion + opted_out inbox fix | ✅ Complete |
+| 2B | Nav shell + Overview page | ✅ Complete |
+| 2C | Dashboard UI/UX redesign + gap fixes | ✅ Complete |
 
----
+## Voice Platform Milestones (approved 2026-07-17)
 
-## Phase 1C — Auth Hardening
+Each milestone ends with QA + freeze + owner approval before the next begins.
+Feature flag `VOICE_PLATFORM_ENABLED` stays OFF in production until owner approval.
 
-- **Rate limiting**: add per-IP rate limits to `POST /api/receptionist/auth/login` and `POST /api/receptionist/auth/signup` to prevent brute-force and enumeration attacks.
-- **Generic error messages**: the `409 email already exists` response on signup currently leaks account existence — replace with a generic error or silent success pattern.
-- **Session review**: audit session TTL (currently 30 days), add explicit session-count-per-firm cap if needed.
-- **Failure logging**: ensure all auth failures are logged with enough context for security review without logging credential values.
-- **Owner ops prerequisite**: `ADMIN_PASSWORD` env var must be set to remove the hardcoded `"sitemint2024"` fallback.
+| Milestone | Scope | Status |
+|---|---|---|
+| **M1 — Foundation + first working assistant** | Checkpoints A–G: docs reconciliation; dark/light design system + collapsible grouped shell + error boundary; versioned migrations for `voice_assistants`/`provider_webhook_events`/`voice_issues`; `VoiceProvider`/`VapiVoiceProvider`/`FakeVoiceProvider`; assistant CRUD + templates + publish + duplicate + guarded delete; browser test call; Vitest + Playwright | **IN PROGRESS** |
+| M2 — Phone numbers + call ingestion | Voice-only number (never the intake SMS number), assignment, end-of-call ingestion → call logs, transcripts, recording proxy | Planned |
+| M3 — Analysis + shared lead scoring + contacts | Call analysis persistence, tier scoring via `intakeScoring` adapter, Resend voice notifications, contacts, trial voice-minute enforcement | Planned |
+| M4 — Tools + knowledge base + SMS unification | Tool CRUD, KB + docs, SMS agent surfaced as messaging assistant (pipeline untouched), inbox reply composer | Planned |
+| M5 — Analytics + issues + integrations pages | | Planned |
+| M6 — Billing expansion + team + settings | Voice plans, usage, `firm_members`; Stripe Phase 1B deferred tests closed | Planned |
+| M7 — Hardening + launch | Full Playwright suite, webhook abuse pass, flag removed in production | Planned |
 
----
+## Ops Tasks (Owner — Not Code Changes)
 
-## Phase 2 — Legacy /app/* Retirement + Dead-Code Deletion + New Nav Shell
-
-- **Retire legacy receptionist routes** in `web-agency/src/App.tsx`: remove `/app`, `/app/login`, `/app/agent-config`, `/app/settings`, `/app/conversations/:id` after confirming all entry points have been migrated to the new dashboard.
-- **Delete legacy receptionist components**: `ReceptionistLogin.tsx`, `ReceptionistConversations.tsx`, `ReceptionistAgentConfig.tsx`, `ReceptionistSettings.tsx`, `ReceptionistAppShell.tsx` from web-agency.
-- **Delete dead helpdesk files**: `Agents.tsx`, `NewTicket.tsx`, `CallDialer.tsx`.
-- **New nav shell**: implement persistent navigation (sidebar or top bar) for the helpdesk dashboard with correct active-state indicators.
-
----
-
-## Ops Tasks (Owner — Anytime, Not Code Changes)
-
-- Set `STRIPE_RECEPTIONIST_PRICE_ID` secret (required before Phase 1B E2E)
-- Set `ADMIN_PASSWORD` secret (required before Phase 1C)
+- Set `STRIPE_RECEPTIONIST_PRICE_ID` secret + connect Stripe (required before Phase 1B
+  E2E tests (d)–(f) — these MUST run before onboarding any paying customer)
+- Set `ADMIN_PASSWORD` secret (removes hardcoded `"sitemint2024"` fallback)
 - Set `RESEND_FROM_EMAIL` to a Resend-verified sending address
-- Fix `replit.md` API server port documentation: 5000 → 8080 *(done in Phase 0.5)*
-- Twilio console: enable Advanced Opt-Out on the intake phone number (ensures STOP/HELP/CANCEL are handled at the carrier level even before Phase 1A ships)
-- Twilio console: confirm A2P 10DLC registration status for the intake number
+- Set `INTAKE_TWILIO_ACCOUNT_SID` in production (required for outbound intake SMS —
+  see corrected `.env.example`)
+- Vapi (before M1 live testing): create account; set `VAPI_API_KEY`, `VAPI_PUBLIC_KEY`,
+  `VAPI_WEBHOOK_SECRET`; create the Custom Credential (HMAC preferred) and register the
+  server URL `https://<domain>/api/voice/webhooks/vapi`
+- Twilio console: Advanced Opt-Out enabled + A2P 10DLC registration confirmed on the
+  intake number
+- **Never** import the intake SMS number into Vapi or enable Vapi SMS management on it

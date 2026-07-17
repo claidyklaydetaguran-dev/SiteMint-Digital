@@ -47,6 +47,68 @@ exact decision dates and discussion context are not available.
 - **Rationale**: The PRD specifies "30 attempts/IP/15min" but recording successful logins would penalise shared-IP offices (e.g. a law firm on a corporate NAT) — 30 normal logins from one building would lock everyone out. Tracking only failures achieves the anti-credential-stuffing goal without that side effect.
 - **Deviation from PRD wording**: intentional and owner-approved; recorded here as the authoritative reference.
 
+## 2026-07-17 — Voice platform program approved (Milestone 1: foundation + first working assistant)
+
+- **Decision**: Expand the AI Receptionist into the SiteMint voice + messaging platform
+  (Vapi-inspired product organization). Vapi provides the initial voice runtime behind a
+  strict server-side provider abstraction; SiteMint owns accounts, billing, configuration,
+  contacts, local call records, analytics, and all UI. Voice and SMS coexist; the SMS
+  pipeline is preserved byte-for-byte.
+- **Milestone 1 scope** (approved): Checkpoints A–G — docs reconciliation; dark/light
+  design system + collapsible grouped shell + global error boundary; versioned migrations
+  for `voice_assistants`, `provider_webhook_events`, `voice_issues` only;
+  `VoiceProvider`/`VapiVoiceProvider`/`FakeVoiceProvider` abstraction; assistant CRUD +
+  templates + publish-to-Vapi + duplicate + guarded delete; browser test call via Vapi Web
+  SDK; Vitest + Playwright verification. One commit per checkpoint.
+- **Feature flag**: `VOICE_PLATFORM_ENABLED` — on in development/staging, OFF in
+  production until owner approval. SMS routes are never behind the flag.
+- **Twilio/SMS safety rule (binding)**: the intake SMS number is never imported into Vapi
+  and Vapi SMS management is never enabled on it. Initial voice testing = browser calls
+  only; later phone milestones use a separate voice-only number or a Twilio import with
+  Vapi SMS explicitly disabled.
+
+## 2026-07-17 — ADR-05 adopted, scoped to voice tables
+
+- The migration-transition ADR proposed in DATABASE_STRATEGY.md is **approved for new
+  voice-platform tables only**: versioned Drizzle migrations (baseline snapshot +
+  numbered, reviewed, additive-only migrations with committed rollback SQL), applied to
+  development only until the owner approves production application.
+- `intake_*` tables remain frozen (no column changes without explicit approval);
+  `crm_*` tables continue push mode per the ADR's original scope note.
+- Dead schema files `lib/db/src/schema/conversations.ts` / `messages.ts` are NOT removed
+  in Milestone 1 (legacy cleanup is out of scope); removal stays deferred.
+
+## 2026-07-17 — Helpdesk UI freezes superseded
+
+- The Phase 2A/2B/2C "locked file" lists in SESSION_HANDOFF.md covering
+  `artifacts/helpdesk` **UI** files are superseded by the approved voice-platform
+  redesign. Those files may now be modified as part of Milestone 1 Checkpoint B
+  (retokenization + new shell) with the requirement that existing behavior is preserved
+  and regression-verified.
+- All backend/SMS locks remain absolute: `intakeAgent.ts`, `intakeOptOut.ts`,
+  `intakeTwilio.ts`, `intakeScoring.ts`, `authRateLimit.ts`, `receptionistAuth` (route +
+  lib), `receptionistConversations.ts`, `receptionistAgentConfig.ts`,
+  `receptionistBilling.ts`, `phone.ts`, CRM engines, `schema/intakeAgent.ts`.
+- The DEVELOPMENT_RULES.md default change budget (5 files / 300 lines) is explicitly
+  waived for the approved voice-platform milestones (owner approval 2026-07-17).
+
+## 2026-07-17 — Vapi webhook authentication mechanism selected
+
+- Verified against current Vapi documentation (docs.vapi.ai, 2026-07): server-URL
+  authentication uses **Custom Credentials referenced by `credentialId`** on the
+  assistant/phone/tool `server` config. Supported types: HMAC, Bearer (configurable
+  header), OAuth2. The legacy inline `x-vapi-secret` header survives only as a
+  backward-compat Bearer configuration and is NOT the preferred method.
+- **Selected**: HMAC credential — SHA-256, signature header, timestamp header enabled;
+  server recomputes the HMAC over the raw request body per the credential's configured
+  payload format, compares in constant time, and rejects when the timestamp skew exceeds
+  300 seconds. Fallback if HMAC is unavailable on our Vapi configuration: a Bearer
+  credential with a dedicated header and ≥32-byte random secret, constant-time compare.
+- No `NODE_ENV` development bypass in the verifier (deliberate contrast with
+  `intakeTwilio.ts`). Exact header names/algorithm/payload format are recorded in
+  `docs/ai-receptionist/VOICE_PLATFORM.md` once confirmed against the live credential
+  configuration during Checkpoint D.
+
 ## 2026-07-17 — Process model established
 
 - **Planning and PRDs**: Claude (external) in Plan Mode — inspection, audit, PRD authoring, reconciliation between phases.
