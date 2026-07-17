@@ -250,7 +250,7 @@ export default function LandingReceptionistSignup() {
 
               <p className="text-[11px] text-muted-foreground text-center">
                 Already have an account?{" "}
-                <Link href="/ai-receptionist/dashboard/login" className="text-primary hover:underline">Sign in</Link>
+                <a href="/ai-receptionist/dashboard/login" className="text-primary hover:underline">Sign in</a>
               </p>
             </form>
           </div>
