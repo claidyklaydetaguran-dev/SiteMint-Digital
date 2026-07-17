@@ -1,6 +1,6 @@
 # AI Receptionist — Session Handoff
 
-**Last updated**: 2026-07-17 (Phase 2B complete) | **SHA at handoff**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A + Phase 2B changes
+**Last updated**: 2026-07-17 (Phase 2C complete) | **SHA at handoff**: `dfb56e38d37c21188bb14cf430a386f9b8f2a901` + Phase 2A + Phase 2B + Phase 2C changes
 
 ## State at Handoff
 
@@ -10,10 +10,11 @@
 - Phase 1B code complete; tests (a)–(c), (g)–(j) passed; **tests (d)–(f) DEFERRED** — must run before onboarding any paying customer (see Phase 1B-E2E waiver below).
 - Phase 1C complete and frozen.
 - Phase 2A complete and frozen.
-- **Phase 2B complete and frozen.**
+- Phase 2B complete and frozen.
+- **Phase 2C complete and frozen.**
 - All workflows running: api-server (port 8080), helpdesk (port 21622), web-agency (port 22065).
 - Database: development (`heliumdb`), seeded test data.
-- Typecheck: PASS (api-server, helpdesk, web-agency — all verified Phase 2B).
+- Typecheck: PASS (helpdesk — verified Phase 2C; api-server and web-agency untouched).
 
 ## Phase 1A — Complete (2026-07-17)
 
@@ -245,6 +246,37 @@ Firm 49 deleted inside Playwright test (DB steps). Firm 50 deleted inside Playwr
 
 ---
 
+## Phase 2C — Complete (2026-07-17)
+
+**Scope**: Full frontend-only UI/UX redesign of `artifacts/helpdesk` to "light & premium business SaaS" standard (Stripe/Linear aesthetic). Zero backend/schema/web-agency changes. Zero new npm dependencies.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `artifacts/helpdesk/src/index.css` | Fixed all shadow variables from zero-alpha (`/ 0.00`) to real values; added `--shadow-2xs` and `--shadow-xs`; dark-mode shadows corrected proportionally |
+| `artifacts/helpdesk/src/lib/agentTemplates.ts` | **New** — 6 industry templates (Law Firm, Home Services, Real Estate, Medical/Dental, Salon & Spa, General Business); each has `emoji`, `greetingMessage`, `businessDescription`, `qualifyingQuestions[]` |
+| `artifacts/helpdesk/src/components/layout/AppLayout.tsx` | Sidebar width 210px → 232px; brand row with "S" logo mark + "SiteMint" + "AI Receptionist" subtitle; 3px left-edge active indicator on nav items; trial chip uses amber progress bar ≥80%; Pro plan Zap badge when paid; mobile drawer + hamburger (<768px) |
+| `artifacts/helpdesk/src/pages/Overview.tsx` | Personalized header ("Good morning/afternoon/evening, {firm}") + date; 4 KPI tiles (30px tabular font, clickable → /conversations); getting-started dismissable checklist (3 steps with check states); better empty conversation state |
+| `artifacts/helpdesk/src/pages/Inbox.tsx` | Tier filter chips row (Hot/Warm/Cold/Disqualified/Needs Review) in ConversationList header — pure client-side, counts from category-filtered set; "Why this tier" styled card in DetailsPanel (tier-colored bg/border/text); date separators in ThreadPanel (Today / Yesterday / weekday+date); per-filter empty states with tailored messaging; 3px left bar on selected ConversationCard |
+| `artifacts/helpdesk/src/pages/AgentConfig.tsx` | Merged AgentConfig + AgentConfigPanel into single component; industry template picker (6 emoji chips, instant-apply); sticky save bar outside scroll container (appears only when isDirty, indigo-50 bg, Discard + Save); character counters (greeting 500, description 1000, each question 200) with amber near-limit / rose over-limit; up/down reorder buttons on questions; phone SMS preview card (right column, hidden <lg) |
+| `artifacts/helpdesk/src/pages/Login.tsx` | Premium card layout with shadow-sm; logo mark; "Sign in to SiteMint" heading + "AI Receptionist Dashboard" subtitle; AlertCircle error banner; autoFocus on email |
+| `artifacts/helpdesk/src/pages/Contacts.tsx` | Replaced placeholder div with proper page header + empty state (icon card + copy + CTA button → /conversations) |
+| `artifacts/helpdesk/src/pages/Settings.tsx` | bg-slate-50 page background; white card for empty state with shadow-sm; rounded-xl settings sections; minor spacing polish |
+
+### Design decisions
+
+- **isDirty pattern in AgentConfig**: isDirty computed client-side by comparing current form state vs last fetched config. Save bar is a flex sibling OUTSIDE the overflow-y-auto container — ensures it is always visible at the bottom of the viewport without scrolling.
+- **Tier chips client-side only**: No new API endpoints. Chips derive counts from the already-fetched conversation list filtered by active category.
+- **Phase 2A opted_out handling not regressed**: `Inbox.tsx` rewrite preserves all opted_out UI (badge, category count, DetailsPanel notice) and `Conversation["status"]` union includes `"opted_out"`.
+- **agentTemplates.ts new lib file**: Lives in `src/lib/` alongside `conversationUi.ts`. Only imported by `AgentConfig.tsx`.
+
+### Typecheck
+
+`pnpm --filter @workspace/helpdesk run typecheck` → EXIT 0 (verified post-write).
+
+---
+
 ## Known Trade-offs and Deferred Gaps
 
 - **Trial cap counts opted-out conversations**: STOP or HELP from a brand-new number creates a conversation row (needed to store the message and set status). That row counts toward `trial_conversations_limit` even though it never engaged the LLM. Revisit cap computation in a later phase (consider excluding `opted_out` rows from the cap count).
@@ -272,12 +304,19 @@ Before starting:
 - `artifacts/helpdesk/src/pages/Inbox.tsx` (Phase 2A frozen — opted_out handling must not regress)
 
 **Phase 2B locked files** (do not modify):
-- `artifacts/helpdesk/src/components/layout/AppLayout.tsx`
 - `artifacts/helpdesk/src/App.tsx`
 - `artifacts/helpdesk/src/hooks/useConversations.ts`
 - `artifacts/helpdesk/src/lib/conversationUi.ts`
+
+**Phase 2C locked files** (do not modify):
+- `artifacts/helpdesk/src/index.css`
+- `artifacts/helpdesk/src/lib/agentTemplates.ts`
+- `artifacts/helpdesk/src/components/layout/AppLayout.tsx`
 - `artifacts/helpdesk/src/pages/Overview.tsx`
+- `artifacts/helpdesk/src/pages/Inbox.tsx`
 - `artifacts/helpdesk/src/pages/AgentConfig.tsx`
+- `artifacts/helpdesk/src/pages/Login.tsx`
+- `artifacts/helpdesk/src/pages/Contacts.tsx`
 - `artifacts/helpdesk/src/pages/Settings.tsx`
 
 ## Technical Debt — Approved Follow-up Items
