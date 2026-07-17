@@ -1,0 +1,73 @@
+PHASE 0.5 — DOCUMENTATION ONLY. Create exactly 7 new files. Modify ZERO existing files, except replit.md (one line). No code changes, no schema changes, no dependency changes.
+
+CREATE these files using your Phase 0 proposed contents AS AMENDED below:
+
+1. docs/ai-receptionist/ARCHITECTURE.md — as proposed, plus:
+   - Note that lib/db/src/schema/conversations.ts and messages.ts define tables
+     that DO NOT exist in the database (dead schema code; do not push; removal
+     deferred to the migration-transition ADR).
+   - Note the rule: receptionist phone/SMS features must NEVER touch
+     artifacts/api-server/src/routes/phone.ts (CRM Twilio, locked); the
+     receptionist uses its own intakeTwilio.ts + INTAKE_TWILIO_AUTH_TOKEN.
+
+2. docs/ai-receptionist/CURRENT_STATE.md — as proposed, but record Billing as:
+   "Broken — STRIPE_RECEPTIONIST_PRICE_ID not configured (route 500s) AND
+   success/cancel URLs point to legacy /app/settings (code bug)."
+
+3. docs/ai-receptionist/ROADMAP.md — REPLACE your proposed P0–P3 ordering with
+   this approved sequence (keep your item details under the matching phase):
+   - Phase 1A (NEXT): Tenant isolation + SMS opt-out compliance
+     (remove LIMIT 1 fallback; safe rejection of unmatched numbers;
+     STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT + START/YES/UNSTOP handling;
+     per-caller message-rate guard; cross-firm isolation tests)
+   - Phase 1B: Billing & entry-point repair
+     (success/cancel URLs → /ai-receptionist/dashboard/billing;
+     signup redirect /app → /ai-receptionist/dashboard;
+     signup page "Sign in" link → /ai-receptionist/dashboard/login;
+     requires owner to set STRIPE_RECEPTIONIST_PRICE_ID; test-mode E2E)
+   - Phase 1C: Auth hardening (rate limiting, generic errors incl. the 409
+     email-exists enumeration vector, session review, failure logging;
+     owner sets ADMIN_PASSWORD)
+   - Phase 2: Legacy /app/* retirement + dead-code deletion + new nav shell
+   - Ops tasks (anytime): STRIPE_RECEPTIONIST_PRICE_ID, ADMIN_PASSWORD,
+     RESEND_FROM_EMAIL secrets; Twilio Advanced Opt-Out + A2P 10DLC check;
+     replit.md port fix.
+
+4. docs/ai-receptionist/DECISION_LOG.md — your proposed entries, but retitle
+   the dated entries as "Reconstructed rationale (undated, inferred from
+   code/commits)". Then ADD:
+   - 2026-07-17 — Phase 0 audit accepted at SHA 6c4ff48e; dev DB confirmed;
+     phase sequence approved: 0.5 docs → 1A tenant/SMS safety → 1B billing/
+     entry points → 1C auth → 2 legacy retirement + shell.
+   - 2026-07-17 — Process: Claude (planning/PRDs/reconciliation) ↔ Replit
+     (Plan Mode inspection, Build Mode implementation); one PRD per phase;
+     QA + freeze between phases.
+
+5. docs/ai-receptionist/DATABASE_STRATEGY.md — as proposed, plus a section
+   "Migration Transition (ADR-05, PROPOSED)": current workflow is drizzle-kit
+   push (no files); target is versioned Drizzle Kit migrations for all NEW
+   receptionist schema changes with a baseline introspection step first; CRM
+   tables keep push until separately approved; automatic production schema
+   sync is forbidden. Schema is FROZEN until this ADR is approved. Also note
+   that intake_* tables have no FK constraints or secondary indexes today.
+
+6. docs/ai-receptionist/SESSION_HANDOFF.md — as proposed, plus the ops-task
+   list from item 3 and the two Twilio console checks as OPEN items.
+
+7. Root .env.example — names only, empty values. INCLUDE: DATABASE_URL,
+   SESSION_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER,
+   FORWARD_TO_PHONE_NUMBER, INTAKE_TWILIO_AUTH_TOKEN,
+   STRIPE_RECEPTIONIST_PRICE_ID, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY,
+   RESEND_FROM_EMAIL, AI_INTEGRATIONS_OPENAI_API_KEY, ADMIN_PASSWORD.
+   OMIT: INTAKE_TWILIO_ACCOUNT_SID, RESEND_WEBHOOK_SECRET (unused in code),
+   BASE_PATH, CRM_BASE_URL (injected/managed by the platform — list them only
+   in a comment as platform-managed).
+
+8. replit.md — fix ONE line only: API server port 5000 → 8080. Touch nothing
+   else in that file.
+
+DO NOT: modify any other file; run drizzle push; install/update dependencies;
+delete the dead files; change any route or component.
+
+COMPLETION REPORT: list of files created with line counts; the one-line
+replit.md diff; confirmation that git status shows only these 8 paths changed.

@@ -1,0 +1,124 @@
+PHASE 0 — AI RECEPTIONIST AUDIT & STABILITY BASELINE
+STRICTLY READ-ONLY: no file edits, no file creation, no schema changes, no product-behavior changes.
+
+STEP 0 — VERSION VERIFICATION (do this before anything else)
+Report:
+- Current git branch
+- Current commit SHA
+- Whether the working tree is clean or has uncommitted changes (list changed files if any)
+- Whether this code matches the GitHub main branch (ahead/behind status)
+- Date and message of the latest five commits
+Do not pull, reset, merge, checkout, stash, or modify branches in any way.
+
+STEP 0.5 — DATABASE SAFETY CLASSIFICATION (before any write of any kind)
+Determine whether DATABASE_URL points to a development, staging, or production
+database (hostname pattern, database name, presence of real customer rows —
+e.g. intake_firms rows with real emails and stripe_customer_id values).
+Do not display the database URL or any credential.
+If the environment is PRODUCTION or cannot be confidently classified:
+- Do not create a throwaway account
+- Do not change any account configuration
+- Do not initiate Stripe checkout
+- Perform read-only route and code-path verification only
+- Clearly mark every write-path test below as "NOT RUN — PRODUCTION SAFETY"
+Only create test records if the database is confirmed non-production.
+State your classification and the evidence for it in the report.
+
+CONTEXT
+This is the SiteMint Digital pnpm monorepo. The customer-facing AI Receptionist consists of:
+- Frontend: artifacts/helpdesk (React+Vite SPA, base path /ai-receptionist/dashboard)
+- Legacy duplicate frontend: artifacts/web-agency/src/pages/receptionist/* (routes /app/*) + marketing pages /ai-receptionist and /ai-receptionist/signup
+- Backend: artifacts/api-server/src/routes/receptionistAuth.ts, receptionistConversations.ts, receptionistAgentConfig.ts, receptionistBilling.ts, receptionistAdmin.ts, intakeAgent.ts, and lib/receptionistAuth.ts, intakeTwilio.ts, intakeScoring.ts
+- Database: lib/db/src/schema/intakeAgent.ts (intake_firms, intake_conversations, intake_messages, intake_cases, receptionist_sessions)
+Note: routes/helpdesk.ts and the helpdesk_* tables are a SEPARATE legacy ticket prototype, NOT part of this product.
+
+GOAL
+Verify the current project installs, type-checks, builds, and serves correctly, and produce a written audit report. Change nothing.
+
+EXACT SCOPE (allowed actions)
+1. Run `pnpm install --frozen-lockfile`. If it fails, STOP and report the exact
+   failure. Do not regenerate or modify the lockfile.
+2. Run `pnpm run typecheck` (workspace-wide). Record every error verbatim.
+3. Run `pnpm run build`. Record any failures verbatim.
+4. Start the dev workflows (api-server, helpdesk, web-agency) and confirm each
+   boots without crash. Record the actual API port in use (replit.md says 5000,
+   artifact.toml says 8080 — report which is real).
+5. READ-ONLY endpoint checks (safe in any environment):
+   - GET /api/healthz — status + body
+   - GET /api/receptionist/auth/me WITHOUT a cookie — expect 401
+   - GET /api/receptionist/conversations WITHOUT a cookie — expect 401
+6. WRITE-PATH smoke tests — ONLY if Step 0.5 confirmed non-production:
+   - POST /api/receptionist/auth/signup (new throwaway email; record firm id)
+   - POST /api/receptionist/auth/login
+   - GET  /api/receptionist/auth/me (with cookie)
+   - GET  /api/receptionist/conversations (with cookie)
+   - GET  /api/receptionist/agent-config (with cookie)
+   - PATCH /api/receptionist/agent-config (throwaway account only; set then revert a greeting)
+   - POST /api/receptionist/auth/logout
+   Otherwise mark each as NOT RUN — PRODUCTION SAFETY and verify the same
+   code paths by reading the route handlers instead.
+7. STRIPE — CODE INSPECTION ONLY by default:
+   Inspect routes/receptionistBilling.ts and report the exact computed
+   success_url and cancel_url strings and which env vars gate the route.
+   Only call POST /api/receptionist/billing/create-checkout-session if ALL of:
+   (a) Stripe TEST-mode credentials are confirmed, (b) the database is
+   confirmed non-production, (c) no payment or subscription will be created.
+   Otherwise mark it: CODE-VERIFIED, NOT EXECUTED.
+8. Browser QA — only with the throwaway account (non-production only):
+   load /ai-receptionist/dashboard/login, sign in, confirm Inbox, Contacts,
+   Deploy, Settings, Billing render without console errors; screenshot each.
+   If production: load only the /login page unauthenticated and screenshot it.
+9. Database inventory (READ-ONLY SQL — SELECTs only): list all tables with row
+   counts. Explicitly report counts for intake_firms, intake_conversations,
+   intake_messages, intake_cases, receptionist_sessions, helpdesk_tickets,
+   helpdesk_contacts, helpdesk_agents, helpdesk_messages, conversations,
+   messages. Also report: how many intake_firms rows have a non-null email
+   (real signups) and how many have a non-null stripe_customer_id.
+10. Env vars — report SET vs MISSING by NAME only, never values:
+    DATABASE_URL, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER,
+    INTAKE_TWILIO_ACCOUNT_SID, INTAKE_TWILIO_AUTH_TOKEN,
+    STRIPE_RECEPTIONIST_PRICE_ID, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY,
+    RESEND_FROM_EMAIL, RESEND_WEBHOOK_SECRET, AI_INTEGRATIONS_OPENAI_API_KEY,
+    CRM_BASE_URL, CRM_EMAIL_TEST_MODE, ADMIN_PASSWORD, BASE_PATH.
+11. Read routes/intakeAgent.ts fully and report: (a) STOP/opt-out keyword
+    handling present or absent; (b) the exact firm-resolution logic for the
+    inbound webhook including any fallback when the To number matches no firm.
+12. Report whether anything imports artifacts/helpdesk/src/components/layout/
+    CallDialer.tsx, pages/Agents.tsx, or pages/NewTicket.tsx.
+13. Report every place in the repo that links to or serves the legacy /app/*
+    receptionist routes (marketing CTAs, redirects, emails).
+
+EXPLICITLY OUT OF SCOPE (do NOT do)
+- No edits to any file. No file creation of any kind — including documentation
+  and .env.example. Instead, return the PROPOSED full contents and file paths
+  for docs/ai-receptionist/ (ARCHITECTURE.md, CURRENT_STATE.md, ROADMAP.md,
+  DECISION_LOG.md, DATABASE_STRATEGY.md, SESSION_HANDOFF.md) and a root
+  .env.example (names only) in the completion report. They will be created
+  later in a separate approved documentation-only Build Mode session.
+- No schema changes, no drizzle push, no migrations, no db.sync.
+- No dependency changes, no lockfile changes, no refactors, no formatting.
+- Never modify: artifacts/api-server/src/routes/phone.ts, crm.ts, discovery.ts,
+  admin.ts; artifacts/web-agency/src/lib/{discEngine,leadScore,
+  communicationIntelligence,workflowEngine}.ts; anything under artifacts/ai-toolkit.
+- No git write operations of any kind.
+
+REQUIRED COMPLETION REPORT
+1. Git status block (branch, SHA, clean/dirty, main-match, last 5 commits)
+2. Database classification (dev/staging/production + evidence)
+3. Install/typecheck/build results (pass/fail + verbatim errors)
+4. Dev-boot results + actual ports
+5. Endpoint results table (route, status, RUN / NOT RUN — PRODUCTION SAFETY / CODE-VERIFIED)
+6. Stripe success_url and cancel_url exact strings (code inspection)
+7. Browser QA results + screenshots
+8. Database table inventory with row counts + real-signup / stripe-customer counts
+9. Env var SET/MISSING table (names only)
+10. STOP/opt-out finding + webhook firm-resolution/fallback finding (verbatim code excerpts)
+11. Dead-code findings and legacy /app/* linkage findings
+12. Discrepancies vs this prompt's description of the codebase
+13. Proposed documentation file contents (for later Build Mode)
+14. Recommended fixes ranked by risk (report only — implement nothing)
+15. Throwaway records created, if any (table + ids), or "none"
+
+ROLLBACK / RECOVERY
+Nothing is created or modified in this phase except (non-production only) a
+throwaway account whose row ids must be reported for later cleanup.
