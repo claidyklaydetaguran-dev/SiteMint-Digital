@@ -10,7 +10,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComingSoon } from "@/components/common/ComingSoon";
 import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
-import { AssistantDraftsProvider } from "@/hooks/useAssistantDrafts";
+import { useAssistantSessionGuard } from "@/hooks/useAssistants";
 
 import Login from "@/pages/Login";
 import Overview from "@/pages/Overview";
@@ -22,6 +22,7 @@ import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
 import Assistants from "@/pages/Assistants";
 import AssistantCreate from "@/pages/AssistantCreate";
+import AssistantBuilderNew from "@/pages/AssistantBuilderNew";
 import AssistantBuilder from "@/pages/AssistantBuilder";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,14 @@ const queryClient = new QueryClient();
 function InSpaRedirect({ to }: { to: string }) {
   const [, navigate] = useLocation();
   useEffect(() => { navigate(to, { replace: true }); }, []);
+  return null;
+}
+
+// Mounted at the app root, independent of route, so it observes every
+// session transition (login, logout, expiry, firm switch) — see
+// useAssistantSessionGuard for why this can't live inside AppShell alone.
+function AssistantSessionGuard() {
+  useAssistantSessionGuard();
   return null;
 }
 
@@ -46,40 +55,39 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route>
-        <AssistantDraftsProvider>
-          <AppShell>
-            <Switch>
-              <Route path="/" component={Overview} />
-              <Route path="/conversations" component={Inbox} />
-              <Route path="/receptionist" component={AgentConfig} />
-              <Route path="/contacts" component={Contacts} />
-              <Route path="/contacts/:id" component={ContactDetail} />
-              <Route path="/deploy">
-                {() => <InSpaRedirect to="/receptionist" />}
+        <AppShell>
+          <Switch>
+            <Route path="/" component={Overview} />
+            <Route path="/conversations" component={Inbox} />
+            <Route path="/receptionist" component={AgentConfig} />
+            <Route path="/contacts" component={Contacts} />
+            <Route path="/contacts/:id" component={ContactDetail} />
+            <Route path="/deploy">
+              {() => <InSpaRedirect to="/receptionist" />}
+            </Route>
+            <Route path="/settings" component={Settings} />
+            <Route path="/billing" component={Billing} />
+            {voicePlatformEnabled && (
+              <>
+                <Route path="/assistants" component={Assistants} />
+                <Route path="/assistants/new" component={AssistantCreate} />
+                <Route path="/assistants/new/:tab" component={AssistantBuilderNew} />
+                <Route path="/assistants/:id/:tab?" component={AssistantBuilder} />
+              </>
+            )}
+            {comingSoonRoutes.map((item) => (
+              <Route key={item.key} path={item.href!}>
+                <ComingSoon
+                  title={item.label}
+                  description={item.description}
+                  icon={item.icon}
+                  availability={item.availability}
+                />
               </Route>
-              <Route path="/settings" component={Settings} />
-              <Route path="/billing" component={Billing} />
-              {voicePlatformEnabled && (
-                <>
-                  <Route path="/assistants" component={Assistants} />
-                  <Route path="/assistants/new" component={AssistantCreate} />
-                  <Route path="/assistants/:id/:tab?" component={AssistantBuilder} />
-                </>
-              )}
-              {comingSoonRoutes.map((item) => (
-                <Route key={item.key} path={item.href!}>
-                  <ComingSoon
-                    title={item.label}
-                    description={item.description}
-                    icon={item.icon}
-                    availability={item.availability}
-                  />
-                </Route>
-              ))}
-              <Route component={NotFound} />
-            </Switch>
-          </AppShell>
-        </AssistantDraftsProvider>
+            ))}
+            <Route component={NotFound} />
+          </Switch>
+        </AppShell>
       </Route>
     </Switch>
   );
@@ -91,6 +99,7 @@ function App() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
+            {voicePlatformEnabled && <AssistantSessionGuard />}
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <Router />
             </WouterRouter>

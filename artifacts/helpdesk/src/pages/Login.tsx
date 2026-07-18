@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useInvalidateSession } from "@/hooks/useSession";
+import { useRefreshSessionAfterLogin } from "@/hooks/useSession";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import { AlertCircle } from "lucide-react";
 
@@ -13,7 +13,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const invalidateSession = useInvalidateSession();
+  const refreshSessionAfterLogin = useRefreshSessionAfterLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +30,9 @@ export default function Login() {
         const data = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(data.error ?? "Invalid email or password");
       }
-      await invalidateSession();
+      // Fetch the new session before navigating so the authenticated app
+      // never briefly renders under the previous firm's identity or cache.
+      await refreshSessionAfterLogin();
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

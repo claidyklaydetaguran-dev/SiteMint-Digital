@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import type { AssistantTemplate } from "@/lib/assistantTemplates";
 import type { VoicePresetId } from "@/lib/assistantEstimates";
 
@@ -49,8 +49,12 @@ export interface AssistantAdvancedState {
   rawOverrides: string;
 }
 
+/**
+ * Editable builder configuration. This is the source of truth mapped to/from
+ * the E1 `config` JSON object (see lib/assistantConfig.ts) — it deliberately
+ * excludes id/status/provider/timestamps, which live only on AssistantDto.
+ */
 export interface AssistantDraft {
-  id: string;
   templateId: string;
   templateName: string;
   setup: AssistantSetupState;
@@ -60,9 +64,8 @@ export interface AssistantDraft {
   advanced: AssistantAdvancedState;
 }
 
-function draftFromTemplate(id: string, template: AssistantTemplate): AssistantDraft {
+export function draftFromTemplate(template: AssistantTemplate): AssistantDraft {
   return {
-    id,
     templateId: template.id,
     templateName: template.name,
     setup: {
@@ -108,68 +111,18 @@ function draftFromTemplate(id: string, template: AssistantTemplate): AssistantDr
   };
 }
 
-interface AssistantDraftsContextValue {
-  drafts: Record<string, AssistantDraft>;
-  createDraft: (template: AssistantTemplate) => string;
-  updateDraft: (id: string, updater: (draft: AssistantDraft) => AssistantDraft) => void;
-}
-
-const AssistantDraftsContext = createContext<AssistantDraftsContextValue | null>(null);
-
 /**
- * In-memory only — no localStorage/IndexedDB/API calls. Lives for the
- * lifetime of the mounted app so builder tabs keep their state while
- * navigating, but a full page reload starts fresh (Checkpoint B3 is UI-only,
- * nothing here is a persisted assistant).
+ * Local, in-memory-only draft state for a new, unsaved assistant. Lives for
+ * the lifetime of the mounted builder route — a full reload reconstructs a
+ * fresh draft from the validated template key rather than reading any
+ * client-side storage (see AssistantBuilderNew).
  */
-export function AssistantDraftsProvider({ children }: { children: ReactNode }) {
-  const [drafts, setDrafts] = useState<Record<string, AssistantDraft>>({});
+export function useLocalAssistantDraft(template: AssistantTemplate) {
+  const [draft, setDraft] = useState<AssistantDraft>(() => draftFromTemplate(template));
 
-  const createDraft = useCallback((template: AssistantTemplate) => {
-    const id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const draft = draftFromTemplate(id, template);
-    setDrafts((prev) => ({ ...prev, [id]: draft }));
-    return id;
+  const update = useCallback((updater: (draft: AssistantDraft) => AssistantDraft) => {
+    setDraft((prev) => updater(prev));
   }, []);
-
-  const updateDraft = useCallback((id: string, updater: (draft: AssistantDraft) => AssistantDraft) => {
-    setDrafts((prev) => {
-      const existing = prev[id];
-      if (!existing) return prev;
-      return { ...prev, [id]: updater(existing) };
-    });
-  }, []);
-
-  const value = useMemo(() => ({ drafts, createDraft, updateDraft }), [drafts, createDraft, updateDraft]);
-
-  return <AssistantDraftsContext.Provider value={value}>{children}</AssistantDraftsContext.Provider>;
-}
-
-function useAssistantDraftsContext(): AssistantDraftsContextValue {
-  const ctx = useContext(AssistantDraftsContext);
-  if (!ctx) throw new Error("useAssistantDraftsContext must be used within AssistantDraftsProvider");
-  return ctx;
-}
-
-export function useCreateAssistantDraft() {
-  const { createDraft } = useAssistantDraftsContext();
-  return createDraft;
-}
-
-/** Returns the draft for `id`, or undefined if it was never created this session (e.g. after a reload). */
-export function useAssistantDraft(id: string | undefined) {
-  const { drafts, updateDraft } = useAssistantDraftsContext();
-  const draft = id ? drafts[id] : undefined;
-
-  const update = useCallback(
-    (updater: (draft: AssistantDraft) => AssistantDraft) => {
-      if (id) updateDraft(id, updater);
-    },
-    [id, updateDraft],
-  );
 
   return { draft, update };
 }

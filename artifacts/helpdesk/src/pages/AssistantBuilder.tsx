@@ -1,92 +1,144 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { ArrowLeft, PlayCircle, Rocket, Save } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Bot, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BuilderNotice } from "@/components/common/BuilderNotice";
-import { CostBreakdown } from "@/components/common/CostBreakdown";
-import { LatencyMeter } from "@/components/common/LatencyMeter";
 import { EmptyState } from "@/components/common/EmptyState";
-import { UnavailableActionButton } from "@/components/common/UnavailableActionButton";
-import { getVoicePreset } from "@/lib/assistantEstimates";
-import { useAssistantDraft, type AssistantDraft } from "@/hooks/useAssistantDrafts";
-import { Bot } from "lucide-react";
+import { InlineError } from "@/components/common/InlineError";
+import { SkeletonCard } from "@/components/common/Skeletons";
+import { useToast } from "@/hooks/use-toast";
+import { useAssistantDetail, useUpdateAssistant } from "@/hooks/useAssistants";
+import { AssistantApiRequestError } from "@/lib/assistantsApi";
+import { serializeDraftToConfig, hydrateConfigToDraft } from "@/lib/assistantConfig";
+import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
+import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
 
-import SetupTab from "@/pages/assistant-builder/SetupTab";
-import PromptTab from "@/pages/assistant-builder/PromptTab";
-import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
-import ToolsTab from "@/pages/assistant-builder/ToolsTab";
-import KnowledgeTab from "@/pages/assistant-builder/KnowledgeTab";
-import TestingTab from "@/pages/assistant-builder/TestingTab";
-import AnalysisTab from "@/pages/assistant-builder/AnalysisTab";
-import AdvancedTab from "@/pages/assistant-builder/AdvancedTab";
+export type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
-const TABS = [
-  { key: "setup", label: "Setup" },
-  { key: "prompt", label: "Prompt" },
-  { key: "voice-model", label: "Voice & Model" },
-  { key: "tools", label: "Tools" },
-  { key: "knowledge", label: "Knowledge" },
-  { key: "testing", label: "Testing" },
-  { key: "analysis", label: "Analysis" },
-  { key: "advanced", label: "Advanced" },
-] as const;
+const ROUTE_ID_PATTERN = /^[1-9]\d*$/;
 
-type TabKey = (typeof TABS)[number]["key"];
-
-export interface BuilderTabProps {
-  draft: AssistantDraft;
-  update: (updater: (draft: AssistantDraft) => AssistantDraft) => void;
+function BuilderDetailSkeleton() {
+  return (
+    <div className="flex h-full flex-col bg-background" aria-hidden="true">
+      <div className="flex-shrink-0 border-b border-border px-6 py-4">
+        <SkeletonCard className="h-4 w-24" />
+        <SkeletonCard className="mt-3 h-8 w-64" />
+      </div>
+      <div className="flex-1 p-6">
+        <SkeletonCard className="h-full" />
+      </div>
+    </div>
+  );
 }
 
-function TabPanel({ tab, draft, update }: { tab: TabKey } & BuilderTabProps) {
-  switch (tab) {
-    case "setup":
-      return <SetupTab draft={draft} update={update} />;
-    case "prompt":
-      return <PromptTab draft={draft} update={update} />;
-    case "voice-model":
-      return <VoiceModelTab draft={draft} update={update} />;
-    case "tools":
-      return <ToolsTab draft={draft} update={update} />;
-    case "knowledge":
-      return <KnowledgeTab draft={draft} update={update} />;
-    case "testing":
-      return <TestingTab draft={draft} update={update} />;
-    case "analysis":
-      return <AnalysisTab draft={draft} update={update} />;
-    case "advanced":
-      return <AdvancedTab draft={draft} update={update} />;
-    default:
-      return null;
-  }
+function draftKey(draft: Pick<AssistantDraft, "setup" | "prompt" | "voiceModel" | "analysis" | "advanced">, name: string): string {
+  return JSON.stringify({ name, config: serializeDraftToConfig(draft as AssistantDraft) });
 }
 
 export default function AssistantBuilder() {
   const params = useParams<{ id: string; tab?: string }>();
   const [, navigate] = useLocation();
-  const { id } = params;
-  const tab: TabKey = (TABS.find((t) => t.key === params.tab)?.key ?? "setup") as TabKey;
-  const { draft, update } = useAssistantDraft(id);
+  const { toast } = useToast();
+  const rawId = params.id;
+  const isValidId = ROUTE_ID_PATTERN.test(rawId ?? "");
+  const numericId = isValidId ? Number(rawId) : undefined;
+  const tab: BuilderTabKey = isBuilderTabKey(params.tab) ? params.tab : "setup";
+
+  const { data: assistant, isLoading, isError, error, refetch } = useAssistantDetail(numericId);
+  const updateMutation = useUpdateAssistant(numericId ?? -1);
+
+  const [draft, setDraft] = useState<AssistantDraft | null>(null);
+  const [baseline, setBaseline] = useState<{ name: string; draft: AssistantDraft } | null>(null);
+  const [hydrationWarning, setHydrationWarning] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const hydratedIdRef = useRef<number | null>(null);
+  const announcedErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!params.tab) {
-      navigate(`/assistants/${id}/setup`, { replace: true });
+    if (!params.tab && numericId !== undefined) {
+      navigate(`/assistants/${numericId}/setup`, { replace: true });
     }
-  }, [params.tab, id, navigate]);
+  }, [params.tab, numericId, navigate]);
 
-  if (!draft) {
+  useEffect(() => {
+    if (!assistant) return;
+    if (hydratedIdRef.current === assistant.id) return;
+    const { draft: hydrated, hadHydrationError } = hydrateConfigToDraft(
+      assistant.config,
+      assistant.templateKey,
+      assistant.name,
+    );
+    setDraft(hydrated);
+    setBaseline({ name: assistant.name, draft: hydrated });
+    setHydrationWarning(hadHydrationError);
+    setSaveError(null);
+    hydratedIdRef.current = assistant.id;
+  }, [assistant]);
+
+  // Full reload of an unsaved builder never happens here — this route is
+  // only reachable with a persisted numeric id, so a browser reload simply
+  // re-fetches GET /:id above.
+  useEffect(() => {
+    if (!draft || !baseline) return;
+    const dirty = draftKey(draft, draft.setup.assistantName) !== draftKey(baseline.draft, baseline.name);
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [draft, baseline]);
+
+  const isDirty = useMemo(() => {
+    if (!draft || !baseline) return false;
+    return draftKey(draft, draft.setup.assistantName) !== draftKey(baseline.draft, baseline.name);
+  }, [draft, baseline]);
+
+  const isNameValid = !!draft && draft.setup.assistantName.trim().length > 0 && draft.setup.assistantName.trim().length <= 100;
+
+  const update = (updater: (d: AssistantDraft) => AssistantDraft) => {
+    setDraft((prev) => (prev ? updater(prev) : prev));
+  };
+
+  const handleSave = () => {
+    if (!draft || !numericId || !isDirty || !isNameValid || updateMutation.isPending) return;
+    setSaveError(null);
+    updateMutation.mutate(
+      {
+        name: draft.setup.assistantName.trim(),
+        config: serializeDraftToConfig(draft),
+      },
+      {
+        onSuccess: (updated) => {
+          const { draft: hydrated } = hydrateConfigToDraft(updated.config, updated.templateKey, updated.name);
+          setDraft(hydrated);
+          setBaseline({ name: updated.name, draft: hydrated });
+          hydratedIdRef.current = updated.id;
+          announcedErrorRef.current = null;
+          toast({ title: "Saved", description: `"${updated.name}" was saved.` });
+        },
+        onError: (err) => {
+          const message = err instanceof AssistantApiRequestError ? err.message : "Save failed. Please try again.";
+          setSaveError(message);
+          if (announcedErrorRef.current !== message) {
+            announcedErrorRef.current = message;
+            toast({ title: "Save failed", description: message, variant: "destructive" });
+          }
+        },
+      },
+    );
+  };
+
+  if (!isValidId) {
     return (
       <div className="flex h-full flex-col bg-background">
         <EmptyState
           icon={Bot}
-          title="This builder preview has expired"
-          description="Configuration in the assistant builder isn't saved yet, so it doesn't survive a reload. Start again from a template."
+          title="Invalid assistant link"
+          description="This assistant link isn't valid. Go back to your assistants list."
           action={
-            <Link href="/assistants/new">
-              <Button className="h-9 text-sm">Choose a template</Button>
+            <Link href="/assistants">
+              <Button className="h-9 text-sm">Back to Assistants</Button>
             </Link>
           }
           className="flex-1"
@@ -95,100 +147,114 @@ export default function AssistantBuilder() {
     );
   }
 
-  const preset = getVoicePreset(draft.voiceModel.preset);
+  if (isLoading) {
+    return <BuilderDetailSkeleton />;
+  }
+
+  if (isError) {
+    const status = error instanceof AssistantApiRequestError ? error.status : undefined;
+    if (status === 404) {
+      return (
+        <div className="flex h-full flex-col bg-background">
+          <EmptyState
+            icon={Bot}
+            title="Assistant not found"
+            description="This assistant doesn't exist, or you don't have access to it."
+            action={
+              <Link href="/assistants">
+                <Button className="h-9 text-sm">Back to Assistants</Button>
+              </Link>
+            }
+            className="flex-1"
+          />
+        </div>
+      );
+    }
+    const message = error instanceof AssistantApiRequestError ? error.message : undefined;
+    return (
+      <div className="flex h-full flex-col bg-background">
+        <InlineError
+          title="Couldn't load this assistant"
+          description={message}
+          onRetry={() => refetch()}
+          className="flex-1"
+        />
+      </div>
+    );
+  }
+
+  if (!assistant || !draft) {
+    return <BuilderDetailSkeleton />;
+  }
+
+  const isEligibleForDelete = assistant.status === "draft" && !assistant.provider && !assistant.providerAssistantId;
+
+  let statusLabel: string;
+  if (updateMutation.isPending) statusLabel = "Saving…";
+  else if (isDirty) statusLabel = "Unsaved changes";
+  else statusLabel = `${assistant.status === "draft" ? "Draft" : assistant.status === "published" ? "Published" : "Error"} · Saved`;
+
+  const announcement = updateMutation.isPending
+    ? "Saving…"
+    : saveError
+      ? `Save failed: ${saveError}. Unsaved changes remain.`
+      : isDirty
+        ? "Unsaved changes"
+        : "Saved";
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-border px-6 py-4">
-        <Link
-          href="/assistants"
-          className="inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-0 md:py-0"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Assistants
-        </Link>
-        <h1 className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Assistant Builder
-        </h1>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <Input
-              aria-label="Assistant name"
-              value={draft.setup.assistantName}
-              onChange={(e) =>
-                update((d) => ({ ...d, setup: { ...d.setup, assistantName: e.target.value } }))
-              }
-              placeholder="Untitled assistant"
-              className="h-9 max-w-xs text-sm font-semibold"
-            />
-            <Badge variant="secondary" className="flex-shrink-0 text-xs font-medium">
-              Draft · Not Saved
-            </Badge>
-          </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
-            <UnavailableActionButton
-              icon={PlayCircle}
-              label="Test"
-              availability="Browser test calling available in Checkpoint F."
-            />
-            <UnavailableActionButton
-              icon={Rocket}
-              label="Publish"
-              availability="Publishing available in Checkpoint E."
-            />
-          </div>
-        </div>
-        <BuilderNotice className="mt-3" />
-      </div>
-
-      {/* Tabs + content */}
-      <Tabs
-        value={tab}
-        onValueChange={(v) => navigate(`/assistants/${id}/${v}`)}
-        className="flex min-h-0 flex-1 flex-col md:flex-row"
-      >
-        <div className="relative flex-shrink-0 md:w-48">
-          <TabsList
-            aria-label="Assistant builder sections"
-            className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-2 md:w-48 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-3"
+    <BuilderShell
+      draft={draft}
+      update={update}
+      tab={tab}
+      onTabChange={(t) => navigate(`/assistants/${numericId}/${t}`)}
+      backHref="/assistants"
+      statusBadge={statusLabel}
+      announcement={announcement}
+      headerBanner={
+        <>
+          {hydrationWarning && (
+            <div role="status" className="rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
+              This assistant's saved configuration couldn't be fully read, so defaults are shown here. Saving will
+              replace it with the values currently in the builder.
+            </div>
+          )}
+          {assistant.status === "error" && assistant.syncError && (
+            <div role="status" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+              <span className="font-semibold">Sync error:</span> {assistant.syncError}
+            </div>
+          )}
+          {!isEligibleForDelete && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {assistant.provider && assistant.providerAssistantId
+                ? "Connected to a voice provider."
+                : "Not connected."}
+              {" "}Assigned phone number: Available after Phone Numbers setup.
+            </p>
+          )}
+        </>
+      }
+      footerRight={
+        <div className="flex flex-col items-end gap-1.5">
+          {saveError && (
+            <p role="alert" className="max-w-xs text-right text-[11px] text-destructive">
+              {saveError}
+            </p>
+          )}
+          <Button
+            onClick={handleSave}
+            disabled={!isDirty || !isNameValid || updateMutation.isPending}
+            className="h-9 gap-1.5 text-sm"
           >
-            {TABS.map((t) => (
-              <TabsTrigger
-                key={t.key}
-                value={t.key}
-                className="w-auto min-h-11 shrink-0 justify-start whitespace-nowrap rounded-lg px-3 py-2 text-sm data-[state=active]:bg-surface-muted data-[state=active]:text-primary data-[state=active]:shadow-none md:w-full"
-              >
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {/* Mobile-only edge fade — hints that the tab strip scrolls */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent md:hidden"
-          />
+            {updateMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Save className="h-4 w-4" aria-hidden="true" />
+            )}
+            {updateMutation.isPending ? "Saving…" : "Save Draft"}
+          </Button>
         </div>
-
-        <div className="min-w-0 flex-1 overflow-y-auto p-6">
-          <TabPanel tab={tab} draft={draft} update={update} />
-        </div>
-      </Tabs>
-
-      {/* Sticky estimate summary */}
-      <div className="flex-shrink-0 border-t border-border bg-card px-6 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid flex-1 grid-cols-2 gap-4 sm:flex sm:gap-8">
-            <CostBreakdown preset={preset} compact />
-            <LatencyMeter latencyMs={preset.latencyMs} compact />
-          </div>
-          <UnavailableActionButton
-            icon={Save}
-            label="Save Draft"
-            availability="Saving available in Checkpoint E"
-          />
-        </div>
-      </div>
-    </div>
+      }
+    />
   );
 }

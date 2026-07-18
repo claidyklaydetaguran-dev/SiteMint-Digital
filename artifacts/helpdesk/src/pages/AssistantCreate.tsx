@@ -3,16 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { ASSISTANT_TEMPLATES, type AssistantTemplate } from "@/lib/assistantTemplates";
 import { TemplateCard } from "@/components/common/TemplateCard";
-import { useCreateAssistantDraft } from "@/hooks/useAssistantDrafts";
 
 export default function AssistantCreate() {
   const [, navigate] = useLocation();
-  const createDraft = useCreateAssistantDraft();
 
   const handleSelect = (template: AssistantTemplate) => {
-    // Local-only: creates in-memory builder state, no API call, no persistence.
-    const id = createDraft(template);
-    navigate(`/assistants/${id}/setup`);
+    // Local-only: no API call, no persisted row. The assistant is created
+    // only when Save Draft is activated in the builder.
+    navigate(`/assistants/new/setup?templateKey=${encodeURIComponent(template.id)}`);
   };
 
   return (
@@ -30,7 +28,7 @@ export default function AssistantCreate() {
         </h1>
         <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
           Pick a template to prefill the builder, or start from a blank assistant. Nothing is
-          saved until Checkpoint E — you can change everything before then.
+          saved until you select Save Draft — you can change everything before then.
         </p>
       </div>
 
