@@ -3,19 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>SiteMint Helpdesk</title>
-    <meta name="description" content="SiteMint Helpdesk — built on Replit. Update this description to reflect the app." />
+    <title>SiteMint AI Receptionist</title>
+    <meta name="description" content="SiteMint AI Receptionist — a premium AI receptionist that answers calls, books appointments, and never misses a customer moment." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="SiteMint Helpdesk" />
-    <meta property="og:description" content="SiteMint Helpdesk — built on Replit. Update this description to reflect the app." />
+    <meta property="og:title" content="SiteMint AI Receptionist" />
+    <meta property="og:description" content="SiteMint AI Receptionist — a premium AI receptionist that answers calls, books appointments, and never misses a customer moment." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="SiteMint Helpdesk" />
-    <meta name="twitter:description" content="SiteMint Helpdesk — built on Replit. Update this description to reflect the app." />
+    <meta name="twitter:title" content="SiteMint AI Receptionist" />
+    <meta name="twitter:description" content="SiteMint AI Receptionist — a premium AI receptionist that answers calls, books appointments, and never misses a customer moment." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+    <script>
+      (function () {
+        try {
+          var STORAGE_KEY = "sitemint-theme";
+          var stored = localStorage.getItem(STORAGE_KEY);
+          var theme = stored === "light" || stored === "dark" ? stored : "system";
+          var resolved =
+            theme === "system"
+              ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+              : theme;
+          if (resolved === "dark") {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
