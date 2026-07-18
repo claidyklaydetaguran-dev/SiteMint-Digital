@@ -26,7 +26,9 @@ import {
  * SiteMint AI Receptionist — approved navigation architecture (Checkpoint B1).
  *
  * state:
- *  - "live"       existing, fully working destination — never flag-gated
+ *  - "live"       fully working destination; combine with voiceGated: true
+ *                 for a built voice-platform surface that only appears when
+ *                 the flag is on (see Assistants, Checkpoint B3)
  *  - "comingSoon" voice-platform destination, rendered with the shared
  *                 ComingSoon component; only reachable when the voice flag
  *                 is on
@@ -68,9 +70,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         key: "assistants", label: "Assistants", href: "/assistants", icon: Bot,
-        state: "comingSoon", voiceGated: true,
+        state: "live", voiceGated: true,
         description: "Build and manage AI voice assistants for your business.",
-        availability: "Arriving in Checkpoint B3",
       },
       {
         key: "tools", label: "Tools", href: "/tools", icon: Wrench,

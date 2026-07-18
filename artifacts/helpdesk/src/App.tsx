@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComingSoon } from "@/components/common/ComingSoon";
 import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
+import { AssistantDraftsProvider } from "@/hooks/useAssistantDrafts";
 
 import Login from "@/pages/Login";
 import Overview from "@/pages/Overview";
@@ -19,6 +20,9 @@ import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
 import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
+import Assistants from "@/pages/Assistants";
+import AssistantCreate from "@/pages/AssistantCreate";
+import AssistantBuilder from "@/pages/AssistantBuilder";
 
 const queryClient = new QueryClient();
 
@@ -42,31 +46,40 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route>
-        <AppShell>
-          <Switch>
-            <Route path="/" component={Overview} />
-            <Route path="/conversations" component={Inbox} />
-            <Route path="/receptionist" component={AgentConfig} />
-            <Route path="/contacts" component={Contacts} />
-            <Route path="/contacts/:id" component={ContactDetail} />
-            <Route path="/deploy">
-              {() => <InSpaRedirect to="/receptionist" />}
-            </Route>
-            <Route path="/settings" component={Settings} />
-            <Route path="/billing" component={Billing} />
-            {comingSoonRoutes.map((item) => (
-              <Route key={item.key} path={item.href!}>
-                <ComingSoon
-                  title={item.label}
-                  description={item.description}
-                  icon={item.icon}
-                  availability={item.availability}
-                />
+        <AssistantDraftsProvider>
+          <AppShell>
+            <Switch>
+              <Route path="/" component={Overview} />
+              <Route path="/conversations" component={Inbox} />
+              <Route path="/receptionist" component={AgentConfig} />
+              <Route path="/contacts" component={Contacts} />
+              <Route path="/contacts/:id" component={ContactDetail} />
+              <Route path="/deploy">
+                {() => <InSpaRedirect to="/receptionist" />}
               </Route>
-            ))}
-            <Route component={NotFound} />
-          </Switch>
-        </AppShell>
+              <Route path="/settings" component={Settings} />
+              <Route path="/billing" component={Billing} />
+              {voicePlatformEnabled && (
+                <>
+                  <Route path="/assistants" component={Assistants} />
+                  <Route path="/assistants/new" component={AssistantCreate} />
+                  <Route path="/assistants/:id/:tab?" component={AssistantBuilder} />
+                </>
+              )}
+              {comingSoonRoutes.map((item) => (
+                <Route key={item.key} path={item.href!}>
+                  <ComingSoon
+                    title={item.label}
+                    description={item.description}
+                    icon={item.icon}
+                    availability={item.availability}
+                  />
+                </Route>
+              ))}
+              <Route component={NotFound} />
+            </Switch>
+          </AppShell>
+        </AssistantDraftsProvider>
       </Route>
     </Switch>
   );
