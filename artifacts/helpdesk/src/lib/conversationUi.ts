@@ -15,11 +15,11 @@ export function phoneInitials(phone: string): string {
 }
 
 export const TIER_STYLES: Record<string, string> = {
-  Hot:           "bg-rose-100 text-rose-700",
-  Warm:          "bg-amber-100 text-amber-700",
-  Cold:          "bg-blue-100 text-blue-700",
-  Disqualified:  "bg-slate-100 text-slate-500",
-  "Needs Review": "bg-yellow-100 text-yellow-700",
+  Hot:           "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
+  Warm:          "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  Cold:          "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  Disqualified:  "bg-muted text-muted-foreground",
+  "Needs Review": "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300",
 };
 
 export function relativeTime(dateStr: string): string {

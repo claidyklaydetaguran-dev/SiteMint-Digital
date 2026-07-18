@@ -66,7 +66,7 @@ export default function Billing() {
   if (isLoading || !me) {
     return (
       <div className="flex items-center justify-center h-full">
-        <RefreshCw className="h-5 w-5 animate-spin text-slate-400" />
+        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -77,24 +77,24 @@ export default function Billing() {
   const usagePct = Math.min(100, Math.round((conversationCount / trialLimit) * 100));
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200">
-        <h1 className="text-lg font-semibold text-slate-900">Billing</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Manage your plan and usage</p>
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      <div className="px-6 py-4 border-b border-border">
+        <h1 className="text-lg font-semibold text-foreground">Billing</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Manage your plan and usage</p>
       </div>
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="plan" className="h-full flex flex-col">
-          <div className="px-6 border-b border-slate-200 bg-white">
+          <div className="px-6 border-b border-border bg-card">
             <TabsList className="h-10 bg-transparent border-0 p-0 gap-6">
               <TabsTrigger
                 value="plan"
-                className="h-10 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 data-[state=active]:bg-transparent text-slate-500 text-sm font-medium"
+                className="h-10 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent text-muted-foreground text-sm font-medium"
               >
                 Plan
               </TabsTrigger>
               <TabsTrigger
                 value="usage"
-                className="h-10 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 data-[state=active]:bg-transparent text-slate-500 text-sm font-medium"
+                className="h-10 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent text-muted-foreground text-sm font-medium"
               >
                 Usage
               </TabsTrigger>
@@ -177,14 +177,14 @@ function PlanTab({
       )}
 
       {!isPaid && (
-        <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-5">
+        <div className="rounded-xl border border-primary/25 bg-gradient-to-br from-surface-muted to-surface-muted p-5">
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="h-5 w-5 text-indigo-600" />
+            <div className="w-9 h-9 rounded-lg bg-surface-muted flex items-center justify-center flex-shrink-0">
+              <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-indigo-900">Upgrade to Pro</h3>
-              <p className="text-xs text-indigo-700 mt-0.5">
+              <h3 className="text-sm font-semibold text-foreground">Upgrade to Pro</h3>
+              <p className="text-xs text-primary mt-0.5">
                 Unlimited conversations, priority AI response, full history
               </p>
             </div>
@@ -196,8 +196,8 @@ function PlanTab({
               "Full conversation history",
               "Priority support",
             ].map((feat) => (
-              <div key={feat} className="flex items-center gap-1.5 text-xs text-indigo-700">
-                <CheckCircle2 className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />
+              <div key={feat} className="flex items-center gap-1.5 text-xs text-primary">
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                 {feat}
               </div>
             ))}
@@ -226,7 +226,7 @@ function PlanTab({
             </p>
           )}
           <Button
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold h-10 gap-1.5"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold h-10 gap-1.5"
             onClick={onUpgrade}
             disabled={upgrading}
           >
@@ -240,14 +240,14 @@ function PlanTab({
               </>
             )}
           </Button>
-          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 mt-3">
+          <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground mt-3">
             <CreditCard className="h-3 w-3" /> Secured by Stripe
           </div>
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Account Details</h3>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Account Details</h3>
         <div className="space-y-3">
           <DetailRow label="Business" value={firm.name} />
           <DetailRow label="Email" value={firm.email ?? "—"} />
@@ -273,8 +273,8 @@ function PlanTab({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
   );
 }
@@ -299,8 +299,8 @@ function UsageTab({
   return (
     <div className="p-6 max-w-xl">
       <div className="mb-5">
-        <h2 className="text-sm font-semibold text-slate-900">Conversation Usage</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <h2 className="text-sm font-semibold text-foreground">Conversation Usage</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
           {isPaid
             ? "Unlimited — you are on a paid plan"
             : `Free trial: ${trialLimit} conversations included`}
@@ -309,10 +309,10 @@ function UsageTab({
 
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-slate-900">Conversations Used</span>
+          <span className="text-sm font-medium text-foreground">Conversations Used</span>
           <span
             className={`text-xs font-medium ${
-              isPaid ? "text-emerald-600" : isHigh ? "text-rose-600" : "text-slate-500"
+              isPaid ? "text-emerald-600" : isHigh ? "text-rose-600" : "text-muted-foreground"
             }`}
           >
             {isPaid
@@ -327,7 +327,7 @@ function UsageTab({
               ? "bg-emerald-100 [&>div]:bg-emerald-500"
               : isHigh
               ? "bg-rose-100 [&>div]:bg-rose-500"
-              : "bg-slate-100 [&>div]:bg-indigo-500"
+              : "bg-muted [&>div]:bg-primary"
           }`}
         />
         {isHigh && !isPaid && (
@@ -338,15 +338,15 @@ function UsageTab({
       </div>
 
       {!isPaid && (
-        <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50 flex items-center gap-4">
-          <Star className="h-5 w-5 text-indigo-500 flex-shrink-0" />
+        <div className="p-4 rounded-xl border border-primary/25 bg-surface-muted flex items-center gap-4">
+          <Star className="h-5 w-5 text-primary flex-shrink-0" />
           <div className="flex-1 text-xs">
-            <div className="font-semibold text-indigo-900 mb-0.5">Remove the limit</div>
-            <div className="text-indigo-700">Upgrade to Pro for unlimited conversations.</div>
+            <div className="font-semibold text-foreground mb-0.5">Remove the limit</div>
+            <div className="text-primary">Upgrade to Pro for unlimited conversations.</div>
           </div>
           <Button
             size="sm"
-            className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white flex-shrink-0"
+            className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground flex-shrink-0"
             onClick={onUpgrade}
             disabled={upgrading}
           >

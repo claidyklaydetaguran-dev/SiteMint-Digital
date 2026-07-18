@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useInvalidateSession } from "@/hooks/useSession";
+import { SiteMintLogo } from "@/components/SiteMintLogo";
 import { AlertCircle } from "lucide-react";
 
 export default function Login() {
@@ -38,78 +40,82 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Ambient mint glow, decorative only */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-accent/20 blur-3xl dark:bg-accent/10"
+      />
+
+      <div className="w-full max-w-sm relative">
         {/* Logo mark */}
         <div className="flex justify-center mb-8">
-          <div className="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl select-none shadow-md">
-            S
-          </div>
+          <SiteMintLogo iconSize={40} showWordmark={false} />
         </div>
 
         {/* Heading */}
         <div className="text-center mb-7">
-          <h1 className="text-xl font-bold text-slate-900">Sign in to SiteMint</h1>
-          <p className="text-sm text-slate-500 mt-1.5">AI Receptionist Dashboard</p>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Sign in to SiteMint</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">AI Receptionist Dashboard</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-card rounded-2xl border border-border shadow-lg p-6">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-sm font-medium text-slate-700">
-                Email
-              </label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="you@company.com"
-                className="h-10 border-slate-200 focus-visible:ring-indigo-500"
+                className="h-10"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
                 autoFocus
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? "login-error" : undefined}
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-sm font-medium text-slate-700">
-                Password
-              </label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
-                className="h-10 border-slate-200 focus-visible:ring-indigo-500"
+                className="h-10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? "login-error" : undefined}
               />
             </div>
 
             {error && (
-              <div className="flex items-start gap-2.5 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2.5">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div
+                id="login-error"
+                role="alert"
+                className="flex items-start gap-2.5 text-sm text-destructive bg-destructive/10 border border-destructive/25 rounded-lg px-3 py-2.5"
+              >
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <span>{error}</span>
               </div>
             )}
 
-            <Button
-              type="submit"
-              className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm transition-colors"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full h-10 font-semibold shadow-xs" disabled={loading}>
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
         </div>
 
-        <p className="text-xs text-slate-400 text-center mt-6">
+        <p className="text-xs text-muted-foreground text-center mt-6">
           Need an account?{" "}
           <a
             href="/ai-receptionist/signup"
-            className="text-indigo-600 hover:text-indigo-700 hover:underline font-medium transition-colors"
+            className="text-primary hover:underline font-medium transition-colors focus-visible:underline"
           >
             Sign up
           </a>

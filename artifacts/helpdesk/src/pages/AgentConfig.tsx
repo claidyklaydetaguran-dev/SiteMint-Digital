@@ -39,7 +39,7 @@ function CharCount({ value, max }: { value: string; max: number }) {
           ? "text-rose-600 font-semibold"
           : nearLimit
           ? "text-amber-600"
-          : "text-slate-400"
+          : "text-muted-foreground"
       }`}
       aria-live="polite"
     >
@@ -63,30 +63,30 @@ function PhonePreview({
   return (
     <div className="w-52 flex-shrink-0 hidden lg:flex flex-col pt-1">
       <div className="flex items-center gap-1.5 mb-3">
-        <Smartphone className="h-3.5 w-3.5 text-slate-400" />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           SMS Preview
         </p>
       </div>
       {/* Phone frame */}
-      <div className="bg-slate-800 rounded-[28px] p-2 shadow-lg">
-        <div className="bg-white rounded-[20px] overflow-hidden">
+      <div className="bg-[#111a15] rounded-[28px] p-2 shadow-lg">
+        <div className="bg-card rounded-[20px] overflow-hidden">
           {/* Notch */}
-          <div className="bg-slate-800 h-5 flex items-center justify-center">
-            <div className="w-12 h-1 bg-slate-600 rounded-full" />
+          <div className="bg-[#111a15] h-5 flex items-center justify-center">
+            <div className="w-12 h-1 bg-[#2a352f] rounded-full" />
           </div>
           {/* Header bar */}
-          <div className="bg-slate-100 px-3 py-2 border-b border-slate-200">
-            <p className="text-[10px] text-center text-slate-500 font-medium">
+          <div className="bg-muted px-3 py-2 border-b border-border">
+            <p className="text-[10px] text-center text-muted-foreground font-medium">
               AI Receptionist · SMS
             </p>
           </div>
           {/* Messages */}
-          <div className="p-3 space-y-2.5 min-h-[260px] bg-slate-50">
+          <div className="p-3 space-y-2.5 min-h-[260px] bg-surface-muted">
             {/* Greeting bubble */}
             <div className="flex justify-start">
-              <div className="bg-white rounded-2xl rounded-tl-sm px-3 py-2 max-w-[90%] border border-slate-200 shadow-sm">
-                <p className="text-[10px] text-slate-700 leading-relaxed">
+              <div className="bg-card rounded-2xl rounded-tl-sm px-3 py-2 max-w-[90%] border border-border shadow-sm">
+                <p className="text-[10px] text-foreground leading-relaxed">
                   {previewGreeting.length > 120
                     ? previewGreeting.slice(0, 117) + "…"
                     : previewGreeting}
@@ -95,15 +95,15 @@ function PhonePreview({
             </div>
             {/* Caller reply placeholder */}
             <div className="flex justify-end">
-              <div className="bg-indigo-600 rounded-2xl rounded-tr-sm px-3 py-2 max-w-[75%]">
-                <p className="text-[10px] text-indigo-100">Hi, I need help with…</p>
+              <div className="bg-primary rounded-2xl rounded-tr-sm px-3 py-2 max-w-[75%]">
+                <p className="text-[10px] text-primary-foreground/80">Hi, I need help with…</p>
               </div>
             </div>
             {/* First question */}
             {previewQ && (
               <div className="flex justify-start">
-                <div className="bg-white rounded-2xl rounded-tl-sm px-3 py-2 max-w-[90%] border border-slate-200 shadow-sm">
-                  <p className="text-[10px] text-slate-700 leading-relaxed">
+                <div className="bg-card rounded-2xl rounded-tl-sm px-3 py-2 max-w-[90%] border border-border shadow-sm">
+                  <p className="text-[10px] text-foreground leading-relaxed">
                     {previewQ.length > 100 ? previewQ.slice(0, 97) + "…" : previewQ}
                   </p>
                 </div>
@@ -111,13 +111,13 @@ function PhonePreview({
             )}
           </div>
           {/* Bottom bar */}
-          <div className="bg-white border-t border-slate-200 px-3 py-2 flex items-center gap-1.5">
-            <div className="flex-1 h-6 bg-slate-100 rounded-full" />
-            <div className="w-6 h-6 bg-indigo-600 rounded-full" />
+          <div className="bg-card border-t border-border px-3 py-2 flex items-center gap-1.5">
+            <div className="flex-1 h-6 bg-muted rounded-full" />
+            <div className="w-6 h-6 bg-primary rounded-full" />
           </div>
         </div>
       </div>
-      <p className="text-[10px] text-slate-400 text-center mt-3 leading-snug">
+      <p className="text-[10px] text-muted-foreground text-center mt-3 leading-snug">
         Approximate preview — exact formatting depends on carrier.
       </p>
     </div>
@@ -207,30 +207,35 @@ export default function AgentConfig() {
 
   if (isLoading || !config) {
     return (
-      <div className="flex items-center justify-center h-full bg-white">
-        <RefreshCw className="h-5 w-5 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center h-full bg-card">
+        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-card">
       {/* Page header */}
-      <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3 flex-shrink-0">
-        <h1 className="text-lg font-semibold text-slate-900">AI Receptionist</h1>
-        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium">
-          Live on SMS
-        </Badge>
+      <div className="px-6 py-4 border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-foreground">Current SMS Receptionist</h1>
+          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium">
+            Live on SMS
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          This controls your current SMS receptionist.
+        </p>
       </div>
 
       {/* Tab bar */}
-      <div className="border-b border-slate-200 px-6 flex gap-6 flex-shrink-0">
-        <button className="py-3 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 -mb-px">
+      <div className="border-b border-border px-6 flex gap-6 flex-shrink-0">
+        <button className="py-3 text-sm font-semibold text-primary border-b-2 border-primary -mb-px">
           Configure
         </button>
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <span className="py-3 text-sm font-medium text-slate-400 cursor-not-allowed select-none">
+            <span className="py-3 text-sm font-medium text-muted-foreground cursor-not-allowed select-none">
               Test
             </span>
           </TooltipTrigger>
@@ -243,8 +248,8 @@ export default function AgentConfig() {
       {/* Scrollable form area */}
       <div className="flex-1 overflow-y-auto">
         {/* Template picker */}
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-600 mb-2.5">
+        <div className="px-6 pt-5 pb-4 border-b border-border">
+          <p className="text-xs font-semibold text-muted-foreground mb-2.5">
             Start from a template
           </p>
           <div className="flex flex-wrap gap-2">
@@ -254,8 +259,8 @@ export default function AgentConfig() {
                 onClick={() => applyTemplate(tpl.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
                   appliedId === tpl.id
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                    : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700 hover:bg-indigo-50"
+                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                    : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-surface-muted"
                 }`}
               >
                 <span role="img" aria-label={tpl.label}>{tpl.emoji}</span>
@@ -264,7 +269,7 @@ export default function AgentConfig() {
             ))}
           </div>
           {appliedId && (
-            <p className="text-[11px] text-indigo-600 mt-2">
+            <p className="text-[11px] text-primary mt-2">
               Template applied — edit the fields below and save.
             </p>
           )}
@@ -276,15 +281,15 @@ export default function AgentConfig() {
           <div className="flex-1 min-w-0 max-w-xl space-y-5">
             {/* Business name (read-only) */}
             <div>
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1.5 block">
+              <label className="text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5 block">
                 Business Name
               </label>
               <Input
                 value={config.name}
                 disabled
-                className="h-9 bg-slate-50 text-slate-500 border-slate-200 text-sm"
+                className="h-9 bg-surface-muted text-muted-foreground border-border text-sm"
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Update your business name in account settings.
               </p>
             </div>
@@ -292,19 +297,19 @@ export default function AgentConfig() {
             {/* Greeting message */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
                   Greeting Message
                 </label>
                 <CharCount value={greeting} max={500} />
               </div>
               <Textarea
                 placeholder="Hi! This is the virtual receptionist for [Business]. How can I help you today?"
-                className="text-sm resize-none min-h-[80px] border-slate-200 focus-visible:ring-indigo-500"
+                className="text-sm resize-none min-h-[80px] border-border focus-visible:ring-ring"
                 maxLength={500}
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value)}
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 The first SMS message sent to callers.
               </p>
             </div>
@@ -312,19 +317,19 @@ export default function AgentConfig() {
             {/* Business description */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
                   Business Description
                 </label>
                 <CharCount value={description} max={1000} />
               </div>
               <Textarea
                 placeholder="We are a [type] company that helps customers with…"
-                className="text-sm resize-none min-h-[100px] border-slate-200 focus-visible:ring-indigo-500"
+                className="text-sm resize-none min-h-[100px] border-border focus-visible:ring-ring"
                 maxLength={1000}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Context the AI uses to answer questions and qualify leads.
               </p>
             </div>
@@ -332,11 +337,11 @@ export default function AgentConfig() {
             {/* Qualifying questions */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
                   Qualifying Questions
                 </label>
                 <button
-                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 disabled:opacity-40 transition-colors"
+                  className="text-xs text-primary hover:text-primary font-medium flex items-center gap-1 disabled:opacity-40 transition-colors"
                   onClick={addQuestion}
                   disabled={questions.length >= 6}
                   aria-label="Add qualifying question"
@@ -344,11 +349,11 @@ export default function AgentConfig() {
                   <Plus className="h-3.5 w-3.5" /> Add
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400 mb-3">
+              <p className="text-[11px] text-muted-foreground mb-3">
                 Questions the AI asks to qualify each lead (up to 6, max 200 chars each).
               </p>
               {questions.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-sm text-slate-400">
+                <div className="text-center py-6 border border-dashed border-border rounded-lg text-sm text-muted-foreground">
                   No questions yet — click Add to create one
                 </div>
               ) : (
@@ -361,7 +366,7 @@ export default function AgentConfig() {
                           <button
                             onClick={() => moveQuestion(i, "up")}
                             disabled={i === 0}
-                            className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-0.5 text-muted-foreground hover:text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             aria-label="Move question up"
                           >
                             <ChevronUp className="h-3.5 w-3.5" />
@@ -369,7 +374,7 @@ export default function AgentConfig() {
                           <button
                             onClick={() => moveQuestion(i, "down")}
                             disabled={i === questions.length - 1}
-                            className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-0.5 text-muted-foreground hover:text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             aria-label="Move question down"
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
@@ -380,11 +385,11 @@ export default function AgentConfig() {
                           onChange={(e) => updateQuestion(i, e.target.value)}
                           placeholder={`Question ${i + 1}…`}
                           maxLength={200}
-                          className="h-9 text-sm border-slate-200 focus-visible:ring-indigo-500 flex-1"
+                          className="h-9 text-sm border-border focus-visible:ring-ring flex-1"
                           aria-label={`Qualifying question ${i + 1}`}
                         />
                         <button
-                          className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors flex-shrink-0"
+                          className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-50 transition-colors flex-shrink-0"
                           onClick={() => removeQuestion(i)}
                           aria-label={`Remove question ${i + 1}`}
                         >
@@ -403,7 +408,7 @@ export default function AgentConfig() {
             {/* Inline save button (always visible in scroll area) */}
             <div className="flex items-center gap-3 pt-1">
               <Button
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold h-9 gap-1.5"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold h-9 gap-1.5"
                 onClick={handleSave}
                 disabled={mutation.isPending || (!isDirty && !saved)}
               >
@@ -428,21 +433,21 @@ export default function AgentConfig() {
 
       {/* Sticky save bar — appears when form is dirty */}
       {isDirty && (
-        <div className="border-t border-indigo-100 bg-indigo-50 px-6 py-3 flex-shrink-0 flex items-center justify-between gap-4 shadow-md">
-          <p className="text-sm text-indigo-700 font-medium">You have unsaved changes</p>
+        <div className="border-t border-primary/20 bg-surface-muted px-6 py-3 flex-shrink-0 flex items-center justify-between gap-4 shadow-md">
+          <p className="text-sm text-primary font-medium">You have unsaved changes</p>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={handleReset}
               disabled={mutation.isPending}
-              className="h-8 text-sm border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+              className="h-8 text-sm border-primary/30 text-primary hover:bg-surface-muted"
             >
               Discard
             </Button>
             <Button
               size="sm"
-              className="h-8 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5"
+              className="h-8 text-sm bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5"
               onClick={handleSave}
               disabled={mutation.isPending}
             >
