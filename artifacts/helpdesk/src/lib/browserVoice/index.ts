@@ -2,8 +2,8 @@ export type { BrowserVoiceTestState, BrowserVoiceEvent, BrowserVoiceStartInput, 
 export { UnavailableBrowserVoiceClient } from "./UnavailableBrowserVoiceClient";
 export {
   BrowserVoiceClientProvider,
-  useBrowserVoiceClientFactory,
-  type BrowserVoiceClientFactory,
+  useBrowserVoiceClientSource,
+  type BrowserVoiceClientSource,
 } from "./context";
 export { safeBrowserVoiceErrorMessage, type BrowserVoiceErrorCategory } from "./errors";
 export { browserTestDisabledReason, isBrowserTestEligible, type BrowserTestEligibilityInput } from "./eligibility";

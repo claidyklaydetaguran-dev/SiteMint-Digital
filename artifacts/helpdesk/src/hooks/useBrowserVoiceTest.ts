@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BrowserVoiceClient, BrowserVoiceEvent, BrowserVoiceStartInput, BrowserVoiceTestState } from "@/lib/browserVoice/types";
-import { useBrowserVoiceClientFactory } from "@/lib/browserVoice/context";
+import { useBrowserVoiceClientSource } from "@/lib/browserVoice/context";
 import { safeBrowserVoiceErrorMessage } from "@/lib/browserVoice/errors";
 
 const ACTIVE_STATES: ReadonlySet<BrowserVoiceTestState> = new Set(["preparing", "connecting", "connected", "ending"]);
@@ -54,7 +54,7 @@ export interface UseBrowserVoiceTestResult {
  * same tick can never produce two client operations.
  */
 export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
-  const factory = useBrowserVoiceClientFactory();
+  const source = useBrowserVoiceClientSource();
   const [state, setState] = useState<BrowserVoiceTestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -147,7 +147,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
       setErrorMessage(null);
       setState("preparing");
 
-      const client = factory();
+      const client = source.create();
       clientRef.current = client;
       liveRef.current = true;
       unsubscribeRef.current = client.subscribe(handleEvent);
@@ -160,7 +160,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
         setState("error");
       });
     },
-    [factory, handleEvent, teardownClient],
+    [source, handleEvent, teardownClient],
   );
 
   const end = useCallback(() => {
@@ -211,7 +211,11 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
 
   useEffect(() => () => teardownClient(), [teardownClient]);
 
-  const clientAvailable = useMemo(() => factory().available, [factory]);
+  // A plain, side-effect-free config read (flags + public key presence) —
+  // never constructs a BrowserVoiceClient or the provider SDK, so this is
+  // safe to read on every render regardless of the current assistant's
+  // eligibility status.
+  const clientAvailable = source.available;
   const isActive = ACTIVE_STATES.has(state);
 
   return { state, errorMessage, elapsedSeconds, clientAvailable, isActive, start, end, dismiss, reset, bestEffortUnloadCleanup };
