@@ -4,12 +4,14 @@ import { Bot, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { BuilderNotice } from "@/components/common/BuilderNotice";
+import { PublishButton } from "@/components/common/PublishButton";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateAssistant } from "@/hooks/useAssistants";
 import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, findTemplateByKey, isValidTemplateKey } from "@/lib/assistantConfig";
 import { useLocalAssistantDraft } from "@/hooks/useAssistantDrafts";
 import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
+import { voicePublishEnabled } from "@/lib/featureFlags";
 
 function ExpiredPreview() {
   return (
@@ -94,6 +96,18 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
       statusBadge={createMutation.isPending ? "Saving…" : "Not Saved"}
       announcement={announcement}
       headerBanner={<BuilderNotice />}
+      publishControl={
+        <PublishButton
+          eligible={false}
+          pending={false}
+          disabledReason={
+            voicePublishEnabled
+              ? "Save this assistant as a draft before publishing."
+              : "Publishing is not enabled in this environment."
+          }
+          onClick={() => {}}
+        />
+      }
       footerRight={
         <div className="flex flex-col items-end gap-1.5">
           {saveError && (

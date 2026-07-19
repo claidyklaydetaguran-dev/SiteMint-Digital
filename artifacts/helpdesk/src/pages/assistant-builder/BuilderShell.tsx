@@ -73,6 +73,21 @@ interface BuilderShellProps extends BuilderTabProps {
   footerRight: ReactNode;
   /** Screen-reader-only save-status announcement (aria-live). */
   announcement: string;
+  /**
+   * Milestone 1 / Checkpoint E3C: the Publish control for this builder
+   * instance. Defaults to the standing "unavailable" placeholder (matching
+   * pre-E3C behavior) when the caller doesn't supply one — the new/unsaved
+   * builder always uses the default, since publishing is never eligible for
+   * an unpersisted assistant.
+   */
+  publishControl?: ReactNode;
+  /**
+   * True while a publish request is in flight for this assistant. Disables
+   * the name field and every tab's editable controls (via a fieldset) so a
+   * publish attempt can't race a concurrent edit — mirrors the existing
+   * disabled Save Draft behavior during that same window.
+   */
+  contentDisabled?: boolean;
 }
 
 /**
@@ -92,6 +107,8 @@ export function BuilderShell({
   headerBanner,
   footerRight,
   announcement,
+  publishControl,
+  contentDisabled = false,
 }: BuilderShellProps) {
   const preset = getVoicePreset(draft.voiceModel.preset);
 
@@ -123,6 +140,7 @@ export function BuilderShell({
               }
               placeholder="Untitled assistant"
               maxLength={100}
+              disabled={contentDisabled}
               className="h-9 max-w-xs text-sm font-semibold"
             />
             <Badge variant="secondary" className="flex-shrink-0 text-xs font-medium">
@@ -135,11 +153,13 @@ export function BuilderShell({
               label="Test"
               availability="Browser test calling available in Checkpoint F."
             />
-            <UnavailableActionButton
-              icon={Rocket}
-              label="Publish"
-              availability="Publishing available in Checkpoint E3."
-            />
+            {publishControl ?? (
+              <UnavailableActionButton
+                icon={Rocket}
+                label="Publish"
+                availability="Publishing available in Checkpoint E3."
+              />
+            )}
           </div>
         </div>
         {headerBanner && <div className="mt-3">{headerBanner}</div>}
@@ -173,7 +193,9 @@ export function BuilderShell({
         </div>
 
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
-          <TabPanel tab={tab} draft={draft} update={update} />
+          <fieldset disabled={contentDisabled} className="min-w-0">
+            <TabPanel tab={tab} draft={draft} update={update} />
+          </fieldset>
         </div>
       </Tabs>
 

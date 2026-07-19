@@ -7,12 +7,14 @@ import {
   updateAssistant,
   duplicateAssistant,
   deleteAssistant,
+  publishAssistant,
   type AssistantDto,
   type CreateAssistantInput,
   type UpdateAssistantInput,
+  type PublishedAssistantResult,
 } from "@/lib/assistantsApi";
-import { useAuthenticatedFirmId } from "@/hooks/useSession";
-import { voicePlatformEnabled } from "@/lib/featureFlags";
+import { useAuthenticatedFirmId, SESSION_KEY } from "@/hooks/useSession";
+import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
 
 /**
  * Milestone 1 / Checkpoint E2 (correction pass): query/mutation hooks for
@@ -111,6 +113,44 @@ export function useDeleteAssistant() {
       if (firmId === undefined) return;
       qc.removeQueries({ queryKey: assistantDetailKey(firmId, id) });
       qc.invalidateQueries({ queryKey: assistantsListKey(firmId) });
+    },
+  });
+}
+
+/**
+ * Milestone 1 / Checkpoint E3C: firm-scoped publish mutation. The
+ * authenticated firm id is used only as a local cache-invalidation
+ * namespace — it is never sent to the server (publishAssistant() sends no
+ * body at all). retry is false: an HTTP error from this endpoint can mean
+ * the backend already transitioned the assistant to `error`, `publishing`,
+ * or `publish_uncertain`, so blindly retrying the same request client-side
+ * would be unsafe. Every settled outcome (success or error) invalidates
+ * only this firm's detail/list caches so the UI always re-renders from the
+ * server-confirmed status rather than an assumed one.
+ */
+export function usePublishAssistant(id: number | undefined) {
+  const qc = useQueryClient();
+  const firmId = useAuthenticatedFirmId();
+  const usable =
+    voicePlatformEnabled && voicePublishEnabled && firmId !== undefined && id !== undefined && id > 0;
+
+  return useMutation<PublishedAssistantResult, unknown, void>({
+    mutationFn: async () => {
+      if (!usable || id === undefined) {
+        throw new Error("Publishing is not available right now.");
+      }
+      return publishAssistant(id);
+    },
+    retry: false,
+    onSettled: (_result, error) => {
+      if (firmId !== undefined && id !== undefined) {
+        qc.invalidateQueries({ queryKey: assistantDetailKey(firmId, id) });
+        qc.invalidateQueries({ queryKey: assistantsListKey(firmId) });
+      }
+      const status = (error as { status?: number } | undefined)?.status;
+      if (status === 401) {
+        qc.invalidateQueries({ queryKey: SESSION_KEY });
+      }
     },
   });
 }

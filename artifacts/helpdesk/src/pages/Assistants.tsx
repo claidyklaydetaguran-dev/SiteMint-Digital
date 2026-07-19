@@ -44,26 +44,24 @@ import { InlineError } from "@/components/common/InlineError";
 import { SearchInput } from "@/components/common/SearchInput";
 import { SegmentedControl } from "@/components/common/SegmentedControl";
 import { SkeletonCard, SkeletonRow } from "@/components/common/Skeletons";
-import { StatusBadge, type StatusTone } from "@/components/common/StatusBadge";
+import { StatusBadge } from "@/components/common/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { useAssistantsList, useDeleteAssistant, useDuplicateAssistant } from "@/hooks/useAssistants";
-import { AssistantApiRequestError, type AssistantDto } from "@/lib/assistantsApi";
+import { AssistantApiRequestError, type AssistantDto, type AssistantStatus } from "@/lib/assistantsApi";
 import { ASSISTANT_TEMPLATES } from "@/lib/assistantTemplates";
+import { STATUS_LABEL, STATUS_TONE, isEligibleForDelete } from "@/lib/assistantStatus";
 
 type ViewMode = "cards" | "table";
-type StatusFilter = "all" | "draft" | "published" | "error";
+type StatusFilter = "all" | AssistantStatus;
 
-const STATUS_LABEL: Record<AssistantDto["status"], string> = {
-  draft: "Draft",
-  published: "Published",
-  error: "Error",
-};
-
-const STATUS_TONE: Record<AssistantDto["status"], StatusTone> = {
-  draft: "neutral",
-  published: "success",
-  error: "destructive",
-};
+const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "All statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "publishing", label: "Publishing" },
+  { value: "published", label: "Published" },
+  { value: "error", label: "Error" },
+  { value: "publish_uncertain", label: "Publish uncertain" },
+];
 
 function templateDisplayName(templateKey: string): string {
   return ASSISTANT_TEMPLATES.find((t) => t.id === templateKey)?.name ?? templateKey;
@@ -73,10 +71,6 @@ function formatUpdatedAt(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function isEligibleForDelete(assistant: AssistantDto): boolean {
-  return assistant.status === "draft" && !assistant.provider && !assistant.providerAssistantId;
 }
 
 function providerLabel(assistant: AssistantDto): string {
@@ -284,10 +278,11 @@ export default function Assistants() {
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="error">Error</SelectItem>
+              {STATUS_FILTER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <SegmentedControl<ViewMode>

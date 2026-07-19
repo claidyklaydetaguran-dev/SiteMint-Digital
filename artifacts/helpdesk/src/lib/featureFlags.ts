@@ -19,3 +19,16 @@ function parseBooleanFlag(value: unknown): boolean {
 export const voicePlatformEnabled: boolean = parseBooleanFlag(
   import.meta.env.VITE_VOICE_PLATFORM_ENABLED,
 );
+
+/**
+ * Milestone 1 / Checkpoint E3C: gates the frontend Publish workflow (the
+ * confirmation dialog and the POST .../publish request). Defaults false
+ * (production-safe) when unset or invalid. This is a frontend convenience
+ * gate only, never a security boundary — the backend `publish_disabled`
+ * response remains the ultimate authority regardless of this flag's value.
+ * Has no effect when `voicePlatformEnabled` is false, since the assistant
+ * routes themselves are unavailable in that case.
+ */
+export const voicePublishEnabled: boolean = parseBooleanFlag(
+  import.meta.env.VITE_VOICE_PUBLISH_ENABLED,
+);

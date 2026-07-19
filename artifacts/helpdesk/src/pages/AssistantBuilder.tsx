@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { Bot, Save, Loader2 } from "lucide-react";
+import { Bot, Save, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { InlineError } from "@/components/common/InlineError";
 import { SkeletonCard } from "@/components/common/Skeletons";
+import { PublishButton } from "@/components/common/PublishButton";
+import { PublishConfirmDialog } from "@/components/common/PublishConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
-import { useAssistantDetail, useUpdateAssistant } from "@/hooks/useAssistants";
+import { useAssistantDetail, useUpdateAssistant, usePublishAssistant } from "@/hooks/useAssistants";
 import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, hydrateConfigToDraft } from "@/lib/assistantConfig";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
+import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
+import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
+import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
 
 export type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
 const ROUTE_ID_PATTERN = /^[1-9]\d*$/;
+const PUBLISHING_POLL_INTERVAL_MS = 4000;
 
 function BuilderDetailSkeleton() {
   return (
@@ -34,6 +40,18 @@ function draftKey(draft: Pick<AssistantDraft, "setup" | "prompt" | "voiceModel" 
   return JSON.stringify({ name, config: serializeDraftToConfig(draft as AssistantDraft) });
 }
 
+function formatSyncedAt(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function formatProviderName(provider: string | null): string {
+  if (!provider) return "the voice provider";
+  return provider.length > 0 ? provider[0].toUpperCase() + provider.slice(1) : provider;
+}
+
 export default function AssistantBuilder() {
   const params = useParams<{ id: string; tab?: string }>();
   const [, navigate] = useLocation();
@@ -45,13 +63,18 @@ export default function AssistantBuilder() {
 
   const { data: assistant, isLoading, isError, error, refetch } = useAssistantDetail(numericId);
   const updateMutation = useUpdateAssistant(numericId ?? -1);
+  const publishMutation = usePublishAssistant(numericId);
 
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
   const [baseline, setBaseline] = useState<{ name: string; draft: AssistantDraft } | null>(null);
   const [hydrationWarning, setHydrationWarning] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [publishBanner, setPublishBanner] = useState<string | null>(null);
   const hydratedIdRef = useRef<number | null>(null);
   const announcedErrorRef = useRef<string | null>(null);
+  const publishButtonRef = useRef<HTMLButtonElement | null>(null);
+  const publishInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!params.tab && numericId !== undefined) {
@@ -89,6 +112,31 @@ export default function AssistantBuilder() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [draft, baseline]);
 
+  // Milestone 1 / Checkpoint E3C: warn on unload while a publish request is
+  // still in flight — leaving the page must never be presented as safely
+  // cancelling a publish attempt that may still complete server-side.
+  useEffect(() => {
+    if (!publishMutation.isPending) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [publishMutation.isPending]);
+
+  // Milestone 1 / Checkpoint E3C: while the server-confirmed status is
+  // "publishing", poll the ordinary GET detail endpoint (never the publish
+  // endpoint) so a customer watching this page sees the outcome without a
+  // manual refresh. Stops the moment status is no longer "publishing".
+  useEffect(() => {
+    if (!assistant || assistant.status !== "publishing") return;
+    const intervalId = window.setInterval(() => {
+      refetch();
+    }, PUBLISHING_POLL_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [assistant?.status, refetch]);
+
   const isDirty = useMemo(() => {
     if (!draft || !baseline) return false;
     return draftKey(draft, draft.setup.assistantName) !== draftKey(baseline.draft, baseline.name);
@@ -101,7 +149,7 @@ export default function AssistantBuilder() {
   };
 
   const handleSave = () => {
-    if (!draft || !numericId || !isDirty || !isNameValid || updateMutation.isPending) return;
+    if (!draft || !numericId || !isDirty || !isNameValid || updateMutation.isPending || publishMutation.isPending) return;
     setSaveError(null);
     updateMutation.mutate(
       {
@@ -127,6 +175,89 @@ export default function AssistantBuilder() {
         },
       },
     );
+  };
+
+  const restoreFocusToPublishButton = () => {
+    requestAnimationFrame(() => publishButtonRef.current?.focus());
+  };
+
+  const publishEligible =
+    voicePlatformEnabled &&
+    voicePublishEnabled &&
+    !!assistant &&
+    !!numericId &&
+    !isDirty &&
+    isNameValid &&
+    !updateMutation.isPending &&
+    !publishMutation.isPending &&
+    isPublishableStatus(assistant.status) &&
+    !assistant.provider &&
+    !assistant.providerAssistantId;
+
+  function publishDisabledReason(): string | undefined {
+    if (!voicePublishEnabled) return "Publishing is not enabled in this environment.";
+    if (!assistant || !draft) return undefined;
+    if (!numericId) return "Save this assistant as a draft before publishing.";
+    if (isDirty) return "Save your changes before publishing.";
+    if (!isNameValid) return "Enter a valid assistant name before publishing.";
+    if (updateMutation.isPending) return "Saving is in progress. Publish will be available once saving finishes.";
+    if (publishMutation.isPending) return "Publishing is already in progress.";
+    if (assistant.status === "publishing") return "Publishing is already in progress.";
+    if (assistant.status === "published") return "This assistant has already been published.";
+    if (assistant.status === "publish_uncertain")
+      return "Publishing could not be confirmed for this assistant. Contact support before taking another action.";
+    if (assistant.status === "unknown") return "This assistant's status could not be determined.";
+    if (assistant.provider || assistant.providerAssistantId)
+      return "This assistant is already connected to a voice provider.";
+    return "Publishing is not available right now.";
+  }
+
+  const openPublishDialog = () => {
+    if (!publishEligible || publishMutation.isPending) return;
+    setPublishBanner(null);
+    setPublishDialogOpen(true);
+  };
+
+  const cancelPublishDialog = () => {
+    if (publishMutation.isPending) return;
+    setPublishDialogOpen(false);
+    restoreFocusToPublishButton();
+  };
+
+  const confirmPublish = () => {
+    // `publishMutation.isPending` only flips after React commits the mutation's
+    // internal state update, so two clicks arriving in the same tick (a fast
+    // double-click, or a click event that fires again before re-render) can
+    // both read `isPending` as still false. `publishInFlightRef` is a plain
+    // mutable ref, set synchronously here, so it closes that race — this is
+    // the only thing standing between "one confirm click" and two POSTs.
+    if (publishInFlightRef.current || publishMutation.isPending) return;
+    publishInFlightRef.current = true;
+    publishMutation.mutate(undefined, {
+      onSuccess: () => {
+        setPublishBanner(null);
+        setPublishDialogOpen(false);
+        restoreFocusToPublishButton();
+        toast({ title: "Assistant published", description: `"${draft?.setup.assistantName ?? "Assistant"}" was published.` });
+      },
+      onError: (err) => {
+        setPublishDialogOpen(false);
+        restoreFocusToPublishButton();
+        const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
+        const code = apiErr?.code;
+        // already_published / publish_in_progress / assistant_not_found resolve
+        // themselves once the detail refetch (triggered by the mutation's
+        // onSettled) lands — no separate transient banner needed for those.
+        if (code === "already_published" || code === "publish_in_progress" || code === "assistant_not_found") {
+          return;
+        }
+        const message = publishRouteErrorMessage(code, apiErr?.message ?? "Something went wrong while publishing. Please try again.");
+        setPublishBanner(message);
+      },
+      onSettled: () => {
+        publishInFlightRef.current = false;
+      },
+    });
   };
 
   if (!isValidId) {
@@ -187,74 +318,144 @@ export default function AssistantBuilder() {
     return <BuilderDetailSkeleton />;
   }
 
-  const isEligibleForDelete = assistant.status === "draft" && !assistant.provider && !assistant.providerAssistantId;
+  const deletable = isEligibleForDelete(assistant);
+  const syncedAtDisplay = formatSyncedAt(assistant.lastSyncedAt);
 
   let statusLabel: string;
-  if (updateMutation.isPending) statusLabel = "Saving…";
+  if (publishMutation.isPending) statusLabel = "Publishing…";
+  else if (updateMutation.isPending) statusLabel = "Saving…";
   else if (isDirty) statusLabel = "Unsaved changes";
-  else statusLabel = `${assistant.status === "draft" ? "Draft" : assistant.status === "published" ? "Published" : "Error"} · Saved`;
+  else statusLabel = `${STATUS_LABEL[assistant.status]} · Saved`;
 
-  const announcement = updateMutation.isPending
-    ? "Saving…"
-    : saveError
-      ? `Save failed: ${saveError}. Unsaved changes remain.`
-      : isDirty
-        ? "Unsaved changes"
-        : "Saved";
+  const announcement = publishMutation.isPending
+    ? "Publishing is in progress. Do not submit again."
+    : assistant.status === "publish_uncertain"
+      ? "Publishing could not be confirmed. Do not publish again. Contact support before taking another action."
+      : assistant.status === "publishing"
+        ? "Publishing is already in progress."
+        : publishBanner
+          ? `Publish failed: ${publishBanner}`
+          : updateMutation.isPending
+            ? "Saving…"
+            : saveError
+              ? `Save failed: ${saveError}. Unsaved changes remain.`
+              : isDirty
+                ? "Unsaved changes"
+                : assistant.status === "published"
+                  ? "Assistant published"
+                  : "Saved";
+
+  const saveDisabled =
+    !isDirty || !isNameValid || updateMutation.isPending || publishMutation.isPending || assistant.status === "publishing";
 
   return (
-    <BuilderShell
-      draft={draft}
-      update={update}
-      tab={tab}
-      onTabChange={(t) => navigate(`/assistants/${numericId}/${t}`)}
-      backHref="/assistants"
-      statusBadge={statusLabel}
-      announcement={announcement}
-      headerBanner={
-        <>
-          {hydrationWarning && (
-            <div role="status" className="rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
-              This assistant's saved configuration couldn't be fully read, so defaults are shown here. Saving will
-              replace it with the values currently in the builder.
-            </div>
-          )}
-          {assistant.status === "error" && assistant.syncError && (
-            <div role="status" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
-              <span className="font-semibold">Sync error:</span> {assistant.syncError}
-            </div>
-          )}
-          {!isEligibleForDelete && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {assistant.provider && assistant.providerAssistantId
-                ? "Connected to a voice provider."
-                : "Not connected."}
-              {" "}Assigned phone number: Available after Phone Numbers setup.
-            </p>
-          )}
-        </>
-      }
-      footerRight={
-        <div className="flex flex-col items-end gap-1.5">
-          {saveError && (
-            <p role="alert" className="max-w-xs text-right text-[11px] text-destructive">
-              {saveError}
-            </p>
-          )}
-          <Button
-            onClick={handleSave}
-            disabled={!isDirty || !isNameValid || updateMutation.isPending}
-            className="h-9 gap-1.5 text-sm"
-          >
-            {updateMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Save className="h-4 w-4" aria-hidden="true" />
+    <>
+      <BuilderShell
+        draft={draft}
+        update={update}
+        tab={tab}
+        onTabChange={(t) => navigate(`/assistants/${numericId}/${t}`)}
+        backHref="/assistants"
+        statusBadge={statusLabel}
+        announcement={announcement}
+        contentDisabled={publishMutation.isPending}
+        publishControl={
+          <PublishButton
+            ref={publishButtonRef}
+            eligible={publishEligible}
+            pending={publishMutation.isPending}
+            disabledReason={publishDisabledReason()}
+            onClick={openPublishDialog}
+          />
+        }
+        headerBanner={
+          <>
+            {hydrationWarning && (
+              <div role="status" className="rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
+                This assistant's saved configuration couldn't be fully read, so defaults are shown here. Saving will
+                replace it with the values currently in the builder.
+              </div>
             )}
-            {updateMutation.isPending ? "Saving…" : "Save Draft"}
-          </Button>
-        </div>
-      }
-    />
+            {assistant.status === "error" && assistant.syncError && (
+              <div role="status" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+                <span className="font-semibold">Publish failed:</span> {safeSyncErrorMessage(assistant.syncError)}
+              </div>
+            )}
+            {assistant.status === "publish_uncertain" && (
+              <div
+                role="alert"
+                className="mt-2 rounded-lg border-2 border-warning bg-warning/15 px-3.5 py-2.5 text-xs font-medium text-warning-foreground dark:text-warning"
+              >
+                Publishing could not be confirmed. Do not publish again. Contact support before taking another action.
+              </div>
+            )}
+            {assistant.status === "publishing" && (
+              <div role="status" className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-info/30 bg-info/10 px-3.5 py-2.5 text-xs text-info">
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  Publishing is already in progress.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-info underline-offset-2 hover:underline"
+                >
+                  <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                  Refresh status
+                </button>
+              </div>
+            )}
+            {publishBanner && assistant.status !== "error" && assistant.status !== "publish_uncertain" && (
+              <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+                {publishBanner}
+              </div>
+            )}
+            {assistant.status === "published" ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Connected to {formatProviderName(assistant.provider)}.
+                {syncedAtDisplay ? ` Last synced ${syncedAtDisplay}.` : ""}
+                {" "}Assigned phone number: Available after Phone Numbers setup. Test calling: Available in Checkpoint F.
+              </p>
+            ) : (
+              !deletable && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Not connected. Assigned phone number: Available after Phone Numbers setup.
+                </p>
+              )
+            )}
+          </>
+        }
+        footerRight={
+          <div className="flex flex-col items-end gap-1.5">
+            {saveError && (
+              <p role="alert" className="max-w-xs text-right text-[11px] text-destructive">
+                {saveError}
+              </p>
+            )}
+            {isDirty && assistant.status !== "publishing" && (
+              <p className="max-w-xs text-right text-[11px] text-muted-foreground">
+                Save your changes before publishing.
+              </p>
+            )}
+            <Button onClick={handleSave} disabled={saveDisabled} className="h-9 gap-1.5 text-sm">
+              {updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Save className="h-4 w-4" aria-hidden="true" />
+              )}
+              {updateMutation.isPending ? "Saving…" : "Save Draft"}
+            </Button>
+          </div>
+        }
+      />
+      <PublishConfirmDialog
+        open={publishDialogOpen}
+        assistantName={draft.setup.assistantName || "Untitled assistant"}
+        statusLabel={STATUS_LABEL[assistant.status]}
+        pending={publishMutation.isPending}
+        onCancel={cancelPublishDialog}
+        onConfirm={confirmPublish}
+      />
+    </>
   );
 }
