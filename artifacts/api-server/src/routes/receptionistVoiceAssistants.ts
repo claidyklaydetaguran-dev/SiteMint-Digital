@@ -6,6 +6,9 @@ import { Router, type Request, type Response } from "express";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import { voiceAssistantService } from "../lib/voiceAssistants/service.js";
 import { AssistantApiError } from "../lib/voiceAssistants/errors.js";
+import { validateRouteId } from "../lib/voiceAssistants/validation.js";
+import { publishAssistant } from "../lib/voicePublishing/publishService.js";
+import { buildPublishRouteError, type PublishRouteError } from "../lib/voicePublishing/publishHttpErrors.js";
 
 const router = Router();
 
@@ -147,6 +150,75 @@ router.delete(
       res.status(204).send();
     } catch (err) {
       handleError(req, res, err, "delete", req.params.id as string);
+    }
+  },
+);
+
+// ── POST /api/receptionist/voice/assistants/:id/publish ───────────────────────
+//
+// Checkpoint E3B2: authenticated, firm-scoped publish orchestration. firmId
+// comes only from req.firmId (the authenticated session) — never from the
+// body, query string, URL parameter, or a header. The browser may not supply
+// an attempt ID, provider, providerAssistantId, runtime values, or publish
+// status; the request body must be absent or an empty plain object.
+
+function sendPublishError(res: Response, error: PublishRouteError): void {
+  res.status(error.status).json({
+    error: { code: error.code, message: error.message, retryable: error.retryable },
+  });
+}
+
+/** The publish body must be absent or `{}` — any key (including firmId, provider, attempt ID, etc.) is rejected. */
+function assertEmptyPublishBody(body: unknown): void {
+  if (body === undefined || body === null) return;
+  if (typeof body !== "object" || Array.isArray(body)) {
+    throw new AssistantApiError("VALIDATION", "Request body must be empty or an empty object");
+  }
+  if (Object.keys(body as Record<string, unknown>).length > 0) {
+    throw new AssistantApiError("VALIDATION", "Request body must not contain any fields");
+  }
+}
+
+router.post(
+  "/receptionist/voice/assistants/:id/publish",
+  requireReceptionistAuth,
+  async (req: Request, res: Response) => {
+    let assistantId: number;
+    try {
+      assertEmptyPublishBody(req.body);
+      assistantId = validateRouteId(req.params.id as string);
+    } catch (err) {
+      if (err instanceof AssistantApiError) {
+        sendPublishError(res, buildPublishRouteError("invalid_request"));
+        return;
+      }
+      req.log.error(
+        { operation: "publish", firmId: req.firmId, category: "unexpected_internal_error", errorClass: safeErrorClassName(err) },
+        "[receptionist] voice assistant publish request failed",
+      );
+      sendPublishError(res, buildPublishRouteError("internal_error"));
+      return;
+    }
+
+    try {
+      const result = await publishAssistant(req.firmId!, assistantId);
+      if (result.ok) {
+        res.status(200).json({ assistant: result.assistant });
+        return;
+      }
+      sendPublishError(res, result.error);
+    } catch (err) {
+      req.log.error(
+        {
+          operation: "publish",
+          firmId: req.firmId,
+          assistantId,
+          category: "unexpected_internal_error",
+          errorClass: safeErrorClassName(err),
+        },
+        "[receptionist] voice assistant publish request failed",
+      );
+      sendPublishError(res, buildPublishRouteError("internal_error"));
     }
   },
 );
