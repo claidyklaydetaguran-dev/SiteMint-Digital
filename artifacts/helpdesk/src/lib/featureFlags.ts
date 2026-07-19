@@ -32,3 +32,19 @@ export const voicePlatformEnabled: boolean = parseBooleanFlag(
 export const voicePublishEnabled: boolean = parseBooleanFlag(
   import.meta.env.VITE_VOICE_PUBLISH_ENABLED,
 );
+
+/**
+ * Milestone 1 / Checkpoint F1: gates the frontend browser voice-test
+ * foundation (the Test confirmation dialog, the browser-test state machine,
+ * and the active test panel). Defaults false (production-safe) when unset
+ * or invalid. This is a frontend convenience gate only, never a security
+ * boundary, and it carries no provider host, public key, or private key —
+ * it is a plain capability switch. Has no effect when `voicePlatformEnabled`
+ * is false, since the assistant routes themselves are unavailable in that
+ * case. Even when this flag is true, production Test remains fail-closed
+ * until a real BrowserVoiceClient is wired in (Checkpoint F2) — see
+ * UnavailableBrowserVoiceClient.
+ */
+export const voiceBrowserTestEnabled: boolean = parseBooleanFlag(
+  import.meta.env.VITE_VOICE_BROWSER_TEST_ENABLED,
+);

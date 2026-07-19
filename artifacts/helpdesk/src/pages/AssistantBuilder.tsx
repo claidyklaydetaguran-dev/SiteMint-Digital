@@ -7,8 +7,13 @@ import { InlineError } from "@/components/common/InlineError";
 import { SkeletonCard } from "@/components/common/Skeletons";
 import { PublishButton } from "@/components/common/PublishButton";
 import { PublishConfirmDialog } from "@/components/common/PublishConfirmDialog";
+import { BrowserTestButton } from "@/components/common/BrowserTestButton";
+import { BrowserTestConfirmDialog } from "@/components/common/BrowserTestConfirmDialog";
+import { BrowserTestPanel } from "@/components/common/BrowserTestPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAssistantDetail, useUpdateAssistant, usePublishAssistant } from "@/hooks/useAssistants";
+import { useBrowserVoiceTest } from "@/hooks/useBrowserVoiceTest";
+import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, hydrateConfigToDraft } from "@/lib/assistantConfig";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
@@ -16,6 +21,7 @@ import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assis
 import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
+import { browserTestDisabledReason } from "@/lib/browserVoice/eligibility";
 
 export type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
@@ -71,10 +77,16 @@ export default function AssistantBuilder() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishBanner, setPublishBanner] = useState<string | null>(null);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
   const hydratedIdRef = useRef<number | null>(null);
   const announcedErrorRef = useRef<string | null>(null);
   const publishButtonRef = useRef<HTMLButtonElement | null>(null);
+  const testButtonRef = useRef<HTMLButtonElement | null>(null);
   const publishInFlightRef = useRef(false);
+  const testInFlightRef = useRef(false);
+
+  const firmId = useAuthenticatedFirmId();
+  const browserTest = useBrowserVoiceTest();
 
   useEffect(() => {
     if (!params.tab && numericId !== undefined) {
@@ -124,6 +136,46 @@ export default function AssistantBuilder() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [publishMutation.isPending]);
+
+  // Milestone 1 / Checkpoint F1: warn on unload while a browser test is
+  // active, and make a best-effort client teardown on pagehide (which fires
+  // more reliably than beforeunload on mobile browsers/tab discard).
+  // Neither promises the provider side actually terminates.
+  useEffect(() => {
+    if (!browserTest.isActive) return;
+    const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    const pagehideHandler = () => {
+      browserTest.bestEffortUnloadCleanup();
+    };
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    window.addEventListener("pagehide", pagehideHandler);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("pagehide", pagehideHandler);
+    };
+  }, [browserTest.isActive, browserTest.bestEffortUnloadCleanup]);
+
+  // Milestone 1 / Checkpoint F1: tenant/session safety. A browser test tied
+  // to one firm/assistant/provider identity must never remain active (or
+  // show its panel) once any of those change underneath the component —
+  // reset (not dismiss) forces an immediate client teardown regardless of
+  // the current state.
+  const resetBrowserTestRef = useRef(browserTest.reset);
+  resetBrowserTestRef.current = browserTest.reset;
+  const tenantResetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${firmId ?? "unresolved"}:${numericId ?? "none"}:${assistant?.providerAssistantId ?? "none"}:${assistant?.status ?? "none"}`;
+    if (tenantResetKeyRef.current === null) {
+      tenantResetKeyRef.current = key;
+      return;
+    }
+    if (tenantResetKeyRef.current === key) return;
+    tenantResetKeyRef.current = key;
+    resetBrowserTestRef.current();
+  }, [firmId, numericId, assistant?.providerAssistantId, assistant?.status]);
 
   // Milestone 1 / Checkpoint E3C: while the server-confirmed status is
   // "publishing", poll the ordinary GET detail endpoint (never the publish
@@ -190,6 +242,7 @@ export default function AssistantBuilder() {
     isNameValid &&
     !updateMutation.isPending &&
     !publishMutation.isPending &&
+    !browserTest.isActive &&
     isPublishableStatus(assistant.status) &&
     !assistant.provider &&
     !assistant.providerAssistantId;
@@ -258,6 +311,44 @@ export default function AssistantBuilder() {
         publishInFlightRef.current = false;
       },
     });
+  };
+
+  const restoreFocusToTestButton = () => {
+    requestAnimationFrame(() => testButtonRef.current?.focus());
+  };
+
+  const testDisabledReason = assistant
+    ? browserTestDisabledReason({
+        assistant,
+        isDirty,
+        savePending: updateMutation.isPending,
+        publishPending: publishMutation.isPending,
+        clientAvailable: browserTest.clientAvailable,
+        testActive: browserTest.isActive,
+      })
+    : "Save and publish this assistant before testing.";
+  const testEligible = voicePlatformEnabled && testDisabledReason === undefined;
+
+  const openTestDialog = () => {
+    if (!testEligible || browserTest.isActive) return;
+    setTestDialogOpen(true);
+  };
+
+  const cancelTestDialog = () => {
+    setTestDialogOpen(false);
+    restoreFocusToTestButton();
+  };
+
+  const confirmTest = () => {
+    // Mirrors confirmPublish's synchronous ref guard: rapid confirm clicks in
+    // the same tick must still produce exactly one client.start() call.
+    if (testInFlightRef.current || browserTest.isActive) return;
+    if (!assistant?.providerAssistantId || assistant.provider !== "vapi") return;
+    testInFlightRef.current = true;
+    setTestDialogOpen(false);
+    restoreFocusToTestButton();
+    browserTest.start({ provider: "vapi", providerAssistantId: assistant.providerAssistantId });
+    testInFlightRef.current = false;
   };
 
   if (!isValidId) {
@@ -346,7 +437,12 @@ export default function AssistantBuilder() {
                   : "Saved";
 
   const saveDisabled =
-    !isDirty || !isNameValid || updateMutation.isPending || publishMutation.isPending || assistant.status === "publishing";
+    !isDirty ||
+    !isNameValid ||
+    updateMutation.isPending ||
+    publishMutation.isPending ||
+    browserTest.isActive ||
+    assistant.status === "publishing";
 
   return (
     <>
@@ -358,7 +454,7 @@ export default function AssistantBuilder() {
         backHref="/assistants"
         statusBadge={statusLabel}
         announcement={announcement}
-        contentDisabled={publishMutation.isPending}
+        contentDisabled={publishMutation.isPending || browserTest.isActive}
         publishControl={
           <PublishButton
             ref={publishButtonRef}
@@ -366,6 +462,25 @@ export default function AssistantBuilder() {
             pending={publishMutation.isPending}
             disabledReason={publishDisabledReason()}
             onClick={openPublishDialog}
+          />
+        }
+        testControl={
+          <BrowserTestButton
+            ref={testButtonRef}
+            eligible={testEligible}
+            active={browserTest.isActive}
+            disabledReason={testDisabledReason}
+            onClick={openTestDialog}
+          />
+        }
+        testPanel={
+          <BrowserTestPanel
+            state={browserTest.state}
+            assistantName={draft.setup.assistantName || "Untitled assistant"}
+            elapsedSeconds={browserTest.elapsedSeconds}
+            errorMessage={browserTest.errorMessage}
+            onEnd={browserTest.end}
+            onDismiss={browserTest.dismiss}
           />
         }
         headerBanner={
@@ -414,7 +529,7 @@ export default function AssistantBuilder() {
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Connected to {formatProviderName(assistant.provider)}.
                 {syncedAtDisplay ? ` Last synced ${syncedAtDisplay}.` : ""}
-                {" "}Assigned phone number: Available after Phone Numbers setup. Test calling: Available in Checkpoint F.
+                {" "}Assigned phone number: Available after Phone Numbers setup.
               </p>
             ) : (
               !deletable && (
@@ -455,6 +570,12 @@ export default function AssistantBuilder() {
         pending={publishMutation.isPending}
         onCancel={cancelPublishDialog}
         onConfirm={confirmPublish}
+      />
+      <BrowserTestConfirmDialog
+        open={testDialogOpen}
+        assistantName={draft.setup.assistantName || "Untitled assistant"}
+        onCancel={cancelTestDialog}
+        onConfirm={confirmTest}
       />
     </>
   );

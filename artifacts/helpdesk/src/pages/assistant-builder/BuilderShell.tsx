@@ -82,6 +82,15 @@ interface BuilderShellProps extends BuilderTabProps {
    */
   publishControl?: ReactNode;
   /**
+   * Milestone 1 / Checkpoint F1: the Test control for this builder
+   * instance. Defaults to the standing "unavailable" placeholder when the
+   * caller doesn't supply one — the new/unsaved builder always uses the
+   * default, since testing is never eligible for an unpersisted assistant.
+   */
+  testControl?: ReactNode;
+  /** Milestone 1 / Checkpoint F1: the active browser-test panel, rendered below the header banner when a test is in progress or has just ended. */
+  testPanel?: ReactNode;
+  /**
    * True while a publish request is in flight for this assistant. Disables
    * the name field and every tab's editable controls (via a fieldset) so a
    * publish attempt can't race a concurrent edit — mirrors the existing
@@ -108,6 +117,8 @@ export function BuilderShell({
   footerRight,
   announcement,
   publishControl,
+  testControl,
+  testPanel,
   contentDisabled = false,
 }: BuilderShellProps) {
   const preset = getVoicePreset(draft.voiceModel.preset);
@@ -148,11 +159,13 @@ export function BuilderShell({
             </Badge>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
-            <UnavailableActionButton
-              icon={PlayCircle}
-              label="Test"
-              availability="Browser test calling available in Checkpoint F."
-            />
+            {testControl ?? (
+              <UnavailableActionButton
+                icon={PlayCircle}
+                label="Test"
+                availability="Save and publish this assistant before testing."
+              />
+            )}
             {publishControl ?? (
               <UnavailableActionButton
                 icon={Rocket}
@@ -163,6 +176,7 @@ export function BuilderShell({
           </div>
         </div>
         {headerBanner && <div className="mt-3">{headerBanner}</div>}
+        {testPanel && <div className="mt-3">{testPanel}</div>}
       </div>
 
       {/* Tabs + content */}
