@@ -1,0 +1,99 @@
+/**
+ * SiteMint Platform — Primitive Tokens
+ *
+ * Source of truth: docs/sitemint-platform/SHARED_DESIGN_TOKENS_SPEC.md §4, §9,
+ * §13-§18. Values are grounded in helpdesk's existing HSL palette
+ * (DESIGN_TOKEN_AUDIT.md §4, §25) and are additive-only per §Token Governance —
+ * changing an existing value here requires a new accessibility/contrast pass,
+ * not a quick edit.
+ *
+ * All color primitives are raw "H S% L%" triplets (no `hsl()` wrapper) so
+ * consumers can compose them with an alpha channel via `hsl(var(--sm-x) / <a>)`.
+ * Namespaced with `--sm-` to avoid colliding with any consuming app's own
+ * token names.
+ */
+
+:root {
+  /* Color primitives */
+  --sm-evergreen-900: 160 76% 22%;
+  --sm-evergreen-700: 160 55% 45%;
+  --sm-mint-500: 160 64% 50%;
+  --sm-mint-300: 160 60% 70%;
+  --sm-mint-100: 152 38% 96%;
+  --sm-jade-500: 172 45% 42%;
+
+  --sm-neutral-0: 0 0% 100%;
+  --sm-neutral-50: 150 22% 99%;
+  --sm-neutral-100: 152 38% 96%;
+  --sm-neutral-200: 152 16% 88%;
+  --sm-neutral-600: 155 10% 40%;
+  --sm-neutral-900: 160 25% 10%;
+
+  --sm-charcoal-950: 160 22% 7%;
+  --sm-charcoal-900: 158 18% 10%;
+  --sm-charcoal-800: 158 16% 13%;
+  --sm-charcoal-700: 158 14% 20%;
+
+  --sm-danger-500: 356 72% 52%;
+  --sm-success-500: 152 60% 42%;
+  --sm-warning-500: 38 92% 50%;
+  --sm-info-500: 199 80% 44%;
+
+  /* Typography primitives */
+  --sm-font-display: 'Playfair Display', 'Plus Jakarta Sans', serif;
+  --sm-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --sm-font-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --sm-weight-regular: 400;
+  --sm-weight-medium: 500;
+  --sm-weight-semibold: 600;
+  --sm-weight-bold: 700;
+  --sm-weight-extrabold: 800;
+
+  --sm-leading-tight: 1.1;
+  --sm-leading-relaxed: 1.6;
+  --sm-tracking-normal: 0em;
+
+  /* Radius primitives (SHARED_DESIGN_TOKENS_SPEC.md §13) */
+  --sm-radius-sm: 0.5rem;   /* ~8px — compact controls */
+  --sm-radius-md: 0.75rem;  /* ~12px — standard controls, inputs, cards */
+  --sm-radius-lg: 1rem;     /* ~16px — larger marketing cards, panels */
+  --sm-radius-xl: 1.25rem;  /* ~20px — hero/feature panels only */
+  --sm-radius-pill: 9999px; /* badges, filters, tags, pill controls only */
+
+  /* Border-width primitives */
+  --sm-border-width-hairline: 1px;
+  --sm-border-width-emphasis: 2px;
+
+  /* Motion primitives (§17) */
+  --sm-duration-instant: 80ms;
+  --sm-duration-fast: 120ms;
+  --sm-duration-normal: 200ms;
+  --sm-duration-slow: 320ms;
+  --sm-easing-standard: cubic-bezier(.2, .8, .2, 1);
+  --sm-easing-enter: cubic-bezier(.2, .9, .1, 1);
+  --sm-easing-exit: cubic-bezier(.4, 0, 1, 1);
+
+  /* Z-index primitives (§18) */
+  --sm-z-base: 0;
+  --sm-z-raised: 10;
+  --sm-z-dropdown: 20;
+  --sm-z-overlay: 40;
+  --sm-z-modal: 50;
+  --sm-z-toast: 100;
+  --sm-z-tooltip: 200;
+}
+
+/**
+ * Reduced motion: every duration primitive collapses to near-instant so any
+ * consumer transitioning on `--sm-duration-*` gets reduced-motion behavior
+ * for free, without needing its own media query (SHARED_DESIGN_TOKENS_SPEC.md §25).
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sm-duration-instant: 0.01ms;
+    --sm-duration-fast: 0.01ms;
+    --sm-duration-normal: 0.01ms;
+    --sm-duration-slow: 0.01ms;
+  }
+}

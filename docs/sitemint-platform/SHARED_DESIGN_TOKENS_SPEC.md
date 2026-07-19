@@ -15,6 +15,19 @@
 > (Phase 1A.1)" near the end of this document; every section below has been
 > updated in place to match those resolutions, and no section still points to
 > "the final report" for an answer.
+>
+> **Addendum (Phase 1B, implemented)**: the shared token source described in
+> §29/§30 now exists at `lib/design-tokens/` (`@workspace/design-tokens`,
+> CSS-only workspace package — `primitives.css` / `semantic.css` /
+> `components.css` / `index.css`, namespaced `--sm-*`). `artifacts/helpdesk`
+> consumes it via `@import "@workspace/design-tokens/css";` in
+> `src/index.css`, with helpdesk's existing variable names aliased onto the
+> shared semantic layer at identical resolved values except the two
+> corrected pairings this spec calls for (`color-border-focus`,
+> `color-status-success`, both §5/§16/§24). See `lib/design-tokens/README.md`
+> for usage and `lib/design-tokens/test/tokens.test.mjs` for the token-source
+> and corrected-contrast checks. No other artifact consumes the package yet —
+> that remains later, separately scoped Migration Strategy stages.
 
 ---
 

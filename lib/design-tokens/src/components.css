@@ -1,0 +1,45 @@
+/**
+ * SiteMint Platform — Component Tokens
+ *
+ * Source of truth: docs/sitemint-platform/SHARED_DESIGN_TOKENS_SPEC.md §6.
+ * These exist so an unsafe primitive/semantic pairing (e.g. white text
+ * directly on bright mint) is structurally impossible to reach through the
+ * sanctioned component API. Requires primitives.css and semantic.css to be
+ * imported first. Not wired into any application component in Phase 1B —
+ * this layer is published for future consumers per §29.
+ */
+
+:root {
+  --sm-button-primary-background: hsl(var(--sm-color-action-primary));
+  --sm-button-primary-text: hsl(var(--sm-color-text-inverse));
+  --sm-button-primary-background-hover: hsl(var(--sm-color-action-primary-hover));
+
+  --sm-button-secondary-background: hsl(var(--sm-color-action-secondary-bg));
+  --sm-button-secondary-text: hsl(var(--sm-color-action-secondary-text));
+
+  --sm-button-outline-border: hsl(var(--sm-color-border-strong));
+  --sm-button-outline-text: hsl(var(--sm-color-text-primary));
+
+  /* Bright-mint fill, dark ink only — never white text (measured 1.96:1, fails) */
+  --sm-button-accent-background: hsl(var(--sm-mint-500));
+  --sm-button-accent-text: hsl(160 30% 12%);
+
+  --sm-card-background: hsl(var(--sm-color-surface-default));
+  --sm-card-border: hsl(var(--sm-color-border-default));
+
+  --sm-input-border: hsl(var(--sm-color-border-default));
+  --sm-input-border-focus: hsl(var(--sm-color-border-focus));
+
+  --sm-badge-success-background: hsl(var(--sm-color-status-success));
+  --sm-badge-success-text: hsl(var(--sm-color-text-inverse));
+
+  --sm-badge-warning-background: hsl(var(--sm-color-status-warning));
+  --sm-badge-warning-text: hsl(32 40% 12%);
+
+  --sm-nav-link-text: hsl(var(--sm-color-text-secondary));
+  --sm-nav-link-text-active: hsl(var(--sm-color-action-primary));
+
+  --sm-focus-ring: hsl(var(--sm-color-border-focus));
+  --sm-focus-ring-width: 2px;
+  --sm-focus-ring-offset: 2px;
+}

@@ -1,0 +1,115 @@
+/**
+ * SiteMint Platform — Semantic Tokens
+ *
+ * Source of truth: docs/sitemint-platform/SHARED_DESIGN_TOKENS_SPEC.md §5,
+ * §15, §16. Resolves primitive tokens (primitives.css) into role-based tokens
+ * consumers should prefer over primitives. Requires primitives.css to be
+ * imported first.
+ *
+ * Two values below are corrected from helpdesk's raw historical values per
+ * the Phase 1A audit (DESIGN_TOKEN_AUDIT.md, Accessibility Review) and are
+ * NOT the same as a literal primitive:
+ *   - --sm-color-border-focus (light): darkened evergreen, not raw mint
+ *     (mint measured 1.96:1, failing the 3:1 non-text minimum).
+ *   - --sm-color-status-success (light): darkened success hue, not raw
+ *     success-500 (raw value measured 2.92:1 with white text, failing AA).
+ */
+
+:root {
+  /* Background (§5 Background) */
+  --sm-color-bg-canvas: var(--sm-neutral-50);
+  --sm-color-bg-subtle: var(--sm-neutral-100);
+  --sm-color-bg-elevated: var(--sm-neutral-0);
+  --sm-color-bg-inverse: var(--sm-charcoal-950);
+
+  /* Surface (§5 Surface) */
+  --sm-color-surface-default: var(--sm-neutral-0);
+  --sm-color-surface-muted: var(--sm-neutral-100);
+  --sm-color-surface-interactive: var(--sm-neutral-100);
+
+  /* Text (§5 Text) */
+  --sm-color-text-primary: var(--sm-neutral-900);
+  --sm-color-text-secondary: 155 10% 30%;
+  --sm-color-text-muted: var(--sm-neutral-600);
+  --sm-color-text-inverse: var(--sm-neutral-50);
+  --sm-color-text-link: var(--sm-evergreen-900);
+  --sm-color-text-disabled: 155 8% 55%;
+
+  /* Border (§5 Border) */
+  --sm-color-border-default: var(--sm-neutral-200);
+  --sm-color-border-subtle: 152 20% 93%;
+  --sm-color-border-strong: 152 10% 70%;
+  --sm-color-border-focus: 160 76% 30%; /* corrected — see file header */
+
+  /* Action (§5 Action) */
+  --sm-color-action-primary: var(--sm-evergreen-900);
+  --sm-color-action-primary-hover: 160 76% 18%;
+  --sm-color-action-primary-active: 160 76% 15%;
+  --sm-color-action-secondary-bg: var(--sm-neutral-100);
+  --sm-color-action-secondary-text: var(--sm-evergreen-900);
+  --sm-color-action-danger: var(--sm-danger-500);
+
+  /* Status (§5 Status) */
+  --sm-color-status-success: 152 50% 32%; /* corrected — see file header */
+  --sm-color-status-warning: var(--sm-warning-500);
+  --sm-color-status-danger: var(--sm-danger-500);
+  --sm-color-status-info: var(--sm-info-500);
+  --sm-color-status-neutral: var(--sm-neutral-600);
+
+  /* Shadow/Elevation (§15) */
+  --sm-shadow-none: none;
+  --sm-shadow-sm: 0 1px 2px 0 rgb(14 40 30 / 0.06);
+  --sm-shadow-md: 0 4px 8px -1px rgb(14 40 30 / 0.08), 0 2px 4px -2px rgb(14 40 30 / 0.05);
+  --sm-shadow-lg: 0 10px 15px -3px rgb(14 40 30 / 0.07), 0 4px 6px -4px rgb(14 40 30 / 0.05);
+  --sm-shadow-overlay: 0 25px 50px -12px rgb(14 40 30 / 0.14);
+  --sm-shadow-glow-subtle: 0 0 0 1px rgb(52 211 153 / 0.35), 0 8px 24px -6px rgb(52 211 153 / 0.35);
+}
+
+.dark {
+  /* Background */
+  --sm-color-bg-canvas: var(--sm-charcoal-950);
+  --sm-color-bg-subtle: var(--sm-charcoal-800);
+  --sm-color-bg-elevated: var(--sm-charcoal-900);
+  --sm-color-bg-inverse: var(--sm-neutral-50);
+
+  /* Surface */
+  --sm-color-surface-default: var(--sm-charcoal-900);
+  --sm-color-surface-muted: var(--sm-charcoal-800);
+  --sm-color-surface-interactive: var(--sm-charcoal-800);
+
+  /* Text */
+  --sm-color-text-primary: 150 20% 92%;
+  --sm-color-text-secondary: 150 12% 78%;
+  --sm-color-text-muted: 150 8% 62%;
+  --sm-color-text-inverse: var(--sm-charcoal-950);
+  --sm-color-text-link: var(--sm-evergreen-700);
+  --sm-color-text-disabled: 150 6% 45%;
+
+  /* Border */
+  --sm-color-border-default: var(--sm-charcoal-700);
+  --sm-color-border-subtle: 158 14% 16%;
+  --sm-color-border-strong: 158 10% 32%;
+  --sm-color-border-focus: 160 64% 55%; /* dark ring already passes (9.96:1), unchanged */
+
+  /* Action */
+  --sm-color-action-primary: var(--sm-evergreen-700);
+  --sm-color-action-primary-hover: 160 55% 50%;
+  --sm-color-action-primary-active: 160 55% 40%;
+  --sm-color-action-secondary-bg: var(--sm-charcoal-800);
+  --sm-color-action-secondary-text: 150 20% 92%;
+  --sm-color-action-danger: 356 65% 55%;
+
+  /* Status */
+  --sm-color-status-success: 152 55% 48%;
+  --sm-color-status-warning: 38 90% 55%;
+  --sm-color-status-danger: 356 65% 55%;
+  --sm-color-status-info: 199 75% 55%;
+  --sm-color-status-neutral: 150 8% 62%;
+
+  /* Shadow/Elevation */
+  --sm-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --sm-shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+  --sm-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+  --sm-shadow-overlay: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  --sm-shadow-glow-subtle: 0 0 0 1px rgb(52 211 153 / 0.4), 0 8px 28px -4px rgb(52 211 153 / 0.4);
+}

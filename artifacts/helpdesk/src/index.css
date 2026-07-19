@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@workspace/design-tokens/css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
@@ -116,18 +117,23 @@
   --elevate-1: rgba(15, 40, 30, .03);
   --elevate-2: rgba(15, 40, 30, .08);
 
-  /* Core surfaces — warm white app bg, white cards, pale-mint muted surfaces */
-  --background: 150 22% 99%;
-  --foreground: 160 25% 10%;
-  --card: 0 0% 100%;
-  --card-foreground: 160 25% 10%;
-  --card-border: 152 16% 88%;
-  --surface: 0 0% 100%;
-  --surface-muted: 152 38% 96%;
+  /* Core surfaces — warm white app bg, white cards, pale-mint muted surfaces.
+     Transitional aliases onto @workspace/design-tokens' shared semantic
+     layer (SHARED_DESIGN_TOKENS_SPEC.md §5, Migration Strategy stage 2) —
+     same resolved values as before, sourced from the shared package now. */
+  --background: var(--sm-color-bg-canvas);
+  --foreground: var(--sm-color-text-primary);
+  --card: var(--sm-color-surface-default);
+  --card-foreground: var(--sm-color-text-primary);
+  --card-border: var(--sm-color-border-default);
+  --surface: var(--sm-color-surface-default);
+  --surface-muted: var(--sm-color-surface-muted);
 
-  --border: 152 16% 88%;
-  --input: 152 16% 88%;
-  --ring: 160 64% 50%;
+  --border: var(--sm-color-border-default);
+  --input: var(--sm-color-border-default);
+  /* Corrected: darkened evergreen focus ring (was raw mint, 1.96:1, failing
+     the 3:1 non-text minimum). See SHARED_DESIGN_TOKENS_SPEC.md §16. */
+  --ring: var(--sm-color-border-focus);
 
   --sidebar: 0 0% 100%;
   --sidebar-foreground: 160 25% 10%;
@@ -158,7 +164,9 @@
 
   --destructive: 356 72% 52%;
   --destructive-foreground: 0 0% 100%;
-  --success: 152 60% 42%;
+  /* Corrected: darkened success fill (was raw success-500, 2.92:1 with white
+     text, failing AA). See SHARED_DESIGN_TOKENS_SPEC.md §5 Status, §24. */
+  --success: var(--sm-color-status-success);
   --success-foreground: 0 0% 100%;
   --warning: 38 92% 50%;
   --warning-foreground: 32 40% 12%;
@@ -172,31 +180,36 @@
   --chart-5: 6 75% 60%;
   --chart-6: 210 12% 45%;
 
-  --app-font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --app-font-display: 'Playfair Display', 'Plus Jakarta Sans', serif;
-  --app-font-mono: Menlo, monospace;
-  --radius: .75rem;
+  /* Typography/radius: transitional aliases onto the shared primitive layer
+     (values unchanged — see SHARED_DESIGN_TOKENS_SPEC.md §9, §13). */
+  --app-font-sans: var(--sm-font-body);
+  --app-font-display: var(--sm-font-display);
+  --app-font-mono: var(--sm-font-mono);
+  --radius: var(--sm-radius-md);
 
-  /* Green-tinted, low-opacity layered shadows */
+  /* Green-tinted, low-opacity layered shadows. shadow-sm/md/lg/2xl/mint-glow
+     alias onto the shared shadow ramp (SHARED_DESIGN_TOKENS_SPEC.md §15) —
+     values unchanged; shadow-2xs/xs/xl are helpdesk-local, not in the shared
+     spec's 5-step ramp, and are left as-is. */
   --shadow-2xs: 0 1px 0 0 rgb(14 40 30 / 0.04);
   --shadow-xs: 0 1px 1px 0 rgb(14 40 30 / 0.05);
-  --shadow-sm: 0 1px 2px 0 rgb(14 40 30 / 0.06);
+  --shadow-sm: var(--sm-shadow-sm);
   --shadow: 0 1px 3px 0 rgb(14 40 30 / 0.08), 0 1px 2px -1px rgb(14 40 30 / 0.07);
-  --shadow-md: 0 4px 8px -1px rgb(14 40 30 / 0.08), 0 2px 4px -2px rgb(14 40 30 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(14 40 30 / 0.07), 0 4px 6px -4px rgb(14 40 30 / 0.05);
+  --shadow-md: var(--sm-shadow-md);
+  --shadow-lg: var(--sm-shadow-lg);
   --shadow-xl: 0 20px 25px -5px rgb(14 40 30 / 0.08), 0 8px 10px -6px rgb(14 40 30 / 0.04);
-  --shadow-2xl: 0 25px 50px -12px rgb(14 40 30 / 0.14);
-  --shadow-mint-glow: 0 0 0 1px rgb(52 211 153 / 0.35), 0 8px 24px -6px rgb(52 211 153 / 0.35);
+  --shadow-2xl: var(--sm-shadow-overlay);
+  --shadow-mint-glow: var(--sm-shadow-glow-subtle);
 
-  --tracking-normal: 0em;
+  --tracking-normal: var(--sm-tracking-normal);
   --spacing: 0.25rem;
 
-  /* Motion */
-  --ease-standard: cubic-bezier(.2, .8, .2, 1);
-  --ease-emphasized: cubic-bezier(.2, .9, .1, 1);
-  --dur-fast: 120ms;
-  --dur: 200ms;
-  --dur-slow: 320ms;
+  /* Motion: aliases onto the shared motion primitives (values unchanged). */
+  --ease-standard: var(--sm-easing-standard);
+  --ease-emphasized: var(--sm-easing-enter);
+  --dur-fast: var(--sm-duration-fast);
+  --dur: var(--sm-duration-normal);
+  --dur-slow: var(--sm-duration-slow);
 
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
@@ -230,18 +243,20 @@
   --elevate-1: rgba(220, 245, 235, .04);
   --elevate-2: rgba(220, 245, 235, .09);
 
-  /* Deep green-charcoal — never pure black */
-  --background: 160 22% 7%;
-  --foreground: 150 20% 92%;
-  --card: 158 18% 10%;
-  --card-foreground: 150 20% 92%;
-  --card-border: 158 14% 20%;
-  --surface: 158 18% 10%;
-  --surface-muted: 158 16% 13%;
+  /* Deep green-charcoal — never pure black. Transitional aliases onto the
+     shared semantic layer (values unchanged — dark theme needed no
+     correction; see SHARED_DESIGN_TOKENS_SPEC.md §8, §16). */
+  --background: var(--sm-color-bg-canvas);
+  --foreground: var(--sm-color-text-primary);
+  --card: var(--sm-color-surface-default);
+  --card-foreground: var(--sm-color-text-primary);
+  --card-border: var(--sm-color-border-default);
+  --surface: var(--sm-color-surface-default);
+  --surface-muted: var(--sm-color-surface-muted);
 
-  --border: 158 14% 20%;
-  --input: 158 14% 20%;
-  --ring: 160 64% 55%;
+  --border: var(--sm-color-border-default);
+  --input: var(--sm-color-border-default);
+  --ring: var(--sm-color-border-focus);
 
   --sidebar: 160 22% 8%;
   --sidebar-foreground: 150 20% 92%;
@@ -272,7 +287,7 @@
 
   --destructive: 356 65% 55%;
   --destructive-foreground: 0 0% 100%;
-  --success: 152 55% 48%;
+  --success: var(--sm-color-status-success);
   --success-foreground: 152 40% 8%;
   --warning: 38 90% 55%;
   --warning-foreground: 32 40% 10%;
@@ -288,13 +303,13 @@
 
   --shadow-2xs: 0 1px 0 0 rgb(0 0 0 / 0.25);
   --shadow-xs: 0 1px 1px 0 rgb(0 0 0 / 0.25);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: var(--sm-shadow-sm);
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+  --shadow-md: var(--sm-shadow-md);
+  --shadow-lg: var(--sm-shadow-lg);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
-  --shadow-mint-glow: 0 0 0 1px rgb(52 211 153 / 0.4), 0 8px 28px -4px rgb(52 211 153 / 0.4);
+  --shadow-2xl: var(--sm-shadow-overlay);
+  --shadow-mint-glow: var(--sm-shadow-glow-subtle);
 }
 
 @layer base {
