@@ -7,6 +7,14 @@
 > Phase 1B is where a pilot application first consumes them.
 > **Companion document**: `DESIGN_TOKEN_AUDIT.md` (the evidence this spec is
 > built on — every value below traces back to a finding in that audit).
+> **Addendum (Phase 1A.1)**: the owner decisions this spec left open at Phase
+> 1A — radius personality, per-product theme defaults, AI Toolkit accent,
+> mint usage tiers, typography roles, motion intensity, icon/package
+> handling, overall visual personality, helpdesk-foundation status, and the
+> Phase 1B pilot scope — are now resolved. See "Owner Decisions — Resolved
+> (Phase 1A.1)" near the end of this document; every section below has been
+> updated in place to match those resolutions, and no section still points to
+> "the final report" for an answer.
 
 ---
 
@@ -18,9 +26,16 @@
 2. **One canonical source, many consumers.** Every artifact reads the same
    token values; no artifact re-derives or re-guesses a SiteMint color.
 3. **Foundation, not final.** Per Blueprint §24 Decision #6/#14, helpdesk's
-   existing values are the starting point, corrected only where
-   `DESIGN_TOKEN_AUDIT.md`'s Accessibility Review found a measured failure —
-   not redesigned wholesale.
+   existing values are the starting point, not an immutable finished design
+   system. This spec carries forward helpdesk's strongest patterns — its
+   semantic token model, evergreen/mint direction, light/dark plumbing, type
+   scale, focus/status concepts, and elevation utilities — while explicitly
+   allowing Phase 1B to refine contrast-failing values, naming consistency,
+   the radius and shadow hierarchies, product-accent rules, and marketing
+   density, per the Phase 1A.1 owner decisions below. No section of this
+   document should be read as declaring a current helpdesk value permanently
+   final; where a value is carried forward unchanged, it is carried forward
+   as the *current best foundation value*, not as a frozen constant.
 4. **Mint is the umbrella accent, not a universal fill.** Every surface being
    "on-brand" does not mean every surface is green.
 5. **Marketing and dashboard are different compositions of the same tokens**,
@@ -70,8 +85,10 @@ expressed as a numbered scale so future steps can be inserted without renaming:
 |---|---|---|
 | `evergreen-900` | `160 76% 22%` | `#0E5C3E` |
 | `evergreen-700` | `160 55% 45%` | `#38B084` |
-| `mint-500` | `160 64% 50%` | `#34D399` |
-| `mint-300` | `160 60% 70%` | `#8FE8C4` |
+| `mint-500` (bright mint) | `160 64% 50%` | `#34D399` |
+| `mint-300` (soft mint) | `160 60% 70%` | `#8FE8C4` |
+| `mint-100` (pale mint) | `152 38% 96%` | `#EFF7F3` |
+| `jade-500` (AI Toolkit secondary accent candidate, Owner Decision 3) | `172 45% 42%` | `#2E9686` |
 | `neutral-0` | `0 0% 100%` | `#FFFFFF` |
 | `neutral-50` | `150 22% 99%` | `#FBFDFC` |
 | `neutral-100` | `152 38% 96%` | `#EFF7F3` |
@@ -89,6 +106,24 @@ expressed as a numbered scale so future steps can be inserted without renaming:
 
 Primitives are additive-only; no existing step's value changes without a new
 owner-approved audit, per §Token Governance.
+
+### Mint Usage Tiers (Owner Decision 4, resolved Phase 1A.1)
+
+Four mint tiers, each with a distinct, non-overlapping role — this is the
+resolved answer to "how much mint is too much mint":
+
+| Tier | Primitive | Approved use |
+|---|---|---|
+| Bright mint | `mint-500` | Highlights, primary visual accents, action **backgrounds** where the accompanying text is dark ink (measured 7.90:1, safe) — never small body text, never paired with white text |
+| Deep evergreen | `evergreen-900` / `evergreen-700` (dark theme) | Accessible text actions (links), selected states, focus indicators — evergreen carries the "safe to read" weight mint cannot |
+| Soft mint | `mint-300` | Hover states, subtle visual grouping, low-emphasis highlight fills |
+| Pale mint | `mint-100` | Large light-theme background washes (e.g. `color-bg-subtle`), never as a text or icon color |
+
+No component or page may reference a raw mint hex/HSL literal; every mint use
+resolves through one of these four tier tokens, which in turn resolve through
+the semantic/component layers in §5–§6. This closes the audit's "raw mint
+literal bypassing the token" finding (`DESIGN_TOKEN_AUDIT.md` §5, §17) at the
+specification level.
 
 ## 5. Semantic Tokens
 
@@ -171,7 +206,8 @@ the sanctioned component API, per §5's finding.
 | `button-secondary-background` | `color-action-secondary` |
 | `button-outline-border` | `color-border-strong` |
 | `button-outline-text` | `color-text-primary` |
-| `button-accent-background` | `mint-500` (light) / `mint-500` at dark-theme value — **`button-accent-text` is always `color-text-inverse`'s dark counterpart (`160 30% 12%`), never white** |
+| `button-accent-background` | Bright-mint tier (`mint-500`, light and dark-theme value) — **`button-accent-text` is always `color-text-inverse`'s dark counterpart (`160 30% 12%`), never white** |
+| `toolkit-accent-illustration` / `toolkit-accent-chart` | `jade-500` — AI Toolkit-scoped secondary accent (Owner Decision 3); never resolves for `button-primary-*`, `nav-link-*`, `badge-success/warning/danger-*`, or `focus-ring` |
 | `card-background` | `color-surface-default` |
 | `card-border` | `color-border-default` |
 | `input-border` | `color-border-default` |
@@ -192,25 +228,30 @@ enforces this by never exposing that combination as an option.
 
 Canvas `150 22% 99%` warm white, surface `0 0% 100%`, text `160 25% 10%`
 charcoal-evergreen, primary action deep evergreen `160 76% 22%`, mint reserved
-for accents/focus-safe fills/data — this is `helpdesk`'s existing light theme,
-adopted verbatim except for the two corrected tokens (`color-status-success`,
-`color-border-focus`) called out above.
+for accents/focus-safe fills/data — helpdesk's existing light theme is the
+adopted foundation, carried forward as-is except for the two corrected
+tokens (`color-status-success`, `color-border-focus`) called out above. This
+is the light theme every artifact converges toward as it migrates, not a
+frozen constant — Phase 1B may further refine individual values as real
+components consume them (Owner Decision 9).
 
 ## 8. Dark-Theme Values
 
 Canvas `160 22% 7%` deep green-charcoal (never pure black), surface one step
 lighter (`158 18% 10%`), text `150 20% 92%`, mint doing more visual work at
-`160 64% 55%` — `helpdesk`'s existing dark theme, adopted verbatim. The dark
-focus ring already measures 9.96:1 (audit finding) and needs no correction.
+`160 64% 55%` — helpdesk's existing dark theme is the adopted foundation,
+carried forward as-is. The dark focus ring already measures 9.96:1 (audit
+finding) and needs no correction. As with the light theme, this is the
+starting foundation, not a value that is exempt from future refinement.
 
 ## 9. Typography Tokens
 
 | Token | Value |
 |---|---|
-| `font-display` | `'Playfair Display', 'Plus Jakarta Sans', serif` — headings only, never body copy |
-| `font-body` | `'Plus Jakarta Sans', system-ui, sans-serif` |
-| `font-mono` | `Menlo, monospace` |
-| `text-xs` … `text-9xl` | Adopted verbatim from the identical scale already shared across all four artifacts (audit §6) |
+| `font-display` | `'Playfair Display', 'Plus Jakarta Sans', serif` — selective editorial/premium accent only, see restrictions below |
+| `font-body` | `'Plus Jakarta Sans', system-ui, sans-serif` — primary UI, body, and product typeface, platform-wide |
+| `font-mono` | `'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace` (restrained fallback stack, Owner Decision 5) — code, IDs, technical values only |
+| `text-xs` … `text-9xl` | Carried forward from the identical scale already shared across all four artifacts (audit §6) |
 | `weight-regular` / `-medium` / `-semibold` / `-bold` / `-extrabold` | `400` / `500` / `600` / `700` / `800` (helpdesk's fuller weight range, since it is a superset of web-agency's) |
 | `leading-tight` / `-normal` / `-relaxed` | `1.1` / per-step computed line-height (already in the scale) / `1.6` (new — for long-form marketing copy, not previously tokenized) |
 | `tracking-normal` | `0em` (existing) |
@@ -220,6 +261,18 @@ Display sizes use `text-4xl`–`text-7xl` for hero/section headings; body uses
 one step down from desktop at `<768px` for any heading `text-4xl` or larger
 (e.g. a `text-6xl` hero drops to `text-4xl`/`text-5xl` on mobile) — this
 formalizes what marketing pages already do informally.
+
+**Playfair Display usage boundary (Owner Decision 5, resolved Phase 1A.1)**:
+`font-display` is approved only for selected hero emphasis, premium campaign
+headings, case-study moments, and occasional editorial statements. It must
+**not** be the default typeface for dashboard headings, tables, forms,
+navigation, settings, ordinary UI labels, or any dense product interface —
+those surfaces use `font-body` (Plus Jakarta Sans) at a heavier weight
+instead. This resolves the prior ambiguity in Design doc §9's "page/section/
+hero headings only" phrasing, which a dashboard section heading could be
+misread to satisfy; dashboard section headings use `font-body`, not
+`font-display`. No additional primary font family may be introduced without a
+future, separately-scoped design review (Owner Decision 5).
 
 ## 10. Spacing Tokens
 
@@ -259,18 +312,26 @@ out of scope for Phase 1A.
 
 ## 13. Radius Tokens
 
-| Token | Value |
-|---|---|
-| `radius-sm` | `radius-md - 4px` |
-| `radius-md` | `radius-lg - 2px` |
-| `radius-lg` | **base** — recommended default `0.75rem` (helpdesk's value), see Owner Decisions for the `web-agency` `0rem` conflict this must resolve |
-| `radius-xl` | `radius-lg + 4px` |
-| `radius-pill` | `9999px` |
+**Resolved (Owner Decision 1, Phase 1A.1)**: a premium softened radius
+hierarchy, replacing both `helpdesk`'s flat `.75rem` base and `web-agency`'s
+`0rem` sharp-corner system. `web-agency`'s `0rem` is not retained as the
+future platform standard; it is migrated away from gradually, per §Migration
+Strategy stage 5, never in a single global change.
 
-This is the one token family this spec cannot fully resolve without an owner
-ruling — see the final report's Owner Decisions section. The recommended
-default carries `helpdesk`'s value forward per the "foundation" approval, but
-`web-agency`'s `0rem` is a real, currently-shipping brand choice, not a bug.
+| Token | Approx. value | Use |
+|---|---|---|
+| `radius-sm` | `~8px` (`0.5rem`) | Compact controls, small surfaces (icon buttons, chips, checkboxes) |
+| `radius-md` | `~12px` (`0.75rem`) | Standard controls, inputs, and cards — the default for most components |
+| `radius-lg` | `~16px` (`1rem`) | Larger marketing cards, content panels |
+| `radius-xl` | `~20–24px` (`1.25rem`–`1.5rem`) | Major hero and feature panels only |
+| `radius-pill` | `9999px` | Badges, filters, tags, and deliberately pill-shaped controls only — not a general-purpose large-radius shortcut |
+
+Not every component becomes highly rounded: `radius-sm`/`radius-md` remain
+the default for the overwhelming majority of controls; `radius-lg`/`radius-xl`
+are reserved for the specific marketing/hero surfaces named above, matching
+the restraint principle in §1. Exact pixel values may be normalized during
+Phase 1B implementation (e.g. snapping to Tailwind's native rem steps); the
+five-tier personality above is the approved decision, not the literal numbers.
 
 ## 14. Border Tokens
 
@@ -291,9 +352,10 @@ default carries `helpdesk`'s value forward per the "foundation" approval, but
 | `shadow-overlay` | `0 25px 50px -12px rgb(14 40 30 / 0.14)` | `0 25px 50px -12px rgb(0 0 0 / 0.5)` |
 | `shadow-glow-subtle` | `0 0 0 1px rgb(52 211 153 / 0.35), 0 8px 24px -6px rgb(52 211 153 / 0.35)` | `0 0 0 1px rgb(52 211 153 / 0.4), 0 8px 28px -4px rgb(52 211 153 / 0.4)` |
 
-Adopted verbatim from helpdesk's authored ramp (audit §9, §25) rather than the
-near-flat shadcn defaults `web-agency`/`ai-toolkit`/`mockup-sandbox` currently
-carry unmodified. `shadow-glow-subtle` is reserved for the single primary-CTA
+Adopted as the foundation from helpdesk's authored ramp (audit §9, §25)
+rather than the near-flat shadcn defaults `web-agency`/`ai-toolkit`/
+`mockup-sandbox` currently carry unmodified, with Phase 1B free to refine the
+exact numeric ramp (Owner Decision 9). `shadow-glow-subtle` is reserved for the single primary-CTA
 emphasis use case per Design doc §16/§Motion Direction — not for general card
 hover. **Not every card gets a shadow**: `shadow-none`/`shadow-sm` is the
 default for dashboard-density list rows and table cells; `shadow-md`+ is
@@ -325,19 +387,39 @@ uses an outline, not a color-only background shift).
 | `easing-enter` | `cubic-bezier(.2, .9, .1, 1)` (existing `--ease-emphasized`) |
 | `easing-exit` | `cubic-bezier(.4, 0, 1, 1)` (new — faster exit than enter, standard motion-design practice, not previously tokenized) |
 
-**Motion budget** (carried from Design doc's "Motion Direction" section,
-restated as a binding numeric ceiling): per page, maximum **one**
+**Motion budget — resolved (Owner Decision 6, Phase 1A.1)**: "restrained
+premium motion" is approved, governed by this binding rule:
+
+> One meaningful animation may lead each major screen. Supporting motion
+> should remain quiet and functional.
+
+Allowed motion: hero ecosystem animation; subtle cursor-responsive lighting;
+slow, controlled gradient movement, limited to flagship sections only; menu
+and dropdown transitions; section reveals; card hover depth; workflow
+connection animation; button feedback; dialog transitions; restrained page
+transitions. Cursor-responsive lighting and controlled gradient movement move
+from "evaluated but not approved" (Phase 1A) to **approved with the limits
+above** — flagship-section-only, low CPU/GPU cost, never platform-wide.
+
+Avoid: every card floating continuously; multiple competing glow animations
+on one screen; constant icon movement; high-motion parallax on mobile;
+animation that delays access to content; continuous movement across most
+sections of a page. **Continuous decorative animation is limited to one or
+two focal areas per page** and must use minimal CPU/GPU resources — this
+replaces Phase 1A's blanket "no continuously running animation anywhere"
+rule with a bounded allowance, per Owner Decision 6.
+
+Numeric ceiling, carried forward and still binding: per page, maximum **one**
 scroll-triggered reveal sequence, **one** hover-glow CTA treatment
 (`shadow-glow-subtle`), standard `duration-fast` card-hover elevate on lists,
 count-up animation only for real non-fabricated numeric data, and the
-homepage's connected-ecosystem visual is the only platform-wide instance of
-interactive storytelling. **Continuously running** animation (looping,
-ambient) is not permitted anywhere in MVP — every animation must be
-state-triggered (hover, focus, scroll-into-view, route change) and settle.
-Cursor-responsive lighting and mesh-gradient movement remain evaluated-but-not-
-approved (Design doc, unchanged by this spec). All motion gates on
-`prefers-reduced-motion: reduce` → fades only, no transforms, no count-up
-(existing rule, now binding platform-wide, not just in helpdesk).
+homepage's connected-ecosystem visual remains the only platform-wide instance
+of interactive storytelling. Outside the one-or-two approved focal areas per
+page, every animation must be state-triggered (hover, focus, scroll-into-view,
+route change) and settle. Every experience must support
+`prefers-reduced-motion: reduce` with a static or near-instant alternative:
+fades only, no transforms, no count-up, no continuous decorative motion
+(existing rule, binding platform-wide, not just in helpdesk).
 
 ## 18. Z-Index Tokens
 
@@ -355,11 +437,20 @@ Derived from the actual values already in use (audit §13):
 
 ## 19. Icon Sizing
 
-`lucide-react` only, platform-wide (audit confirms it is already the only icon
-library with real usage; `react-icons` is dead weight in three artifacts).
-Sizes: `icon-xs` `14px`, `icon-sm` `16px`, `icon-md` `20px` (default),
-`icon-lg` `24px`, `icon-xl` `32px` — stroke width fixed at `1.75` (lucide
-default) platform-wide for visual consistency.
+**Resolved (Owner Decision 7, Phase 1A.1)**: `lucide-react` is approved as the
+standard SiteMint interface icon system, platform-wide (audit confirms it is
+already the only icon library with real usage; `react-icons` is dead weight
+in three artifacts). Sizes: `icon-xs` `14px`, `icon-sm` `16px`, `icon-md`
+`20px` (default), `icon-lg` `24px`, `icon-xl` `32px` — stroke width fixed at
+`1.75` (lucide default) platform-wide for visual consistency.
+
+`react-icons` is **not** uninstalled and `framer-motion` is **not** removed
+from any `package.json` during this or any prior documentation checkpoint.
+Package removal may occur only once: usage is verified (zero import sites,
+matching this audit's grep-based finding), replacement coverage exists, a
+future migration checkpoint explicitly includes package cleanup in its scope,
+and the resulting `package.json`/lockfile changes are reviewed as their own
+change, separate from token/design work.
 
 ## 20. Marketing-Density Rules
 
@@ -389,15 +480,23 @@ hue, never mint itself):
 |---|---|
 | AI Receptionist | Mint (`mint-500`) — existing, canonical, unchanged |
 | Web & App Services | No distinct accent — services pages use the core evergreen/mint system directly, since services are SiteMint-delivered work on the customer's own asset, not a separate product identity |
-| SiteMint CRM/Admin | No distinct accent — CRM is internal tooling for the whole company, not a product with its own identity; it inherits the shared system plus its existing fixed-dark chrome tokens (`crm-sidebar`/`crm-header`/`crm-content`), which this spec preserves as-is (audit §4) |
-| AI Toolkit | Candidate for a controlled secondary accent — see Owner Decisions in the final report; this spec does not assign one unilaterally |
+| SiteMint CRM/Admin | No distinct accent — CRM is internal tooling for the whole company, not a product with its own identity; it inherits the shared system. Its current fixed-dark chrome tokens (`crm-sidebar`/`crm-header`/`crm-content`) are the **initial** state, not permanent architecture — see §Theme Strategy (Owner Decision 2) |
+| AI Toolkit | **Resolved (Owner Decision 3, Phase 1A.1)**: a subtle cool-jade/restrained-aqua secondary accent (`jade-500`, §4) is approved — AI Toolkit does not become a separately branded purple product, and mint remains the primary product and company accent |
 
 Accents are permitted in: illustrations, charts, small status details,
-product-specific diagrams, selected hero treatments. Accents are **not**
-permitted in: global navigation identity, the primary company CTA, ordinary
-body text, security/status meaning (status tokens are semantic, not
-accent-driven), or accessibility focus indicators (`color-border-focus` is
-fixed platform-wide, never swapped per product).
+product-specific diagrams, selected hero treatments. For AI Toolkit
+specifically, the jade secondary accent is limited to: illustrations,
+prompt-flow diagrams, charts, selected feature highlights, and small product
+identifiers. Accents — including AI Toolkit's jade — are **not** permitted
+in: global navigation identity, the primary company CTA, ordinary body text
+or ordinary account screens, security/status meaning (status tokens are
+semantic, not accent-driven, and jade never substitutes for
+`color-status-success/warning/danger`), or accessibility focus indicators
+(`color-border-focus` is fixed platform-wide, never swapped per product).
+Mint remains the primary product and company accent everywhere; jade never
+replaces it. The final jade value above is a candidate — it is validated
+(contrast-measured against AI Toolkit's dark-theme surfaces) during Phase 1B,
+not finalized by this document.
 
 ## 23. Chart-Color Rules
 
@@ -516,31 +615,51 @@ Strategy (§below), never in one step.
 
 ## Theme Strategy
 
+**Resolved (Owner Decision 2, Phase 1A.1)** — per-product theme defaults,
+replacing Phase 1A's undecided "CRM theme default" placeholder and correcting
+the framing of AI Toolkit's forced-dark mode as permanent:
+
+| Surface | Default | Direction |
+|---|---|---|
+| Public marketing website (`web-agency` public routes) | Light-first | Follows OS preference (`prefers-color-scheme`) when no manual preference exists; provides a manual light/dark control; supports a complete premium dark theme; never forces every visitor into dark mode |
+| AI Receptionist (`helpdesk`) | Equal | Light and dark theme support remain equal, exactly as already implemented — no change |
+| AI Toolkit | Equal (changed from Phase 1A) | Moves from forced-dark-only to **equal** light and dark theme support — the current forced-dark `:root` is the starting point being migrated away from, not the approved end state |
+| Internal CRM/admin (`web-agency` `/admin/*`) | Dark-first, initially | Uses the shared **semantic** tokens (§5) rather than the current raw fixed-dark chrome values, so a complete light theme remains reachable later without a token-architecture rewrite; a full CRM light-theme migration is deliberately deferred to its own dedicated future checkpoint, not attempted in Phase 1B |
+
+Mechanics, unchanged from Phase 1A and still binding:
+
 - **Root theme selector**: `.dark` class on `<html>`, matching helpdesk's
   existing, working mechanism — no new mechanism invented.
 - **System theme behavior**: default to OS preference (`prefers-color-scheme`)
-  on first visit, exactly as `next-themes`' `system` mode already does in
-  helpdesk.
+  on first visit where a product's default is light-first or equal, exactly
+  as `next-themes`' `system` mode already does in helpdesk.
 - **Manual override**: user-selectable Light/Dark/System, persisted via
-  `next-themes`' existing `localStorage` mechanism.
+  `next-themes`' existing `localStorage` mechanism, on every surface above.
 - **No-flash**: `next-themes`' existing inline-script-before-hydration
-  approach, already proven in helpdesk — adopt verbatim, do not re-invent.
+  approach, already proven in helpdesk — carried forward as the mechanism,
+  not re-invented.
 - **Server-rendering considerations**: not applicable today — every artifact
   is a client-rendered Vite SPA, no SSR exists in this repo to reconcile
   against.
-- **Shared tokens across products**: identical token values; **product-specific
-  overrides** are limited to the CRM's fixed-dark chrome (`crm-sidebar`/
-  `crm-header`/`crm-content`, which intentionally ignores the light/dark
-  toggle, per existing code comment and audit §4) and to `ai-toolkit`'s
-  forced-dark-only mode, both preserved as deliberate exceptions, not
-  errors, per §Owner Decisions in the final report (CRM theme default).
-- **Accessibility**: both themes must independently pass the same contrast
-  bar (§24 above) — a theme is not exempt from review just because it is the
-  "off" default.
+- **Shared tokens across products**: identical semantic token values across
+  every surface; the CRM's current fixed raw chrome values
+  (`crm-sidebar`/`crm-header`/`crm-content`) are re-expressed through the
+  semantic layer as its dark-first *initial* values, not preserved as
+  permanent architecture (this corrects Phase 1A's framing of them as a
+  preserved-as-is exception).
+- **Accessibility**: every theme on every surface must independently pass
+  the same contrast bar (§24 above) — a theme is not exempt from review just
+  because it is a product's current or initial default.
+- **Theme choice never changes authentication or product permissions**
+  (Owner Decision 2, explicit) — switching light/dark on any surface has no
+  effect on session state, auth boundaries, or what a user can access.
 
 **Not changed by this document**: no application currently wires a live theme
-toggle onto `web-agency` or `ai-toolkit`; this spec documents how one *would*
-work if built, it does not build it.
+toggle onto `web-agency` public pages or `ai-toolkit`; this spec documents the
+approved direction for one, it does not build it. Implementation of any of
+the above (wiring a toggle, moving AI Toolkit off forced-dark, re-expressing
+CRM chrome through semantic tokens) is Phase 1B+ work, scoped per surface,
+never a single global change.
 
 ## Migration Strategy
 
@@ -555,8 +674,8 @@ Phased, narrow-scope, one reviewable commit per stage, matching
 | 4. Migrate public global shell | web-agency Navbar/Footer only | Medium | Full-page diff on every public route | Nav text, link, CTA contrast | Revert; old Navbar/Footer file kept until verified |
 | 5. Migrate marketing pages | web-agency `/`, `/services`, `/pricing`, `/portfolio`, `/about`, `/contact`, `/discovery` | Medium–High (567 raw literals to reconcile) | Full visual diff, page-by-page, no batch replace | Full contrast pass on new blue→evergreen mappings | Revert per-page; never a single all-pages commit |
 | 6. Migrate AI Receptionist | helpdesk dashboard, already closest to target — mostly verification, not conversion | Low | Route walkthrough, light + dark | Confirm no regression from stage 2 | Revert |
-| 7. Migrate AI Toolkit | ai-toolkit's forced-dark palette re-pointed at shared dark tokens | Low–Medium | Full-page diff (3 routes only) | Contrast pass on forced-dark surfaces | Revert |
-| 8. Migrate CRM/admin | web-agency `/admin/*`, preserving fixed-dark chrome tokens | Medium (CRM is the largest surface by route count) | Section-by-section diff (leads, deals, pipeline, etc.), not all at once | Table/badge/status contrast pass | Revert per-section |
+| 7. Migrate AI Toolkit | ai-toolkit's forced-dark palette re-pointed at shared dark tokens first (no visual change), with the equal light/dark direction (Owner Decision 2) and jade secondary accent (Owner Decision 3) implemented as separate, later sub-stages, not bundled into this stage | Low–Medium | Full-page diff (3 routes only) per sub-stage | Contrast pass on forced-dark surfaces; jade-on-dark contrast measured before jade ships | Revert per sub-stage |
+| 8. Migrate CRM/admin | web-agency `/admin/*`, re-expressing the current fixed-dark chrome through shared semantic tokens at its current dark-first values (no visual change in this stage) — a full CRM light-theme migration is explicitly a separate, later, dedicated checkpoint, not part of this stage | Medium (CRM is the largest surface by route count) | Section-by-section diff (leads, deals, pipeline, etc.), not all at once | Table/badge/status contrast pass | Revert per-section |
 | 9. Remove deprecated raw values | Only after grep-verified zero remaining usage | Low, if stages above were done correctly | Full build + typecheck | N/A (no rendering change expected) | Revert; old values still in git history |
 
 No stage performs a global search-and-replace of colors, per explicit task
@@ -576,15 +695,61 @@ risk-ascending order above (helpdesk is stage 2 and 6, both low-risk; the
 blue-heavy `web-agency` marketing pages are correctly sequenced later, at
 stage 5).
 
-Phase 1B, narrowly scoped (not started in this checkpoint):
+**Resolved (Owner Decision 10, Phase 1A.1)**: AI Receptionist/helpdesk is
+confirmed as the Phase 1B pilot, and Phase 1B's scope is fixed as follows.
+
+Phase 1B must include, narrowly scoped (not started in this checkpoint):
 1. Create the shared token source (exact package location is Phase 1B's own
    decision, per `IMPLEMENTATION_ROADMAP.md`'s Phase 1A entry).
-2. Re-point helpdesk's `index.css` at it (Migration Strategy stage 2).
-3. Prove light/dark behavior unchanged except the two corrected tokens.
-4. Prove accessibility: live-measure the corrected pairs in a real browser,
-   not just computed offline as this document does.
-5. Prove zero functional regression: `pnpm run typecheck`, helpdesk build,
+2. Map the approved token system (this spec, as resolved by Phase 1A.1) into
+   helpdesk (Migration Strategy stage 2).
+3. Preserve the current helpdesk visual experience as closely as practical —
+   light/dark behavior unchanged except the tokens this spec deliberately
+   corrects or resolves (§Owner Decisions below).
+4. Validate light and dark themes in a real browser, not just computed
+   offline as this document does.
+5. Validate measured contrast for every corrected/new pairing live.
+6. Validate reduced motion (`prefers-reduced-motion: reduce`) behaves per
+   §17/§25.
+7. Prove zero functional regression: `pnpm run typecheck`, helpdesk build,
    full route walkthrough, zero console errors, zero-line diff on every
    `CLAUDE.md`-protected file.
+8. Prove the shared token source can later support other applications
+   (structural review, not a second application's full migration).
+
+Phase 1B must **not** include: homepage redesign; CRM redesign; AI Toolkit
+redesign; navigation mega-menu implementation; global color replacement;
+voice/provider changes of any kind; or route or authentication changes. Any
+of these remain separately scoped, later checkpoints per
+`IMPLEMENTATION_ROADMAP.md`.
 
 Do not implement Phase 1B in this checkpoint.
+
+---
+
+## Owner Decisions — Resolved (Phase 1A.1)
+
+The single source of truth for every decision this spec previously left open.
+Every other section of this document has been updated in place to match the
+resolutions below; nothing elsewhere in this document or in
+`DESIGN_TOKEN_AUDIT.md` should be read as contradicting this table.
+
+| # | Decision | Resolution |
+|---|---|---|
+| 1 | Border-radius personality | Premium softened hierarchy approved: `~8px` compact, `~12px` standard/inputs/cards, `~16px` marketing cards/panels, `~20–24px` hero/feature panels, pill for badges/filters/tags/pill-controls only. `web-agency`'s `0rem` is not the future standard. Not every component becomes highly rounded. See §13. |
+| 2 | Theme behavior per product | Public marketing: light-first, follows OS preference, manual control, complete dark theme, never forced dark. AI Receptionist: equal light/dark (unchanged). AI Toolkit: equal light/dark (changed from forced-dark-only). CRM/admin: dark-first initially, built on shared semantic tokens so a full light theme is reachable later via a separate dedicated checkpoint. Theme choice never changes auth or permissions. See §Theme Strategy. |
+| 3 | AI Toolkit accent | Mint remains the primary product and company accent; AI Toolkit does not become a separately branded purple product. A subtle cool-jade/restrained-aqua secondary accent (`jade-500`) is approved, limited to illustrations, prompt-flow diagrams, charts, selected feature highlights, and small product identifiers — never navigation, primary CTAs, ordinary account screens/body text, focus indicators, or status semantics. Final value validated in Phase 1B. See §4, §22. |
+| 4 | Mint usage | Existing helpdesk mint/evergreen direction approved as foundation with semantic corrections. Four tiers: bright mint (highlights/accent backgrounds with dark text), deep evergreen (accessible text actions, selected states, focus), soft mint (hover/subtle grouping), pale mint (large light-theme backgrounds). No bright mint as small body text; no white text on mint where measured contrast fails (1.96:1, confirmed failing). No raw mint hex scattered through components — all mint resolves through the tier tokens. Phase 1A's contrast corrections (`color-status-success`, `color-border-focus`) are approved as baseline. See §Mint Usage Tiers, §5, §16, §24. |
+| 5 | Typography | Plus Jakarta Sans: primary UI/body/product typeface. Playfair Display: selective editorial/premium accent only (hero emphasis, campaign headings, case-study moments, occasional editorial statements) — never dashboards, tables, forms, navigation, settings, ordinary labels, or dense product interfaces. Restrained monospace fallback stack for code/IDs/technical values. No additional unrelated primary font family without a future design review. See §9. |
+| 6 | Motion intensity | Restrained premium motion approved, governed by: "One meaningful animation may lead each major screen. Supporting motion should remain quiet and functional." Allowed: hero ecosystem animation, subtle cursor-responsive lighting, slow controlled gradient movement (flagship sections only), menu/dropdown/dialog/page transitions, section reveals, card hover depth, workflow connection animation, button feedback. Avoid: continuous floating cards, competing glows, constant icon movement, high-motion mobile parallax, content-delaying animation, continuous movement across most sections. Continuous decorative animation limited to one or two focal areas per page, minimal CPU/GPU cost. `prefers-reduced-motion` always supported with a static/near-instant alternative. See §17, §25. |
+| 7 | Icon system | `lucide-react` approved as the standard SiteMint interface icon system. `react-icons` and `framer-motion` are not uninstalled in this or any documentation-only checkpoint; removal requires verified zero usage, replacement coverage, an explicit migration-checkpoint scope, and separately reviewed package/lockfile changes. See §19, §27. |
+| 8 | Visual personality | Warm premium light surfaces, deep evergreen dark surfaces, controlled mint accents, softly rounded structural cards, precise typography/spacing, selective editorial character, purposeful responsive motion, consistent identity across products and services. SiteMint should feel modern, intelligent, premium, calm, alive, trustworthy, technically capable, approachable — never neon, childish, overly bubbly, visually noisy, a generic purple/blue SaaS template, or like each product belongs to a different company. See §Color Direction — Confirmed, §Owner Decision 8 note below. |
+| 9 | Helpdesk foundation | Helpdesk is the approved starting foundation, not an immutable finished design system. Its strongest patterns are preserved: semantic token model, evergreen/mint direction, light/dark plumbing, type scale, focus/status concepts, elevation utilities. Phase 1B may refine contrast-failing values, naming consistency, radius hierarchy, shadow hierarchy, product accent rules, marketing density, and shared token packaging. No existing helpdesk value is described as permanently final or immutable "verbatim" — where this document carries a value forward unchanged, it does so as the current best foundation value, open to Phase 1B refinement. See §1 Token Principles, §7, §8, §15. |
+| 10 | Phase 1B pilot | AI Receptionist/helpdesk approved. Phase 1B is limited to: creating the shared token source, mapping the approved system into helpdesk, preserving helpdesk's current visual experience as closely as practical, validating light/dark themes, validating measured contrast, validating reduced motion, proving no functional regressions, and proving the shared tokens can later support other applications structurally. Phase 1B excludes: homepage redesign, CRM redesign, AI Toolkit redesign, navigation mega-menu implementation, global color replacement, provider/voice changes, and route/authentication changes. See §Phase 1B Definition. |
+
+**Owner Decision 8 note**: this decision does not add a new token family — it
+is the qualitative brand-personality standard every quantitative decision
+above (1–7, 9–10) is measured against. A future token or component proposal
+that reads as neon, childish, visually noisy, or like a generic purple/blue
+SaaS template fails this standard regardless of whether it otherwise passes
+contrast or naming review.

@@ -9,6 +9,15 @@
 > `claude/sitemint-platform-blueprint-j6snjs`).
 > **Companion document**: `SHARED_DESIGN_TOKENS_SPEC.md` (the proposed token
 > architecture this audit justifies).
+> **Addendum (Phase 1A.1)**: every owner decision this audit left open
+> (radius personality, theme defaults per product, AI Toolkit accent, mint
+> usage tiers, typography roles, motion intensity, icon/package handling,
+> visual personality, helpdesk-foundation status, Phase 1B pilot scope) is
+> now **resolved** — see `SHARED_DESIGN_TOKENS_SPEC.md`'s "Owner Decisions —
+> Resolved (Phase 1A.1)" section, the single source of truth for those
+> answers. This audit document is left as the factual record of the
+> repository's state at Phase 1A and is not rewritten to describe a future
+> state — no code changed between Phase 1A and Phase 1A.1.
 
 ---
 
@@ -400,9 +409,11 @@ confusion risk" the blueprint calls out (Blueprint §22).
   (`#062e71`, `#0a3d91`, `#1249a8`, `#6366f1`, and related tints) — retire per
   the already-approved gradual migration (Blueprint §24 Decision #6/#14),
   never via a single global find-and-replace.
-- `web-agency`'s `0rem` sharp-radius system, once a radius decision is made for
-  the shared spec (see Owner Decisions in the final report — this is not
-  pre-decided by this audit).
+- `web-agency`'s `0rem` sharp-radius system — **resolved (Phase 1A.1)**: a
+  softened, tiered radius personality (`~8px` compact, `~12px` standard,
+  `~16px` marketing cards, `~20–24px` hero/feature panels, pill for
+  badges/filters) is the approved future direction; `web-agency`'s `0rem` is
+  not retained. See `SHARED_DESIGN_TOKENS_SPEC.md` §13.
 - `react-icons` dependency (dead in all three artifacts that install it).
 - `framer-motion` installed-but-unused in `helpdesk`, `ai-toolkit`,
   `mockup-sandbox` — either adopt it deliberately (per
@@ -431,17 +442,19 @@ existing per-artifact pattern.
 |---|---|---|---|
 | `web-agency` blue removal breaks an unaudited component that hardcodes a blue hex outside any token | Medium (567 raw literals, unaudited component-by-component) | Medium — visual regression, not functional | Migrate component-by-component with visual diff review per component family, never a global search-and-replace (already a binding rule from the task brief and Blueprint §22) |
 | Wiring `web-agency`'s dead `.dark` block live surfaces an untested dark palette | Low today (nothing currently triggers it) | Medium if triggered accidentally during unrelated refactor | Treat `web-agency` dark-mode enablement as its own reviewed phase, not a byproduct of token migration |
-| Radius change from `0rem` to a shared value visibly changes `web-agency`'s brand character | High (it is the single most visible per-page difference today) | Medium–High, this is a genuine brand decision, not a bug fix | Owner decision required (see final report); do not default silently to helpdesk's `.75rem` |
+| Radius change from `0rem` to a shared value visibly changes `web-agency`'s brand character | High (it is the single most visible per-page difference today) | Medium–High, this is a genuine brand decision, not a bug fix | **Resolved (Phase 1A.1)**: tiered softened-radius personality approved (`SHARED_DESIGN_TOKENS_SPEC.md` §13); `web-agency`'s eventual migration to it is still a dedicated, reviewed migration stage (§Migration Strategy stage 5), not a silent default |
 | Mint token reused unsafely (white-on-mint, mint-as-body-text) once shared package exists | Medium — the *ability* to misuse increases once tokens are easy to grab | High if shipped — real contrast failures (1.96:1) | Component-token layer (button/text primitives) enforces safe combinations so page authors cannot accidentally pick an unsafe pairing (see companion spec §Component tokens) |
 | Removing `react-icons`/unused `framer-motion` breaks something at build time | Low (zero import sites confirmed for react-icons; framer-motion only unused, not misconfigured) | Low | Verify via `pnpm run build` per artifact before removal, in whatever future cleanup phase performs it (not this checkpoint) |
 
 ## 30. Phase 1B Implementation Prerequisites
 
-1. Owner decisions below (final report) resolved for: mint intensity,
-   typography personality, light/dark warmth, radius personality, animation
-   intensity, AI Toolkit secondary accent, CRM theme default.
-2. `SHARED_DESIGN_TOKENS_SPEC.md` reviewed and approved as-is or with owner
-   edits.
+1. Owner decisions resolved for: mint intensity, typography personality,
+   light/dark warmth, radius personality, animation intensity, AI Toolkit
+   secondary accent, CRM theme default — **done as of Phase 1A.1**, see
+   `SHARED_DESIGN_TOKENS_SPEC.md`'s "Owner Decisions — Resolved (Phase 1A.1)"
+   section.
+2. `SHARED_DESIGN_TOKENS_SPEC.md` reviewed and approved with the Phase 1A.1
+   resolutions incorporated.
 3. Pilot application confirmed (this audit's recommendation: `helpdesk`/AI
    Receptionist — see companion spec §Phase 1B Definition).
 4. No apparent blocker: `helpdesk` already contains every primitive value
@@ -532,10 +545,10 @@ compliant until it is.
 | `#062e71`, `#0a3d91`, `#1249a8` (deep blues) | `web-agency` components, not in any token file | Ad hoc hero/section blue accents | No — three near-identical, undocumented blues doing the same job | `color-action-primary` (evergreen) once web-agency migrates, or retire entirely | High (brand-identity conflict) |
 | `#6366f1` (indigo) | `web-agency` components | Secondary accent/highlight in places | No — not tokenized anywhere | `color-status-info` or a scoped illustration accent, case-by-case | Medium |
 | `#34d399` / `#34D399` (mint) | `web-agency`, `helpdesk`, `ai-toolkit` raw literals, despite existing as `--accent` token in all three | Ad hoc mint highlight, bypassing the token | Consistent *intent*, inconsistent *mechanism* | `color-action-primary` / `color-brand-accent` semantic token, referenced not re-typed | High (easiest, lowest-risk fix — literal token substitution) |
-| `0rem` radius base (`web-agency`) vs `.75rem` (`helpdesk`) | both `index.css` `--radius` | Global corner personality | No — direct conflict | `radius-md`/`radius-lg` per the shared radius scale (owner decision required, see final report) | High (visible on every card/button/input) |
+| `0rem` radius base (`web-agency`) vs `.75rem` (`helpdesk`) | both `index.css` `--radius` | Global corner personality | No — direct conflict | **Resolved (Phase 1A.1)**: tiered softened-radius scale — `radius-sm`≈8px, `radius-md`≈12px, `radius-lg`≈16px, `radius-xl`≈20–24px, `radius-pill` for badges/filters/tags only (`SHARED_DESIGN_TOKENS_SPEC.md` §13) | High (visible on every card/button/input) |
 | `duration-200`/`300`/`500` (raw Tailwind classes) | all four artifacts, scattered | Ad hoc transition timing | Loosely consistent by convention, not by shared token | `duration-fast` / `duration-normal` / `duration-slow` | Low (values already converge; this is a naming/token exercise, not a value fix) |
 | `z-50` / `z-10` / `z-[100]` / `z-[200]` | all four artifacts, overlays/menus/dialogs | Stacking order for menus, dialogs, toasts | Roughly consistent (same rough tiers) but ungoverned — no documented z-index scale | `z-dropdown` / `z-overlay` / `z-modal` / `z-toast` | Medium (risk grows as more overlay surfaces are added across products) |
-| Near-flat shadow ramp (`0px 2px 0px 0px hsl(0 0% 0% / 0.02)` etc., shadcn defaults) | `web-agency`, `ai-toolkit`, `mockup-sandbox` | Elevation, currently near-invisible | Consistent across the three, but never a deliberate choice | `shadow-sm`/`shadow-md` from the shared spec (owner decision: keep restrained-flat as-is, or adopt helpdesk's tinted ramp) | Medium |
+| Near-flat shadow ramp (`0px 2px 0px 0px hsl(0 0% 0% / 0.02)` etc., shadcn defaults) | `web-agency`, `ai-toolkit`, `mockup-sandbox` | Elevation, currently near-invisible | Consistent across the three, but never a deliberate choice | `shadow-sm`/`shadow-md` from the shared spec — helpdesk's tinted ramp adopted as the foundation (`SHARED_DESIGN_TOKENS_SPEC.md` §15) | Medium |
 | `react-icons` (installed, unused) | `web-agency`, `helpdesk`, `ai-toolkit` `package.json` | Dead dependency | Consistent (consistently unused) | Remove | Low (cleanup, not a token issue; out of this checkpoint's scope) |
 
 (Lockfile-only occurrences and non-rendering values are intentionally excluded
