@@ -1,9 +1,24 @@
 # SiteMint Digital — Platform Implementation Roadmap
 
-> Documentation only — Checkpoint P0. No phase below has started. Each phase is a
-> separate future checkpoint requiring its own owner approval before work begins,
-> per the task brief's explicit instruction not to produce one giant implementation
-> prompt.
+> Documentation only — Checkpoint P0, corrected in Checkpoint P0.1. No phase below
+> has started. Each phase is a separate future checkpoint requiring its own owner
+> approval before work begins, per the task brief's explicit instruction not to
+> produce one giant implementation prompt.
+>
+> **Phase numbering (Blueprint §24 Decision #9/#19, approved)**: this roadmap is
+> **Phase 0 through Phase 8 — nine numbered phases** (Phase 0, 1A, 1, 2, 3, 4, 5,
+> 6, 7, 8; Phase 1A is a sub-checkpoint inserted between Phase 0 and Phase 1, not
+> a tenth top-level number). Any reference elsewhere in these documents to "eight
+> phases" means the eight implementation phases that follow Phase 0 (Phase 1
+> through Phase 8), not the roadmap's total phase count.
+>
+> **Next implementation checkpoint (approved, not started)**: after blueprint
+> approval, the next checkpoint is **Phase 1A — Design-token audit and shared
+> token specification**. It must come before homepage redesign (Phase 2),
+> mega-menu implementation (Phase 2/3), application visual restyling (Phase 4/6),
+> and CRM shell redesign (Phase 7). **Phase 1A is not implemented in this
+> checkpoint (P0.1)** — it is documented here only so a future session does not
+> need to reinterpret sequencing.
 
 ## Cross-Phase Rules (apply to every phase below)
 
@@ -38,17 +53,58 @@
   before Phase 1 token work begins).
 - **Rollback**: revert the single P0 commit.
 
+## Phase 1A — Design-Token Audit and Shared Token Specification
+
+> **Not implemented in this checkpoint.** Documented here as the approved next
+> implementation checkpoint (Blueprint §24 Decision #9/#19) so it does not need
+> to be re-derived or re-approved from scratch by a future session.
+
+- **Goal**: audit helpdesk's existing evergreen/mint tokens against the
+  accessibility/contrast/visual-quality bar required for platform-wide adoption
+  (per Design doc's "Foundation, Not Final" note), and produce a written shared
+  token specification — the single source of truth Phase 1 implements against.
+  This phase produces a **specification document**, not CSS changes.
+- **Scope**: a new specification artifact only (e.g.
+  `docs/sitemint-platform/design-tokens-reference.md`, or equivalent — exact
+  location is this phase's own judgment call). No application file is touched.
+- **Dependencies**: Blueprint §24 Decision #6/#14 (helpdesk tokens approved as
+  starting foundation) — already satisfied as of Checkpoint P0.1.
+- **Risks**: none — documentation/specification only, no application code touched.
+- **Acceptance tests**: specification document exists; every token has a
+  contrast-verified value for both light and dark where applicable; marketing-vs-
+  dashboard density rules (Design doc §41) are captured explicitly, not left
+  implicit.
+- **Visual tests**: not applicable (no rendered surface changes in this phase).
+- **Accessibility tests**: contrast ratios computed and recorded for every core
+  neutral, semantic, and accent token pairing that will be reused platform-wide.
+- **Performance tests**: not applicable.
+- **Database impact**: none. **Deployment impact**: none.
+- **Estimated effort**: small.
+- **Stop conditions**: if any existing helpdesk token fails AA contrast under
+  audit, the specification must record a revised value rather than carrying the
+  failure forward into Phase 1 — this phase is the gate that prevents an
+  inaccessible token from becoming "final" by default.
+- **Rollback**: N/A — no code changes; a revised specification simply supersedes
+  the prior draft.
+- **Must precede**: homepage redesign (Phase 2), mega-menu implementation
+  (Phase 2/3), application visual restyling (Phase 4/6), and CRM shell redesign
+  (Phase 7) — binding sequencing rule, not a soft suggestion.
+
 ## Phase 1 — Shared SiteMint Design System
 
 - **Goal**: implement the token system from `DESIGN_SYSTEM_DIRECTION.md` as the
-  platform standard, starting with formalizing helpdesk's existing tokens as the
-  canonical source and bringing `web-agency` onto the same neutral/semantic layer.
+  platform standard, per the Phase 1A specification, starting with formalizing
+  helpdesk's existing (now audited) tokens as the canonical source and bringing
+  `web-agency` onto the same neutral/semantic layer.
 - **Scope**: `artifacts/web-agency/src/index.css` (token values only — no
   component rewrites yet), optionally a new shared reference (e.g.
   `docs/sitemint-platform/design-tokens-reference.md` or a future `lib/`
   package — package extraction is a judgment call for the phase's own planning,
   not decided here).
-- **Dependencies**: Phase 0 owner decision on final palette (Blueprint §24.6).
+- **Dependencies**: Phase 1A complete (token specification approved). The
+  underlying palette-foundation decision (Blueprint §24 Decision #6/#14) is
+  already resolved as of Checkpoint P0.1 — Phase 1A's audit refines it, it does
+  not re-litigate it.
 - **Risks**: `web-agency`'s existing blue-branded pages will look visually
   "unfinished" until Phase 2 re-themes components — this phase changes tokens,
   not yet every component's usage of them; must be scoped and communicated as such.
@@ -90,9 +146,9 @@
   (per Design doc motion budget).
 - **Database impact**: none. **Deployment impact**: none.
 - **Estimated effort**: large.
-- **Stop conditions**: if the new nav set (Route doc §Recommended Navigation
-  Direction) is not yet owner-approved, stop before this phase — nav structure
-  must be locked before homepage build.
+- **Stop conditions**: the MVP nav set (Route doc §14, Blueprint §24 Decision
+  #4/#13) is already approved as of Checkpoint P0.1 — this phase does not stop on
+  that dependency. It does stop if Phase 1A/Phase 1 tokens are not yet complete.
 - **Rollback**: revert the phase commit; old Home/Navbar/Footer restored exactly.
 
 ## Phase 3 — Products/Services Navigation and Overview Pages
@@ -101,8 +157,8 @@
   the Phase 2 nav.
 - **Scope**: two new page files + route registration in `App.tsx`; no changes to
   any existing route.
-- **Dependencies**: Phase 2 complete; owner decision on AI Toolkit inclusion
-  (Blueprint §24.2).
+- **Dependencies**: Phase 2 complete. AI Toolkit inclusion is already approved
+  (Blueprint §24 Decision #2) — this phase does not wait on that decision.
 - **Risks**: low — purely additive routes.
 - **Acceptance tests**: both pages render, both reachable from nav, both list
   only real (non-fabricated) products/services.
@@ -175,13 +231,21 @@
   `support`, `content`, `portfolio`-as-CRM-content) — **only if and when the
   owner separately commissions this work**; this phase is a placeholder pointer,
   not a committed scope.
+- **Binding constraint (Blueprint §24 Decision #5/#16, approved)**: existing CRM
+  routes are not reorganized, renamed, or removed as part of the main public
+  website redesign or shared design-system work (Phases 1A–6). If this phase is
+  ever pursued, it **begins with an admin information architecture and shell
+  review**, not with route renames — and any actual route migration, alias, or
+  redirect requires its own separately approved checkpoint beyond even this
+  Phase 7 placeholder.
 - **Scope**: TBD in its own future PRD; explicitly not defined here per the "no
   large feature-list bundling" instruction in the source brief.
-- **Dependencies**: Phase 0 owner decision on whether CRM route reorganization
-  happens at all (Blueprint §24.5).
+- **Dependencies**: a dedicated owner commission and its own CRM-specific PRD —
+  this is not implied or unlocked by any decision resolved in Checkpoint P0.1.
 - **Risks**: highest of any phase — touches locked-adjacent, revenue-critical CRM
   surface (`ARCHITECTURE.md` DEVELOPMENT_RULES.md change-budget and locked-engine
-  rules apply in full).
+  rules apply in full); existing CRM data and workflows must remain protected
+  throughout, if this phase is ever pursued at all.
 - **Acceptance tests**: TBD per its own PRD.
 - **Database impact**: TBD — likely additive-only if any (per root CRM push-mode
   convention). **Deployment impact**: TBD.
@@ -198,8 +262,9 @@
 - **Scope**: `index.html`/per-route meta handling in `web-agency` (and `ai-
   toolkit` if it's been integrated by Phase 4), one new analytics dependency +
   its initialization code.
-- **Dependencies**: owner analytics-vendor decision (Blueprint §24.3); all prior
-  phases complete.
+- **Dependencies**: owner analytics-vendor decision (Blueprint §24 Decision #3 —
+  deliberately deferred to this phase, not resolved earlier); all prior phases
+  complete.
 - **Risks**: analytics script must not become render-blocking or introduce a
   new third-party security surface without review (PRD §28).
 - **Acceptance tests**: unique `<title>`/meta per route verified; sitemap.xml
@@ -226,7 +291,8 @@
 
 ```mermaid
 graph LR
-  P0[Phase 0<br/>Blueprint] --> P1[Phase 1<br/>Design System]
+  P0[Phase 0<br/>Blueprint] --> P1A[Phase 1A<br/>Token Audit + Spec]
+  P1A --> P1[Phase 1<br/>Design System]
   P1 --> P2[Phase 2<br/>Homepage + Shell]
   P2 --> P3[Phase 3<br/>Products/Services Nav]
   P3 --> P4[Phase 4<br/>Product Pages]
@@ -237,6 +303,11 @@ graph LR
   P6 --> P8
   P7[Phase 7<br/>CRM Consolidation<br/>— separately commissioned] -.optional, unscoped.-> P8
 ```
+
+Nine numbered phases total — Phase 0 through Phase 8 (0, 1, 2, 3, 4, 5, 6,
+7 [optional/unscoped], 8) — plus one inserted sub-checkpoint, Phase 1A, sitting
+between Phase 0 and Phase 1. Phase 1A is the next implementation checkpoint after
+this documentation program — not started, not implemented in Checkpoint P0.1.
 
 Each arrow is a hard dependency and a stop point: no phase begins before its
 predecessor is reviewed, committed, and (if the owner chooses) pushed as a branch

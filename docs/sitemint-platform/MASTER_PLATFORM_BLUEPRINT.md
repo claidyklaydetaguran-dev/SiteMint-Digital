@@ -8,6 +8,11 @@
 > **Author context**: produced from direct repository inspection (routes, package.json
 > files, CSS/token files, API route registration) — see companion
 > `ROUTE_AND_NAVIGATION_ARCHITECTURE.md` for the full inventory this blueprint is built on.
+> **Checkpoint P0.1**: the owner decisions in §24 below have been resolved (except
+> analytics vendor selection, which stays deliberately open — see §24.3). Where this
+> document is silent on a point Checkpoint P0.1 addressed, the correction lives in
+> the companion document it most directly affects (PRD, Route doc, Design doc, or
+> Roadmap) rather than being duplicated here.
 
 ---
 
@@ -237,8 +242,10 @@ AI Receptionist landing (`/ai-receptionist`) → signup (`/ai-receptionist/signu
 **Prospect → Service client**: sitemintdigital.com → Services or homepage CTA →
 Discovery form (`/discovery`) → CRM lead → Proposal/SOW → Deal → Client → Project.
 
-**Prospect → AI Toolkit customer**: currently no path exists from the main site —
-this is a gap (see Risks, §21).
+**Prospect → AI Toolkit customer**: currently no path exists from the main site.
+This is an approved gap to close (§24 Decision #2) — sitemintdigital.com →
+Products → AI Toolkit page → standalone checkout app — implemented in a future
+Phase 3/4 checkpoint, not in this documentation-only checkpoint.
 
 ## 17. Internal Staff Journeys
 
@@ -255,7 +262,17 @@ account administration, communications, and reporting — all already built (see
 - **Auth boundary 2**: AI Receptionist customer — httpOnly cookie
   `receptionist_session`, DB-backed, protects helpdesk routes via `/me` check.
 - **No boundary today**: AI Toolkit has no authenticated area (checkout only).
-- These boundaries must never merge (binding rule, CLAUDE.md and DECISION_LOG.md).
+- **Corrected framing (P0.1)**: these two systems are not merged during the
+  public-site and design-system phases (MVP), and existing login routes, session
+  behavior, and authorization rules are preserved unchanged throughout this
+  program — that restriction is binding today. It is **not** a claim that the
+  systems must remain separate *permanently*. A future, separately-scoped
+  security PRD may evaluate a shared SiteMint **customer** identity across
+  customer-facing products (e.g. AI Receptionist + AI Toolkit), but any such
+  change is explicitly out of scope for this platform blueprint and must never be
+  treated as implied by shared visual design. See the full statement in
+  `PRODUCT_REQUIREMENTS_DOCUMENT.md` §18 (Authentication Requirements) and the
+  Authentication Boundary Decision below.
 
 ## 19. Public vs. Authenticated Areas
 
@@ -305,8 +322,13 @@ future products, TBD per product at launch).
   already exist under different names than initially proposed) — route docs must
   describe reality, not the aspirational list, and any renaming is a deliberate,
   separately-approved migration (see Route doc, redirects).
-- **Two auth systems must never merge** — repeated here because it is the single
-  highest-consequence mistake a future phase could make.
+- **Auth-system rewrite mistaken for a design task** — the highest-consequence
+  mistake a future phase could make is treating shared visual design as license
+  to merge or rewrite the CRM Bearer-token and AI Receptionist cookie-session
+  systems "to make things look unified." MVP scope keeps both systems exactly as
+  they are; any future consolidation is a dedicated, separately-approved security
+  initiative (see Authentication Boundary Decision below), never a side effect of
+  a navigation or homepage phase.
 - **Scope-creep risk in this very checkpoint** — the source brief describes a huge
   surface area; documents must stay descriptive/planning-only and resist the urge
   to start "just fixing" small things (e.g. the AI Toolkit orphan gap) during P0.
@@ -324,20 +346,69 @@ future products, TBD per product at launch).
 
 ## 24. Decisions Requiring Owner Approval
 
-1. Whether `/solutions` becomes a real routed section post-MVP or stays
-   messaging-only permanently.
-2. Whether AI Toolkit gets a `/products/ai-toolkit` marketing page and CRM
-   integration in Phase 3/4, or stays intentionally separate.
+> **Status as of Checkpoint P0.1**: items 1, 2, 4, 5, and 6 below are **resolved**.
+> Item 3 (analytics vendor) is **deliberately kept open** — see §24.3. Resolutions
+> are recorded in the Architecture Decision Log at the end of this document and
+> propagated into the four companion documents.
+
+1. ~~Whether `/solutions` becomes a real routed section post-MVP or stays
+   messaging-only permanently.~~ **Resolved**: `/solutions` is not a top-level MVP
+   navigation item. Solution-oriented content may appear on the homepage, inside
+   product pages, inside service pages, in future SEO landing pages, and in the
+   footer once real solution pages exist. Route extensibility for a future
+   `/solutions` tree is explicitly preserved — this is a sequencing decision, not
+   a permanent rejection.
+2. ~~Whether AI Toolkit gets a `/products/ai-toolkit` marketing page and CRM
+   integration in Phase 3/4, or stays intentionally separate.~~ **Resolved**: AI
+   Toolkit is an approved current SiteMint product (alongside AI Receptionist) and
+   **must** be integrated into the main SiteMint website and into the Products
+   navigation. This closes the "orphaned product" risk in §22. No additional
+   public products are approved beyond these two; future products follow the
+   platform taxonomy (§12) and go through this same owner-approval process.
 3. Which analytics tool to adopt (none is currently installed; PRD lists
-   requirements but not a vendor choice).
-4. Final top-level navigation set (Products / Services / Work / Pricing /
-   Resources / Company / Client Login / Start a Project vs. a trimmed set — see
-   Route doc recommendation).
-5. Whether the CRM's existing route names (`/admin/crm/dna`, `/admin/crm/
-   intelligence/*`, etc.) should ever be reorganized to match a cleaner IA, or are
-   permanently frozen as "working, do not touch."
-6. Final SiteMint color palette — the proposed palette in the task brief vs. the
-   two palettes already live in the codebase (see Design doc §Color Architecture).
+   requirements but not a vendor choice). **Deliberately unresolved.** Vendor
+   selection belongs to `IMPLEMENTATION_ROADMAP.md` Phase 8 (SEO, Accessibility,
+   Analytics, and Release QA), not to this checkpoint or to P0.1. The Blueprint
+   and PRD define required conversion events, privacy expectations, dashboard
+   needs, attribution needs, and performance constraints (PRD §24) so that vendor
+   selection is an implementation detail, not a re-litigation of requirements.
+4. ~~Final top-level navigation set...~~ **Resolved**: **Products, Services, Work,
+   Pricing, Company, Client Login, Start a Project** — see
+   `ROUTE_AND_NAVIGATION_ARCHITECTURE.md` §14 and §Recommended Navigation
+   Direction for the approved interaction type per item. Neither Solutions nor
+   Resources is a top-level MVP item (see #1 above and the Resources note below).
+5. ~~Whether the CRM's existing route names... should ever be reorganized...~~
+   **Resolved**: existing CRM routes are **not** reorganized, renamed, or removed
+   during the public-website redesign or design-system work. They remain fully
+   operational — the CRM continues to serve the entire SiteMint company exactly
+   as it does today. Any future consolidation begins with an admin information
+   architecture and shell review (not a route rename), and any actual route
+   migration, alias, or redirect requires its own separately approved checkpoint
+   with a dedicated CRM-specific PRD (see `ROUTE_AND_NAVIGATION_ARCHITECTURE.md`
+   §Admin/CRM Structure Evaluation and `IMPLEMENTATION_ROADMAP.md` Phase 7).
+6. ~~Final SiteMint color palette...~~ **Resolved (as a starting foundation, not a
+   final ruling)**: the existing, already-implemented helpdesk evergreen/mint
+   token system is approved as the **starting foundation** for the platform-wide
+   design system. This is not a declaration that every current helpdesk color
+   value is permanently final — the tokens still require a dedicated
+   accessibility, contrast, and visual-quality review before broad adoption (see
+   `DESIGN_SYSTEM_DIRECTION.md` §Proposed Color Direction and its "Foundation, Not
+   Final" note). No broad visual rewrite of `web-agency` occurs before that review
+   and the shared token/component set are formally approved.
+
+**Also resolved in Checkpoint P0.1** (not originally numbered in P0):
+
+7. Resources (as a nav concept) is not a top-level MVP navigation item — no blog,
+   guide, case-study, or template content exists in the repository today. It may
+   be added post-MVP once such content genuinely exists. Route extensibility for
+   a future `/resources` tree is preserved.
+8. Authentication boundaries — corrected framing. See §18 above and the full
+   Current State / MVP / Future statement in `PRODUCT_REQUIREMENTS_DOCUMENT.md`
+   §18. In one line: unchanged for MVP, never merged as a side effect of visual
+   work, and any future shared **customer** identity is a distinct, dedicated
+   security initiative that never implies internal CRM/admin access.
+9. Roadmap phase numbering and the next implementation checkpoint — see
+   `IMPLEMENTATION_ROADMAP.md` header note and its new Phase 1A entry.
 
 ---
 
@@ -354,8 +425,13 @@ future products, TBD per product at launch).
 | 7 | Provider names are not ordinary customer-facing branding | **Approved** (carried from same source) |
 | 8 | The implementation must be phased | **Approved** — see `IMPLEMENTATION_ROADMAP.md` |
 | 9 | Existing working functionality must be preserved | **Approved** — binding, see §22 Risks |
-| 10 | Shared design-system work precedes broad page redesign | **Approved** — Phase 1 before Phase 2+ in roadmap |
-| 11 | `/solutions` is messaging-only in MVP, not a routed section | **Proposed — requires owner confirmation** (§24.1) |
-| 12 | AI Toolkit gains a main-site presence in Phase 3/4 | **Proposed — requires owner confirmation** (§24.2) |
-| 13 | Final nav set (trimmed vs. full 8-item) | **Proposed — requires owner confirmation** (§24.4) |
-| 14 | Final SiteMint color palette | **Proposed — requires owner confirmation** (§24.6) |
+| 10 | Shared design-system work precedes broad page redesign | **Approved** — Phase 1A then Phase 1 before Phase 2+ in roadmap |
+| 11 | `/solutions` is messaging-only in MVP, not a routed top-level nav item; route extensibility preserved | **Approved (P0.1)** |
+| 12 | AI Toolkit is an approved product and must be integrated into the main site + Products nav | **Approved (P0.1)** |
+| 13 | Final MVP nav set: Products, Services, Work, Pricing, Company, Client Login, Start a Project | **Approved (P0.1)** |
+| 14 | Existing helpdesk evergreen/mint tokens are the starting foundation for the platform design system, pending accessibility/contrast/visual-quality review — not permanently final | **Approved as foundation (P0.1)** |
+| 15 | `/resources` is not a top-level MVP nav item; may be added post-MVP once real content exists; route extensibility preserved | **Approved (P0.1)** |
+| 16 | Existing CRM routes are not reorganized/renamed/removed during public-site or design-system work; any future migration requires a separate approved checkpoint | **Approved (P0.1)** |
+| 17 | Authentication boundaries stay unchanged for MVP; a future shared **customer** identity is a distinct future direction, never an MVP task, and never implies internal CRM/admin access | **Approved (P0.1)** — see §18 |
+| 18 | Analytics vendor selection | **Deliberately open** — belongs to Roadmap Phase 8 (§24.3) |
+| 19 | Roadmap is Phase 0 through Phase 8 (nine numbered phases); next implementation checkpoint after blueprint approval is Phase 1A (design-token audit and shared token specification) | **Approved (P0.1)** — see `IMPLEMENTATION_ROADMAP.md` |

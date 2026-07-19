@@ -1,7 +1,8 @@
 # SiteMint Digital — Platform Product Requirements Document
 
 > Master PRD for the SiteMint Digital platform. Companion to
-> `MASTER_PLATFORM_BLUEPRINT.md`. Documentation only — Checkpoint P0. Feature-level
+> `MASTER_PLATFORM_BLUEPRINT.md`. Documentation only — Checkpoint P0, corrected in
+> Checkpoint P0.1 (owner decisions resolved — see Blueprint §24). Feature-level
 > PRDs for AI Receptionist voice telephony and deep CRM work remain separate
 > documents (`docs/ai-receptionist/*`) and are out of scope here.
 
@@ -86,7 +87,8 @@ Receptionist voice telephony, deep CRM feature work beyond what already exists.
 - Rebuilding the CRM, campaigns engine, DISC/lead-scoring engines, or Twilio
   integration (all locked/stable per root `ARCHITECTURE.md`).
 - Rebuilding the AI Receptionist SMS pipeline or voice platform.
-- Merging authentication systems.
+- Merging or rewriting authentication systems (MVP scope only — see §18 for the
+  distinct, future-only evaluation of a shared customer identity).
 - Building `/solutions` as a routed IA section (messaging-only per Blueprint §15).
 - Any database migration.
 
@@ -101,8 +103,10 @@ Receptionist voice telephony, deep CRM feature work beyond what already exists.
 - FR4: AI Receptionist keeps its existing marketing page and signup flow, reachable
   from primary nav.
 - FR5: AI Toolkit gains a discoverable entry point from the main site (a new
-  `/products/ai-toolkit` page linking out to the standalone app) — MVP-eligible,
-  owner-decision pending (Blueprint §24.2).
+  `/products/ai-toolkit` page linking out to the standalone app) — **approved**
+  (Blueprint §24 Decision #2): AI Toolkit is a current SiteMint product and must
+  be integrated into the main site and Products navigation. Implementation lands
+  in `IMPLEMENTATION_ROADMAP.md` Phase 3/4, not in this documentation checkpoint.
 - FR6: Client Login and Start a Project remain the two primary conversion actions
   in navigation.
 - FR7: Private admin entry point (`/admin`) remains reachable but not promoted in
@@ -158,11 +162,44 @@ parallel store.
 
 ## 18. Authentication Requirements
 
-No change in this checkpoint. Two systems remain: CRM/Admin Bearer-token
-(`localStorage`), and AI Receptionist httpOnly cookie session. Future products may
-introduce a third distinct auth boundary if needed (e.g. AI Toolkit, if it ever
-grows a logged-in area) — never reuse or merge with the other two (see Blueprint
-§18, §24 open decision on hybrid auth strategy for the platform long-term).
+> **Corrected in Checkpoint P0.1** — see Blueprint §24 Decision #17/§18. This
+> section replaces any prior statement implying the current authentication
+> systems must remain separate *permanently*.
+
+**Current State**
+- The internal CRM currently uses its existing Bearer-token authentication
+  (`Authorization: Bearer`, token in `localStorage`, resets on server restart).
+- The AI Receptionist currently uses its existing cookie/session authentication
+  (httpOnly `receptionist_session` cookie, DB-backed, `/me` check).
+- Existing authentication must not be changed during the public-site and design
+  system phases (Phases 1A through 8 of `IMPLEMENTATION_ROADMAP.md`).
+
+**MVP**
+- Keep the current authentication systems unchanged.
+- Do not attempt an authentication rewrite merely to make the applications look
+  unified — shared visual design (Design doc) does not imply shared
+  authentication.
+- Preserve current login routes, session behavior, and authorization rules
+  exactly as they are.
+- Internal `/admin` access remains private and staff-only.
+- Customer dashboards and internal administration remain separate security
+  boundaries throughout MVP.
+- If AI Toolkit ever grows a logged-in area during MVP-era work, it introduces
+  its own distinct auth boundary rather than reusing either existing system.
+
+**Future (explicitly not an MVP task)**
+- Evaluate a shared SiteMint customer identity or single sign-on across
+  customer-facing products (e.g. AI Receptionist and AI Toolkit).
+- A future shared customer identity must **not** automatically grant internal
+  CRM or administrator access under any circumstance.
+- Any authentication consolidation requires its own dedicated security PRD,
+  migration plan, session-transition plan, and rollback strategy — never bundled
+  into a navigation, homepage, or design-system checkpoint.
+- **Recommended long-term direction** (future architecture direction, not an MVP
+  implementation task): a hybrid model — one possible shared SiteMint customer
+  identity across customer products, kept strictly separate from privileged
+  staff/admin authorization, with product-specific permissions and tenant
+  isolation preserved underneath.
 
 ## 19. Authorization Requirements
 
@@ -204,11 +241,28 @@ checkpoint.
 ## 24. Analytics Requirements
 
 No analytics tool is installed anywhere today (confirmed by repo inspection).
-Requirements for a future phase (not this checkpoint): homepage CTA clicks,
-product-card opens, service-page opens, discovery form start/complete, contact
-submit, client-login click, pricing view, AI Receptionist/AI Toolkit demo starts
-(see Blueprint's Analytics and Conversion section for the full event list).
-Vendor selection is an open owner decision (Blueprint §24.3).
+**Vendor selection is deliberately kept unresolved through Checkpoint P0.1** —
+it belongs to `IMPLEMENTATION_ROADMAP.md` Phase 8 (SEO, Accessibility, Analytics,
+and Release QA), not to any earlier phase. This section defines requirements a
+vendor must satisfy, independent of which vendor is eventually chosen:
+
+- **Required conversion events**: homepage CTA clicks, product-card opens,
+  service-page opens, discovery form start/complete, contact submit,
+  client-login click, pricing view, AI Receptionist/AI Toolkit demo or trial
+  starts (see Blueprint's Analytics and Conversion section for the full list).
+- **Privacy expectations**: no tracking on `/admin*` or authenticated product
+  dashboards beyond what each product already does internally; no PII sent to a
+  third-party analytics vendor beyond standard pageview/event metadata; cookie/
+  consent behavior must match applicable regional requirements at
+  implementation time (not specified further here — a Phase 8 concern).
+- **Dashboard needs**: funnel view from marketing page → conversion event per
+  product/service; no requirement for real-time dashboards in MVP.
+- **Attribution needs**: at minimum, first-touch source/campaign on inbound
+  leads reaching the CRM (Discovery/Contact forms) — exact mechanism is a Phase 8
+  implementation detail.
+- **Performance constraints**: script must load async/deferred, must not become
+  render-blocking, must respect the Design doc's performance budget (§43 of
+  `DESIGN_SYSTEM_DIRECTION.md`).
 
 ## 25. Accessibility Requirements
 
@@ -294,8 +348,10 @@ No target numbers are set in this document (would be fabricated without data).
 
 - Design system (Doc 4) must ship before broad page re-theming (Blueprint decision
   #10).
-- Analytics vendor decision (owner) blocks measurable success metrics.
-- AI Toolkit main-site integration (FR5) depends on owner approval (Blueprint §24.2).
+- Analytics vendor decision (owner, deliberately deferred to Phase 8) blocks
+  measurable success metrics until made.
+- AI Toolkit main-site integration (FR5) is approved (Blueprint §24 Decision #2)
+  and depends only on reaching Roadmap Phase 3/4, not on further owner approval.
 
 ## 39. Risks
 
@@ -312,9 +368,12 @@ duplicated here.
 
 ## 41. Open Owner Decisions
 
-Carried from `MASTER_PLATFORM_BLUEPRINT.md` §24 — see that section for the full
-numbered list (solutions IA, AI Toolkit integration, analytics vendor, nav set,
-CRM route reorganization, final color palette).
+As of Checkpoint P0.1, only **analytics vendor selection** remains open (Blueprint
+§24 Decision #3 — deliberately deferred to Roadmap Phase 8). All other items
+originally listed here (Solutions/Resources nav placement, AI Toolkit
+integration, final nav set, CRM route reorganization, color-palette foundation,
+authentication-boundary framing, phase numbering) are resolved — see
+`MASTER_PLATFORM_BLUEPRINT.md` §24 for the full numbered list and resolutions.
 
 ---
 
@@ -327,8 +386,8 @@ CRM route reorganization, final color palette).
 - Products overview page (AI Receptionist + AI Toolkit)
 - Services overview page (six service lines, real copy)
 - AI Receptionist landing page (existing page, retokenized to shared design system)
-- AI Toolkit landing page (**new** — closes the current orphan gap, pending owner
-  approval per Blueprint §24.2)
+- AI Toolkit landing page (**new** — closes the current orphan gap; **approved**
+  per Blueprint §24 Decision #2)
 - Web & App service page (part of Services overview or a dedicated page — decided
   in Phase 3 planning, not this checkpoint)
 - Work/portfolio page (existing page, retokenized)
@@ -341,10 +400,13 @@ CRM route reorganization, final color palette).
 
 ### Post-MVP
 
-- `/solutions` as a routed IA section (if owner approves)
-- Products mega-menu with rich previews
+- `/solutions` as a routed IA section, and/or `/resources`, once real content
+  volume justifies either (route extensibility preserved for both — Blueprint
+  §24 Decisions #1 and #7)
+- Products mega-menu with rich previews (once a 3rd+ product exists)
 - AI Toolkit logged-in customer area
-- CRM route reorganization (if owner approves)
+- Shared SiteMint customer identity / SSO evaluation across customer products
+  (future architecture direction only — Blueprint §24 Decision #17, PRD §18)
 - Dark mode for `web-agency`
 
 ### Future Platform Capabilities

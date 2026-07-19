@@ -1,8 +1,11 @@
 # SiteMint Digital — Route and Navigation Architecture
 
-> Documentation only — Checkpoint P0. No route in this repository is renamed,
-> moved, or redirected by this document. All "recommended" routes are proposals
-> for future, separately-approved checkpoints.
+> Documentation only — Checkpoint P0, corrected in Checkpoint P0.1. No route in
+> this repository is renamed, moved, or redirected by this document. All
+> "recommended" routes are proposals for future, separately-approved checkpoints.
+> **The MVP navigation set and per-item interaction types below are approved**
+> (Blueprint §24 Decision #4/#13) — implementation still waits for
+> `IMPLEMENTATION_ROADMAP.md` Phase 2.
 
 ## 1. Existing Route Inventory
 
@@ -160,10 +163,31 @@ doc).
 
 ## 14. Desktop Navigation
 
-Recommended top-level (see §Recommended Navigation Direction below for full
-per-item rationale): **Products, Services, Work, Pricing, Company, Client Login,
-Start a Project.** Five content items + two actions — trimmed from the task
-brief's eight-item list (see rationale, §Recommended Navigation Direction).
+**Approved MVP top-level set** (Blueprint §24 Decision #4/#13): **Products,
+Services, Work, Pricing, Company, Client Login, Start a Project.** Five content
+items + two actions — trimmed from the task brief's eight-item list (Solutions
+and Resources excluded from top-level MVP nav, see §Recommended Navigation
+Direction). Approved interaction type per item:
+
+| Item | Interaction type |
+|---|---|
+| Products | Dropdown (2 entries at MVP) or compact mega menu if a 3rd product lands before this ships |
+| Services | Dropdown or compact mega menu (6 entries) |
+| Work | Direct link |
+| Pricing | Direct link |
+| Company | Dropdown or direct overview page with clear access to About and Contact |
+| Client Login | Secondary action (visually distinct from the primary CTA, not a dropdown) |
+| Start a Project | Primary CTA (button styling, not a text nav link) |
+
+Solutions is explicitly **not** a top-level MVP navigation item (§18). Solution-
+oriented content may still appear on the homepage, inside product pages, inside
+service pages, in future SEO landing pages, and in the footer once real solution
+pages exist — none of that requires a top-level nav slot. Resources is likewise
+**not** a top-level MVP navigation item (no guide/case-study/article/template
+content exists in the repo today) but may be added post-MVP once such content
+exists. Neither exclusion removes future route extensibility for `/solutions` or
+`/resources` — both remain valid future top-level additions once their content
+case is real.
 
 ## 15. Mobile Navigation
 
@@ -184,9 +208,12 @@ over-engineering for six short, similar items. Plain dropdown recommended for MV
 
 ## 18. Solutions Navigation
 
-Not present in top-level nav (Blueprint §24.1). If solution-style messaging is
-needed, it lives inside the homepage narrative and/or as anchor sections on
-Products/Services pages, not as its own nav item or route tree.
+Not present in top-level MVP nav (Blueprint §24 Decision #1 — approved, not
+merely proposed). Solution-oriented content lives inside the homepage narrative,
+inside product pages, inside service pages, and later in SEO landing pages and
+the footer, not as its own nav item or route tree in MVP. Future route
+extensibility for a real `/solutions` tree is explicitly preserved — this is a
+sequencing decision, not a permanent rejection of the concept.
 
 ## 19. Login Behavior
 
@@ -255,7 +282,7 @@ Phase 4 (individual product/service pages) — see that document.
 
 ---
 
-## Recommended Navigation Direction
+## Recommended Navigation Direction (Approved, Blueprint §24 Decision #4/#13)
 
 Evaluating the task brief's proposed set — **Products, Services, Solutions, Work,
 Pricing, Resources, Company, Client Login, Start a Project** — against the actual
@@ -309,12 +336,27 @@ exists:
 | `/admin/crm/analytics/` | Exists as `reporting` |
 | `/admin/crm/settings/` | Exists |
 
-**Recommendation**: do not rename existing, working CRM routes to match the
-brief's naming (`analytics` vs `reporting`, `automation` vs
-`intelligence/automation-queue`) — these are cosmetic differences on a stable,
-locked-adjacent system; renaming has real regression risk for no user-facing
-benefit (see Blueprint §22 risk, and DEVELOPMENT_RULES.md "no scope creep"). The
-"missing" items (`clients`, `proposals` standalone, `support`, `content`,
-`portfolio`-as-CRM-content) are genuine gaps but are **CRM feature work**, not
-platform-navigation work, and belong in a future CRM-specific PRD — not this
-checkpoint or `IMPLEMENTATION_ROADMAP.md` Phase 7's scope beyond flagging them.
+**Decision (Blueprint §24 Decision #5 — approved, Checkpoint P0.1)**: existing CRM
+routes are **not** reorganized, renamed, or removed during the main public
+website redesign or the shared design-system work (Roadmap Phases 1A–6). Do not
+rename existing, working CRM routes to match the brief's naming (`analytics` vs
+`reporting`, `automation` vs `intelligence/automation-queue`) — these are
+cosmetic differences on a stable, locked-adjacent system; renaming has real
+regression risk for no user-facing benefit (see Blueprint §22 risk, and
+DEVELOPMENT_RULES.md "no scope creep"). Binding points from this decision:
+
+- Current CRM routes remain fully operational, unchanged, throughout this
+  program.
+- The internal CRM continues to serve the entire SiteMint company, not just one
+  product line.
+- The "missing" items (`clients`, `proposals` standalone, `support`, `content`,
+  `portfolio`-as-CRM-content) are genuine gaps but are **CRM feature work**, not
+  platform-navigation work, and require a future CRM-specific PRD.
+- If admin/CRM consolidation is ever pursued, it **begins with an admin
+  information architecture and shell review**, not with route renames.
+- Any actual route migration, alias, or redirect requires its own separately
+  approved checkpoint — never bundled into the public-site or design-system work.
+- Existing CRM data and workflows must remain protected throughout — this
+  decision exists specifically to prevent this platform program from touching a
+  revenue-critical, locked-adjacent system as a side effect of unrelated work
+  (see `IMPLEMENTATION_ROADMAP.md` Phase 7, which remains unscoped/optional).

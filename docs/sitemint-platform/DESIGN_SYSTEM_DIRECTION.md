@@ -1,8 +1,14 @@
 # SiteMint Digital — Design System Direction
 
-> Documentation only — Checkpoint P0. No CSS, token, or component file is
-> modified by this document. All values here are **proposed**, to be implemented
-> in `IMPLEMENTATION_ROADMAP.md` Phase 1.
+> Documentation only — Checkpoint P0, corrected in Checkpoint P0.1. No CSS, token,
+> or component file is modified by this document. All values here are
+> **proposed**, to be implemented starting in `IMPLEMENTATION_ROADMAP.md`
+> Phase 1A (design-token audit and shared token specification) and Phase 1.
+> **Owner decision (Blueprint §24 Decision #6/#14, approved as a starting
+> foundation, not a final ruling)**: the existing helpdesk evergreen/mint token
+> system is the approved starting point for the platform-wide design system —
+> but no current helpdesk color value is thereby declared permanently final. See
+> the "Foundation, Not Final" note at the end of this document.
 
 ## Current State (grounded in repo inspection)
 
@@ -310,6 +316,33 @@ content) stays per-artifact.
 
 ---
 
+## Foundation, Not Final (Owner Decision, Checkpoint P0.1)
+
+The evergreen/mint token system already implemented in helpdesk is approved as
+the **starting foundation** for the platform-wide design system — it is the
+lowest-risk, already-tested starting point (contrast-checked, dark-mode complete)
+rather than a fourth palette invented from scratch. This approval carries explicit
+limits:
+
+- The tokens **still require** a dedicated accessibility, contrast, and
+  visual-quality review before platform-wide adoption is considered final — that
+  review is Phase 1A work, not assumed to already be complete just because the
+  tokens exist and function in helpdesk today.
+- The marketing website (`web-agency`) may use **more spacious and expressive**
+  layouts than the dashboard — adopting the same *tokens* does not mean adopting
+  the same *density* or *layout rhythm* (see §41 Marketing vs. Dashboard Density).
+- Dashboards (helpdesk, and any future product dashboard) may stay **denser**
+  than marketing pages — same token source, different composition rules.
+- The core mint identity must remain consistent across every surface that adopts
+  it — one mint, not a family of near-identical mints per product.
+- The existing `web-agency` blue identity is retired **gradually**, not in a
+  single rewrite — see `IMPLEMENTATION_ROADMAP.md` Phase 1A (audit + spec) and
+  Phase 1 (token adoption) preceding Phase 2 (component-level re-theming).
+- **No broad visual rewrite of any page occurs before the shared tokens and
+  component set are formally approved** — Phase 1A's output (a shared token
+  specification) is itself a reviewable, approvable deliverable, distinct from
+  and prior to any homepage or component redesign work.
+
 ## Proposed Color Direction — Assessment of Task-Brief Palette
 
 The brief proposes: Deep background `#071712`, dark mint surface `#0D241C`,
@@ -325,8 +358,10 @@ existing, already-verified helpdesk token values as the platform standard, and
 retire the brief's specific hex proposal in favor of them. This satisfies every
 brand-direction requirement in the brief (premium, technical-without-cold,
 light/dark capable) while avoiding a second near-identical palette to maintain.
-Final adoption is an owner decision (Blueprint §24.6) since it means migrating
-`web-agency` off its current blue identity, not a small tweak.
+This is now **approved as the starting foundation** (Blueprint §24 Decision #6/#14,
+Checkpoint P0.1) — see the "Foundation, Not Final" note above for the limits of
+that approval. It still means migrating `web-agency` off its current blue
+identity gradually (Phase 1A/1/2), not in a single step.
 
 ## Motion Direction — Explicit Motion Budget
 
