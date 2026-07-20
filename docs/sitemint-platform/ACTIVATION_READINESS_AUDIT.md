@@ -17,7 +17,7 @@
 | Company information | Present in `index.html` JSON-LD (`Organization` schema: name, url, email, phone, address region) | — |
 | Contact information | `info.sitemint@gmail.com`, `+1 949 880 6515` in schema | — |
 | Pricing destination | Links to existing `/pricing` route (outside preview, unchanged) | — |
-| Sign In destination | Not audited in depth this checkpoint — flag for 2B.3 to confirm it points at the correct (CRM vs. receptionist) auth system per `CLAUDE.md`'s two-auth-system rule | **Owner/engineering confirmation needed** |
+| Sign In destination | **Previously verified** — `signInHref` (`navConfig.ts`) resolves to `/ai-receptionist/dashboard/login`, AI Receptionist customer access, checked against `artifacts/helpdesk/src/App.tsx`'s registered routes during Phase 2A.2/2A.3. No `/admin` exposure, no internal CRM login exposure, no AI Toolkit login. This is not presently an unresolved architecture question | Reverify during final activation testing, as a regression check rather than an open question |
 | Legal links | Not confirmed present in preview shell this checkpoint | **Needs verification in 2B.3** |
 | Unsupported claims | None found — capability-labeling system and qualitative-only portfolio outcomes both actively prevent this | Existing discipline should be preserved, not weakened, when visuals are added |
 | Placeholder copy | None found in the files reviewed | — |
@@ -32,14 +32,29 @@
 | Discovery/project form | Real, working form at `/discovery`, submits to `POST /api/discovery/submit` | Backend route exists (`artifacts/api-server/src/routes/discovery.ts`), inserts into `discoverySubmissions`, computes lead score/tags/package recommendation, triggers `sendFormEmails` |
 | Form acknowledgement | Not traced end-to-end this checkpoint (no submission was made — instructed not to submit a production form) | Static-code read only |
 | CRM lead capture | Discovery submissions insert into DB; onward CRM linkage not traced this checkpoint | — |
-| Conversion tracking | **None found** — no `gtag`/GA/Plausible/PostHog/Segment snippet anywhere in `web-agency/index.html` or `src/` | Confirmed gap, not a preview-specific issue — the *current live* site has the same gap |
+| Conversion tracking | **None found** — no `gtag`/GA/Plausible/PostHog/Segment snippet anywhere in `web-agency/index.html` or `src/` | Confirmed gap, not a preview-specific issue — the *current live* site has the same gap. See classification note below: not a technical blocker to rendering, but a real gap by the time paid advertising or the public homepage switch happens |
 | Error handling | Present in form code (`fetch` + response handling observed at line 582 of `Discovery.tsx`) | Not exhaustively reviewed |
 | Success state | Not traced in depth this checkpoint | Flag for 2B.3 |
-| Spam protection | Not found (no CAPTCHA/honeypot observed in the brief read) | Flag for 2B.3 — real risk if this becomes the live homepage's main lead form |
+| Spam protection | No obvious CAPTCHA, honeypot, rate limiter, or equivalent protection was found during the limited static review of `Discovery.tsx` and `discovery.ts` | Direct verification is still required across `Discovery.tsx`, `POST /api/discovery/submit`, route middleware, reverse-proxy/platform controls, and server-side rate limiting before this is treated as either present or absent. Classified as: needs verification before activation, not a confirmed absence |
 | Mobile conversion path | Not tested in a browser this checkpoint (documentation-only checkpoint, no browser testing performed) | Flag for 2B.3 |
 
 No email was sent, no production form was submitted, no payment or provider
 system was touched during this audit.
+
+**Analytics classification** (corrects an earlier overstatement that
+conflated "missing" with "blocking"):
+
+- Not required to implement portfolio visuals — a purely technical,
+  code-level task with no analytics dependency.
+- Strongly recommended before the public homepage switch — launching a
+  redesigned homepage with zero conversion visibility is a real business
+  risk, even though the page will render and function without it.
+- Required before paid campaign landing pages are launched — campaign
+  tracking has no meaning without a baseline analytics/event layer.
+
+A homepage can technically render without analytics; the recommendation to
+add it before the public switch is not weakened by this classification —
+it is a business-risk judgment, not a rendering blocker.
 
 ## C. SEO and AI Search
 
@@ -63,9 +78,9 @@ No schema or metadata changes were made this checkpoint.
 
 | Area | Status | Notes |
 |---|---|---|
-| Prior accessibility work | Phase 1B.1/1C.1 explicitly addressed contrast/focus gaps; `DESIGN_TOKEN_AUDIT.md` documents known contrast risks (mint/accent misuse, `success` token as white-text fill, light-theme focus ring) | These are documented, tracked risks — not fixed in this checkpoint |
-| Keyboard/focus | Not tested in a live browser this checkpoint | Flag for 2B.3 — this audit is static-analysis only |
-| Contrast | See `DESIGN_TOKEN_AUDIT.md` §20 — known risks exist in the shared token system, not preview-specific | — |
+| Accessibility history | **Corrected/fixed**: Phase 1B.1 and 1C.1 explicitly corrected the focus and contrast gaps found during Phase 1A's initial token audit — those specific issues are resolved, not open. **Documented, tracked risk (separate from the fixed issues)**: `DESIGN_TOKEN_AUDIT.md` §20 records a *different*, still-live risk — mint/accent misuse outside its approved lane, the `success` token as a white-text fill, and the light-theme focus ring — none of which is confirmed as an end-user-facing defect in shipping `helpdesk` code today, but which could resurface if a *new* surface (e.g. this preview) consumes the shared tokens carelessly. **Not reverified this checkpoint**: whether the preview itself avoids the §20 risk pattern | Do not describe the Phase 1A issues (already corrected in 1B.1/1C.1) as currently unresolved; the §20 risk is a distinct, still-open item, not a restatement of the fixed ones |
+| Keyboard/focus | Not tested in a live browser this checkpoint | Flag for 2B.3 — this audit is static-analysis only; not reverified since 1C.1 in this specific preview surface |
+| Contrast | See `DESIGN_TOKEN_AUDIT.md` §20 for the still-open risk pattern (distinct from the Phase 1A issues already fixed in 1B.1/1C.1) | — |
 | Reduced motion | Not audited this checkpoint | Flag for 2B.3 (preview uses `framer-motion` for animated sections) |
 | Headings/landmarks | Not audited line-by-line this checkpoint | Flag for 2B.3 |
 | Link text | Spot-checked (`SelectedWorkSection.tsx`, `Portfolio.tsx`) — descriptive ("Visit live site," "View all work"), no bare "click here" found | — |
@@ -74,7 +89,11 @@ No schema or metadata changes were made this checkpoint.
 | Image alt-text plan | Existing `Portfolio.tsx` pattern (`"{name} website preview"`) is a reasonable baseline; recommended alt pattern for new captures is in `PORTFOLIO_EVIDENCE_AUDIT.md` §5 | — |
 | Screenshots containing text | All four existing portfolio screenshots contain readable page text (headlines, nav labels) — none of it is captured as accessible text (it's a static image), which is a real but common trade-off for site-preview thumbnails; not a blocker | — |
 
-No claim of formal WCAG conformance is made by this audit.
+No claim of formal WCAG conformance is made by this audit. Final activation
+testing still needs, none of which was performed this checkpoint: browser
+keyboard testing, focus visibility, contrast review, reduced motion,
+headings and landmarks, target sizes, image alt text, and mobile
+navigation.
 
 ## E. Performance
 
@@ -90,22 +109,31 @@ Investigated the reported ~2 MB ordinary entry-bundle figure.
   **preview lazy chunk ~65.33 kB JS / ~10.29 kB CSS, isolated from the
   ordinary bundle** (confirms the preview itself is not the cause of the
   2 MB figure — it loads separately via `React.lazy`).
-- **Likely causes, from static inspection of `package.json` and prior
-  audit docs** (`DESIGN_TOKEN_AUDIT.md` §21):
-  - `framer-motion` is bundled into the ordinary entry even on routes that
-    don't use animation, in at least 3 of 4 artifacts (shipped-but-unused
-    duplication across artifacts, no shared runtime).
-  - `react-icons` is installed in `web-agency`, `helpdesk`, and
-    `ai-toolkit` `package.json` files with **zero import sites** anywhere
-    — confirmed dead weight, safe to remove, but a dependency change is
-    out of scope for a documentation-only checkpoint.
-  - Google Fonts loaded via CSS `@import url(...)` in every artifact —
-    render-blocking, no `<link rel="preload">` pattern.
-  - `recharts` is a dependency (used by CRM reporting pages,
-    `CrmReporting.tsx`) — if it is not route-split away from the public
-    marketing entry, it is a plausible large contributor. Not confirmed
-    without a real build; flagged as the top candidate to verify first in
-    a future performance checkpoint.
+- **Hypotheses, from static inspection of `package.json` and prior audit
+  docs** (`DESIGN_TOKEN_AUDIT.md` §21) — none of the following was
+  confirmed by an actual bundle analysis this checkpoint; treat each as an
+  unproven candidate, not an established cause, until a real build
+  measures it directly:
+  - `framer-motion` is a **hypothesis**: per `DESIGN_TOKEN_AUDIT.md` §21 it
+    is bundled into the ordinary entry in at least 3 of 4 artifacts
+    regardless of use (shipped-but-unused duplication, no shared runtime),
+    but its actual byte contribution to *this* bundle was not measured.
+  - `react-icons` is the **strongest dead-dependency candidate**: installed
+    in `web-agency`, `helpdesk`, and `ai-toolkit` `package.json` files with
+    **zero import sites** anywhere in the codebase, per the audit's grep.
+    This is closer to confirmed-unused than the other items, but it should
+    still not be removed before a dedicated build-and-lockfile checkpoint
+    verifies the grep and measures the before/after bundle delta — no
+    dependency should be removed on the strength of a documentation
+    checkpoint's static read alone.
+  - Google Fonts loaded via CSS `@import url(...)` in every artifact is an
+    **observed pattern** (render-blocking, no `<link rel="preload">`), not
+    a sized hypothesis — its byte/timing cost was not measured.
+  - `recharts` (used by CRM reporting pages, `CrmReporting.tsx`) is a
+    **hypothesis**: plausible if not route-split away from the public
+    marketing entry, but unconfirmed without a real build. Flagged as the
+    top candidate to verify first in a future performance checkpoint,
+    precisely because it is unconfirmed, not because it is known.
 - **Route-level splitting**: `App.tsx` already lazy-loads `PlatformPreview`
   (confirmed via `lazy(() => import("@/pages/PlatformPreview"))`) — the
   preview route itself is well-isolated. The 2 MB figure describes the
@@ -183,7 +211,17 @@ Two future campaign routes were requested for planning:
 - **Target audience**: service businesses currently losing inbound leads
   to slow response times (matches AI Receptionist's core pitch)
 - **Problem**: missed calls/messages after hours or during busy periods
-- **Promise**: instant, always-on lead capture and response
+- **Promise**: **corrected** — "instant, always-on lead capture and
+  response" is too broad; it could be read as claiming voice calling is
+  already a complete production service, which is not verified. The
+  campaign promise must match verified channel-level readiness: SMS
+  receptionist available now; voice experience in development; connected
+  CRM and automated follow-up described as platform direction unless
+  independently verified. Recommended initial campaign promise: "Help
+  customers reach your business and make every inquiry easier to capture,
+  organize, and follow up." A more channel-specific promise (e.g. naming
+  voice explicitly) may be used only once supported by the verified
+  product state at publish time.
 - **Proof required**: real AI Receptionist demo or transcript — not yet
   available in a publishable form per capability-labeling status; needs
   confirmation of current in-development vs. available state before this
@@ -226,25 +264,56 @@ before publishing a claim.
 
 ## Summary
 
-### Major activation blockers
+### Blockers and improvements, by category
 
-1. No portfolio visuals in the homepage-scale Selected Work section yet
-   (see `PORTFOLIO_EVIDENCE_AUDIT.md`) — text-only currently.
-2. No owner permission on record for displaying any of the three/four
-   client project screenshots publicly.
-3. No analytics/conversion tracking anywhere on the site (preview or
-   live) — a business-risk-level gap for launching a new homepage.
-4. Ordinary entry bundle (~2 MB) unmeasured *today* and unexplained beyond
-   plausible hypotheses (CRM code, `framer-motion`, dead `react-icons`,
-   render-blocking fonts) — needs its own checkpoint before activation.
-5. No written release-safety plan (flag-removal, rollback, smoke-test
-   checklist) yet.
-6. No spam protection identified on the discovery form, which would become
-   the primary homepage conversion path.
+Reorganized from a single flat list into four categories, so an unverified
+hypothesis (e.g. bundle-size cause) is not read with the same weight as a
+confirmed gap (e.g. no analytics exists).
 
-### Non-blocking improvements
+**A. Blocks portfolio implementation**
 
-- Remove confirmed-dead `react-icons` dependency.
+1. Missing documented permissions — no owner/client/organizational approval
+   on record for any of the four project screenshots.
+2. Missing mobile visuals — no mobile screenshot exists for any project.
+3. Unoptimized image files — existing desktop PNGs are 1.3–2.4 MB each,
+   unsuitable for direct use in a homepage-critical section without
+   compression/format conversion.
+
+**B. Blocks or strongly constrains public activation**
+
+1. Final capability confirmation — current real-world status of AI
+   Receptionist/AI Toolkit not independently reverified against the
+   capability-labeling system this checkpoint.
+2. Release and rollback plan — not written yet (flag-removal, homepage
+   route-switch, rollback, smoke-test checklist, monitoring).
+3. Conversion-form protection verification — spam protection status is
+   unverified, not confirmed absent (see Correction 5); needs direct
+   verification before the discovery form becomes the primary homepage
+   conversion path.
+4. Unresolved public bundle measurement — the ~2 MB ordinary entry bundle
+   figure is carried forward from Phase 2A.4, not re-measured this
+   checkpoint, and its causes are unproven hypotheses (see Performance
+   section).
+5. Owner content approval — headline/positioning, Sign In destination, and
+   legal-link presence need a final confirmation pass even where evidence
+   strongly suggests they're already correct.
+
+**C. Required before paid advertising**
+
+1. Analytics and conversion-event tracking — not required to render the
+   homepage, but required before any campaign page is measurable.
+2. Campaign-specific proof (demo, transcript, or workflow example) for
+   each planned `/solutions/*` page.
+3. Channel-accurate AI Receptionist claims — campaign copy must reflect
+   verified per-channel readiness (SMS now, voice in development), not a
+   blanket "always-on" promise.
+4. Tested campaign conversion path — not exercised this checkpoint.
+
+**D. Non-blocking improvements**
+
+- Remove confirmed-dead `react-icons` dependency, but only after a
+  dedicated build/lockfile checkpoint re-verifies the zero-import-sites
+  finding and measures the before/after bundle delta.
 - Consolidate duplicate portfolio-data arrays between `Portfolio.tsx` and
   `SelectedWorkSection.tsx` once images are added to both.
 - Clean up duplicate/stale files in `attached_assets/screenshots/`.

@@ -30,10 +30,16 @@
 | 17 | Network access available | Not tested directly this session; prior session (`IMPLEMENTATION_ROADMAP.md`, Phase 2A.4) recorded outbound requests to all three live domains returning 403 from the environment proxy. No live reachability check was attempted here to avoid re-triggering that unresolved condition; treat all "live URL" status below as **last-verified, not re-confirmed today**. |
 | 18 | Screenshot capture completed reliably | Not attempted this checkpoint (out of scope — Phase 2B.1 is evidence-inventory only). See §5 for the plan to do it in 2B.2. |
 
-**Key finding:** real, high-quality desktop screenshots of three of the four
-portfolio projects already exist in the repository
+**Key finding:** real, high-quality desktop screenshots exist for **all four**
+portfolio projects in the repository
 (`artifacts/web-agency/public/portfolio-*.png`) and are already live-used on
-`/portfolio`. The homepage-scale `SelectedWorkSection.tsx` component was
+`/portfolio`. Three (Shasta Greene, OneFilAm, Herlinda Valdovinos) are
+recommended for immediate homepage consideration; the fourth (Claidy Taguran
+Portfolio) has an equally real, high-quality asset but remains **deferred**
+pending confirmation of its correct live URL and its relationship to SiteMint
+(see §2 detail and Correction log below) — the asset is not missing, the
+project's readiness for use is what's unresolved. The homepage-scale
+`SelectedWorkSection.tsx` component was
 built during Phase 2A.4 believing screenshot capture was blocked, and shipped
 a text-only browser-chrome frame instead. That belief was correct for *new*
 capture at the time, but the assets already existed elsewhere in the repo and
@@ -157,11 +163,30 @@ Recommended classification for the Phase 2B.2/2B.3 composition:
 
 ## 5. Screenshot-Capture Plan (for Phase 2B.2)
 
-Desktop screenshots already exist and are reusable pending permission.
+Desktop screenshots already exist for all four projects and are reusable
+pending documented approval (see approval-status table below).
 **Mobile screenshots do not exist for any project** and are the primary gap.
 
-For each of the three permission-cleared projects (Shasta Greene, OneFilAm,
+For each of the three recommended candidate projects, pending documented
+owner, organizational, or client approval (Shasta Greene, OneFilAm,
 Herlinda Valdovinos — Claidy Taguran deferred, see §4):
+
+### Recommended approval status by project
+
+- **Shasta Greene Real Estate** — owner-controlled project; recommended for
+  featured use; final owner approval must still be explicitly documented
+  before publication.
+- **OneFilAm Community** — recommended supporting project; organizational
+  permission should be recorded before public use.
+- **Herlinda Valdovinos** — recommended supporting project; explicit client
+  permission is required before publication.
+- **Claidy Taguran Portfolio** — deferred; internal permission, the
+  SiteMint/Claidy relationship, and the correct live URL all require
+  confirmation.
+
+None of the above should be read as permission already granted — every
+project's status is "recommended candidate, pending documented approval,"
+not "cleared."
 
 | Parameter | Recommendation |
 |---|---|
@@ -202,7 +227,9 @@ a need to capture authenticated screens.
 ## 7. Summary: what remains before Selected Work can show real visuals
 
 1. Owner confirms permission to publicly display each of the three
-   (or four) client/project screenshots on the SiteMint homepage.
+   recommended candidate projects' screenshots on the SiteMint homepage
+   (Shasta Greene, OneFilAm, Herlinda Valdovinos); Claidy Taguran remains
+   deferred pending item 2 below regardless of permission.
 2. Owner confirms the Claidy Taguran Portfolio project's correct URL and
    its relationship to SiteMint (built-by vs. self-built).
 3. Mobile screenshots captured for each approved project (none exist today).
