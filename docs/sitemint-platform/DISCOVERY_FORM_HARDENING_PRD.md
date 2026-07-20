@@ -46,6 +46,33 @@ form as a Level 3/4 activation blocker.
 > unchanged evidence from Checkpoint 2C.2A. No implementation occurred in
 > any of the three checkpoints.
 
+> **Further corrected by Checkpoint 2C.2A.3** (documentation-only). Owner
+> review found three remaining implementation-contract gaps: the PRD
+> defined different behavior for same-key/same-payload vs. same-key/
+> different-payload but never defined how payload sameness is determined;
+> rotation was described as using a "current and previous" HMAC key but
+> only one key variable was ever documented, making rotation as described
+> unimplementable; and `duplicateReviewStatus` did not distinguish a
+> submission cleared as legitimate from one confirmed as a real duplicate
+> — two outcomes with opposite downstream effects. §18, §19, §24–§26,
+> §29, §30, §34, §37, §38, and §41–§43 were corrected in place: a
+> canonical, HMAC-based idempotency-payload digest with explicit domain
+> separation from the duplicate fingerprint now determines payload
+> sameness; `DISCOVERY_FINGERPRINT_HMAC_PREVIOUS_KEY`/`DISCOVERY_
+> FINGERPRINT_PREVIOUS_KEY_VERSION` (documented, not added) make key
+> rotation actually configurable, with defined startup validation;
+> `duplicateReviewStatus` now has four states (`none`/`pending`/`cleared`/
+> `confirmed_duplicate`) with `cleared` triggering exactly-once withheld-
+> job creation and `confirmed_duplicate` staying permanently suppressed;
+> and a workable operator review path for pending duplicate reviews is
+> now a documented precondition for public activation. The three-table
+> model, delivery-job/AI-brief architecture, transactional outbox, and
+> `409 idempotency_conflict` contract from 2C.2A.1/2C.2A.2 are unchanged
+> except for their documented interaction with duplicate resolution. The
+> current-state audit (§8–§11) remains the unchanged evidence from
+> Checkpoint 2C.2A. No implementation occurred in any of the four
+> checkpoints.
+
 ---
 
 ## 1. Executive Summary
@@ -422,8 +449,14 @@ the original task brief:
   (indexed, not unique — see below), **`fingerprintKeyVersion`** (added
   2C.2A.2, non-secret — records which HMAC key version produced the
   stored fingerprint, see the fingerprint-secret documentation below),
-  high-level intake status (§19), **`duplicateReviewStatus`** (added
-  2C.2A.2 — `none`/`pending`/`resolved`, see §24 Correction 5), an
+  **`idempotencyPayloadHash`, `idempotencyPayloadHashKeyVersion`,
+  `idempotencyCanonicalizationVersion`** (added 2C.2A.3 — see the
+  canonical idempotency payload documentation below), high-level intake
+  status (§19), **`duplicateReviewStatus`** (**corrected 2C.2A.3 — four
+  states, not three: `none`/`pending`/`cleared`/`confirmed_duplicate`,
+  see §24 Correction 4**), **`duplicateOfSubmissionId`,
+  `duplicateResolvedAt`, `duplicateResolvedBy`, optionally
+  `duplicateResolutionReasonCode`** (added 2C.2A.3 — see §24), an
   optional linked CRM lead ID, created/updated timestamps. JSONB for the
   full structured answers (`projectScope`, `readiness`, `decisionContext`
   detail, etc.). This single table replaces both current
@@ -539,33 +572,120 @@ own. Corrected approach:
   project later, and never silently accepting a materially different
   submission under a reused key as if it were the original.
 
-**Fingerprint HMAC secret and rotation (documented 2C.2A.2, not added
-this checkpoint):** the duplicate fingerprint (above) requires a
-server-side HMAC key to be non-reversible — this was left undefined in
-2C.2A.1. Proposed configuration:
-  - `DISCOVERY_FINGERPRINT_HMAC_KEY` — the server-side HMAC key used to
-    derive the fingerprint from normalized fields. Requirements: secret;
-    server-only; never exposed to Vite/client-side code; never logged;
-    distinct from the database, email, CRM, AI, session, and signing
-    secrets; validated at startup before the public submission endpoint
-    is enabled; the endpoint fails closed (stays disabled) if this value
-    is missing in production; a test-only value is mocked/supplied during
-    automated tests.
+**Fingerprint HMAC secret and rotation (documented 2C.2A.2, corrected to
+be actually implementable in 2C.2A.3; not added this checkpoint):** the
+duplicate fingerprint (above) requires a server-side HMAC key to be
+non-reversible — this was left undefined in 2C.2A.1, and the 2C.2A.2
+rotation description referenced a "previous key" that was never actually
+documented as configuration, making rotation as described impossible to
+implement. Corrected proposed configuration:
+  - `DISCOVERY_FINGERPRINT_HMAC_KEY` — the current server-side HMAC key
+    used to derive the fingerprint from normalized fields. Requirements:
+    secret; server-only; never exposed to Vite/client-side code; never
+    logged; distinct from the database, email, CRM, AI, session, and
+    signing secrets; validated at startup before the public submission
+    endpoint is enabled; the endpoint fails closed (stays disabled) if
+    this value is missing in production; a test-only value is mocked/
+    supplied during automated tests.
   - `DISCOVERY_FINGERPRINT_KEY_VERSION` — a non-secret configuration
     value recording which key version generated a given stored
     fingerprint (stored per-row as `discovery_submissions.
     fingerprintKeyVersion`, added above). Supports deliberate key
     rotation without silently invalidating historical duplicate data.
-  - Rotation direction: new submissions use the current key version;
+  - **`DISCOVERY_FINGERPRINT_HMAC_PREVIOUS_KEY`** (added 2C.2A.3) — the
+    immediately previous approved HMAC secret, temporarily retained
+    during a controlled rotation window. Requirements: secret;
+    server-only; **optional outside an active rotation**; never exposed
+    to Vite; never logged; never stored in the database.
+  - **`DISCOVERY_FINGERPRINT_PREVIOUS_KEY_VERSION`** (added 2C.2A.3) — the
+    non-secret version identifier for the previous key. Required when the
+    previous key is configured.
+  - **Startup validation (added 2C.2A.3)**, enforced before the public
+    endpoint is enabled: current key and current version must both be
+    present in production; previous key and previous version must be
+    either both present or both absent (never one without the other);
+    current and previous versions must be different; any malformed or
+    incomplete rotation configuration disables the new public endpoint
+    safely (true fail-closed, §22 Correction 7) rather than proceeding
+    with ambiguous key state.
+  - Rotation direction: new submissions use only the current key/version;
     recent duplicate lookups may temporarily compute fingerprints using
     both the current and the immediately-previous approved key during a
     controlled rotation window (so in-flight duplicate detection doesn't
-    break mid-rotation); old raw PII is never reconstructed from a
-    fingerprint; no key value is ever stored in the database, only the
-    version identifier; the actual rotation procedure is a separately
-    reviewed operational process, not defined by this PRD.
-  - Neither variable is added to the environment in this checkpoint — see
-    §34 for the environment-variable inventory entry.
+    break mid-rotation); idempotency-payload comparison (below) uses the
+    recorded key version for that submission specifically; the previous
+    key remains available for at least the duplicate window, the
+    idempotency retry window, and an approved operational grace period;
+    previous-key removal occurs only after no records requiring it still
+    need comparison under the active retry policy; old raw PII is never
+    reconstructed from a fingerprint; no key value is ever stored in the
+    database, only the version identifier; the actual rotation procedure
+    is a separately reviewed operational process, not defined by this
+    PRD.
+  - None of these four variables is added to the environment in this
+    checkpoint — see §34 for the environment-variable inventory entry.
+
+**Canonical idempotency payload and payload-hash comparison (added
+2C.2A.3).** The PRD previously stated that "same idempotency key,
+different payload" returns `409 idempotency_conflict` (§24) without
+defining how payload sameness is determined. Corrected mechanism:
+
+  - **Canonical payload definition.** A deterministic server-side
+    representation of the *validated and normalized* submission payload,
+    derived from the shared validated DTO (§14) — never from raw request
+    JSON. It includes the client-provided business and project-intake
+    data that defines the intended submission (the seven-category answer
+    set, §12). It explicitly **excludes** ephemeral or transport-only
+    fields: `idempotencyKey` itself, the honeypot value, `formStartedAt`,
+    client-generated submission timestamps, analytics identifiers,
+    request correlation IDs, IP address, user agent, rate-limit metadata,
+    server-generated fields, database-generated IDs, and delivery/AI
+    statuses.
+  - **Serialization requirements:** stable property ordering (not
+    dependent on ordinary JavaScript object insertion order); normalized
+    strings (matching the §21 normalization rules already applied before
+    comparison); normalized enum values; deterministic array handling
+    (e.g. sorted where order is not semantically meaningful); exactly one
+    documented canonicalization version, tracked as
+    `idempotencyCanonicalizationVersion` (recommended initial value
+    `v1`). Canonicalization itself is **not implemented in this
+    checkpoint** — this is a documentation-only contract.
+  - **Payload hash fields** (added to `discovery_submissions` above):
+    `idempotencyPayloadHash` — an HMAC of the canonical validated
+    payload, **not** a plain hash of raw user data; `idempotencyPayloadHashKeyVersion`
+    — which key version produced the stored hash; `idempotencyCanonicalizationVersion`
+    — which canonicalization version produced the canonical form that was
+    hashed.
+  - **Domain separation (added 2C.2A.3):** the idempotency-payload hash
+    must use a distinct HMAC domain from the duplicate-fingerprint hash,
+    even though the same underlying key material may be used. Conceptual
+    domain strings: duplicate fingerprint domain `discovery-fingerprint:v1`;
+    idempotency-payload domain `discovery-idempotency-payload:v1`. The
+    PRD recommends either explicit domain-separated HMAC construction
+    (e.g. domain string prepended/mixed into the HMAC input) or separately
+    derived subkeys from the same root secret — the concrete choice is an
+    implementation detail for 2C.2D, not fixed here.
+  - **Do not store:** the canonical payload string itself merely for
+    comparison (only its hash); raw request JSON in logs; contact data in
+    the hash fields; any secret or key value in the database.
+  - **Same-idempotency-key comparison procedure:** (1) load the original
+    submission; (2) recreate the incoming canonical payload after
+    validation and normalization; (3) calculate its HMAC using the key
+    version recorded with the original submission, when that approved
+    key remains available; (4) compare in constant time when supported by
+    the runtime; (5) matching hash → `submission_already_received`; (6)
+    different hash → `409 idempotency_conflict`; (7) the coarse duplicate
+    fingerprint must **never** be used to decide whether the complete
+    payload is identical — it is a lookup aid for distinct-submission
+    duplicate review (§24 scenario 3), not a payload-equality mechanism.
+  - **Verification key unavailable:** if the key needed to verify an
+    existing idempotency payload hash is no longer available (e.g.
+    outside the rotation grace period), the system must not assume the
+    payload matches, must not overwrite the original, and must return a
+    safe conflict or temporary-retry response according to the finalized
+    implementation policy (decided in 2C.2D) — while raising an
+    operational signal and never exposing key-version or cryptographic
+    details publicly.
 
 Keys/constraints: UUID primary keys on all three tables; unique constraint
 on `discovery_submissions.idempotencyKey`; ordinary index on the
@@ -601,12 +721,19 @@ per-*brief-version* (`pending`, `processing`, `retry_scheduled`,
 `humanReviewStatus` (`pending_review`, `approved`, `changes_requested`,
 `rejected`, `superseded`) tracked per version, not per submission.
 
-**Added (2C.2A.2):** `discovery_submissions.duplicateReviewStatus`
-(`none`, `pending`, `resolved`) is a high-level field on the submission
-row — not a delivery status — used solely by the conservative v1
-duplicate-handling policy (§24 Correction 5) to gate whether delivery
-jobs and an AI-brief row have been created yet for a likely-duplicate
-submission.
+**Added (2C.2A.2), corrected (2C.2A.3):** `discovery_submissions.
+duplicateReviewStatus` has **four** states, not three —
+`none`, `pending`, `cleared`, `confirmed_duplicate` — distinguishing a
+submission cleared as legitimate (process normally, exactly once) from
+one confirmed as a real duplicate (stays suppressed, never processed). It
+is a high-level field on the submission row — not a delivery status —
+used by the duplicate-handling policy (§24 Correction 4) to gate whether
+delivery jobs and an AI-brief row have been created yet for a likely-
+duplicate submission. Accompanying fields `duplicateOfSubmissionId`
+(nullable self-reference to `discovery_submissions.id`, populated only
+when `confirmed_duplicate`), `duplicateResolvedAt`, `duplicateResolvedBy`,
+and optionally `duplicateResolutionReasonCode` record the resolution
+outcome (§18, §24).
 
 ## 20. Validation Requirements
 
@@ -715,18 +842,25 @@ phone/IP stored in plain text, keyed by `DISCOVERY_FINGERPRINT_HMAC_KEY`,
 for recent matches** within the chosen duplicate window (e.g. 15 minutes)
 flags likely-duplicate *distinct* submissions for operator review.
 
-The five scenarios, fully corrected:
+The five scenarios, fully corrected — **scenarios 1 and 2 now use the
+canonical idempotency payload hash defined in §18, closing the 2C.2A.2 gap
+where "same payload" vs. "different payload" was never actually defined:**
 
-1. **Same idempotency key + same payload** — return the original
-   submission result; do not insert another row. `200` (or the previously
-   stored success representation). Safe public code:
-   `submission_already_received`.
+1. **Same idempotency key + same payload** — determined via the
+   canonical-payload-hash comparison procedure (§18): load the original
+   submission, recreate the incoming canonical payload post-validation,
+   compute its HMAC with the recorded key version, compare in constant
+   time where supported, and on a match return the original submission
+   result; do not insert another row. `200` (or the previously stored
+   success representation). Safe public code:
+   `submission_already_received`. The coarse duplicate fingerprint is
+   never used for this comparison (§18).
 
-2. **Same idempotency key + different payload — corrected 2C.2A.2.**
-   Previously this returned an ordinary success with the original result,
-   which is misleading (it silently discards the client's changed data
-   without telling them). Corrected behavior: do **not** return an
-   ordinary success; do **not** overwrite the original submission; do
+2. **Same idempotency key + different payload — corrected 2C.2A.2,
+   comparison mechanism finalized 2C.2A.3.** A hash mismatch in the
+   canonical-payload-hash comparison above (rather than an undefined
+   notion of "different payload") triggers this path. Do **not** return
+   an ordinary success; do **not** overwrite the original submission; do
    **not** insert the changed payload under the reused key. Return
    **HTTP 409**, safe public code `idempotency_conflict`, safe public
    message *"This submission session has already been used. Please
@@ -735,15 +869,19 @@ The five scenarios, fully corrected:
    idempotency key is generated only after an explicit retry or a new
    form session — never automatically reused. Only a sanitized
    discrepancy signal is logged (e.g. "key reuse with payload mismatch");
-   the full submitted payload is never logged. See §30 for the safe-error
-   matrix entry.
+   the full submitted payload is never logged. If the key needed to
+   verify the existing hash is no longer available (§18 "verification key
+   unavailable"), never assume a match, never overwrite, return a safe
+   conflict or temporary-retry response per the finalized 2C.2D policy,
+   and raise an operational signal. See §30 for the safe-error matrix
+   entry.
 
 3. **Different key but a fingerprint match within the window.** Store the
    new submission — never silently discard it. Set
-   `duplicateReviewStatus = pending` (§19). **Corrected 2C.2A.2 /
-   Correction 5:** do not automatically send a client acknowledgment,
-   internal notification, or create a CRM lead for this submission until
-   the duplicate is resolved — see the conservative v1 policy below.
+   `duplicateReviewStatus = pending` (§19). Do not automatically send a
+   client acknowledgment, internal notification, or create a CRM lead for
+   this submission until the duplicate is resolved — see the conservative
+   v1 policy and the **corrected four-state resolution model** below.
 
 4. **Different key and a meaningfully changed submission** (new
    fingerprint) — store normally, `duplicateReviewStatus = none`, all
@@ -753,35 +891,86 @@ The five scenarios, fully corrected:
 5. **A legitimate resubmission after the duplicate window has elapsed** —
    store normally, same as scenario 4.
 
-**Conservative v1 duplicate-job policy (added 2C.2A.2, Correction 5).**
-When a submission is flagged as a likely duplicate (scenario 3), the
-system must not both store it for human review *and* automatically fire
-duplicate emails and create a duplicate CRM lead — that would defeat the
-point of flagging it. Chosen v1 behavior: the same transaction that
+**Conservative v1 duplicate-job policy (added 2C.2A.2, unchanged
+mechanism).** When a submission is flagged as a likely duplicate
+(scenario 3), the system must not both store it for human review *and*
+automatically fire duplicate emails and create a duplicate CRM lead —
+that would defeat the point of flagging it. The same transaction that
 creates the `discovery_submissions` row for a flagged submission creates
 the row with `duplicateReviewStatus = pending` and **withholds** creation
 of its `discovery_delivery_jobs` rows (and its `discovery_ai_briefs` row,
 if AI generation is enabled) until an authorized operator resolves the
 duplicate review. This remains compatible with the one-transaction
 reliability model (§26) — the transaction still commits atomically, it
-simply omits the job-creation step for flagged submissions. The
-resolution action itself (an authorized operator confirming the
-submission is not a duplicate, or merging it) is documented as a future
-capability that creates the required jobs **exactly once** when
-triggered — it is not implemented or further specified in this
-checkpoint.
+simply omits the job-creation step for flagged submissions.
+
+**Corrected 2C.2A.3 — duplicate-review outcome model.** The 2C.2A.2
+`duplicateReviewStatus` (`none`/`pending`/`resolved`) did not distinguish
+two outcomes with opposite downstream behavior. Corrected to four states:
+`none`, `pending`, `cleared`, `confirmed_duplicate`.
+
+- **`cleared` outcome** — an authorized operator determines the flagged
+  submission is legitimate. Transactionally: transition
+  `pending` → `cleared`; record `duplicateResolvedAt` and
+  `duplicateResolvedBy`; create the previously withheld
+  `discovery_delivery_jobs` rows exactly once; create the `pending`
+  `discovery_ai_briefs` row exactly once when AI brief generation is
+  enabled. The resolution service relies on the existing
+  `(submissionId, jobType)` / `(submissionId, briefVersion)` unique
+  constraints (§18) to prevent duplicate job or brief creation even if
+  the resolution action is attempted more than once — it treats a
+  uniqueness conflict idempotently, not as an error.
+
+- **`confirmed_duplicate` outcome** — an authorized operator confirms the
+  submission is genuinely a duplicate. Transactionally: transition
+  `pending` → `confirmed_duplicate`; set `duplicateOfSubmissionId` to the
+  original submission's ID; record `duplicateResolvedAt` and
+  `duplicateResolvedBy`. Do **not** create the withheld delivery jobs. Do
+  **not** create an AI-brief row. Preserve the submitted record for audit
+  and retention purposes (never deleted merely for being a duplicate). Do
+  **not** create a duplicate CRM lead. Do **not** send a second client
+  acknowledgment unless a later policy explicitly approves it. This
+  internal duplicate classification is never exposed to the prospect.
+
+Neither resolution outcome, nor the resolution action itself (the
+authorized-operator workflow that triggers it), is implemented or further
+designed in this checkpoint — see §41 for the remaining open item on the
+resolution workflow/authorization model, and §38/Correction 5 below for
+the operator-visibility requirement this policy depends on.
+
+**Operator visibility requirement (added 2C.2A.3, documented future
+requirement, not implemented).** A `pending` likely duplicate must not
+become an invisible stored record — if the duplicate-withholding policy
+above is enabled, authorized SiteMint operators must have at least one
+reliable way to identify pending duplicate reviews before the public
+endpoint is activated (§38). Acceptable future approaches: an internal
+CRM/admin review queue, an operator dashboard query, a scheduled
+operational report, or a separate alerting mechanism — the exact
+operational UI is deliberately left open for a later checkpoint. While a
+submission is `pending` duplicate review, the ordinary internal-
+notification email job must not be sent for it (consistent with the
+job-withholding policy above). The final implementation must provide, at
+minimum: a pending count, submission timestamp, a safe business/contact
+summary, a possible original-submission reference, clear/confirm actions,
+exactly-once resolution behavior, authorization, and audit fields. No
+admin queue is implemented in this checkpoint.
 
 ## 25. Idempotency Strategy
 
 See §24/§18 — the idempotency key (enforced via a real unique database
 constraint) is the mechanism for safe retries of the *same* client action
 (e.g., a network timeout followed by an automatic client retry) and
-returns the original result unchanged. It is distinct from (a) the
-same-key-different-payload conflict case, which is corrected in 2C.2A.2
-to return `409 idempotency_conflict` rather than silently returning the
-original result (§24 scenario 2), and (b) the fingerprint-based spam/
-duplicate-review signal, which flags but never blocks near-duplicate
-distinct submissions under different keys (§24 scenario 3).
+returns the original result unchanged **when the canonical-payload-hash
+comparison (§18, finalized 2C.2A.3) confirms the resubmitted payload is
+identical to the original.** It is distinct from (a) the same-key-
+different-payload conflict case, which is corrected in 2C.2A.2 to return
+`409 idempotency_conflict` rather than silently returning the original
+result, and whose payload-sameness determination is now precisely defined
+by the canonical-hash comparison rather than left implicit (§24 scenario
+2), and (b) the fingerprint-based spam/duplicate-review signal, which
+flags but never blocks near-duplicate distinct submissions under
+different keys (§24 scenario 3) and is never used to decide payload
+equality (§18).
 
 ## 26. Reliability and Partial-Failure Model
 
@@ -815,8 +1004,8 @@ When AI generation is disabled, no AI row is created during submission,
 and an operator may later create one through a separately-approved
 workflow (not defined in this checkpoint).
 
-**Interaction with the duplicate-review policy (added 2C.2A.2, §24
-Correction 5):** when a submission is flagged as a likely duplicate
+**Interaction with the duplicate-review policy (added 2C.2A.2, §24):**
+when a submission is flagged as a likely duplicate
 (`duplicateReviewStatus = pending`), the same transaction still creates
 the `discovery_submissions` row, but **withholds** creation of its
 `discovery_delivery_jobs` rows and its `discovery_ai_briefs` row (if AI
@@ -824,6 +1013,17 @@ generation is enabled) until an operator resolves the duplicate review.
 This stays compatible with the one-transaction model — the transaction
 still commits atomically, it simply omits certain inserts for flagged
 submissions rather than running a second, separate transaction later.
+
+**Corrected 2C.2A.3 — resolution transactions reuse the same pattern.**
+The `cleared`/`confirmed_duplicate` resolution transaction (§24 Correction
+4) is not a new reliability mechanism — it reuses the same "insert,
+relying on unique constraints to prevent double-creation" pattern
+described throughout this section: on `cleared`, the resolution service
+attempts to insert the withheld `discovery_delivery_jobs` rows and (if
+enabled) the `discovery_ai_briefs` row exactly as the original submission
+transaction would have, and the existing `(submissionId, jobType)` /
+`(submissionId, briefVersion)` unique constraints (§18) make a repeated
+resolution attempt idempotent rather than an error condition.
 
 Explicit scenario (per task brief): *DB succeeds, internal notification
 fails, client acknowledgment fails, CRM handoff fails, AI brief fails.*
@@ -923,6 +1123,12 @@ missing information, discovery-call questions, preliminary complexity,
 suggested phases, initial PRD outline, recommended human follow-up.
 Always labeled `AI-generated draft — requires human review`.
 
+**Corrected 2C.2A.3:** the `pending` `briefVersion 1` row created on a
+`cleared` duplicate-review resolution (§24 Correction 4) is created by
+attempting the same insert as any other enqueue path, subject to the same
+`(submissionId, briefVersion)` uniqueness (§18) — no special-case AI
+enqueue logic is needed for the resolution path.
+
 **AI worker reliability requirements (added 2C.2A.2, documented only —
 no worker selected or implemented this checkpoint):** the AI processor
 must use atomic row claiming (`lockedAt`/`lockedBy`, matching the
@@ -985,6 +1191,37 @@ provider response body, API key, environment value, internal table name,
 internal email address, or internal CRM route — extending the safe
 precedent already present in the current `discovery.ts` implementation.
 
+**Added 2C.2A.3 — internal conditions from the idempotency-hash and
+duplicate-resolution mechanisms.** These do not necessarily require new
+public error codes distinct from the ones above; the PRD requires only
+that they are handled safely and do not leak internals:
+
+- **Idempotency verification key unavailable** (§18) — maps to a safe
+  conflict or temporary-retry response per the finalized 2C.2D policy
+  (either reuses `idempotency_conflict` or a generic `temporarily_
+  unavailable`-style response); raises an operational signal; never
+  exposes which key version was needed or why it's unavailable.
+- **Duplicate resolution already completed** (a resolution action
+  attempted on a submission no longer `pending`) — treated idempotently
+  by the resolution service (§24/§26), not surfaced as an error to the
+  operator beyond a neutral "already resolved" indication.
+- **Duplicate resolution conflict** (e.g. concurrent resolution attempts)
+  — resolved via the same transactional/unique-constraint mechanism as
+  other double-submission protection; never exposes raw database
+  conflict details.
+- **Duplicate original-reference invalid** (a `duplicateOfSubmissionId`
+  that fails to resolve) — internal-only signal for operator/engineering
+  attention; never surfaces an internal submission ID or link publicly.
+- **Duplicate resolution transaction failure** — treated like any other
+  transaction failure (§26): the underlying submission record is
+  unaffected, the operator sees a generic failure indication, and no raw
+  database error is exposed.
+
+None of these internal conditions may disclose duplicate classifications,
+database IDs, cryptographic versions, key availability, internal
+submission links, operator identity, or SQL/provider details to any
+public-facing surface.
+
 ## 31. Privacy and Legal UX
 
 Minimum: short privacy disclosure adjacent to the form; a working `/privacy`
@@ -1035,13 +1272,17 @@ AI-generated interpretation. Consent requirement and environment behavior
 | `DISCOVERY_INTERNAL_NOTIFY_EMAIL` (proposed) | replace hardcoded `info.sitemint@gmail.com` | optional | mocked | required | required | no | falls back to a documented default if unset |
 | `DISCOVERY_FINGERPRINT_HMAC_KEY` (proposed, **added 2C.2A.2**) | server-side HMAC key for the non-reversible duplicate fingerprint (§18) | required for real duplicate detection | test-only mocked value | required | required | yes | true fail-closed — the new public submission endpoint stays disabled if missing in production (§22 Correction 7) |
 | `DISCOVERY_FINGERPRINT_KEY_VERSION` (proposed, **added 2C.2A.2**) | records which HMAC key version produced a stored fingerprint, supports rotation (§18) | optional (defaults to version 1) | optional | required | required | no | non-secret; defaults to the current approved version if unset |
+| `DISCOVERY_FINGERPRINT_HMAC_PREVIOUS_KEY` (proposed, **added 2C.2A.3**) | the immediately previous approved HMAC secret, temporarily retained during a controlled rotation window (§18) | unset outside rotation | unset or test-only value | optional | optional — required only during an active rotation window | yes | optional; if set, `DISCOVERY_FINGERPRINT_PREVIOUS_KEY_VERSION` must also be set and differ from the current version, or the endpoint fails closed (§18 startup validation) |
+| `DISCOVERY_FINGERPRINT_PREVIOUS_KEY_VERSION` (proposed, **added 2C.2A.3**) | version identifier for the previous HMAC key, required when the previous key is configured (§18) | unset outside rotation | unset | optional | optional — required only during an active rotation window | no | non-secret; must be present whenever the previous key is present, and absent whenever it is absent (§18 startup validation) |
 | `DISCOVERY_RATE_LIMIT_WINDOW`/`_MAX` (proposed) | Stage 1 rate limiting | optional (sane default) | disabled or high limit | required | required | no | **corrected 2C.2A.2** — distinguish missing config (true fail-closed, endpoint disabled) from a runtime store outage (ordinary traffic: degrade to an in-process fallback limiter + alert; paid traffic: fail closed / pause campaign traffic) — see §22 Correction 7 |
 | `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` (proposed, Stage 2) | paid-traffic bot protection | unset (feature off) | unset | optional | required at Stage 2 | secret (server key) | **corrected 2C.2A.2** — never described as "fail closed" when merely unavailable; the policy is explicitly one of "degraded fallback to Stage 1 protections when risk policy permits" or "temporary submission unavailability when paid-traffic policy requires the challenge," chosen before paid-traffic activation (§22 Correction 7) |
 | `PRIVACY_POLICY_VERSION` (proposed) | consent-record versioning | optional | optional | required | required | no | defaults to a documented initial version |
 | `VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED` (existing, unrelated flag reused as gating pattern) | gates the new frontend behind the same safe-preview mechanism during rollout | off | off | on | off until approved | no | fails closed (confirmed unchanged this checkpoint) |
 
 No variable is added or changed by this checkpoint — table is a planning
-inventory for 2C.2B–2C.2D.
+inventory for 2C.2B–2C.2D. **Note (added 2C.2A.3):**
+`idempotencyCanonicalizationVersion` (§18) is a per-row data-versioning
+value, not an environment variable — it does not appear in this table.
 
 **Correction 7 reconciliation (2C.2A.1):** the original text recommended
 resolving `DISCOVERY_INTERNAL_NOTIFY_EMAIL` "at the start of Phase 2C.2B"
@@ -1091,29 +1332,41 @@ checkpoint; no push/deploy/preview-activation without separate approval.
 ## 37. Implementation Phases
 
 **Phase 2C.2B — Domain model and backend contract (corrected 2C.2A.1,
-further clarified 2C.2A.2).** Scope: shared zod schema, DTO, request/
-response contracts, submission/delivery statuses, `discovery_submissions`
-(redesigned, including `fingerprintKeyVersion` and `duplicateReviewStatus`
-in its schema) + `discovery_delivery_jobs` (added 2C.2A.1) +
-`discovery_ai_briefs` schema and Drizzle migration — **clarified 2C.2A.2:
-`discovery_ai_briefs` is modeled as one row per brief version** (unique
-`(submissionId, briefVersion)`, with AI-worker state fields —
-`attemptCount`, `maxAttempts`, `nextAttemptAt`, `lockedAt`, `lockedBy`,
-`lastErrorCode`, `lastErrorAt` — part of the schema contract, matching the
-delivery-job pattern), idempotency model (unique `idempotencyKey`
-constraint + indexed fingerprint, per §18/§24 — **clarified 2C.2A.2: the
-same-key/different-payload case maps to the `409 idempotency_conflict`
-contract, §30**, not an ordinary-success path), safe-error contract
-(including the 409 entry), versioning. `DISCOVERY_FINGERPRINT_HMAC_KEY`
-and `DISCOVERY_FINGERPRINT_KEY_VERSION` are documented in this phase's
-PRD reference (§18/§34) but **not added** as environment variables here.
-No email/CRM/AI integration, no route wiring, and no worker execution in
-this phase — the transactional-outbox insert logic and the delivery/AI
-workers are 2C.2D/2C.2E scope. Files: shared schema location (§14),
-migration files for all three tables, no route wiring yet or minimal
-route stub only. Stop condition: schema + migration reviewed and
-typechecked; no UI. Tests: schema validation unit tests. Requires
-separate approval prompt before starting.
+clarified 2C.2A.2, further clarified 2C.2A.3).** Scope: shared zod schema,
+DTO, request/response contracts, submission/delivery statuses,
+`discovery_submissions` (redesigned, including `fingerprintKeyVersion` —
+**clarified 2C.2A.3: also `idempotencyPayloadHash`,
+`idempotencyPayloadHashKeyVersion`, `idempotencyCanonicalizationVersion`,
+`duplicateOfSubmissionId`, `duplicateResolvedAt`, `duplicateResolvedBy`,
+optionally `duplicateResolutionReasonCode`, and `duplicateReviewStatus`
+using the four values `none`/`pending`/`cleared`/`confirmed_duplicate`,
+not the three-value 2C.2A.2 set** — in its schema) + `discovery_delivery_jobs`
+(added 2C.2A.1) + `discovery_ai_briefs` schema and Drizzle migration —
+**clarified 2C.2A.2: `discovery_ai_briefs` is modeled as one row per
+brief version** (unique `(submissionId, briefVersion)`, with AI-worker
+state fields — `attemptCount`, `maxAttempts`, `nextAttemptAt`, `lockedAt`,
+`lockedBy`, `lastErrorCode`, `lastErrorAt` — part of the schema contract,
+matching the delivery-job pattern), idempotency model (unique
+`idempotencyKey` constraint + indexed fingerprint, per §18/§24 —
+**clarified 2C.2A.2: the same-key/different-payload case maps to the
+`409 idempotency_conflict` contract, §30**, not an ordinary-success path
+— **clarified 2C.2A.3: same-key comparison must use the canonical
+idempotency-payload-hash mechanism (§18), not an undefined notion of
+"payload sameness"**), safe-error contract (including the 409 entry and
+the internal conditions added 2C.2A.3, §30), versioning.
+`DISCOVERY_FINGERPRINT_HMAC_KEY`, `DISCOVERY_FINGERPRINT_KEY_VERSION`,
+and — **added 2C.2A.3** — `DISCOVERY_FINGERPRINT_HMAC_PREVIOUS_KEY` /
+`DISCOVERY_FINGERPRINT_PREVIOUS_KEY_VERSION` are documented in this
+phase's PRD reference (§18/§34) but **not added** as environment
+variables here. **Added 2C.2A.3:** schema and contract tests cover all
+new fields (idempotency-hash fields, duplicate-resolution fields, the
+four-state `duplicateReviewStatus`). No email/CRM/AI integration, no
+route wiring, and no worker execution in this phase — the transactional-
+outbox insert logic and the delivery/AI workers are 2C.2D/2C.2E scope.
+Files: shared schema location (§14), migration files for all three
+tables, no route wiring yet or minimal route stub only. Stop condition:
+schema + migration reviewed and typechecked; no UI. Tests: schema
+validation unit tests. Requires separate approval prompt before starting.
 
 **Phase 2C.2C — Guided frontend experience (corrected 2C.2A.1).** Scope:
 `StartProjectPage`, `DiscoveryFormShell`, step components, branching
@@ -1134,31 +1387,56 @@ request-size limits, origin handling, honeypot, completion-time check, rate
 limiting, duplicate-window check (§24), idempotency enforcement — **clarified
 2C.2A.2: the production endpoint validates that
 `DISCOVERY_FINGERPRINT_HMAC_KEY` is present and stays disabled if it is
-not (§22 Correction 7); duplicate-review behavior (§24 Correction 5) is
-enforced transactionally, with delivery-job (and AI-brief) creation
-withheld for flagged submissions until operator resolution** — the
-transactional submission-plus-delivery-job insert (§26), safe logging,
-sanitized HTTP errors, privacy disclosure, working `/privacy` and `/terms`
-destinations, controlled-preview integration with the 2C.2C frontend (which
-now has a real endpoint to call instead of its mock adapter). Does not
-remove the legacy endpoint. Requires separate approval prompt.
+not (§22 Correction 7); duplicate-review behavior (§24) is enforced
+transactionally, with delivery-job (and AI-brief) creation withheld for
+flagged submissions until operator resolution** — **clarified 2C.2A.3:**
+implement canonical payload construction (§18) from the shared validated
+DTO; implement idempotency-payload HMAC comparison (§18) as the mechanism
+for the same-key scenarios (§24); implement current/previous key parsing
+and the startup validation rules (§18 — current required in prod,
+previous key+version both-present-or-both-absent, versions differ,
+malformed config disables the endpoint); enforce transactional duplicate
+detection and job withholding (unchanged mechanism, §24/§26); implement
+or clearly gate the authorized duplicate-resolution service (§24
+Correction 4 outcomes) behind an explicit approval boundary — this
+service is complex enough that 2C.2D may choose to implement only the
+detection/withholding half and defer the resolution service itself to
+2C.2E, a decision left to the phase's own scoping; ensure public
+activation remains blocked (§38) whenever the duplicate-withholding
+policy is enabled and no operator review path (§24 operator-visibility
+requirement) is yet available — the transactional submission-plus-
+delivery-job insert (§26), safe logging, sanitized HTTP errors, privacy
+disclosure, working `/privacy` and `/terms` destinations, controlled-
+preview integration with the 2C.2C frontend (which now has a real
+endpoint to call instead of its mock adapter). Does not remove the legacy
+endpoint. Requires separate approval prompt.
 
 **Phase 2C.2E — Delivery worker, CRM, email, and AI brief (corrected
-2C.2A.1, further clarified 2C.2A.2).** Scope: the durable
-`discovery_delivery_jobs` processor/worker (§17), bounded retry policy,
-locking and stale-lock recovery, client-acknowledgment job execution,
-internal-notification job execution (recipient made configuration-driven
-here, per the §34 reconciliation — not in 2C.2B), automatic SiteMint CRM
-lead upsert (§28 owner decision), operator-visible permanently-failed jobs,
-manual retry capability, AI-brief generation workflow — **clarified
-2C.2A.2: when AI brief generation is enabled, the `pending` `briefVersion 1`
-row is created transactionally in 2C.2D's submission flow (§18/§26); this
-phase's AI worker processes existing `discovery_ai_briefs` rows directly
-(claims via `lockedAt`/`lockedBy`, executes the provider call, validates
-the response schema); a retry updates the same brief-version row; a
-regeneration request creates a new version row** — human-review state,
-downstream partial-failure behavior per §26. Requires separate approval
-prompt; explicitly requires provider credentials/config decisions first.
+2C.2A.1, clarified 2C.2A.2, further clarified 2C.2A.3).** Scope: the
+durable `discovery_delivery_jobs` processor/worker (§17), bounded retry
+policy, locking and stale-lock recovery, client-acknowledgment job
+execution, internal-notification job execution (recipient made
+configuration-driven here, per the §34 reconciliation — not in 2C.2B),
+automatic SiteMint CRM lead upsert (§28 owner decision), operator-visible
+permanently-failed jobs, manual retry capability, AI-brief generation
+workflow — **clarified 2C.2A.2: when AI brief generation is enabled, the
+`pending` `briefVersion 1` row is created transactionally in 2C.2D's
+submission flow (§18/§26); this phase's AI worker processes existing
+`discovery_ai_briefs` rows directly (claims via `lockedAt`/`lockedBy`,
+executes the provider call, validates the response schema); a retry
+updates the same brief-version row; a regeneration request creates a new
+version row** — human-review state, downstream partial-failure behavior
+per §26. **Clarified 2C.2A.3:** if not already completed in 2C.2D, this
+phase surfaces `pending` duplicate reviews to authorized operators (§24
+operator-visibility requirement — pending count, timestamp, safe summary,
+possible original-submission reference, clear/confirm actions,
+authorization, audit fields); executes the `cleared`/`confirmed_duplicate`
+resolution outcomes (§24 Correction 4); creates the withheld delivery
+jobs and AI-brief row transactionally on `cleared`, relying on the
+existing unique constraints for exactly-once behavior (§18/§26); keeps
+`confirmed_duplicate` submissions permanently suppressed from downstream
+processing. Requires separate approval prompt; explicitly requires
+provider credentials/config decisions first.
 
 **Phase 2C.2F — Automated and controlled verification.** Scope: full test
 matrix (§35), accessibility audit, security review, spam tests, duplicate
@@ -1184,6 +1462,12 @@ casual review, feature gated behind the existing preview-flag pattern.
 working `/privacy` and `/terms`, Stage 1 anti-spam (§23) live, rate limiting
 live, duplicate/idempotency protection live, accessibility test matrix
 (§32) passed, no known Level-3-blocking defect from §8/§11 remaining open.
+**Added 2C.2A.3:** whenever the duplicate-withholding policy (§24) is
+enabled, a workable operator review path for `pending` duplicate reviews
+(§24 operator-visibility requirement) must exist — public activation is
+explicitly blocked without one, since a `pending` submission otherwise
+never receives its client acknowledgment, internal notification, or CRM
+handoff.
 
 **Level 4 — Paid traffic.** Level 3 plus: Stage 2 anti-spam (§23), verified
 email/CRM delivery in a controlled test, analytics live, operational alerts
@@ -1260,9 +1544,22 @@ confirmed available — tracked as open questions (§41) rather than assumed.
 | AI-brief record granularity | One `discovery_ai_briefs` row per brief *version*, not per provider attempt; retries update the same row, regeneration creates a new version (§18/§29) |
 | AI-brief enqueue durability | The `pending` `briefVersion 1` row is created in the same transaction as the submission when AI generation is enabled — closes the same durability gap already fixed for email/CRM (§18/§26) |
 | Same idempotency key + different payload | Returns `409 idempotency_conflict`, not an ordinary success; original submission is never overwritten (§24, §30) |
-| Likely-duplicate downstream jobs | Conservative v1 policy: store the submission with `duplicateReviewStatus = pending`, withhold delivery jobs and the AI-brief row until an authorized operator resolves the flag (§24 Correction 5) |
+| Likely-duplicate downstream jobs | Conservative v1 policy: store the submission with `duplicateReviewStatus = pending`, withhold delivery jobs and the AI-brief row until an authorized operator resolves the flag (§24) |
 | Duplicate-fingerprint secret requirement | `DISCOVERY_FINGERPRINT_HMAC_KEY` (secret, server-only) and `DISCOVERY_FINGERPRINT_KEY_VERSION` (non-secret) are required for the fingerprint mechanism to be safely implementable; documented, not added this checkpoint (§18/§34) |
 | Rate-limit/Turnstile failure language | Precise, distinct wording for missing-config (true fail-closed), runtime store outage (degrade + alert for ordinary traffic, fail closed/pause for paid traffic), and Turnstile unavailability (explicit "degraded fallback" vs. "temporary unavailability" policy choice, not "fail closed") (§22 Correction 7) |
+
+**Recorded decisions (2C.2A.3 — moved out of "open"):**
+
+| Topic | Recorded decision |
+|---|---|
+| Same-key payload comparison mechanism | A canonical, HMAC-based payload digest (`idempotencyPayloadHash`), not the coarse duplicate fingerprint, determines same- vs. different-payload for the idempotency-key scenarios (§18/§24) |
+| HMAC domain separation | The idempotency-payload hash and the duplicate fingerprint use explicitly separated HMAC domains, even when derived from the same root key material (§18) |
+| Key rotation configuration | Current-plus-previous key configuration (`DISCOVERY_FINGERPRINT_HMAC_KEY`/`_KEY_VERSION` plus optional `DISCOVERY_FINGERPRINT_HMAC_PREVIOUS_KEY`/`_PREVIOUS_KEY_VERSION`) is required to make the previously-described rotation actually implementable; documented, not added this checkpoint (§18/§34) |
+| Previous-key retention window | Must cover at least the duplicate window, the idempotency retry window, and an approved operational grace period before removal (§18) |
+| Duplicate-review outcomes | `duplicateReviewStatus` has four states — `none`/`pending`/`cleared`/`confirmed_duplicate` — not three; `cleared` and `confirmed_duplicate` have opposite downstream effects (§18/§24) |
+| Cleared-submission processing | A `cleared` submission receives its withheld delivery jobs and AI-brief row exactly once, transactionally, relying on existing unique constraints (§24/§26) |
+| Confirmed-duplicate processing | A `confirmed_duplicate` submission never receives delivery jobs or an AI-brief row, is preserved for audit/retention, and is never exposed to the prospect as a duplicate (§24) |
+| Operator visibility precondition | A pending duplicate-review queue or equivalent operational path is required before public activation whenever duplicate-withholding is enabled; the exact operational UI design remains open for a later checkpoint (§24, §38) |
 
 **Still owner-decision required:**
 - Should acknowledgment email send immediately after persistence, or wait
@@ -1279,10 +1576,15 @@ confirmed available — tracked as open questions (§41) rather than assumed.
 - Which exact Privacy and Terms page content/routes will be used (net-new
   pages are needed regardless — §8 items 31-32)?
 - Final confirmation of the 24-month retention default above.
-- What is the authorized-operator resolution workflow for a flagged
-  likely-duplicate submission (§24 Correction 5)? This checkpoint defines
-  that jobs must be created "exactly once" on resolution but does not
-  design the resolution action itself.
+- What is the authorized-operator resolution workflow and authorization
+  model for a flagged likely-duplicate submission (§24)? This checkpoint
+  defines the `cleared`/`confirmed_duplicate` outcomes and that jobs must
+  be created "exactly once" on `cleared`, but does not design the
+  resolution UI or the authorization mechanism itself.
+- What does the operator review path/admin queue for pending duplicate
+  reviews look like (§24 operator-visibility requirement, §38)? Approach
+  (CRM queue, dashboard query, scheduled report, alerting) is deliberately
+  left open.
 - Which named policy applies when Turnstile is unavailable — "degraded
   fallback to Stage 1" or "temporary submission unavailability"? (§22
   Correction 7) — must be decided before paid-traffic activation.
@@ -1301,9 +1603,10 @@ Technical investigation required:
   this must be resolved before 2C.2E can select a concrete worker
   mechanism (applies to both the delivery-job worker and the AI worker,
   §29).
-- The fingerprint HMAC key **rotation procedure** (added 2C.2A.2) is
+- The fingerprint HMAC key **rotation procedure** itself (distinct from
+  the current/previous key *configuration*, which is now defined, §18) is
   explicitly a separately-reviewed operational process, not defined by
-  this PRD (§18) — remains open.
+  this PRD — remains open.
 
 Safe default available (recommended, pending owner override): the
 corrected three-table database model (§18) over both the original two-
@@ -1344,22 +1647,37 @@ the documented (not yet added) requirement for the fingerprint mechanism
 to be safely implementable (§18/§34); adopt the precise, distinct fail-
 open/fail-closed language for missing config vs. runtime store outage vs.
 Turnstile unavailability (§22 Correction 7), never using "fail closed" for
-a soft-degradation case.
+a soft-degradation case. **Added 2C.2A.3:** adopt a canonical, HMAC-based
+idempotency-payload digest (with explicit domain separation from the
+duplicate fingerprint) as the mechanism for same-key payload comparison,
+never the coarse fingerprint (§18/§24); adopt current-plus-previous HMAC
+key configuration as a requirement for implementable rotation, with
+previous-key retention covering at least the duplicate/idempotency retry
+windows plus an operational grace period (§18/§34); adopt the four-state
+`duplicateReviewStatus` model (`cleared` → exactly-once withheld
+processing; `confirmed_duplicate` → permanently suppressed, audit-only)
+over the three-state 2C.2A.2 model (§18/§24); require a workable operator
+review path for pending duplicate reviews as a precondition for public
+activation whenever duplicate-withholding is enabled, while leaving the
+exact operational UI open for a later checkpoint (§24/§38).
 
 ## 43. Recommended Next Checkpoint
 
 **Phase 2C.2B — Domain model and backend contract** (§37, corrected
-2C.2A.1, further clarified 2C.2A.2), scoped exactly as described there:
-shared schema, DTO, database schema + migration for all **three** tables
-(`discovery_submissions` with `fingerprintKeyVersion`/
-`duplicateReviewStatus`, `discovery_delivery_jobs`, `discovery_ai_briefs`
-modeled per brief version), statuses, idempotency model (unique key +
-indexed fingerprint, with the same-key/different-payload case mapped to
-the `409 idempotency_conflict` contract), safe-error contract, versioning
-— no email, CRM, AI integration, route wiring, or worker execution.
-Requires a separate, explicit approval prompt before any code is written,
-per the AI-vibe-coding rules (§36) and the task brief's binding
-instruction not to bundle phases into one prompt.
+2C.2A.1, clarified 2C.2A.2, further clarified 2C.2A.3), scoped exactly as
+described there: shared schema, DTO, database schema + migration for all
+**three** tables (`discovery_submissions` with `fingerprintKeyVersion`,
+the canonical idempotency-payload-hash fields, and the four-state
+`duplicateReviewStatus` plus its resolution audit fields;
+`discovery_delivery_jobs`; `discovery_ai_briefs` modeled per brief
+version), statuses, idempotency model (unique key + indexed fingerprint,
+with the same-key comparison mapped to the canonical-payload-hash
+mechanism and the mismatch case mapped to the `409 idempotency_conflict`
+contract), safe-error contract, versioning — no email, CRM, AI
+integration, route wiring, or worker execution. Requires a separate,
+explicit approval prompt before any code is written, per the
+AI-vibe-coding rules (§36) and the task brief's binding instruction not
+to bundle phases into one prompt.
 
 ## 44. Explicit No-Implementation Decision
 

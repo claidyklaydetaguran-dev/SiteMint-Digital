@@ -1021,3 +1021,45 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   three-table model, transactional outbox, delivery-job architecture, and
   legacy-endpoint isolation from Checkpoint 2C.2A.1 remain unchanged.
 - No implementation was performed or approved by this checkpoint.
+
+## Checkpoint 2C.2A.3 — Finalize Discovery Data Contract (documentation-only)
+
+> Documentation-only correction. No application code, component, route,
+> database schema, migration, package, lockfile, environment variable, or
+> Privacy/Terms page changed. Corrects sections of
+> `docs/sitemint-platform/DISCOVERY_FORM_HARDENING_PRD.md` in place; the
+> current-state audit evidence (§8–§11) and the three-table model,
+> delivery-job model, and AI-brief model from Checkpoints 2C.2A.1/2C.2A.2
+> were preserved unchanged except for their documented interaction with
+> duplicate resolution.
+
+- Added a canonical idempotency payload and payload-hash digest contract
+  (`idempotencyPayloadHash`, `idempotencyPayloadHashKeyVersion`,
+  `idempotencyCanonicalizationVersion`), derived from the shared validated
+  DTO with an explicit inclusion/exclusion field list and domain
+  separation from the duplicate fingerprint — closing the gap where
+  "same key, different payload" was never actually defined.
+- Made the same-idempotency-key payload comparison implementable: load
+  the original submission, recreate the canonical payload post-
+  validation, compare HMAC digests in constant time, and route to
+  `submission_already_received` or `409 idempotency_conflict` based on
+  the comparison rather than an undefined notion of sameness.
+- Completed the HMAC rotation configuration: documented
+  `DISCOVERY_FINGERPRINT_HMAC_PREVIOUS_KEY` and `DISCOVERY_FINGERPRINT_
+  PREVIOUS_KEY_VERSION` alongside defined startup-validation rules,
+  closing the gap where the 2C.2A.2 rotation description referenced a
+  previous key that was never documented as configuration.
+- Completed the duplicate-review outcome model: `duplicateReviewStatus`
+  now has four states (`none`/`pending`/`cleared`/`confirmed_duplicate`),
+  with `cleared` triggering exactly-once creation of withheld delivery
+  jobs and the AI-brief row, and `confirmed_duplicate` staying
+  permanently suppressed and audit-only, never exposed to the prospect.
+- Added duplicate-resolution audit fields (`duplicateOfSubmissionId`,
+  `duplicateResolvedAt`, `duplicateResolvedBy`, optional
+  `duplicateResolutionReasonCode`) to the submission model.
+- Added an operator-visible pending-duplicate-review requirement as a
+  documented precondition for public activation whenever duplicate-
+  withholding is enabled — exact operational UI left open for a later
+  checkpoint.
+- Reconciled Phases 2C.2B, 2C.2D, and 2C.2E scope accordingly. No
+  implementation was approved or performed by this checkpoint.
