@@ -1,10 +1,12 @@
-# Portfolio Asset Manifest — Phase 2B.2
+# Portfolio Asset Manifest — Phase 2B.2 (corrected in Phase 2B.2.1)
 
-> Prepared: 2026-07-20. Branch `claude/phase-2b2-portfolio-assets-8vh4q1`,
-> based on `claude/sitemint-phase-2b1-audit-wtoai0` @
-> `0ca3f4311d4a688aa0167797db54cd6cace4b450`. Does not modify
-> `SelectedWorkSection.tsx`, the platform-preview homepage, routes, or
-> navigation.
+> Originally prepared 2026-07-20 in Phase 2B.2, branch
+> `claude/phase-2b2-portfolio-assets-8vh4q1`, based on
+> `claude/sitemint-phase-2b1-audit-wtoai0` @
+> `0ca3f4311d4a688aa0167797db54cd6cace4b450`. **Corrected 2026-07-20 in
+> Phase 2B.2.1** following owner visual review of the Phase 2B.2 owner-review
+> package — see §8 below. Does not modify `SelectedWorkSection.tsx`, the
+> platform-preview homepage, routes, or navigation.
 
 ## 1. Environment constraint (read first)
 
@@ -65,20 +67,22 @@ Produced under `artifacts/web-agency/public/portfolio/`. Claidy Taguran was
 **not** optimized or added to this directory, per instructions not to include
 it in the approved implementation set.
 
-| Project | Output file | Source dims/size | Output dims/size | Quality | Compression ratio | Output MD5 | Edits made |
-|---|---|---|---|---|---|---|---|
-| Shasta Greene | `shasta-greene-desktop.webp` | 1920x1080, 2,429,598 B | 1600x733, 97,098 B | WebP q82 | 25.0x | `1d43500b093752507c38b87d2ec8f445` | Cropped bottom 200px of the 1080px source (removed the feedback-widget region) before resizing; source PNG left unmodified |
-| OneFilAm Community | `onefilam-community-desktop.webp` | 1920x1080, 1,316,691 B | 1600x900, 62,506 B | WebP q82 | 21.1x | `a21fd50ab3e5ec84db1c0002bf6bc703` | None — straight resize + re-encode |
-| Herlinda Valdovinos | `herlinda-valdovinos-desktop.webp` | 1920x1080, 1,890,203 B | 1600x900, 102,046 B | WebP q82 | 18.5x | `71bafa61d7384c7992e90380dbd89142` | None — straight resize + re-encode |
+| Project | Output file | Source dims/size | Output dims/size | Quality | Compression ratio | Output MD5 | Edits made | Status (Phase 2B.2.1) |
+|---|---|---|---|---|---|---|---|---|
+| Shasta Greene | `shasta-greene-desktop.webp` | 1920x1080, 2,429,598 B | **1600x733 (not 16:9 — see §8)** | WebP q82 | 25.0x | `1d43500b093752507c38b87d2ec8f445` | Cropped bottom 200px of the 1080px source (removed the feedback-widget region) before resizing; source PNG left unmodified | **Prepared reference — recapture required. Not implementation-approved.** Still shows the site's own "$250M+ / 500+ / #1" stats row; not reverified against the current live site. |
+| OneFilAm Community | `onefilam-community-desktop.webp` | 1920x1080, 1,316,691 B | 1600x900, 62,506 B | WebP q82 | 21.1x | `a21fd50ab3e5ec84db1c0002bf6bc703` | None — straight resize + re-encode | **Historical/prepared reference only.** Owner independently confirmed the live site now shows active 2026 content; this capture's date is unknown, so it is not current-site-verified. |
+| Herlinda Valdovinos | `herlinda-valdovinos-desktop.webp` | 1920x1080, 1,890,203 B | 1600x900, 102,046 B | WebP q82 | 18.5x | `71bafa61d7384c7992e90380dbd89142` | None — straight resize + re-encode | **Visually approved candidate.** Not current-site-verified, not permission-approved. Cleanest of the three per owner review. |
 
 All three outputs verified: open correctly, non-zero dimensions, no visible
-corruption, no distortion, aspect ratio preserved (Shasta's crop is
-intentional and documented above, not a distortion), text remains legible at
+corruption, no distortion (Shasta's crop is intentional and documented
+above, not a distortion of the retained region), text remains legible at
 1600px width, no upscaling performed, no generated/inpainted content, no
 watermark added. All are under the 300 KB desktop target.
 
 **No mobile-optimized assets exist** (`*-mobile.webp` files were not
 created for any project) because no mobile source screenshots exist yet.
+**None of the three files above may be used in Phase 2B.3 as-is** — see §8
+for the corrected readiness status of each.
 
 ## 6. Implementation manifest for Phase 2B.3
 
@@ -90,60 +94,63 @@ this checkpoint.
 | Field | Value |
 |---|---|
 | Category | Real Estate |
-| Desktop asset | `/portfolio/shasta-greene-desktop.webp` |
-| Mobile asset | **Not available** — capture required before mobile card can ship |
-| Fallback asset | `/portfolio-shasta.png` (existing, unoptimized, uncropped — not recommended as final fallback since it still shows the feedback widget) |
-| Alt text (draft) | "Shasta Greene Real Estate — Real Estate website, desktop view" |
-| Public URL | https://shastagreene.com (not re-verified live this session) |
-| CTA label | "Visit Website" (existing pattern) |
-| Permission status | Final owner visual approval pending |
-| Recommended crop | 16:9, top-anchored (hero + headline), matches the widget-cropped optimized asset |
-| Light-theme treatment | Card on `bg-card`/`border-border`, as in existing `Portfolio.tsx` pattern |
-| Dark-theme treatment | Needs a dark-shell container treatment (image itself is light/bright) — not yet designed |
+| Project-placement status | **Approved as the intended featured project** (owner decision, Phase 2B.2.1) |
+| Desktop asset | `/portfolio/shasta-greene-desktop.webp` — **rejected for public use, see §8**; do not reference this file from any implementation |
+| Mobile asset | **Not available** — capture required |
+| Fallback asset | `/portfolio-shasta.png` (existing, unoptimized, uncropped — also rejected, still shows both the feedback widget and the stats row) |
+| Alt text (draft) | Do not draft until a current, approved capture exists |
+| Public URL | https://shastagreene.com (not re-verified live this session; owner independently confirmed current 2026 content is indexed) |
+| CTA label | "Visit Website" (existing pattern, for future use) |
+| Permission status | Placement approved; current-asset use not approved |
+| Recommended crop | See §8 aspect-ratio correction — 1600x733 is not an approved implementation ratio |
+| Light-theme treatment | Not designed — blocked on a current, approved capture |
+| Dark-theme treatment | Not designed — blocked on a current, approved capture |
 | Mobile treatment | Undefined until mobile capture exists |
-| Lazy-loading | Recommend `loading="lazy"` (currently absent from `Portfolio.tsx` images too) |
-| Fixed aspect ratio | `aspect-[16/9]`, `object-cover` (matches existing `ProjectCard` pattern) |
-| May ship in 2B.3? | **No** — permission not yet granted, mobile asset missing |
+| Lazy-loading | Recommend `loading="lazy"` when implemented |
+| Fixed aspect ratio | To be decided in §8 once a real 16:9 (or intentionally-supported alternate ratio) capture exists |
+| May ship in 2B.3? | **No** — current asset rejected; requires a fresh current desktop + mobile capture |
 
 ### SUPPORTING — OneFilAm Community
 
 | Field | Value |
 |---|---|
 | Category | Nonprofit Organization |
-| Desktop asset | `/portfolio/onefilam-community-desktop.webp` |
+| Project-placement status | **Approved in principle as a supporting project** (owner decision, Phase 2B.2.1) |
+| Desktop asset | `/portfolio/onefilam-community-desktop.webp` — **historical reference only**, not current-site-verified |
 | Mobile asset | Not available |
-| Fallback asset | `/portfolio-onefilam.png` |
-| Alt text (draft) | "OneFilAm Community — Nonprofit Organization website, desktop view" |
-| Public URL | https://onefilamcommunity.org (not re-verified live this session) |
-| CTA label | "Visit Website" |
+| Fallback asset | `/portfolio-onefilam.png` (same historical-reference caveat) |
+| Alt text (draft) | Do not draft until a current, verified capture exists |
+| Public URL | https://onefilamcommunity.org (not re-verified live this session; owner independently confirmed the live site now shows active 2026 content) |
+| CTA label | "Visit Website" (existing pattern, for future use) |
 | Permission status | Organizational approval pending |
-| Recommended crop | 16:9, top-anchored |
+| Recommended crop | 16:9, top-anchored (already matches on the existing reference asset) |
 | Light-theme treatment | Standard card, as existing pattern |
 | Dark-theme treatment | Not yet designed |
 | Mobile treatment | Undefined until mobile capture exists |
 | Lazy-loading | Recommend `loading="lazy"` |
 | Fixed aspect ratio | `aspect-[16/9]`, `object-cover` |
-| May ship in 2B.3? | **No** — permission not yet granted, mobile asset missing |
+| May ship in 2B.3? | **No** — requires current desktop recapture, current mobile capture, and organizational approval |
 
 ### SUPPORTING — Herlinda Valdovinos (only after client approval)
 
 | Field | Value |
 |---|---|
 | Category | Professional Services |
-| Desktop asset | `/portfolio/herlinda-valdovinos-desktop.webp` |
+| Project-placement status | **Approved as a supporting candidate, contingent on client permission** (owner decision, Phase 2B.2.1) |
+| Desktop asset | `/portfolio/herlinda-valdovinos-desktop.webp` — **visually approved candidate**, not current-site-verified |
 | Mobile asset | Not available |
 | Fallback asset | `/portfolio-herlinda.png` |
-| Alt text (draft) | "Herlinda Valdovinos — Professional Services website, desktop view" |
-| Public URL | https://herlindavaldovinos.com (not re-verified live this session) |
+| Alt text (draft) | "Herlinda Valdovinos — Professional Services website, desktop view" (may be finalized once permission + verification are in) |
+| Public URL | https://herlindavaldovinos.com (not re-verified live this session; requires final verification) |
 | CTA label | "Visit Website" |
 | Permission status | **Pending client approval** |
-| Recommended crop | 16:9, top-anchored |
+| Recommended crop | 16:9, top-anchored (already matches on the existing asset) |
 | Light-theme treatment | Standard card, as existing pattern |
 | Dark-theme treatment | Not yet designed |
 | Mobile treatment | Undefined until mobile capture exists |
 | Lazy-loading | Recommend `loading="lazy"` |
 | Fixed aspect ratio | `aspect-[16/9]`, `object-cover` |
-| May ship in 2B.3? | **No** — explicit client permission required first |
+| May ship in 2B.3? | **No** — explicit client permission, current-site verification, and a mobile capture are all required first |
 
 ### DEFERRED — Claidy Taguran Portfolio
 
@@ -166,15 +173,116 @@ this checkpoint.
 
 ## 7. What remains before Phase 2B.3 can wire real images into `SelectedWorkSection.tsx`
 
-1. Owner grants explicit, documented permission for Shasta Greene (final
-   visual approval), OneFilAm (organizational approval), and/or Herlinda
-   Valdovinos (client approval) — independently; 2B.3 can proceed with
-   whichever subset is approved.
-2. Mobile screenshots captured for each approved project — requires network
-   access this environment does not currently have, or an owner-run capture
-   using the instructions in the owner-review package.
-3. Claidy Taguran's URL and company-work-attribution questions resolved
+1. A **fresh current desktop and mobile capture** for Shasta Greene (the
+   existing capture is rejected — see §8), and a documented owner permission
+   record.
+2. A **fresh current desktop and mobile capture** for OneFilAm Community
+   (the existing capture is historical-reference-only — see §8), plus
+   organizational permission.
+3. A **current-site verification** and **mobile capture** for Herlinda
+   Valdovinos, plus explicit client permission (the existing desktop
+   screenshot is visually approved and may be reusable once verified current
+   — see §8).
+4. Claidy Taguran's URL and company-work-attribution questions resolved
    before any Claidy asset is prepared or featured.
-4. A design decision for the dark-theme treatment of these (currently
+5. A design decision for the dark-theme treatment of these (currently
    light/bright) screenshots inside `SelectedWorkSection.tsx`'s dark
    browser-chrome frame.
+6. A resolved standard aspect ratio for the Shasta replacement asset (see §8
+   — the current 1600x733 file is not 16:9 and must not be treated as one).
+
+## 8. Phase 2B.2.1 corrections (owner review of the Phase 2B.2 package)
+
+The owner reviewed the Phase 2B.2 owner-review ZIP and the three boards and
+returned the following corrections. Nothing in §§1–7 above was rewritten to
+erase the original Phase 2B.2 findings — inline status notes were added
+instead so the history of what changed and why stays visible.
+
+### 8.1 Shasta Greene — asset rejected, placement approved
+
+- **Project-placement decision:** approved as the intended featured project.
+- **Current optimized screenshot decision:** rejected for public
+  implementation. It still visibly shows "$250M+ Annual Team Volume," "500+
+  Families Helped," and "#1 OC Market Specialist" — claims the owner
+  identifies as older or potentially unsupported and inconsistent with
+  current, more grounded positioning. The screenshot was never reverified
+  against the current live homepage; the owner independently confirmed
+  (from an unrestricted browser) that the current Shasta Greene site is
+  indexed and serving current 2026 content, meaning a fresh capture should
+  be achievable outside this environment's blocked network.
+- Cropping only the feedback widget (the Phase 2B.2 edit) was **insufficient**
+  — the whole statistics row needs to be either absent from a fresh capture
+  or cropped above entirely. Per the owner's explicit instruction, the
+  existing file was **not** cropped further to force an approval — that
+  would risk misrepresenting old evidence as if it were resolved. A genuine
+  recapture is required instead.
+- Relationship wording corrected in `PORTFOLIO_PERMISSION_MANIFEST.md` from
+  "Owner's own business (Claidy/SiteMint-affiliated)" to "Shasta Greene's
+  owner-controlled real estate business; SiteMint project attribution
+  subject to the approved portfolio description."
+
+### 8.2 Shasta Greene — aspect-ratio correction
+
+The Phase 2B.2 implementation manifest recommended `aspect-[16/9]` for the
+Shasta card, but the optimized file produced that checkpoint is **1600x733**
+— a true 16:9 image at 1600px wide would be **1600x900**. Using the
+1600x733 file inside a 16:9 CSS container would introduce unintended
+`object-cover` cropping or letterboxing that was never explicitly reviewed.
+This manifest does not resolve that mismatch by stretching or further
+cropping the existing file. Instead, the standard for the **replacement**
+capture is recorded here:
+
+| Asset | Standard |
+|---|---|
+| Desktop | 1600x900, 16:9 |
+| Mobile | 780x1688 source capture, or an optimized proportional equivalent based on a 390x844 viewport |
+
+No stretching of the existing 1600x733 file is permitted, and it must not be
+placed inside a 16:9 implementation container without an explicitly
+approved crop decision — which has not been made, because the file itself
+is rejected pending recapture.
+
+### 8.3 OneFilAm Community — historical reference only
+
+Project placement approved in principle as a supporting project. The
+existing optimized screenshot is visually clean but of unknown capture date;
+the owner independently confirmed the live OneFilAm site now shows active
+2026 community/event content, meaning it has continued to evolve since this
+repository's capture. The image is retained in the repo as a **historical
+reference only** and must not be described as current or implementation-
+ready. A current desktop recapture and current mobile capture are both
+required, alongside organizational permission.
+
+### 8.4 Herlinda Valdovinos — visually approved, not publication-ready
+
+The owner assessed this as the cleanest current asset — strong visual
+identity, clear hero treatment, no overlay, no visible private information,
+good optimization quality — and marked it a **visually approved candidate**.
+This is explicitly *not* the same as current-site-verified or
+permission-approved: the screenshot has not been compared against the
+current live site, and that comparison must not be implied anywhere in this
+documentation. Client permission and a mobile capture remain required before
+any public use.
+
+### 8.5 Mobile assets — genuinely missing, not a documentation gap
+
+The Phase 2B.2 mobile board was a status board only; it contained zero
+project screenshots and none were fabricated. That remains true after this
+correction. Desktop-only implementation is **not approved** for Phase
+2B.3 — using desktop screenshots everywhere on mobile would look like an
+afterthought, which is the exact impression this program is trying to
+avoid. A mobile capture is a hard requirement for all three candidate
+projects, not an optional enhancement.
+
+### 8.6 Required capture set before Phase 2B.3 implementation
+
+| Project | Required before implementation |
+|---|---|
+| Shasta Greene | Current desktop capture (no outdated stats row), current mobile capture |
+| OneFilAm Community | Current desktop capture, current mobile capture, organizational approval |
+| Herlinda Valdovinos | Current desktop verification or recapture, current mobile capture, client permission |
+| Claidy Taguran | Remains deferred — no capture requested |
+
+See `/tmp/sitemint-2b2-owner-capture-intake/OWNER_CAPTURE_INSTRUCTIONS.md`
+for the exact capture parameters provided to the owner to produce these six
+files from an unrestricted browser.

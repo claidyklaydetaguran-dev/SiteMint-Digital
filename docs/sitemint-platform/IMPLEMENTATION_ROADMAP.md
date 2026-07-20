@@ -664,3 +664,38 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   exist for any project and remain the primary open gap.
 - No project has permission-approved or implementation-approved status yet;
   see the permission manifest for per-project approval requirements.
+
+## Checkpoint 2B.2.1 — Correct Portfolio Asset Readiness and Prepare Owner Capture Intake (implemented)
+
+> Narrow correction checkpoint following owner visual review of the Phase
+> 2B.2 owner-review package. `SelectedWorkSection.tsx` and all other
+> application code remain unmodified; no images changed; the Phase 2B.2
+> commit was not amended.
+
+- **Shasta Greene:** project placement approved as the intended featured
+  project, but the existing optimized screenshot is **rejected** — it still
+  shows the site's own "$250M+ / 500+ Families Helped / #1 OC Market
+  Specialist" stats row and was never reverified against the current live
+  site. Reclassified as "prepared reference — recapture required," not
+  implementation-ready. The file was **not** cropped further to force an
+  approval; a genuine recapture is required.
+- **Shasta Greene aspect ratio:** the existing 1600x733 optimized file is
+  not a true 16:9 image (1600x900 would be); this mismatch is now recorded
+  rather than silently absorbed into a 16:9 container. Standard recorded for
+  the replacement: 1600x900 desktop, 780x1688-equivalent mobile.
+- **OneFilAm Community:** project placement approved in principle; existing
+  screenshot reclassified as historical/prepared reference only pending a
+  current recapture and organizational permission.
+- **Herlinda Valdovinos:** reclassified as a visually approved candidate
+  (cleanest of the three) — distinct from current-site-verified or
+  permission-approved, neither of which it has yet.
+- **Claidy Taguran:** remains deferred, unchanged.
+- Relationship wording for Shasta Greene corrected in
+  `PORTFOLIO_PERMISSION_MANIFEST.md` to remove the confusing
+  "Claidy/SiteMint-affiliated" phrasing.
+- Prepared `/tmp/sitemint-2b2-owner-capture-intake/` (outside the repo) with
+  owner capture instructions, expected filenames, and an approval checklist
+  for the six required current captures (desktop + mobile for Shasta and
+  OneFilAm; desktop verification/recapture + mobile for Herlinda).
+- No new images were fabricated, generated, or derived from the existing
+  desktop screenshots to simulate mobile views.
