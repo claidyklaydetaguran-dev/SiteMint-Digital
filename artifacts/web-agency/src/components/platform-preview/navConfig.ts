@@ -29,7 +29,11 @@ export const productsNavItems: PreviewNavChild[] = [
     label: "AI Toolkit",
     description: "A focused set of AI tools for day-to-day business work.",
     disabled: true,
-    disabledNote: "Coming to sitemintdigital.com",
+    // Checkpoint 2A.3: was "Coming to sitemintdigital.com" — contradicted the
+    // "In development" badge shown on the same product elsewhere (Products
+    // section, AiToolkitPreview). One consistent readiness word now, matching
+    // capabilityStatus.ts's label exactly.
+    disabledNote: "In development",
   },
 ];
 

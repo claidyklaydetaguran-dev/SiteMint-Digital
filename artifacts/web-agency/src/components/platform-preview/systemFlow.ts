@@ -71,7 +71,7 @@ export const systemStages: SystemStage[] = [
   {
     id: "respond",
     label: "AI or team responds",
-    note: "AI Receptionist or your team follows up.",
+    note: "AI Receptionist (SMS) or your team follows up.",
     state: "Responding",
     disconnectedNote: "Response waits until a team member has time to check.",
     disconnectedState: "Waiting on staff",

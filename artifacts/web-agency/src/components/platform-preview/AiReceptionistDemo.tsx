@@ -1,14 +1,20 @@
 import { CheckCircle2, MessageSquareText, User } from "lucide-react";
 import { useSelectedGoal } from "./PlatformPreviewGoalContext";
 import { receptionistDemoScenarios, defaultReceptionistDemoScenarioId } from "./receptionistDemoScenarios";
-import { CapabilityBadge } from "./CapabilityBadge";
 
 /**
  * Compact, clearly synthetic demonstration (Checkpoint 2A.2 Part 3) — not a
  * live call, not a real provider connection, no microphone, no fake "live"
- * indicator. Updates via the shared business-goal selection
- * (PlatformPreviewGoalContext) rather than a second selector, per Part 7's
- * data-driven-architecture requirement.
+ * indicator, no real customer record, no implied automatic appointment
+ * completion or production CRM sync. Updates via the shared business-goal
+ * selection (PlatformPreviewGoalContext) rather than a second selector, per
+ * Part 7's data-driven-architecture requirement.
+ *
+ * Checkpoint 2A.3: the per-channel SMS/Voice/CRM-follow-up readiness
+ * breakdown now lives once, in ProductsSection's `receptionistReadiness`
+ * list directly above this panel (same card) — not repeated here, per the
+ * status-badge-restraint requirement ("no repeated identical readiness
+ * label within the same compact card").
  */
 export function AiReceptionistDemo() {
   const { selectedGoal } = useSelectedGoal();
@@ -59,17 +65,10 @@ export function AiReceptionistDemo() {
         </div>
       </div>
 
-      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-[hsl(var(--sm-color-text-muted))]">
-        <li className="inline-flex items-center gap-1.5">
-          SMS intake <CapabilityBadge level={scenario.smsCapability} />
-        </li>
-        <li className="inline-flex items-center gap-1.5">
-          Voice <CapabilityBadge level={scenario.voiceCapability} />
-        </li>
-        <li className="inline-flex items-center gap-1.5">
-          Automated CRM follow-up <CapabilityBadge level={scenario.crmFollowupCapability} />
-        </li>
-      </ul>
+      <p className="mt-3 text-[11px] leading-snug text-[hsl(var(--sm-color-text-muted))]">
+        Synthetic example, not a live conversation — no real call, provider connection, or
+        customer record. See the readiness breakdown above for what's live today.
+      </p>
     </div>
   );
 }

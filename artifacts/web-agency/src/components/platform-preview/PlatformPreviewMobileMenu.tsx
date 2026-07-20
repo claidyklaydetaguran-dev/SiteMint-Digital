@@ -147,6 +147,7 @@ export function PlatformPreviewMobileMenu({ onClose }: { onClose: () => void }) 
         <Link
           href={signInHref}
           onClick={onClose}
+          aria-label="Sign in to AI Receptionist"
           className="rounded-[var(--sm-radius-pill)] border border-[hsl(var(--sm-color-border-strong))] px-4 py-3 text-center text-sm font-medium text-[hsl(var(--sm-color-text-primary))]"
         >
           Sign In

@@ -509,3 +509,54 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   badges" anti-pattern, since the workflow section's prose already states
   the same capability honestly.
 - **Activation is not approved.** Same standing note as Checkpoint 2A/2A.1.
+
+---
+
+## Checkpoint 2A.3 — Clarify Product Readiness and Owner Review (implemented)
+
+> Copy, capability-governance, and visual-review checkpoint only — no new
+> route, no redesign, no new product functionality. Same route/flag as prior
+> checkpoints.
+
+- **Final Sign In strategy**: label stays "Sign In" (concise, visible);
+  destination stays `/ai-receptionist/dashboard/login` (unchanged,
+  re-verified); all three instances (desktop nav, mobile menu, footer) now
+  carry `aria-label="Sign in to AI Receptionist"` for a precise accessible
+  name without lengthening the visible label. `navConfig.ts`'s existing
+  comment (from Checkpoint 2A.2) already documents that Sign In becomes a
+  product-access menu only once a second real customer-product login
+  exists — unchanged, reaffirmed.
+- **AI Receptionist readiness hierarchy**: `ProductsSection.tsx` no longer
+  shows one blanket "Available now" badge for the whole product. It now
+  shows a three-line breakdown (`receptionistReadiness`): SMS receptionist
+  — Available now; Voice experience — In development; Connected CRM &
+  follow-up — Planned direction. The interactive demo
+  (`AiReceptionistDemo.tsx`) no longer repeats this breakdown (avoids
+  duplicate badges in the same card) and instead carries one explicit
+  disclosure line: "Synthetic example, not a live conversation — no real
+  call, provider connection, or customer record."
+- **AI Toolkit product-preview status**: unified on one readiness word,
+  "In development," everywhere it appears — `navConfig.ts`'s dropdown note
+  (was "Coming to sitemintdigital.com," which read as a scheduling promise
+  next to the "In development" badge elsewhere), `ProductsSection.tsx`'s
+  card badge, and `AiToolkitPreview.tsx`'s panel heading (was "conceptual
+  direction," now "product preview" — naming what the panel *is* rather
+  than adding a second readiness word next to the badge). No Sign In,
+  Launch, or "Available now" label anywhere for AI Toolkit.
+- **Capability-evidence review**: completed this checkpoint against the
+  actual repository (root `CLAUDE.md` protected-file list, `lib/db/src`
+  schema, `artifacts/ai-toolkit/src/App.tsx`'s route registration, and this
+  repo's CRM route inventory) — full matrix recorded in the Checkpoint 2A.3
+  session report, not duplicated here. Headline correction: "CRM storage"
+  (the CRM itself, real and extensive) and "CRM integration" (an automatic
+  hand-off from AI Receptionist conversations into the CRM pipeline) are
+  now treated as two distinct capabilities — no evidence of the latter
+  (no foreign key or sync path from `intake_*` tables into `crm_leads`/
+  `crm_deals`; `/admin/crm/intake-cases` is a dedicated staff view, not a
+  merged pipeline), so it stays labeled "Planned direction," not
+  "Available now."
+- **No SiteMint Account yet.** No client portal yet. Both remain documented
+  direction only (Checkpoint 2A.1's future-account-strategy entry, above),
+  never implemented, never linked from the prototype.
+- **Activation is not approved.** Same standing note as every prior
+  checkpoint in this program.

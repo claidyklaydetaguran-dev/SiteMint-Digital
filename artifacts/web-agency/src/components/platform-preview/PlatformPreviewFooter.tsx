@@ -64,6 +64,7 @@ export function PlatformPreviewFooter() {
             <li>
               <Link
                 href={signInHref}
+                aria-label="Sign in to AI Receptionist"
                 className="text-sm text-[hsl(var(--sm-color-text-muted))] transition-colors hover:text-[hsl(var(--sm-color-action-primary))]"
               >
                 Sign In

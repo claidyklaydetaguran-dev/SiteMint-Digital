@@ -156,6 +156,7 @@ export function PlatformPreviewNavbar({
           <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
           <Link
             href={signInHref}
+            aria-label="Sign in to AI Receptionist"
             className="rounded-[var(--sm-radius-pill)] border border-[hsl(var(--sm-color-border-strong))] px-4 py-2 text-sm font-medium text-[hsl(var(--sm-color-text-primary))] transition-colors hover:bg-[hsl(var(--sm-color-surface-interactive))]"
           >
             Sign In

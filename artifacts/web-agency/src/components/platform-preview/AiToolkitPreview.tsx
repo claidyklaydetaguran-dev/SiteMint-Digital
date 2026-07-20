@@ -8,11 +8,19 @@ import { CapabilityBadge } from "./CapabilityBadge";
  * customer login/account of any kind (artifacts/ai-toolkit/src/App.tsx
  * registers only `/`, `/thank-you`, `/cancel`) and no entry point from the
  * main site — so it is labeled "In development" as a *customer product*
- * here, distinct from ProductsSection's per-product badge which now uses
- * the same label. The five items below are conceptual direction only, all
- * grounded in existing platform documentation (AI Toolkit's product
- * category, the shared automation/systems positioning) — never presented
- * as shipped capabilities, and carry no Sign In / Launch App action.
+ * here, matching ProductsSection's per-product badge for the same reason.
+ *
+ * Checkpoint 2A.3: the heading previously read "AI Toolkit — conceptual
+ * direction" while the badge beside it read "In development" — two
+ * different-sounding readiness words for the same fact. Now both say the
+ * same thing ("In development"), with "product preview" naming what this
+ * panel actually is. The five items below remain individually unlabeled
+ * (no per-item badge) since they're one unambiguous readiness level, not
+ * five separate claims — adding five more badges here would be exactly the
+ * "badge overload" this checkpoint's restraint requirement warns against.
+ * Never presented as shipped capabilities; carries no Sign In / Launch App
+ * action, no "Available now" label, and no dashboard/integration/analytics
+ * implication.
  */
 const conceptualCapabilities = [
   { label: "Content assistance", icon: FileText },
@@ -26,11 +34,11 @@ export function AiToolkitPreview() {
   return (
     <div className="rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-muted))] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">AI Toolkit — conceptual direction</h3>
+        <h3 className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">AI Toolkit — product preview</h3>
         <CapabilityBadge level="in-development" />
       </div>
       <p className="mt-1.5 text-xs text-[hsl(var(--sm-color-text-muted))]">
-        Not yet a generally available customer product. These are directions under
+        Not yet a generally available customer product. The directions below are under
         consideration, not shipped features.
       </p>
 
