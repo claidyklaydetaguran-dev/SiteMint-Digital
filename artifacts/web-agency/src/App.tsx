@@ -1,6 +1,7 @@
 import { Layout } from "@/components/layout/Layout";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
+import { platformPreviewEnabled } from "@/lib/platformPreviewFlag";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -50,6 +51,11 @@ import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
 
+// Lazy-loaded so its chunk (and the shared design-tokens CSS it imports)
+// only fetches when /platform-preview is actually visited — ordinary routes
+// never pay for this bundle. See docs/sitemint-platform's Phase 2A checkpoint.
+const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
+
 function CrmHomeRedirect() {
   const [, navigate] = useLocation();
   useEffect(() => { navigate("/admin/crm/dashboard"); }, [navigate]);
@@ -97,6 +103,21 @@ function Router() {
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
+
+      {/* Platform Preview (Phase 2A) — feature-flagged, no main layout (its own
+          shell), never rendered when VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED is
+          unset/false. Fails closed to the app's ordinary not-found page. */}
+      <Route path="/platform-preview">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
 
       {/* Discovery form — no main layout */}
       <Route path="/discovery" component={Discovery} />

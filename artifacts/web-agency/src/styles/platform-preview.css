@@ -1,0 +1,97 @@
+/**
+ * SiteMint Platform Preview — prototype-only styles.
+ *
+ * Only imported by src/pages/PlatformPreview.tsx, which is lazy-loaded and
+ * gated by VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED (see
+ * src/lib/platformPreviewFlag.ts). Vite code-splits this file into the same
+ * lazy chunk as the page, so ordinary routes never fetch it.
+ *
+ * Imports the shared @workspace/design-tokens package. Its custom properties
+ * are namespaced `--sm-*` and do not redefine or alias any of web-agency's
+ * existing `--background`/`--primary`/etc. tokens (src/index.css), so
+ * existing pages are unaffected. Every prototype component below consumes
+ * `--sm-*` tokens directly (via Tailwind arbitrary values) rather than the
+ * app's own `--color-*` theme, so no existing page's visual system changes.
+ */
+@import "@workspace/design-tokens/css";
+
+.platform-preview {
+  font-family: var(--sm-font-body);
+}
+
+.platform-preview .pp-font-display {
+  font-family: var(--sm-font-display);
+}
+
+/* Ecosystem visual — restrained, single leading animation per §Motion.
+   Reduced-motion users get the static end state immediately. */
+@keyframes pp-connector-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.platform-preview .pp-connector-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: pp-connector-draw 1.6s var(--sm-easing-enter) forwards;
+  animation-delay: 0.2s;
+}
+
+.platform-preview .pp-reveal {
+  animation: pp-fade-up var(--sm-duration-slow) var(--sm-easing-enter) both;
+}
+
+@keyframes pp-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-connector-path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .platform-preview .pp-reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .platform-preview * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+.platform-preview :focus-visible {
+  outline: var(--sm-focus-ring-width) solid hsl(var(--sm-color-border-focus));
+  outline-offset: var(--sm-focus-ring-offset);
+}
+
+.platform-preview .pp-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: var(--sm-z-tooltip);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--sm-radius-md);
+  background: hsl(var(--sm-color-bg-elevated));
+  color: hsl(var(--sm-color-text-primary));
+  box-shadow: var(--sm-shadow-lg);
+}
+
+.platform-preview .pp-skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+}

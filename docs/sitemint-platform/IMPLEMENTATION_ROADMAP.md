@@ -313,3 +313,49 @@ Each arrow is a hard dependency and a stop point: no phase begins before its
 predecessor is reviewed, committed, and (if the owner chooses) pushed as a branch
 backup — mirroring the precedent already set by the voice-platform program's
 B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
+
+---
+
+## Checkpoint 2A — Feature-Flagged Global Shell and Homepage Preview (implemented)
+
+> Distinct from roadmap **Phase 2** above (which redesigns the live
+> `Home.tsx`/`Navbar.tsx`/`Footer.tsx`). Checkpoint 2A is a **feature-flagged,
+> non-live visual prototype** validating the shell/homepage direction before
+> Phase 2 touches any production route — it does not replace or unblock Phase 2's
+> own dependency on Phase 1 (shared design system in `web-agency/src/index.css`).
+
+- **Route**: `/platform-preview` (`artifacts/web-agency/src/pages/PlatformPreview.tsx`),
+  lazy-loaded, registered in `App.tsx` outside the main `<Layout>` (own navbar/
+  footer/theme, per `components/platform-preview/*`).
+- **Feature flag**: `VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED` (`src/lib/platformPreviewFlag.ts`),
+  default false/fail-closed. When false or unset, the route renders the app's
+  ordinary `NotFound` page — no redirect, no prototype markup ships.
+- **Preview status**: internal, unpublished. `noindex, nofollow` set at
+  runtime for this route only (`document.title`/meta patched on mount, restored
+  on unmount); never in `sitemap.xml`, never linked from the current public
+  Navbar/Footer, robots allowlist, or CRM.
+- **Design tokens**: consumes `@workspace/design-tokens` (Phase 1B/1B.1/1C.1
+  tokens) directly via `--sm-*` custom properties, scoped to prototype
+  components only — `web-agency`'s existing `--color-*`/`--primary`/etc. theme
+  (its current blue identity) is untouched; no existing page re-themed.
+- **Theme**: prototype-local light/dark toggle (`usePlatformPreviewTheme.ts`),
+  namespaced `sitemint-platform-preview-theme` localStorage key, `.dark` class
+  scoped to the prototype's own root element only — documented as transitional
+  per `SHARED_DESIGN_TOKENS_SPEC.md`'s "Theme Strategy," not a platform-wide
+  theme provider.
+- **Bundle isolation**: `PlatformPreview` and `platform-preview.css` ship as
+  their own lazy chunk; measured production build showed the shared/ordinary
+  entry bundle essentially unchanged (+1.69 kB JS, 0 kB CSS) with the prototype
+  isolated in its own ~37 kB JS / ~10 kB CSS chunk.
+- **Known placeholder/owner-review items**: AI Toolkit product card CTA is a
+  non-navigating "Coming to sitemintdigital.com" state (no `/products/ai-toolkit`
+  route exists yet — Phase 4 territory); Services card CTAs all point at the
+  existing `/services` overview (no per-service routes exist yet — Phase 5
+  territory); Connected Workflow section is explicitly labeled as direction/mix
+  of already-live and future capability, not a claim that every step is live
+  today; Selected Work reuses the same three real projects already in
+  `Portfolio.tsx` (no fabricated results).
+- **Activation is not approved.** This checkpoint ships the prototype behind
+  the flag only — turning the flag on anywhere outside local/private preview,
+  linking the route publicly, or promoting it to a live route are separate,
+  future, explicitly-approved actions (Phase 2+).
