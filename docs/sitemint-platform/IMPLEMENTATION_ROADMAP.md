@@ -863,3 +863,25 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   manifest): the public UI must never expose internal permission or audit
   language. No code was changed — adopting the model remains a Phase 2B.3
   implementation decision.
+
+## Checkpoint 2C.1 — Platform Preview Release-Readiness Audit (implemented)
+
+> Documentation-only checkpoint. No application code, component, style,
+> route, image, or feature flag changed. See
+> `docs/sitemint-platform/PLATFORM_PREVIEW_RELEASE_AUDIT.md` for the full
+> report.
+
+- Audited the complete Phase 2B.3 preview (all sections, both themes, 8
+  responsive breakpoints, feature-flag on/off behavior, copy/claims,
+  portfolio content, routes/links, accessibility, security/privacy,
+  forms/spam, SEO/indexing, and a real production build) and separated
+  readiness into four levels: local private review, private deployed
+  preview, public homepage switch, and paid-traffic readiness.
+- Result: Level 1 ready; Level 2 conditionally ready (Discovery-form
+  hardening and a full accessibility pass are the open caveats, not
+  preview defects); Levels 3 and 4 not ready, pending a Phase 2C.2
+  correction checkpoint (Discovery-form hardening, accessibility
+  verification, a release-engineering plan, a bundle-size decision, and
+  analytics instrumentation).
+- No release-blocking defect found inside the platform-preview component
+  tree itself. Activation is not approved.
