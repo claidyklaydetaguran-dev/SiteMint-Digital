@@ -1,4 +1,4 @@
-# Portfolio Permission Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2 and 2B.2.3, Claidy crop reconciled in 2B.2.3.1)
+# Portfolio Permission Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2 and 2B.2.3, Claidy crop reconciled in 2B.2.3.1, publication approvals recorded in 2B.2.4)
 
 > Originally prepared 2026-07-20 in Phase 2B.2 (`claude/phase-2b2-portfolio-assets-8vh4q1`
 > @ `0ca3f4311d4a688aa0167797db54cd6cace4b450`). **Corrected 2026-07-20 in
@@ -10,27 +10,39 @@
 > `PORTFOLIO_ASSET_MANIFEST.md` §10 for the full validation/optimization
 > record. **Updated in Phase 2B.2.3.1** to reconcile Claidy's mobile asset
 > after its crop was corrected — a clean image is not a permission grant;
-> see the Claidy section's "Phase 2B.2.3.1 correction" note below.
+> see the Claidy section's "Phase 2B.2.3.1 correction" note below. **Updated
+> in Phase 2B.2.4** to record the owner's July 20, 2026 project-placement,
+> SiteMint-attribution, and public-portfolio-publication approvals for
+> OneFilAm, Hand Homecare, Herlinda (desktop only), and Claidy (mobile
+> only) — see each project's "Phase 2B.2.4 approval" note below and §12 for
+> the approved Phase 2B.3 lineup. Shasta Greene's project and publication
+> intent were approved, but **no current visual asset was approved** —
+> see its Phase 2B.2.4 note.
 >
 > This manifest records **approval status only**. It does not grant approval.
 > Nothing here should be read as "cleared for public use" unless the status
-> column explicitly says so, and no project's status here says that yet.
+> column explicitly says so.
 
 ## Status definitions (kept distinct on purpose)
 
 | Status | Meaning |
 |---|---|
 | Project-placement approved | Owner has decided this project's intended role (featured/supporting/deferred), independent of any specific screenshot |
+| SiteMint attribution confirmed | Owner has confirmed SiteMint actually built/owns credit for this project (distinct from placement — a project can be placed without SiteMint having built it, e.g. Claidy's own portfolio) |
 | Asset prepared | An optimized image file exists in the repo |
 | Asset visually approved | Owner/client has confirmed the specific screenshot's framing/content is accurate and acceptable |
-| Current-site verified | The screenshot has been checked against the site as it exists today (not just checked for quality in isolation) |
-| Permission approved | Owner/organization/client has given explicit permission to display it publicly |
+| Current-site verified | The screenshot has been checked against the site as it exists today (not just checked for quality in isolation) — distinct from owner-supplied; still not independently browser-verified by this environment for any project |
+| Permission approved | Owner/organization/client has given explicit permission to display it publicly (this checkpoint records the **owner's own** permission grant for private preview and public portfolio publication; organizational/client permission from OneFilAm/Herlinda/Hand Homecare themselves remains separately tracked where applicable) |
+| Metric permission | Whether any specific number (dollar volume, client count, satisfaction percentage, etc.) may be presented as a SiteMint-attributable claim — kept separate because a project or image can be fully approved for placement while still carrying zero metric permission |
 | Implementation approved | Someone has approved wiring it into `SelectedWorkSection.tsx` |
 | Public publication approved | The change is live in production |
 
-These seven statuses are independent. A project can have project-placement
-approved while its current asset has none of the other six statuses — that
-is exactly the state Shasta Greene is in below.
+These eight statuses are independent. A project can have project-placement
+and public-publication-intent approved while its current visual asset has
+none of the other statuses — that is exactly the state Shasta Greene is in
+below: the project and the *intent* to publish it publicly are approved,
+but no specific screenshot has cleared visual approval, so there is nothing
+yet eligible for implementation.
 
 ## Per-project manifest
 
@@ -84,6 +96,24 @@ was optimized or added to the implementation directory, and neither was
 cropped to force an approval. Status remains **prepared reference —
 recapture required**; the featured-project placement intent is unchanged.
 
+**Phase 2B.2.4 approval (owner-provided decision, July 20, 2026):**
+- Private preview: **approved.**
+- Public portfolio publication: **approved** (of the project and the
+  intent to feature it — not of any current screenshot).
+- Project placement: **approved as a future featured project.**
+- **No current visual asset is approved.** Both the desktop and mobile
+  screenshots remain rejected for the reasons already recorded above
+  (stats row + feedback widget still visible).
+- **Not eligible for Phase 2B.3 visual implementation.** A clean desktop
+  and mobile recapture both remain required before any Shasta asset can
+  be used.
+- The rejected screenshots must **not** be cropped to force
+  implementation — the same instruction given in Phase 2B.2.1/2B.2.3
+  still applies.
+- Metric permission: **still not granted.** No old numerical claim
+  ($250M+, 500+, #1) may be repeated as a SiteMint marketing claim, in
+  any recapture, without separate evidence and separate approval.
+
 ### OneFilAm Community
 
 | Field | Value |
@@ -123,6 +153,21 @@ candidates** and have been optimized into
 "current recapture" requirement above — **organizational approval is now
 the only remaining blocker** before this project can move past
 visually-approved to permission-approved.
+
+**Phase 2B.2.4 approval (owner-provided decision, July 20, 2026):**
+- Private preview: **approved.**
+- Public portfolio publication: **approved.**
+- SiteMint portfolio placement: **approved as a supporting project.**
+- Approved visual assets: `onefilam-community-desktop.webp` and
+  `onefilam-community-mobile.webp` — **both desktop and mobile visually
+  approved.**
+- **Implementation eligible for Phase 2B.3.**
+- Public publication: **approved.**
+- Metric permission: **no numerical performance claim is approved** unless
+  separately evidenced — nothing currently exists to evidence one, and
+  none should be added without that evidence and a separate approval.
+- This owner-provided decision satisfies the organizational-approval
+  requirement recorded earlier in this section.
 
 ### Herlinda Valdovinos
 
@@ -172,6 +217,26 @@ status: **mobile responsive improvement and recapture required**. The
 mobile file was not optimized or added to the implementation directory.
 Client permission remains pending regardless of the desktop asset's visual
 approval.
+
+**Phase 2B.2.4 approval (owner-provided decision, July 20, 2026):**
+- Private preview: **approved.**
+- Public portfolio publication: **approved.**
+- Portfolio placement: **approved as a supporting project.**
+- Approved visual asset: `herlinda-valdovinos-desktop.webp` — **desktop
+  visually approved.**
+- Mobile asset: **not approved for implementation** — the navigation is
+  not intentionally collapsed on the submitted mobile capture; this is
+  the same responsive-design defect already recorded above, not a new
+  finding.
+- **Desktop-only implementation eligible for Phase 2B.3.** Mobile
+  implementation remains deferred.
+- Current approved URL: `https://sunshine-herlinda-site.replit.app/`.
+- Metric permission: **no numerical result or performance claim is
+  approved** unless separately evidenced.
+- This owner-provided decision on July 20, 2026 resolves the "client
+  permission and URL verification required" status recorded earlier in
+  this section — public portfolio publication of the approved desktop
+  asset is now approved.
 
 ### Claidy Taguran Portfolio
 
@@ -256,6 +321,26 @@ since a clean image can be mistaken for a permission signal:
 - No other project's permission, implementation, or publication status was
   elevated by this correction.
 
+**Phase 2B.2.4 approval (owner-provided decision, July 20, 2026):**
+- Private preview: **approved.**
+- Public portfolio publication: **approved.**
+- Portfolio placement: **approved as a supporting project.**
+- Approved visual asset: `claidy-taguran-mobile.webp` — **cropped mobile
+  visually approved.**
+- Desktop asset: **not approved** — the submitted desktop capture omitted
+  the animated word "Solutions," as already recorded above.
+- **Mobile-only implementation eligible for Phase 2B.3.** Desktop
+  implementation remains deferred.
+- Current URL: `https://ClaidyTaguranPorfolio.replit.app` — the spelling
+  "Porfolio" is kept exactly as supplied because it is part of the current
+  URL; replace later only when a custom domain or corrected deployment URL
+  is separately approved.
+- The 10+, 3+, and 100% values were **intentionally excluded** from the
+  approved crop (Phase 2B.2.3.1).
+- Metric permission: **no numerical metric permission is granted through
+  this approval** — even though the crop is clean, this approval covers
+  placement and publication of the image only, not any metric claim.
+
 ### Hand Homecare *(new candidate, Phase 2B.2.3)*
 
 | Field | Value |
@@ -287,18 +372,79 @@ tools, no broken content. This project was **not** independently
 browser-verified by this environment — its inclusion is entirely
 owner-supplied, and it must not be described as SiteMint-verified.
 
-## Summary (as of Phase 2B.2.3)
+**Phase 2B.2.4 approval (owner-provided decision, July 20, 2026):**
+- **SiteMint attribution: confirmed by the owner — SiteMint built this
+  project.** This resolves the "attribution and permission confirmation
+  pending" status recorded above, for the attribution half of that
+  question.
+- Private preview: **approved.**
+- Public portfolio publication: **approved.**
+- Portfolio placement: **approved as the initial featured project**
+  (supersedes the earlier "recommended temporary featured candidate"
+  language — this is now the owner's actual placement decision, not a
+  recommendation).
+- Approved visual assets: `hand-homecare-desktop.webp` and
+  `hand-homecare-mobile.webp` — **both desktop and mobile visually
+  approved.**
+- **Implementation eligible for Phase 2B.3.**
+- Public publication: **approved.**
+- Do not copy the visible phone number (818-914-4990) into SiteMint's own
+  marketing copy — same instruction as before, still binding.
+- Metric permission: **no performance or conversion metric is approved**
+  unless separately evidenced.
 
-| Project | Project-placement | Desktop asset status | Mobile asset status |
-|---|---|---|---|
-| Shasta Greene Real Estate | Featured — approved | Rejected (stats row + widget); recapture required | Rejected (same reasons); recapture required |
-| OneFilAm Community | Supporting — approved in principle | Visually approved candidate; org. approval pending | Visually approved candidate; org. approval pending |
-| Herlinda Valdovinos | Supporting — approved, contingent on client permission | Visually approved candidate; client permission pending | Rejected — un-collapsed nav; responsive fix + recapture required |
-| Claidy Taguran Portfolio | Future supporting — approved | Rejected — missing "Solutions"; recapture required | Visually approved candidate |
-| Hand Homecare | **New — recommended temporary featured candidate** | Visually approved candidate; attribution/permission pending | Visually approved candidate; attribution/permission pending |
+## Summary (as of Phase 2B.2.4)
 
-No project has reached permission-approved, implementation-approved, or
-public-publication-approved status. Every visually-approved asset above
-still requires an explicit permission grant (organizational, client, or
-attribution-and-publication confirmation, as applicable) before Phase 2B.3
-may reference it in `SelectedWorkSection.tsx`.
+| Project | Project-placement | Public publication | Desktop asset status | Mobile asset status | Metric permission |
+|---|---|---|---|---|---|
+| Shasta Greene Real Estate | Featured — approved | Approved (project/intent only) | **Rejected** — stats row + widget still visible; recapture required | **Rejected** — same reasons; recapture required | Not granted |
+| OneFilAm Community | Supporting — approved | **Approved** | **Approved — implementation eligible** | **Approved — implementation eligible** | Not granted unless separately evidenced |
+| Herlinda Valdovinos | Supporting — approved | **Approved (desktop only)** | **Approved — implementation eligible** | **Not approved** — nav not collapsed; deferred | Not granted unless separately evidenced |
+| Claidy Taguran Portfolio | Supporting — approved | **Approved (mobile only)** | **Not approved** — missing "Solutions"; deferred | **Approved — implementation eligible** (cropped) | Not granted |
+| Hand Homecare | **Featured (initial) — approved** | **Approved** | **Approved — implementation eligible** | **Approved — implementation eligible** | Not granted unless separately evidenced |
+
+**Implementation-eligible for Phase 2B.3** (owner-approved, July 20, 2026):
+`hand-homecare-desktop.webp`, `hand-homecare-mobile.webp`,
+`onefilam-community-desktop.webp`, `onefilam-community-mobile.webp`,
+`herlinda-valdovinos-desktop.webp`, `claidy-taguran-mobile.webp`.
+
+**Not implementation-eligible** (rejected or deferred — do not wire into
+`SelectedWorkSection.tsx`): all submitted Shasta Greene screenshots
+(desktop and mobile), Claidy's desktop capture, Herlinda's mobile capture.
+
+No metric/numerical performance claim is approved for any project unless
+separately evidenced and separately approved — visual/publication approval
+never implies metric approval.
+
+## 12. Approved Phase 2B.3 implementation lineup (owner decision, July 20, 2026)
+
+This is the approved *lineup* — an implementation authorization for which
+assets may be wired in and in what role. It does not itself perform any
+implementation; `SelectedWorkSection.tsx` was not modified in this
+checkpoint.
+
+**FEATURED**
+- Hand Homecare (`hand-homecare-desktop.webp`, `hand-homecare-mobile.webp`)
+
+**SUPPORTING**
+- OneFilAm Community (`onefilam-community-desktop.webp`,
+  `onefilam-community-mobile.webp`)
+- Herlinda Valdovinos — **desktop visual only**
+  (`herlinda-valdovinos-desktop.webp`)
+- Claidy Taguran Portfolio — **cropped mobile visual only**
+  (`claidy-taguran-mobile.webp`)
+
+**RESERVED / NOT YET IMPLEMENTABLE**
+- Shasta Greene Real Estate — project and public-publication intent
+  approved; no visual asset approved; a clean desktop and mobile recapture
+  remain required before this project has anything eligible to implement.
+
+Per owner direction, Phase 2B.3's data model must support featured/
+supporting placement, desktop-only projects, mobile-only projects,
+desktop+mobile pairs, fallback assets, custom image fit/position,
+permission status, visual-approval status, publication status,
+current-site verification, hiding/reordering, and later URL/screenshot
+replacement — and the public UI must never expose internal permission or
+audit language. See `PORTFOLIO_ASSET_MANIFEST.md` §10.7 and §12 for the
+model definition and the full approval record; adopting the model remains
+a Phase 2B.3 implementation decision, not performed in this checkpoint.

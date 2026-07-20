@@ -787,3 +787,31 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   or metric permission — a clean image is not a permission signal. No other
   project's permission status was elevated.
 - Phase 2B.3 (portfolio UI implementation) remains unapproved.
+
+## Checkpoint 2B.2.4 — Record Owner-Provided Portfolio Publication Approvals (implemented)
+
+> Documentation-only checkpoint. No image, application code, or component
+> changed; `SelectedWorkSection.tsx` untouched.
+
+- Recorded the owner's July 20, 2026 decisions: private-preview and
+  public-portfolio-publication approval for OneFilAm Community (desktop +
+  mobile), Hand Homecare (desktop + mobile, now the initial featured
+  project, with SiteMint attribution confirmed), Herlinda Valdovinos
+  (desktop only), and Claidy Taguran Portfolio (cropped mobile only).
+- Shasta Greene's project and public-publication *intent* were approved,
+  but **no current visual asset was approved** — both submitted captures
+  remain rejected (stats row + feedback widget still visible); it is not
+  eligible for Phase 2B.3 visual implementation.
+- Recorded the approved Phase 2B.3 lineup: Hand Homecare (featured);
+  OneFilAm, Herlinda (desktop only), Claidy (mobile only) (supporting);
+  Shasta Greene (reserved, pending recapture).
+- **Permission gating for this approved Phase 2B.3 lineup is now
+  complete** — six specific assets are implementation-eligible; all
+  Shasta screenshots, Claidy's desktop, and Herlinda's mobile remain
+  ineligible.
+- No metric/numerical performance claim was approved for any project;
+  visual and publication approval never implies metric approval.
+- Reaffirmed the Phase 2B.3 data-model requirement (§10.7 of the asset
+  manifest): the public UI must never expose internal permission or audit
+  language. No code was changed — adopting the model remains a Phase 2B.3
+  implementation decision.

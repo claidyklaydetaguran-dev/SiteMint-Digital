@@ -1,4 +1,4 @@
-# Portfolio Asset Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2, current captures validated in 2B.2.3, Claidy crop corrected in 2B.2.3.1)
+# Portfolio Asset Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2, current captures validated in 2B.2.3, Claidy crop corrected in 2B.2.3.1, publication approvals recorded in 2B.2.4)
 
 > Originally prepared 2026-07-20 in Phase 2B.2, branch
 > `claude/phase-2b2-portfolio-assets-8vh4q1`, based on
@@ -744,3 +744,65 @@ permission, implementation, or publication status, and it does not
 constitute metric permission of any kind (see §10.5's updated Claidy block
 and `PORTFOLIO_PERMISSION_MANIFEST.md`). No other project's asset, status,
 or permission was touched by this correction.
+
+## 12. Phase 2B.2.4 — Owner-Provided Portfolio Publication Approvals
+
+Recorded July 20, 2026. This is a documentation-only checkpoint — no image
+changed, no application code changed. Full per-project detail (including
+the distinction between project-placement, SiteMint-attribution,
+screenshot visual approval, current-site verification, implementation
+approval, public-publication approval, and metric permission) is in
+`PORTFOLIO_PERMISSION_MANIFEST.md` §12; this section records the resulting
+asset-eligibility outcome.
+
+### 12.1 Implementation-eligible assets (owner-approved)
+
+| Asset | Project | Role |
+|---|---|---|
+| `hand-homecare-desktop.webp` | Hand Homecare | Featured (initial) |
+| `hand-homecare-mobile.webp` | Hand Homecare | Featured (initial) |
+| `onefilam-community-desktop.webp` | OneFilAm Community | Supporting |
+| `onefilam-community-mobile.webp` | OneFilAm Community | Supporting |
+| `herlinda-valdovinos-desktop.webp` | Herlinda Valdovinos | Supporting — desktop only |
+| `claidy-taguran-mobile.webp` | Claidy Taguran Portfolio | Supporting — mobile only |
+
+### 12.2 Not implementation-eligible (rejected or deferred)
+
+| Asset | Project | Reason |
+|---|---|---|
+| `shasta-greene-desktop-current.png` (never optimized) | Shasta Greene | Stats row + feedback widget still visible; recapture required |
+| `shasta-greene-mobile-current.png` (never optimized) | Shasta Greene | Same reasons; recapture required |
+| `shasta-greene-desktop.webp` (Phase 2B.2/2B.2.1 historical reference) | Shasta Greene | Same underlying content issue; also not eligible |
+| Claidy desktop (never optimized) | Claidy Taguran Portfolio | Missing animated word "Solutions"; recapture required |
+| Herlinda mobile (never optimized) | Herlinda Valdovinos | Navigation not intentionally collapsed; responsive fix + recapture required |
+
+Shasta Greene's visual asset is **not** described as ready anywhere in this
+checkpoint — the project and the intent to publish it are approved, but no
+current screenshot has cleared visual approval.
+
+### 12.3 Approved Phase 2B.3 lineup
+
+| Slot | Project | Assets |
+|---|---|---|
+| Featured | Hand Homecare | Desktop + mobile |
+| Supporting | OneFilAm Community | Desktop + mobile |
+| Supporting | Herlinda Valdovinos | Desktop only |
+| Supporting | Claidy Taguran Portfolio | Cropped mobile only |
+| Reserved / not yet implementable | Shasta Greene Real Estate | None — recapture required |
+
+This is an implementation *authorization*, not an implementation — no file
+under `artifacts/web-agency/src/` changed in this checkpoint, and
+`SelectedWorkSection.tsx` has zero diff.
+
+### 12.4 Data-model requirement (reaffirmed, not implemented)
+
+Per owner direction, the Phase 2B.3 data-driven model (§10.7) must support:
+featured/supporting placement, desktop-only projects, mobile-only projects,
+desktop+mobile asset pairs, fallback assets, custom image fit, custom image
+position, permission status, visual-approval status, publication status,
+current-site verification, hiding and reordering, and later URL/screenshot
+replacement. **The public-facing UI must not expose internal permission or
+audit language** (e.g. no "pending client approval" or "not
+current-site-verified" text should ever render for site visitors — those
+are internal manifest fields only). Adopting this model remains a Phase
+2B.3 implementation decision; no code was changed in this checkpoint.
