@@ -31,8 +31,12 @@ export function PlatformPreviewFooter() {
           <Link href="/" className="inline-flex mb-4">
             <SiteMintLogo variant="dark" iconSize={30} />
           </Link>
-          <p className="max-w-xs text-sm leading-relaxed text-[hsl(var(--sm-color-text-muted))]">
-            One connected technology company: websites, AI products, and the systems that run them.
+          <p className="pp-font-display mt-1 max-w-xs text-lg font-semibold leading-snug text-[hsl(var(--sm-color-text-primary))]">
+            Websites, AI products, and the systems that connect them.
+          </p>
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-[hsl(var(--sm-color-text-muted))]">
+            One SiteMint Digital account team, one connected technology company — not a website
+            vendor and a software vendor working apart.
           </p>
         </div>
 

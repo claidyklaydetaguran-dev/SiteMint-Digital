@@ -41,7 +41,7 @@ const products = [
     icon: Wrench,
     problem: "Teams juggle too many disconnected AI tools for everyday work.",
     description:
-      "A focused set of AI tools built for common business tasks, in one place.",
+      "A focused set of AI tools built for common business tasks, in one place. Direction under consideration: content assistance, workflow suggestions, and structured automation guidance.",
     href: null,
     cta: "Explore the product direction",
     available: false,
@@ -70,14 +70,21 @@ export function ProductsSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Asymmetric: AI Receptionist (2 cols, full content) vs. AI Toolkit
+            (1 col, self-start so it never stretches to match the featured
+            product's height — Checkpoint 2A.4 Part 4, avoids the "large
+            empty card" impression an equal-height grid produced). */}
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
           {products.map((product) => {
             const Icon = product.icon;
             const isRecommended = selectedGoal.recommendedProductIds.includes(product.id);
+            const isFeatured = product.id === "ai-receptionist";
             return (
               <div
                 key={product.id}
-                className="relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 shadow-[var(--sm-shadow-sm)] transition-colors"
+                className={`relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 shadow-[var(--sm-shadow-sm)] transition-colors ${
+                  isFeatured ? "lg:col-span-2" : "lg:col-span-1"
+                }`}
                 style={{
                   borderColor: isRecommended ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
                   backgroundColor: "hsl(var(--sm-color-surface-default))",

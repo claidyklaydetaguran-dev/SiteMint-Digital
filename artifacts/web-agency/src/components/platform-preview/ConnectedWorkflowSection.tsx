@@ -38,7 +38,13 @@ export function ConnectedWorkflowSection() {
                 className="flex items-start gap-4 rounded-[var(--sm-radius-lg)] border p-5 transition-colors"
                 style={{
                   borderColor: isEmphasized ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
-                  backgroundColor: isEmphasized ? "hsl(var(--sm-mint-100) / 0.5)" : "hsl(var(--sm-color-surface-default))",
+                  // Checkpoint 2A.4 Part 12: was hsl(var(--sm-mint-100) / 0.5),
+                  // which reads as pale/washed gray in dark theme (mint-100 is
+                  // a light-theme primitive) and can look like a disabled
+                  // control. A low-opacity tint of the theme-aware
+                  // action-primary color stays a legible green tint in both
+                  // themes instead.
+                  backgroundColor: isEmphasized ? "hsl(var(--sm-color-action-primary) / 0.1)" : "hsl(var(--sm-color-surface-default))",
                 }}
               >
                 <span

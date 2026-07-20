@@ -50,7 +50,9 @@ export function AiToolkitPreview() {
               key={item.label}
               className="flex flex-col items-center gap-2 rounded-[var(--sm-radius-md)] bg-[hsl(var(--sm-color-surface-default))] p-3 text-center"
             >
-              <Icon size={16} aria-hidden="true" className="text-[hsl(var(--sm-color-text-muted))]" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-mint-100))] text-[hsl(var(--sm-color-action-primary))]">
+                <Icon size={14} aria-hidden="true" />
+              </span>
               <span className="text-[11px] leading-snug text-[hsl(var(--sm-color-text-secondary))]">{item.label}</span>
             </li>
           );

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { systemStages } from "./systemFlow";
 import { useSelectedGoal } from "./PlatformPreviewGoalContext";
-import { CapabilityBadge, CapabilityLegend } from "./CapabilityBadge";
+import { CapabilityLegend } from "./CapabilityBadge";
+import { capabilityTokenKey } from "./capabilityStatus";
 import { ConnectedModeToggle } from "./ConnectedModeToggle";
 import { AiToolkitPreview } from "./AiToolkitPreview";
 
@@ -109,15 +110,24 @@ export function EcosystemVisual() {
               ? "Customer journey through the connected SiteMint system, showing each stage's current status"
               : "The same customer journey without a connected system"
           }
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
+          className="relative grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
         >
+          {/* Connecting thread, desktop only — decorative; the numbered
+              sequence and labels already carry the meaning. */}
+          <div
+            aria-hidden="true"
+            className="absolute left-0 right-0 top-9 hidden h-px lg:block"
+            style={{ backgroundColor: "hsl(var(--sm-color-border-default))" }}
+          />
           {systemStages.map((stage, index) => {
             const Icon = stage.icon;
             const isActive = isConnected && index === activeIndex && !reducedMotionRef.current;
             const isEmphasized = isConnected && selectedGoal.emphasizedStageIds.includes(stage.id);
 
+            const capKey = capabilityTokenKey[stage.capability];
+
             return (
-              <li key={stage.id}>
+              <li key={stage.id} className="relative z-[1]">
                 <div
                   tabIndex={0}
                   className="pp-reveal flex h-full flex-col items-center gap-2 rounded-[var(--sm-radius-lg)] border p-4 text-center transition-all duration-300 focus:outline-none focus-visible:shadow-[var(--sm-shadow-glow-subtle)]"
@@ -158,7 +168,12 @@ export function EcosystemVisual() {
                   <span className="text-[11px] leading-snug text-[hsl(var(--sm-color-text-muted))]">
                     {isConnected ? stage.system : stage.disconnectedNote}
                   </span>
-                  {isConnected && <CapabilityBadge level={stage.capability} />}
+                  {isConnected && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: `var(--sm-statusbadge-${capKey}-text)` }}>
+                      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `var(--sm-statusbadge-${capKey}-text)` }} />
+                      {stage.capability === "available" ? "Available" : stage.capability === "in-development" ? "In development" : "Planned"}
+                    </span>
+                  )}
                 </div>
               </li>
             );

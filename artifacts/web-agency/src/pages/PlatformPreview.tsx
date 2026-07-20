@@ -5,7 +5,6 @@ import { PlatformPreviewNavbar } from "@/components/platform-preview/PlatformPre
 import { PlatformPreviewMobileMenu } from "@/components/platform-preview/PlatformPreviewMobileMenu";
 import { PlatformPreviewFooter } from "@/components/platform-preview/PlatformPreviewFooter";
 import { PlatformHero } from "@/components/platform-preview/PlatformHero";
-import { BusinessGoalSelector } from "@/components/platform-preview/BusinessGoalSelector";
 import { PlatformPreviewGoalProvider } from "@/components/platform-preview/PlatformPreviewGoalContext";
 import { EcosystemVisual } from "@/components/platform-preview/EcosystemVisual";
 import { ProductsSection } from "@/components/platform-preview/ProductsSection";
@@ -98,7 +97,6 @@ export default function PlatformPreview() {
       <main id="pp-main-content" className="flex-1">
         <PlatformPreviewGoalProvider>
           <PlatformHero />
-          <BusinessGoalSelector />
           <EcosystemVisual />
           <ProductsSection />
           <ServicesSection />

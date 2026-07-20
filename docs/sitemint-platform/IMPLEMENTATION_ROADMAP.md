@@ -560,3 +560,84 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   never implemented, never linked from the prototype.
 - **Activation is not approved.** Same standing note as every prior
   checkpoint in this program.
+
+---
+
+## Checkpoint 2A.4 — Premium Visual Art Direction and Signature Product Experience (implemented)
+
+> Visual/art-direction refinement only, following an owner review of the
+> Checkpoint 2A.3 screenshot package. Same architecture, interaction logic,
+> route, and flag as prior checkpoints — no new business logic, no strategy
+> expansion.
+
+- **Signature hero**: rebuilt as a two-column composition
+  (`PlatformHero.tsx`) — headline/CTA/goal-selector on the left, a new
+  `HeroSystemCanvas.tsx` living-system diagram on the right (five-node
+  inquiry path, driven by the same `selectedGoal.emphasizedStageIds` data
+  the rest of the page already reads). Restrained architectural grid +
+  two radial glows in the background; one non-looping draw-in animation
+  only. No gradient blobs, no WebGL/Three.js, no video, no cursor gimmicks.
+  `BusinessGoalSelector.tsx` moved from a standalone section into a compact
+  panel embedded in the hero's left column.
+- **Hero CTA hierarchy**: primary CTA is now "Build Your SiteMint System"
+  (→ `/discovery`); secondary is "Explore How It Works" (in-page anchor to
+  the ecosystem section). Nav's "Start a Project" and "Sign In" unchanged.
+- **Goal-selection screenshot defect fixed**: the Checkpoint 2A.3 owner
+  review flagged that `02-desktop-hero-never-miss-call.png` was
+  byte-identical to the default goal state (a capture-script no-op, not an
+  actual design issue). The Phase 2A.4 review package captures all four
+  goal states with content-verified, uniquely-hashed screenshots
+  (`01`–`04`) — confirmed genuinely distinct via MD5 and via the
+  goal-selector's own visible supporting copy.
+- **Product section rebalance**: `ProductsSection.tsx` grid changed to an
+  asymmetric `lg:grid-cols-3` layout (AI Receptionist spans 2 columns, AI
+  Toolkit spans 1) instead of two equal-width cards; AI Toolkit's
+  description was extended so its card isn't visually empty next to
+  Receptionist's richer content. `AiToolkitPreview.tsx`'s capability icons
+  now sit in mint-tinted circular chips instead of flat unstyled icons.
+- **Services bento layout**: `ServicesSection.tsx` replaced the uniform
+  6-card grid with two tiers — two larger "featured" cards (Websites, CRM
+  Systems, with problem/approach/deliverable) and four smaller "compact"
+  cards (problem statement only), instead of six visually identical cards.
+- **Connected-journey visual continuity**: `EcosystemVisual.tsx` gained a
+  decorative connecting line across its stage row and replaced the
+  per-stage `CapabilityBadge` with a lighter inline dot+label (reduces
+  badge density per the reviewer's note).
+- **Difference section rebuilt as a system-boundary flow**:
+  `SiteMintDifferenceSection.tsx` replaced the 3-column comparison grid
+  with a single linear vertical flow (`boundarySteps`) showing one inquiry
+  moving through either path, with a connected/disconnected-aware closing
+  line, instead of a conventional SaaS comparison table.
+- **Selected Work**: `SelectedWorkSection.tsx` now presents each real
+  project inside a browser-chrome frame (dot controls + domain pill) to
+  visually signal "real external site." Real screenshot capture of the
+  three live project domains was attempted and confirmed unavailable in
+  this environment (outbound requests to all three return a 403 from the
+  environment's proxy) — documented in the component's code comment rather
+  than fabricating page imagery, which the task's honesty constraints
+  prohibit.
+- **Process section artifacts**: `ProcessSection.tsx`'s detail panel now has
+  an artifact-style header bar (icon + "{phase} artifact — {artifact
+  type}") above the existing description, giving each phase a distinct
+  visual deliverable identity instead of one flat paragraph.
+- **Final CTA / dark-theme fix**: `FinalCtaSection.tsx` no longer uses
+  `--sm-color-bg-inverse` (which flips to near-white in dark theme,
+  producing a stark white card against a dark page). It now uses a fixed
+  deep evergreen-charcoal gradient with fixed light text in both themes.
+  `ConnectedWorkflowSection.tsx`'s emphasized-row background was changed
+  from a light-theme-only mint primitive (read as a disabled gray row in
+  dark theme) to a theme-aware primary-action tint.
+- **Footer**: `PlatformPreviewFooter.tsx` gained a bolder brand statement
+  line above the existing muted paragraph, and the muted paragraph was
+  reworded to state the "one connected technology company" positioning
+  more directly.
+- **Verification**: whole-workspace typecheck clean; web-agency production
+  build clean (ordinary entry bundle unchanged at ~2,016 kB JS / ~199 kB
+  CSS; preview lazy chunk 65.33 kB JS / 10.29 kB CSS, isolated from the
+  ordinary bundle); shared design-token/accessibility test suite passing;
+  zero horizontal overflow at 320/375/768/1024/1280/1440px in both themes;
+  keyboard focus confirmed visible; flag-off homepage and `/platform-preview`
+  re-confirmed unchanged/404 respectively; zero-line diff on every
+  CLAUDE.md-protected file; frozen-lockfile install clean.
+- **Activation is not approved.** Same standing note as every prior
+  checkpoint in this program.

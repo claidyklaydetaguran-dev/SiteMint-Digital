@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { CheckSquare, FileSearch, Hammer, Network, TrendingUp } from "lucide-react";
 
 /**
  * Coordinated project-control rail (Checkpoint 2A.2 Part 6) rather than five
@@ -13,6 +14,8 @@ const phases = [
     id: "discover",
     label: "Discover",
     artifact: "Business goals, bottlenecks, and customer journey",
+    artifactType: "Customer-journey map",
+    icon: FileSearch,
     detail:
       "We start by understanding the business, not the tech stack: current goals, where leads or time are being lost, and what the customer's actual journey looks like today.",
   },
@@ -20,6 +23,8 @@ const phases = [
     id: "architect",
     label: "Architect",
     artifact: "System map, product scope, and technical plan",
+    artifactType: "System blueprint",
+    icon: Network,
     detail:
       "Before building anything, we map how the pieces connect — website, product, CRM, automation — and scope exactly what's in and out, so the build has a real plan behind it.",
   },
@@ -27,6 +32,8 @@ const phases = [
     id: "build",
     label: "Build",
     artifact: "Design, engineering, and integrations",
+    artifactType: "Interface & integration modules",
+    icon: Hammer,
     detail:
       "Design and engineering happen together, with the systems from Architect actually wired up — not a static design handed off to be built later.",
   },
@@ -34,6 +41,8 @@ const phases = [
     id: "launch",
     label: "Launch",
     artifact: "Quality assurance, training, and controlled release",
+    artifactType: "QA & release checklist",
+    icon: CheckSquare,
     detail:
       "We verify the system works end to end, train the team who'll use it, and release in a controlled way rather than a single risky cutover.",
   },
@@ -41,6 +50,8 @@ const phases = [
     id: "improve",
     label: "Improve",
     artifact: "Performance review, system refinement, and future opportunities",
+    artifactType: "Performance & opportunity review",
+    icon: TrendingUp,
     detail:
       "A launched system isn't a finished one. We review how it's actually performing and refine it — and flag real opportunities as the business changes.",
   },
@@ -128,10 +139,17 @@ export function ProcessSection() {
         <div
           role="status"
           aria-live="polite"
-          className="mt-6 rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-6"
+          className="mt-6 overflow-hidden rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))]"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-action-primary))]">{selectedPhase.label}</p>
-          <p className="mt-2 text-sm leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">{selectedPhase.detail}</p>
+          {/* Artifact-style header bar — signals "this is a project deliverable
+              preview," not just another paragraph (Checkpoint 2A.4 Part 10). */}
+          <div className="flex items-center gap-2.5 border-b border-[hsl(var(--sm-color-border-subtle))] bg-[hsl(var(--sm-color-surface-muted))] px-6 py-3">
+            <selectedPhase.icon size={15} aria-hidden="true" className="text-[hsl(var(--sm-color-action-primary))]" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-action-primary))]">
+              {selectedPhase.label} artifact — {selectedPhase.artifactType}
+            </span>
+          </div>
+          <p className="p-6 text-sm leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">{selectedPhase.detail}</p>
         </div>
       </div>
     </section>
