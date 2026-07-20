@@ -925,3 +925,21 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   affected AI Receptionist authenticated/product workflows, not the
   marketing preview or homepage.
 - Activation is still not approved.
+
+## Checkpoint 2C.2A — Project Discovery System PRD (documentation-only)
+
+> Documentation-only checkpoint. No application code, component, route,
+> database schema, migration, package, lockfile, environment variable, or
+> Privacy/Terms page changed. See
+> `docs/sitemint-platform/DISCOVERY_FORM_HARDENING_PRD.md` for the full
+> report.
+
+- Produced the SiteMint Project Discovery System PRD, replacing the
+  audited-as-blocking current Discovery form (Checkpoint 2C.1/2C.1.1
+  findings) with a fully specified, implementation-ready plan for a
+  structured, multi-step "Start Your Project" intake, its shared data
+  contract, target frontend/backend/database architecture, security and
+  anti-spam strategy, reliability model, AI-brief workflow, and a five-
+  phase implementation sequence (2C.2B–2C.2F).
+- Implementation remains unapproved. No phase in the PRD may begin without
+  a separate, explicit approval prompt.
