@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
-import { clientLoginHref } from "./navConfig";
+import { signInHref } from "./navConfig";
 
 const footerGroups = [
   {
@@ -63,10 +63,10 @@ export function PlatformPreviewFooter() {
           <ul className="flex flex-col gap-3">
             <li>
               <Link
-                href={clientLoginHref}
+                href={signInHref}
                 className="text-sm text-[hsl(var(--sm-color-text-muted))] transition-colors hover:text-[hsl(var(--sm-color-action-primary))]"
               >
-                Client Login
+                Sign In
               </Link>
             </li>
             <li>

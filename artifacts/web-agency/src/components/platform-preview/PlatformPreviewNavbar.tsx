@@ -4,7 +4,7 @@ import { ChevronDown, Menu } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import { PlatformPreviewThemeToggle } from "./PlatformPreviewThemeToggle";
 import {
-  clientLoginHref,
+  signInHref,
   companyNavItems,
   primaryNavItems,
   productsNavItems,
@@ -155,10 +155,10 @@ export function PlatformPreviewNavbar({
         <div className="hidden items-center gap-3 lg:flex">
           <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
           <Link
-            href={clientLoginHref}
+            href={signInHref}
             className="rounded-[var(--sm-radius-pill)] border border-[hsl(var(--sm-color-border-strong))] px-4 py-2 text-sm font-medium text-[hsl(var(--sm-color-text-primary))] transition-colors hover:bg-[hsl(var(--sm-color-surface-interactive))]"
           >
-            Client Login
+            Sign In
           </Link>
           <Link
             href={startProjectHref}

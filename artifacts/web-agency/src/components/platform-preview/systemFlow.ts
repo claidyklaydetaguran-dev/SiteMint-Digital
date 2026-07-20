@@ -27,6 +27,13 @@ export interface SystemStage {
   label: string;
   note: string;
   state: string;
+  /** What the same moment looks like without a connected system — read by
+   * the Connected/Disconnected control (Checkpoint 2A.2), shared by
+   * EcosystemVisual and SiteMintDifferenceSection so neither hardcodes a
+   * second version of this narrative. Deliberately realistic and
+   * non-alarmist, not a worst-case scare scenario. */
+  disconnectedNote: string;
+  disconnectedState: string;
   icon: LucideIcon;
   system: string;
   /** Honest capability labeling (Checkpoint 2A.1) — see capabilityStatus.ts.
@@ -44,6 +51,8 @@ export const systemStages: SystemStage[] = [
     label: "Visitor arrives",
     note: "On your website or a product landing page.",
     state: "Waiting",
+    disconnectedNote: "Visitor lands on a page with no clear next step.",
+    disconnectedState: "Unclear",
     icon: Globe,
     system: "Website",
     capability: "available",
@@ -53,6 +62,8 @@ export const systemStages: SystemStage[] = [
     label: "Inquiry captured",
     note: "Contact, Discovery, or product signup form.",
     state: "Received",
+    disconnectedNote: "Inquiry lands in a separate form or inbox, disconnected from everything else.",
+    disconnectedState: "Isolated",
     icon: Inbox,
     system: "Website",
     capability: "available",
@@ -62,6 +73,8 @@ export const systemStages: SystemStage[] = [
     label: "AI or team responds",
     note: "AI Receptionist or your team follows up.",
     state: "Responding",
+    disconnectedNote: "Response waits until a team member has time to check.",
+    disconnectedState: "Waiting on staff",
     icon: MessageCircle,
     system: "AI Receptionist",
     capability: "available",
@@ -71,6 +84,8 @@ export const systemStages: SystemStage[] = [
     label: "Lead enters CRM",
     note: "Every inquiry becomes a tracked record.",
     state: "Captured",
+    disconnectedNote: "Details get copied by hand, if they get recorded at all.",
+    disconnectedState: "Manual entry",
     icon: UserPlus,
     system: "CRM",
     capability: "available",
@@ -80,6 +95,8 @@ export const systemStages: SystemStage[] = [
     label: "Follow-up begins",
     note: "Automated or manual, nothing sits idle.",
     state: "Organized",
+    disconnectedNote: "Follow-up depends on someone remembering to do it.",
+    disconnectedState: "Depends on memory",
     icon: Workflow,
     system: "Automation",
     capability: "available",
@@ -89,6 +106,8 @@ export const systemStages: SystemStage[] = [
     label: "Appointment or next action",
     note: "The lead moves toward a real outcome.",
     state: "Scheduled",
+    disconnectedNote: "Next steps stall without a system prompting anyone.",
+    disconnectedState: "Stalled",
     icon: CalendarCheck,
     system: "Automation",
     capability: "in-development",
@@ -98,6 +117,8 @@ export const systemStages: SystemStage[] = [
     label: "Visible to the team",
     note: "Every touchpoint is visible in one place.",
     state: "Visible",
+    disconnectedNote: "Management has limited visibility into what actually happened.",
+    disconnectedState: "Limited visibility",
     icon: BarChart3,
     system: "Analytics",
     capability: "planned",

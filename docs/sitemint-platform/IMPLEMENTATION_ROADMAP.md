@@ -434,3 +434,78 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
 - **Privacy**: goal selection is an explicit, visible, session-only choice —
   no covert inference, fingerprinting, or cross-session tracking; no
   advertising tracker is introduced this checkpoint.
+
+---
+
+## Checkpoint 2A.2 — Complete Access Strategy, Connected Comparison, Product Demos (implemented)
+
+> Extends Checkpoint 2A/2A.1 on the same route/flag. No new route, no unified
+> auth, no SSO, no customer portal, no real AI/provider call.
+
+- **Sign In strategy**: "Client Login" is removed from the prototype
+  (desktop nav, mobile menu, footer) and replaced with **Sign In**, a direct
+  secondary-hierarchy link — not a dropdown, since exactly one customer
+  product has a real login today. Destination is
+  `/ai-receptionist/dashboard/login` (`navConfig.ts`'s `signInHref`),
+  verified against `artifacts/helpdesk/src/App.tsx`'s registered `/login`
+  route and matching the existing link in `LandingReceptionistSignup.tsx`.
+  Never `/admin`, never a legacy route. A code comment on `signInHref`
+  records that Sign In should become a small product-access menu once a
+  second real customer-product login exists — not before.
+- **Only AI Receptionist is exposed as customer product access** in this
+  checkpoint. AI Toolkit has no login/account of any kind
+  (`artifacts/ai-toolkit/src/App.tsx` registers only `/`, `/thank-you`,
+  `/cancel`) and gets no Sign In or Launch App affordance anywhere in the
+  prototype — only a non-link "Explore the product direction" state.
+- **Future SiteMint Account direction** — documented, not built (see
+  Checkpoint 2A.1's future-account-strategy entry above; unchanged this
+  checkpoint, Sign In's code comment cross-references it).
+- **Connected/Disconnected interaction**: a real accessible segmented
+  control (`ConnectedModeToggle.tsx`, radiogroup, keyboard-operable, no
+  hover-only behavior) shared via `PlatformPreviewGoalContext`'s new
+  `systemMode` state — rendered once, in `EcosystemVisual`, and read (not
+  re-rendered) by `SiteMintDifferenceSection`, so the two sections never show
+  two competing toggles for the same comparison. Disconnected-state
+  narrative lives in `systemFlow.ts` (`disconnectedNote`/`disconnectedState`
+  per stage) — one data source, not a duplicated second diagram. Capability
+  badges are shown only in connected mode, since they describe what
+  SiteMint's system does; showing them next to the disconnected narrative
+  would read as contradictory.
+- **Demonstration labeling**: the AI Receptionist mini-demo
+  (`AiReceptionistDemo.tsx`) is explicitly labeled "Interactive
+  demonstration — example customer journey," uses only fabricated example
+  data (never real customer information), and separately labels SMS intake
+  (available now), voice (in development), and automated CRM follow-up
+  (conceptual demonstration) rather than implying one uniform capability
+  level. It updates via the existing goal-selection interaction
+  (`businessGoals.ts`'s new `demoScenarioId` field mapping to
+  `receptionistDemoScenarios.ts`) rather than introducing a second,
+  competing selector.
+- **AI Toolkit development status**: corrected from Checkpoint 2A.1's
+  "available" framing (which conflated "the app is deployed" with "it's a
+  ready customer product") to **"In development"** — the honest status per
+  this checkpoint's explicit instruction, since AI Toolkit has no customer
+  auth. `AiToolkitPreview.tsx` replaces the earlier decorative note with a
+  labeled panel of conceptual (not shipped) capability directions and no
+  Sign In/Launch CTA.
+- **Process section**: relabeled Discover → **Architect** → Build → Launch →
+  Improve (was Discover/Design/Build/Launch/Improve), rebuilt as an
+  interactive milestone rail (`ProcessSection.tsx`) using the same
+  accessible radiogroup pattern as the goal selector — each phase's artifact
+  is always visible without interaction; selecting a phase reveals its
+  fuller detail. No fake project-status, timeline, or delivery-date data.
+- **Difference section**: rebuilt as a three-part composition
+  (`SiteMintDifferenceSection.tsx`) — fragmented operation / customer
+  journey boundary / SiteMint connected system — reading the shared
+  `systemMode` instead of rendering its own toggle.
+- **Motion discipline**: the living-system auto-cycle (`EcosystemVisual.tsx`)
+  now also pauses via `document.visibilityState` (tab hidden) and an
+  `IntersectionObserver` (scrolled out of view), in addition to the existing
+  hover/focus/reduced-motion/disconnected-mode pauses — verified via a
+  simulated `visibilitychange` event.
+- **Badge discipline**: capability badges were removed from
+  `ConnectedWorkflowSection`'s per-item rendering (kept only in
+  `EcosystemVisual` and `ProductsSection`) to avoid the "excessive status
+  badges" anti-pattern, since the workflow section's prose already states
+  the same capability honestly.
+- **Activation is not approved.** Same standing note as Checkpoint 2A/2A.1.

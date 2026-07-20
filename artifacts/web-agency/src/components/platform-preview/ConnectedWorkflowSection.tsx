@@ -1,14 +1,16 @@
 import { Sparkles } from "lucide-react";
 import { systemStages } from "./systemFlow";
 import { useSelectedGoal } from "./PlatformPreviewGoalContext";
-import { CapabilityBadge } from "./CapabilityBadge";
 
 /**
  * Detailed vertical read of the same systemStages data EcosystemVisual
  * animates — no separate hardcoded step list. Steps matching the selected
  * business goal (BusinessGoalSelector) get a "Focus for your goal" badge,
  * so the two sections read as one coordinated system rather than two
- * unrelated diagrams.
+ * unrelated diagrams. Capability labels (Available now/In development/
+ * Planned direction) are shown once, in EcosystemVisual, rather than
+ * repeated here — avoids the "excessive status badges" anti-pattern while
+ * this section's own prose already states the same capability honestly.
  */
 export function ConnectedWorkflowSection() {
   const { selectedGoal } = useSelectedGoal();
@@ -48,7 +50,6 @@ export function ConnectedWorkflowSection() {
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">{stage.label}</p>
-                    <CapabilityBadge level={stage.capability} />
                     {isEmphasized && (
                       <span className="inline-flex items-center gap-1 rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-color-action-primary))] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-text-inverse))]">
                         <Sparkles size={10} aria-hidden="true" />

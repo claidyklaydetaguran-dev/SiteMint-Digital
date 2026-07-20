@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ChevronDown, X } from "lucide-react";
 import {
-  clientLoginHref,
+  signInHref,
   companyNavItems,
   productsNavItems,
   servicesNavItems,
@@ -145,11 +145,11 @@ export function PlatformPreviewMobileMenu({ onClose }: { onClose: () => void }) 
 
       <div className="flex flex-col gap-3 px-5 py-6">
         <Link
-          href={clientLoginHref}
+          href={signInHref}
           onClick={onClose}
           className="rounded-[var(--sm-radius-pill)] border border-[hsl(var(--sm-color-border-strong))] px-4 py-3 text-center text-sm font-medium text-[hsl(var(--sm-color-text-primary))]"
         >
-          Client Login
+          Sign In
         </Link>
         <Link
           href={startProjectHref}

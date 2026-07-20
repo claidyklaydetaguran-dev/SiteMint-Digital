@@ -7,7 +7,12 @@
  *
  * `emphasizedStageIds` reference `systemStages` ids (systemFlow.ts).
  * `recommendedProductIds`/`recommendedServiceIds` reference the `id` field
- * on ProductsSection's/ServicesSection's own data arrays.
+ * on ProductsSection's/ServicesSection's own data arrays. `demoScenarioId`
+ * references `receptionistDemoScenarios.ts` — this is how the AI
+ * Receptionist mini-demo (Checkpoint 2A.2 Part 3) updates contextually
+ * without a second, competing selector: it reads the same goal selection
+ * everything else here reads. More than one goal may map to the same
+ * scenario; that's expected, not a bug.
  *
  * Copy below is proposed, not approved — see the Phase 2A implementation
  * note in docs/sitemint-platform/IMPLEMENTATION_ROADMAP.md.
@@ -22,6 +27,7 @@ export interface BusinessGoal {
   emphasizedStageIds: string[];
   recommendedProductIds: string[];
   recommendedServiceIds: string[];
+  demoScenarioId: "never-miss-a-call" | "automate-follow-up" | "organize-leads-crm";
 }
 
 export const businessGoals: BusinessGoal[] = [
@@ -35,6 +41,7 @@ export const businessGoals: BusinessGoal[] = [
     emphasizedStageIds: ["arrive", "capture", "respond"],
     recommendedProductIds: ["ai-receptionist"],
     recommendedServiceIds: ["websites", "seo"],
+    demoScenarioId: "never-miss-a-call",
   },
   {
     id: "respond-faster",
@@ -46,6 +53,7 @@ export const businessGoals: BusinessGoal[] = [
     emphasizedStageIds: ["respond", "crm"],
     recommendedProductIds: ["ai-receptionist"],
     recommendedServiceIds: ["crm", "automation"],
+    demoScenarioId: "never-miss-a-call",
   },
   {
     id: "organize-followup",
@@ -57,6 +65,7 @@ export const businessGoals: BusinessGoal[] = [
     emphasizedStageIds: ["crm", "followup", "action"],
     recommendedProductIds: ["ai-receptionist"],
     recommendedServiceIds: ["crm", "automation"],
+    demoScenarioId: "organize-leads-crm",
   },
   {
     id: "see-whats-working",
@@ -68,5 +77,6 @@ export const businessGoals: BusinessGoal[] = [
     emphasizedStageIds: ["visible"],
     recommendedProductIds: ["ai-toolkit"],
     recommendedServiceIds: ["seo", "maintenance"],
+    demoScenarioId: "automate-follow-up",
   },
 ];

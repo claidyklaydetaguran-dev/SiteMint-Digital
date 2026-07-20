@@ -1,74 +1,120 @@
 import { useEffect, useRef, useState } from "react";
-import { Wrench } from "lucide-react";
 import { systemStages } from "./systemFlow";
 import { useSelectedGoal } from "./PlatformPreviewGoalContext";
 import { CapabilityBadge, CapabilityLegend } from "./CapabilityBadge";
+import { ConnectedModeToggle } from "./ConnectedModeToggle";
+import { AiToolkitPreview } from "./AiToolkitPreview";
 
 const CYCLE_MS = 2400;
 
 /**
- * "Living system" demonstration, not a static diagram: cycles a single
- * "current stage" indicator across the same systemStages data the workflow
- * section uses, showing state words (Waiting/Received/Responding/…) rather
- * than a decorative animation. The full stage list — label, state, and
- * owning system — is always rendered as real text, so the narrative is
- * complete even with the cycle disabled (reduced motion, or before JS
- * finishes hydrating). Nodes matching the selected business goal
- * (BusinessGoalSelector) get a persistent emphasis ring independent of the
- * auto-cycle, so the two interactions read as coordinated, not competing.
+ * "Living system" demonstration, not a static diagram: in "Connected with
+ * SiteMint" mode, cycles a single "current stage" indicator across the same
+ * systemStages data the workflow section uses, showing state words
+ * (Waiting/Received/Responding/…). In "Disconnected" mode the cycle stops —
+ * there is no live system to animate — and each stage instead shows its
+ * disconnectedNote/disconnectedState (systemFlow.ts), so the comparison
+ * lives inside this one visual rather than a second unrelated diagram
+ * (Checkpoint 2A.2 Part 2). The full stage list is always rendered as real
+ * text in both modes, so the narrative is complete with the cycle disabled
+ * (reduced motion, disconnected mode, or before JS finishes hydrating).
+ *
+ * The auto-cycle (connected mode only) pauses on hover/focus, when the tab
+ * is hidden (`document.visibilityState`), and when the section scrolls out
+ * of view (IntersectionObserver) — never runs anywhere the visitor isn't
+ * actually looking, per the Part 9 motion requirement.
  */
 export function EcosystemVisual() {
-  const { selectedGoal } = useSelectedGoal();
+  const { selectedGoal, systemMode } = useSelectedGoal();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [interactionPaused, setInteractionPaused] = useState(false);
+  const [documentVisible, setDocumentVisible] = useState(true);
+  const [inViewport, setInViewport] = useState(false);
   const reducedMotionRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  const isConnected = systemMode === "connected";
 
   useEffect(() => {
     reducedMotionRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }, []);
 
   useEffect(() => {
-    if (reducedMotionRef.current || paused) return;
+    function onVisibilityChange() {
+      setDocumentVisible(document.visibilityState === "visible");
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setInViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => setInViewport(entry.isIntersecting), {
+      threshold: 0.3,
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const cycleActive = isConnected && !reducedMotionRef.current && !interactionPaused && documentVisible && inViewport;
+
+  useEffect(() => {
+    if (!cycleActive) return;
     const interval = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % systemStages.length);
     }, CYCLE_MS);
     return () => window.clearInterval(interval);
-  }, [paused]);
+  }, [cycleActive]);
 
   return (
     <section
+      ref={sectionRef}
       id="pp-ecosystem"
       aria-labelledby="pp-ecosystem-heading"
       className="px-4 py-20 md:px-8 md:py-28"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      onMouseEnter={() => setInteractionPaused(true)}
+      onMouseLeave={() => setInteractionPaused(false)}
+      onFocus={() => setInteractionPaused(true)}
+      onBlur={() => setInteractionPaused(false)}
     >
       <div className="mx-auto max-w-[1280px]">
-        <div className="mx-auto mb-14 max-w-2xl text-center">
+        <div className="mx-auto mb-8 max-w-2xl text-center">
           <h2 id="pp-ecosystem-heading" className="pp-font-display text-3xl font-semibold text-[hsl(var(--sm-color-text-primary))] md:text-4xl">
             One connected system, not six disconnected tools
           </h2>
           <p className="mt-4 text-base text-[hsl(var(--sm-color-text-secondary))]">
-            A live look at how a single inquiry moves through SiteMint's connected
-            systems — the same website, AI receptionist, CRM, and automation working
-            together, not six separate tools.
+            {isConnected
+              ? "A live look at how a single inquiry moves through SiteMint's connected systems — the same website, AI receptionist, CRM, and automation working together."
+              : "The same inquiry, moving through separate tools with no system connecting them — a realistic day for a business without SiteMint."}
           </p>
         </div>
 
-        <div className="mb-6">
-          <CapabilityLegend />
+        <div className="mb-8 flex justify-center">
+          <ConnectedModeToggle />
         </div>
 
+        {isConnected && (
+          <div className="mb-6">
+            <CapabilityLegend />
+          </div>
+        )}
+
         <ol
-          aria-label="Customer journey through the SiteMint system, showing each stage's current status"
+          aria-label={
+            isConnected
+              ? "Customer journey through the connected SiteMint system, showing each stage's current status"
+              : "The same customer journey without a connected system"
+          }
           className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
         >
           {systemStages.map((stage, index) => {
             const Icon = stage.icon;
-            const isActive = index === activeIndex && !reducedMotionRef.current;
-            const isEmphasized = selectedGoal.emphasizedStageIds.includes(stage.id);
+            const isActive = isConnected && index === activeIndex && !reducedMotionRef.current;
+            const isEmphasized = isConnected && selectedGoal.emphasizedStageIds.includes(stage.id);
 
             return (
               <li key={stage.id}>
@@ -82,7 +128,9 @@ export function EcosystemVisual() {
                       : "hsl(var(--sm-color-border-default))",
                     backgroundColor: isActive
                       ? "hsl(var(--sm-mint-100))"
-                      : "hsl(var(--sm-color-surface-default))",
+                      : isConnected
+                        ? "hsl(var(--sm-color-surface-default))"
+                        : "hsl(var(--sm-color-surface-muted))",
                     boxShadow: isActive ? "var(--sm-shadow-md)" : undefined,
                   }}
                 >
@@ -103,24 +151,22 @@ export function EcosystemVisual() {
                       color: isActive ? "hsl(var(--sm-color-text-inverse))" : "hsl(var(--sm-color-text-muted))",
                     }}
                   >
-                    {stage.state}
+                    {isConnected ? stage.state : stage.disconnectedState}
                   </span>
 
                   <span className="text-xs font-semibold leading-tight text-[hsl(var(--sm-color-text-primary))]">{stage.label}</span>
-                  <span className="text-[11px] leading-snug text-[hsl(var(--sm-color-text-muted))]">{stage.system}</span>
-                  <CapabilityBadge level={stage.capability} />
+                  <span className="text-[11px] leading-snug text-[hsl(var(--sm-color-text-muted))]">
+                    {isConnected ? stage.system : stage.disconnectedNote}
+                  </span>
+                  {isConnected && <CapabilityBadge level={stage.capability} />}
                 </div>
               </li>
             );
           })}
         </ol>
 
-        <div className="mt-6 flex items-center justify-center gap-3 rounded-[var(--sm-radius-lg)] border border-dashed border-[hsl(var(--sm-color-border-strong))] px-5 py-3 text-center">
-          <Wrench size={16} aria-hidden="true" className="shrink-0 text-[hsl(var(--sm-color-text-muted))]" />
-          <p className="text-xs text-[hsl(var(--sm-color-text-muted))]">
-            <span className="font-semibold text-[hsl(var(--sm-color-text-secondary))]">AI Toolkit</span> supports the team
-            behind every stage above — it isn't a single step in the pipeline, it's used throughout.
-          </p>
+        <div className="mt-6">
+          <AiToolkitPreview />
         </div>
       </div>
     </section>

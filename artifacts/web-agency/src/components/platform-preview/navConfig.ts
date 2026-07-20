@@ -55,5 +55,21 @@ export const primaryNavItems: PreviewNavItem[] = [
   { label: "Company", children: companyNavItems },
 ];
 
-export const clientLoginHref = "/ai-receptionist/dashboard/login";
+/**
+ * Verified against artifacts/helpdesk/src/App.tsx's registered `/login`
+ * route, served at BASE_PATH=/ai-receptionist/dashboard — the same
+ * destination LandingReceptionistSignup.tsx already links to today. This is
+ * the only real, working customer-product login in the repository (AI
+ * Toolkit has no auth route at all — artifacts/ai-toolkit/src/App.tsx
+ * registers only `/`, `/thank-you`, `/cancel`); never point Sign In at
+ * `/admin` (staff-only, Bearer token) or any other route.
+ *
+ * Labeled "Sign In" rather than "Client Login" (Checkpoint 2A.2) — a direct
+ * link, not a dropdown, because exactly one customer product has a real
+ * login today. Once a second real customer-product destination exists
+ * (e.g. an AI Toolkit account area), this should become a small product-
+ * access menu instead of a single direct link — do not add a second menu
+ * item before that destination is verified real.
+ */
+export const signInHref = "/ai-receptionist/dashboard/login";
 export const startProjectHref = "/discovery";

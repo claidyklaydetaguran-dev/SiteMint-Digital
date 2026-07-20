@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { ArrowRight, Phone, Sparkles, Wrench } from "lucide-react";
 import { useSelectedGoal } from "./PlatformPreviewGoalContext";
 import { CapabilityBadge } from "./CapabilityBadge";
+import { AiReceptionistDemo } from "./AiReceptionistDemo";
 
 const products = [
   {
@@ -27,13 +28,17 @@ const products = [
     description:
       "A focused set of AI tools built for common business tasks, in one place.",
     href: null,
-    cta: "Coming to sitemintdigital.com",
+    cta: "Explore the product direction",
     available: false,
-    // The product exists and is deployed (its own standalone app, real
-    // checkout) — only its entry point from the main site is missing, which
-    // is why the badge below is "available" while the CTA still explains
-    // the discoverability gap explicitly (Blueprint §22 "orphaned product").
-    capability: "available" as const,
+    // Corrected (Checkpoint 2A.2): AI Toolkit is a real, deployed, standalone
+    // app with working checkout, but it is not yet a generally available
+    // *customer product* — it has no login/account of any kind
+    // (artifacts/ai-toolkit/src/App.tsx registers only `/`, `/thank-you`,
+    // `/cancel`) and no entry point from the main site. "In development"
+    // reflects that honestly; the earlier "available" framing (Checkpoint
+    // 2A.1) conflated "the app is deployed" with "it's a ready customer
+    // product," which this checkpoint's instructions correct.
+    capability: "in-development" as const,
   },
 ];
 
@@ -98,6 +103,8 @@ export function ProductsSection() {
                     {product.cta}
                   </span>
                 )}
+
+                {product.id === "ai-receptionist" && <AiReceptionistDemo />}
               </div>
             );
           })}
