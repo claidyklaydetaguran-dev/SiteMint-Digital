@@ -665,6 +665,54 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
 - No project has permission-approved or implementation-approved status yet;
   see the permission manifest for per-project approval requirements.
 
+## Checkpoint 2B.3 — Data-Driven Selected Work Experience (implemented)
+
+> Implements the real portfolio visuals inside the existing feature-flagged
+> `/platform-preview` route. No redesign of the rest of the homepage; no
+> other route, application, or protected file touched; preview activation
+> remains unapproved.
+
+- New data model: `portfolioProjects.ts` (typed `PortfolioProject[]`) is the
+  single source of truth for `SelectedWorkSection.tsx` — adding, replacing,
+  reordering, or hiding a project (including Shasta Greene once its asset is
+  approved) is a data-only change, not a redesign. `visualMode`
+  (`responsive-pair` / `desktop-only` / `mobile-only`) drives which device
+  frame(s) a new `PortfolioVisual.tsx` subcomponent renders, so desktop-only
+  and mobile-only projects never show an empty opposite-device frame.
+- Rendered the owner-approved Phase 2B.3 lineup only: **Hand Homecare**
+  (featured, desktop+mobile, editorial large treatment), **OneFilAm
+  Community** (supporting, desktop+mobile pair), **Herlinda Valdovinos**
+  (supporting, desktop-only), **Claidy Taguran** (supporting, mobile-only,
+  labeled "Portfolio Experience"). **Shasta Greene Real Estate remains
+  reserved** — omitted entirely from the public data array and UI, not
+  rendered as an empty card, per its unresolved asset status in
+  `PORTFOLIO_PERMISSION_MANIFEST.md`.
+- Hand Homecare's public URL was not recorded in any prior checkpoint
+  document; the owner supplied it directly this session
+  (`https://website-crm.replit.app/`) after the standing stop condition on
+  an unverified featured-project URL was raised before any implementation
+  began.
+- No fabricated metric, testimonial, award, or outcome added; Hand
+  Homecare's visible phone number and Claidy's own self-reported stats are
+  not reproduced in SiteMint copy.
+- Images use explicit `width`/`height`, `loading="lazy"`, `decoding="async"`,
+  per-project `object-fit`/`object-position`, and fixed aspect-ratio
+  wrappers — verified no layout shift and no empty device frame at
+  320/375/768/1024/1280/1440px, light and dark.
+- Verified: whole-workspace typecheck clean; web-agency production build
+  clean; ordinary entry bundle byte-identical JS (2,016.40 kB) with a
+  +1.39 kB CSS delta (new Tailwind utility classnames picked up by the
+  single global stylesheet, not portfolio images or preview logic); preview
+  lazy chunk +5.8 kB JS, 0 kB CSS change; zero-line diff on every
+  CLAUDE.md-protected file; flag-off `/platform-preview` and homepage both
+  fire zero `/portfolio/` requests and render unchanged; design-token test
+  suite passing; keyboard focus visible with four distinct, descriptive CTA
+  accessible names; frozen-lockfile install clean, no package/lockfile
+  change.
+- **Activation is not approved.** Same standing note as every prior
+  checkpoint in this program. Owner visual review of the screenshot package
+  is the next step, not activation.
+
 ## Checkpoint 2B.2.1 — Correct Portfolio Asset Readiness and Prepare Owner Capture Intake (implemented)
 
 > Narrow correction checkpoint following owner visual review of the Phase

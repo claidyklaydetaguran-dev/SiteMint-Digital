@@ -1,52 +1,84 @@
 import { Link } from "wouter";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { portfolioProjects, type PortfolioProject } from "./portfolioProjects";
+import { FeaturedVisual, SupportingVisual } from "./PortfolioVisual";
 
 /**
- * Real projects, matching src/pages/Portfolio.tsx — no fabricated results.
- * Trimmed to three for a homepage-scale section; "View all work" links to
- * the existing /portfolio page for the complete list.
- *
- * Checkpoint 2A.4 Part 9: real screenshots of these live sites were the
- * goal, captured with controlled local tooling. That tooling requires
- * outbound network access to each project's real domain — confirmed
- * unavailable in this environment (direct `curl` to all three domains
- * returns a 403 from the environment's outbound proxy, verified before
- * writing this component). Fabricating screenshot imagery to simulate what
- * the real pages look like would violate the "no fabricated... real
- * project interfaces" requirement, so this section keeps real text content
- * only, presented in a browser-chrome frame that visually signals "this is
- * a real, external website" without depicting invented page content.
- * Capturing genuine local screenshots remains a follow-up task once
- * network access (or owner-supplied image assets) is available.
+ * Data-driven Selected Work (Checkpoint 2B.3). Project content lives in
+ * portfolioProjects.ts; this file only composes layout. Adding, replacing,
+ * or reordering a project — or later adding Shasta Greene once its asset is
+ * approved — is a data change there, not a redesign here.
  */
-const projects = [
-  {
-    name: "Shasta Greene Real Estate",
-    url: "https://shastagreene.com",
-    domain: "shastagreene.com",
-    category: "Real Estate",
-    description:
-      "A professional real estate website designed to build trust, showcase services, and support lead generation.",
-  },
-  {
-    name: "OneFilAm Community",
-    url: "https://onefilamcommunity.org",
-    domain: "onefilamcommunity.org",
-    category: "Nonprofit Organization",
-    description:
-      "A nonprofit community website supporting Filipino-American outreach, events, and organizational credibility.",
-  },
-  {
-    name: "Herlinda Valdovinos",
-    url: "https://herlindavaldovinos.com",
-    domain: "herlindavaldovinos.com",
-    category: "Professional Services",
-    description:
-      "A professional website built to establish online credibility and help generate client inquiries.",
-  },
-];
+
+function ProjectCta({ project }: { project: PortfolioProject }) {
+  if (!project.publicUrl) return null;
+  return (
+    <a
+      href={project.publicUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${project.ctaLabel} — ${project.projectName} (opens in a new tab)`}
+      className="group/cta inline-flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--sm-color-action-primary))] hover:underline"
+    >
+      {project.ctaLabel}
+      <ArrowUpRight size={15} aria-hidden="true" className="transition-transform group-hover/cta:translate-x-0.5 group-hover/cta:-translate-y-0.5" />
+    </a>
+  );
+}
+
+function FeaturedProject({ project }: { project: PortfolioProject }) {
+  return (
+    <article className="grid grid-cols-1 items-center gap-10 rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-6 md:p-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
+      <div className="order-2 lg:order-1">
+        <span className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-action-primary))]">
+          Featured project — {project.category}
+        </span>
+        <h3 className="pp-font-display mt-3 text-2xl font-semibold text-[hsl(var(--sm-color-text-primary))] md:text-3xl">
+          {project.projectName}
+        </h3>
+        <p className="mt-4 text-base leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">{project.summary}</p>
+        <ul className="mt-6 space-y-2">
+          {project.contribution.map((item) => (
+            <li key={item} className="flex items-start gap-2 text-sm text-[hsl(var(--sm-color-text-secondary))]">
+              <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[hsl(var(--sm-color-action-primary))]" />
+              {item}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-8">
+          <ProjectCta project={project} />
+        </div>
+      </div>
+      <div className="order-1 lg:order-2 lg:pb-10 lg:pr-6">
+        <FeaturedVisual project={project} />
+      </div>
+    </article>
+  );
+}
+
+function SupportingProject({ project }: { project: PortfolioProject }) {
+  return (
+    <article className="flex flex-col overflow-hidden rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-6">
+      <SupportingVisual project={project} />
+      <div className="mt-6 flex flex-1 flex-col">
+        <span className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-action-primary))]">
+          {project.statusLabel ?? project.category}
+        </span>
+        <h3 className="mt-2 text-base font-semibold text-[hsl(var(--sm-color-text-primary))]">{project.projectName}</h3>
+        <p className="mt-2 flex-1 text-sm leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">{project.summary}</p>
+        <div className="mt-5">
+          <ProjectCta project={project} />
+        </div>
+      </div>
+    </article>
+  );
+}
 
 export function SelectedWorkSection() {
+  const sorted = [...portfolioProjects].sort((a, b) => a.sortOrder - b.sortOrder);
+  const featured = sorted.find((project) => project.featured);
+  const supporting = sorted.filter((project) => !project.featured);
+
   return (
     <section aria-labelledby="pp-work-heading" className="px-4 py-20 md:px-8 md:py-28">
       <div className="mx-auto max-w-[1280px]">
@@ -56,7 +88,7 @@ export function SelectedWorkSection() {
               Selected work
             </h2>
             <p className="mt-4 text-base text-[hsl(var(--sm-color-text-secondary))]">
-              Real projects SiteMint has delivered.
+              Real projects SiteMint has delivered, across different industries.
             </p>
           </div>
           <Link
@@ -68,39 +100,15 @@ export function SelectedWorkSection() {
           </Link>
         </div>
 
+        {featured && (
+          <div className="mb-6">
+            <FeaturedProject project={featured} />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {projects.map((project) => (
-            <a
-              key={project.domain}
-              href={project.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex flex-col overflow-hidden rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] transition-shadow hover:shadow-[var(--sm-shadow-md)]"
-            >
-              {/* Browser-chrome frame — signals "real external site," without
-                  depicting fabricated page content (see file header note). */}
-              <div className="flex items-center gap-2 border-b border-[hsl(var(--sm-color-border-subtle))] bg-[hsl(var(--sm-color-surface-muted))] px-4 py-2.5">
-                <span aria-hidden="true" className="flex gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[hsl(var(--sm-color-border-strong))]" />
-                  <span className="h-2 w-2 rounded-full bg-[hsl(var(--sm-color-border-strong))]" />
-                  <span className="h-2 w-2 rounded-full bg-[hsl(var(--sm-color-border-strong))]" />
-                </span>
-                <span className="ml-1 truncate rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-color-surface-default))] px-2.5 py-0.5 text-[11px] text-[hsl(var(--sm-color-text-muted))]">
-                  {project.domain}
-                </span>
-              </div>
-              <div className="flex flex-1 flex-col p-6">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-action-primary))]">
-                  {project.category}
-                </span>
-                <h3 className="mt-2 text-base font-semibold text-[hsl(var(--sm-color-text-primary))]">{project.name}</h3>
-                <p className="mt-2 flex-1 text-sm text-[hsl(var(--sm-color-text-secondary))]">{project.description}</p>
-                <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--sm-color-text-muted))] group-hover:text-[hsl(var(--sm-color-action-primary))]">
-                  Visit live site
-                  <ExternalLink size={13} aria-hidden="true" />
-                </span>
-              </div>
-            </a>
+          {supporting.map((project) => (
+            <SupportingProject key={project.id} project={project} />
           ))}
         </div>
       </div>
