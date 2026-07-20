@@ -60,6 +60,23 @@
 > `destructive` variant already resolves through the corrected dark-danger
 > alias from Phase 1B.1) and required no code change. See
 > `artifacts/helpdesk/src/components/ui/{button,input,textarea,card}.tsx`.
+>
+> **Addendum (Phase 1C.1, implemented)**: Phase 1C-V's rendered verification
+> measured the Button focus indicator failing 3:1 against the button's own
+> fill (1.61:1 light / 1.45:1 dark) because `focus-visible:outline-none`
+> suppressed the global 2px outline, leaving only a 1px same-hue box-shadow
+> ring touching the fill directly. Fix: `Button` no longer suppresses the
+> global rule; its 2px `outline-offset` opens a real gap so the ring's actual
+> adjacent color becomes the surrounding surface (already passing, now
+> re-verified live at 3.46–12.81:1 across every variant/theme), not the
+> fill. No new focus token was needed. Phase 1C-V also measured three
+> `StatusBadge` soft-tint pairs failing 4.5:1 (light warning 2.09:1, light
+> info 3.47:1, dark destructive 3.83:1). Fix: new `statusbadge-*`
+> semantic/component token pairs (`lib/design-tokens/src/semantic.css`,
+> `components.css`) — solid (not alpha-blended) tints with corrected text,
+> now 4.87–7.23:1 across all tones/themes. See
+> `lib/design-tokens/test/tokens.test.mjs` for the live-parsed regression
+> tests and `artifacts/helpdesk/src/components/{ui/button,common/StatusBadge}.tsx`.
 
 ---
 

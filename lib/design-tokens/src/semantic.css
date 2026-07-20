@@ -27,6 +27,21 @@
  * the new disabled surface — see the Accessibility Review in
  * DESIGN_TOKEN_AUDIT.md for why disabled labels are held to a readable-text
  * standard here even though WCAG itself exempts truly inactive controls.
+ *
+ * Phase 1C.1 adds dedicated statusbadge-* text/background pairs for the
+ * "soft tint" status-pill pattern (StatusBadge.tsx: a pale/dark tinted fill
+ * with a colored text label, distinct from the solid-fill white-text badge
+ * pattern in components.css's badge-success/-warning tokens). Phase 1C-V
+ * measured the raw hue-as-text approach failing 4.5:1 in three cases: light
+ * warning (2.09:1), light info (3.47:1), dark destructive (3.83:1). Rather
+ * than changing the shared success/warning/info/danger primitives (used
+ * correctly elsewhere as solid fills or icons), this adds darker
+ * (light-theme) or brighter (dark-theme destructive) text variants plus
+ * solid (not alpha-blended) pale/dark tint backgrounds so the pairing is
+ * deterministic regardless of what surface the badge sits on. Success,
+ * dark-warning, dark-info, and neutral already passed and are reused
+ * unchanged via var() references — only the three failing pairs get new
+ * dedicated values.
  */
 
 :root {
@@ -79,6 +94,20 @@
   --sm-color-status-danger: var(--sm-danger-500);
   --sm-color-status-info: var(--sm-info-500);
   --sm-color-status-neutral: var(--sm-neutral-600);
+
+  /* StatusBadge soft-tint pairs (Phase 1C.1 — see file header).
+     success/neutral reuse already-passing existing tokens; warning/info/
+     danger get dedicated darker text (raw hues fail as text-on-tint). */
+  --sm-color-statusbadge-success-bg: 148 30% 96%;
+  --sm-color-statusbadge-success-text: var(--sm-color-status-success); /* 4.87:1 */
+  --sm-color-statusbadge-warning-bg: 40 55% 95%;
+  --sm-color-statusbadge-warning-text: 32 80% 26%; /* 7.23:1 — was 2.09:1 raw warning-500 */
+  --sm-color-statusbadge-info-bg: 202 55% 95%;
+  --sm-color-statusbadge-info-text: 202 80% 28%; /* 6.98:1 — was 3.47:1 raw info-500 */
+  --sm-color-statusbadge-neutral-bg: var(--sm-color-surface-muted);
+  --sm-color-statusbadge-neutral-text: var(--sm-color-text-muted);
+  --sm-color-statusbadge-danger-bg: 356 55% 95%;
+  --sm-color-statusbadge-danger-text: 356 75% 40%; /* 5.88:1 — was 4.58:1 raw danger-500, thin margin */
 
   /* Shadow/Elevation (§15) */
   --sm-shadow-none: none;
@@ -140,6 +169,21 @@
   --sm-color-status-danger: 356 65% 52%;
   --sm-color-status-info: 199 75% 55%;
   --sm-color-status-neutral: 150 8% 62%;
+
+  /* StatusBadge soft-tint pairs (Phase 1C.1 — see file header).
+     success/warning/info/neutral already passed at healthy margins
+     (5.46:1–7.73:1) and are reused unchanged via var(); only destructive
+     (3.83:1 raw) needed a dedicated brighter-text/darker-tint pair. */
+  --sm-color-statusbadge-success-bg: 152 30% 16%;
+  --sm-color-statusbadge-success-text: var(--sm-color-status-success); /* 5.54:1 */
+  --sm-color-statusbadge-warning-bg: 38 35% 16%;
+  --sm-color-statusbadge-warning-text: var(--sm-color-status-warning); /* 6.74:1 */
+  --sm-color-statusbadge-info-bg: 199 35% 16%;
+  --sm-color-statusbadge-info-text: var(--sm-color-status-info); /* 5.46:1 */
+  --sm-color-statusbadge-neutral-bg: var(--sm-color-surface-muted);
+  --sm-color-statusbadge-neutral-text: var(--sm-color-text-muted); /* 6.10:1 */
+  --sm-color-statusbadge-danger-bg: 356 35% 14%;
+  --sm-color-statusbadge-danger-text: 356 85% 72%; /* 6.34:1 — was 3.83:1 raw dark danger */
 
   /* Shadow/Elevation */
   --sm-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);

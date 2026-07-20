@@ -58,7 +58,24 @@
   --sm-nav-link-text: hsl(var(--sm-color-text-secondary));
   --sm-nav-link-text-active: hsl(var(--sm-color-action-primary));
 
+  /* focus-ring-width/-offset already match the platform's 2px outline
+     convention (index.css's `:focus-visible { outline: 2px; outline-offset:
+     2px; }`) — Phase 1C.1 is this pair's first real consumer, via Button no
+     longer suppressing that global rule. No new focus token was needed. */
   --sm-focus-ring: hsl(var(--sm-color-border-focus));
   --sm-focus-ring-width: 2px;
   --sm-focus-ring-offset: 2px;
+
+  /* StatusBadge soft-tint pairs (Phase 1C.1) — see semantic.css file header
+     for the corrected-value rationale. */
+  --sm-statusbadge-success-background: hsl(var(--sm-color-statusbadge-success-bg));
+  --sm-statusbadge-success-text: hsl(var(--sm-color-statusbadge-success-text));
+  --sm-statusbadge-warning-background: hsl(var(--sm-color-statusbadge-warning-bg));
+  --sm-statusbadge-warning-text: hsl(var(--sm-color-statusbadge-warning-text));
+  --sm-statusbadge-info-background: hsl(var(--sm-color-statusbadge-info-bg));
+  --sm-statusbadge-info-text: hsl(var(--sm-color-statusbadge-info-text));
+  --sm-statusbadge-neutral-background: hsl(var(--sm-color-statusbadge-neutral-bg));
+  --sm-statusbadge-neutral-text: hsl(var(--sm-color-statusbadge-neutral-text));
+  --sm-statusbadge-danger-background: hsl(var(--sm-color-statusbadge-danger-bg));
+  --sm-statusbadge-danger-text: hsl(var(--sm-color-statusbadge-danger-text));
 }

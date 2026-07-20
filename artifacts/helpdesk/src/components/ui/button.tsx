@@ -5,7 +5,17 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0" +
+  // Phase 1C.1: this cva string deliberately omits any focus-visible outline
+  // suppression or ring override — the
+  // global `:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }`
+  // rule (index.css) is left to apply natively. Its 2px offset opens a real
+  // gap between the button's own fill/border and the ring, so the ring's
+  // actual adjacent color is the surrounding surface (already measured
+  // >=3:1 in both themes) rather than the button's own same-hue fill
+  // (previously measured failing at 1.61:1 light / 1.45:1 dark because the
+  // suppressed outline left only a 1px flush box-shadow ring touching the
+  // fill directly).
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0" +
 " hover-elevate active-elevate-2",
   {
     variants: {

@@ -63,6 +63,22 @@
   --color-input-disabled-fg: var(--sm-input-disabled-text);
   --color-input-disabled-border: var(--sm-input-disabled-border);
 
+  /* Phase 1C.1: expose the corrected StatusBadge soft-tint component tokens
+     (bg-statusbadge-*-bg / text-statusbadge-*-text) so StatusBadge.tsx can
+     consume them directly instead of raw success/warning/info/destructive
+     opacity tints, which measured below 4.5:1 for warning (light), info
+     (light), and destructive (dark). */
+  --color-statusbadge-success-bg: var(--sm-statusbadge-success-background);
+  --color-statusbadge-success-text: var(--sm-statusbadge-success-text);
+  --color-statusbadge-warning-bg: var(--sm-statusbadge-warning-background);
+  --color-statusbadge-warning-text: var(--sm-statusbadge-warning-text);
+  --color-statusbadge-info-bg: var(--sm-statusbadge-info-background);
+  --color-statusbadge-info-text: var(--sm-statusbadge-info-text);
+  --color-statusbadge-neutral-bg: var(--sm-statusbadge-neutral-background);
+  --color-statusbadge-neutral-text: var(--sm-statusbadge-neutral-text);
+  --color-statusbadge-danger-bg: var(--sm-statusbadge-danger-background);
+  --color-statusbadge-danger-text: var(--sm-statusbadge-danger-text);
+
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
