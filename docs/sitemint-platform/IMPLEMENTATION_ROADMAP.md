@@ -641,3 +641,26 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   CLAUDE.md-protected file; frozen-lockfile install clean.
 - **Activation is not approved.** Same standing note as every prior
   checkpoint in this program.
+
+## Checkpoint 2B.2 — Portfolio Permissions, Asset Validation, Mobile Captures, and Image Optimization (implemented)
+
+> Documentation- and asset-only checkpoint. `SelectedWorkSection.tsx` was
+> **not** modified. Full detail in `PORTFOLIO_ASSET_MANIFEST.md` and
+> `PORTFOLIO_PERMISSION_MANIFEST.md`.
+
+- Optimized the three approved-candidate desktop screenshots already present
+  in the repo (Shasta Greene, OneFilAm Community, Herlinda Valdovinos) into
+  WebP under `artifacts/web-agency/public/portfolio/`, all under 300 KB.
+  Shasta Greene's source was cropped to remove a third-party feedback-widget
+  overlay; the original source PNG was left unmodified.
+- Claidy Taguran Portfolio was deliberately **not** optimized or added to the
+  approved set — it remains deferred pending URL and relationship
+  confirmation.
+- Outbound network access to all four project domains was blocked by
+  environment policy this session (403 at the proxy), consistent with the
+  Phase 2A.4/2B.1 finding for the same domains. No live-site re-verification
+  and no new screenshot capture (desktop or mobile) was possible; this is
+  reported directly rather than worked around. Mobile screenshots do not
+  exist for any project and remain the primary open gap.
+- No project has permission-approved or implementation-approved status yet;
+  see the permission manifest for per-project approval requirements.
