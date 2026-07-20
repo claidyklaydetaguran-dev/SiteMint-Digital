@@ -14,6 +14,18 @@ Baseline: branch `claude/sitemint-phase-2c2a-audit-euthts`, HEAD
 `ACTIVATION_READINESS_AUDIT.md`, which both identified the current Discovery
 form as a Level 3/4 activation blocker.
 
+> **Corrected by Checkpoint 2C.2A.1** (documentation-only). Owner review of
+> the original database/reliability model (§18, §26–§29) found the
+> two-table-plus-status-columns design too fragile to durably back the
+> asynchronous, retried, duplicate-safe, operator-visible delivery this PRD
+> promises. §16–§19, §24–§29, §34, §37, and §41–§43 were corrected in place
+> to a three-table model (`discovery_submissions`, `discovery_delivery_jobs`,
+> `discovery_ai_briefs`) backed by a transactional outbox and a separately-
+> running delivery worker; the frontend-to-legacy-endpoint direction and the
+> fingerprint-uniqueness direction were also corrected. The current-state
+> audit (§8–§11) is unchanged evidence from Checkpoint 2C.2A and was not
+> re-derived. No implementation occurred in either checkpoint.
+
 ---
 
 ## 1. Executive Summary
@@ -314,17 +326,44 @@ is a smaller risk than typical, but business-description text is still PII-
 adjacent and should be considered for redaction-on-persist evaluation in
 2C.2C).
 
+**Correction (2C.2A.1):** the 2C.2C frontend must **not** submit to the
+legacy `POST /api/discovery/submit` endpoint — that endpoint accepts the
+old unstructured payload and lacks the required server-side validation and
+security controls this redesign exists to fix. During 2C.2C, the shell
+uses a local typed mock adapter or an intentionally disabled submit action
+(kept behind the inactive preview gate). It connects to the real
+`POST /api/v1/discovery-submissions` endpoint only once that endpoint
+exists and is hardened (2C.2D). No production submission may occur before
+then.
+
 ## 17. Target Backend Architecture (documented only, not created)
 
 | Path (proposed) | Responsibility |
 |---|---|
 | `artifacts/api-server/src/routes/v1/discoverySubmissions.ts` | Thin route: parse, call controller, map result to HTTP |
 | `artifacts/api-server/src/controllers/discoverySubmissionController.ts` | Orchestrates validation → service → response mapping |
-| `artifacts/api-server/src/services/discoverySubmissionService.ts` | Business logic: normalize, dedupe/idempotency check, transaction, enqueue downstream jobs |
+| `artifacts/api-server/src/services/discoverySubmissionService.ts` | Business logic: normalize, dedupe/idempotency check, **one database transaction that inserts the submission row and its required `discovery_delivery_jobs` rows together** (transactional outbox — see §18/§26) |
 | shared schema (per §14) | Request/DTO validation, imported by controller, not redefined |
 | `artifacts/api-server/src/lib/discoveryAntiSpam.ts` | Honeypot + time-trap + rate-limit + fingerprint evaluation, isolated from business logic |
-| `artifacts/api-server/src/jobs/discoveryDelivery.ts` | Email + CRM handoff, async, retry-tracked |
+| `artifacts/api-server/src/workers/discoveryDeliveryWorker.ts` (corrected 2C.2A.1, replaces the earlier `jobs/discoveryDelivery.ts` fire-and-forget direction) | Durable processor that polls/claims `pending`/`retry_scheduled` rows in `discovery_delivery_jobs` and executes each job type (client acknowledgment, internal notification, CRM upsert) independently, with locking and bounded retry. Runs as a separate process/scheduled task from the request path — never invoked synchronously inside the submission request. |
 | `artifacts/api-server/src/jobs/discoveryAiBrief.ts` | AI-brief generation, async, isolated, never in the request's critical path |
+
+**Correction (2C.2A.1):** the previous direction described delivery as an
+"async job triggered post-commit" inside the request lifecycle. That is
+not durable — a process restart, deployment, or crash between commit and
+job execution would silently lose the notification/CRM work while the
+submission itself still shows as received. The corrected direction is a
+transactional outbox: the submission and its required delivery-job rows
+are committed together in the same transaction (§18/§26), and a
+separately-running worker picks up pending jobs afterward. If no worker is
+running, jobs simply remain `pending` in the database rather than being
+lost — they are recovered whenever a worker (or an operator's manual
+retry) next runs. Smallest viable worker options for this stack — a
+dedicated worker process, a scheduled database poller, a deployment-
+platform scheduled task, or a controlled admin manual-retry action as a
+temporary fallback — are compared in 2C.2B/2C.2E without committing to one
+until verified against the actual deployment environment; no worker is
+implemented in this checkpoint.
 
 Endpoint direction: `POST /api/v1/discovery-submissions`. Transition plan
 for the existing `POST /api/discovery/submit`: keep it live and unmodified
@@ -339,56 +378,137 @@ style routes in root `CLAUDE.md`.
 
 ## 18. Target Database Model
 
-Recommendation: **two tables**, not four, contrary to the maximal four-table
-option in the task brief — justified directly by the existing dual-table
-redundancy finding (§8 item 15, §11 item 5), which this redesign should
-*reduce*, not multiply:
+**Corrected in 2C.2A.1.** The original recommendation (two tables, with
+delivery state as status columns on `discovery_submissions`) is too
+fragile for the reliability behavior this PRD promises: asynchronous,
+independently-retried, duplicate-safe, provider-tracked, operator-visible
+delivery for two separate emails plus CRM handoff cannot be represented by
+a handful of enum columns on the submission row. A single `emailStatus`
+column cannot distinguish "client acknowledgment sent, internal
+notification still retrying" from the reverse, cannot hold a provider
+message ID for either message independently, and cannot hold attempt
+counts or next-retry times at all.
 
-- `discovery_submissions` (redesigned) — one row per submission, hybrid
-  model: normal columns for submission ID, status, name, email, phone,
-  business name, project type, investment range, launch window, spam
-  classification, submission fingerprint, email status, CRM status, AI
-  status, `schemaVersion`, `formVersion`, created/updated timestamps,
-  consent timestamps, privacy-policy version; JSONB for the full structured
-  answers (`projectScope`, `readiness`, `decisionContext` detail, etc.).
-  This single table replaces both current `discovery_submissions` and
-  `form_submissions` for this flow — eliminates the redundant write.
-- `discovery_ai_briefs` — separate table, one row per AI-brief attempt,
-  FK to `discovery_submissions.id`, holding only AI-generated content,
-  `aiBriefPromptVersion`, status, human-review status. Kept structurally
-  separate from the submission row specifically so AI content can never be
-  written into the same JSON blob as client-supplied answers (§29
-  requirement).
+Recommendation: **three tables**, not two and not the maximal four from
+the original task brief:
 
-`discovery_delivery_attempts` and `discovery_status_events` are evaluated
-but **not** recommended as separate tables for v1: the existing
-`form_submissions` pattern of simple status columns
-(`emailTeamSent`/`emailClientSent`) already covers delivery status
-adequately at current volume; a full event-log table adds migration and
-query surface not justified until delivery volume or auditing requirements
-grow. Recommendation: model delivery status as columns on
-`discovery_submissions` (`emailStatus`, `crmStatus`, `aiStatus`, each with a
-small enum) for v1, and revisit a dedicated attempts/events table only if
-retry complexity grows in 2C.2E. This is a recommendation for owner
-decision, not a default to implement without approval.
+- `discovery_submissions` — immutable source of truth for the client's
+  original structured answers, plus the searchable operational record.
+  Normal columns: submission ID, `schemaVersion`, `formVersion`,
+  normalized contact fields (name, email, phone), normalized business
+  fields (name, industry, etc.), project type, launch window, investment
+  range, consent records + timestamps, privacy-policy version, anti-spam
+  classification, idempotency key (unique), duplicate fingerprint
+  (indexed, not unique — see below), high-level intake status (§19), an
+  optional linked CRM lead ID, created/updated timestamps. JSONB for the
+  full structured answers (`projectScope`, `readiness`, `decisionContext`
+  detail, etc.). This single table replaces both current
+  `discovery_submissions` and `form_submissions` for this flow —
+  eliminates the redundant write. AI interpretations are never stored
+  inside this row or its JSONB (§29).
 
-Keys/constraints: UUID primary key; unique index on submission fingerprint
-scoped to a rolling dedupe window (not a hard unique constraint, to avoid
-rejecting legitimate close-together resubmissions); index on `email`,
-`status`, `createdAt`; FK from `discovery_ai_briefs.submissionId` to
-`discovery_submissions.id`. All future database changes use Drizzle Kit
+- `discovery_delivery_jobs` (**not** `discovery_delivery_attempts`) —
+  one row represents one durable downstream processing obligation, not
+  one attempt-event. Job types for v1: `client_acknowledgment_email`,
+  `internal_notification_email`, `crm_lead_upsert` — kept as three
+  distinct job types (and three distinct rows per submission) rather than
+  merged into a single email status, because the two emails have separate
+  recipients, provider IDs, attempt histories, and failure states. Fields:
+  `id`, `submissionId` (FK), `jobType`, `status`, `idempotencyKey`,
+  `attemptCount`, `maxAttempts`, `nextAttemptAt`, `lockedAt`, `lockedBy`,
+  `providerMessageId`, `lastErrorCode`, `lastErrorAt`, `createdAt`,
+  `updatedAt`, `completedAt`. Statuses: `pending`, `processing`,
+  `retry_scheduled`, `completed`, `permanently_failed`, `cancelled`. Only
+  a sanitized failure classification/code is stored in `lastErrorCode` —
+  never a raw provider response body, secret, stack trace, or the full
+  form payload. Uniqueness: a unique constraint on `(submissionId,
+  jobType)` — chosen over a separate deterministic per-job idempotency key
+  because each submission needs at most one row per job type by
+  construction (the transaction that creates the submission also creates
+  exactly one job row per required job type, §26), so the compound key is
+  sufficient to prevent duplicate job creation without an extra generated
+  value. The row's own `idempotencyKey` field exists for the *delivery
+  attempt itself* (e.g. passed to the email/CRM provider as their
+  idempotency token where supported), distinct from the `(submissionId,
+  jobType)` uniqueness that prevents duplicate job rows. A future
+  `discovery_delivery_events` table (immutable, attempt-by-attempt audit
+  log) is explicitly deferred — added only when SiteMint's operational
+  history needs genuinely require it beyond what `attemptCount` +
+  `lastErrorCode` + `lastErrorAt` already provide.
+
+- `discovery_ai_briefs` — one row per AI-brief attempt, FK to
+  `discovery_submissions.id`, holding only AI-generated content: source
+  submission ID, `aiBriefPromptVersion`, provider/model metadata (once
+  approved), generation status, retry count/processing metadata,
+  structured AI output, human-review status, reviewer, review timestamp,
+  created/updated timestamps. Kept structurally separate from the
+  submission row specifically so AI content can never be written into the
+  same JSON blob as client-supplied answers (§29 requirement).
+
+`discovery_status_events` remains out of scope for v1, as in the original
+recommendation — the per-job `discovery_delivery_jobs` row already carries
+enough retry/failure state for v1 operations; a full immutable event log
+is deferred alongside `discovery_delivery_events` above.
+
+**Idempotency and fingerprint correction (2C.2A.1):** the original
+"unique index on submission fingerprint scoped to a rolling dedupe window"
+is not a coherent database mechanism — an index is either unique
+(permanently, rejecting any future match) or not unique (not a dedupe
+mechanism by itself); it cannot be scoped to a rolling time window on its
+own. Corrected approach:
+  - a **unique constraint on the client-generated `idempotencyKey`** on
+    `discovery_submissions` — this is what actually prevents duplicate
+    rows for the *same* client action (e.g. a retried network request);
+  - an **ordinary (non-unique) index on a duplicate fingerprint**, which
+    is an HMAC of normalized fields (never raw email/phone/IP stored in
+    plain text) — this supports fast lookups, not uniqueness;
+  - a **transactional query for recent matching submissions** within the
+    chosen duplicate window (e.g. 15 minutes), run inside the same
+    transaction as the insert, to flag likely-duplicate *distinct*
+    submissions for operator review without ever blocking or silently
+    discarding them.
+  Documented behavior: (1) same idempotency key + same payload → return
+  the original stored result, no new row; (2) same idempotency key +
+  different payload → treated as a client bug/replay, original result
+  returned, discrepancy logged for review, no data loss; (3) different key
+  but a fingerprint match within the window → flagged for operator review
+  as a likely duplicate, but still stored as its own row (never silently
+  dropped); (4) different key and a meaningfully changed submission → a
+  new fingerprint, stored normally, no flag; (5) a legitimate resubmission
+  after the duplicate window has elapsed → stored normally as a new
+  submission, no special handling. This preserves the property the
+  original two-table draft was trying to protect (retries and near-
+  duplicates don't silently multiply) while never permanently blocking a
+  prospect who genuinely submits an updated project later.
+
+Keys/constraints: UUID primary keys on all three tables; unique constraint
+on `discovery_submissions.idempotencyKey`; ordinary index on the
+duplicate fingerprint (not unique, per above); indexes on `email`,
+`status`, `createdAt` on `discovery_submissions`; unique constraint on
+`discovery_delivery_jobs(submissionId, jobType)`; FK from
+`discovery_delivery_jobs.submissionId` and `discovery_ai_briefs.submissionId`
+to `discovery_submissions.id`. All future database changes use Drizzle Kit
 versioned migrations with committed rollback SQL, per root `CLAUDE.md` and
 `lib/db/MIGRATIONS.md` convention — never push/sync in production.
 
 ## 19. Submission and Delivery Statuses
 
-Lead/business status (internal only, never shown to client): `received`,
-`processing`, `under_review`, `needs_information`, `qualified`,
-`proposal_preparation`, `not_a_fit`, `spam`, `archived`.
+Lead/business status (internal only, never shown to client, lives on
+`discovery_submissions`): `received`, `processing`, `under_review`,
+`needs_information`, `qualified`, `proposal_preparation`, `not_a_fit`,
+`spam`, `archived`.
 
-Delivery status (per channel — email, CRM, AI — tracked independently):
-`pending`, `processing`, `delivered`, `failed`, `retry_scheduled`,
-`permanently_failed`, `not_applicable`.
+**Corrected (2C.2A.1):** delivery status is **not** modeled as status
+columns on `discovery_submissions`. `discovery_submissions` may carry
+high-level summary fields when operationally useful (e.g. "all delivery
+jobs completed" as a convenience flag), but `discovery_delivery_jobs`
+(§18) is the sole authoritative record for each individual delivery
+obligation's status: `pending`, `processing`, `retry_scheduled`,
+`completed`, `permanently_failed`, `cancelled` — one row and one status
+per job type (client acknowledgment, internal notification, CRM upsert),
+not one shared column per channel. `discovery_ai_briefs` similarly remains
+authoritative for AI generation and human-review state, never mirrored
+onto the submission row.
 
 ## 20. Validation Requirements
 
@@ -465,27 +585,48 @@ merely because it is common — friction should match actual traffic risk.
 
 ## 24. Duplicate-Submission Strategy
 
-Client generates an `idempotencyKey` (UUID) once per form session, sent with
-the submission and stored server-side with a uniqueness constraint; a retry
-with the same key returns the original stored result rather than creating a
-new row. Independently, a submission fingerprint (hash of email + business
-name + primary problem, rolling window e.g. 15 minutes) flags likely
-duplicate *distinct* submissions for operator review without silently
-discarding them (a legitimate second inquiry must never be lost).
+**Corrected (2C.2A.1)** — see the full correction and the five documented
+scenarios in §18. Summary: client generates an `idempotencyKey` (UUID)
+once per form session; the server enforces it with a **unique constraint**
+on `discovery_submissions.idempotencyKey`, so a retry with the same key
+returns the original stored result rather than creating a new row.
+Independently, an **HMAC-based duplicate fingerprint** (never raw email/
+phone/IP stored in plain text) gets an **ordinary, non-unique index**, and
+a **transactional query for recent matches** within the chosen duplicate
+window (e.g. 15 minutes) flags likely-duplicate *distinct* submissions for
+operator review — it never blocks, rejects, or silently discards them (a
+legitimate second inquiry, or a genuinely updated resubmission after the
+window, must never be lost). The prior direction ("unique index on
+fingerprint scoped to a rolling window") was not a coherent database
+mechanism and is retracted.
 
 ## 25. Idempotency Strategy
 
-See §24 — idempotency key is the mechanism for safe retries of the *same*
-client action (e.g., a network timeout followed by an automatic client
-retry); it is distinct from spam/duplicate detection, which flags but does
-not block near-duplicate distinct submissions.
+See §24/§18 — the idempotency key (enforced via a real unique database
+constraint) is the mechanism for safe retries of the *same* client action
+(e.g., a network timeout followed by an automatic client retry); it is
+distinct from the fingerprint-based spam/duplicate-review signal, which
+flags but never blocks near-duplicate distinct submissions.
 
 ## 26. Reliability and Partial-Failure Model
 
-A submission is **received** the moment its source-of-truth
-`discovery_submissions` row is committed. Everything after that — internal
-notification, client acknowledgment, CRM handoff, AI brief — is async,
-independently tracked, and can fail without affecting that received state.
+**Corrected (2C.2A.1) — transactional outbox, not in-request fire-and-
+forget.** A submission is **received** the moment one database transaction
+commits both (a) the `discovery_submissions` row and (b) its required
+`discovery_delivery_jobs` rows (`client_acknowledgment_email`,
+`internal_notification_email`, and — pending the CRM decision recorded in
+§28 — `crm_lead_upsert`), all created `pending`. The HTTP response is
+returned only after that transaction commits. A **separately-running
+worker** (§17), not a callback started inside the request, later claims
+and processes pending/`retry_scheduled` jobs. If no worker happens to be
+running at that moment, the jobs simply remain `pending` in the database —
+nothing is lost to a deployment restart, process crash, or request-
+lifecycle interruption, because the durable record already exists before
+the response is sent. AI brief generation (§29) is enqueued the same way
+but is not a `discovery_delivery_jobs` row — it is its own record in
+`discovery_ai_briefs`, created after (not inside) the same transaction and
+processed by its own async path, since it is not a "delivery" obligation
+in the client-facing sense.
 
 Explicit scenario (per task brief): *DB succeeds, internal notification
 fails, client acknowledgment fails, CRM handoff fails, AI brief fails.*
@@ -493,17 +634,22 @@ fails, client acknowledgment fails, CRM handoff fails, AI brief fails.*
 - **API response**: `201` with the stored submission ID — unchanged from
   today's behavior in this scenario, since today's code already doesn't
   gate the HTTP response on email success (§8 item 17-18); the new system
-  keeps that property and extends it to CRM/AI.
+  keeps that property and extends it to CRM/AI, now backed by durable job
+  rows instead of status columns.
 - **Client sees**: the existing success state (confirmation, no client-
   visible email/CRM/AI status).
-- **Statuses stored**: `discovery_submissions.status = received`,
-  `emailStatus = failed`, `crmStatus = failed`, `aiStatus = failed`.
-- **Retried**: email and CRM via the delivery-job retry policy (bounded
-  attempts, exponential backoff); AI brief via its own retry policy,
-  capped, never blocking.
-- **Requires operator attention**: yes — failed deliveries surface in the
-  admin review queue (existing `/admin/crm/discovery` pattern extended,
-  not rebuilt).
+- **Statuses stored**: `discovery_submissions.status = received`;
+  `discovery_delivery_jobs` rows for `client_acknowledgment_email`,
+  `internal_notification_email`, and `crm_lead_upsert` each independently
+  reach `permanently_failed` (or `retry_scheduled` if attempts remain),
+  each with its own `attemptCount`, `lastErrorCode`, `lastErrorAt`;
+  `discovery_ai_briefs` row reaches its own failure state.
+- **Retried**: each delivery job via its own bounded-attempt, exponential-
+  backoff schedule (`nextAttemptAt`), independent of the other jobs; AI
+  brief via its own capped retry policy, never blocking.
+- **Requires operator attention**: yes — `permanently_failed` jobs surface
+  in the admin review queue (existing `/admin/crm/discovery` pattern
+  extended, not rebuilt), with a manual-retry action available per job.
 - **Never exposed publicly**: which specific downstream system failed,
   provider error text, retry counts, internal statuses.
 
@@ -513,26 +659,46 @@ submission acceptance, matching the task brief's binding requirement.
 ## 27. Email Reliability
 
 Current: Resend, synchronous, hardcoded internal recipient
-(`info.sitemint@gmail.com`), failures logged but non-blocking. Target:
-same provider, but **queued/job-based** rather than inline-in-request (per
-§26), internal recipient moved to an environment variable (open question
-§41 on exact address), retry-tracked, duplicate-send prevented via the
-delivery-status column plus idempotency key, provider errors sanitized
-before any surfacing to operator tooling. Recommended architecture:
-smallest reliable option compatible with the existing stack — an
-in-process async job triggered post-commit (not a full external queue
-system) is sufficient at current volume; revisit only if delivery volume
-or reliability requirements grow.
+(`info.sitemint@gmail.com`), failures logged but non-blocking.
+
+**Corrected target (2C.2A.1):** client acknowledgment and internal
+notification are modeled as **two independent `discovery_delivery_jobs`
+rows** (`client_acknowledgment_email`, `internal_notification_email`), not
+one shared email status — each has its own `status`, `attemptCount`,
+`nextAttemptAt`, `providerMessageId`, and failure state, because they are
+different messages to different recipients that can succeed or fail
+independently. Both are created transactionally alongside the submission
+row (§26) and executed later by the delivery worker (§17), never inline
+in the request. Duplicate sends are prevented by the job's own status
+(`completed` jobs are never re-sent) plus the job's `idempotencyKey`
+passed to the provider where supported. Internal recipient: the *value*
+`info.sitemint@gmail.com` is recorded as the current recipient (§28
+owner-decision table), but making it configuration-driven is implemented
+in the checkpoint that actually wires the email jobs (2C.2D/2C.2E — see
+§34 reconciliation), not earlier. Provider errors are sanitized before any
+surfacing to operator tooling. The "smallest reliable option compatible
+with the existing stack" principle still applies to the *worker*
+implementation choice (§17), but the mechanism is now a durable job table
+processed by a separately-running worker, not an in-request async
+callback — that in-process direction is retracted as not durable.
 
 ## 28. CRM Reliability
 
 Current: no automatic CRM record on public submission; conversion is a
-manual, admin-triggered action (`crmDiscovery.ts`). Target: PRD leaves this
-as an explicit open question (§41) — whether the redesigned system should
-auto-create a CRM lead on every valid submission, or preserve the current
-manual-review-then-convert model. Either way, CRM write (when it exists)
-must be async, non-blocking, retry-tracked, and never able to cause a valid
-submission to be lost or duplicated if it fails.
+manual, admin-triggered action (`crmDiscovery.ts`).
+
+**Recorded owner decision (2C.2A.1, resolves the prior open question):**
+every accepted, non-spam submission automatically creates or updates a
+SiteMint CRM lead, asynchronously, via a `crm_lead_upsert`
+`discovery_delivery_jobs` row created in the same transaction as the
+submission (§26). SiteMint's internal CRM is the ongoing lead-management
+source of truth once handoff succeeds; `discovery_submissions` remains the
+immutable intake source of truth regardless of CRM state. CRM failure must
+never fail, delete, or otherwise affect the already-accepted submission —
+it only leaves the `crm_lead_upsert` job `retry_scheduled` or
+`permanently_failed` for operator follow-up. The CRM upsert uses the
+submission ID as its external/idempotency key on the CRM side specifically
+to prevent duplicate-lead creation across retries.
 
 ## 29. AI-Generated Brief Workflow
 
@@ -547,9 +713,16 @@ contradictions, missing information, discovery-call questions, preliminary
 complexity, suggested phases, initial PRD outline, recommended human
 follow-up. Always labeled `AI-generated draft — requires human review`.
 
+**Recorded owner decision (2C.2A.1):** the AI provider does not receive
+contact name, email, or phone by default — only the business/project-
+scoping fields actually needed for the brief. Every generated brief
+requires review by an authorized SiteMint administrator or team member
+before any downstream use. AI failure never affects submission acceptance
+(§26).
+
 Definitions required before implementation (2C.2E scope): exact source
 fields sent to the AI provider (excluding anything not needed for the
-brief), PII minimization approach, provider boundary (single abstraction
+brief, per the PII-exclusion decision above), provider boundary (single abstraction
 point, matching the existing `VoiceProvider` isolation pattern precedent in
 root `CLAUDE.md` for the voice platform), `aiBriefPromptVersion`, response
 schema + validation, storage location (`discovery_ai_briefs`), failure
@@ -642,6 +815,19 @@ AI-generated interpretation. Consent requirement and environment behavior
 No variable is added or changed by this checkpoint — table is a planning
 inventory for 2C.2B–2C.2D.
 
+**Correction 7 reconciliation (2C.2A.1):** the original text recommended
+resolving `DISCOVERY_INTERNAL_NOTIFY_EMAIL` "at the start of Phase 2C.2B"
+while also scoping 2C.2B to exclude email integration and environment
+changes — a direct contradiction. Resolved: the *desired configuration
+name and behavior* for the internal recipient (`DISCOVERY_INTERNAL_NOTIFY_
+EMAIL`, current value `info.sitemint@gmail.com`, config-driven rather than
+hardcoded, falls back to a documented default if unset) is recorded here,
+in this planning document, as of 2C.2B. The actual environment-variable
+addition and the email-job wiring that reads it are deferred to the
+checkpoint that implements delivery (2C.2D for the secure API route,
+2C.2E for the delivery worker/jobs) — not implemented or added in 2C.2B or
+in this correction checkpoint.
+
 ## 35. Testing Strategy
 
 Full matrix per task brief is adopted as the implementation-phase
@@ -676,38 +862,53 @@ checkpoint; no push/deploy/preview-activation without separate approval.
 
 ## 37. Implementation Phases
 
-**Phase 2C.2B — Domain model and backend contract.** Scope: shared zod
-schema, DTO, request/response contracts, submission/delivery statuses,
-`discovery_submissions` (redesigned) + `discovery_ai_briefs` schema and
-Drizzle migration, idempotency model, safe-error contract, versioning. No
-email/CRM/AI integration unless the existing architecture makes it
-unavoidable. Files: shared schema location (§14), migration files, no
-route wiring yet or minimal route stub only. Stop condition: schema +
-migration reviewed and typechecked; no UI. Tests: schema validation unit
-tests. Requires separate approval prompt before starting.
+**Phase 2C.2B — Domain model and backend contract (corrected 2C.2A.1).**
+Scope: shared zod schema, DTO, request/response contracts, submission/
+delivery statuses, `discovery_submissions` (redesigned) +
+**`discovery_delivery_jobs`** (added in this correction) +
+`discovery_ai_briefs` schema and Drizzle migration, idempotency model
+(unique `idempotencyKey` constraint + indexed fingerprint, per §18/§24),
+safe-error contract, versioning. No email/CRM/AI integration, no route
+wiring, and no worker execution in this phase — the transactional-outbox
+insert logic and the delivery worker are 2C.2D/2C.2E scope. Files: shared
+schema location (§14), migration files for all three tables, no route
+wiring yet or minimal route stub only. Stop condition: schema + migration
+reviewed and typechecked; no UI. Tests: schema validation unit tests.
+Requires separate approval prompt before starting.
 
-**Phase 2C.2C — Guided frontend experience.** Scope: `StartProjectPage`,
-`DiscoveryFormShell`, step components, branching config, progress, field
-components, feature prioritization UI, draft recovery, accessible
-validation, review screen, loading/retry states — built against the 2C.2B
-contract, submitting to the *existing* `/api/discovery/submit` endpoint
-initially (or a stubbed new endpoint) so it can be built and reviewed before
-backend hardening lands. Kept behind an inactive preview/safe gate. Requires
+**Phase 2C.2C — Guided frontend experience (corrected 2C.2A.1).** Scope:
+`StartProjectPage`, `DiscoveryFormShell`, step components, branching
+config, progress, field components, feature prioritization UI, draft
+recovery (sessionStorage, per §16), accessible validation, review screen,
+loading/retry states — built against the 2C.2B contract. **Correction:**
+must **not** submit to the legacy `POST /api/discovery/submit` endpoint
+(§16/§17) — that endpoint's unstructured payload and missing validation
+are incompatible with the new contract. Use a local typed mock adapter or
+an intentionally disabled submit action instead. Kept behind an inactive
+preview/safe gate; no production submission occurs in this phase. Requires
 separate approval prompt.
 
-**Phase 2C.2D — Security, privacy, anti-spam.** Scope: server-side
-validation wiring, request-size limits, normalization, honeypot, time trap,
-rate limiting, duplicate suppression, idempotency enforcement, privacy
-disclosure, working `/privacy` and `/terms` destinations, safe logging,
-safe errors — applied to the new `POST /api/v1/discovery-submissions`
-route. Requires separate approval prompt.
+**Phase 2C.2D — Secure API and public-form hardening (corrected 2C.2A.1,
+retitled from "Security, privacy, anti-spam").** Scope: `POST /api/v1/
+discovery-submissions`, server-side shared-schema validation, normalization,
+request-size limits, origin handling, honeypot, completion-time check, rate
+limiting, duplicate-window check (§24), idempotency enforcement, **the
+transactional submission-plus-delivery-job insert (§26)**, safe logging,
+sanitized HTTP errors, privacy disclosure, working `/privacy` and `/terms`
+destinations, controlled-preview integration with the 2C.2C frontend (which
+now has a real endpoint to call instead of its mock adapter). Does not
+remove the legacy endpoint. Requires separate approval prompt.
 
-**Phase 2C.2E — Delivery and AI workflow.** Scope: internal notification
-job, client acknowledgment job, CRM handoff (pending §41 decision),
-delivery-attempt tracking, retry behavior, AI-generated internal brief,
-human-review status, partial-failure behavior per §26. Requires separate
-approval prompt; explicitly requires provider credentials/config decisions
-first.
+**Phase 2C.2E — Delivery worker, CRM, email, and AI brief (corrected
+2C.2A.1, retitled from "Delivery and AI workflow").** Scope: the durable
+`discovery_delivery_jobs` processor/worker (§17), bounded retry policy,
+locking and stale-lock recovery, client-acknowledgment job execution,
+internal-notification job execution (recipient made configuration-driven
+here, per the §34 reconciliation — not in 2C.2B), automatic SiteMint CRM
+lead upsert (§28 owner decision), operator-visible permanently-failed jobs,
+manual retry capability, AI-brief generation workflow, human-review state,
+downstream partial-failure behavior per §26. Requires separate approval
+prompt; explicitly requires provider credentials/config decisions first.
 
 **Phase 2C.2F — Automated and controlled verification.** Scope: full test
 matrix (§35), accessibility audit, security review, spam tests, duplicate
@@ -779,79 +980,99 @@ confirmed available — tracked as open questions (§41) rather than assumed.
 
 ## 41. Open Questions
 
-Owner decision required:
-- Exact current/desired internal notification recipient (replacing the
-  hardcoded `info.sitemint@gmail.com`)?
-- Should every valid submission auto-create a CRM record, or keep the
-  current manual admin-conversion model (§28)?
-- Which CRM is the source of truth — confirm SiteMint's internal CRM per
-  `MASTER_PLATFORM_BLUEPRINT.md`, or something else?
+**Recorded decisions (2C.2A.1 — moved out of "open," per owner review):**
+
+| Topic | Recorded decision |
+|---|---|
+| Original intake source of truth | `discovery_submissions` (§18) |
+| Ongoing lead-management source of truth | SiteMint internal CRM (§28) |
+| Auto-create CRM lead | Yes, asynchronously after accepted, non-spam storage (§28) |
+| CRM failure effect on submission | None — must never fail or delete the submission (§28) |
+| Client acknowledgment mechanism | Separate durable `discovery_delivery_jobs` job, created immediately after persistence (§26/§27) |
+| Internal notification mechanism | Separate durable `discovery_delivery_jobs` job (§27) |
+| Current internal recipient | `info.sitemint@gmail.com`, to be made configuration-driven (not hardcoded) in the delivery checkpoint, not 2C.2B (§34) |
+| Phone | Optional (§18, §41 prior) |
+| SMS consent | Separate and optional; shown only when SMS follow-up is offered |
+| Draft recovery | `sessionStorage` for v1, not `localStorage`; clear after confirmed success; define a stale-draft expiration; no anonymous server-side draft sync in v1 (§16) |
+| File uploads | Excluded from v1 (task brief First-Version Exclusions) |
+| AI access to contact PII | No by default — only business/project-scoping fields (§29) |
+| AI brief reviewer | Authorized SiteMint administrator or team member (§29) |
+| AI failure effect on submission | None — durable failure state + bounded retry, never affects acceptance (§26/§29) |
+| Pricing/packages | Configuration-driven; no public numeric ranges hard-coded until approved (§12 Step 6) |
+| Industry-specific branching | General v1 branching only; nonprofit/real-estate specialization deferred |
+| Turnstile timing | Before paid traffic (Stage 2), or earlier if real abuse is observed (§23) |
+| Retention | Proposed 24-month default for intake data, **subject to owner/legal review before public activation** — not yet a final decision |
+
+**Still owner-decision required:**
 - Should acknowledgment email send immediately after persistence, or wait
-  for some validation/review step?
-- Approved sender domain for outbound email?
-- Should phone be optional in the new system (as it effectively is today)?
-- Is SMS consent needed in the initial version (given `CLAUDE.md`'s binding
-  SMS separation rule between intake and CRM Twilio numbers — this form
-  must never conflate the two)?
+  for some validation/review step (beyond "job created immediately," does
+  the *send* itself need a delay)?
+- Approved sender domain for outbound email — remains pending
+  verification.
 - Which investment ranges are owner-approved for public display?
-- Which SiteMint packages (Starter/Growth/Premium/Custom) should appear
-  publicly, and with what labels/pricing, if any?
-- Should the form branch differently for nonprofit or real-estate
-  projects, beyond the general project-type branching?
-- Is anonymous draft persistence (before any identifying info is entered)
-  acceptable, or should draft-save be gated behind at least an email?
-- What retention period applies to stored submissions and AI briefs?
-- Should AI processing be opt-out (default on, disclosed) or require
-  explicit opt-in?
+- Which SiteMint packages should appear publicly, and with what labels?
 - Which AI provider should generate the brief (and does this interact with
   the existing `integrations-openai-ai-server` package already in the
   repo)?
-- Should the AI provider receive contact information (name/email/phone),
-  or only business/project content (PII-minimization decision, §29)?
-- Who reviews AI-generated briefs operationally?
-- Who receives delivery-failure alerts?
+- Who receives delivery-failure alerts (which operator/role)?
 - Which exact Privacy and Terms page content/routes will be used (net-new
   pages are needed regardless — §8 items 31-32)?
+- Final confirmation of the 24-month retention default above.
+
+Legal review required: all Privacy/Terms/consent copy (§31); the
+retention-period default above.
+
+Technical investigation required:
 - Is Cloudflare available for future Turnstile and edge rate limiting?
 - Is Redis (or another distributed store) available for rate limiting
   across multiple server instances, or is in-memory sufficient at current
   scale?
-- Does the current database environment support the recommended
-  status-column-on-submission model, or does delivery volume justify a
-  dedicated attempts table sooner than assumed (§18)?
+- Current hosting's support for background job/worker execution (affects
+  which of the worker options in §17 — dedicated process, scheduled
+  poller, platform scheduled task, or manual-retry fallback — is viable);
+  this must be resolved before 2C.2E can select a concrete worker
+  mechanism.
 
-Legal review required: all Privacy/Terms/consent copy (§31).
-
-Technical investigation required: Cloudflare/Redis availability (above);
-current hosting's support for background job execution vs. request-scoped
-async only (affects §17/§27 "smallest reliable architecture" choice).
-
-Safe default available (recommended, pending owner override): two-table
-database model (§18) over four; `sessionStorage` over `localStorage` for
-drafts (§16); idempotency key + fingerprint duplicate strategy (§24) over
-CAPTCHA-first anti-spam; staged anti-spam (§23) with Stage 2 additions
-deferred until paid traffic is actually planned.
+Safe default available (recommended, pending owner override): the
+corrected three-table database model (§18) over both the original two-
+table and the maximal four-table options; `sessionStorage` over
+`localStorage` for drafts (§16); idempotency key + fingerprint duplicate
+strategy (§18/§24) over CAPTCHA-first anti-spam; staged anti-spam (§23)
+with Stage 2 additions deferred until paid traffic is actually planned.
 
 ## 42. Recommended Decisions
 
-Adopt the two-table database model (§18); adopt `sessionStorage`-based
-draft recovery with explicit opt-in (§16); adopt idempotency key +
-fingerprint as the primary duplicate/reliability mechanism ahead of any
-CAPTCHA (§23/§24); keep the AI brief strictly non-blocking and structurally
-separated from client answers regardless of which AI provider is chosen
-(§29); keep the existing `/discovery` route live and unmodified until the
-new system is independently verified (§17/§39); resolve the environment-
-variable-vs-hardcoded internal recipient gap (§27/§34) at the start of
-2C.2B regardless of which recipient address is ultimately chosen.
+Adopt the corrected **three-table** database model — `discovery_
+submissions`, `discovery_delivery_jobs`, `discovery_ai_briefs` (§18) —
+over both the original two-table draft and the maximal four-table option;
+adopt the transactional-outbox + separately-running-worker delivery
+mechanism (§17/§26) over in-process fire-and-forget; adopt `sessionStorage`
+-based draft recovery with explicit opt-in (§16); adopt idempotency-key-
+uniqueness + indexed HMAC fingerprint + transactional recent-match lookup
+as the duplicate/reliability mechanism (§18/§24), never a permanent or
+"rolling" unique index on the fingerprint; adopt automatic, asynchronous
+CRM lead upsert after accepted, non-spam submissions, with CRM failure
+never affecting the submission (§28); keep the AI brief strictly non-
+blocking and structurally separated from client answers regardless of
+which AI provider is chosen (§29); keep the existing `/discovery` route
+**and** the existing `POST /api/discovery/submit` endpoint live and
+unmodified until the new system is independently verified (§17/§39); the
+2C.2C frontend must never connect to the legacy endpoint (§16/§17);
+document (but do not implement) the internal-recipient configuration
+variable in 2C.2B, deferring its actual addition and wiring to 2C.2D/2C.2E
+(§34).
 
 ## 43. Recommended Next Checkpoint
 
-**Phase 2C.2B — Domain model and backend contract** (§37), scoped exactly
-as described there: shared schema, DTO, database schema + migration,
-statuses, idempotency model, safe-error contract, versioning — no email,
-CRM, or AI integration. Requires a separate, explicit approval prompt
-before any code is written, per the AI-vibe-coding rules (§36) and the
-task brief's binding instruction not to bundle phases into one prompt.
+**Phase 2C.2B — Domain model and backend contract** (§37, corrected),
+scoped exactly as described there: shared schema, DTO, database schema +
+migration for all **three** tables (`discovery_submissions`,
+`discovery_delivery_jobs`, `discovery_ai_briefs`), statuses, idempotency
+model (unique key + indexed fingerprint), safe-error contract, versioning
+— no email, CRM, AI integration, route wiring, or worker execution.
+Requires a separate, explicit approval prompt before any code is written,
+per the AI-vibe-coding rules (§36) and the task brief's binding
+instruction not to bundle phases into one prompt.
 
 ## 44. Explicit No-Implementation Decision
 

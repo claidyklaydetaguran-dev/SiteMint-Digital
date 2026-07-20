@@ -943,3 +943,44 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   phase implementation sequence (2C.2B–2C.2F).
 - Implementation remains unapproved. No phase in the PRD may begin without
   a separate, explicit approval prompt.
+
+## Checkpoint 2C.2A.1 — Correct Discovery Reliability Architecture (documentation-only)
+
+> Documentation-only correction. No application code, component, route,
+> database schema, migration, package, lockfile, environment variable, or
+> Privacy/Terms page changed. Corrects sections of
+> `docs/sitemint-platform/DISCOVERY_FORM_HARDENING_PRD.md` in place; the
+> current-state audit evidence (§8–§11) was preserved unchanged.
+
+- Owner review found the Checkpoint 2C.2A database/reliability model
+  (two tables plus status columns, an in-process "fire and forget" async
+  job) too fragile to durably support the PRD's own promises of
+  asynchronous, retried, duplicate-safe, provider-tracked, operator-
+  visible delivery for two independent emails plus CRM handoff.
+- Adopted a durable three-table model: `discovery_submissions`,
+  `discovery_delivery_jobs` (one row per durable delivery obligation, not
+  per attempt-event — `discovery_delivery_events`/`discovery_status_events`
+  remain deferred), `discovery_ai_briefs`.
+- Replaced in-process fire-and-forget with a transactional-outbox model:
+  the submission and its required delivery-job rows commit together in one
+  transaction; a separately-running worker processes pending jobs
+  afterward; nothing is lost across a restart.
+- Recorded the CRM auto-handoff decision (automatic, asynchronous lead
+  upsert after accepted, non-spam submission; CRM failure never affects
+  the submission) and several other previously-open decisions (AI PII
+  exclusion, draft-recovery behavior, SMS-consent scoping, pricing
+  configurability, Turnstile timing, a proposed 24-month retention
+  default pending legal review).
+- Corrected the idempotency/duplicate-fingerprint strategy: replaced the
+  incoherent "unique index scoped to a rolling window" with a unique
+  idempotency-key constraint, an ordinary indexed HMAC fingerprint, and a
+  transactional recent-match lookup — documented for five specific
+  duplicate/resubmission scenarios.
+- Prohibited connecting the Phase 2C.2C frontend to the legacy
+  `POST /api/discovery/submit` endpoint; it must use a mock/disabled
+  adapter until the new, hardened `POST /api/v1/discovery-submissions`
+  endpoint exists (2C.2D).
+- Reconciled Phases 2C.2B–2C.2E scope accordingly and resolved the
+  internal-notification-recipient environment-variable timing
+  contradiction (documented in 2C.2B, implemented in 2C.2D/2C.2E).
+- No implementation was performed or approved by this checkpoint.
