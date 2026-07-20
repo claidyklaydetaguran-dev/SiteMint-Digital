@@ -1,16 +1,17 @@
-# Portfolio Asset Manifest — Phase 2B.2 (corrected in Phase 2B.2.1, updated for Claidy placement)
+# Portfolio Asset Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2, current captures validated in 2B.2.3)
 
 > Originally prepared 2026-07-20 in Phase 2B.2, branch
 > `claude/phase-2b2-portfolio-assets-8vh4q1`, based on
 > `claude/sitemint-phase-2b1-audit-wtoai0` @
 > `0ca3f4311d4a688aa0167797db54cd6cace4b450`. **Corrected 2026-07-20 in
 > Phase 2B.2.1** following owner visual review of the Phase 2B.2 owner-review
-> package — see §8 below. **Updated again 2026-07-20** to record the owner's
+> package — see §8 below. **Updated in Phase 2B.2.2** to record the owner's
 > decision approving Claidy Taguran Portfolio as a future supporting project
-> (placement only — no permission, implementation, or publication approval)
-> after a controlled browser retry of its exact URL was blocked by this
-> environment's proxy policy — see §6 and §9. Does not modify
-> `SelectedWorkSection.tsx`, the platform-preview homepage, routes, or
+> (placement only) — see §6 and §9. **Updated in Phase 2B.2.3** to validate
+> and optimize ten owner-supplied current screenshots (five projects,
+> desktop + mobile each, including a new candidate, Hand Homecare) — see §10,
+> which is the current source of truth for per-project readiness. Does not
+> modify `SelectedWorkSection.tsx`, the platform-preview homepage, routes, or
 > navigation.
 
 ## 1. Environment constraint (read first)
@@ -190,23 +191,24 @@ this checkpoint.
    Valdovinos, plus explicit client permission (the existing desktop
    screenshot is visually approved and may be reusable once verified current
    — see §8).
-4. A separate owner review of whether `portfolio-claidy.png` may be used as
-   a temporary supporting entry, and whether the "Visit Website" link should
-   be shown, hidden, or disabled until the deployment's reachability is
-   confirmed by a real browser outside this environment.
-5. A separate owner review of whether `portfolio-claidy.png` may be used as
-   a temporary supporting entry, and whether the "Visit Website" link should
-   be shown, hidden, or disabled until the deployment's reachability is
-   confirmed by a real browser outside this environment.
-6. A design decision for the dark-theme treatment of these (currently
+4. ~~A separate owner review of whether `portfolio-claidy.png` may be used
+   as a temporary supporting entry~~ — **resolved in Phase 2B.2.3**: the
+   owner supplied current captures for Claidy and reviewed them directly;
+   see §10.
+5. A design decision for the dark-theme treatment of these (currently
    light/bright) screenshots inside `SelectedWorkSection.tsx`'s dark
    browser-chrome frame.
-7. A resolved standard aspect ratio for the Shasta replacement asset (see §8
-   — the current 1600x733 file is not 16:9 and must not be treated as one).
-8. Adoption of a data-driven portfolio model (see §9) so that Shasta,
-   OneFilAm, Herlinda, Claidy, and future projects can each be added,
-   replaced, reordered, or hidden independently, without further homepage
-   redesign.
+6. A resolved standard aspect ratio for the Shasta replacement asset — still
+   open; see §10.1, the Phase 2B.2.3 Shasta captures were rejected for the
+   same underlying reasons as Phase 2B.2.1 plus a still-visible feedback
+   widget.
+7. Adoption of a data-driven portfolio model — direction refined in §10.7
+   (supersedes §9) with fields for per-project image fit/position and
+   owner-verification status.
+8. **New as of Phase 2B.2.3:** current desktop/mobile captures now exist for
+   Shasta, OneFilAm, Herlinda, and Claidy (owner-supplied), plus a new
+   candidate project, Hand Homecare. See §10 for the full validation and
+   optimization record.
 
 ## 8. Phase 2B.2.1 corrections (owner review of the Phase 2B.2 package)
 
@@ -349,3 +351,299 @@ This structure is intended to let SiteMint:
 
 Adopting this model is a Phase 2B.3 implementation decision, not something
 performed in this documentation-only checkpoint.
+
+## 10. Phase 2B.2.3 — Owner-Supplied Current Captures (validation and optimization)
+
+The owner supplied ten current screenshots (desktop + mobile for five
+projects — Shasta Greene, OneFilAm Community, Herlinda Valdovinos, Claidy
+Taguran, and a new candidate, **Hand Homecare**) in
+`SiteMint-Portfolio-Current-Captures-Reviewed.zip`, along with the owner's
+own `CAPTURE_MANIFEST.tsv` (checksums/dimensions) and
+`PORTFOLIO_VISUAL_REVIEW.md` (visual decisions). This checkpoint treats
+these as **owner-supplied** captures — no URL was independently reached or
+verified by this environment for any of the five projects. All checksums
+and dimensions below were independently re-derived from the actual image
+bytes and matched the owner-supplied manifest exactly.
+
+### 10.1 Source-capture inventory (owner-supplied, unmodified)
+
+| Filename | Dimensions | Size | SHA-256 |
+|---|---|---|---|
+| `claidy-taguran-desktop-current.png` | 1222×842 | 1,518,599 B | `0ee4279e410dceaf344488a3163ad4b5260dc8530dfa7501b2a145cfdbd9a0a6` |
+| `claidy-taguran-mobile-current.png` | 388×836 | 464,383 B | `83badfbf90c6ba5131dec4b3bcfc8317bc27b6ca46c48ddfa4da86e4e112a2c3` |
+| `shasta-greene-desktop-current.png` | 1221×846 | 2,139,827 B | `2ebb2eb5fdfe1b6e1f6a0a1a3e339cae727554c639b42491022b00c6343f03f8` |
+| `shasta-greene-mobile-current.png` | 390×844 | 535,027 B | `5e20f35d017de293ace0dcb86bcc62c3f38320bd9efbcab0a974d8e66935cfcd` |
+| `onefilam-community-desktop-current.png` | 1221×844 | 895,561 B | `cd15ee53a3f5008506befe7c213b044b8dcec04b60f9004b491f1d035a74b9e1` |
+| `onefilam-community-mobile-current.png` | 388×840 | 202,414 B | `7cb510c927700fe4012c99dbb1437a9d6cf96991958cd00a16ec4a1bc9ec2e1b` |
+| `hand-homecare-desktop-current.png` | 1221×850 | 1,606,686 B | `196ca01ac34fefcc742aeef86daa074ba81918ac90f491368a0f5c38a8286a0f` |
+| `hand-homecare-mobile-current.png` | 388×838 | 388,897 B | `e7aaedd2abed34b36592be9b0b8741b1b997055ec13588b583f15c68fdb7658c` |
+| `herlinda-valdovinos-desktop-current.png` | 1218×804 | 1,695,624 B | `051a60af3a4a6e8aeb04ed47906f7265efbb908f1581e5646e8398cd48f0aa25` |
+| `herlinda-valdovinos-mobile-current.png` | 388×840 | 448,791 B | `3acea560fdc7a7c4c48b7e8d29c53e0092a749598119ff130e0877df4b1cf607` |
+
+These source PNGs are staged only in the temporary owner-review package
+(`/tmp/sitemint-2b23-owner-review/source/`), not committed to the
+repository, per the checkpoint's allowed-files list.
+
+### 10.2 Direct visual review findings (this checkpoint)
+
+| Project | Desktop finding | Mobile finding |
+|---|---|---|
+| Claidy Taguran | Headline reads "Building Digital" / "That Drive Results" — the animated middle word "Solutions" is absent at capture time, leaving the phrase incomplete. Confirmed by direct inspection. | Full headline present ("Building Digital / Solutions / That Drive Results") after a tighter hero crop. Visible stats (10+, 3+, 100%) are Claidy's own claims. |
+| Shasta Greene | "$250M+ Annual Team Volume," "500+ Families Helped," "#1 OC Market Specialist" all still visible, plus a small circular feedback/chat widget icon bottom-right. Confirmed by direct inspection. | Same stats row visible, same widget icon present in the bottom-right corner. Confirmed by direct inspection. |
+| OneFilAm Community | Clean — flag hero, no overlay, no private data. | Clean — matches desktop content, no overlay. |
+| Hand Homecare | Clean, commercially credible hero ("Caring for the Elderly is where Our Passion Lies"), public business phone number (818-914-4990) and "Licensed in California" badge visible — this is the site's own public contact info, not private/customer data. | Clean, same content as desktop, phone number visible in the same public capacity. |
+| Herlinda Valdovinos | Clean hero (sunflower field + house), full nav bar in a single row, no overlay. | Confirmed: the desktop nav items (BUYER JOURNEY / SELLER ROADMAP / PURCHASE PROGRAMS / SEARCH HOMES / SAY HELLO) remain expanded and wrap across two lines above the hero, rather than collapsing into a mobile menu — this is a real responsive-design gap, not a capture artifact. |
+
+No private customer/lead/donor data, admin screens, broken-page notices, or
+placeholder content were found in any of the ten captures. Hand Homecare's
+visible phone number is the business's own public contact number displayed
+on its own homepage — not customer data — but per owner instruction it must
+not be copied into SiteMint's own marketing copy.
+
+### 10.3 Owner decisions (recorded verbatim, this checkpoint)
+
+**Claidy Taguran Portfolio**
+- Placement: future supporting project (unchanged from Phase 2B.2.2).
+- Desktop: **reference only — recapture required** (missing "Solutions").
+  Not optimized as an implementation asset.
+- Mobile: **visually approved candidate** after the intentional hero crop.
+  Optimized this checkpoint.
+- Visible 10+/3+/100% values remain Claidy's own claims — must not be used
+  as SiteMint outcome claims.
+- URL unchanged: `https://ClaidyTaguranPorfolio.replit.app`, misspelling
+  retained exactly as supplied.
+
+**Shasta Greene Real Estate**
+- Project strategy: reserved future featured project (placement intent
+  unchanged from Phase 2B.2.1).
+- Both submitted captures: **rejected for public implementation** — the
+  stats row ($250M+ / 500+ / #1) and the feedback/chat widget both remain
+  visible, conflicting with current approved brand positioning. Neither
+  file was optimized into the implementation directory, and neither was
+  cropped further to force an approval.
+- Both are retained only as rejected references in the temporary
+  owner-review package.
+
+**OneFilAm Community**
+- Placement: supporting candidate (unchanged).
+- Desktop and mobile: both **visually approved candidates**. Both
+  optimized this checkpoint.
+- Permission: organizational approval still pending — not marked
+  permission-, implementation-, or publication-approved.
+
+**Hand Homecare** *(new candidate this checkpoint)*
+- Placement: **recommended temporary featured candidate** — a strong,
+  commercially credible visual while Shasta Greene awaits recapture. This
+  is a placement recommendation only, not an implementation approval.
+- Desktop and mobile: both **visually approved candidates**. Both
+  optimized this checkpoint.
+- Status: **new portfolio candidate — SiteMint attribution and publication
+  permission confirmation pending.** Not marked publicly approved merely
+  because screenshots exist. Recorded in `PORTFOLIO_PERMISSION_MANIFEST.md`
+  with that exact status.
+- The visible public phone number (818-914-4990) must not be copied into
+  SiteMint's own marketing copy.
+
+**Herlinda Valdovinos**
+- Current URL supplied by owner (**changed from the prior manifest**):
+  `https://sunshine-herlinda-site.replit.app/` (previously recorded as
+  `herlindavaldovinos.com` — not independently re-verified by this
+  environment; recorded here as owner-supplied).
+- Desktop: **visually approved candidate**. Optimized this checkpoint.
+- Mobile: **not approved for portfolio implementation** — the navigation
+  remains expanded and wraps across the mobile hero instead of using a
+  collapsed mobile-menu treatment. Recorded as **mobile responsive
+  improvement and recapture required**. Not optimized as an implementation
+  asset.
+- Client permission remains pending.
+
+### 10.4 Optimization results (approved candidates only)
+
+Produced under `artifacts/web-agency/public/portfolio/current/`. Native
+capture dimensions were preserved in every case — **no source was
+upscaled**. Shasta's two captures and Claidy's desktop capture were **not**
+optimized or placed in this directory, per the rejections above.
+
+| Source | Output file | Dimensions (unchanged) | Source size | Output size | Quality | Ratio | Output MD5 |
+|---|---|---|---|---|---|---|---|
+| `claidy-taguran-mobile-current.png` | `claidy-taguran-mobile.webp` | 388×836 | 464,383 B | 49,574 B | WebP q85 | 9.4x | `886660a3230c0a61a9d0c48928141eb4` |
+| `onefilam-community-desktop-current.png` | `onefilam-community-desktop.webp` | 1221×844 | 895,561 B | 61,584 B | WebP q85 | 14.5x | `e103f6b8172b20afcf2f9e78269c8898` |
+| `onefilam-community-mobile-current.png` | `onefilam-community-mobile.webp` | 388×840 | 202,414 B | 33,648 B | WebP q85 | 6.0x | `ee647a093d959b12874cacbdd2a09933` |
+| `hand-homecare-desktop-current.png` | `hand-homecare-desktop.webp` | 1221×850 | 1,606,686 B | 100,604 B | WebP q85 | 16.0x | `5c25f0e1e6e9dbce7305231152cf8a19` |
+| `hand-homecare-mobile-current.png` | `hand-homecare-mobile.webp` | 388×838 | 388,897 B | 43,998 B | WebP q85 | 8.8x | `82f911811846140982e70a90d46f4446` |
+| `herlinda-valdovinos-desktop-current.png` | `herlinda-valdovinos-desktop.webp` | 1218×804 | 1,695,624 B | 103,820 B | WebP q85 | 16.3x | `50a7eb4357c6be991e4c47a0d640091e` |
+
+All six outputs verified: open correctly, non-zero dimensions, no visible
+corruption, text fully legible, no upscaling, no generated/inpainted
+content, no watermark. All desktop outputs are well under the 300 KB target
+(61–104 KB); both mobile outputs are well under the 180 KB target (34–50
+KB). No forced 16:9 crop was applied to any file — each was re-encoded at
+its native captured aspect ratio (desktop ≈ 1221×844–850, a slightly taller
+ratio than 16:9; mobile ≈ 388×836–840, a tall mobile composition), since a
+forced 16:9 crop would have cut into real content on several of these
+captures.
+
+### 10.5 Crop and presentation manifest (per-project fields)
+
+Distinct fields are recorded per project rather than assuming one crop or
+aspect ratio fits every card — the source captures are not uniform
+dimensions (each is a real, unscaled capture at whatever height the page
+and viewport produced).
+
+**Shasta Greene Real Estate**
+| Field | Value |
+|---|---|
+| sourceWidth / sourceHeight | 1221 / 846 (desktop), 390 / 844 (mobile) |
+| outputWidth / outputHeight | N/A — rejected, not optimized |
+| aspectRatio | N/A |
+| objectFit | N/A |
+| objectPosition | N/A |
+| recommendedCrop | None — a genuine recapture is required, not a crop |
+| desktopAsset | none (rejected) |
+| mobileAsset | none (rejected) |
+| fallbackAsset | none recommended — do not fall back to the Phase 2B.2.1 asset either (also rejected) |
+| captureSource | Owner-supplied |
+| captureDate | Not supplied |
+| currentSiteVerifiedByOwner | Owner-supplied capture; not independently browser-verified by this environment |
+| visuallyApproved | No — rejected (stats row + widget) |
+| permissionStatus | Not evaluated (asset rejected before permission review) |
+| implementationStatus | Not implementation-ready |
+| publicationStatus | Not publication-ready |
+
+**OneFilAm Community**
+| Field | Value |
+|---|---|
+| sourceWidth / sourceHeight | 1221 / 844 (desktop), 388 / 840 (mobile) |
+| outputWidth / outputHeight | 1221 / 844 (desktop), 388 / 840 (mobile) — unscaled |
+| aspectRatio | ≈1.45:1 (desktop), ≈0.46:1 (mobile) — native, not forced 16:9 |
+| objectFit | `cover` |
+| objectPosition | `top center` |
+| recommendedCrop | None needed — hero flag graphic reads cleanly at native ratio |
+| desktopAsset | `/portfolio/current/onefilam-community-desktop.webp` |
+| mobileAsset | `/portfolio/current/onefilam-community-mobile.webp` |
+| fallbackAsset | `/portfolio/onefilam-community-desktop.webp` (Phase 2B.2.1 historical reference) |
+| captureSource | Owner-supplied |
+| captureDate | Not supplied |
+| currentSiteVerifiedByOwner | Owner-supplied capture; not independently browser-verified by this environment |
+| visuallyApproved | Yes (desktop and mobile) |
+| permissionStatus | Organizational approval pending |
+| implementationStatus | Not implementation-approved |
+| publicationStatus | Not publication-approved |
+
+**Hand Homecare** *(new)*
+| Field | Value |
+|---|---|
+| sourceWidth / sourceHeight | 1221 / 850 (desktop), 388 / 838 (mobile) |
+| outputWidth / outputHeight | 1221 / 850 (desktop), 388 / 838 (mobile) — unscaled |
+| aspectRatio | ≈1.44:1 (desktop), ≈0.46:1 (mobile) — native |
+| objectFit | `cover` |
+| objectPosition | `center` (portrait subject is right-of-center; centered crop keeps both subject and headline legible) |
+| recommendedCrop | None needed |
+| desktopAsset | `/portfolio/current/hand-homecare-desktop.webp` |
+| mobileAsset | `/portfolio/current/hand-homecare-mobile.webp` |
+| fallbackAsset | None — no prior historical asset exists for this new project |
+| captureSource | Owner-supplied |
+| captureDate | Not supplied |
+| currentSiteVerifiedByOwner | Owner-supplied capture; not independently browser-verified by this environment |
+| visuallyApproved | Yes (desktop and mobile) |
+| permissionStatus | **New candidate — SiteMint attribution and publication permission confirmation pending** |
+| implementationStatus | Not implementation-approved |
+| publicationStatus | Not publication-approved |
+
+**Herlinda Valdovinos**
+| Field | Value |
+|---|---|
+| sourceWidth / sourceHeight | 1218 / 804 (desktop), 388 / 840 (mobile) |
+| outputWidth / outputHeight | 1218 / 804 (desktop, unscaled); mobile not optimized |
+| aspectRatio | ≈1.51:1 (desktop) — native |
+| objectFit | `cover` |
+| objectPosition | `center` |
+| recommendedCrop | Desktop: none needed. Mobile: no crop can fix this — the issue is an un-collapsed navigation, a responsive-design defect, not a framing problem |
+| desktopAsset | `/portfolio/current/herlinda-valdovinos-desktop.webp` |
+| mobileAsset | none (rejected — see §10.3) |
+| fallbackAsset | `/portfolio/herlinda-valdovinos-desktop.webp` (Phase 2B.2.1 historical reference, desktop only) |
+| captureSource | Owner-supplied |
+| captureDate | Not supplied |
+| currentSiteVerifiedByOwner | Owner-supplied capture; not independently browser-verified by this environment |
+| visuallyApproved | Desktop: yes. Mobile: no |
+| permissionStatus | Pending client approval |
+| implementationStatus | Not implementation-approved |
+| publicationStatus | Not publication-approved |
+
+**Claidy Taguran Portfolio**
+| Field | Value |
+|---|---|
+| sourceWidth / sourceHeight | 1222 / 842 (desktop, rejected), 388 / 836 (mobile) |
+| outputWidth / outputHeight | Desktop: N/A (rejected). Mobile: 388 / 836 — unscaled |
+| aspectRatio | Mobile ≈0.46:1 — native |
+| objectFit | `cover` (mobile) |
+| objectPosition | `top center` (mobile) |
+| recommendedCrop | Desktop: none — a recapture with the full animated headline is required, not a crop. Mobile: already reflects the intentional hero crop the owner approved |
+| desktopAsset | none (reference only — recapture required) |
+| mobileAsset | `/portfolio/current/claidy-taguran-mobile.webp` |
+| fallbackAsset | `/portfolio-claidy.png` (Phase 2B.2/2B.2.2 historical reference, desktop only) |
+| captureSource | Owner-supplied |
+| captureDate | Not supplied |
+| currentSiteVerifiedByOwner | Owner-supplied capture; not independently browser-verified by this environment |
+| visuallyApproved | Desktop: no (incomplete headline). Mobile: yes |
+| permissionStatus | Placement approved (future supporting); screenshot/publication permission not approved |
+| implementationStatus | Not implementation-approved |
+| publicationStatus | Not publication-approved |
+
+### 10.6 Recommended Phase 2B.3 project lineup (recommendation only — not implemented)
+
+| Slot | Project | Basis |
+|---|---|---|
+| Temporary featured | **Hand Homecare** | Strong, commercially credible desktop + mobile visuals, both visually approved; attribution/permission confirmation still required before real implementation |
+| Reserved featured (pending recapture) | Shasta Greene Real Estate | Placement intent unchanged; both current captures rejected, genuine recapture needed |
+| Supporting | OneFilAm Community | Desktop + mobile both visually approved; organizational approval pending |
+| Supporting (desktop only, pending) | Herlinda Valdovinos | Desktop visually approved; mobile blocked on a real responsive-nav fix; client permission pending |
+| Future supporting (partial) | Claidy Taguran Portfolio | Mobile visually approved; desktop needs recapture (missing "Solutions"); permission/publication not approved |
+
+This is a recommendation for Phase 2B.3 to evaluate — no project has
+permission-approved, implementation-approved, or publication-approved
+status as of this checkpoint, and `SelectedWorkSection.tsx` was not
+modified.
+
+### 10.7 Data-driven portfolio model — refined (documented only, supersedes §9's shape)
+
+Per the owner's Phase 2B.2.3 direction, the model gains explicit
+`visualApprovalStatus`, `imageFit`/`imagePosition`, and
+`currentSiteVerifiedByOwner` fields, distinguishing *owner*-attested
+verification (which is what this checkpoint actually has, for all five
+projects) from independent browser verification (which this environment
+still cannot perform for any of them):
+
+```ts
+type PortfolioProject = {
+  id: string;
+  projectName: string;
+  category: string;
+  description: string;
+  contribution: string;
+  publicUrl: string;
+  desktopAsset?: string;
+  mobileAsset?: string;
+  fallbackAsset?: string;
+  captureDate?: string;
+  currentSiteVerifiedByOwner: boolean;
+  permissionStatus: string;
+  visualApprovalStatus: string;
+  implementationStatus: string;
+  publicationStatus: string;
+  featured: boolean;
+  sortOrder: number;
+  altText: string;
+  imageFit?: "cover" | "contain";
+  imagePosition?: string;
+  statusLabel?: string;
+};
+```
+
+This model supports everything §9 listed, plus: per-project image fit and
+position (since these captures are not uniform aspect ratios — see §10.5),
+desktop-only temporary projects (Herlinda pending a mobile recapture,
+Claidy pending a desktop recapture), and a `visualApprovalStatus` distinct
+from `permissionStatus` so a visually-clean image never implies permission
+that hasn't been granted. Adopting this model remains a Phase 2B.3
+implementation decision — no code was changed this checkpoint.

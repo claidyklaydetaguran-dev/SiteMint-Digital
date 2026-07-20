@@ -728,3 +728,38 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
 - Documented (not implemented) a future data-driven `PortfolioProject` model
   for Phase 2B.3, so projects, screenshots, and verification status can be
   added, replaced, or reordered without redesigning the homepage.
+
+## Checkpoint 2B.2.3 — Ingest, Validate, and Optimize Owner-Supplied Current Portfolio Captures (implemented)
+
+> No application code, images outside `portfolio/current/`, or components
+> changed. `SelectedWorkSection.tsx` untouched.
+
+- Ingested ten owner-supplied current screenshots (desktop + mobile for
+  Shasta Greene, OneFilAm Community, Herlinda Valdovinos, Claidy Taguran,
+  and a new candidate, **Hand Homecare**), verified every checksum and
+  dimension against the owner's own capture manifest, and reviewed each
+  image directly for privacy, overlays, and content accuracy.
+- **Shasta Greene:** both captures rejected — the outdated stats row and a
+  feedback widget both remain visible. Featured-placement intent unchanged;
+  recapture still required.
+- **OneFilAm Community:** both captures visually approved and optimized.
+  Organizational permission remains the only blocker.
+- **Herlinda Valdovinos:** desktop visually approved and optimized; new
+  owner-supplied URL recorded (`sunshine-herlinda-site.replit.app`).
+  Mobile rejected — the site's navigation does not collapse on mobile,
+  a real responsive-design gap, not a capture issue.
+- **Claidy Taguran:** desktop rejected — the animated headline word
+  "Solutions" is missing at capture time. Mobile visually approved and
+  optimized after an intentional hero crop.
+- **Hand Homecare** (new): both captures visually approved and optimized;
+  recommended as a temporary featured candidate while Shasta awaits
+  recapture, pending SiteMint attribution and publication permission
+  confirmation.
+- Six approved WebP assets added under
+  `artifacts/web-agency/public/portfolio/current/` at native (unscaled)
+  capture dimensions; rejected/reference-only captures were not optimized
+  or added to any implementation directory.
+- Refined the future data-driven `PortfolioProject` model (documented only)
+  with `visualApprovalStatus`, `imageFit`/`imagePosition`, and
+  `currentSiteVerifiedByOwner` fields to reflect owner-attested vs.
+  independently-verified status.
