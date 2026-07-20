@@ -984,3 +984,40 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   internal-notification-recipient environment-variable timing
   contradiction (documented in 2C.2B, implemented in 2C.2D/2C.2E).
 - No implementation was performed or approved by this checkpoint.
+
+## Checkpoint 2C.2A.2 — Finalize Discovery PRD Reliability Rules (documentation-only)
+
+> Documentation-only correction. No application code, component, route,
+> database schema, migration, package, lockfile, environment variable, or
+> Privacy/Terms page changed. Corrects sections of
+> `docs/sitemint-platform/DISCOVERY_FORM_HARDENING_PRD.md` in place; the
+> current-state audit evidence (§8–§11) and the three-table model/delivery-
+> job architecture from Checkpoint 2C.2A.1 were preserved unchanged.
+
+- Corrected `discovery_ai_briefs` to model one row per brief *version*,
+  not per provider attempt; retries update the same row, a deliberate
+  regeneration creates a new versioned row, and the row is now created
+  transactionally alongside the submission when AI generation is enabled —
+  closing an AI durability gap parallel to the one already fixed for
+  email/CRM in Checkpoint 2C.2A.1.
+- Corrected the same-idempotency-key/different-payload scenario from an
+  ordinary success response to a distinct `HTTP 409 idempotency_conflict`
+  response that never overwrites the original submission.
+- Defined a conservative v1 policy for likely-duplicate submissions
+  (different key, matching recent fingerprint): store the submission for
+  operator review, but withhold client-acknowledgment, internal-
+  notification, and CRM-upsert job creation until the duplicate is
+  resolved, so a flagged submission is never both reviewed as a possible
+  duplicate and automatically delivered as if it were confirmed distinct.
+- Documented the HMAC fingerprint's required secret and rotation model
+  (`DISCOVERY_FINGERPRINT_HMAC_KEY`, `DISCOVERY_FINGERPRINT_KEY_VERSION`)
+  — not added as environment variables this checkpoint — closing a gap
+  where the 2C.2A.1 fingerprint mechanism had no defined key.
+- Reconciled fail-open/fail-closed language across three distinct failure
+  modes (missing required security configuration, a runtime rate-limit
+  store outage, and Turnstile unavailability), replacing loose or
+  inaccurate "fail closed" wording with mode-specific, explicit policies.
+- Clarified Phases 2C.2B, 2C.2D, and 2C.2E scope accordingly; the
+  three-table model, transactional outbox, delivery-job architecture, and
+  legacy-endpoint isolation from Checkpoint 2C.2A.1 remain unchanged.
+- No implementation was performed or approved by this checkpoint.

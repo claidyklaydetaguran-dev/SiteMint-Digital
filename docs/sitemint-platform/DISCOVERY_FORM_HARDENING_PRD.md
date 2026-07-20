@@ -26,6 +26,26 @@ form as a Level 3/4 activation blocker.
 > audit (§8–§11) is unchanged evidence from Checkpoint 2C.2A and was not
 > re-derived. No implementation occurred in either checkpoint.
 
+> **Further corrected by Checkpoint 2C.2A.2** (documentation-only). Owner
+> review found three remaining gaps in the 2C.2A.1 model: `discovery_ai_briefs`
+> was still described as one row per provider attempt rather than one row
+> per brief *version*, and its creation was not guaranteed to be
+> transactional when AI generation is enabled; the same-idempotency-key,
+> different-payload case returned a misleading ordinary-success response
+> instead of a distinct conflict; and the HMAC duplicate fingerprint had no
+> defined secret/rotation model. §18, §19, §22–§30, §34, §37, and §41–§43
+> were corrected in place: `discovery_ai_briefs` now models one row per
+> brief version with transactional enqueue; same-key/different-payload now
+> returns `409 idempotency_conflict`; likely-duplicate submissions withhold
+> downstream jobs under a conservative v1 policy until operator resolution;
+> `DISCOVERY_FINGERPRINT_HMAC_KEY`/`DISCOVERY_FINGERPRINT_KEY_VERSION` are
+> documented (not added); and fail-open/fail-closed language for missing
+> config vs. runtime store outage vs. Turnstile unavailability was made
+> precise and distinct. The three-table model and delivery-job architecture
+> from 2C.2A.1 are unchanged. The current-state audit (§8–§11) remains the
+> unchanged evidence from Checkpoint 2C.2A. No implementation occurred in
+> any of the three checkpoints.
+
 ---
 
 ## 1. Executive Summary
@@ -399,7 +419,11 @@ the original task brief:
   fields (name, industry, etc.), project type, launch window, investment
   range, consent records + timestamps, privacy-policy version, anti-spam
   classification, idempotency key (unique), duplicate fingerprint
-  (indexed, not unique — see below), high-level intake status (§19), an
+  (indexed, not unique — see below), **`fingerprintKeyVersion`** (added
+  2C.2A.2, non-secret — records which HMAC key version produced the
+  stored fingerprint, see the fingerprint-secret documentation below),
+  high-level intake status (§19), **`duplicateReviewStatus`** (added
+  2C.2A.2 — `none`/`pending`/`resolved`, see §24 Correction 5), an
   optional linked CRM lead ID, created/updated timestamps. JSONB for the
   full structured answers (`projectScope`, `readiness`, `decisionContext`
   detail, etc.). This single table replaces both current
@@ -436,14 +460,49 @@ the original task brief:
   history needs genuinely require it beyond what `attemptCount` +
   `lastErrorCode` + `lastErrorAt` already provide.
 
-- `discovery_ai_briefs` — one row per AI-brief attempt, FK to
-  `discovery_submissions.id`, holding only AI-generated content: source
-  submission ID, `aiBriefPromptVersion`, provider/model metadata (once
-  approved), generation status, retry count/processing metadata,
-  structured AI output, human-review status, reviewer, review timestamp,
-  created/updated timestamps. Kept structurally separate from the
-  submission row specifically so AI content can never be written into the
-  same JSON blob as client-supplied answers (§29 requirement).
+- `discovery_ai_briefs` — **corrected in 2C.2A.2: one row per brief
+  *version*, not one row per provider attempt.** Retries for the same
+  brief version update the same row (via `attemptCount`); a deliberate
+  regeneration creates a new versioned row (`briefVersion + 1`) and never
+  overwrites an older generated or reviewed brief. FK to
+  `discovery_submissions.id`. Fields: `id`, `submissionId`,
+  `briefVersion`, `promptVersion` (renamed from `aiBriefPromptVersion` for
+  consistency with `briefVersion`), `provider`, `model`, `status`,
+  `attemptCount`, `maxAttempts`, `nextAttemptAt`, `lockedAt`, `lockedBy`,
+  `lastErrorCode`, `lastErrorAt`, `structuredOutput`, `humanReviewStatus`,
+  `reviewedBy`, `reviewedAt`, `createdAt`, `updatedAt`, `completedAt`.
+  Statuses: `pending`, `processing`, `retry_scheduled`, `generated`,
+  `permanently_failed`, `cancelled`. Human-review statuses:
+  `pending_review`, `approved`, `changes_requested`, `rejected`,
+  `superseded` (set on an older version when a newer one is generated).
+  Uniqueness: a unique constraint on `(submissionId, briefVersion)` —
+  chosen for the same reason as the delivery-job compound key (§ above):
+  the process that creates a brief version does so exactly once per
+  version by construction. Only a sanitized failure code is stored in
+  `lastErrorCode` — never a raw provider response body. Kept structurally
+  separate from the submission row specifically so AI content can never be
+  written into the same JSON blob as client-supplied answers (§29
+  requirement).
+
+  **Durable AI enqueue (corrected 2C.2A.2):** when AI brief generation is
+  enabled for accepted submissions, the transaction that creates
+  `discovery_submissions` and its required `discovery_delivery_jobs` rows
+  (§26) also creates one `pending` `discovery_ai_briefs` row for
+  `briefVersion 1`, in the **same transaction** — not a separate step
+  after commit. This closes the same durability gap already fixed for
+  email/CRM in 2C.2A.1: without a transactional enqueue, an AI-generation
+  intent could be lost on a crash between commit and the (previously
+  undefined) point where an AI row would have been created. AI generation
+  itself remains non-blocking and is processed later by its own worker
+  path (§29) — only the *record* of the intent to generate is durable and
+  transactional, not the generation itself. When AI brief generation is
+  disabled, no AI row is required during submission and submission
+  acceptance is unaffected; an authorized operator may later create a
+  `pending` brief-version row through a separately-approved workflow (not
+  defined in this checkpoint). AI generation is **not** modeled as a
+  fourth `discovery_delivery_jobs` job type — `discovery_ai_briefs` itself
+  is the durable work record for AI generation, distinct from delivery
+  obligations.
 
 `discovery_status_events` remains out of scope for v1, as in the original
 recommendation — the per-job `discovery_delivery_jobs` row already carries
@@ -467,25 +526,53 @@ own. Corrected approach:
     transaction as the insert, to flag likely-duplicate *distinct*
     submissions for operator review without ever blocking or silently
     discarding them.
-  Documented behavior: (1) same idempotency key + same payload → return
-  the original stored result, no new row; (2) same idempotency key +
-  different payload → treated as a client bug/replay, original result
-  returned, discrepancy logged for review, no data loss; (3) different key
-  but a fingerprint match within the window → flagged for operator review
-  as a likely duplicate, but still stored as its own row (never silently
-  dropped); (4) different key and a meaningfully changed submission → a
-  new fingerprint, stored normally, no flag; (5) a legitimate resubmission
-  after the duplicate window has elapsed → stored normally as a new
-  submission, no special handling. This preserves the property the
-  original two-table draft was trying to protect (retries and near-
-  duplicates don't silently multiply) while never permanently blocking a
-  prospect who genuinely submits an updated project later.
+  Documented behavior — **the same-key/different-payload scenario is
+  corrected in 2C.2A.2; see the full corrected five-scenario list in
+  §24.** Summary of the correction: (2) same idempotency key + *different*
+  payload no longer returns an ordinary success — it is now a distinct
+  `409 idempotency_conflict` response (§24, §30); it never overwrites the
+  original row and never inserts the changed payload under the reused
+  key. Scenarios (1), (3), (4), (5) are unchanged from 2C.2A.1. This
+  preserves the property the original two-table draft was trying to
+  protect (retries and near-duplicates don't silently multiply) while
+  never permanently blocking a prospect who genuinely submits an updated
+  project later, and never silently accepting a materially different
+  submission under a reused key as if it were the original.
+
+**Fingerprint HMAC secret and rotation (documented 2C.2A.2, not added
+this checkpoint):** the duplicate fingerprint (above) requires a
+server-side HMAC key to be non-reversible — this was left undefined in
+2C.2A.1. Proposed configuration:
+  - `DISCOVERY_FINGERPRINT_HMAC_KEY` — the server-side HMAC key used to
+    derive the fingerprint from normalized fields. Requirements: secret;
+    server-only; never exposed to Vite/client-side code; never logged;
+    distinct from the database, email, CRM, AI, session, and signing
+    secrets; validated at startup before the public submission endpoint
+    is enabled; the endpoint fails closed (stays disabled) if this value
+    is missing in production; a test-only value is mocked/supplied during
+    automated tests.
+  - `DISCOVERY_FINGERPRINT_KEY_VERSION` — a non-secret configuration
+    value recording which key version generated a given stored
+    fingerprint (stored per-row as `discovery_submissions.
+    fingerprintKeyVersion`, added above). Supports deliberate key
+    rotation without silently invalidating historical duplicate data.
+  - Rotation direction: new submissions use the current key version;
+    recent duplicate lookups may temporarily compute fingerprints using
+    both the current and the immediately-previous approved key during a
+    controlled rotation window (so in-flight duplicate detection doesn't
+    break mid-rotation); old raw PII is never reconstructed from a
+    fingerprint; no key value is ever stored in the database, only the
+    version identifier; the actual rotation procedure is a separately
+    reviewed operational process, not defined by this PRD.
+  - Neither variable is added to the environment in this checkpoint — see
+    §34 for the environment-variable inventory entry.
 
 Keys/constraints: UUID primary keys on all three tables; unique constraint
 on `discovery_submissions.idempotencyKey`; ordinary index on the
 duplicate fingerprint (not unique, per above); indexes on `email`,
 `status`, `createdAt` on `discovery_submissions`; unique constraint on
-`discovery_delivery_jobs(submissionId, jobType)`; FK from
+`discovery_delivery_jobs(submissionId, jobType)`; unique constraint on
+`discovery_ai_briefs(submissionId, briefVersion)`; FK from
 `discovery_delivery_jobs.submissionId` and `discovery_ai_briefs.submissionId`
 to `discovery_submissions.id`. All future database changes use Drizzle Kit
 versioned migrations with committed rollback SQL, per root `CLAUDE.md` and
@@ -508,7 +595,18 @@ obligation's status: `pending`, `processing`, `retry_scheduled`,
 per job type (client acknowledgment, internal notification, CRM upsert),
 not one shared column per channel. `discovery_ai_briefs` similarly remains
 authoritative for AI generation and human-review state, never mirrored
-onto the submission row.
+onto the submission row — **corrected (2C.2A.2):** status there is
+per-*brief-version* (`pending`, `processing`, `retry_scheduled`,
+`generated`, `permanently_failed`, `cancelled`), with a separate
+`humanReviewStatus` (`pending_review`, `approved`, `changes_requested`,
+`rejected`, `superseded`) tracked per version, not per submission.
+
+**Added (2C.2A.2):** `discovery_submissions.duplicateReviewStatus`
+(`none`, `pending`, `resolved`) is a high-level field on the submission
+row — not a delivery status — used solely by the conservative v1
+duplicate-handling policy (§24 Correction 5) to gate whether delivery
+jobs and an AI-brief row have been created yet for a likely-duplicate
+submission.
 
 ## 20. Validation Requirements
 
@@ -548,7 +646,30 @@ body logged); origin/CORS tightened from the current `origin: true` reflect-
 all (§8 backend audit) to an explicit allowlist for this endpoint at
 minimum; URL protocol restriction (§21); protection against oversized
 arrays/excessively nested payloads (§20); rate limiting and duplicate/
-repeated-submission protection (§23/§24).
+repeated-submission protection (§23/§24); the duplicate-fingerprint HMAC
+secret requirement documented in §18 (`DISCOVERY_FINGERPRINT_HMAC_KEY`,
+not added this checkpoint).
+
+**Precise fail-open/fail-closed language (corrected 2C.2A.2, Correction
+7)** — three distinct failure modes must not be described with the same
+"fail closed" language:
+1. **Required security configuration missing in production** (e.g. the
+   fingerprint HMAC key) — true fail-closed: the new public endpoint
+   fails safely and stays **disabled** until the configuration is present.
+2. **Runtime distributed rate-limit store failure** (the store itself
+   goes down, not a missing config value) — for ordinary public traffic,
+   fall back to a conservative in-process limiter when technically safe,
+   raise an operational alert, and document that protection is degraded
+   rather than absent; for paid-traffic mode, fail closed or pause paid
+   campaign traffic until protection is restored — never silently operate
+   without the required anti-abuse layer under paid traffic.
+3. **Turnstile unavailable** — never described as "fail closed." Document
+   it as one of two named policies instead: "degraded fallback to Stage 1
+   protections when risk policy permits," or "temporary submission
+   unavailability when paid-traffic policy requires the challenge." Which
+   of the two applies must be an explicit choice made before paid-traffic
+   activation (§41), not assumed.
+None of these three mechanisms is implemented in this checkpoint.
 
 ## 23. Anti-Spam Strategy
 
@@ -585,48 +706,124 @@ merely because it is common — friction should match actual traffic risk.
 
 ## 24. Duplicate-Submission Strategy
 
-**Corrected (2C.2A.1)** — see the full correction and the five documented
-scenarios in §18. Summary: client generates an `idempotencyKey` (UUID)
-once per form session; the server enforces it with a **unique constraint**
-on `discovery_submissions.idempotencyKey`, so a retry with the same key
-returns the original stored result rather than creating a new row.
+**Corrected (2C.2A.1, further corrected 2C.2A.2).** Client generates an
+`idempotencyKey` (UUID) once per form session; the server enforces it with
+a **unique constraint** on `discovery_submissions.idempotencyKey`.
 Independently, an **HMAC-based duplicate fingerprint** (never raw email/
-phone/IP stored in plain text) gets an **ordinary, non-unique index**, and
-a **transactional query for recent matches** within the chosen duplicate
-window (e.g. 15 minutes) flags likely-duplicate *distinct* submissions for
-operator review — it never blocks, rejects, or silently discards them (a
-legitimate second inquiry, or a genuinely updated resubmission after the
-window, must never be lost). The prior direction ("unique index on
-fingerprint scoped to a rolling window") was not a coherent database
-mechanism and is retracted.
+phone/IP stored in plain text, keyed by `DISCOVERY_FINGERPRINT_HMAC_KEY`,
+§18) gets an **ordinary, non-unique index**, and a **transactional query
+for recent matches** within the chosen duplicate window (e.g. 15 minutes)
+flags likely-duplicate *distinct* submissions for operator review.
+
+The five scenarios, fully corrected:
+
+1. **Same idempotency key + same payload** — return the original
+   submission result; do not insert another row. `200` (or the previously
+   stored success representation). Safe public code:
+   `submission_already_received`.
+
+2. **Same idempotency key + different payload — corrected 2C.2A.2.**
+   Previously this returned an ordinary success with the original result,
+   which is misleading (it silently discards the client's changed data
+   without telling them). Corrected behavior: do **not** return an
+   ordinary success; do **not** overwrite the original submission; do
+   **not** insert the changed payload under the reused key. Return
+   **HTTP 409**, safe public code `idempotency_conflict`, safe public
+   message *"This submission session has already been used. Please
+   refresh the form and try again."* The client preserves the user's form
+   values locally so nothing is lost from their perspective. A new
+   idempotency key is generated only after an explicit retry or a new
+   form session — never automatically reused. Only a sanitized
+   discrepancy signal is logged (e.g. "key reuse with payload mismatch");
+   the full submitted payload is never logged. See §30 for the safe-error
+   matrix entry.
+
+3. **Different key but a fingerprint match within the window.** Store the
+   new submission — never silently discard it. Set
+   `duplicateReviewStatus = pending` (§19). **Corrected 2C.2A.2 /
+   Correction 5:** do not automatically send a client acknowledgment,
+   internal notification, or create a CRM lead for this submission until
+   the duplicate is resolved — see the conservative v1 policy below.
+
+4. **Different key and a meaningfully changed submission** (new
+   fingerprint) — store normally, `duplicateReviewStatus = none`, all
+   delivery jobs (and the AI-brief row, if enabled) created transactionally
+   as usual.
+
+5. **A legitimate resubmission after the duplicate window has elapsed** —
+   store normally, same as scenario 4.
+
+**Conservative v1 duplicate-job policy (added 2C.2A.2, Correction 5).**
+When a submission is flagged as a likely duplicate (scenario 3), the
+system must not both store it for human review *and* automatically fire
+duplicate emails and create a duplicate CRM lead — that would defeat the
+point of flagging it. Chosen v1 behavior: the same transaction that
+creates the `discovery_submissions` row for a flagged submission creates
+the row with `duplicateReviewStatus = pending` and **withholds** creation
+of its `discovery_delivery_jobs` rows (and its `discovery_ai_briefs` row,
+if AI generation is enabled) until an authorized operator resolves the
+duplicate review. This remains compatible with the one-transaction
+reliability model (§26) — the transaction still commits atomically, it
+simply omits the job-creation step for flagged submissions. The
+resolution action itself (an authorized operator confirming the
+submission is not a duplicate, or merging it) is documented as a future
+capability that creates the required jobs **exactly once** when
+triggered — it is not implemented or further specified in this
+checkpoint.
 
 ## 25. Idempotency Strategy
 
 See §24/§18 — the idempotency key (enforced via a real unique database
 constraint) is the mechanism for safe retries of the *same* client action
-(e.g., a network timeout followed by an automatic client retry); it is
-distinct from the fingerprint-based spam/duplicate-review signal, which
-flags but never blocks near-duplicate distinct submissions.
+(e.g., a network timeout followed by an automatic client retry) and
+returns the original result unchanged. It is distinct from (a) the
+same-key-different-payload conflict case, which is corrected in 2C.2A.2
+to return `409 idempotency_conflict` rather than silently returning the
+original result (§24 scenario 2), and (b) the fingerprint-based spam/
+duplicate-review signal, which flags but never blocks near-duplicate
+distinct submissions under different keys (§24 scenario 3).
 
 ## 26. Reliability and Partial-Failure Model
 
 **Corrected (2C.2A.1) — transactional outbox, not in-request fire-and-
 forget.** A submission is **received** the moment one database transaction
-commits both (a) the `discovery_submissions` row and (b) its required
+commits (a) the `discovery_submissions` row, (b) its required
 `discovery_delivery_jobs` rows (`client_acknowledgment_email`,
 `internal_notification_email`, and — pending the CRM decision recorded in
-§28 — `crm_lead_upsert`), all created `pending`. The HTTP response is
-returned only after that transaction commits. A **separately-running
-worker** (§17), not a callback started inside the request, later claims
-and processes pending/`retry_scheduled` jobs. If no worker happens to be
-running at that moment, the jobs simply remain `pending` in the database —
-nothing is lost to a deployment restart, process crash, or request-
-lifecycle interruption, because the durable record already exists before
-the response is sent. AI brief generation (§29) is enqueued the same way
-but is not a `discovery_delivery_jobs` row — it is its own record in
-`discovery_ai_briefs`, created after (not inside) the same transaction and
-processed by its own async path, since it is not a "delivery" obligation
-in the client-facing sense.
+§28 — `crm_lead_upsert`), all created `pending`, and (c) — **corrected
+2C.2A.2** — one `pending` `discovery_ai_briefs` row for `briefVersion 1`
+when AI brief generation is enabled. The HTTP response is returned only
+after that transaction commits. A **separately-running worker** (§17),
+not a callback started inside the request, later claims and processes
+pending/`retry_scheduled` delivery jobs; a separate AI worker path (§29)
+does the same for pending AI-brief rows. If no worker happens to be
+running at that moment, the jobs and the AI-brief row simply remain
+`pending` in the database — nothing is lost to a deployment restart,
+process crash, or request-lifecycle interruption, because the durable
+record already exists before the response is sent.
+
+**Correction 2C.2A.2 — this replaces the prior 2C.2A.1 text, which said
+the AI-brief row was created "after (not inside) the same transaction."**
+That left the same durability gap already fixed for email/CRM: an
+AI-generation intent recorded only after commit could be silently lost on
+a crash between commit and that later step. The corrected model puts the
+AI-brief row's *creation* inside the same transaction as the submission
+(when AI generation is enabled); only the AI *generation work itself*
+(the provider call) remains outside the transaction and outside the
+request's critical path, processed asynchronously by the AI worker (§29).
+When AI generation is disabled, no AI row is created during submission,
+and an operator may later create one through a separately-approved
+workflow (not defined in this checkpoint).
+
+**Interaction with the duplicate-review policy (added 2C.2A.2, §24
+Correction 5):** when a submission is flagged as a likely duplicate
+(`duplicateReviewStatus = pending`), the same transaction still creates
+the `discovery_submissions` row, but **withholds** creation of its
+`discovery_delivery_jobs` rows and its `discovery_ai_briefs` row (if AI
+generation is enabled) until an operator resolves the duplicate review.
+This stays compatible with the one-transaction model — the transaction
+still commits atomically, it simply omits certain inserts for flagged
+submissions rather than running a second, separate transaction later.
 
 Explicit scenario (per task brief): *DB succeeds, internal notification
 fails, client acknowledgment fails, CRM handoff fails, AI brief fails.*
@@ -668,8 +865,10 @@ one shared email status — each has its own `status`, `attemptCount`,
 `nextAttemptAt`, `providerMessageId`, and failure state, because they are
 different messages to different recipients that can succeed or fail
 independently. Both are created transactionally alongside the submission
-row (§26) and executed later by the delivery worker (§17), never inline
-in the request. Duplicate sends are prevented by the job's own status
+row (§26) — except when the submission is flagged as a likely duplicate,
+in which case job creation is withheld until operator resolution (§24
+Correction 5) — and executed later by the delivery worker (§17), never
+inline in the request. Duplicate sends are prevented by the job's own status
 (`completed` jobs are never re-sent) plus the job's `idempotencyKey`
 passed to the provider where supported. Internal recipient: the *value*
 `info.sitemint@gmail.com` is recorded as the current recipient (§28
@@ -691,7 +890,8 @@ manual, admin-triggered action (`crmDiscovery.ts`).
 every accepted, non-spam submission automatically creates or updates a
 SiteMint CRM lead, asynchronously, via a `crm_lead_upsert`
 `discovery_delivery_jobs` row created in the same transaction as the
-submission (§26). SiteMint's internal CRM is the ongoing lead-management
+submission (§26) — except when withheld under the duplicate-review policy
+(§24 Correction 5) until an operator resolves the flag. SiteMint's internal CRM is the ongoing lead-management
 source of truth once handoff succeeds; `discovery_submissions` remains the
 immutable intake source of truth regardless of CRM state. CRM failure must
 never fail, delete, or otherwise affect the already-accepted submission —
@@ -702,16 +902,41 @@ to prevent duplicate-lead creation across retries.
 
 ## 29. AI-Generated Brief Workflow
 
-Runs only after the source submission is durably stored; strictly
-non-blocking; separate table (`discovery_ai_briefs`, §18) so AI output can
-never overwrite, obscure, or be confused with the client's original
-answers. Brief may include: project summary, business context, primary
-problem, customer/team impact, desired outcome, decision context, likely
-self-reported motivations (restated, not invented), required modules, user
-roles, permissions, workflows, integrations, risks, unknowns,
-contradictions, missing information, discovery-call questions, preliminary
-complexity, suggested phases, initial PRD outline, recommended human
-follow-up. Always labeled `AI-generated draft — requires human review`.
+**Corrected (2C.2A.2) — one row per brief version, durably enqueued.**
+The intent to generate `briefVersion 1` is recorded transactionally
+alongside the submission when AI generation is enabled (§18, §26); the
+generation work itself runs strictly non-blocking, after the source
+submission is durably stored, via a separate AI worker path. Retries for
+the same brief version update the same `discovery_ai_briefs` row
+(`attemptCount`); a deliberate regeneration creates a new row
+(`briefVersion + 1`) and never overwrites an older `generated` or
+reviewed brief — the superseded version's `humanReviewStatus` may be set
+to `superseded`. Separate table (`discovery_ai_briefs`, §18) so AI output
+can never overwrite, obscure, or be confused with the client's original
+answers. AI generation is not modeled as a `discovery_delivery_jobs` job
+type — `discovery_ai_briefs` itself is the durable work record. Brief may
+include: project summary, business context, primary problem, customer/
+team impact, desired outcome, decision context, likely self-reported
+motivations (restated, not invented), required modules, user roles,
+permissions, workflows, integrations, risks, unknowns, contradictions,
+missing information, discovery-call questions, preliminary complexity,
+suggested phases, initial PRD outline, recommended human follow-up.
+Always labeled `AI-generated draft — requires human review`.
+
+**AI worker reliability requirements (added 2C.2A.2, documented only —
+no worker selected or implemented this checkpoint):** the AI processor
+must use atomic row claiming (`lockedAt`/`lockedBy`, matching the
+delivery-job locking pattern, §18), stale-lock recovery, bounded retries
+with exponential backoff (`attemptCount`/`maxAttempts`/`nextAttemptAt`),
+sanitized failure codes only (`lastErrorCode`, never a raw provider
+response body), an operator-visible `permanently_failed` state, no raw
+provider error storage, no contact PII sent to the provider by default,
+`promptVersion` tracking per generated version, and response-schema
+validation before a `structuredOutput` is accepted as `generated`. The
+concrete worker runtime (dedicated process, scheduled poller, platform
+scheduled task, or another mechanism) remains pending technical
+investigation alongside the delivery-job worker decision (§17) and is not
+selected in this checkpoint.
 
 **Recorded owner decision (2C.2A.1):** the AI provider does not receive
 contact name, email, or phone by default — only the business/project-
@@ -722,17 +947,17 @@ before any downstream use. AI failure never affects submission acceptance
 
 Definitions required before implementation (2C.2E scope): exact source
 fields sent to the AI provider (excluding anything not needed for the
-brief, per the PII-exclusion decision above), provider boundary (single abstraction
-point, matching the existing `VoiceProvider` isolation pattern precedent in
-root `CLAUDE.md` for the voice platform), `aiBriefPromptVersion`, response
-schema + validation, storage location (`discovery_ai_briefs`), failure
-status, bounded retry strategy, human-review status field, audit history,
-deletion behavior, regeneration behavior (creates a new versioned row,
-never overwrites a prior brief). AI must never promise price, timeline, or
-feasibility; never reject a lead; never score protected characteristics;
-never infer medical/psychological diagnoses; never invent requirements;
-never rewrite original answers; never trigger a contract or send an
-unreviewed proposal; never expose an interpretation to the client as fact.
+brief, per the PII-exclusion decision above), provider boundary (single
+abstraction point, matching the existing `VoiceProvider` isolation pattern
+precedent in root `CLAUDE.md` for the voice platform), `promptVersion`
+per brief version, response schema + validation, storage location
+(`discovery_ai_briefs`), failure status, bounded retry strategy,
+human-review status field, audit history, deletion behavior. AI must
+never promise price, timeline, or feasibility; never reject a lead; never
+score protected characteristics; never infer medical/psychological
+diagnoses; never invent requirements; never rewrite original answers;
+never trigger a contract or send an unreviewed proposal; never expose an
+interpretation to the client as fact.
 
 ## 30. Safe Error Model
 
@@ -745,7 +970,8 @@ unreviewed proposal; never expose an interpretation to the client as fact.
 | Honeypot triggered | as above | as above | neutral | no | no | yes | yes |
 | Completion-time violation | as above | as above | neutral | no | no | yes | yes |
 | Rate limit exceeded | 429 | `rate_limited` | generic, retry-after | yes, after delay | no | monitor only | yes |
-| Duplicate submission (idempotency key) | 200/201 (returns original) | `duplicate_of_existing` | neutral | n/a | yes (original) | no | yes |
+| Same idempotency key + same payload | 200/201 (returns original) | `submission_already_received` | neutral | n/a | yes (original) | no | yes |
+| Same idempotency key + different payload — **added 2C.2A.2** | **409** | `idempotency_conflict` | "This submission session has already been used. Please refresh the form and try again." | yes, only with a fresh submission session/key | yes (original only) | no | yes, sanitized discrepancy signal only — never the full payload |
 | Accepted submission | 201 | `received` | confirmation | n/a | yes | no | yes |
 | Accepted, downstream pending | 201 | `received` | confirmation | n/a | yes | if downstream permanently fails | yes |
 | Database unavailable | 503 | `temporarily_unavailable` | generic, retry later | yes | no | yes (alert) | yes |
@@ -807,8 +1033,10 @@ AI-generated interpretation. Consent requirement and environment behavior
 | `RESEND_FROM_EMAIL` (existing) | sender identity | optional (fallback) | mocked | required | required | no | falls back to hardcoded default today; recommend making required |
 | `DATABASE_URL` (existing) | persistence | required | required | required | required | yes | fail closed, submission cannot succeed without DB |
 | `DISCOVERY_INTERNAL_NOTIFY_EMAIL` (proposed) | replace hardcoded `info.sitemint@gmail.com` | optional | mocked | required | required | no | falls back to a documented default if unset |
-| `DISCOVERY_RATE_LIMIT_WINDOW`/`_MAX` (proposed) | Stage 1 rate limiting | optional (sane default) | disabled or high limit | required | required | no | fail open to a conservative default, never fail closed and block all traffic |
-| `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` (proposed, Stage 2) | paid-traffic bot protection | unset (feature off) | unset | optional | required at Stage 2 | secret (server key) | fails closed to "challenge unavailable, fall back to Stage 1 controls," never fails closed to blocking all submissions |
+| `DISCOVERY_FINGERPRINT_HMAC_KEY` (proposed, **added 2C.2A.2**) | server-side HMAC key for the non-reversible duplicate fingerprint (§18) | required for real duplicate detection | test-only mocked value | required | required | yes | true fail-closed — the new public submission endpoint stays disabled if missing in production (§22 Correction 7) |
+| `DISCOVERY_FINGERPRINT_KEY_VERSION` (proposed, **added 2C.2A.2**) | records which HMAC key version produced a stored fingerprint, supports rotation (§18) | optional (defaults to version 1) | optional | required | required | no | non-secret; defaults to the current approved version if unset |
+| `DISCOVERY_RATE_LIMIT_WINDOW`/`_MAX` (proposed) | Stage 1 rate limiting | optional (sane default) | disabled or high limit | required | required | no | **corrected 2C.2A.2** — distinguish missing config (true fail-closed, endpoint disabled) from a runtime store outage (ordinary traffic: degrade to an in-process fallback limiter + alert; paid traffic: fail closed / pause campaign traffic) — see §22 Correction 7 |
+| `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` (proposed, Stage 2) | paid-traffic bot protection | unset (feature off) | unset | optional | required at Stage 2 | secret (server key) | **corrected 2C.2A.2** — never described as "fail closed" when merely unavailable; the policy is explicitly one of "degraded fallback to Stage 1 protections when risk policy permits" or "temporary submission unavailability when paid-traffic policy requires the challenge," chosen before paid-traffic activation (§22 Correction 7) |
 | `PRIVACY_POLICY_VERSION` (proposed) | consent-record versioning | optional | optional | required | required | no | defaults to a documented initial version |
 | `VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED` (existing, unrelated flag reused as gating pattern) | gates the new frontend behind the same safe-preview mechanism during rollout | off | off | on | off until approved | no | fails closed (confirmed unchanged this checkpoint) |
 
@@ -862,19 +1090,30 @@ checkpoint; no push/deploy/preview-activation without separate approval.
 
 ## 37. Implementation Phases
 
-**Phase 2C.2B — Domain model and backend contract (corrected 2C.2A.1).**
-Scope: shared zod schema, DTO, request/response contracts, submission/
-delivery statuses, `discovery_submissions` (redesigned) +
-**`discovery_delivery_jobs`** (added in this correction) +
-`discovery_ai_briefs` schema and Drizzle migration, idempotency model
-(unique `idempotencyKey` constraint + indexed fingerprint, per §18/§24),
-safe-error contract, versioning. No email/CRM/AI integration, no route
-wiring, and no worker execution in this phase — the transactional-outbox
-insert logic and the delivery worker are 2C.2D/2C.2E scope. Files: shared
-schema location (§14), migration files for all three tables, no route
-wiring yet or minimal route stub only. Stop condition: schema + migration
-reviewed and typechecked; no UI. Tests: schema validation unit tests.
-Requires separate approval prompt before starting.
+**Phase 2C.2B — Domain model and backend contract (corrected 2C.2A.1,
+further clarified 2C.2A.2).** Scope: shared zod schema, DTO, request/
+response contracts, submission/delivery statuses, `discovery_submissions`
+(redesigned, including `fingerprintKeyVersion` and `duplicateReviewStatus`
+in its schema) + `discovery_delivery_jobs` (added 2C.2A.1) +
+`discovery_ai_briefs` schema and Drizzle migration — **clarified 2C.2A.2:
+`discovery_ai_briefs` is modeled as one row per brief version** (unique
+`(submissionId, briefVersion)`, with AI-worker state fields —
+`attemptCount`, `maxAttempts`, `nextAttemptAt`, `lockedAt`, `lockedBy`,
+`lastErrorCode`, `lastErrorAt` — part of the schema contract, matching the
+delivery-job pattern), idempotency model (unique `idempotencyKey`
+constraint + indexed fingerprint, per §18/§24 — **clarified 2C.2A.2: the
+same-key/different-payload case maps to the `409 idempotency_conflict`
+contract, §30**, not an ordinary-success path), safe-error contract
+(including the 409 entry), versioning. `DISCOVERY_FINGERPRINT_HMAC_KEY`
+and `DISCOVERY_FINGERPRINT_KEY_VERSION` are documented in this phase's
+PRD reference (§18/§34) but **not added** as environment variables here.
+No email/CRM/AI integration, no route wiring, and no worker execution in
+this phase — the transactional-outbox insert logic and the delivery/AI
+workers are 2C.2D/2C.2E scope. Files: shared schema location (§14),
+migration files for all three tables, no route wiring yet or minimal
+route stub only. Stop condition: schema + migration reviewed and
+typechecked; no UI. Tests: schema validation unit tests. Requires
+separate approval prompt before starting.
 
 **Phase 2C.2C — Guided frontend experience (corrected 2C.2A.1).** Scope:
 `StartProjectPage`, `DiscoveryFormShell`, step components, branching
@@ -892,21 +1131,32 @@ separate approval prompt.
 retitled from "Security, privacy, anti-spam").** Scope: `POST /api/v1/
 discovery-submissions`, server-side shared-schema validation, normalization,
 request-size limits, origin handling, honeypot, completion-time check, rate
-limiting, duplicate-window check (§24), idempotency enforcement, **the
-transactional submission-plus-delivery-job insert (§26)**, safe logging,
+limiting, duplicate-window check (§24), idempotency enforcement — **clarified
+2C.2A.2: the production endpoint validates that
+`DISCOVERY_FINGERPRINT_HMAC_KEY` is present and stays disabled if it is
+not (§22 Correction 7); duplicate-review behavior (§24 Correction 5) is
+enforced transactionally, with delivery-job (and AI-brief) creation
+withheld for flagged submissions until operator resolution** — the
+transactional submission-plus-delivery-job insert (§26), safe logging,
 sanitized HTTP errors, privacy disclosure, working `/privacy` and `/terms`
 destinations, controlled-preview integration with the 2C.2C frontend (which
 now has a real endpoint to call instead of its mock adapter). Does not
 remove the legacy endpoint. Requires separate approval prompt.
 
 **Phase 2C.2E — Delivery worker, CRM, email, and AI brief (corrected
-2C.2A.1, retitled from "Delivery and AI workflow").** Scope: the durable
+2C.2A.1, further clarified 2C.2A.2).** Scope: the durable
 `discovery_delivery_jobs` processor/worker (§17), bounded retry policy,
 locking and stale-lock recovery, client-acknowledgment job execution,
 internal-notification job execution (recipient made configuration-driven
 here, per the §34 reconciliation — not in 2C.2B), automatic SiteMint CRM
 lead upsert (§28 owner decision), operator-visible permanently-failed jobs,
-manual retry capability, AI-brief generation workflow, human-review state,
+manual retry capability, AI-brief generation workflow — **clarified
+2C.2A.2: when AI brief generation is enabled, the `pending` `briefVersion 1`
+row is created transactionally in 2C.2D's submission flow (§18/§26); this
+phase's AI worker processes existing `discovery_ai_briefs` rows directly
+(claims via `lockedAt`/`lockedBy`, executes the provider call, validates
+the response schema); a retry updates the same brief-version row; a
+regeneration request creates a new version row** — human-review state,
 downstream partial-failure behavior per §26. Requires separate approval
 prompt; explicitly requires provider credentials/config decisions first.
 
@@ -1003,6 +1253,17 @@ confirmed available — tracked as open questions (§41) rather than assumed.
 | Turnstile timing | Before paid traffic (Stage 2), or earlier if real abuse is observed (§23) |
 | Retention | Proposed 24-month default for intake data, **subject to owner/legal review before public activation** — not yet a final decision |
 
+**Recorded decisions (2C.2A.2 — moved out of "open"):**
+
+| Topic | Recorded decision |
+|---|---|
+| AI-brief record granularity | One `discovery_ai_briefs` row per brief *version*, not per provider attempt; retries update the same row, regeneration creates a new version (§18/§29) |
+| AI-brief enqueue durability | The `pending` `briefVersion 1` row is created in the same transaction as the submission when AI generation is enabled — closes the same durability gap already fixed for email/CRM (§18/§26) |
+| Same idempotency key + different payload | Returns `409 idempotency_conflict`, not an ordinary success; original submission is never overwritten (§24, §30) |
+| Likely-duplicate downstream jobs | Conservative v1 policy: store the submission with `duplicateReviewStatus = pending`, withhold delivery jobs and the AI-brief row until an authorized operator resolves the flag (§24 Correction 5) |
+| Duplicate-fingerprint secret requirement | `DISCOVERY_FINGERPRINT_HMAC_KEY` (secret, server-only) and `DISCOVERY_FINGERPRINT_KEY_VERSION` (non-secret) are required for the fingerprint mechanism to be safely implementable; documented, not added this checkpoint (§18/§34) |
+| Rate-limit/Turnstile failure language | Precise, distinct wording for missing-config (true fail-closed), runtime store outage (degrade + alert for ordinary traffic, fail closed/pause for paid traffic), and Turnstile unavailability (explicit "degraded fallback" vs. "temporary unavailability" policy choice, not "fail closed") (§22 Correction 7) |
+
 **Still owner-decision required:**
 - Should acknowledgment email send immediately after persistence, or wait
   for some validation/review step (beyond "job created immediately," does
@@ -1018,6 +1279,13 @@ confirmed available — tracked as open questions (§41) rather than assumed.
 - Which exact Privacy and Terms page content/routes will be used (net-new
   pages are needed regardless — §8 items 31-32)?
 - Final confirmation of the 24-month retention default above.
+- What is the authorized-operator resolution workflow for a flagged
+  likely-duplicate submission (§24 Correction 5)? This checkpoint defines
+  that jobs must be created "exactly once" on resolution but does not
+  design the resolution action itself.
+- Which named policy applies when Turnstile is unavailable — "degraded
+  fallback to Stage 1" or "temporary submission unavailability"? (§22
+  Correction 7) — must be decided before paid-traffic activation.
 
 Legal review required: all Privacy/Terms/consent copy (§31); the
 retention-period default above.
@@ -1031,7 +1299,11 @@ Technical investigation required:
   which of the worker options in §17 — dedicated process, scheduled
   poller, platform scheduled task, or manual-retry fallback — is viable);
   this must be resolved before 2C.2E can select a concrete worker
-  mechanism.
+  mechanism (applies to both the delivery-job worker and the AI worker,
+  §29).
+- The fingerprint HMAC key **rotation procedure** (added 2C.2A.2) is
+  explicitly a separately-reviewed operational process, not defined by
+  this PRD (§18) — remains open.
 
 Safe default available (recommended, pending owner override): the
 corrected three-table database model (§18) over both the original two-
@@ -1060,15 +1332,30 @@ unmodified until the new system is independently verified (§17/§39); the
 2C.2C frontend must never connect to the legacy endpoint (§16/§17);
 document (but do not implement) the internal-recipient configuration
 variable in 2C.2B, deferring its actual addition and wiring to 2C.2D/2C.2E
-(§34).
+(§34). **Added 2C.2A.2:** adopt one-row-per-brief-version for
+`discovery_ai_briefs`, with transactional enqueue of `briefVersion 1`
+alongside the submission when AI generation is enabled (§18/§26/§29);
+adopt `409 idempotency_conflict` for the same-key/different-payload case,
+never an ordinary success (§24/§30); adopt the conservative v1 policy of
+withholding delivery jobs and the AI-brief row for flagged likely-
+duplicate submissions until operator resolution (§24 Correction 5); adopt
+`DISCOVERY_FINGERPRINT_HMAC_KEY` + `DISCOVERY_FINGERPRINT_KEY_VERSION` as
+the documented (not yet added) requirement for the fingerprint mechanism
+to be safely implementable (§18/§34); adopt the precise, distinct fail-
+open/fail-closed language for missing config vs. runtime store outage vs.
+Turnstile unavailability (§22 Correction 7), never using "fail closed" for
+a soft-degradation case.
 
 ## 43. Recommended Next Checkpoint
 
-**Phase 2C.2B — Domain model and backend contract** (§37, corrected),
-scoped exactly as described there: shared schema, DTO, database schema +
-migration for all **three** tables (`discovery_submissions`,
-`discovery_delivery_jobs`, `discovery_ai_briefs`), statuses, idempotency
-model (unique key + indexed fingerprint), safe-error contract, versioning
+**Phase 2C.2B — Domain model and backend contract** (§37, corrected
+2C.2A.1, further clarified 2C.2A.2), scoped exactly as described there:
+shared schema, DTO, database schema + migration for all **three** tables
+(`discovery_submissions` with `fingerprintKeyVersion`/
+`duplicateReviewStatus`, `discovery_delivery_jobs`, `discovery_ai_briefs`
+modeled per brief version), statuses, idempotency model (unique key +
+indexed fingerprint, with the same-key/different-payload case mapped to
+the `409 idempotency_conflict` contract), safe-error contract, versioning
 — no email, CRM, AI integration, route wiring, or worker execution.
 Requires a separate, explicit approval prompt before any code is written,
 per the AI-vibe-coding rules (§36) and the task brief's binding
