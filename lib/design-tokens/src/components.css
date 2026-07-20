@@ -24,17 +24,36 @@
   --sm-button-accent-background: hsl(var(--sm-mint-500));
   --sm-button-accent-text: hsl(160 30% 12%);
 
+  /* White text on danger fill passes in both themes as of Phase 1B.1's dark
+     correction (light 4.68:1, dark 4.79:1 — see semantic.css). */
+  --sm-button-danger-background: hsl(var(--sm-color-action-danger));
+  --sm-button-danger-text: hsl(0 0% 100%);
+
+  /* Disabled (Phase 1B.1) — not wired into any component this checkpoint;
+     published for the next consumer, per §29. */
+  --sm-button-disabled-background: hsl(var(--sm-color-surface-disabled));
+  --sm-button-disabled-text: hsl(var(--sm-color-text-disabled));
+  --sm-button-disabled-border: hsl(var(--sm-color-border-disabled));
+
   --sm-card-background: hsl(var(--sm-color-surface-default));
   --sm-card-border: hsl(var(--sm-color-border-default));
 
   --sm-input-border: hsl(var(--sm-color-border-default));
   --sm-input-border-focus: hsl(var(--sm-color-border-focus));
+  --sm-input-disabled-background: hsl(var(--sm-color-surface-disabled));
+  --sm-input-disabled-text: hsl(var(--sm-color-text-disabled));
+  --sm-input-disabled-border: hsl(var(--sm-color-border-disabled));
 
   --sm-badge-success-background: hsl(var(--sm-color-status-success));
   --sm-badge-success-text: hsl(var(--sm-color-text-inverse));
 
   --sm-badge-warning-background: hsl(var(--sm-color-status-warning));
   --sm-badge-warning-text: hsl(32 40% 12%);
+
+  /* Inverse (Phase 1B.1) — badges/overlays placed on a strongly colored or
+     dark-on-light-theme surface (--sm-color-bg-inverse). */
+  --sm-badge-inverse-background: hsl(var(--sm-color-bg-inverse));
+  --sm-badge-inverse-text: hsl(var(--sm-color-text-inverse));
 
   --sm-nav-link-text: hsl(var(--sm-color-text-secondary));
   --sm-nav-link-text-active: hsl(var(--sm-color-action-primary));

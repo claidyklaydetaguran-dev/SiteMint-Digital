@@ -6,13 +6,27 @@
  * consumers should prefer over primitives. Requires primitives.css to be
  * imported first.
  *
- * Two values below are corrected from helpdesk's raw historical values per
- * the Phase 1A audit (DESIGN_TOKEN_AUDIT.md, Accessibility Review) and are
- * NOT the same as a literal primitive:
+ * Three values below are corrected from helpdesk's raw historical values per
+ * the Phase 1A audit (DESIGN_TOKEN_AUDIT.md, Accessibility Review) and the
+ * Phase 1B-V rendered verification, and are NOT the same as a literal
+ * primitive:
  *   - --sm-color-border-focus (light): darkened evergreen, not raw mint
  *     (mint measured 1.96:1, failing the 3:1 non-text minimum).
  *   - --sm-color-status-success (light): darkened success hue, not raw
  *     success-500 (raw value measured 2.92:1 with white text, failing AA).
+ *   - --sm-color-action-danger / --sm-color-status-danger (dark, Phase 1B.1):
+ *     darkened from `356 65% 55%` to `356 65% 52%` — the raw value measured
+ *     4.40:1 with white text, marginally failing the 4.5:1 AA text minimum;
+ *     the corrected value measures 4.79:1. Same hue/saturation, only
+ *     lightness moved, so it stays a clearly recognizable destructive red.
+ *
+ * Phase 1B.1 also adds explicit disabled and inverse semantic roles
+ * (surface-disabled, border-disabled, text-inverse-secondary) that did not
+ * exist in Phase 1B. text-disabled (light) is additionally corrected from
+ * `155 8% 55%` to `155 8% 49%` so it clears 3:1 against both the canvas and
+ * the new disabled surface — see the Accessibility Review in
+ * DESIGN_TOKEN_AUDIT.md for why disabled labels are held to a readable-text
+ * standard here even though WCAG itself exempts truly inactive controls.
  */
 
 :root {
@@ -26,20 +40,30 @@
   --sm-color-surface-default: var(--sm-neutral-0);
   --sm-color-surface-muted: var(--sm-neutral-100);
   --sm-color-surface-interactive: var(--sm-neutral-100);
+  --sm-color-surface-disabled: var(--sm-neutral-100);
 
   /* Text (§5 Text) */
   --sm-color-text-primary: var(--sm-neutral-900);
   --sm-color-text-secondary: 155 10% 30%;
   --sm-color-text-muted: var(--sm-neutral-600);
+  /* Inverse text — for content placed on --sm-color-bg-inverse. Primary
+     pairs at 18.02:1 both themes; secondary pairs at 11.28:1 (light) /
+     7.83:1 (dark), both well above the 4.5:1 text minimum. */
   --sm-color-text-inverse: var(--sm-neutral-50);
+  --sm-color-text-inverse-secondary: 150 12% 78%;
   --sm-color-text-link: var(--sm-evergreen-900);
-  --sm-color-text-disabled: 155 8% 55%;
+  /* Corrected (Phase 1B.1) — see file header. 3.74:1 vs canvas, 3.57:1 vs
+     --sm-color-surface-disabled. */
+  --sm-color-text-disabled: 155 8% 49%;
 
   /* Border (§5 Border) */
   --sm-color-border-default: var(--sm-neutral-200);
   --sm-color-border-subtle: 152 20% 93%;
   --sm-color-border-strong: 152 10% 70%;
   --sm-color-border-focus: 160 76% 30%; /* corrected — see file header */
+  /* Decorative divider around a disabled control — like other borders
+     (§10/§Accessibility Review), not held to a text contrast minimum. */
+  --sm-color-border-disabled: 152 10% 80%;
 
   /* Action (§5 Action) */
   --sm-color-action-primary: var(--sm-evergreen-900);
@@ -76,13 +100,19 @@
   --sm-color-surface-default: var(--sm-charcoal-900);
   --sm-color-surface-muted: var(--sm-charcoal-800);
   --sm-color-surface-interactive: var(--sm-charcoal-800);
+  --sm-color-surface-disabled: var(--sm-charcoal-800);
 
   /* Text */
   --sm-color-text-primary: 150 20% 92%;
   --sm-color-text-secondary: 150 12% 78%;
   --sm-color-text-muted: 150 8% 62%;
+  /* Inverse text — for content placed on --sm-color-bg-inverse. Primary
+     pairs at 18.02:1; secondary pairs at 7.83:1. */
   --sm-color-text-inverse: var(--sm-charcoal-950);
+  --sm-color-text-inverse-secondary: 155 10% 30%;
   --sm-color-text-link: var(--sm-evergreen-700);
+  /* Already passes 3:1 against both canvas (4.09:1) and the new
+     --sm-color-surface-disabled (3.46:1) — no correction needed. */
   --sm-color-text-disabled: 150 6% 45%;
 
   /* Border */
@@ -90,6 +120,7 @@
   --sm-color-border-subtle: 158 14% 16%;
   --sm-color-border-strong: 158 10% 32%;
   --sm-color-border-focus: 160 64% 55%; /* dark ring already passes (9.96:1), unchanged */
+  --sm-color-border-disabled: 158 10% 26%;
 
   /* Action */
   --sm-color-action-primary: var(--sm-evergreen-700);
@@ -97,12 +128,16 @@
   --sm-color-action-primary-active: 160 55% 40%;
   --sm-color-action-secondary-bg: var(--sm-charcoal-800);
   --sm-color-action-secondary-text: 150 20% 92%;
-  --sm-color-action-danger: 356 65% 55%;
+  /* Corrected (Phase 1B.1) — see file header. Was 356 65% 55% (4.40:1 with
+     white text, marginal AA fail); now 4.79:1. */
+  --sm-color-action-danger: 356 65% 52%;
 
   /* Status */
   --sm-color-status-success: 152 55% 48%;
   --sm-color-status-warning: 38 90% 55%;
-  --sm-color-status-danger: 356 65% 55%;
+  /* Corrected (Phase 1B.1) — kept in sync with --sm-color-action-danger
+     above, same underlying destructive red concept. */
+  --sm-color-status-danger: 356 65% 52%;
   --sm-color-status-info: 199 75% 55%;
   --sm-color-status-neutral: 150 8% 62%;
 

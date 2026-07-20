@@ -162,7 +162,10 @@
   --accent: 160 64% 50%;
   --accent-foreground: 160 30% 12%;
 
-  --destructive: 356 72% 52%;
+  /* Transitional alias onto the shared semantic layer (value unchanged —
+     light danger already passes AA, 4.68:1). See SHARED_DESIGN_TOKENS_SPEC.md
+     §5 Action/Status. */
+  --destructive: var(--sm-color-action-danger);
   --destructive-foreground: 0 0% 100%;
   /* Corrected: darkened success fill (was raw success-500, 2.92:1 with white
      text, failing AA). See SHARED_DESIGN_TOKENS_SPEC.md §5 Status, §24. */
@@ -285,7 +288,10 @@
   --accent: 160 64% 55%;
   --accent-foreground: 160 30% 10%;
 
-  --destructive: 356 65% 55%;
+  /* Corrected (Phase 1B.1): was 356 65% 55% (4.40:1 with white text,
+     marginal AA fail); now aliased to the shared corrected value, 4.79:1.
+     See SHARED_DESIGN_TOKENS_SPEC.md §5 Action/Status. */
+  --destructive: var(--sm-color-action-danger);
   --destructive-foreground: 0 0% 100%;
   --success: var(--sm-color-status-success);
   --success-foreground: 152 40% 8%;

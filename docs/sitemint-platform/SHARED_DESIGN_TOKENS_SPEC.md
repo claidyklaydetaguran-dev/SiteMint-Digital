@@ -28,6 +28,21 @@
 > for usage and `lib/design-tokens/test/tokens.test.mjs` for the token-source
 > and corrected-contrast checks. No other artifact consumes the package yet —
 > that remains later, separately scoped Migration Strategy stages.
+>
+> **Addendum (Phase 1B.1, implemented)**: the Phase 1B-V rendered
+> verification found dark-theme `color-action-danger`/`color-status-danger`
+> measuring 4.40:1 with white text (marginal AA fail) and no dedicated
+> inverse or disabled semantic roles. Corrected: dark danger is now
+> `356 65% 52%` (4.79:1, same hue/saturation as before). Added
+> `color-surface-disabled`, `color-border-disabled`, and
+> `color-text-inverse-secondary` (light + dark, both measured), and
+> corrected `color-text-disabled` (light) from `155 8% 55%` to `155 8% 49%`
+> so it clears 3:1 against both canvas and the new disabled surface. See
+> `lib/design-tokens/src/semantic.css`'s file header for full rationale and
+> `lib/design-tokens/test/tokens.test.mjs` for the live-parsed regression
+> tests. None of the new roles are wired into a helpdesk component this
+> checkpoint — only `--destructive` was aliased in
+> `artifacts/helpdesk/src/index.css` to expose the dark danger correction.
 
 ---
 
