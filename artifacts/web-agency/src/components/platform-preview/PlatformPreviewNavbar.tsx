@@ -14,7 +14,7 @@ import {
 } from "./navConfig";
 import type { PlatformPreviewTheme } from "@/hooks/usePlatformPreviewTheme";
 
-function NavDropdown({ item }: { item: PreviewNavItem }) {
+function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?: "center" | "end" }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [location] = useLocation();
@@ -76,7 +76,9 @@ function NavDropdown({ item }: { item: PreviewNavItem }) {
         <div
           role="menu"
           aria-label={item.label}
-          className="absolute left-1/2 top-full z-[var(--sm-z-dropdown)] mt-2 w-80 -translate-x-1/2 rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-bg-elevated))] p-2 shadow-[var(--sm-shadow-lg)]"
+          className={`absolute top-full z-[var(--sm-z-dropdown)] mt-2 w-80 rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-bg-elevated))] p-2 shadow-[var(--sm-shadow-lg)] ${
+            align === "end" ? "right-0" : "left-1/2 -translate-x-1/2"
+          }`}
         >
           {item.children.map((child) =>
             child.disabled ? (
@@ -146,7 +148,7 @@ export function PlatformPreviewNavbar({
 
         <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
           {primaryNavItems.map((item) => (
-            <NavDropdown key={item.label} item={item} />
+            <NavDropdown key={item.label} item={item} align={item.label === "Company" ? "end" : "center"} />
           ))}
         </nav>
 

@@ -359,3 +359,78 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   the flag only — turning the flag on anywhere outside local/private preview,
   linking the route publicly, or promoting it to a live route are separate,
   future, explicitly-approved actions (Phase 2+).
+
+---
+
+## Checkpoint 2A.1 — AI-Native Positioning, Capability Labeling, Future Direction (implemented)
+
+> Extends Checkpoint 2A on the same route/flag; no new route, no auth change,
+> no real AI calls, no SSO/portal build. Documentation additions below are
+> **direction statements**, not commitments with a scheduled phase number —
+> they still require their own future-approved checkpoint before any is built.
+
+- **Signature interaction**: `/platform-preview`'s "What's your priority right
+  now?" business-goal selector (`BusinessGoalSelector.tsx`) is data-driven
+  (`businessGoals.ts`) and coordinates hero-adjacent copy, ecosystem/workflow
+  stage emphasis (`systemFlow.ts`, shared by both `EcosystemVisual.tsx` and
+  `ConnectedWorkflowSection.tsx` — one data source, two compositions, no
+  per-goal duplicated layout), recommended product/service badges, and a
+  contextual CTA. Session-only React state — no localStorage, cookie, or
+  cross-session persistence of the selection; a visible microcopy line
+  states this explicitly next to the control.
+- **Honest capability labeling** (`capabilityStatus.ts`, `CapabilityBadge.tsx`):
+  every system-flow stage and product carries one of four labels —
+  Available now / In development / Planned direction / Conceptual
+  demonstration — using the design-tokens' already-corrected
+  `statusbadge-*` tokens. Labels are grounded in the actual repo state
+  (e.g. the "Visible to the team" / Analytics stage is labeled **planned**
+  because no analytics tool is installed anywhere in the repo today —
+  `DESIGN_TOKEN_AUDIT.md` §21, PRD §24 — not because of a stylistic choice).
+- **AI-native operating model — documented direction, not built**: future
+  SiteMint AI product actions are intended to follow **Understand → Recommend
+  → Use an approved tool → Ask for confirmation when required → Complete the
+  action → Record the outcome → Keep the business informed**, preserving
+  human escalation, permission boundaries, auditability, structured data,
+  tenant isolation, input validation, cost controls, explicit uncertainty
+  handling, and provider independence throughout. The prototype illustrates
+  this only through the capability-labeled system-flow narrative above — it
+  performs no real AI action, calls no model, and makes no autonomous-agent
+  claim. Any implementation is a future, separately-scoped checkpoint.
+- **SEO & AI Search Visibility — recorded as a future strategic service
+  direction**, not implemented this checkpoint. Direction: important claims
+  stay as readable HTML text (never hidden/keyword-stuffed blocks), descriptive
+  headings, internally linked product/service/solution pages, visible company
+  and contact information, structured data only where it matches visible
+  content, no fabricated authorship/expertise claims, and no promise of
+  guaranteed inclusion in any AI-assisted answer surface. Current `web-agency`
+  SEO (static per-app title/meta, `sitemap.xml`/`robots.txt`) is unchanged —
+  this remains Roadmap Phase 8 scope.
+- **Future account strategy — documented direction, not built.** Phase 2A.1
+  does not implement unified customer authentication:
+  ```
+  sitemintdigital.com   → public company/marketing experience
+  SiteMint Account      → future unified customer identity + product launcher
+  AI Receptionist       → customer product (own auth, unchanged)
+  AI Toolkit            → customer product when a logged-in area exists
+  Service Client Portal → projects/files/billing/support, when built
+  Private Admin         → separate SiteMint staff identity (unchanged)
+  ```
+  Consistent with `PRODUCT_REQUIREMENTS_DOCUMENT.md` §18: any future shared
+  customer identity (with optional org workspaces/roles/SSO/passkeys) is a
+  distinct, dedicated security initiative with its own PRD, and must never
+  imply internal CRM/admin access.
+- **Performance design targets** (not measured/claimed this checkpoint — no
+  Lighthouse run occurred): LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1 as the
+  production bar this prototype is designed toward. Consistent with that bar:
+  no WebGL/canvas library, no autoplaying video, no oversized hero assets, one
+  bounded `setInterval` cycle (the living-system demo, cleared on unmount and
+  paused on hover/focus/reduced-motion), and every goal variation renders from
+  the same DOM (conditional content swap, never all variants mounted at once).
+- **Accessibility target**: WCAG 2.2 AA, not claimed as formally audited.
+  Existing Phase 2A keyboard/focus/reduced-motion verification extends to the
+  new goal-selector radiogroup (arrow-key roving tabindex, `aria-checked`,
+  `aria-live="polite"` result region) and capability badges (text-based
+  labels, not color-only meaning).
+- **Privacy**: goal selection is an explicit, visible, session-only choice —
+  no covert inference, fingerprinting, or cross-session tracking; no
+  advertising tracker is introduced this checkpoint.

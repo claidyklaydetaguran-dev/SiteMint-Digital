@@ -1,8 +1,11 @@
 import { Link } from "wouter";
-import { ArrowRight, Phone, Wrench } from "lucide-react";
+import { ArrowRight, Phone, Sparkles, Wrench } from "lucide-react";
+import { useSelectedGoal } from "./PlatformPreviewGoalContext";
+import { CapabilityBadge } from "./CapabilityBadge";
 
 const products = [
   {
+    id: "ai-receptionist",
     name: "AI Receptionist",
     icon: Phone,
     problem: "Missed calls and slow follow-up cost businesses real leads.",
@@ -11,8 +14,13 @@ const products = [
     href: "/ai-receptionist",
     cta: "See AI Receptionist",
     available: true,
+    // The product itself is live and in production use (root CLAUDE.md
+    // protected-file list). "Coming to sitemintdigital.com" below refers only
+    // to AI Toolkit's main-site entry point, a separate, narrower gap.
+    capability: "available" as const,
   },
   {
+    id: "ai-toolkit",
     name: "AI Toolkit",
     icon: Wrench,
     problem: "Teams juggle too many disconnected AI tools for everyday work.",
@@ -21,10 +29,17 @@ const products = [
     href: null,
     cta: "Coming to sitemintdigital.com",
     available: false,
+    // The product exists and is deployed (its own standalone app, real
+    // checkout) — only its entry point from the main site is missing, which
+    // is why the badge below is "available" while the CTA still explains
+    // the discoverability gap explicitly (Blueprint §22 "orphaned product").
+    capability: "available" as const,
   },
 ];
 
 export function ProductsSection() {
+  const { selectedGoal } = useSelectedGoal();
+
   return (
     <section aria-labelledby="pp-products-heading" className="px-4 py-20 md:px-8 md:py-28">
       <div className="mx-auto max-w-[1280px]">
@@ -40,14 +55,29 @@ export function ProductsSection() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {products.map((product) => {
             const Icon = product.icon;
+            const isRecommended = selectedGoal.recommendedProductIds.includes(product.id);
             return (
               <div
-                key={product.name}
-                className="flex flex-col rounded-[var(--sm-radius-xl)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-8 shadow-[var(--sm-shadow-sm)]"
+                key={product.id}
+                className="relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 shadow-[var(--sm-shadow-sm)] transition-colors"
+                style={{
+                  borderColor: isRecommended ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
+                  backgroundColor: "hsl(var(--sm-color-surface-default))",
+                }}
               >
-                <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-[var(--sm-radius-md)] bg-[var(--sm-button-accent-background)] text-[var(--sm-button-accent-text)]">
-                  <Icon size={22} aria-hidden="true" />
-                </span>
+                {isRecommended && (
+                  <span className="absolute -top-3 left-8 inline-flex items-center gap-1 rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-color-action-primary))] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-text-inverse))]">
+                    <Sparkles size={11} aria-hidden="true" />
+                    Recommended for you
+                  </span>
+                )}
+
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-[var(--sm-radius-md)] bg-[var(--sm-button-accent-background)] text-[var(--sm-button-accent-text)]">
+                    <Icon size={22} aria-hidden="true" />
+                  </span>
+                  <CapabilityBadge level={product.capability} />
+                </div>
                 <h3 className="pp-font-display text-xl font-semibold text-[hsl(var(--sm-color-text-primary))]">{product.name}</h3>
                 <p className="mt-2 text-sm font-medium text-[hsl(var(--sm-color-action-primary))]">{product.problem}</p>
                 <p className="mt-3 flex-1 text-sm leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">{product.description}</p>

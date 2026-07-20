@@ -1,14 +1,18 @@
-const steps = [
-  { label: "Visitor arrives", note: "On your website or a product landing page." },
-  { label: "Inquiry captured", note: "Contact, Discovery, or product signup form." },
-  { label: "AI or team responds", note: "AI Receptionist or your team follows up." },
-  { label: "Lead enters CRM", note: "Every inquiry becomes a tracked record." },
-  { label: "Follow-up begins", note: "Automated or manual, nothing sits idle." },
-  { label: "Appointment or next action", note: "The lead moves toward a real outcome." },
-  { label: "Visible to the team", note: "Every touchpoint is visible in one place." },
-];
+import { Sparkles } from "lucide-react";
+import { systemStages } from "./systemFlow";
+import { useSelectedGoal } from "./PlatformPreviewGoalContext";
+import { CapabilityBadge } from "./CapabilityBadge";
 
+/**
+ * Detailed vertical read of the same systemStages data EcosystemVisual
+ * animates — no separate hardcoded step list. Steps matching the selected
+ * business goal (BusinessGoalSelector) get a "Focus for your goal" badge,
+ * so the two sections read as one coordinated system rather than two
+ * unrelated diagrams.
+ */
 export function ConnectedWorkflowSection() {
+  const { selectedGoal } = useSelectedGoal();
+
   return (
     <section aria-labelledby="pp-workflow-heading" className="px-4 py-20 md:px-8 md:py-28">
       <div className="mx-auto max-w-4xl">
@@ -24,23 +28,39 @@ export function ConnectedWorkflowSection() {
         </div>
 
         <ol className="flex flex-col gap-3">
-          {steps.map((step, index) => (
-            <li
-              key={step.label}
-              className="flex items-start gap-4 rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-5"
-            >
-              <span
-                aria-hidden="true"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--sm-radius-pill)] bg-[var(--sm-button-primary-background)] text-sm font-semibold text-[var(--sm-button-primary-text)]"
+          {systemStages.map((stage, index) => {
+            const isEmphasized = selectedGoal.emphasizedStageIds.includes(stage.id);
+            return (
+              <li
+                key={stage.id}
+                className="flex items-start gap-4 rounded-[var(--sm-radius-lg)] border p-5 transition-colors"
+                style={{
+                  borderColor: isEmphasized ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
+                  backgroundColor: isEmphasized ? "hsl(var(--sm-mint-100) / 0.5)" : "hsl(var(--sm-color-surface-default))",
+                }}
               >
-                {index + 1}
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">{step.label}</p>
-                <p className="text-sm text-[hsl(var(--sm-color-text-muted))]">{step.note}</p>
-              </div>
-            </li>
-          ))}
+                <span
+                  aria-hidden="true"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--sm-radius-pill)] bg-[var(--sm-button-primary-background)] text-sm font-semibold text-[var(--sm-button-primary-text)]"
+                >
+                  {index + 1}
+                </span>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">{stage.label}</p>
+                    <CapabilityBadge level={stage.capability} />
+                    {isEmphasized && (
+                      <span className="inline-flex items-center gap-1 rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-color-action-primary))] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-text-inverse))]">
+                        <Sparkles size={10} aria-hidden="true" />
+                        Focus for your goal
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-[hsl(var(--sm-color-text-muted))]">{stage.note}</p>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </section>

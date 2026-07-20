@@ -1,8 +1,10 @@
 import { Link } from "wouter";
-import { ArrowRight, Bot, Code2, LayoutTemplate, LineChart, Search, Wrench } from "lucide-react";
+import { ArrowRight, Bot, Code2, LayoutTemplate, LineChart, Search, Sparkles, Wrench } from "lucide-react";
+import { useSelectedGoal } from "./PlatformPreviewGoalContext";
 
 const services = [
   {
+    id: "websites",
     name: "Websites",
     icon: LayoutTemplate,
     problem: "Businesses that look outdated online lose trust before a call ever happens.",
@@ -10,6 +12,7 @@ const services = [
     deliverable: "A responsive, SEO-ready website your team can maintain.",
   },
   {
+    id: "web-apps",
     name: "Web Applications",
     icon: Code2,
     problem: "Off-the-shelf software rarely fits how a business actually operates.",
@@ -17,6 +20,7 @@ const services = [
     deliverable: "A purpose-built internal or customer-facing application.",
   },
   {
+    id: "crm",
     name: "CRM Systems",
     icon: Bot,
     problem: "Leads scattered across inboxes and spreadsheets go cold.",
@@ -24,6 +28,7 @@ const services = [
     deliverable: "A working CRM, configured for your pipeline.",
   },
   {
+    id: "automation",
     name: "Business Automation",
     icon: Wrench,
     problem: "Manual follow-up and repetitive admin work eat time that should go to customers.",
@@ -31,6 +36,7 @@ const services = [
     deliverable: "Documented automations connected to your existing systems.",
   },
   {
+    id: "seo",
     name: "SEO & Digital Growth",
     icon: Search,
     problem: "A site that isn't found doesn't generate leads.",
@@ -38,6 +44,7 @@ const services = [
     deliverable: "A technically sound, search-ready site structure.",
   },
   {
+    id: "maintenance",
     name: "Maintenance & Support",
     icon: LineChart,
     problem: "Sites and systems that aren't maintained slowly break or fall behind.",
@@ -47,6 +54,8 @@ const services = [
 ];
 
 export function ServicesSection() {
+  const { selectedGoal } = useSelectedGoal();
+
   return (
     <section aria-labelledby="pp-services-heading" className="bg-[hsl(var(--sm-color-bg-subtle))] px-4 py-20 md:px-8 md:py-28">
       <div className="mx-auto max-w-[1280px]">
@@ -72,12 +81,24 @@ export function ServicesSection() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((service) => {
             const Icon = service.icon;
+            const isRecommended = selectedGoal.recommendedServiceIds.includes(service.id);
             return (
               <Link
-                key={service.name}
+                key={service.id}
                 href="/services"
-                className="group flex flex-col rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-6 transition-shadow hover:shadow-[var(--sm-shadow-md)]"
+                className="group relative flex flex-col rounded-[var(--sm-radius-lg)] border p-6 transition-shadow hover:shadow-[var(--sm-shadow-md)]"
+                style={{
+                  borderColor: isRecommended ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
+                  backgroundColor: "hsl(var(--sm-color-surface-default))",
+                }}
               >
+                {isRecommended && (
+                  <span className="absolute -top-2.5 right-5 inline-flex items-center gap-1 rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-color-action-primary))] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-text-inverse))]">
+                    <Sparkles size={10} aria-hidden="true" />
+                    For you
+                  </span>
+                )}
+
                 <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-md)] bg-[hsl(var(--sm-mint-100))] text-[hsl(var(--sm-color-action-primary))]">
                   <Icon size={18} aria-hidden="true" />
                 </span>
