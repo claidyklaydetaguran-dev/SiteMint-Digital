@@ -1,4 +1,4 @@
-# Portfolio Asset Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2, current captures validated in 2B.2.3)
+# Portfolio Asset Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2, current captures validated in 2B.2.3, Claidy crop corrected in 2B.2.3.1)
 
 > Originally prepared 2026-07-20 in Phase 2B.2, branch
 > `claude/phase-2b2-portfolio-assets-8vh4q1`, based on
@@ -181,34 +181,66 @@ this checkpoint.
 
 ## 7. What remains before Phase 2B.3 can wire real images into `SelectedWorkSection.tsx`
 
-1. A **fresh current desktop and mobile capture** for Shasta Greene (the
-   existing capture is rejected — see §8), and a documented owner permission
-   record.
-2. A **fresh current desktop and mobile capture** for OneFilAm Community
-   (the existing capture is historical-reference-only — see §8), plus
-   organizational permission.
-3. A **current-site verification** and **mobile capture** for Herlinda
-   Valdovinos, plus explicit client permission (the existing desktop
-   screenshot is visually approved and may be reusable once verified current
-   — see §8).
-4. ~~A separate owner review of whether `portfolio-claidy.png` may be used
-   as a temporary supporting entry~~ — **resolved in Phase 2B.2.3**: the
-   owner supplied current captures for Claidy and reviewed them directly;
-   see §10.
-5. A design decision for the dark-theme treatment of these (currently
+> **Reconciled in Phase 2B.2.3.1.** The items below originally read as if no
+> captures existed yet for any project. As of Phase 2B.2.3, current captures
+> exist for all five projects (four existing + Hand Homecare); several of
+> the original "remains" items are now resolved, and this section is
+> rewritten per-project below so completed capture work is no longer
+> presented as unresolved. Nothing here erases the original findings —
+> they remain in §8 and §10 with full detail; this is a status reconciliation
+> only.
+
+**Shasta Greene Real Estate** — *open*
+- Current desktop and mobile captures were supplied (Phase 2B.2.3).
+- Both were rejected (stats row + feedback widget both still visible).
+- **Fresh recapture still required** — this remains fully open.
+- Owner permission record and a resolved standard aspect ratio for the
+  eventual replacement asset (see §8.2/§10.1) also remain open.
+
+**OneFilAm Community** — *partially resolved — remaining item listed*
+- Current desktop and mobile captures were supplied (Phase 2B.2.3).
+- Both were visually approved and optimized.
+- **Capture task: resolved by Phase 2B.2.3.**
+- **Organizational approval remains open.**
+
+**Herlinda Valdovinos** — *partially resolved — remaining item listed*
+- Current desktop was supplied and visually approved (Phase 2B.2.3).
+- **Desktop capture task: resolved by Phase 2B.2.3.**
+- Mobile was supplied but **rejected** because the navigation does not
+  collapse into a mobile menu (a live responsive-design gap).
+- **Mobile responsive improvement and recapture remain open.**
+- **Client permission remains open.**
+- Current URL updated by the owner to
+  `https://sunshine-herlinda-site.replit.app/` (Phase 2B.2.3); not
+  independently browser-verified.
+
+**Claidy Taguran Portfolio** — *partially resolved — remaining item listed*
+- Current desktop was supplied but **rejected** due to the missing animated
+  word "Solutions" in the headline.
+- **Desktop recapture remains open.**
+- Current mobile was supplied; a corrected hero crop excluding the
+  statistics row was prepared in **this checkpoint (Phase 2B.2.3.1)** after
+  the Phase 2B.2.3 output was found to still contain the statistics (see
+  §10.3/§10.4 correction notes).
+- **Mobile capture task: resolved by Phase 2B.2.3.1.**
+- **Permission remains open** (placement approved; screenshot/publication
+  permission is not).
+
+**Hand Homecare** *(new, Phase 2B.2.3)* — *partially resolved — remaining item listed*
+- Current desktop and mobile were supplied and visually approved.
+- **Capture task: resolved by Phase 2B.2.3.**
+- **SiteMint attribution confirmation remains open.**
+- **Publication permission remains open.**
+
+**Cross-cutting items still open:**
+1. A design decision for the dark-theme treatment of these (currently
    light/bright) screenshots inside `SelectedWorkSection.tsx`'s dark
    browser-chrome frame.
-6. A resolved standard aspect ratio for the Shasta replacement asset — still
-   open; see §10.1, the Phase 2B.2.3 Shasta captures were rejected for the
-   same underlying reasons as Phase 2B.2.1 plus a still-visible feedback
-   widget.
-7. Adoption of a data-driven portfolio model — direction refined in §10.7
+2. A resolved standard aspect ratio for the Shasta replacement asset — see
+   §8.2/§10.1.
+3. Adoption of a data-driven portfolio model — direction refined in §10.7
    (supersedes §9) with fields for per-project image fit/position and
    owner-verification status.
-8. **New as of Phase 2B.2.3:** current desktop/mobile captures now exist for
-   Shasta, OneFilAm, Herlinda, and Claidy (owner-supplied), plus a new
-   candidate project, Hand Homecare. See §10 for the full validation and
-   optimization record.
 
 ## 8. Phase 2B.2.1 corrections (owner review of the Phase 2B.2 package)
 
@@ -413,6 +445,18 @@ not be copied into SiteMint's own marketing copy.
 - URL unchanged: `https://ClaidyTaguranPorfolio.replit.app`, misspelling
   retained exactly as supplied.
 
+> **Correction (Phase 2B.2.3.1):** the file actually produced in Phase
+> 2B.2.3 (`claidy-taguran-mobile.webp`, MD5 `886660a3230c0a61a9d0c48928141eb4`)
+> was a straight resize of the full 388×836 source, not a crop — it still
+> visibly contained the "10+ Projects Completed / 3+ Years Experience /
+> 100% Client Satisfaction" statistics row, contradicting the "after the
+> intentional hero crop" language above. That was a mismatch between the
+> stated decision and the actual asset, not an intentional inclusion. This
+> checkpoint replaces that file with a real top-anchored crop
+> (0, 0, 388, 528) of the same source that excludes the entire statistics
+> region while preserving the full headline, supporting text, and both
+> CTAs. See §10.4/§10.5 below for the corrected output details.
+
 **Shasta Greene Real Estate**
 - Project strategy: reserved future featured project (placement intent
   unchanged from Phase 2B.2.1).
@@ -464,14 +508,31 @@ capture dimensions were preserved in every case — **no source was
 upscaled**. Shasta's two captures and Claidy's desktop capture were **not**
 optimized or placed in this directory, per the rejections above.
 
-| Source | Output file | Dimensions (unchanged) | Source size | Output size | Quality | Ratio | Output MD5 |
+| Source | Output file | Dimensions | Source size | Output size | Quality | Ratio | Output MD5 |
 |---|---|---|---|---|---|---|---|
-| `claidy-taguran-mobile-current.png` | `claidy-taguran-mobile.webp` | 388×836 | 464,383 B | 49,574 B | WebP q85 | 9.4x | `886660a3230c0a61a9d0c48928141eb4` |
+| `claidy-taguran-mobile-current.png` | `claidy-taguran-mobile.webp` | ~~388×836~~ **388×528 (cropped, Phase 2B.2.3.1 — see below)** | 464,383 B | ~~49,574 B~~ **34,842 B** | WebP q85 | 13.3x | ~~`886660a3230c0a61a9d0c48928141eb4`~~ **`c1b314d945ad4e09c8c6c2751aea9a78`** |
 | `onefilam-community-desktop-current.png` | `onefilam-community-desktop.webp` | 1221×844 | 895,561 B | 61,584 B | WebP q85 | 14.5x | `e103f6b8172b20afcf2f9e78269c8898` |
 | `onefilam-community-mobile-current.png` | `onefilam-community-mobile.webp` | 388×840 | 202,414 B | 33,648 B | WebP q85 | 6.0x | `ee647a093d959b12874cacbdd2a09933` |
 | `hand-homecare-desktop-current.png` | `hand-homecare-desktop.webp` | 1221×850 | 1,606,686 B | 100,604 B | WebP q85 | 16.0x | `5c25f0e1e6e9dbce7305231152cf8a19` |
 | `hand-homecare-mobile-current.png` | `hand-homecare-mobile.webp` | 388×838 | 388,897 B | 43,998 B | WebP q85 | 8.8x | `82f911811846140982e70a90d46f4446` |
 | `herlinda-valdovinos-desktop-current.png` | `herlinda-valdovinos-desktop.webp` | 1218×804 | 1,695,624 B | 103,820 B | WebP q85 | 16.3x | `50a7eb4357c6be991e4c47a0d640091e` |
+
+**Phase 2B.2.3.1 correction — Claidy mobile crop:** the Phase 2B.2.3 output
+above was a straight resize of the full source (statistics visible),
+mismatched against the stated "after crop" decision. It has been replaced
+in-place (same filename, same directory — this is the exact asset the
+correction targets) with a genuine top-anchored crop:
+
+| Field | Value |
+|---|---|
+| Source | `claidy-taguran-mobile-current.png`, 388×836, 464,383 B, SHA-256 `83badfbf90c6ba5131dec4b3bcfc8317bc27b6ca46c48ddfa4da86e4e112a2c3` |
+| Crop rectangle | `(0, 0, 388, 528)` — top-anchored, full width preserved, height reduced from 836 to 528 |
+| Excluded content | The entire statistics row ("10+ Projects Completed," "3+ Years Experience," "100% Client Satisfaction") and the "SCROLL" indicator below it |
+| Preserved content | Claidy logo/wordmark, mobile menu icon, "Available for Projects · Bohol, Philippines" label, full headline ("Building Digital / Solutions / That Drive Results"), supporting description, "View My Work" CTA, "Let's Talk" secondary action |
+| Output | `artifacts/web-agency/public/portfolio/current/claidy-taguran-mobile.webp`, 388×528, 34,842 B, WebP q85, MD5 `c1b314d945ad4e09c8c6c2751aea9a78` |
+| Upscaling | None — output width equals source width; only height was reduced by cropping |
+| Generated/reconstructed content | None — pure crop of real captured pixels, no fill, no extension |
+| Visual verification | Confirmed by direct inspection: complete headline including "Solutions," supporting text fully readable, both CTAs visible, no statistics or numerical claims visible, no distortion, no blank/generated area |
 
 All six outputs verified: open correctly, non-zero dimensions, no visible
 corruption, text fully legible, no upscaling, no generated/inpainted
@@ -570,25 +631,26 @@ and viewport produced).
 | implementationStatus | Not implementation-approved |
 | publicationStatus | Not publication-approved |
 
-**Claidy Taguran Portfolio**
+**Claidy Taguran Portfolio** *(corrected in Phase 2B.2.3.1 — see the §10.4 correction note above)*
 | Field | Value |
 |---|---|
 | sourceWidth / sourceHeight | 1222 / 842 (desktop, rejected), 388 / 836 (mobile) |
-| outputWidth / outputHeight | Desktop: N/A (rejected). Mobile: 388 / 836 — unscaled |
-| aspectRatio | Mobile ≈0.46:1 — native |
+| outputWidth / outputHeight | Desktop: N/A (rejected). Mobile: **388 / 528** — cropped (0, 0, 388, 528), not upscaled |
+| aspectRatio | Mobile ≈0.735:1 (post-crop) — not the source's native 0.46:1, intentionally, to exclude the statistics region |
 | objectFit | `cover` (mobile) |
 | objectPosition | `top center` (mobile) |
-| recommendedCrop | Desktop: none — a recapture with the full animated headline is required, not a crop. Mobile: already reflects the intentional hero crop the owner approved |
+| recommendedCrop | Desktop: none — a recapture with the full animated headline is required, not a crop. Mobile: **(0, 0, 388, 528)**, applied this checkpoint — top-anchored, excludes the entire statistics row and the scroll indicator, preserves logo/menu/availability-label/full headline/description/both CTAs |
 | desktopAsset | none (reference only — recapture required) |
-| mobileAsset | `/portfolio/current/claidy-taguran-mobile.webp` |
+| mobileAsset | `/portfolio/current/claidy-taguran-mobile.webp` (corrected file, MD5 `c1b314d945ad4e09c8c6c2751aea9a78`) |
 | fallbackAsset | `/portfolio-claidy.png` (Phase 2B.2/2B.2.2 historical reference, desktop only) |
 | captureSource | Owner-supplied |
 | captureDate | Not supplied |
 | currentSiteVerifiedByOwner | Owner-supplied capture; not independently browser-verified by this environment |
-| visuallyApproved | Desktop: no (incomplete headline). Mobile: yes |
-| permissionStatus | Placement approved (future supporting); screenshot/publication permission not approved |
+| visuallyApproved | Desktop: no (incomplete headline). Mobile: **yes — the corrected crop**, confirmed statistics-free |
+| permissionStatus | Placement approved (future supporting); screenshot/publication permission **not** approved by the visual crop correction — a clean crop is not a permission grant |
 | implementationStatus | Not implementation-approved |
 | publicationStatus | Not publication-approved |
+| metricPermission | N/A — no metric was ever visible or claimed in the corrected crop; the crop correction grants no metric permission of any kind |
 
 ### 10.6 Recommended Phase 2B.3 project lineup (recommendation only — not implemented)
 
@@ -647,3 +709,38 @@ Claidy pending a desktop recapture), and a `visualApprovalStatus` distinct
 from `permissionStatus` so a visually-clean image never implies permission
 that hasn't been granted. Adopting this model remains a Phase 2B.3
 implementation decision — no code was changed this checkpoint.
+
+## 11. Phase 2B.2.3.1 — Claidy Mobile Crop Correction
+
+**What was wrong:** the Claidy mobile asset produced in Phase 2B.2.3
+(`claidy-taguran-mobile.webp`) was a straight resize of the full
+388×836 source at unchanged aspect ratio. It still visibly contained the
+"10+ Projects Completed / 3+ Years Experience / 100% Client Satisfaction"
+statistics row — the exact content the Phase 2B.2.3 visual decision said
+would be excluded "after the intentional hero crop." The crop had been
+described but not actually performed.
+
+**What was corrected:** the same file was replaced (same filename, same
+directory — this is precisely the asset the correction targets) with a
+genuine top-anchored crop of the original owner-supplied source,
+`(0, 0, 388, 528)`, re-verified against the original SHA-256
+(`83badfbf90c6ba5131dec4b3bcfc8317bc27b6ca46c48ddfa4da86e4e112a2c3`) before
+cropping. The new output is 388×528, 34,842 B, WebP quality 85, MD5
+`c1b314d945ad4e09c8c6c2751aea9a78`.
+
+**What the crop preserves:** the Claidy logo/wordmark, the mobile menu
+icon, the "Available for Projects · Bohol, Philippines" label, the
+complete headline ("Building Digital / **Solutions** / That Drive
+Results"), the supporting description, the "View My Work" CTA, and the
+"Let's Talk" secondary action.
+
+**What the crop excludes:** the entire statistics row (10+/3+/100% and
+their labels) and the "SCROLL" indicator below it.
+
+**What this correction does not do:** it does not upscale, stretch,
+regenerate, or extend any part of the source image — only a rectangular
+crop was applied, at native resolution. It does not change Claidy's
+permission, implementation, or publication status, and it does not
+constitute metric permission of any kind (see §10.5's updated Claidy block
+and `PORTFOLIO_PERMISSION_MANIFEST.md`). No other project's asset, status,
+or permission was touched by this correction.

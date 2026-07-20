@@ -763,3 +763,27 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   with `visualApprovalStatus`, `imageFit`/`imagePosition`, and
   `currentSiteVerifiedByOwner` fields to reflect owner-attested vs.
   independently-verified status.
+
+## Checkpoint 2B.2.3.1 — Correct Claidy Mobile Crop and Reconcile Portfolio Manifest Status (implemented)
+
+> Narrow asset + documentation correction. No application code, routes, or
+> `SelectedWorkSection.tsx` changed.
+
+- The Claidy mobile asset from Phase 2B.2.3 was found to still contain the
+  full statistics row (a straight resize, not the crop the stated decision
+  described). Replaced with a real top-anchored crop of the original
+  owner-supplied source that excludes the entire statistics region while
+  preserving the logo, menu icon, availability label, full headline
+  (including "Solutions"), description, and both CTAs. No upscaling, no
+  generated content — a pure crop of real captured pixels.
+- Reconciled the asset manifest's "remaining work" section on a per-project
+  basis so completed capture tasks (OneFilAm, Herlinda desktop, Hand
+  Homecare, Claidy mobile) are labeled resolved, while genuinely open items
+  (Shasta recapture, Herlinda mobile/permission, Claidy desktop/permission,
+  Hand Homecare attribution/permission) remain clearly open. No audit
+  history was deleted.
+- Clarified in the permission manifest that the corrected, statistics-free
+  Claidy mobile crop does not grant screenshot, implementation, publication,
+  or metric permission — a clean image is not a permission signal. No other
+  project's permission status was elevated.
+- Phase 2B.3 (portfolio UI implementation) remains unapproved.

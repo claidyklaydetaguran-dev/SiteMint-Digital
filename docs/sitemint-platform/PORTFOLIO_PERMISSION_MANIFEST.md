@@ -1,4 +1,4 @@
-# Portfolio Permission Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2 and 2B.2.3)
+# Portfolio Permission Manifest — Phase 2B.2 (corrected in 2B.2.1, updated in 2B.2.2 and 2B.2.3, Claidy crop reconciled in 2B.2.3.1)
 
 > Originally prepared 2026-07-20 in Phase 2B.2 (`claude/phase-2b2-portfolio-assets-8vh4q1`
 > @ `0ca3f4311d4a688aa0167797db54cd6cace4b450`). **Corrected 2026-07-20 in
@@ -8,7 +8,9 @@
 > screenshots for all four existing projects plus a new candidate, **Hand
 > Homecare** — see the per-project "Phase 2B.2.3" notes below and
 > `PORTFOLIO_ASSET_MANIFEST.md` §10 for the full validation/optimization
-> record.
+> record. **Updated in Phase 2B.2.3.1** to reconcile Claidy's mobile asset
+> after its crop was corrected — a clean image is not a permission grant;
+> see the Claidy section's "Phase 2B.2.3.1 correction" note below.
 >
 > This manifest records **approval status only**. It does not grant approval.
 > Nothing here should be read as "cleared for public use" unless the status
@@ -234,6 +236,25 @@ used as SiteMint outcome claims. The URL is unchanged
 (`https://ClaidyTaguranPorfolio.replit.app`, misspelling retained exactly
 as supplied) and remains unverified by any independent browser this
 session.
+
+**Phase 2B.2.3.1 correction:** the mobile file actually produced in Phase
+2B.2.3 was found to still contain the full statistics row — it had been
+resized, not cropped, contradicting the "after an intentional hero crop"
+language above. This checkpoint replaces that file with a real crop
+`(0, 0, 388, 528)` of the same owner-supplied source that excludes the
+entire statistics region while keeping the logo, menu icon, availability
+label, full headline, description, and both CTAs intact. **This crop
+correction changes nothing about permission status.** To be explicit,
+since a clean image can be mistaken for a permission signal:
+- **Screenshot permission:** still not granted — remains "not approved for
+  public use; may be prepared as a temporary internal asset only."
+- **Implementation approval:** still not granted.
+- **Public publication approval:** still not granted.
+- **Metric permission:** still N/A / not granted — the corrected crop
+  contains no visible metric at all now, and even if it did, Claidy's own
+  self-reported numbers could never become a SiteMint metric claim.
+- No other project's permission, implementation, or publication status was
+  elevated by this correction.
 
 ### Hand Homecare *(new candidate, Phase 2B.2.3)*
 
