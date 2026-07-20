@@ -135,46 +135,63 @@ current mobile capture also remains required.
 
 | Field | Value |
 |---|---|
-| Relationship | Deferred — team member's personal portfolio; relationship to SiteMint (built-by vs. self-built) undocumented |
+| Relationship | Team member's personal portfolio; relationship to SiteMint (built-by vs. self-built) still undocumented |
 | Screenshot owner | Claidy Taguran |
 | Website owner | Claidy Taguran |
-| Project-placement status | **Remains deferred** (owner decision, Phase 2B.2.1 — unchanged from Phase 2B.2) |
-| Current approval state | **Internal confirmation and URL verification pending** |
-| Who must approve | Claidy (confirm URL, live status, and whether SiteMint may present it as company work) |
-| Approval method | Not yet recorded |
-| Approval date | — |
-| Permitted uses | Not defined — deferred |
-| Prohibited uses | Do not optimize, implement, or approve any Claidy portfolio asset until deferred status is resolved |
-| Expiration / re-review date | Re-review once URL/live-status confirmed |
-| Public-link permission | Deferred |
-| Screenshot permission | Deferred — **not** added to the optimized/approved asset set |
+| Project-placement status | **Approved as a future supporting project** (owner decision, this checkpoint — supersedes the "deferred" placement from Phase 2B.2/2B.2.1) |
+| Current URL | `https://ClaidyTaguranPorfolio.replit.app` — kept as-is, misspelling included, because it is the actual deployment address; a custom domain is not required for a public Replit deployment to be linkable |
+| Current approval state | **Historical reference — current browser verification pending** |
+| Who must approve | Claidy (confirm live status and whether SiteMint may present it as company work); owner has already approved the *placement* decision below |
+| Approval method | Owner decision recorded this checkpoint for placement; permission/publication approval not yet recorded |
+| Approval date | — (placement decision only, this checkpoint) |
+| Permitted uses | The existing real portfolio screenshot (`portfolio-claidy.png`) may be used **temporarily** as a supporting visual, pending owner review, with its status clearly marked internally |
+| Prohibited uses | Do not describe the project or its screenshot as newly launched, recently verified, or currently updated; do not use `attached_assets/screenshots/claidytaguranportfolio_replit_app.png` (the stale "app isn't live yet" placeholder) for anything |
+| Expiration / re-review date | Replace the screenshot and/or URL whenever Claidy publishes a custom domain or supplies a newer capture |
+| Public-link permission | Not yet approved — link may remain disabled/omitted in the UI until the deployment's live status is confirmed |
+| Screenshot permission | Not approved for public use; may be prepared as a temporary internal asset only |
 | Logo permission | Not evaluated |
 | Case-study permission | Not evaluated |
-| Metric permission | N/A |
-| Status | **Deferred** |
+| Metric permission | N/A — the screenshot's visible stats (10+ Projects, 3+ Years, 100% Satisfaction) are Claidy's own claims about Claidy's work and must never be attributed to SiteMint |
+| Status | **Future supporting project — placement approved; permission, implementation, and public-publication all remain unapproved** |
 
-Open questions carried forward from Phase 2B.1/2B.2, still unresolved:
-1. Correct current URL — `ClaidyTaguranPorfolio.replit.app` (misspelled,
-   live per existing screenshot) vs. the correctly-spelled variant (shows
-   Replit's "not live yet" placeholder in the existing capture).
+**Verification attempted this checkpoint:** a real Chromium/Playwright
+browser was pointed directly at `https://ClaidyTaguranPorfolio.replit.app`
+(not curl/DNS/search-index metadata) and failed identically on three
+attempts with `net::ERR_TUNNEL_CONNECTION_FAILED`, matching the same 403
+proxy-policy denial already recorded for the other three project domains.
+This is an environment-side block, not evidence that the site is private,
+broken, or unpublished — see `CLAIDY_CAPTURE_VALIDATION.txt` (delivered
+directly to the owner, not committed to the repo) for the full attempt log.
+The owner independently attempted the same URL from their own web
+environment and also could not confirm reachability from there, so **the
+site's actual live/public status remains unconfirmed by anyone this
+session** — it is not confirmed broken, and it is not confirmed live.
+
+Open questions carried forward, still unresolved:
+1. Whether the Replit deployment is actually reachable by the public (only
+   a direct browser test from an unrestricted network can confirm this).
 2. Whether SiteMint may present this as company work vs. Claidy's personal
    project.
-3. Whether the existing screenshot represents the final live product.
-4. Whether the misspelled URL will remain in use.
+3. Whether the existing screenshot represents the current live product.
+4. Whether the misspelled URL will remain in use long-term (owner has
+   confirmed it should remain in use *for now*, since changing the text
+   would break the actual address).
 
-No Claidy asset was optimized, implemented, or approved this checkpoint,
-consistent with the deferred directive.
+No Claidy asset was optimized, implemented, or marked permission-approved
+this checkpoint. Only the project-placement status changed, per explicit
+owner decision.
 
-## Summary (as of Phase 2B.2.1)
+## Summary (as of this checkpoint)
 
 | Project | Project-placement | Current asset status |
 |---|---|---|
 | Shasta Greene Real Estate | Featured — approved | Prepared reference — recapture required; not implementation-approved |
 | OneFilAm Community | Supporting — approved in principle | Historical/prepared reference only; current recapture + organizational approval required |
 | Herlinda Valdovinos | Supporting — approved, contingent on client permission | Visually approved candidate; client permission + current-site verification + mobile capture required |
-| Claidy Taguran Portfolio | Deferred | Not prepared; not evaluated |
+| Claidy Taguran Portfolio | **Future supporting — approved** | Historical reference (existing `portfolio-claidy.png`) — current browser verification pending; not permission-, implementation-, or publication-approved |
 
 No project has reached permission-approved, implementation-approved, or
 public-publication-approved status. No current asset in this manifest is
-ready for Phase 2B.3 without a fresh capture (Shasta, OneFilAm) or explicit
-client permission plus a mobile capture (Herlinda).
+ready for Phase 2B.3 without a fresh capture (Shasta, OneFilAm), explicit
+client permission plus a mobile capture (Herlinda), or owner review of the
+temporary fallback asset (Claidy).

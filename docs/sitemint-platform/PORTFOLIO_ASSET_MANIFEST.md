@@ -1,12 +1,17 @@
-# Portfolio Asset Manifest — Phase 2B.2 (corrected in Phase 2B.2.1)
+# Portfolio Asset Manifest — Phase 2B.2 (corrected in Phase 2B.2.1, updated for Claidy placement)
 
 > Originally prepared 2026-07-20 in Phase 2B.2, branch
 > `claude/phase-2b2-portfolio-assets-8vh4q1`, based on
 > `claude/sitemint-phase-2b1-audit-wtoai0` @
 > `0ca3f4311d4a688aa0167797db54cd6cace4b450`. **Corrected 2026-07-20 in
 > Phase 2B.2.1** following owner visual review of the Phase 2B.2 owner-review
-> package — see §8 below. Does not modify `SelectedWorkSection.tsx`, the
-> platform-preview homepage, routes, or navigation.
+> package — see §8 below. **Updated again 2026-07-20** to record the owner's
+> decision approving Claidy Taguran Portfolio as a future supporting project
+> (placement only — no permission, implementation, or publication approval)
+> after a controlled browser retry of its exact URL was blocked by this
+> environment's proxy policy — see §6 and §9. Does not modify
+> `SelectedWorkSection.tsx`, the platform-preview homepage, routes, or
+> navigation.
 
 ## 1. Environment constraint (read first)
 
@@ -152,24 +157,26 @@ this checkpoint.
 | Fixed aspect ratio | `aspect-[16/9]`, `object-cover` |
 | May ship in 2B.3? | **No** — explicit client permission, current-site verification, and a mobile capture are all required first |
 
-### DEFERRED — Claidy Taguran Portfolio
+### ADDITIONAL SUPPORTING (future) — Claidy Taguran Portfolio
 
 | Field | Value |
 |---|---|
 | Category | Developer Portfolio |
-| Desktop asset | Not prepared this checkpoint (deferred) |
-| Mobile asset | Not available |
-| Fallback asset | N/A |
-| Alt text (draft) | N/A — do not draft until deferred status is resolved |
-| Public URL | Unresolved — two conflicting Replit URL spellings, see `PORTFOLIO_PERMISSION_MANIFEST.md` |
-| CTA label | N/A |
-| Permission status | Deferred |
-| Recommended crop | N/A |
-| Light/dark-theme treatment | N/A |
-| Mobile treatment | N/A |
-| Lazy-loading | N/A |
-| Fixed aspect ratio | N/A |
-| May ship in 2B.3? | **No** |
+| Project-placement status | **Approved as a future supporting project** (owner decision, this checkpoint) |
+| Desktop asset | Not optimized or added to `artifacts/web-agency/public/portfolio/` this checkpoint. The existing `artifacts/web-agency/public/portfolio-claidy.png` may be used **temporarily** as-is, pending owner review, marked **historical reference — current browser verification pending** |
+| Mobile asset | Not available — a real browser attempt at the exact URL failed with a proxy-level tunnel error identical to the other three projects' known block; no mobile screenshot exists and none was fabricated |
+| Fallback asset | `portfolio-claidy.png` (temporary use only, per owner decision) |
+| Explicitly excluded | `attached_assets/screenshots/claidytaguranportfolio_replit_app.png` — this is the stale, correctly-spelled-URL capture showing Replit's "app isn't live yet" placeholder, and must never be used for anything public |
+| Alt text (draft) | Do not draft public alt text implying a verified-current screenshot; if used temporarily, alt text should reflect the project only, not freshness claims |
+| Public URL | `https://ClaidyTaguranPorfolio.replit.app` (misspelling intentional — matches the real deployment address) — reachability unconfirmed by anyone this session (see `PORTFOLIO_PERMISSION_MANIFEST.md`) |
+| CTA label | Consider omitting or disabling the external "Visit Website" link until the deployment's live status is confirmed, per owner's practical fallback suggestion |
+| Permission status | Placement approved; screenshot/publication permission not approved |
+| Recommended crop | Not evaluated — existing asset unchanged this checkpoint |
+| Light/dark-theme treatment | Not evaluated this checkpoint |
+| Mobile treatment | Undefined until a real mobile capture exists |
+| Lazy-loading | N/A until implemented |
+| Fixed aspect ratio | N/A until implemented |
+| May ship in 2B.3? | **Only as a clearly internally-marked temporary/historical-reference entry**, if the owner separately reviews and approves using the existing screenshot; not as a "verified current" entry |
 
 ## 7. What remains before Phase 2B.3 can wire real images into `SelectedWorkSection.tsx`
 
@@ -183,13 +190,23 @@ this checkpoint.
    Valdovinos, plus explicit client permission (the existing desktop
    screenshot is visually approved and may be reusable once verified current
    — see §8).
-4. Claidy Taguran's URL and company-work-attribution questions resolved
-   before any Claidy asset is prepared or featured.
-5. A design decision for the dark-theme treatment of these (currently
+4. A separate owner review of whether `portfolio-claidy.png` may be used as
+   a temporary supporting entry, and whether the "Visit Website" link should
+   be shown, hidden, or disabled until the deployment's reachability is
+   confirmed by a real browser outside this environment.
+5. A separate owner review of whether `portfolio-claidy.png` may be used as
+   a temporary supporting entry, and whether the "Visit Website" link should
+   be shown, hidden, or disabled until the deployment's reachability is
+   confirmed by a real browser outside this environment.
+6. A design decision for the dark-theme treatment of these (currently
    light/bright) screenshots inside `SelectedWorkSection.tsx`'s dark
    browser-chrome frame.
-6. A resolved standard aspect ratio for the Shasta replacement asset (see §8
+7. A resolved standard aspect ratio for the Shasta replacement asset (see §8
    — the current 1600x733 file is not 16:9 and must not be treated as one).
+8. Adoption of a data-driven portfolio model (see §9) so that Shasta,
+   OneFilAm, Herlinda, Claidy, and future projects can each be added,
+   replaced, reordered, or hidden independently, without further homepage
+   redesign.
 
 ## 8. Phase 2B.2.1 corrections (owner review of the Phase 2B.2 package)
 
@@ -281,8 +298,54 @@ projects, not an optional enhancement.
 | Shasta Greene | Current desktop capture (no outdated stats row), current mobile capture |
 | OneFilAm Community | Current desktop capture, current mobile capture, organizational approval |
 | Herlinda Valdovinos | Current desktop verification or recapture, current mobile capture, client permission |
-| Claidy Taguran | Remains deferred — no capture requested |
+| Claidy Taguran | Future supporting project (placement approved) — real browser verification of `https://ClaidyTaguranPorfolio.replit.app` still pending; desktop/mobile capture optional, not requested this checkpoint |
 
 See `/tmp/sitemint-2b2-owner-capture-intake/OWNER_CAPTURE_INSTRUCTIONS.md`
 for the exact capture parameters provided to the owner to produce these six
 files from an unrestricted browser.
+
+## 9. Future data-driven portfolio model (documented only — not implemented)
+
+Per owner direction, Phase 2B.3 should replace the current hardcoded
+`projects` arrays in `Portfolio.tsx` and `SelectedWorkSection.tsx` with a
+single shared, data-driven model. No code was changed this checkpoint; this
+is a recorded direction for that future implementation.
+
+```ts
+type PortfolioProject = {
+  id: string;
+  projectName: string;
+  category: string;
+  description: string;
+  contribution: string;
+  publicUrl: string;
+  desktopAsset: string;
+  mobileAsset?: string;
+  fallbackAsset?: string;
+  captureDate?: string;
+  currentSiteVerified: boolean;
+  permissionStatus: string;
+  publicationStatus: string;
+  featured: boolean;
+  sortOrder: number;
+  altText: string;
+  statusLabel?: string;
+};
+```
+
+This structure is intended to let SiteMint:
+
+- add new projects later without touching component markup
+- replace screenshots (e.g. Claidy's temporary asset) without a redesign
+- change a Replit link to a custom domain by editing one field
+- reorder or re-feature projects via `sortOrder`/`featured`
+- hide an outdated project without deleting its record
+- use a desktop-only fallback temporarily via `fallbackAsset` when
+  `mobileAsset` is absent
+- keep `currentSiteVerified` and `permissionStatus` — internal verification
+  state — visibly separate from public marketing copy, so a project can
+  never accidentally present as "verified current" just because it renders
+  on the page
+
+Adopting this model is a Phase 2B.3 implementation decision, not something
+performed in this documentation-only checkpoint.

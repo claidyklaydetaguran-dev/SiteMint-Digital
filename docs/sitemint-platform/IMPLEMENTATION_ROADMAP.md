@@ -699,3 +699,32 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   OneFilAm; desktop verification/recapture + mobile for Herlinda).
 - No new images were fabricated, generated, or derived from the existing
   desktop screenshots to simulate mobile views.
+
+## Checkpoint 2B.2.2 — Claidy URL Retry and Future-Supporting Placement (documentation only)
+
+> No repository code, images, or components changed. Documentation-only
+> update to `PORTFOLIO_PERMISSION_MANIFEST.md` and
+> `PORTFOLIO_ASSET_MANIFEST.md` per explicit owner decision.
+
+- A real Chromium/Playwright browser (not curl/DNS/search-index) was pointed
+  directly at `https://ClaidyTaguranPorfolio.replit.app` and failed
+  identically on three attempts with a proxy-level tunnel error, matching
+  the same 403 policy denial already recorded for the other three project
+  domains. This is an environment-side block, not evidence the site is
+  private, broken, or unpublished — the site's actual reachability remains
+  unconfirmed by anyone this session.
+- Per owner decision, Claidy Taguran Portfolio's **project-placement**
+  status changed from "deferred" to **"approved as a future supporting
+  project,"** using its existing misspelled Replit URL as-is (a custom
+  domain is not required for a public Replit deployment to be linkable).
+  This is a placement decision only — permission, implementation, and
+  public-publication approval all remain unapproved.
+- The existing real screenshot (`portfolio-claidy.png`) may be used
+  **temporarily** as a historical-reference asset pending separate owner
+  review; the stale placeholder capture
+  (`attached_assets/screenshots/claidytaguranportfolio_replit_app.png`,
+  showing Replit's "app isn't live yet" message) remains explicitly excluded
+  from any use.
+- Documented (not implemented) a future data-driven `PortfolioProject` model
+  for Phase 2B.3, so projects, screenshots, and verification status can be
+  added, replaced, or reordered without redesigning the homepage.
