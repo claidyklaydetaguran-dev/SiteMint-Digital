@@ -885,3 +885,43 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   analytics instrumentation).
 - No release-blocking defect found inside the platform-preview component
   tree itself. Activation is not approved.
+
+## Checkpoint 2C.1.1 — Reconcile Release-Readiness Classifications (implemented)
+
+> Documentation-only correction. No application code, component, style,
+> route, image, feature flag, package, or lockfile changed; no evidence,
+> measurement, screenshot, or test result altered. Corrects classification
+> language only in `PLATFORM_PREVIEW_RELEASE_AUDIT.md`.
+
+- Corrected: lack of owner-granted metric/proof-point permission is no
+  longer classified as a Level 3/4 blocker, because the current
+  implementation displays no numerical performance, conversion, revenue,
+  lead, customer-count, or outcome claim. Recorded instead as a governance
+  constraint on any *future* numerical claim (separate evidence and
+  owner/client permission required per `PORTFOLIO_PERMISSION_MANIFEST.md`).
+  No metric was added.
+- Corrected: absence of a complete, reusable per-route SEO system is no
+  longer classified as an automatic Level 3 blocker for replacing `/`.
+  Recorded the specific Level 3 requirement instead (verify the activated
+  `/` route's title, meta description, canonical, Open Graph/Twitter,
+  structured data, and confirm the preview's `noindex` behavior does not
+  carry over); a broader per-route metadata system remains a recommended
+  architectural improvement for future product/service landing pages.
+- Corrected: Discovery-form and Privacy/Terms findings are now classified
+  per release level (Level 1 ready; Level 2 conditionally ready for
+  stakeholder review only; Level 3 requires privacy disclosure, working
+  Privacy/Terms destinations, and server-side hardening; Level 4 adds
+  rate limiting, bot protection, verified delivery, and analytics).
+- Corrected: analytics is not required for Level 2; for Level 3 it is a
+  strong business-readiness recommendation (owner may explicitly accept a
+  named business-risk exception) rather than a technical rendering
+  blocker; it remains required for Level 4.
+- Preserved as still-genuine blockers for Level 3/4: remaining
+  accessibility verification, the release-engineering plan (still
+  entirely absent), and the Discovery form's production-hardening gaps.
+- Preserved, kept explicitly separate per governance requirement: the
+  known receptionist auth/session safe-error concern does not block
+  local or controlled preview review and remains a blocker only for the
+  affected AI Receptionist authenticated/product workflows, not the
+  marketing preview or homepage.
+- Activation is still not approved.

@@ -3,6 +3,12 @@
 > Documentation and audit checkpoint only. No application code, styles, copy,
 > routes, images, feature flags, or dependencies were changed to produce this
 > report. Last updated: 2026-07-20.
+>
+> **Reconciled by Checkpoint 2C.1.1 (2026-07-20):** the classification language in
+> this document was corrected to match the underlying evidence more precisely — no
+> finding, measurement, screenshot, or test result was altered. See the note at the
+> end of each corrected section for what changed and why. The full rationale is
+> recorded in `IMPLEMENTATION_ROADMAP.md`'s Checkpoint 2C.1.1 entry.
 
 ## 1. Executive Summary
 
@@ -12,20 +18,28 @@ Checkpoint 2B.3, in which the "Selected Work" section became a real, data-driven
 component (`portfolioProjects.ts`) rather than placeholder content.
 
 **Headline finding: the preview is technically sound and ready for continued Level 1
-(local) and Level 2 (private-deployed) review.** No release-blocking defect was found
-inside the platform-preview component tree itself — copy claims are accurate and
-honestly labeled, the feature flag fails closed, routing is fully gated, no secrets or
-PII are exposed, and the portfolio content matches its owner-approved manifest exactly.
+(local) and Level 2 (private-deployed, stakeholder-only) review.** No release-blocking
+defect was found inside the platform-preview component tree itself — copy claims are
+accurate and honestly labeled, the feature flag fails closed, routing is fully gated,
+no secrets or PII are exposed, and the portfolio content matches its owner-approved
+manifest exactly. The current implementation displays no numerical performance,
+conversion, revenue, lead, customer-count, or outcome claims, so it requires no metric
+permission today — that requirement only activates if a future checkpoint adds such a
+claim (see §12).
 
 **The preview is not ready to replace the current public homepage (Level 3) or receive
-paid traffic (Level 4).** The blockers for those levels are largely pre-existing,
-site-wide issues that predate this preview and are not introduced by it: the shared
-Discovery form lacks rate limiting and bot protection, there is no analytics/conversion
-tracking anywhere on the site, no per-route SEO system exists for a public launch, and
-a full accessibility verification pass (axe-core scan, exhaustive keyboard walk,
-screen-reader pass) has not yet been performed. None of these require code changes
-under this checkpoint — they define the scope of a future Phase 2C.2 correction
-checkpoint.
+paid traffic (Level 4).** The real, still-open requirements for those levels are: a
+hardened, privacy-disclosed Discovery form (§20), completed remaining accessibility
+verification (§15), a written release/rollback plan (§23), and a deliberate,
+owner-made analytics decision (§4/§17) — either build measurement before switching, or
+accept the absence as a named business-risk exception. A reusable per-route SEO
+*system* is a recommended architectural improvement for when product/service landing
+pages launch, not a precondition for replacing the content at `/` (§18); the specific,
+narrow requirement for Level 3 is verifying the activated `/` route's own title, meta
+description, canonical, Open Graph/Twitter tags, and structured data, and confirming
+the preview's `noindex` behavior is not carried onto the public route. None of these
+require code changes under this checkpoint — they define the scope of a future Phase
+2C.2 correction checkpoint.
 
 **Explicit decision this checkpoint: do not activate the preview publicly, do not
 replace the current homepage, do not enable paid traffic.** This is unchanged from
@@ -87,44 +101,95 @@ render, the flag fails closed, and no code changes are required to review it tod
 
 ## 5. Level 2 Readiness — Private Deployed Preview
 
-**CONDITIONALLY READY.** The preview's own surface (routing, flag gating, SEO
-exclusion, security posture, portfolio content, theming, responsiveness) is sound
-enough to deploy privately for controlled review. The caveats are about surfaces the
-preview links to but does not own: the Discovery form it funnels "Start a Project"
-CTAs to has no rate limiting or bot protection, and a full accessibility verification
-pass has not yet been run. Recommend proceeding to a private deployment with these
-two caveats disclosed to reviewers, rather than blocking Level 2 outright.
+**CONDITIONALLY READY FOR STAKEHOLDER REVIEW ONLY** — not approved for public
+lead-generation use or paid traffic. The preview's own surface (routing, flag gating,
+SEO exclusion, security posture, portfolio content, theming, responsiveness) is sound
+enough to deploy privately for controlled owner/stakeholder review. Analytics is not
+required for this level. Conditions for treating Level 2 as ready:
+- it is not treated as a production lead-generation launch;
+- reviewers are told that Discovery-form hardening remains incomplete and that
+  production submission reliability should not be assumed;
+- no paid traffic is directed to it;
+- the remaining accessibility verification items (§15) are disclosed as pending, not
+  claimed as passed.
+No code change is required to proceed under these conditions.
 
 ## 6. Level 3 Readiness — Public Homepage Switch
 
-**NOT READY.** Missing, in order of impact: (a) a per-route SEO system for public
-launch (canonical/OG/meta beyond the current single static `index.html` head), (b) a
-hardened Discovery form (rate limiting, bot protection, server-side validation,
-privacy disclosure, duplicate-submission guard), (c) a completed accessibility
-verification pass, (d) an explicit flag-removal / route-switch / rollback / monitoring
-plan (none exists yet, carried forward as still-true from
-`ACTIVATION_READINESS_AUDIT.md`), and (e) a decision on the ~2 MB ordinary-entry
-bundle, which is pre-existing and site-wide, not preview-specific, but becomes more
-consequential once the preview's traffic profile is the general public rather than
-internal reviewers.
+**NOT READY.** The actual outstanding requirements, none of which require code
+changes to state (implementation is a separate, future checkpoint):
+- **Discovery-form privacy and production hardening** (§20): accurate privacy
+  disclosure near the form, a real working Privacy destination, a real working Terms
+  destination where shown, server-side schema validation, safe success/failure
+  behavior, and confirmation that the submit endpoint and acknowledgment flow work
+  end-to-end without exposing a raw error or private implementation detail. Rate
+  limiting and bot protection should be completed here when the form will be exposed
+  publicly, or explicitly documented as a release exception with owner acceptance.
+- **Working Privacy/Terms destinations** wherever shown on the activated homepage —
+  the existing dead placeholder controls (§21) must not remain classified as merely
+  cosmetic once the page is collecting personal information from the public.
+- **Remaining accessibility verification** (§15): automated scan, exhaustive keyboard
+  traversal, screen-reader review, and the other items listed there.
+- **Homepage metadata verification** (§18): confirm the activated `/` route's title,
+  meta description, canonical URL, Open Graph/Twitter tags, and structured-data
+  behavior are correct, and confirm the preview's `noindex, nofollow` behavior is not
+  carried onto the public homepage. A complete, reusable per-route SEO *system* is a
+  recommended architectural improvement for future product/service landing pages —
+  it is not, by itself, required merely to replace the content at `/`.
+- **A written release and rollback plan** (§23), which remains entirely absent.
+- **A deliberate analytics decision** (§4/§17): build page-view, primary-CTA-click,
+  and Discovery-form-funnel measurement before switching, or have the owner
+  explicitly accept launching without it as a named business-risk exception. Absence
+  of analytics is a business-readiness condition, not a technical rendering blocker,
+  and is tracked separately from the items above.
+- **Any remaining public-link verification** (§22): the four external portfolio
+  domains were not independently re-verified live this checkpoint.
+
+No numerical performance, conversion, revenue, lead, customer-count, or outcome claim
+is displayed by the current implementation, so lack of metric/proof-point permission
+is **not** included as a Level 3 blocker here — see §12 for the governance rule that
+applies if a future checkpoint adds such a claim.
 
 ## 7. Level 4 Readiness — Paid-Traffic Readiness
 
-**NOT READY / BLOCKED.** Requires everything in Level 3 plus: zero analytics or
-conversion tracking currently exists anywhere in `web-agency` (live site or preview),
-and no portfolio project has an owner-granted metric/proof-point permission per
-`PORTFOLIO_PERMISSION_MANIFEST.md` — both are prerequisites for responsible
-paid-traffic spend and neither can be assessed as "ready" from repository evidence
-alone.
+**BLOCKED.** Requires everything in Level 3 (now genuinely complete, not merely
+attempted) plus:
+- analytics and conversion tracking (page-view, primary-CTA-click, Discovery-form
+  start, Discovery-form submission success, Discovery-form submission failure) and a
+  campaign-attribution strategy — required at this level, unlike Level 3 where it is
+  a strong recommendation with an owner-risk-acceptance escape valve;
+- full anti-spam/anti-abuse protection on the Discovery form: rate limiting, bot
+  protection or an equivalent control, and duplicate-submission/idempotent handling;
+- verified email/CRM delivery of Discovery-form submissions;
+- operational monitoring and a spam-monitoring response plan;
+- campaign-specific claim and landing-page review, including confirmation that no
+  portfolio project's metric/proof-point permission has been granted (none has been,
+  per `PORTFOLIO_PERMISSION_MANIFEST.md`) before any ad copy attempts to cite an
+  outcome.
 
 ## 8. Release-Readiness Matrix
 
-See `release-readiness-matrix.txt` in the owner-review package for the full
-category-by-category table (feature flag, copy/claims, portfolio, SEO,
-security/privacy, forms/spam, accessibility, responsive, theme, performance,
-route/link integrity, analytics, release engineering) against all four levels.
-Summary verdict repeated here: L1 READY, L2 CONDITIONALLY READY, L3 NOT READY, L4
-NOT READY/BLOCKED.
+`release-readiness-matrix.txt` in the owner-review package is the original Phase 2C.1
+category-by-category table and is unchanged (per this checkpoint's scope, only this
+document and the roadmap may be edited). Its per-category detail remains accurate;
+where its category verdicts implied metric-permission or a complete per-route SEO
+system as Level 3/4 blockers, treat §6/§7/§12/§18 of this document as the reconciled,
+authoritative classification. Reconciled summary verdict:
+
+- **Level 1 — local private review: READY.**
+- **Level 2 — controlled private deployed preview: CONDITIONALLY READY FOR
+  STAKEHOLDER REVIEW ONLY** (not approved for public lead-generation use or paid
+  traffic).
+- **Level 3 — public homepage switch: NOT READY** (Discovery-form privacy/production
+  hardening; working Privacy/Terms destinations; remaining accessibility
+  verification; homepage metadata verification; a release/rollback plan; a
+  deliberate analytics decision with explicit owner risk acceptance if launching
+  without it; remaining public-link verification — lack of metric permission and
+  lack of a complete per-route SEO framework are explicitly **not** included here).
+- **Level 4 — paid traffic: BLOCKED** (all Level 3 requirements, plus analytics and
+  conversion tracking, campaign attribution, full anti-spam/abuse protection,
+  verified form delivery, operational monitoring, and campaign-specific claim/
+  landing-page review).
 
 ## 9. Verified Strengths
 
@@ -160,29 +225,58 @@ NOT READY/BLOCKED.
 ## 10. Blocking Issues (by target level)
 
 None block Level 1. Blocking Level 3/4 only (not Level 1/2):
-- No per-route SEO system for a public, non-flag-gated launch.
 - Discovery form: no rate limiting, no bot/spam protection, no server-side schema
-  validation beyond three truthy-field checks, no privacy disclosure, weak
-  duplicate-submission guard, and a dead/unreachable `SuccessScreen` code path
-  (form submission actually full-page-navigates to `/thank-you`, `setDone(true)` is
-  never called).
-- No release-engineering plan (flag removal, route switch, rollback, monitoring,
-  smoke tests) — carried forward as still-unwritten from the prior activation audit.
-- Zero analytics/conversion tracking anywhere on the site.
-- No owner-granted metric/proof-point permission for any portfolio project (blocks
-  any paid-ad copy that would want to cite a real outcome).
+  validation beyond three truthy-field checks, no privacy disclosure, no working
+  Privacy/Terms destination, weak duplicate-submission guard, and a
+  dead/unreachable `SuccessScreen` code path (form submission actually
+  full-page-navigates to `/thank-you`, `setDone(true)` is never called). Rate
+  limiting and bot protection specifically are required at Level 4 and should be
+  completed at Level 3 (or explicitly accepted by the owner as a documented
+  exception) before public exposure.
+- Remaining accessibility verification (§15) — not a confirmed defect, but genuinely
+  unverified and therefore blocking for Level 3/4 specifically.
+- No release-engineering plan (activation method, environment-variable plan,
+  homepage route-switch plan, metadata transition plan, smoke-test checklist,
+  rollback procedure, cache/CDN considerations, post-release monitoring, a named
+  owner responsible for rollback, and confirmation of what happens to the preview
+  route after activation) — carried forward as still-unwritten from the prior
+  activation audit. This remains a genuine blocker.
+- Homepage metadata verification not yet performed for the activated `/` route
+  (§18) — a specific, narrow verification step, not a request for a new
+  architecture.
+- Analytics/conversion tracking: a strong business-readiness condition and strongly
+  recommended before Level 3, but distinguished here from a technical rendering
+  blocker — an owner who explicitly accepts launching without measurement is
+  recording a business-risk exception, not overriding a technical blocker. Required
+  (not optional) at Level 4.
+
+**Explicitly not classified as Level 3/4 blockers, corrected this checkpoint:**
+- Lack of owner-granted metric/proof-point permission for any portfolio project is
+  **not** a blocker for the current implementation, because it displays no
+  numerical performance, conversion, revenue, lead, customer-count, or outcome
+  claim. It becomes a governance gate only if/when a future checkpoint proposes
+  adding such a claim (§12).
+- Absence of a complete, reusable per-route SEO *system* is **not** a blocker for
+  replacing the content at `/` — it is a recommended architectural improvement,
+  required later when product/service landing pages launch (§18).
+
+**Kept genuinely separate, per governance requirement:** the known receptionist
+auth/session database safe-error concern (§19) does not block static local preview
+review and does not inherently block controlled viewing of the marketing preview; it
+remains a blocker only for activating or promoting the affected AI Receptionist
+authenticated/product workflows, and must not be read as a general homepage finding.
 
 ## 11. Non-Blocking Improvements
 
+- Current lack of metric/proof-point permission for portfolio projects is a
+  governance constraint on any *future* numerical claim, not a defect or an
+  activation blocker for the page as it exists today (see §6, §12).
 - `ServicesSection.tsx`'s "CRM Systems" service tile sits close enough to the
   AI-Receptionist CRM/follow-up topic that a stricter copy pass may want the
   distinction (implementation service vs. automated intake hand-off) made explicit.
 - Three divergent, un-consolidated portfolio-data copies exist (`Home.tsx`,
   `Portfolio.tsx`, `portfolioProjects.ts`) with different URLs/asset sets — a
   pre-existing, non-preview-specific duplication.
-- The real, currently-live `Footer.tsx`'s "Privacy Policy"/"Terms of Service" are
-  styled as clickable but have no `href`/`onClick` at all — a genuine dead control,
-  but on the live site today, not introduced by or part of the preview.
 - `react-icons` and `ogl` are both confirmed (via real grep, not just carried-forward
   hypothesis) to have zero import sites anywhere in `web-agency/src` — both are
   real dead-dependency removal candidates for a future cleanup checkpoint.
@@ -195,6 +289,14 @@ None block Level 1. Blocking Level 3/4 only (not Level 1/2):
   than a native `<button disabled>` — functionally correct (excluded from tab order,
   not clickable) but a native disabled button would be more idiomatic.
 
+Note: the real, currently-live `Footer.tsx`'s "Privacy Policy"/"Terms of Service"
+being styled as clickable but carrying no `href`/`onClick` is **no longer listed as
+non-blocking here** — per §6/§20's reconciled classification, working Privacy/Terms
+destinations are a genuine Level 3 requirement once the page collects personal
+information from the public, so this item moved to §10's Level 3 blocker list. It
+remains true that this defect exists on the live site today and was not introduced
+by, and is not part of, the preview.
+
 ## 12. Copy and Claim Findings
 
 Full verbatim findings are in `claim-audit.txt` (owner-review package). Summary: no
@@ -204,6 +306,18 @@ metrics, unsupported testimonials/customer counts/outcomes, client phone numbers
 preview content, Claidy's excluded statistics, rejected Shasta metrics, internal
 audit/permission language leaking into rendered copy) produced a confirmed violation.
 One non-blocking clarity item is noted (§11, CRM service vs. hand-off distinction).
+
+**Metric-permission governance (reconciled this checkpoint):** the current
+implementation displays no numerical performance, conversion, revenue, lead,
+customer-count, or outcome claim anywhere in the audited files — confirmed by the
+same read that produced the findings above. Because no metric is displayed, no
+metric permission is required for the current implementation, and this is correctly
+not counted as a Level 3/4 blocker (§6, §10). This is a forward-looking governance
+rule, not a current defect: any future checkpoint that proposes adding a numerical
+claim must first obtain separate evidence and owner/client permission for that
+specific claim, per `PORTFOLIO_PERMISSION_MANIFEST.md`'s existing standard that
+visual/publication approval never implies metric approval. Unsupported metrics must
+remain excluded regardless. No metric was added by this checkpoint.
 
 ## 13. Portfolio Findings
 
@@ -260,6 +374,17 @@ return, screen-reader software pass) is enumerated at the end of that file — n
 are confirmed defects, all are recommended scope for a dedicated Phase 2C.2
 accessibility checkpoint before Level 3.
 
+**Level classification (reconciled this checkpoint):** Level 2 controlled preview —
+conditionally acceptable, on the strength of the verified positive findings above
+(no confirmed defect, visible focus rings, working skip link, passing token-contrast
+tests, clean sampled responsive layouts) with the verification-pending list disclosed
+to reviewers as pending, not claimed as passed. Level 3 public switch — the remaining
+accessibility verification items above are required before switching. Level 4 paid
+traffic — the same Level 3 accessibility requirements remain required; paid traffic
+does not add a distinct accessibility requirement beyond completing Level 3's. This
+report does not claim WCAG conformance at any level; it reports what was verified
+and what remains open.
+
 ## 16. Theme Findings
 
 The shared design-tokens package's accessibility test suite
@@ -294,6 +419,18 @@ entry is a public-homepage/paid-traffic blocker but is pre-existing and site-wid
 not introduced by the preview. No Core Web Vitals figure is claimed anywhere in this
 report — no field data exists for this site.
 
+**Analytics classification (reconciled this checkpoint):** analytics/conversion
+tracking is not required for Level 2 controlled stakeholder review. For Level 3, it
+is a strong business-readiness condition and strongly recommended before the
+homepage switch, but is tracked as distinct from a technical rendering blocker — an
+owner who intentionally accepts launching without measurement is recording an
+explicit business-risk exception, not clearing a technical defect. For Level 4, it
+is required, at minimum covering: page-view measurement, primary-CTA-click
+measurement, Discovery-form start, Discovery-form submission success, Discovery-form
+submission failure, a campaign-attribution strategy, and a consent/privacy treatment
+appropriate to whichever analytics system is selected. No analytics was implemented
+by this checkpoint.
+
 ## 18. SEO/Indexing Findings
 
 `noindex, nofollow` confirmed injected at runtime while `/platform-preview` is
@@ -302,9 +439,20 @@ mounted, restored on unmount. `robots.txt` and `sitemap.xml` both confirmed to o
 `/platform-preview` (checked directly against the live dev server's served files).
 The real homepage's existing static SEO surface (canonical, OG/Twitter cards,
 `Organization` JSON-LD in `index.html`) is unaffected by and independent of the
-preview. Public activation (Level 3) would require building a genuine per-route SEO
-system, since today's setup is a single static `<head>` plus one route-scoped runtime
-patch — not yet a general solution for multiple public routes.
+preview.
+
+**Reconciled Level 3 requirement:** activating the homepage switch does **not**
+inherently require building a complete, reusable per-route SEO system merely to
+replace the content at `/`. The specific, narrow verification required before that
+switch is: confirm the activated `/` route's final title; confirm its meta
+description; confirm its canonical URL; confirm its Open Graph and Twitter metadata;
+confirm structured-data behavior; confirm the activated `/` route actually receives
+the intended metadata (not leftover preview values); and confirm that the preview's
+`noindex, nofollow` runtime behavior is not carried onto the public homepage once
+activated. A broader, reusable per-route metadata system remains a recommended
+architectural improvement and will become genuinely required once additional
+product/service landing pages launch beyond `/` — it is not weakened or waived for
+that future need, only correctly scoped out of what replacing `/` alone requires.
 
 ## 19. Security/Privacy Findings
 
@@ -331,6 +479,17 @@ by anything in `receptionistAuth.ts` regardless of that route's behavior. Any fu
 finding about this route would affect the AI Receptionist product/dashboard directly,
 not the platform preview, and not the public marketing homepage.
 
+**Kept explicitly separate (reconciled this checkpoint), not to be lost inside
+general homepage findings:**
+- It does not block static local preview review (Level 1).
+- It does not inherently block controlled viewing of the marketing preview (Level 2).
+- It remains a blocker for activating or promoting the affected AI Receptionist
+  authenticated/product workflows specifically — a distinct product surface from
+  this marketing preview and the public homepage.
+- The receptionist implementation was not inspected further or modified during this
+  reconciliation checkpoint; the finding above was produced entirely by the prior
+  Phase 2C.1 audit's read of `receptionistAuth.ts`.
+
 ## 20. Form/Spam Findings
 
 The Discovery form (`Discovery.tsx` → `POST /api/discovery/submit` →
@@ -347,8 +506,36 @@ idempotency key or dedup check). A leftover dead-code path was also found: the f
 defines a full `SuccessScreen` component and `done` state, but `setDone` is never
 called anywhere — actual success UX is a full-page navigation to `/thank-you`, making
 `SuccessScreen` unreachable. This form is shared infrastructure, not part of the
-preview's own code, but the preview is the thing funneling new traffic to it, so its
-readiness gates Level 2+ deployment of the preview in practice.
+preview's own code, but the preview is the thing funneling new traffic to it.
+
+**Level-by-level classification (reconciled this checkpoint):**
+- **Level 1 (local private review): READY.** No real submission is required for a
+  visual-only review of the preview.
+- **Level 2 (controlled private deployed preview): CONDITIONALLY READY, for
+  owner/stakeholder review only**, on these conditions: it is not treated as a
+  production lead-generation launch; reviewers are told that form hardening remains
+  incomplete; no paid traffic is directed to it; and production submission
+  reliability is not assumed.
+- **Level 3 (public homepage switch): REQUIRED before the homepage directs public
+  users to this form** — accurate privacy disclosure near the form; a real, working
+  Privacy destination; a real, working Terms destination where shown; server-side
+  schema validation; safe success and failure behavior; confirmation that the form
+  endpoint and acknowledgment flow work; and confirmation that no raw error or
+  private implementation detail is returned. Rate limiting and bot protection should
+  be completed at this level when the form will be exposed publicly, or explicitly
+  documented as a release exception with owner acceptance — prefer classifying them
+  as required.
+- **Level 4 (paid traffic): REQUIRED** — rate limiting; bot protection or an
+  equivalent anti-abuse control; server-side schema validation; privacy disclosure;
+  working Privacy/Terms destinations; duplicate-submission protection or idempotent
+  handling; safe success and failure states; verified email/CRM delivery; analytics
+  and conversion tracking; and a spam-monitoring operational response plan.
+
+The existing dead/placeholder Privacy and Terms controls on the real, live site
+(§21) must not remain classified solely as cosmetic once the page is collecting
+personal information from the public — they are a genuine Level 3 requirement, not
+merely a cleanup item. No form was submitted and no email was sent during this or
+the prior checkpoint's audit.
 
 ## 21. Route/Link Findings
 
@@ -362,7 +549,11 @@ by design per the two-auth-system architecture), the four portfolio `publicUrl`s
 controls found inside the platform-preview surface itself. One pre-existing broken
 control was found on the **real, currently-live** `Footer.tsx` (Privacy
 Policy/Terms of Service render as non-functional styled spans) — unrelated to the
-preview, not touched, flagged for owner awareness only.
+preview and not touched by any checkpoint. Per §6/§20's reconciled classification,
+this is not merely a cosmetic flag: working Privacy/Terms destinations are a genuine
+Level 3 requirement once a page collects personal information from the public, so
+this finding carries forward as a named Level 3 requirement, not only owner
+awareness.
 
 ## 22. Known Network-Verification Limitations
 
@@ -382,23 +573,42 @@ checkpoint's live-testing needs.
 ## 23. Recommended Correction Checkpoint (Phase 2C.2)
 
 Scope recommendation for the next checkpoint, in priority order:
-1. Harden the Discovery form: add rate limiting, bot/spam protection, server-side
-   schema validation, a privacy disclosure, and either wire up or remove the dead
-   `SuccessScreen` code path.
+1. Harden the Discovery form for Level 3: accurate privacy disclosure, a real
+   working Privacy destination, a real working Terms destination where shown,
+   server-side schema validation, safe success/failure behavior, confirmed
+   endpoint/acknowledgment-flow behavior with no raw-error exposure, and either wire
+   up or remove the dead `SuccessScreen` code path. Add rate limiting and bot
+   protection at this stage, or record an explicit owner-accepted release exception
+   if deferred. Add the remaining Level 4 anti-abuse/duplicate-submission/verified-
+   delivery items when paid traffic is being planned.
 2. Run a full accessibility verification pass: automated axe-core scan (both
    themes), exhaustive keyboard walk of every interactive element, mobile-menu
    focus-trap/Escape behavior, nav-dropdown disclosure focus-return behavior, and a
    screen-reader software pass.
 3. Write the release-engineering plan required before any Level 3 consideration:
-   flag-removal plan, homepage-route-switch plan, rollback plan, smoke-test
-   checklist, monitoring plan.
-4. Decide on and address the ~2 MB ordinary-entry bundle (candidates already
+   activation method, environment-variable plan, homepage route-switch plan,
+   metadata transition plan, smoke-test checklist, rollback procedure, cache/CDN
+   considerations, post-release monitoring, a named owner responsible for rollback,
+   and confirmation of whether the preview route stays hidden, is removed, or
+   remains noindexed after activation.
+4. Verify homepage metadata for the activated `/` route specifically (title, meta
+   description, canonical, Open Graph/Twitter, structured data, confirmation the
+   preview's `noindex` behavior does not carry over) — this is a verification task,
+   not a request to build a new per-route SEO system.
+5. Bring the owner a deliberate analytics decision before Level 3: build the
+   minimum measurement set (page views, primary-CTA clicks, Discovery-form start/
+   success/failure) and a campaign-attribution plan, or record explicit owner
+   acceptance of launching without it as a named business-risk exception. Required,
+   not optional, before Level 4.
+6. Decide on and address the ~2 MB ordinary-entry bundle (candidates already
    evidence-supported this checkpoint: remove `react-icons` and `ogl`, lazy-split
    CRM/admin routes, reconsider Google Fonts loading strategy).
-5. Add analytics/conversion tracking before any Level 4 consideration.
-6. Non-blocking: consolidate the three divergent portfolio-data copies; fix the
-   real Footer's dead Privacy Policy/Terms of Service links; consider the CRM
-   service vs. automated-hand-off copy clarification (§11).
+7. Non-blocking: consolidate the three divergent portfolio-data copies; consider the
+   CRM service vs. automated-hand-off copy clarification (§11).
+
+No numerical claim should be added to the preview in this future checkpoint without
+first obtaining the separate evidence and owner/client permission that
+`PORTFOLIO_PERMISSION_MANIFEST.md` already requires for any metric.
 
 ## 24. Explicit Do-Not-Activate Decision
 
