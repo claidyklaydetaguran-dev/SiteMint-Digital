@@ -51,6 +51,18 @@
   --color-info: hsl(var(--info));
   --color-info-foreground: hsl(var(--info-foreground));
 
+  /* Phase 1C: expose @workspace/design-tokens' component-layer disabled
+     roles as Tailwind utilities (`disabled:bg-button-disabled-bg`, etc.) so
+     Button/Input/Textarea can consume the approved disabled tokens directly
+     instead of a generic opacity dim. Values are the component tokens
+     themselves (already hsl()-wrapped in components.css), not re-derived. */
+  --color-button-disabled-bg: var(--sm-button-disabled-background);
+  --color-button-disabled-fg: var(--sm-button-disabled-text);
+  --color-button-disabled-border: var(--sm-button-disabled-border);
+  --color-input-disabled-bg: var(--sm-input-disabled-background);
+  --color-input-disabled-fg: var(--sm-input-disabled-text);
+  --color-input-disabled-border: var(--sm-input-disabled-border);
+
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));

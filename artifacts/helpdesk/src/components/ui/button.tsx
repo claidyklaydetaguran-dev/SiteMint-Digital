@@ -5,27 +5,29 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0" +
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0" +
 " hover-elevate active-elevate-2",
   {
     variants: {
       variant: {
         default:
            // @replit: no hover, and add primary border
-           "bg-primary text-primary-foreground border border-primary-border",
+           // Phase 1C: disabled state uses the shared button-disabled component
+           // tokens (bg/text/border) instead of a generic opacity dim.
+           "bg-primary text-primary-foreground border border-primary-border disabled:bg-button-disabled-bg disabled:text-button-disabled-fg disabled:border-button-disabled-border",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm border-destructive-border",
+          "bg-destructive text-destructive-foreground shadow-sm border-destructive-border disabled:bg-button-disabled-bg disabled:text-button-disabled-fg disabled:border-button-disabled-border",
         outline:
           // @replit Shows the background color of whatever card / sidebar / accent background it is inside of.
           // Inherits the current text color. Uses shadow-xs. no shadow on active
           // No hover state
-          " border [border-color:var(--button-outline)] shadow-xs active:shadow-none ",
+          " border [border-color:var(--button-outline)] shadow-xs active:shadow-none disabled:text-button-disabled-fg disabled:border-button-disabled-border ",
         secondary:
           // @replit border, no hover, no shadow, secondary border.
-          "border bg-secondary text-secondary-foreground border border-secondary-border ",
+          "border bg-secondary text-secondary-foreground border border-secondary-border disabled:bg-button-disabled-bg disabled:text-button-disabled-fg disabled:border-button-disabled-border ",
         // @replit no hover, transparent border
-        ghost: "border border-transparent",
-        link: "text-primary underline-offset-4 hover:underline",
+        ghost: "border border-transparent disabled:text-button-disabled-fg",
+        link: "text-primary underline-offset-4 hover:underline disabled:text-button-disabled-fg disabled:no-underline",
       },
       size: {
         // @replit changed sizes

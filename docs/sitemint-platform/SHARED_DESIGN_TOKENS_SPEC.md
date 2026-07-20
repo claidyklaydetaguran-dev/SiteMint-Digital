@@ -43,6 +43,23 @@
 > tests. None of the new roles are wired into a helpdesk component this
 > checkpoint — only `--destructive` was aliased in
 > `artifacts/helpdesk/src/index.css` to expose the dark danger correction.
+>
+> **Addendum (Phase 1C, implemented)**: the component-token layer
+> (`lib/design-tokens/src/components.css`) is now consumed directly by
+> helpdesk's `Button`, `Input`, and `Textarea` primitives for the disabled
+> state — `disabled:bg-button-disabled-bg`/`-fg`/`-border` and
+> `disabled:bg-input-disabled-bg`/`-fg`/`-border` Tailwind utilities
+> (`artifacts/helpdesk/src/index.css`) resolve straight to
+> `--sm-button-disabled-*`/`--sm-input-disabled-*`, replacing the prior
+> generic `disabled:opacity-50` dim. `Card` now uses an explicit
+> `border-card-border` utility (value-equivalent to the existing `border`
+> it replaces — both resolve to `--sm-color-border-default` — a zero-diff
+> alias, not a visual change). No new component token was needed; every
+> token this checkpoint consumes already existed from Phase 1B/1B.1.
+> `Badge`'s existing variants were verified already compliant (its
+> `destructive` variant already resolves through the corrected dark-danger
+> alias from Phase 1B.1) and required no code change. See
+> `artifacts/helpdesk/src/components/ui/{button,input,textarea,card}.tsx`.
 
 ---
 
