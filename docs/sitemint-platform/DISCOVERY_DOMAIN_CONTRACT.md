@@ -17,7 +17,7 @@ helpers, and tests. Nothing here is wired into any application code path.
 | File | Role |
 |---|---|
 | `lib/db/src/schema/submissions.ts` | Existing `discoverySubmissions` table, evolved additively (see below) |
-| `artifacts/api-server/src/routes/crmDiscovery.ts` | **Narrow, type-only compatibility exception** — two type annotations changed, zero runtime behavior change (see "crmDiscovery.ts compatibility exception" below) |
+| `artifacts/api-server/src/routes/crmDiscovery.ts` | **Narrow, strictly type-only compatibility exception** — one helper parameter type narrowed and one overly broad variable type annotation removed; the full original runtime object literal is preserved unchanged (corrected in Checkpoint 2C.2B.1 — see "crmDiscovery.ts compatibility exception" below) |
 | `lib/db/src/schema/discoveryDeliveryJobs.ts` | New `discovery_delivery_jobs` table |
 | `lib/db/src/schema/discoveryAiBriefs.ts` | New `discovery_ai_briefs` table |
 | `lib/db/src/schema/discoveryContract.ts` | Shared `DiscoverySubmissionContract` Zod DTO, `DiscoveryTransportMeta`, version constants |
@@ -235,43 +235,63 @@ necessarily changes `DiscoverySubmission` (`typeof discoverySubmissions.
 $inferSelect`), because Drizzle's inferred select type always includes every
 column as a required key (a nullable column still produces a required key
 whose *value* type includes `null`, not an optional key). This broke
-`artifacts/api-server/src/routes/crmDiscovery.ts:164`, which built a full
+`artifacts/api-server/src/routes/crmDiscovery.ts`, which built a full
 `DiscoverySubmission`-typed object literal (`partial`) purely as a synthetic
 scratch input to a local helper, `buildDeterministicSummary` (also defined
 in that file), to compute an AI summary/complexity/budget-tier
 classification without touching the database.
 
 `crmDiscovery.ts` is on this checkpoint's explicit "do not change" list.
-This is a narrowly approved, type-only compatibility exception (owner
-decision during implementation) to unblock the workspace typecheck gate,
-scoped to exactly two type annotations:
+This is a narrowly approved, **strictly type-only** compatibility exception
+(owner decision during implementation), corrected in Checkpoint 2C.2B.1 after
+an initial Checkpoint 2C.2B pass over-corrected by also trimming the
+`partial` object literal's runtime properties — that trim is reverted.
+Final, correct scope is exactly two type-level changes, with **zero runtime
+change**:
 
 - `buildDeterministicSummary`'s parameter type narrowed from
   `DiscoverySubmission` to a new local type,
-  `DiscoverySubmissionSummaryInput = Pick<DiscoverySubmission, "formData" |
+  `DeterministicSummaryInput = Pick<DiscoverySubmission, "formData" |
   "budget" | "timeline" | "companyName" | "contactName" | "leadScore">` —
   exactly the six fields the function body actually reads (verified by
   inspection: `sub.formData`, `sub.budget`, `sub.timeline`,
-  `sub.companyName`, `sub.contactName`, `sub.leadScore`).
-- The `partial` object literal's type annotation changed to match, and the
-  fifteen fields it previously set but `buildDeterministicSummary` never
-  read (`id`, `createdAt`, `updatedAt`, `email`, `phone`, `industry`,
-  `serviceInterest`, `decisionMaker`, `tags`, `status`, `recommendedPackage`,
-  `generatedProposal`, `generatedSow`, `internalNotes`, `leadId`,
-  `aiSummary`, `estimatedComplexity`, `estimatedBudgetTier`,
-  `suggestedScope`, `crmStatus`, `preferredContactMethod`,
-  `convertedProjectId`) were removed from the literal — `partial` is used in
-  exactly one place (as the sole argument to `buildDeterministicSummary`,
-  confirmed via `grep`), so removing dead, never-read fields from this
-  throwaway scratch object has no observable runtime effect.
+  `sub.companyName`, `sub.contactName`, `sub.leadScore`). Only the helper's
+  *compile-time dependency* was narrowed — its body, logic, and return value
+  are byte-for-byte unchanged.
+- The `partial` object literal **keeps its complete original runtime
+  construction**, exactly as it existed before Checkpoint 2C.2B (all
+  twenty-one properties: `id`, `createdAt`, `updatedAt`, `contactName`,
+  `companyName`, `email`, `phone`, `industry`, `serviceInterest`, `budget`,
+  `timeline`, `decisionMaker`, `leadScore`, `tags`, `status`,
+  `recommendedPackage`, `formData`, `generatedProposal`, `generatedSow`,
+  `internalNotes`, `leadId`, `aiSummary`, `estimatedComplexity`,
+  `estimatedBudgetTier`, `suggestedScope`, `crmStatus`,
+  `preferredContactMethod`, `convertedProjectId` — same values, same
+  construction order). Only its overly broad `: DiscoverySubmission` type
+  annotation was removed; TypeScript now infers the literal's shape, and
+  that inferred (wider) shape is passed structurally to the narrowed
+  `buildDeterministicSummary` parameter — TypeScript permits passing a named
+  variable with extra properties wherever a narrower `Pick<>` is expected
+  (excess-property checking only applies to fresh object literals at a call
+  site, not to a variable reference). **No Phase 2C.2B Discovery field
+  (`schemaVersion`, `idempotencyKey`, etc.) was ever inserted into this
+  legacy object**, as a null placeholder or otherwise.
+
+**Runtime-equivalence verification (2C.2B.1):** the corrected file's emitted
+JavaScript was compared against the Phase 2C.2A.3 parent commit's version
+(`1a7514560af1e73f3aff4a92de27c44dfc30d65d`) via `tsc` with matching
+`target`/`module`/`moduleResolution` settings. The only difference in the
+entire emitted output is one erased section-header comment that TypeScript's
+emitter drops because it sits directly above a type-only `type` alias
+declaration (a well-known comment-attachment artifact of type erasure, not a
+code difference) — every statement, expression, property, value, function
+body, and return is identical.
 
 **Explicitly unaffected**: the function's return value, every database
 read/write in the route (both the `crmLeads` upsert and the
 `discoverySubmissions` insert below it), the route path, `requireAdmin`
-gating, request validation, status handling, and every other route in the
-file. No Phase 2C.2B field was added to any runtime object merely to satisfy
-TypeScript — the fix is a pure narrowing of what the type declares, not an
-addition to what the code does.
+gating, request validation, status handling, CRM conversion behavior, and
+every other route in the file. No CRM behavior of any kind changed.
 
 ## Next-phase boundaries
 

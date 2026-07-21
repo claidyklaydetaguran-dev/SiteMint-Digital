@@ -51,16 +51,19 @@ const DEFAULT_LAUNCH_CHECKLIST = [
 
 // ── Deterministic classification ──────────────────────────────────────────────
 
-// Narrowed to exactly the fields this function reads, so it (and the
-// synthetic `partial` scratch object below) stay valid regardless of future
-// additive columns on discoverySubmissions — see docs/sitemint-platform/
-// DISCOVERY_DOMAIN_CONTRACT.md, "crmDiscovery.ts compatibility exception."
-type DiscoverySubmissionSummaryInput = Pick<
+// Narrowed to exactly the fields this function reads, so it stays valid
+// regardless of future additive columns on discoverySubmissions — see
+// docs/sitemint-platform/DISCOVERY_DOMAIN_CONTRACT.md, "crmDiscovery.ts
+// compatibility exception." Compile-time only: the `partial` object below
+// keeps its full original runtime construction and is passed here
+// structurally (TypeScript accepts a wider-shaped variable wherever a
+// narrower Pick<> is expected).
+type DeterministicSummaryInput = Pick<
   DiscoverySubmission,
   "formData" | "budget" | "timeline" | "companyName" | "contactName" | "leadScore"
 >;
 
-function buildDeterministicSummary(sub: DiscoverySubmissionSummaryInput): {
+function buildDeterministicSummary(sub: DeterministicSummaryInput): {
   aiSummary: string;
   estimatedComplexity: string;
   estimatedBudgetTier: string;
@@ -170,12 +173,20 @@ router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res
 
   const formData = (body.formData as Record<string, unknown>) || {};
 
-  const partial: DiscoverySubmissionSummaryInput = {
-    contactName, companyName,
+  const partial = {
+    id: 0, createdAt: new Date(), updatedAt: new Date(),
+    contactName, companyName, email,
+    phone: String(body.phone || "") || null,
+    industry: String(body.industry || "") || null,
+    serviceInterest: String(body.serviceInterest || "") || null,
     budget: String(body.budget || "") || null,
     timeline: String(body.timeline || "") || null,
-    leadScore: 5,
-    formData,
+    decisionMaker: String(body.decisionMaker || "") || null,
+    leadScore: 5, tags: [], status: "New", recommendedPackage: null,
+    formData, generatedProposal: null, generatedSow: null, internalNotes: null,
+    leadId: null, aiSummary: null, estimatedComplexity: null,
+    estimatedBudgetTier: null, suggestedScope: null,
+    crmStatus: "New", preferredContactMethod: null, convertedProjectId: null,
   };
 
   const { aiSummary, estimatedComplexity, estimatedBudgetTier, suggestedScope } =

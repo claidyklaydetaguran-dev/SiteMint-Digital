@@ -1114,3 +1114,47 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   provider was wired. No environment variable was added. No production
   database was contacted. No migration was applied. Activation of any kind
   is not approved.
+
+## Checkpoint 2C.2B.1 — Preserve CRM Runtime Compatibility (implemented)
+
+> Narrow correction and verification checkpoint. Only
+> `artifacts/api-server/src/routes/crmDiscovery.ts` and this pair of
+> documentation files changed. The Discovery domain schema, migration SQL,
+> `discovery_submissions`/`discovery_delivery_jobs`/`discovery_ai_briefs`,
+> the four Phase 2C.2B test files, `/discovery`, and
+> `POST /api/discovery/submit` are all untouched.
+
+- Verified the Checkpoint 2C.2B commit amend (fixing commit author/email for
+  GitHub verification) changed only commit metadata: both the pre-amend
+  commit (`5dd6c293be0289ab10531e5796a1501b4b18ae5d`) and the amended commit
+  (`4b23be92d6f93bfd36cd137b7556c288306353bf`) share the identical tree hash
+  `f07cb974a0671b87f3d340e78a0512d55953c5ea`, and `git diff` between them is
+  empty. Parentage was unchanged. Neither commit was rewritten by this
+  checkpoint.
+- Corrected the Checkpoint 2C.2B `crmDiscovery.ts` compatibility exception,
+  which had over-corrected by also trimming the `partial` scratch object's
+  runtime properties down to the six fields actually read. The full original
+  twenty-one-property runtime object literal (unchanged property names,
+  values, and construction order) is restored exactly as it existed in the
+  Phase 2C.2A.3 parent commit. The fix is now strictly type-only: a local
+  `DeterministicSummaryInput` (`Pick<DiscoverySubmission, "formData" |
+  "budget" | "timeline" | "companyName" | "contactName" | "leadScore">`)
+  narrows `buildDeterministicSummary`'s parameter type, and the `partial`
+  literal's overly broad `: DiscoverySubmission` annotation is removed so
+  TypeScript infers its shape and passes it structurally.
+- Verified runtime equivalence directly: transpiled `crmDiscovery.ts` (both
+  the corrected working copy and the Phase 2C.2A.3 parent version) with
+  matching `target`/`module`/`moduleResolution` settings and diffed the
+  emitted JavaScript. The only difference in the entire output is one
+  section-header comment TypeScript's emitter drops because it sits directly
+  above an erased `type` alias — a known comment-attachment artifact of type
+  erasure, not a code difference. No CRM behavior, database read/write,
+  route, validation, or status handling changed.
+- No Discovery schema, migration, table, contract, canonicalization, or HMAC
+  file changed — `lib/db/drizzle/discovery/0000_discovery-domain-contract.sql`
+  is byte-identical (checksum-verified) to the version already committed in
+  Checkpoint 2C.2B.
+- The previous commit (`4b23be92d6f93bfd36cd137b7556c288306353bf`) was not
+  amended again; this checkpoint is one new, separate commit. No migration
+  was applied. No database was contacted. No package or lockfile changed. No
+  environment variable changed. Nothing was pushed, deployed, or activated.
