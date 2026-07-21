@@ -1,11 +1,11 @@
 // Phase 2C.2B — shared contract schema tests. No test framework is installed
 // in this repo (see DISCOVERY_DOMAIN_CONTRACT.md); run directly via:
-//   pnpm --filter @workspace/scripts exec tsx lib/db/test/discoveryContract.test.ts
+//   pnpm --filter @workspace/discovery-contract run test
 import {
   DiscoverySubmissionContract,
   DiscoveryTransportMeta,
   DiscoverySubmissionRequest,
-} from "../src/schema/discoveryContract";
+} from "../src/schemas";
 
 let failures = 0;
 function check(label: string, condition: boolean): void {

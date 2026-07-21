@@ -1,7 +1,7 @@
 // Phase 2C.2B — canonicalization determinism tests. Run via:
-//   pnpm --filter @workspace/scripts exec tsx lib/db/test/discoveryCanonicalization.test.ts
-import { canonicalizeDiscoveryPayload } from "../src/schema/discoveryCanonicalization";
-import { DISCOVERY_IDEMPOTENCY_CANONICALIZATION_VERSION, type DiscoverySubmissionContract } from "../src/schema/discoveryContract";
+//   pnpm --filter @workspace/discovery-contract run test
+import { canonicalizeDiscoveryPayload } from "../src/canonicalization";
+import { DISCOVERY_IDEMPOTENCY_CANONICALIZATION_VERSION, type DiscoverySubmissionContract } from "../src/schemas";
 
 let failures = 0;
 function check(label: string, condition: boolean): void {

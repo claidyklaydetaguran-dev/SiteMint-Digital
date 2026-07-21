@@ -5,6 +5,19 @@
 > only — no route, component, worker, email, CRM, AI provider, environment
 > variable, or deployment action. The current `/discovery` form and
 > `POST /api/discovery/submit` endpoint are unchanged.
+>
+> **Current-location update (Checkpoint 2C.2C1, implemented):** the three
+> browser-safe files this document originally placed under
+> `lib/db/src/schema/` — `discoveryContract.ts`, `discoveryCanonicalization.ts`,
+> `discoveryResponses.ts` — and their two co-located tests have moved to the
+> dedicated `@workspace/discovery-contract` package
+> (`lib/discovery-contract/src/schemas.ts`, `canonicalization.ts`,
+> `responses.ts`; tests at `lib/discovery-contract/test/schemas.test.ts`,
+> `canonicalization.test.ts`), per
+> `docs/sitemint-platform/DISCOVERY_SHARED_CONTRACT_BOUNDARY.md`. The File
+> map and Export/reachability sections below are preserved as an accurate
+> record of Phase 2C.2B's original placement; see the current-location note
+> inline in each for where each file lives now.
 
 ## Scope of this checkpoint
 
@@ -20,24 +33,26 @@ helpers, and tests. Nothing here is wired into any application code path.
 | `artifacts/api-server/src/routes/crmDiscovery.ts` | **Narrow, strictly type-only compatibility exception** — one helper parameter type narrowed and one overly broad variable type annotation removed; the full original runtime object literal is preserved unchanged (corrected in Checkpoint 2C.2B.1 — see "crmDiscovery.ts compatibility exception" below) |
 | `lib/db/src/schema/discoveryDeliveryJobs.ts` | New `discovery_delivery_jobs` table |
 | `lib/db/src/schema/discoveryAiBriefs.ts` | New `discovery_ai_briefs` table |
-| `lib/db/src/schema/discoveryContract.ts` | Shared `DiscoverySubmissionContract` Zod DTO, `DiscoveryTransportMeta`, version constants |
-| `lib/db/src/schema/discoveryCanonicalization.ts` | Pure `canonicalizeDiscoveryPayload` function |
-| `lib/db/src/schema/discoveryResponses.ts` | Typed safe response/error contracts, closed error-code union |
+| `lib/db/src/schema/discoveryContract.ts` (Phase 2C.2B location; moved to `lib/discovery-contract/src/schemas.ts` in Checkpoint 2C.2C1) | Shared `DiscoverySubmissionContract` Zod DTO, `DiscoveryTransportMeta`, version constants |
+| `lib/db/src/schema/discoveryCanonicalization.ts` (Phase 2C.2B location; moved to `lib/discovery-contract/src/canonicalization.ts` in Checkpoint 2C.2C1) | Pure `canonicalizeDiscoveryPayload` function |
+| `lib/db/src/schema/discoveryResponses.ts` (Phase 2C.2B location; moved to `lib/discovery-contract/src/responses.ts` in Checkpoint 2C.2C1) | Typed safe response/error contracts, closed error-code union |
 | `lib/db/src/schema/discovery/index.ts` | Internal-only migration barrel (not a package export) |
 | `lib/db/drizzle.discovery.config.ts` | Isolated Drizzle Kit config for the discovery migration lane |
 | `lib/db/drizzle/discovery/0000_discovery-domain-contract.sql` | The one hand-authored additive migration |
 | `artifacts/api-server/src/lib/discoveryHmac.ts` | Server-only HMAC utilities |
-| `lib/db/test/discoveryContract.test.ts` | Shared contract schema tests |
-| `lib/db/test/discoveryCanonicalization.test.ts` | Canonicalization determinism tests |
+| `lib/db/test/discoveryContract.test.ts` (Phase 2C.2B location; moved to `lib/discovery-contract/test/schemas.test.ts` in Checkpoint 2C.2C1) | Shared contract schema tests |
+| `lib/db/test/discoveryCanonicalization.test.ts` (Phase 2C.2B location; moved to `lib/discovery-contract/test/canonicalization.test.ts` in Checkpoint 2C.2C1) | Canonicalization determinism tests |
 | `lib/db/test/discoveryDatabaseContract.test.ts` | Static Drizzle table/constraint assertions |
 | `artifacts/api-server/test/discoveryHmac.test.ts` | HMAC utility tests |
 
-## Export/reachability status (accurate as of this checkpoint)
+## Export/reachability status (accurate as of Phase 2C.2B; see Checkpoint 2C.2C1 update below for the three moved files' current status)
 
-**All five new Project Discovery files are internal to `lib/db/src/schema/`.**
-None is exported from `lib/db/src/schema/index.ts` (the shared,
-application-facing barrel) — that file has **zero diff** this checkpoint.
-Concretely:
+**All five new Project Discovery files were internal to `lib/db/src/schema/`
+as of this checkpoint (Phase 2C.2B).**
+None was exported from `lib/db/src/schema/index.ts` (the shared,
+application-facing barrel) — that file had **zero diff** in this checkpoint,
+and still has zero diff after the Checkpoint 2C.2C1 move described below.
+Concretely, as of Phase 2C.2B:
 
 - `discoveryContract.ts`, `discoveryCanonicalization.ts`, `discoveryResponses.ts`
   — reachable only via a plain relative import from another file physically
@@ -51,6 +66,15 @@ Concretely:
   `lib/db` vs. extract to a dedicated package/subpath) is an explicit,
   separately-reviewed decision for the future frontend-wiring checkpoint
   (2C.2C+), not made here.
+
+  **Update (Checkpoint 2C.2C1, implemented):** these three files (and their
+  two tests) have moved to the new `@workspace/discovery-contract` package
+  at `lib/discovery-contract/`, per the Option A decision in
+  `DISCOVERY_SHARED_CONTRACT_BOUNDARY.md`. They are no longer present under
+  `lib/db/src/schema/` or `lib/db/test/`. Both `web-agency` and `api-server`
+  now declare a `workspace:*` dependency on `@workspace/discovery-contract`,
+  though neither's application source imports it yet — no guided form, no
+  new endpoint, and no consumer activation occurred in Checkpoint 2C.2C1.
 - `discoveryDeliveryJobs.ts`, `discoveryAiBriefs.ts` — reachable only through
   the internal `lib/db/src/schema/discovery/index.ts` barrel, itself used
   solely as the `schema:` target of `drizzle.discovery.config.ts`. Not an

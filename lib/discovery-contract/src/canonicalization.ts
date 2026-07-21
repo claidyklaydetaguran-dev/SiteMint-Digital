@@ -1,4 +1,4 @@
-import { DISCOVERY_IDEMPOTENCY_CANONICALIZATION_VERSION, type DiscoverySubmissionContract } from "./discoveryContract";
+import { DISCOVERY_IDEMPOTENCY_CANONICALIZATION_VERSION, type DiscoverySubmissionContract } from "./schemas";
 
 // ── Canonical idempotency payload (v1) ────────────────────────────────────────
 // Phase 2C.2B (docs/sitemint-platform/DISCOVERY_FORM_HARDENING_PRD.md §18,

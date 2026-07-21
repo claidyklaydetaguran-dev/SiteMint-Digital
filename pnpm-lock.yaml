@@ -376,6 +376,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/discovery-contract':
+        specifier: workspace:*
+        version: link:../../lib/discovery-contract
       '@workspace/integrations-openai-ai-server':
         specifier: workspace:*
         version: link:../../lib/integrations-openai-ai-server
@@ -952,6 +955,9 @@ importers:
       '@workspace/design-tokens':
         specifier: workspace:*
         version: link:../../lib/design-tokens
+      '@workspace/discovery-contract':
+        specifier: workspace:*
+        version: link:../../lib/discovery-contract
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -1069,6 +1075,16 @@ importers:
         version: 0.31.10
 
   lib/design-tokens: {}
+
+  lib/discovery-contract:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
 
   lib/integrations-openai-ai-react: {}
 

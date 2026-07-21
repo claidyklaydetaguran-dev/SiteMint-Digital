@@ -1240,3 +1240,128 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
 - No code, package, schema, migration, lockfile, frontend, or API change
   occurred in this checkpoint. Phase 2C.2C1 remains unapproved pending
   owner review.
+
+## Checkpoint 2C.2C1 — Create Shared Discovery Contract Package (implemented)
+
+> Implements the Option A package move approved in
+> `DISCOVERY_SHARED_CONTRACT_BOUNDARY.md` (Checkpoint 2C.2C0/2C.2C0.1). No
+> guided form, no new versioned endpoint, no HMAC change, no migration
+> applied, no database contacted, and no application source wired to import
+> the new package — activation remains unapproved, per every prior
+> checkpoint's standing note.
+
+- **New package**: `@workspace/discovery-contract` at `lib/discovery-contract/`
+  — `package.json` (`private: true`, `type: module`, single export
+  `"." : "./src/index.ts"`, `zod: catalog:` dependency, `tsx: catalog:`
+  package-local dev dependency), `tsconfig.json` (extends
+  `../../tsconfig.base.json`, mirrors `lib/api-zod/tsconfig.json` exactly:
+  `composite`, `declarationMap`, `emitDeclarationOnly`, `outDir: dist`,
+  `rootDir: src`), a `test` script (`tsx test/schemas.test.ts && tsx
+  test/canonicalization.test.ts`) and a `typecheck` script
+  (`tsc -p tsconfig.json --noEmit`).
+- **Clean source/test move (no duplicate, no compatibility re-export)**:
+  `lib/db/src/schema/discoveryContract.ts` → `lib/discovery-contract/src/schemas.ts`;
+  `discoveryCanonicalization.ts` → `canonicalization.ts`;
+  `discoveryResponses.ts` → `responses.ts`; `lib/db/test/discoveryContract.test.ts`
+  → `lib/discovery-contract/test/schemas.test.ts`;
+  `discoveryCanonicalization.test.ts` → `canonicalization.test.ts`. Only the
+  moved files' own relative imports and header comments were updated;
+  assertions and behavior are byte-identical. The five original files no
+  longer exist under `lib/db`. `lib/db/src/schema/discoveryDeliveryJobs.ts`,
+  `discoveryAiBriefs.ts`, `discovery/index.ts`, and
+  `lib/db/src/schema/index.ts` were not touched (verified zero-line diff).
+- **New public entry point** (`lib/discovery-contract/src/index.ts`)
+  re-exports `schemas.ts`, `canonicalization.ts`, `responses.ts` — 20 runtime
+  exports (schema/version/enum constants, the three dual-purpose
+  schema-and-type exports, `canonicalizeDiscoveryPayload`) and 12 type-only
+  exports (the three dual-purpose types plus `CanonicalDiscoveryPayload`,
+  `DiscoverySafeErrorCode`, and six response interfaces). No test-only
+  utility, Drizzle table, HMAC helper, or `process.env` access is exported.
+- **Dependency links added**: `"@workspace/discovery-contract": "workspace:*"`
+  added to `artifacts/web-agency/package.json` (`devDependencies`) and
+  `artifacts/api-server/package.json` (`dependencies`). `lib/db/package.json`
+  unchanged — no other `lib/db` source or test depended on anything unique
+  to the three moved files. `pnpm-workspace.yaml` unchanged — its existing
+  `lib/*` glob already covered the new package directory.
+- **TypeScript project references added** (three, matching the existing
+  `lib/api-zod` wiring pattern exactly, so the new package participates in
+  the same `tsc --build` composite graph and per-app typecheck as every
+  sibling `lib/*` package): root `tsconfig.json`, `artifacts/web-agency/tsconfig.json`,
+  and `artifacts/api-server/tsconfig.json` each gained a
+  `{"path": ".../lib/discovery-contract"}` reference entry.
+- **Lockfile regenerated** via `pnpm install`; the diff was inspected under
+  a lockfile guard before proceeding and confirmed limited to exactly: the
+  new `lib/discovery-contract` importer block (`zod`/`tsx` catalog edges)
+  and one new `@workspace/discovery-contract: workspace:*` edge each in the
+  `web-agency` and `api-server` importer sections. No unrelated package
+  version changed, no workspace catalog entry changed, `pnpm-workspace.yaml`
+  itself was not touched, and the workspace-wide `zod` resolution remained
+  a single deduplicated `zod@3.25.76` (no second/duplicate resolution
+  introduced).
+- **Seven-check verification, all passed:**
+  1. *Package tests* — `pnpm --filter @workspace/discovery-contract run test`:
+     all 32 moved assertions (20 schema, 12 canonicalization) passed
+     unchanged.
+  2. *Package typecheck* — `pnpm --filter @workspace/discovery-contract run
+     typecheck` clean.
+  3. *Public-entry smoke test, split into a runtime check and a type-only
+     check* (interfaces/type aliases have no runtime emission, so a single
+     combined `Object.keys` comparison would be invalid):
+     - **Runtime check**, run from the package directory so `zod/v4`
+       resolved through the package's own dependency graph
+       (`pnpm --dir lib/discovery-contract exec tsx -e '...'`): the actual
+       runtime export list matched the approved 20-item list exactly (zero
+       missing, zero extra), and `DiscoverySubmissionContract instanceof
+       z.ZodType` confirmed the schema shares the package's resolved
+       `zod/v4` runtime.
+     - **Type-only check**: an untracked `/tmp` file `import type`-ed all 12
+       approved type-only symbols (including `DiscoverySafeResponse`)
+       through `src/index.ts` by absolute path, referenced in a
+       compile-time tuple so none was unused, compiled cleanly via
+       `pnpm --dir lib/discovery-contract exec tsc --noEmit --module ESNext
+       --moduleResolution Bundler --target ESNext
+       --allowImportingTsExtensions` (exit 0). The file was deleted after
+       use and never committed.
+  4. *Direct browser-targeted bundle* — a direct `esbuild --bundle
+     --platform=browser --format=esm` build of `lib/discovery-contract/src/index.ts`
+     (via `pnpm --filter @workspace/api-server exec esbuild ...`) succeeded
+     (401.8 kB, `/tmp`-only output); its metafile's 69-entry input list was
+     inspected and contained only the four package source files plus `zod`'s
+     own `v4` classic/core/locale modules — none of `@workspace/db`,
+     `drizzle-orm`, `drizzle-zod`, `pg`, `node:crypto`, any other `node:*`,
+     `discoveryHmac.ts`, any `process.env`-reading module, or any API
+     route/controller/worker file entered the graph. This is distinct from
+     and does not rely on the ordinary `web-agency` build, since no
+     application source imports the package yet.
+  5. *Consumer dependency-link resolution* —
+     `import.meta.resolve('@workspace/discovery-contract')`, run from both
+     `web-agency` and `api-server`, each resolved to
+     `lib/discovery-contract/src/index.ts` via the `workspace:*` symlink.
+  6. *Application builds (regression checks only, not a browser-safety
+     proof)* — `PORT=5173 BASE_PATH=/ VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED=false
+     pnpm --filter @workspace/web-agency run build` and
+     `pnpm --filter @workspace/api-server run build` both succeeded; the
+     web-agency ordinary entry bundle and preview lazy chunk sizes matched
+     the pre-existing historical baseline (no size regression from the new
+     dependency edge, since no application source imports it yet); the
+     preview flag stayed `false`, no preview activation occurred, no Replit
+     port/config file was touched, and homepage behavior is unchanged.
+  7. *Whole-workspace typecheck* — `pnpm run typecheck` (`tsc --build` +
+     every app's own `typecheck` script) passed clean, confirming the new
+     project reference integrates into the composite graph with no
+     repository-wide type regression.
+- **Protected-file and migration verification**: zero-line `git diff` on
+  every root-`CLAUDE.md`-protected file, on `lib/db/src/schema/index.ts`,
+  and on `lib/db/src/schema/discovery/index.ts`;
+  `lib/db/drizzle/discovery/0000_discovery-domain-contract.sql`'s SHA-256
+  re-verified unchanged (`be59800749959dc6e21d75cbe8046007d5e48189ba905bafe7fb31f7c8a1a772`);
+  no database connection made; no migration applied, generated, or pushed.
+- **No application consumer was activated.** Nothing in `web-agency` or
+  `api-server` application source imports `@workspace/discovery-contract`
+  yet — the dependency edges exist so a future checkpoint can wire the
+  guided form and the versioned endpoint, per the same standing
+  "activation is not approved" note every prior checkpoint in this program
+  carries.
+- Exactly one commit was created on this checkpoint's branch; not pushed,
+  not merged, not deployed. No database was contacted and no migration was
+  applied at any point.

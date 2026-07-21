@@ -1,5 +1,25 @@
 # Discovery Shared Contract Boundary — Architecture Decision Record
 
+> **Implemented in Checkpoint 2C.2C1.** The Option A package move this ADR
+> recommends (§7, §9, §12, §22) has been carried out: `lib/discovery-contract/`
+> exists, the three browser-safe files and their two tests moved into it
+> exactly per §12's file-movement strategy (clean cut, no compatibility
+> re-export), `web-agency` and `api-server` each gained a `workspace:*`
+> dependency on `@workspace/discovery-contract`, and the §9/§24 zod/v4
+> resolution, deduplication, TypeScript-compatibility, runtime-identity, and
+> Vite/esbuild bundle-safety verification was performed and passed (single
+> deduplicated `zod@3.25.76` resolution workspace-wide; a direct
+> browser-targeted esbuild bundle of the package entry point contained no
+> Drizzle/`pg`/`node:crypto`/HMAC/route input). No consumer's application
+> source imports the package yet — no guided form, no new endpoint, no
+> activation. The original decision rationale and evaluated options below
+> (§2–§27) are preserved unchanged as the reasoning record for why Option A
+> was chosen; the "not created," "not moved," and "implementation is not
+> approved" language in those sections describes this ADR's own
+> documentation-only checkpoint (2C.2C0/2C.2C0.1) and is historically
+> accurate for that checkpoint — it does not describe the current,
+> post-2C.2C1 state.
+>
 > Checkpoint 2C.2C0. Documentation and architecture decision only. No
 > application code, component, route, package, `package.json`,
 > `pnpm-lock.yaml`, TypeScript/Vite configuration, schema, migration, or
