@@ -56,6 +56,11 @@ const queryClient = new QueryClient();
 // never pay for this bundle. See docs/sitemint-platform's Phase 2A checkpoint.
 const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
 
+// Lazy-loaded for the same reason as PlatformPreview above — this route's
+// chunk (react-hook-form step components + @workspace/discovery-contract)
+// only fetches when /platform-preview/start-project is actually visited.
+const PlatformDiscoveryPreview = lazy(() => import("@/pages/PlatformDiscoveryPreview"));
+
 function CrmHomeRedirect() {
   const [, navigate] = useLocation();
   useEffect(() => { navigate("/admin/crm/dashboard"); }, [navigate]);
@@ -112,6 +117,22 @@ function Router() {
           platformPreviewEnabled ? (
             <Suspense fallback={null}>
               <PlatformPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+
+      {/* Platform Preview — Guided Discovery Form Preview (Phase 2C.2C2):
+          same feature flag, same fail-closed shape as /platform-preview
+          above. Preview-only — no network request, no persistence, not the
+          real /discovery funnel. */}
+      <Route path="/platform-preview/start-project">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformDiscoveryPreview />
             </Suspense>
           ) : (
             <NotFound />

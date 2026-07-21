@@ -76,4 +76,12 @@ export const primaryNavItems: PreviewNavItem[] = [
  * item before that destination is verified real.
  */
 export const signInHref = "/ai-receptionist/dashboard/login";
-export const startProjectHref = "/discovery";
+
+/**
+ * Phase 2C.2C2: points at the flag-gated, preview-only guided discovery
+ * form (`/platform-preview/start-project`), not the real `/discovery`
+ * funnel — this CTA lives only inside `/platform-preview`, itself gated by
+ * `platformPreviewEnabled`, so it can never expose the preview form to a
+ * visitor who reached it any other way.
+ */
+export const startProjectHref = "/platform-preview/start-project";
