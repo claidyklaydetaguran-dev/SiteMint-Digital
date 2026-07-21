@@ -3,8 +3,6 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -23,6 +21,11 @@
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
   --color-primary-border: var(--primary-border);
+
+  --color-primary-soft: hsl(var(--primary-soft));
+  --color-primary-soft-foreground: hsl(var(--primary-soft-foreground));
+
+  --color-navy: hsl(var(--navy));
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
@@ -98,7 +101,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* LIGHT MODE */
+/* SiteMint — single light theme, mint-first */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -108,47 +111,57 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 218 45% 98%;
-  --foreground: 222 45% 12%;
-  --border: 218 25% 88%;
+  --background: 150 30% 98%;
+  --foreground: 222 30% 14%;
+  --border: 150 20% 88%;
   --card: 0 0% 100%;
-  --card-foreground: 222 45% 12%;
-  --card-border: 218 25% 90%;
+  --card-foreground: 222 30% 14%;
+  --card-border: 150 20% 90%;
 
-  --sidebar: 218 45% 98%;
-  --sidebar-foreground: 222 45% 12%;
-  --sidebar-border: 218 25% 88%;
-  --sidebar-primary: 218 90% 23%;
+  --sidebar: 150 30% 98%;
+  --sidebar-foreground: 222 30% 14%;
+  --sidebar-border: 150 20% 88%;
+  --sidebar-primary: 155 45% 38%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 218 30% 94%;
-  --sidebar-accent-foreground: 222 45% 12%;
-  --sidebar-ring: 218 90% 23%;
+  --sidebar-accent: 150 30% 94%;
+  --sidebar-accent-foreground: 222 30% 14%;
+  --sidebar-ring: 160 60% 55%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 45% 12%;
-  --popover-border: 218 25% 90%;
+  --popover-foreground: 222 30% 14%;
+  --popover-border: 150 20% 90%;
 
-  --primary: 218 90% 23%;
+  /* Medium mint — the readable, actionable accent (text, links, buttons,
+     active states) used site-wide. Kept dark enough to stay legible on
+     white; the softer pastel wash lives in --primary-soft below. */
+  --primary: 155 45% 38%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 218 40% 95%;
-  --secondary-foreground: 218 90% 15%;
-  --muted: 218 25% 95%;
-  --muted-foreground: 220 15% 40%;
-  --accent: 218 45% 93%;
-  --accent-foreground: 218 90% 18%;
+  /* Pastel mint wash — section tints, badges, chip backgrounds. */
+  --primary-soft: 150 45% 88%;
+  --primary-soft-foreground: 155 45% 22%;
+  --secondary: 150 30% 95%;
+  --secondary-foreground: 155 40% 20%;
+  --muted: 150 20% 95%;
+  --muted-foreground: 220 12% 42%;
+  --accent: 150 40% 92%;
+  --accent-foreground: 155 45% 18%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 218 20% 85%;
-  --ring: 218 90% 23%;
-  --chart-1: 218 90% 23%;
-  --chart-2: 160 64% 50%;
-  --chart-3: 220 10% 10%;
-  --chart-4: 218 25% 90%;
-  --chart-5: 218 15% 80%;
+  /* Secondary/neutral dark accent — headline emphasis, hero backdrop, footer band.
+     No longer the dominant brand hue, kept for contrast anchoring. */
+  --navy: 222 47% 18%;
 
-  /* CRM admin shell — fixed dark chrome, does not follow light/dark mode.
-     Dedicated tokens because no existing light-mode token maps to this shade. */
+  --input: 150 15% 85%;
+  --ring: 160 60% 55%;
+  --chart-1: 155 55% 55%;
+  --chart-2: 175 55% 50%;
+  --chart-3: 222 30% 20%;
+  --chart-4: 150 20% 85%;
+  --chart-5: 150 15% 75%;
+
+  /* CRM admin shell — fixed dark chrome, intentionally does not follow the
+     site theme. Dedicated tokens because no light-mode token maps to this shade. */
   --crm-sidebar: 222 34% 15%;
   --crm-header: 222 47% 11%;
   --crm-content: 210 17% 95%;
@@ -156,7 +169,7 @@
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: 'Playfair Display', serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0rem;
+  --radius: 0.75rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.02);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.04);
   --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.02), 0px 1px 2px -1px hsl(0 0% 0% / 0.02);
@@ -182,67 +195,6 @@
   --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-}
-
-.dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
-  --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-
-  --background: 220 10% 10%;
-  --foreground: 40 20% 98%;
-  --border: 220 10% 20%;
-  --card: 220 10% 12%;
-  --card-foreground: 40 20% 98%;
-  --card-border: 220 10% 20%;
-  
-  --sidebar: 220 10% 10%;
-  --sidebar-foreground: 40 20% 98%;
-  --sidebar-border: 220 10% 20%;
-  --sidebar-primary: 222 47% 45%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 10% 15%;
-  --sidebar-accent-foreground: 40 20% 98%;
-  --sidebar-ring: 222 47% 45%;
-
-  --popover: 220 10% 12%;
-  --popover-foreground: 40 20% 98%;
-  --popover-border: 220 10% 20%;
-
-  --primary: 40 20% 98%;
-  --primary-foreground: 220 10% 10%;
-  --secondary: 220 10% 15%;
-  --secondary-foreground: 40 20% 98%;
-  --muted: 220 10% 15%;
-  --muted-foreground: 40 10% 70%;
-  --accent: 222 47% 25%;
-  --accent-foreground: 40 20% 98%;
-  --destructive: 0 62% 30%;
-  --destructive-foreground: 40 20% 98%;
-
-  --input: 220 10% 20%;
-  --ring: 222 47% 45%;
-  --chart-1: 222 47% 45%;
-  --chart-2: 40 20% 98%;
-  --chart-3: 40 10% 70%;
-  --chart-4: 220 10% 15%;
-  --chart-5: 220 10% 20%;
-
-  /* CRM admin shell keeps the same fixed dark chrome in dark mode. */
-  --crm-sidebar: 222 34% 15%;
-  --crm-header: 222 47% 11%;
-  --crm-content: 210 17% 95%;
-
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
 }
 
 @layer base {

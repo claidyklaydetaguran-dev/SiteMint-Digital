@@ -3,85 +3,46 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { HeroSection } from "@/components/HeroSection";
-import {
-  ArrowRight,
-  MonitorSmartphone,
-  Search,
-  Zap,
-  Clock,
-  ShieldCheck,
-  Code,
-  LayoutTemplate,
-  BarChart3,
-  Code2,
-  ExternalLink,
-} from "lucide-react";
+import { HeroSection, AvatarStack } from "@/components/HeroSection";
+import { TrustBadgeRow } from "@/components/home/TrustBadgeRow";
+import { BenefitRow } from "@/components/home/BenefitRow";
+import { CaseStudySpotlight } from "@/components/home/CaseStudySpotlight";
+import { StatsChart } from "@/components/home/StatsChart";
+import { ArrowRight, Diamond } from "lucide-react";
 
-const recentWork = [
+const pricingTiers = [
   {
-    name: "Shasta Greene Real Estate",
-    url: "https://shastagreene.com",
-    domain: "shastagreene.com",
-    category: "Real Estate",
-    image: "/portfolio-shasta.png",
-    outcomes: ["Professional online presence", "Lead capture ready"],
+    title: "Essential Presence",
+    price: "2,995",
+    desc: "For new businesses and local service providers that need a credible online home.",
+    features: ["5-page responsive website", "Contact & lead capture forms", "Basic SEO setup"],
   },
   {
-    name: "OneFilAm Community",
-    url: "https://onefilamcommunity.org",
-    domain: "onefilamcommunity.org",
-    category: "Nonprofit",
-    image: "/portfolio-onefilam.png",
-    outcomes: ["Community-focused platform", "Improved credibility"],
+    title: "Lead Generation Website",
+    price: "5,995",
+    desc: "For service businesses ready to convert visitors into leads.",
+    features: ["Everything in Essential, plus", "Conversion-focused design", "CRM-ready lead capture", "4–6 week delivery"],
+    popular: true,
   },
   {
-    name: "Herlinda Valdovinos",
-    url: "https://herlindavaldovinos.com",
-    domain: "herlindavaldovinos.com",
-    category: "Professional Services",
-    image: "/portfolio-herlinda.png",
-    outcomes: ["Polished professional presence", "Clear service layout"],
+    title: "Growth Platform",
+    price: "9,995",
+    desc: "For established businesses that need a complete digital system.",
+    features: ["Everything in Lead Gen, plus", "Custom CRM & automations", "Advanced local SEO", "Ongoing care & support"],
   },
 ];
 
-function WorkCard({ item }: { item: typeof recentWork[0] }) {
-  return (
-    <a href={item.url} target="_blank" rel="noopener noreferrer" className="group block">
-      <div className="rounded-xl overflow-hidden border border-background/10 hover:border-background/30 transition-all duration-300">
-        {/* AI mockup image */}
-        <div className="aspect-[4/3] relative overflow-hidden bg-background/5">
-          <img
-            src={item.image}
-            alt={`${item.name} website`}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-mono text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap"
-            style={{ background: "rgba(0,0,0,0.50)", backdropFilter: "blur(4px)" }}
-          >
-            {item.domain}
-          </div>
-        </div>
+const processSteps = ["Discover", "Design", "Build", "Launch", "Optimize"];
 
-        <div className="p-5">
-          <div className="text-xs font-semibold text-background/50 uppercase tracking-wider mb-1">{item.category}</div>
-          <h3 className="font-serif font-bold text-lg text-background mb-3 group-hover:text-background/80 transition-colors">
-            {item.name}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {item.outcomes.map((o) => (
-              <span key={o} className="text-xs text-background/60 bg-background/10 px-2.5 py-1 rounded-full">
-                {o}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </a>
-  );
-}
+const stepContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12 } },
+};
+
+const stepItem = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.23, 1, 0.32, 1] as const } },
+};
 
 export default function Home() {
   return (
@@ -89,60 +50,66 @@ export default function Home() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Trust Bar */}
-      <section className="border-y border-border/40 py-8 relative" style={{ background: "linear-gradient(135deg, #f2f6fd 0%, #e4ecfb 50%, #f2f6fd 100%)" }}>
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="flex flex-wrap justify-center md:justify-between items-center gap-8 md:gap-4 text-sm font-medium text-muted-foreground">
-            <div className="flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Fast Turnaround</div>
-            <div className="flex items-center gap-2"><MonitorSmartphone className="w-5 h-5 text-primary" /> Mobile-Friendly</div>
-            <div className="flex items-center gap-2"><Search className="w-5 h-5 text-primary" /> SEO-Ready</div>
-            <div className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /> Business Automation</div>
-            <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Ongoing Support</div>
-          </div>
-        </div>
-      </section>
+      {/* Trust badge row */}
+      <TrustBadgeRow />
 
-      {/* Services Preview */}
-      <section className="py-24">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="text-center mb-16 max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6">Digital Systems for Growth</h2>
-            <p className="text-lg text-muted-foreground">We build everything you need to attract leads, organize follow-up, and operate a successful modern business online.</p>
-          </div>
+      {/* Benefit / pain-point row */}
+      <BenefitRow />
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { icon: LayoutTemplate, title: "Growth Websites", desc: "Mobile-responsive, conversion-focused websites that serve as your 24/7 digital storefront and lead capture engine." },
-              { icon: Code, title: "CRM Systems", desc: "Custom client portals and CRM dashboards that organize your contacts, automate follow-up, and track every lead." },
-              { icon: Search, title: "SEO Foundations", desc: "Technical and local SEO so your business gets found by the right people searching for your services." },
-              { icon: Zap, title: "Business Automation", desc: "Connect your tools, eliminate manual admin work, and capture every lead without lifting a finger." },
-              { icon: Code2, title: "Custom Web Apps", desc: "Booking systems, client portals, internal dashboards, and AI-powered tools built for how your business operates." },
-              { icon: BarChart3, title: "AI-Assisted Tools", desc: "Chatbots, automated proposals, smart intake forms, and data systems that scale your operations without scaling headcount." },
-            ].map((service, i) => (
-              <Card
+      {/* Case study spotlight */}
+      <CaseStudySpotlight />
+
+      {/* Stats + animated chart */}
+      <StatsChart />
+
+      {/* Process Timeline */}
+      <section className="py-24 relative overflow-hidden">
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6">How We Work</h2>
+            <p className="text-lg text-muted-foreground">A proven process for delivering results on time.</p>
+          </motion.div>
+
+          <motion.div
+            className="flex flex-col md:flex-row justify-between relative max-w-5xl mx-auto"
+            variants={stepContainer}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, amount: 0.3 }}
+          >
+            <motion.div
+              className="hidden md:block absolute top-6 left-0 w-full h-[1px] bg-border -translate-y-1/2 z-0 origin-left"
+              initial={{ scaleX: 0 }}
+              whileInView={{ scaleX: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 1, ease: [0.23, 1, 0.32, 1] as const }}
+            />
+            {processSteps.map((step, i) => (
+              <motion.div
                 key={i}
-                className="group border border-primary/10 shadow-sm bg-white hover:border-primary/40 hover:shadow-[0_12px_32px_rgba(6,46,113,0.12)] hover:-translate-y-1 transition-all duration-300"
+                variants={stepItem}
+                className="relative z-10 flex flex-row md:flex-col items-center gap-4 md:gap-6 mb-8 md:mb-0"
               >
-                <CardHeader>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)" }}>
-                    <service.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <CardTitle className="font-serif text-xl">{service.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-6">{service.desc}</p>
-                  <Link href="/services" className="text-sm font-medium text-foreground group-hover:text-primary flex items-center transition-colors">
-                    Learn more <ArrowRight className="w-4 h-4 ml-1 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                  </Link>
-                </CardContent>
-              </Card>
+                <div className="w-12 h-12 rounded-full bg-background border-2 border-primary flex items-center justify-center font-bold text-primary shadow-[0_0_0_8px_hsl(var(--background))]">
+                  {i + 1}
+                </div>
+                <div className="text-left md:text-center">
+                  <h4 className="font-serif font-bold text-lg mb-1">{step}</h4>
+                </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-24 border-y border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(160deg, #f2f6fd 0%, #dce8f9 50%, #e4ecfb 100%)" }}>
+      <section className="py-24 border-y border-border/40 relative overflow-hidden bg-secondary/40">
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
             <div className="max-w-2xl">
@@ -155,99 +122,41 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { title: "Essential Presence", price: "2,995", desc: "For new businesses, local service providers, and professional services that need a credible online home." },
-              { title: "Lead Generation Website", price: "5,995", desc: "For service businesses ready to convert visitors into leads with a conversion-focused digital presence.", popular: true },
-              { title: "Growth Platform", price: "9,995", desc: "For established businesses that need a complete digital system with automation, CRM, and advanced SEO." },
-            ].map((tier, i) => (
-              <Card key={i} className={`relative bg-white ${(tier as any).popular ? "border-primary shadow-xl shadow-primary/10" : "border-primary/10"}`}>
-                {(tier as any).popular && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
-                    Best Seller
+            {pricingTiers.map((tier, i) => (
+              <Card
+                key={i}
+                className={`relative bg-card overflow-hidden ${tier.popular ? "border-primary shadow-xl shadow-primary/10 md:-translate-y-2" : "border-card-border"}`}
+              >
+                {tier.popular && (
+                  <div
+                    className="absolute top-0 left-0 right-0 py-2 text-center text-xs font-bold tracking-wider uppercase text-white"
+                    style={{ background: "linear-gradient(135deg, #4dcb97 0%, #309169 100%)" }}
+                  >
+                    Most Popular
                   </div>
                 )}
-                <CardHeader className="pt-8">
+                <CardHeader className={tier.popular ? "pt-14" : "pt-8"}>
                   <CardTitle className="font-serif text-2xl">{tier.title}</CardTitle>
                   <CardDescription>{tier.desc}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground mb-1">Starting at</div>
-                  <div className="text-4xl font-bold">${tier.price}</div>
+                  <div className="text-4xl font-bold mb-6">${tier.price}</div>
+                  <ul className="flex flex-col gap-2.5">
+                    {tier.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                        <Diamond className="w-3 h-3 mt-1 flex-shrink-0 fill-primary text-primary" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
                 </CardContent>
                 <CardFooter>
                   <Link href="/pricing" className="w-full">
-                    <Button variant={(tier as any).popular ? "default" : "secondary"} className="w-full">View Details</Button>
+                    <Button variant={tier.popular ? "default" : "secondary"} className="w-full">View Details</Button>
                   </Link>
                 </CardFooter>
               </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Process Timeline */}
-      <section className="py-24 relative overflow-hidden">
-        <div className="container mx-auto px-4 md:px-6 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6">How We Work</h2>
-            <p className="text-lg text-muted-foreground">A proven process for delivering results on time.</p>
-          </div>
-
-          <div className="flex flex-col md:flex-row justify-between relative max-w-5xl mx-auto">
-            <div className="hidden md:block absolute top-1/2 left-0 w-full h-[1px] bg-border -translate-y-1/2 z-0" />
-            {["Discover", "Design", "Build", "Launch", "Optimize"].map((step, i) => (
-              <div key={i} className="relative z-10 flex flex-row md:flex-col items-center gap-4 md:gap-6 mb-8 md:mb-0">
-                <div className="w-12 h-12 rounded-full bg-background border-2 border-primary flex items-center justify-center font-bold text-primary shadow-[0_0_0_8px_hsl(var(--background))]">
-                  {i + 1}
-                </div>
-                <div className="text-left md:text-center">
-                  <h4 className="font-serif font-bold text-lg mb-1">{step}</h4>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Recent Work — real projects */}
-      <section className="py-24 text-background relative overflow-hidden" style={{ background: "radial-gradient(ellipse at top, #0a3d91 0%, #062040 45%, #040c2c 100%)" }}>
-        <div className="container mx-auto px-4 md:px-6 relative z-10">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
-            <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-5xl font-serif font-bold mb-4">Recent Work</h2>
-              <p className="text-lg text-background/70">
-                Real websites built for real businesses — real estate professionals, nonprofits, and service providers.
-              </p>
-            </div>
-            <Link href="/portfolio">
-              <Button
-                variant="outline"
-                className="bg-transparent border-background/20 text-background hover:bg-background hover:text-foreground"
-                data-testid="button-home-portfolio"
-              >
-                View All Work
-              </Button>
-            </Link>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 mb-20">
-            {recentWork.map((item, i) => (
-              <WorkCard key={i} item={item} />
-            ))}
-          </div>
-
-          {/* Honest results strip */}
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { label: "Projects Delivered", value: "10+", note: "Websites, web apps & systems" },
-              { label: "Avg. Turnaround", value: "4–6 wks", note: "For standard marketing websites" },
-              { label: "Client Satisfaction", value: "100%", note: "Based on completed projects" },
-            ].map((stat, i) => (
-              <div key={i} className="p-6 border border-background/10 rounded-xl text-center">
-                <div className="text-3xl font-bold text-background mb-1">{stat.value}</div>
-                <div className="font-semibold text-background/80 mb-1">{stat.label}</div>
-                <div className="text-sm text-background/50">{stat.note}</div>
-              </div>
             ))}
           </div>
         </div>
@@ -286,25 +195,40 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="py-24 border-t border-border/40 relative overflow-hidden" style={{ background: "linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 40%, #f2f6fd 70%, #dce8f9 100%)" }}>
+      {/* Final CTA / promo band */}
+      <section
+        className="py-24 border-t border-border/40 relative overflow-hidden"
+        style={{ background: "linear-gradient(155deg, #d5f0e4 0%, #e6f8ef 40%, #f7fdfa 70%, #e3f6ee 100%)" }}
+      >
         <div className="container mx-auto px-4 md:px-6 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">Let's build your business online.</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
-            Start with a website. Grow with systems. Turn your online presence into a real business tool.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/discovery">
-              <Button size="lg" className="h-14 px-8 text-base gap-2" data-testid="button-final-cta">
-                Get My Free Business Growth Assessment <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link href="/portfolio">
-              <Button size="lg" variant="outline" className="h-14 px-8 text-base">
-                View Our Work
-              </Button>
-            </Link>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">
+              Let's build your <span className="text-primary">business online</span>.
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+              Start with a website. Grow with systems. Turn your online presence into a real business tool.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+              <Link href="/discovery">
+                <Button size="lg" className="h-14 px-8 text-base gap-2" data-testid="button-final-cta">
+                  Get My Free Business Growth Assessment <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+              <Link href="/portfolio">
+                <Button size="lg" variant="outline" className="h-14 px-8 text-base">
+                  View Our Work
+                </Button>
+              </Link>
+            </div>
+            <div className="flex justify-center">
+              <AvatarStack />
+            </div>
+          </motion.div>
         </div>
       </section>
     </div>

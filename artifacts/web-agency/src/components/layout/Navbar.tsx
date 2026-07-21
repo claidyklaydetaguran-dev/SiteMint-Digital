@@ -46,12 +46,12 @@ export function Navbar() {
             : "rgba(255,255,255,0.76)",
           backdropFilter: "blur(22px)",
           WebkitBackdropFilter: "blur(22px)",
-          border: `1px solid ${isScrolled ? "rgba(6,46,113,0.22)" : "rgba(6,46,113,0.13)"}`,
+          border: `1px solid ${isScrolled ? "rgba(77,203,151,0.22)" : "rgba(77,203,151,0.13)"}`,
           borderRadius: 100,
           padding: "7px 7px 7px 22px",
           boxShadow: isScrolled
-            ? "0 8px 40px rgba(6,46,113,0.18), 0 2px 8px rgba(0,0,0,0.07)"
-            : "0 4px 28px rgba(6,46,113,0.11)",
+            ? "0 8px 40px rgba(77,203,151,0.18), 0 2px 8px rgba(0,0,0,0.07)"
+            : "0 4px 28px rgba(77,203,151,0.11)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -95,7 +95,7 @@ export function Navbar() {
                         style={{
                           position: "absolute", inset: 0,
                           borderRadius: 100,
-                          background: "rgba(6,46,113,0.07)",
+                          background: "rgba(77,203,151,0.07)",
                           pointerEvents: "none",
                         }}
                       />
@@ -106,7 +106,7 @@ export function Navbar() {
                     style={{
                       fontSize: 13.5,
                       fontWeight: active ? 700 : 500,
-                      color: active ? "#062e71" : "#374151",
+                      color: active ? "#16233d" : "#374151",
                       letterSpacing: "-0.01em",
                       position: "relative",
                       display: "flex",
@@ -123,7 +123,7 @@ export function Navbar() {
                         layoutId="nav-active-dot"
                         style={{
                           width: 4, height: 4, borderRadius: "50%",
-                          background: "#062e71",
+                          background: "#16233d",
                           display: "block",
                         }}
                         transition={{ type: "spring", stiffness: 380, damping: 30 }}
@@ -142,26 +142,26 @@ export function Navbar() {
             <Button
               data-testid="button-nav-contact"
               style={{
-                background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)",
-                color: "#fff",
+                background: "linear-gradient(135deg, #7fdbb6 0%, #4dcb97 100%)",
+                color: "#16233d",
                 fontSize: 13,
                 fontWeight: 700,
                 padding: "9px 18px",
                 borderRadius: 100,
                 height: "auto",
                 border: "none",
-                boxShadow: "0 2px 12px rgba(6,46,113,0.32), inset 0 1px 0 rgba(255,255,255,0.12)",
+                boxShadow: "0 2px 12px rgba(77,203,151,0.32), inset 0 1px 0 rgba(255,255,255,0.12)",
                 letterSpacing: "-0.01em",
                 transition: "box-shadow 0.2s, transform 0.15s",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 6px 22px rgba(6,46,113,0.52), inset 0 1px 0 rgba(255,255,255,0.14)";
+                  "0 6px 22px rgba(77,203,151,0.52), inset 0 1px 0 rgba(255,255,255,0.14)";
                 (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 2px 12px rgba(6,46,113,0.32), inset 0 1px 0 rgba(255,255,255,0.12)";
+                  "0 2px 12px rgba(77,203,151,0.32), inset 0 1px 0 rgba(255,255,255,0.12)";
                 (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
               }}
             >
@@ -177,9 +177,9 @@ export function Navbar() {
           aria-label="Toggle menu"
           style={{
             width: 38, height: 38, borderRadius: "50%",
-            background: isOpen ? "rgba(6,46,113,0.10)" : "rgba(6,46,113,0.06)",
-            border: "1px solid rgba(6,46,113,0.14)",
-            color: "#062e71",
+            background: isOpen ? "rgba(77,203,151,0.10)" : "rgba(77,203,151,0.06)",
+            border: "1px solid rgba(77,203,151,0.14)",
+            color: "#16233d",
             cursor: "pointer",
             transition: "background 0.2s",
             flexShrink: 0,
@@ -216,10 +216,10 @@ export function Navbar() {
               background: "rgba(255,255,255,0.96)",
               backdropFilter: "blur(22px)",
               WebkitBackdropFilter: "blur(22px)",
-              border: "1px solid rgba(6,46,113,0.16)",
+              border: "1px solid rgba(77,203,151,0.16)",
               borderRadius: 20,
               padding: "12px 12px 16px",
-              boxShadow: "0 12px 40px rgba(6,46,113,0.16)",
+              boxShadow: "0 12px 40px rgba(77,203,151,0.16)",
               pointerEvents: "auto",
             }}
           >
@@ -238,7 +238,7 @@ export function Navbar() {
                         padding: "11px 14px",
                         borderRadius: 12,
                         display: "flex", alignItems: "center", gap: 10,
-                        background: active ? "rgba(6,46,113,0.07)" : "transparent",
+                        background: active ? "rgba(77,203,151,0.07)" : "transparent",
                         transition: "background 0.18s",
                         cursor: "pointer",
                       }}
@@ -246,12 +246,12 @@ export function Navbar() {
                       {active && (
                         <span style={{
                           width: 5, height: 5, borderRadius: "50%",
-                          background: "#062e71", flexShrink: 0,
+                          background: "#16233d", flexShrink: 0,
                         }} />
                       )}
                       <span style={{
                         fontSize: 15, fontWeight: active ? 700 : 500,
-                        color: active ? "#062e71" : "#374151",
+                        color: active ? "#16233d" : "#374151",
                         marginLeft: active ? 0 : 15,
                       }}>
                         {link.name}
@@ -269,15 +269,15 @@ export function Navbar() {
                   data-testid="button-mobile-nav-contact"
                   style={{
                     width: "100%",
-                    background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)",
-                    color: "#fff",
+                    background: "linear-gradient(135deg, #7fdbb6 0%, #4dcb97 100%)",
+                    color: "#16233d",
                     fontSize: 14,
                     fontWeight: 700,
                     borderRadius: 12,
                     height: "auto",
                     padding: "13px",
                     border: "none",
-                    boxShadow: "0 4px 16px rgba(6,46,113,0.36)",
+                    boxShadow: "0 4px 16px rgba(77,203,151,0.36)",
                   }}
                 >
                   Start Your Project

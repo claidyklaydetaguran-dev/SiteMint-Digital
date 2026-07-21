@@ -10,7 +10,8 @@ import "./HeroResponsive.css";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const WORDS = ["Customers", "Clients", "Leads", "Sales", "Revenue"];
-const DEEP_NAVY = "#062e71";
+const NAVY = "#182544";
+const MINT = "#309169";
 
 const FEATURE_CARDS = [
   {
@@ -69,13 +70,13 @@ function WaveBackground() {
     >
       <defs>
         <linearGradient id="wg1" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#062e71" stopOpacity="0.22" />
-          <stop offset="55%" stopColor="#1255c4" stopOpacity="0.30" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.10" />
+          <stop offset="0%" stopColor="#309169" stopOpacity="0.20" />
+          <stop offset="55%" stopColor="#4dcb97" stopOpacity="0.26" />
+          <stop offset="100%" stopColor="#a0e4c7" stopOpacity="0.14" />
         </linearGradient>
         <linearGradient id="wg2" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#062e71" stopOpacity="0.12" />
-          <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.06" />
+          <stop offset="0%" stopColor="#309169" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="#bdeeda" stopOpacity="0.06" />
         </linearGradient>
         <filter id="wblur">
           <feGaussianBlur stdDeviation="12" />
@@ -91,8 +92,8 @@ function WaveBackground() {
         stroke="url(#wg2)" strokeWidth="150" fill="none"
         strokeLinecap="round" filter="url(#wblur)"
       />
-      <ellipse cx="960" cy="130" rx="340" ry="100" fill="#3b82f6" opacity="0.12" filter="url(#wblur)" />
-      <ellipse cx="1200" cy="340" rx="220" ry="80" fill="#1d4ed8" opacity="0.09" filter="url(#wblur)" />
+      <ellipse cx="960" cy="130" rx="340" ry="100" fill="#4dcb97" opacity="0.12" filter="url(#wblur)" />
+      <ellipse cx="1200" cy="340" rx="220" ry="80" fill="#7fdbb6" opacity="0.10" filter="url(#wblur)" />
     </svg>
   );
 }
@@ -133,8 +134,8 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
               borderRadius: 14,
               padding: "11px 13px 12px",
               boxShadow: hovered
-                ? `0 0 0 1px ${card.color}28, 0 18px 52px rgba(6,46,113,0.38), 0 0 32px ${card.color}20, inset 0 1px 0 rgba(255,255,255,0.09)`
-                : "0 0 0 1px rgba(6,46,113,0.12), 0 14px 44px rgba(6,46,113,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
+                ? `0 0 0 1px ${card.color}28, 0 18px 52px rgba(24,37,68,0.38), 0 0 32px ${card.color}20, inset 0 1px 0 rgba(255,255,255,0.09)`
+                : "0 0 0 1px rgba(24,37,68,0.12), 0 14px 44px rgba(24,37,68,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
               position: "relative",
               overflow: "hidden",
               cursor: "pointer",
@@ -194,8 +195,8 @@ function Feature3DCard({ card, style }: { card: typeof FEATURE_CARDS[0]; style: 
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                   animate={hovered
-                    ? { scale: 1.12, boxShadow: `0 0 22px ${card.color}99, 0 4px 10px rgba(6,46,113,0.45), inset 0 1px 0 rgba(255,255,255,0.22)` }
-                    : { scale: 1,    boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(6,46,113,0.40), inset 0 1px 0 rgba(255,255,255,0.16)` }
+                    ? { scale: 1.12, boxShadow: `0 0 22px ${card.color}99, 0 4px 10px rgba(24,37,68,0.45), inset 0 1px 0 rgba(255,255,255,0.22)` }
+                    : { scale: 1,    boxShadow: `0 0 14px ${card.color}55, 0 4px 10px rgba(24,37,68,0.40), inset 0 1px 0 rgba(255,255,255,0.16)` }
                   }
                   transition={{ type: "spring", stiffness: 300, damping: 22 }}
                 >
@@ -340,7 +341,7 @@ function LaptopMockup() {
       style={{
         width: 400,
         filter:
-          "drop-shadow(0 40px 70px rgba(0,0,0,0.55)) drop-shadow(0 10px 28px rgba(6,46,113,0.28))",
+          "drop-shadow(0 40px 70px rgba(0,0,0,0.55)) drop-shadow(0 10px 28px rgba(24,37,68,0.28))",
         position: "relative",
         zIndex: 3,
       }}
@@ -474,7 +475,7 @@ function LaptopMockup() {
           left: "10%",
           right: "10%",
           height: 16,
-          background: "rgba(6,46,113,0.20)",
+          background: "rgba(24,37,68,0.20)",
           filter: "blur(14px)",
           borderRadius: "50%",
         }}
@@ -624,7 +625,7 @@ function PhoneMockup() {
         borderRadius: 24,
         padding: "0 4px 8px",
         boxShadow:
-          "0 28px 56px rgba(0,0,0,0.55), 0 8px 18px rgba(6,46,113,0.22), inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(255,255,255,0.04)",
+          "0 28px 56px rgba(0,0,0,0.55), 0 8px 18px rgba(24,37,68,0.22), inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(255,255,255,0.04)",
         border: "1px solid #1F2937",
         position: "relative",
         zIndex: 5,
@@ -803,7 +804,7 @@ function TabletMockup() {
         borderRadius: 16,
         padding: "8px 5px 7px",
         boxShadow:
-          "0 24px 48px rgba(0,0,0,0.45), 0 6px 16px rgba(6,46,113,0.18), inset 0 1px 0 rgba(255,255,255,0.08)",
+          "0 24px 48px rgba(0,0,0,0.45), 0 6px 16px rgba(24,37,68,0.18), inset 0 1px 0 rgba(255,255,255,0.08)",
         border: "1px solid #2D3748",
         position: "relative",
         zIndex: 4,
@@ -918,7 +919,7 @@ function TabletScreen() {
 }
 
 // ── Avatar Stack ──────────────────────────────────────────────────────────────
-function AvatarStack() {
+export function AvatarStack() {
   const avatars = [
     { bg: "#2563EB", text: "JD" },
     { bg: "#6366F1", text: "MR" },
@@ -985,7 +986,7 @@ function DeviceImageHover() {
     const sx = -rx * 2.4;
     const sy =  ry * 2.4 + 32;
     imgRef.current.style.filter =
-      `drop-shadow(${sx}px ${sy}px 56px rgba(6,46,113,0.38))
+      `drop-shadow(${sx}px ${sy}px 56px rgba(24,37,68,0.38))
        drop-shadow(${sx * 0.4}px ${sy * 0.3}px 18px rgba(0,0,0,0.22))`;
 
     // Spotlight follows cursor
@@ -1007,7 +1008,7 @@ function DeviceImageHover() {
     imgRef.current.style.transform =
       "perspective(1100px) rotateY(0deg) rotateX(0deg)";
     imgRef.current.style.filter =
-      "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))";
+      "drop-shadow(0 32px 56px rgba(24,37,68,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))";
     spotRef.current.style.background = "transparent";
   };
 
@@ -1031,7 +1032,7 @@ function DeviceImageHover() {
           transformStyle: "preserve-3d",
           transition: "transform 0.28s cubic-bezier(0.23,1,0.32,1), filter 0.28s ease",
           willChange: "transform",
-          filter: "drop-shadow(0 32px 56px rgba(6,46,113,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))",
+          filter: "drop-shadow(0 32px 56px rgba(24,37,68,0.30)) drop-shadow(0 8px 18px rgba(0,0,0,0.22))",
         }}
       />
 
@@ -1061,7 +1062,7 @@ export function HeroSection() {
     <section
       style={{
         minHeight: "100vh",
-        background: `linear-gradient(155deg, #cfdcf7 0%, #e4ecfb 20%, #f2f6fd 50%, #dce8f9 80%, #c8d9f5 100%)`,
+        background: `linear-gradient(155deg, #d5f0e4 0%, #e6f8ef 20%, #f7fdfa 50%, #e3f6ee 80%, #cdeee0 100%)`,
         position: "relative",
         overflowX: "clip",
         display: "flex",
@@ -1077,7 +1078,7 @@ export function HeroSection() {
       {/* Particles — full section, z=0 */}
       <Particles
         particleCount={40}
-        particleColors={["#062e71", "#0a3d91", "#1255c4", "#3b82f6"]}
+        particleColors={["#309169", "#4dcb97", "#7fdbb6", "#a0e4c7"]}
       />
 
       {/* Light radial glows */}
@@ -1085,7 +1086,7 @@ export function HeroSection() {
         style={{
           position: "absolute", top: -80, right: -80,
           width: 620, height: 620, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(6,46,113,0.14) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(77,203,151,0.18) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
         }}
       />
@@ -1093,7 +1094,7 @@ export function HeroSection() {
         style={{
           position: "absolute", bottom: -40, left: -60,
           width: 460, height: 460, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(6,46,113,0.08) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(77,203,151,0.10) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
         }}
       />
@@ -1126,8 +1127,8 @@ export function HeroSection() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                background: "rgba(219,234,254,0.85)",
-                border: "1px solid rgba(147,197,253,0.55)",
+                background: "rgba(224,247,236,0.85)",
+                border: "1px solid rgba(127,219,182,0.55)",
                 borderRadius: 100,
                 padding: "7px 16px",
                 marginBottom: 28,
@@ -1152,7 +1153,7 @@ export function HeroSection() {
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <span style={{ fontSize: 14, fontWeight: 600, color: DEEP_NAVY }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: NAVY }}>
                 Now accepting new clients
               </span>
             </motion.div>
@@ -1180,7 +1181,7 @@ export function HeroSection() {
                     words={WORDS}
                     duration={2600}
                     className="font-black"
-                    style={{ color: DEEP_NAVY } as React.CSSProperties}
+                    style={{ color: MINT } as React.CSSProperties}
                   />
                 )}
               </span>
@@ -1214,9 +1215,8 @@ export function HeroSection() {
               <Link href="/discovery">
                 <Button
                   size="lg"
-                  className="!bg-[#062e71] hover:!bg-[#0a3d91] hover:shadow-[0_8px_28px_rgba(6,46,113,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+                  className="hover:shadow-[0_8px_28px_rgba(77,203,151,0.45)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
                   style={{
-                    color: "#fff",
                     fontSize: 14,
                     fontWeight: 700,
                     padding: "14px 22px",
