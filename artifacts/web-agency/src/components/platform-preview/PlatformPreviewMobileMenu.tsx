@@ -7,6 +7,8 @@ import {
   productsNavItems,
   servicesNavItems,
   startProjectHref,
+  workHref,
+  pricingHref,
   type PreviewNavChild,
 } from "./navConfig";
 
@@ -124,7 +126,7 @@ export function PlatformPreviewMobileMenu({ onClose }: { onClose: () => void }) 
         <MobileSection label="Services" items={servicesNavItems} onNavigate={onClose} />
         <div className="border-b border-[hsl(var(--sm-color-border-default))] py-2">
           <Link
-            href="/portfolio"
+            href={workHref}
             onClick={onClose}
             className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]"
           >
@@ -133,7 +135,7 @@ export function PlatformPreviewMobileMenu({ onClose }: { onClose: () => void }) 
         </div>
         <div className="border-b border-[hsl(var(--sm-color-border-default))] py-2">
           <Link
-            href="/pricing"
+            href={pricingHref}
             onClick={onClose}
             className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]"
           >

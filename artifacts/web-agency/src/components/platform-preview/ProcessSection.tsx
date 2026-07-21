@@ -60,7 +60,9 @@ const phases = [
 export function ProcessSection() {
   const [selectedId, setSelectedId] = useState<(typeof phases)[number]["id"]>(phases[0].id);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const selectedPhase = phases.find((phase) => phase.id === selectedId) ?? phases[0];
+  const selectedIndex = phases.findIndex((phase) => phase.id === selectedId);
+  const selectedPhase = phases[selectedIndex] ?? phases[0];
+  const fillPercent = phases.length > 1 ? (selectedIndex / (phases.length - 1)) * 100 : 0;
 
   function onKeyDown(event: React.KeyboardEvent, index: number) {
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
@@ -89,12 +91,19 @@ export function ProcessSection() {
           aria-label="Project phases — select a phase for more detail"
           className="relative grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5"
         >
-          {/* Connecting rail line, desktop only — decorative, meaning already
-              carried by the numbered/labeled cards themselves. */}
+          {/* Connecting rail line, desktop only. Static track plus a mint
+              fill that animates up to the selected phase — motion-optional,
+              the numbered/labeled cards already carry the meaning without
+              it (works fully with `transition` disabled). */}
           <div
             aria-hidden="true"
             className="absolute left-0 right-0 top-9 hidden h-px lg:block"
             style={{ backgroundColor: "hsl(var(--sm-color-border-default))" }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute left-0 top-9 hidden h-px lg:block transition-[width] duration-500 ease-out"
+            style={{ width: `${fillPercent}%`, backgroundColor: "hsl(var(--sm-mint-500))" }}
           />
 
           {phases.map((phase, index) => {
@@ -112,19 +121,19 @@ export function ProcessSection() {
                 onClick={() => setSelectedId(phase.id)}
                 onFocus={() => setSelectedId(phase.id)}
                 onKeyDown={(event) => onKeyDown(event, index)}
-                className="relative z-[1] flex flex-col items-start gap-2 rounded-[var(--sm-radius-lg)] border p-6 text-left transition-all"
+                className="relative z-[1] flex flex-col items-start gap-2 rounded-[var(--sm-radius-lg)] border p-6 text-left transition-all duration-300"
                 style={{
-                  borderColor: isSelected ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
+                  borderColor: isSelected ? "hsl(var(--sm-mint-500))" : "hsl(var(--sm-color-border-default))",
                   backgroundColor: "hsl(var(--sm-color-surface-default))",
-                  boxShadow: isSelected ? "var(--sm-shadow-md)" : undefined,
+                  boxShadow: isSelected ? "var(--sm-shadow-glow-subtle)" : undefined,
                 }}
               >
                 <span
                   aria-hidden="true"
-                  className="flex h-8 w-8 items-center justify-center rounded-[var(--sm-radius-pill)] text-xs font-semibold transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--sm-radius-pill)] text-xs font-semibold transition-colors duration-300"
                   style={{
-                    backgroundColor: isSelected ? "hsl(var(--sm-color-action-primary))" : "hsl(var(--sm-color-surface-muted))",
-                    color: isSelected ? "hsl(var(--sm-color-text-inverse))" : "hsl(var(--sm-color-text-muted))",
+                    backgroundColor: isSelected ? "var(--sm-button-accent-background)" : "hsl(var(--sm-color-surface-muted))",
+                    color: isSelected ? "var(--sm-button-accent-text)" : "hsl(var(--sm-color-text-muted))",
                   }}
                 >
                   {String(index + 1).padStart(2, "0")}

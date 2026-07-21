@@ -1,24 +1,27 @@
 import { Link } from "wouter";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
-import { signInHref } from "./navConfig";
+import { signInHref, workHref, pricingHref } from "./navConfig";
 
 const footerGroups = [
   {
     heading: "Products",
     links: [
-      { label: "AI Receptionist", href: "/ai-receptionist" },
+      { label: "AI Receptionist", href: "/platform-preview/ai-receptionist" },
     ],
   },
   {
     heading: "Services",
-    links: [{ label: "All Services", href: "/services" }],
+    links: [
+      { label: "All Services", href: "/platform-preview/services" },
+      { label: "Pricing", href: pricingHref },
+    ],
   },
   {
     heading: "Company",
     links: [
-      { label: "About", href: "/about" },
-      { label: "Work", href: "/portfolio" },
-      { label: "Contact", href: "/contact" },
+      { label: "About", href: "/platform-preview/about" },
+      { label: "Work", href: workHref },
+      { label: "Contact", href: "/platform-preview/contact" },
     ],
   },
 ];

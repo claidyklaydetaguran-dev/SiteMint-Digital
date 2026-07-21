@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
+import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   defaultDiscoveryDraft,
@@ -108,7 +109,13 @@ export function PlatformDiscoveryShell() {
   if (validatedSubmission) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6" aria-live="polite">
-        <h1 className="text-2xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))]">
+        <span
+          className="pp-check-pop mx-auto flex h-14 w-14 items-center justify-center rounded-full"
+          style={{ backgroundColor: "hsl(var(--sm-mint-100))" }}
+        >
+          <CheckCircle2 size={28} aria-hidden="true" className="text-[hsl(var(--sm-mint-500))]" />
+        </span>
+        <h1 className="mt-5 text-2xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))]">
           Review Experience Complete
         </h1>
         <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))]">
@@ -153,15 +160,17 @@ export function PlatformDiscoveryShell() {
             event.preventDefault();
           }}
         >
-          {currentStep < REVIEW_STEP_INDEX ? (
-            <StepComponent />
-          ) : (
-            <DiscoveryReview
-              values={form.getValues()}
-              onEditStep={handleEditStep}
-              onCompletePreview={handleCompletePreview}
-            />
-          )}
+          <div key={currentStep} className="pp-reveal">
+            {currentStep < REVIEW_STEP_INDEX ? (
+              <StepComponent />
+            ) : (
+              <DiscoveryReview
+                values={form.getValues()}
+                onEditStep={handleEditStep}
+                onCompletePreview={handleCompletePreview}
+              />
+            )}
+          </div>
 
           <DiscoveryStepNavigation
             currentStep={currentStep}

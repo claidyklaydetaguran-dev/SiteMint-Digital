@@ -1,8 +1,14 @@
 /**
- * Nav data shared between the desktop navbar and the mobile menu. Routes
- * are the same real routes used across web-agency today (see
- * docs/sitemint-platform/ROUTE_AND_NAVIGATION_ARCHITECTURE.md §1) — nothing
- * here invents a new route.
+ * Nav data shared between the desktop navbar and the mobile menu.
+ *
+ * Frontend Epic 1: every content link (Products/AI Receptionist,
+ * Services, Work, Pricing, Company/About/Contact) now points at this
+ * preview family's own `/platform-preview/*` sub-pages rather than the
+ * production `/services`, `/pricing`, `/portfolio`, `/about`, `/contact`,
+ * `/ai-receptionist` routes — so the preview reads as one self-contained
+ * site and never silently hands a preview visitor off to production. Only
+ * `signInHref` still points outside the preview family, because it is a
+ * real authenticated destination the preview intentionally links out to.
  */
 
 export interface PreviewNavChild {
@@ -23,7 +29,7 @@ export const productsNavItems: PreviewNavChild[] = [
   {
     label: "AI Receptionist",
     description: "Never miss a lead — AI answers, qualifies, and follows up 24/7.",
-    href: "/ai-receptionist",
+    href: "/platform-preview/ai-receptionist",
   },
   {
     label: "AI Toolkit",
@@ -38,24 +44,30 @@ export const productsNavItems: PreviewNavChild[] = [
 ];
 
 export const servicesNavItems: PreviewNavChild[] = [
-  { label: "Websites", description: "Marketing sites built to convert visitors into leads.", href: "/services" },
-  { label: "Web Applications", description: "Custom software for how your business actually runs.", href: "/services" },
-  { label: "CRM Systems", description: "One system of record for every lead and client.", href: "/services" },
-  { label: "Business Automation", description: "Automate the follow-up work that falls through the cracks.", href: "/services" },
-  { label: "SEO & Digital Growth", description: "Foundational SEO built into every page you launch.", href: "/services" },
-  { label: "Maintenance & Support", description: "Ongoing care so your systems keep working.", href: "/services" },
+  { label: "Websites", description: "Marketing sites built to convert visitors into leads.", href: "/platform-preview/services" },
+  { label: "Web Applications", description: "Custom software for how your business actually runs.", href: "/platform-preview/services" },
+  { label: "CRM Systems", description: "One system of record for every lead and client.", href: "/platform-preview/services" },
+  { label: "Business Automation", description: "Automate the follow-up work that falls through the cracks.", href: "/platform-preview/services" },
+  { label: "SEO & Digital Growth", description: "Foundational SEO built into every page you launch.", href: "/platform-preview/services" },
+  { label: "Maintenance & Support", description: "Ongoing care so your systems keep working.", href: "/platform-preview/services" },
 ];
 
 export const companyNavItems: PreviewNavChild[] = [
-  { label: "About", description: "Who we are and how we work.", href: "/about" },
-  { label: "Contact", description: "Get in touch with the team.", href: "/contact" },
+  { label: "About", description: "Who we are and how we work.", href: "/platform-preview/about" },
+  { label: "Contact", description: "Get in touch with the team.", href: "/platform-preview/contact" },
 ];
+
+/** Single source of truth for these two top-level links — read by both
+ * PlatformPreviewNavbar's `primaryNavItems` loop and PlatformPreviewMobileMenu,
+ * which previously hardcoded the same two paths a second time. */
+export const workHref = "/platform-preview/portfolio";
+export const pricingHref = "/platform-preview/pricing";
 
 export const primaryNavItems: PreviewNavItem[] = [
   { label: "Products", children: productsNavItems },
   { label: "Services", children: servicesNavItems },
-  { label: "Work", href: "/portfolio" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Work", href: workHref },
+  { label: "Pricing", href: pricingHref },
   { label: "Company", children: companyNavItems },
 ];
 

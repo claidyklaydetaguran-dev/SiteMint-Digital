@@ -31,7 +31,7 @@ const products = [
     problem: "Missed calls and slow follow-up cost businesses real leads.",
     description:
       "An AI-powered receptionist that answers and qualifies every inbound text — day or night — so no inquiry goes unanswered.",
-    href: "/ai-receptionist",
+    href: "/platform-preview/ai-receptionist",
     cta: "See AI Receptionist",
     available: true,
   },

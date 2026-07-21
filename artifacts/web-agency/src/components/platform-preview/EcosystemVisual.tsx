@@ -28,6 +28,7 @@ const CYCLE_MS = 2400;
 export function EcosystemVisual() {
   const { selectedGoal, systemMode } = useSelectedGoal();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [hoveredSystem, setHoveredSystem] = useState<string | null>(null);
   const [interactionPaused, setInteractionPaused] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
   const [inViewport, setInViewport] = useState(false);
@@ -123,6 +124,7 @@ export function EcosystemVisual() {
             const Icon = stage.icon;
             const isActive = isConnected && index === activeIndex && !reducedMotionRef.current;
             const isEmphasized = isConnected && selectedGoal.emphasizedStageIds.includes(stage.id);
+            const isHoverRelated = isConnected && hoveredSystem !== null && stage.system === hoveredSystem;
 
             const capKey = capabilityTokenKey[stage.capability];
 
@@ -130,18 +132,27 @@ export function EcosystemVisual() {
               <li key={stage.id} className="relative z-[1]">
                 <div
                   tabIndex={0}
+                  onMouseEnter={() => setHoveredSystem(stage.system)}
+                  onMouseLeave={() => setHoveredSystem(null)}
+                  onFocus={() => setHoveredSystem(stage.system)}
+                  onBlur={() => setHoveredSystem(null)}
                   className="pp-reveal flex h-full flex-col items-center gap-2 rounded-[var(--sm-radius-lg)] border p-4 text-center transition-all duration-300 focus:outline-none focus-visible:shadow-[var(--sm-shadow-glow-subtle)]"
                   style={{
                     animationDelay: `${index * 60}ms`,
-                    borderColor: isEmphasized
-                      ? "hsl(var(--sm-color-border-focus))"
-                      : "hsl(var(--sm-color-border-default))",
+                    borderColor: isHoverRelated
+                      ? "hsl(var(--sm-mint-500))"
+                      : isEmphasized
+                        ? "hsl(var(--sm-color-border-focus))"
+                        : "hsl(var(--sm-color-border-default))",
                     backgroundColor: isActive
                       ? "hsl(var(--sm-mint-100))"
-                      : isConnected
-                        ? "hsl(var(--sm-color-surface-default))"
-                        : "hsl(var(--sm-color-surface-muted))",
-                    boxShadow: isActive ? "var(--sm-shadow-md)" : undefined,
+                      : isHoverRelated
+                        ? "hsl(var(--sm-mint-100) / 0.5)"
+                        : isConnected
+                          ? "hsl(var(--sm-color-surface-default))"
+                          : "hsl(var(--sm-color-surface-muted))",
+                    boxShadow: isActive || isHoverRelated ? "var(--sm-shadow-glow-subtle)" : undefined,
+                    transform: isHoverRelated ? "translateY(-2px)" : undefined,
                   }}
                 >
                   <span

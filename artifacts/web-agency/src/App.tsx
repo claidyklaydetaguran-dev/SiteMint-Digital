@@ -61,6 +61,16 @@ const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
 // only fetches when /platform-preview/start-project is actually visited.
 const PlatformDiscoveryPreview = lazy(() => import("@/pages/PlatformDiscoveryPreview"));
 
+// Frontend Epic 1 — the remaining /platform-preview/* customer pages.
+// Same lazy + flag-gated pattern as the two routes above; each fetches only
+// when its own path is visited.
+const PlatformServicesPreview = lazy(() => import("@/pages/PlatformServicesPreview"));
+const PlatformPricingPreview = lazy(() => import("@/pages/PlatformPricingPreview"));
+const PlatformPortfolioPreview = lazy(() => import("@/pages/PlatformPortfolioPreview"));
+const PlatformAboutPreview = lazy(() => import("@/pages/PlatformAboutPreview"));
+const PlatformContactPreview = lazy(() => import("@/pages/PlatformContactPreview"));
+const PlatformAiReceptionistPreview = lazy(() => import("@/pages/PlatformAiReceptionistPreview"));
+
 function CrmHomeRedirect() {
   const [, navigate] = useLocation();
   useEffect(() => { navigate("/admin/crm/dashboard"); }, [navigate]);
@@ -139,6 +149,79 @@ function Router() {
           )
         }
       </Route>
+
+      {/* Platform Preview — Frontend Epic 1 customer pages. Same feature
+          flag, same fail-closed shape as the two routes above. */}
+      <Route path="/platform-preview/services">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformServicesPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+      <Route path="/platform-preview/pricing">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformPricingPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+      <Route path="/platform-preview/portfolio">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformPortfolioPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+      <Route path="/platform-preview/about">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformAboutPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+      <Route path="/platform-preview/contact">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformContactPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+      <Route path="/platform-preview/ai-receptionist">
+        {() =>
+          platformPreviewEnabled ? (
+            <Suspense fallback={null}>
+              <PlatformAiReceptionistPreview />
+            </Suspense>
+          ) : (
+            <NotFound />
+          )
+        }
+      </Route>
+
+      {/* Any other /platform-preview/* path — fails closed the same as
+          every route above, whether or not the flag is on. */}
+      <Route path="/platform-preview/:rest*" component={NotFound} />
 
       {/* Discovery form — no main layout */}
       <Route path="/discovery" component={Discovery} />

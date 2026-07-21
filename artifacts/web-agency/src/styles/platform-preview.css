@@ -95,3 +95,110 @@
   left: 1rem;
   top: 1rem;
 }
+
+/* Hero Aurora Network — ambient background motion only. Slow (12-18s per
+   the owner's motion rules), low-amplitude, and always paused via the
+   `.pp-aurora-paused` class HeroAuroraNetwork applies when its section is
+   off-screen or the tab is hidden, in addition to the reduced-motion
+   collapse below. */
+@keyframes pp-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-2%, 1.5%, 0) scale(1.04); }
+}
+
+@keyframes pp-aurora-drift-slow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(1.5%, -2%, 0) scale(1.03); }
+}
+
+@keyframes pp-ribbon-flow {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(1.5%, -1%, 0); }
+}
+
+@keyframes pp-node-pulse {
+  0%, 100% { opacity: 0.35; r: 3px; }
+  50% { opacity: 0.9; r: 4.5px; }
+}
+
+.platform-preview .pp-aurora-drift {
+  animation: pp-aurora-drift 14s ease-in-out infinite;
+}
+
+.platform-preview .pp-aurora-drift-slow {
+  animation: pp-aurora-drift-slow 18s ease-in-out infinite;
+}
+
+.platform-preview .pp-aurora-ribbon {
+  animation: pp-ribbon-flow 16s ease-in-out infinite;
+}
+
+.platform-preview .pp-node-pulse {
+  transform-origin: center;
+  animation: pp-node-pulse 2.4s ease-in-out infinite;
+}
+
+.platform-preview .pp-aurora-paused .pp-aurora-drift,
+.platform-preview .pp-aurora-paused .pp-aurora-drift-slow,
+.platform-preview .pp-aurora-paused .pp-aurora-ribbon,
+.platform-preview .pp-aurora-paused .pp-node-pulse {
+  animation-play-state: paused;
+}
+
+@media (max-width: 767px) {
+  /* Mobile simplification: fewer visible layers, no ribbon/parallax. */
+  .platform-preview .pp-aurora-ribbon {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-aurora-drift,
+  .platform-preview .pp-aurora-drift-slow,
+  .platform-preview .pp-aurora-ribbon,
+  .platform-preview .pp-node-pulse {
+    animation: none;
+  }
+}
+
+/* AI Receptionist demo — simulated waveform. The demo's own phase state
+   machine (AiReceptionistDemo.tsx) skips this state entirely under
+   prefers-reduced-motion, but the media-query collapse above still
+   applies defensively if it's ever rendered anyway. */
+@keyframes pp-waveform {
+  0%, 100% { height: 4px; opacity: 0.5; }
+  50% { height: 18px; opacity: 1; }
+}
+
+.platform-preview .pp-waveform-bar {
+  animation: pp-waveform 900ms ease-in-out infinite;
+}
+
+/* Mint focus glow for every form control across the guided Discovery
+   preview (inputs, textareas, selects, radio/checkbox), applied once here
+   instead of editing every step component individually. Additive to each
+   control's own focus-visible ring, not a replacement of it. */
+.platform-preview input:focus-visible,
+.platform-preview textarea:focus-visible,
+.platform-preview select:focus-visible,
+.platform-preview button[role="radio"]:focus-visible,
+.platform-preview button[role="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 3px hsl(var(--sm-mint-500) / 0.35);
+}
+
+/* Completion checkmark — restrained, one-shot pop-in. */
+@keyframes pp-check-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.platform-preview .pp-check-pop {
+  animation: pp-check-pop 500ms var(--sm-easing-enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-check-pop {
+    animation: none;
+  }
+}

@@ -35,9 +35,9 @@ export function DiscoveryProgress({ currentStep }: DiscoveryProgressProps) {
             >
               <span
                 className={cn(
-                  "block h-1.5 rounded-full transition-colors",
+                  "block h-1.5 rounded-full transition-all duration-500",
                   isCurrent || isComplete
-                    ? "bg-[hsl(var(--sm-color-action-primary))]"
+                    ? "bg-[hsl(var(--sm-mint-500))]"
                     : "bg-[hsl(var(--sm-color-border-default))]",
                 )}
               />

@@ -70,7 +70,7 @@ export function ServicesSection() {
             </p>
           </div>
           <Link
-            href="/services"
+            href="/platform-preview/services"
             className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[hsl(var(--sm-color-action-primary))] hover:underline"
           >
             View all services
@@ -88,8 +88,8 @@ export function ServicesSection() {
             return (
               <Link
                 key={service.id}
-                href="/services"
-                className="group relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 transition-shadow hover:shadow-[var(--sm-shadow-md)]"
+                href="/platform-preview/services"
+                className="group relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 transition-all duration-300 hover:-translate-y-1 hover:border-[hsl(var(--sm-mint-500))] hover:shadow-[var(--sm-shadow-glow-subtle)]"
                 style={{
                   borderColor: isRecommended ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
                   backgroundColor: "hsl(var(--sm-color-surface-default))",
@@ -124,7 +124,7 @@ export function ServicesSection() {
             return (
               <Link
                 key={service.id}
-                href="/services"
+                href="/platform-preview/services"
                 className="group relative flex flex-col rounded-[var(--sm-radius-lg)] border p-5 transition-shadow hover:shadow-[var(--sm-shadow-sm)]"
                 style={{
                   borderColor: isRecommended ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
