@@ -1187,3 +1187,56 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
 - No package was created, no file was moved, and no code changed as a
   result of this checkpoint. Implementation of the shared package remains
   unapproved pending owner review.
+
+## Checkpoint 2C.2C0.1 — Correct Shared Discovery Contract Boundary ADR (documentation-only)
+
+> Documentation-only correction. No application code, component, route,
+> database schema, migration, package, lockfile, environment variable, or
+> Privacy/Terms page changed. Corrects
+> `docs/sitemint-platform/DISCOVERY_SHARED_CONTRACT_BOUNDARY.md` in place;
+> the Checkpoint 2C.2C0 entry above is left unrewritten.
+
+- Corrected an inaccurate claim that the shared `lib/db/src/schema/index.ts`
+  barrel currently exports the three browser-safe Discovery files
+  (`discoveryContract.ts`, `discoveryCanonicalization.ts`,
+  `discoveryResponses.ts`). Verified by grep that it exports none of them
+  today; the clean move planned for Phase 2C.2C1 therefore requires no edit
+  to that barrel at all. The migration-only
+  `lib/db/src/schema/discovery/index.ts` barrel is unaffected for the same
+  reason — it exports only the submissions table and the two new Drizzle
+  tables, never the three contract files.
+- Corrected the initial dependency graph: removed the `lib/db →
+  discovery-contract` arrow from the recommended architecture. The initial
+  target graph keeps `@workspace/db` independent, with no dependency on
+  `@workspace/discovery-contract`. Any future types-only dependency in that
+  direction is documented as not required, not approved for Phase 2C.2C1,
+  and subject to a separate, owner-reviewed checkpoint if ever proposed.
+- Replaced the "zod v4 or downgrade to v3" framing with a verification
+  requirement: `@workspace/discovery-contract` standardizes its internal
+  runtime schema imports on `zod/v4` (matching the already-working
+  `discoveryContract.ts`); Phase 2C.2C1 must verify the exact resolved
+  package version, pnpm deduplication, TypeScript compatibility, runtime
+  identity, and Vite bundle behavior. This is documented as a verification
+  item, not a proven incompatibility; a workspace-catalog major-version
+  bump is not assumed, and downgrading the contract package to a v3-style
+  API is not recommended or approved. A catalog change, if evidence
+  actually requires one, must stop the checkpoint performing it and return
+  to owner review.
+- Preserved the approved initial testing strategy: the two existing plain
+  TypeScript test files move with their source files, keep their assertion
+  style, and continue to run via the existing `tsx` approach. Removed the
+  open question suggesting Phase 2C.2C1 might introduce Vitest or another
+  "real test runner" — adopting a new test framework requires its own,
+  separately approved package/lockfile checkpoint.
+- Rewrote the Phase 2C.2C1 implementation sequence to the corrected
+  11-step version (verify baseline/consumers, create the package,
+  move source and test files, no duplicate/re-export left behind, add
+  workspace dependencies, regenerate the lockfile, verify zod/v4
+  resolution and bundle safety, run tests/typechecks/builds/protected-file
+  checks, confirm `lib/db/src/schema/index.ts` and the Discovery migration
+  are unchanged, and stop before any guided-form or endpoint
+  implementation) — it no longer instructs Phase 2C.2C1 to edit
+  `lib/db/src/schema/index.ts`.
+- No code, package, schema, migration, lockfile, frontend, or API change
+  occurred in this checkpoint. Phase 2C.2C1 remains unapproved pending
+  owner review.

@@ -5,6 +5,22 @@
 > `pnpm-lock.yaml`, TypeScript/Vite configuration, schema, migration, or
 > environment variable changed. No database was contacted. No file was
 > moved. Nothing was pushed, deployed, or activated.
+>
+> **Corrected in Checkpoint 2C.2C0.1** (documentation-only correction, no
+> code/package/schema/migration change): fixed an inaccurate claim that the
+> shared `lib/db/src/schema/index.ts` barrel currently exports the three
+> browser-safe Discovery files (it does not); removed the `lib/db →
+> discovery-contract` arrow from the recommended initial dependency graph
+> (a future, types-only dependency in that direction is unnecessary for the
+> package move and is not approved by this or the prior checkpoint);
+> replaced the "Zod v4 or downgrade to v3" framing with a verification
+> requirement — the contract package standardizes on `zod/v4` internally,
+> and Phase 2C.2C1 must verify resolution/dedup/type/runtime/bundle
+> behavior rather than assuming either a catalog bump or a v3 downgrade;
+> and removed the open question suggesting a new test framework, since the
+> existing `tsx`-based plain-TypeScript testing pattern is the approved
+> initial strategy. See the corresponding `## Checkpoint 2C.2C0.1` entry in
+> `docs/sitemint-platform/IMPLEMENTATION_ROADMAP.md` for the full record.
 
 ## 1. Executive decision
 
@@ -32,8 +48,20 @@ Phase 2C.2B added the Discovery domain contract inside `@workspace/db`:
 - `lib/db/src/schema/discoveryDeliveryJobs.ts` and `discoveryAiBriefs.ts` —
   Drizzle `pg-core` table definitions. Node/DB-only, correctly placed.
 - `lib/db/src/schema/discovery/index.ts` — an internal migration-only barrel
-  consumed solely by `drizzle.discovery.config.ts`; deliberately not
+  consumed solely by `drizzle.discovery.config.ts`; it re-exports only
+  `../submissions`, `discoveryDeliveryJobs.ts`, and `discoveryAiBriefs.ts`
+  (the two new Drizzle tables plus the existing submissions table) — **not**
+  the three browser-safe contract files — and is itself deliberately not
   re-exported from `lib/db/src/schema/index.ts`.
+- **`lib/db/src/schema/index.ts` (the shared application schema barrel)
+  currently contains no export, direct or indirect, for any of
+  `discoveryContract.ts`, `discoveryCanonicalization.ts`, or
+  `discoveryResponses.ts`** (verified: `grep -n discovery
+  lib/db/src/schema/index.ts` returns no matches). Phase 2C.2B intentionally
+  kept all three files internal to `lib/db/src/schema/` and excluded from
+  every barrel. Consequently, moving them into `discovery-contract` does not
+  require removing any shared-barrel export — there is none to remove — and
+  `lib/db/src/schema/index.ts` needs no edit at all for the move to happen.
 - `artifacts/api-server/src/lib/discoveryHmac.ts` — `node:crypto`-based HMAC
   helpers for duplicate fingerprint and idempotency-payload hashing. Key
   material is always an explicit argument; no `process.env` read inside the
@@ -47,10 +75,15 @@ Phase 2C.2B added the Discovery domain contract inside `@workspace/db`:
   is no `./schema/discovery` export, so `web-agency` cannot reach these files
   today without importing the entire `@workspace/db` package (which would
   also pull in `drizzle-orm`, `drizzle-zod`, and `pg`).
-- `web-agency`'s `zod` dependency resolves via the pnpm catalog to **v3**
-  (`^3.25.76`); `discoveryContract.ts` imports `zod/v4`. This is a real
-  version-boundary detail, called out below as an open question — not
-  resolved by this checkpoint.
+- The workspace catalog currently resolves the `zod` package version used by
+  consumers (`web-agency`'s catalog-pinned entry is `^3.25.76`), and the
+  existing `discoveryContract.ts` already successfully imports from
+  `zod/v4` today — this is not a proven incompatibility, only an unverified
+  detail of how the new package's imports will resolve once
+  `discovery-contract` becomes a dependency of `web-agency`. Phase 2C.2C1
+  must verify the exact resolved package version, pnpm deduplication,
+  TypeScript compatibility, runtime identity, and Vite bundle behavior
+  before treating this as settled (see §24/§25).
 
 ## 3. Problem
 
@@ -81,7 +114,13 @@ in the browser bundle — none of which the browser needs, and some of which
 - Not creating `lib/discovery-contract/`, its `package.json`, or any export.
 - Not touching `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or any existing
   `package.json`.
-- Not resolving the zod v3/v4 boundary — flagged as an open question only.
+- Not performing the Phase 2C.2C1 zod/v4 resolution, deduplication,
+  TypeScript-compatibility, runtime-identity, or Vite-bundle verification —
+  a required step of the next implementation checkpoint, not this one.
+- Not assuming a workspace-catalog major-version bump, and not downgrading
+  the contract package's internal schema imports to a v3-style API.
+- Not editing `lib/db/src/schema/index.ts` — it requires no change, since it
+  does not export any of the three files being relocated.
 - Not applying the Phase 2C.2B migration or touching any database.
 
 ## 6. Evaluated options
@@ -139,28 +178,33 @@ discovery-contract
 
 api-server
     |
-    v
+    +--> discovery-contract
+    +--> lib/db (@workspace/db)         (separate sibling dependency)
+    +--> server-local discoveryHmac.ts  (stays in api-server, not shared)
+
 discovery-contract
     |
     v
-(api-server's own) server-only HMAC + lib/db persistence services
-    (discoveryHmac.ts stays local to api-server; lib/db stays a
-     separate, sibling dependency of api-server — not a dependency
-     of discovery-contract)
+zod/v4 only
 
-lib/db (Drizzle schema)
-    |
-    v
-discovery-contract   (types-only, e.g. for drizzle-zod insert-schema
-                       alignment against DiscoverySubmissionContract's
-                       inferred type — permitted later, not required now)
+lib/db (@workspace/db)
+    (no dependency on discovery-contract initially)
 ```
 
-No cycle is created: `discovery-contract` never imports from `lib/db` or
-`api-server`. `api-server` depends on both `discovery-contract` and
-`lib/db` as independent siblings. `lib/db` may optionally depend on
-`discovery-contract` for types without `discovery-contract` depending back
-on it.
+This is the initial target graph for the package move: `web-agency` depends
+only on `discovery-contract`; `api-server` depends on `discovery-contract`,
+`lib/db`, and its own local `discoveryHmac.ts` as three independent
+siblings; `discovery-contract` depends on nothing but `zod/v4`; `lib/db` has
+no dependency on `discovery-contract` at all in this initial architecture.
+No cycle is created or possible under this graph.
+
+A future, types-only dependency from `lib/db` to `discovery-contract` (e.g.
+for `drizzle-zod` insert-schema alignment against
+`DiscoverySubmissionContract`'s inferred type) is **not required, not
+approved for Phase 2C.2C1, and unnecessary for the clean package move**. It
+may be proposed later, but only as its own, separately owner-reviewed
+checkpoint — it is not part of the recommended initial architecture and
+must not be implemented alongside the package move.
 
 ## 9. Proposed package layout (not created in this checkpoint)
 
@@ -179,7 +223,7 @@ lib/discovery-contract/
 ```
 
 - Package name: `@workspace/discovery-contract`.
-- `package.json`: `{"name": "@workspace/discovery-contract", "version": "0.0.0", "private": true, "type": "module", "exports": {".": "./src/index.ts"}, "dependencies": {"zod": "catalog:"}}` — matching `@workspace/api-zod`'s minimal shape exactly.
+- `package.json`: `{"name": "@workspace/discovery-contract", "version": "0.0.0", "private": true, "type": "module", "exports": {".": "./src/index.ts"}, "dependencies": {"zod": "catalog:"}}` — matching `@workspace/api-zod`'s minimal shape exactly. The package's *internal* runtime schema code standardizes on the `zod/v4` import path (matching the already-working `discoveryContract.ts`); consumers import the package's exported schemas and inferred types from `@workspace/discovery-contract` itself, not from `zod` directly. Phase 2C.2C1 must verify the exact resolved `zod` package version under the workspace catalog, pnpm deduplication behavior, TypeScript type compatibility, runtime identity, and Vite bundle behavior for both `web-agency` and `api-server` before this is considered settled — see §24/§25. A catalog major-version bump is not assumed, and downgrading the contract package's internal imports to a v3-style API is not recommended or approved; if evidence from that verification shows a catalog change is actually required, Phase 2C.2C1 must stop and return to owner review rather than making the change unilaterally.
 - No build step: consumed as raw TypeScript source, resolved by each
   consuming app's own toolchain (Vite for `web-agency`, `tsx`/`tsc` for
   `api-server`), identical to every other `lib/*` package today.
@@ -189,7 +233,8 @@ lib/discovery-contract/
 - TypeScript configuration: extend the same base `tsconfig` every other
   `lib/*` package extends; no new compiler options required since the code
   is plain, dependency-light Zod/TS.
-- Dependency list: `zod` only (via the workspace catalog).
+- Dependency list: `zod` only (via the workspace catalog), with its
+  resolved version and `zod/v4` compatibility verified per above.
 - Testing command: mirror `lib/db`'s pattern — run via `tsx` (already an
   installed dependency, since no test framework exists in this repo), e.g.
   a `test` script in the new package's `package.json` invoking the two
@@ -258,6 +303,13 @@ consumer to break. At the implementation checkpoint that creates
 4. `lib/db/src/schema/discoveryDeliveryJobs.ts`, `discoveryAiBriefs.ts`, and
    the `discovery/index.ts` migration barrel stay in `lib/db` unchanged —
    only the three Drizzle-free files move.
+5. **`lib/db/src/schema/index.ts` (the shared barrel) is not touched by this
+   move.** It currently contains no export for `discoveryContract.ts`,
+   `discoveryCanonicalization.ts`, or `discoveryResponses.ts` (per §2), so
+   there is no shared-barrel export to remove, update, or redirect — the
+   move only deletes the three physical files from `lib/db/src/schema/` and
+   recreates them under `lib/discovery-contract/src/`. `lib/db/src/schema/
+   index.ts` must remain unchanged during Phase 2C.2C1.
 
 A temporary compatibility re-export is unnecessary here (unlike a
 widely-consumed public API) precisely because nothing outside `lib/db/test/`
@@ -375,9 +427,14 @@ The two existing Phase 2C.2B test files
 (`lib/db/test/discoveryContract.test.ts`,
 `lib/db/test/discoveryCanonicalization.test.ts`) move with their source
 files into `lib/discovery-contract/test/` at implementation time, updating
-only their relative import paths — their assertions are unchanged. The new
-package gets its own test-run script (via `tsx`, matching the existing
-no-framework convention) so it can be tested in isolation from `lib/db`.
+only their relative import paths — their assertions and plain-TypeScript
+style are unchanged. The new package gets its own test-run script (via
+`tsx`, matching the existing no-framework convention) so it can be tested
+in isolation from `lib/db`; Phase 2C.2C1 verifies the exact package-local
+command. This checkpoint introduces no Vitest, Jest, Playwright, Supertest,
+or other new test framework. Adopting one later would require its own,
+separately approved package/lockfile checkpoint — it is not bundled into
+the package move.
 
 ## 20. Package and lockfile impact (future, not performed now)
 
@@ -389,9 +446,12 @@ no-framework convention) so it can be tested in isolation from `lib/db`.
   `api-server`.
 - `web-agency/package.json` and `api-server/package.json`: each gains one new
   `"@workspace/discovery-contract": "workspace:*"` dependency line.
-- `lib/db/package.json`: loses nothing required (it never exported
-  `./schema/discovery`), but its `src/schema/index.ts` barrel and the three
-  moved files' imports are removed.
+- `lib/db/package.json`: no change required — it never exported
+  `./schema/discovery` or any subpath for the three moved files, so there is
+  no export to remove. `lib/db/src/schema/index.ts` (the shared barrel)
+  itself needs **zero edits**, since it never referenced the three files
+  being moved; only the physical `.ts` files under `lib/db/src/schema/` are
+  deleted as part of the move.
 - No TypeScript project-reference changes are anticipated beyond what pnpm
   workspace resolution already provides; no build configuration changes,
   since the new package follows the existing no-build convention.
@@ -409,32 +469,55 @@ by this checkpoint.
 
 ## 22. Implementation sequence (recommended, not started)
 
-1. Owner reviews and approves this boundary decision.
-2. Create `lib/discovery-contract/` per §9, move the three files + two
-   tests per §12, update `lib/db/src/schema/index.ts` (remove the moved
-   exports).
-3. Add `workspace:*` dependency edges from `web-agency` and `api-server`;
-   regenerate the lockfile.
-4. Resolve the zod v3/v4 boundary (open question, §25) before any
-   `web-agency` code actually imports the new package.
-5. Only after 1–4: begin the guided-form frontend work and the versioned API
-   endpoint, each importing `discovery-contract` per §17/§18.
+1. Verify baseline and current consumers (re-confirm §2's grep result that
+   only the two `lib/db/test/` files import the three target files).
+2. Create `lib/discovery-contract/package.json` and the source/test layout
+   per §9.
+3. Move the three browser-safe source files into the new package.
+4. Move the two associated tests and update only their imports as needed.
+5. Do not leave duplicate source files or compatibility re-exports behind.
+6. Add the new package dependency to `web-agency` and `api-server`.
+7. Regenerate `pnpm-lock.yaml` using the approved package-management
+   workflow.
+8. Verify `zod/v4` resolution, deduplication, type compatibility, runtime
+   behavior, and Vite bundle safety (§9, §24).
+9. Run package tests, workspace typechecks, builds, and protected-file
+   checks.
+10. Confirm `lib/db/src/schema/index.ts` and the Discovery migration are
+    unchanged (per §5/§12/§20 — no edit to that barrel is expected or
+    permitted as part of this move).
+11. Stop before any guided-form or endpoint implementation.
+
+No application consumer needs to import the package merely to prove the
+move; actual frontend/API use (per §17/§18) remains a later checkpoint
+unless explicitly included and approved separately.
 
 ## 23. Stop conditions
 
 Stop and return to owner review if: any application code needs to change to
 make this boundary work (it shouldn't — the three files are already
 Drizzle-free); a cycle would be introduced between `discovery-contract`,
-`lib/db`, or `api-server`; or the zod version boundary turns out to require
-a breaking change to an already-shipped package.
+`lib/db`, or `api-server`; the Phase 2C.2C1 zod/v4 verification (§9, §24)
+turns out to require a workspace-catalog major-version change to an
+already-shipped package; or `lib/db/src/schema/index.ts` would need any
+edit to complete the move (it should not — see §2/§12/§20).
 
 ## 24. Risks
 
-- **Zod v3 vs. v4**: `web-agency`'s catalog-pinned `zod` is v3;
-  `discoveryContract.ts` imports `zod/v4`. If these cannot coexist cleanly
-  in one dependency graph, either the contract package needs to target the
-  same major version as the catalog, or the catalog needs a coordinated
-  bump — a decision for a future checkpoint, not this one.
+- **Zod resolution unverified**: the workspace catalog currently resolves
+  the `zod` package version used by consumers, and the existing
+  `discoveryContract.ts` already successfully imports from `zod/v4` today —
+  this is a verification requirement, not a proven incompatibility. The
+  contract package should standardize its internal runtime schema imports
+  on `zod/v4`, with consumers importing the package's exported schemas and
+  inferred types rather than `zod` directly. Phase 2C.2C1 must verify the
+  exact resolved package version, pnpm deduplication, TypeScript
+  compatibility, runtime identity, and Vite bundle behavior. A
+  catalog major-version bump is not assumed, and downgrading the contract
+  to a v3-style API is not recommended or approved. If evidence from that
+  verification shows a catalog change is actually required, the checkpoint
+  performing it must stop and return to owner review rather than making the
+  change unilaterally.
 - **Missing `lib/db/MIGRATIONS.md`**: both `DISCOVERY_FORM_HARDENING_PRD.md`
   and `DISCOVERY_DOMAIN_CONTRACT.md` reference this file for migration
   convention, but it does not exist in the repository today. Not a blocker
@@ -447,22 +530,34 @@ a breaking change to an already-shipped package.
 
 ## 25. Open questions
 
-1. Should the contract package standardize on zod v4 (requiring a workspace
-   catalog bump) or be downgraded to v3 to match `web-agency`'s current
-   dependency, before `web-agency` ever imports it?
+1. During Phase 2C.2C1's zod/v4 resolution verification (§9, §24), what
+   exactly does pnpm resolve for `web-agency` and `api-server` once
+   `discovery-contract` is a dependency — a single deduplicated `zod`
+   install compatible with the `zod/v4` import path, or something requiring
+   further action? This is a verification item to close out during that
+   checkpoint, not a choice to make now.
 2. Should `lib/db/MIGRATIONS.md` be authored now (documentation-only) as a
    separate, unrelated checkpoint, given both PRD documents already cite it?
-3. Should `discovery-contract`'s test script use the same ad hoc `tsx`
-   invocation pattern as `lib/db`, or is this the moment to introduce a real
-   test runner (e.g. vitest) workspace-wide? Out of scope for this decision,
-   but worth flagging since it affects the new package's `package.json`
-   `scripts` block.
+3. Should a future, types-only `lib/db → discovery-contract` dependency
+   (§8) ever be proposed, and if so, is it worth its own owner-reviewed
+   checkpoint, or should `lib/db`'s Drizzle insert schemas simply stay
+   independently defined indefinitely?
+
+Adopting a new testing framework (Vitest, Jest, Playwright, Supertest, or
+similar) is explicitly **not** an open question for Phase 2C.2C1: the
+existing plain-TypeScript, `tsx`-based testing pattern (§19) is the
+approved initial strategy. Introducing a different framework would require
+its own, separately approved package/lockfile checkpoint.
 
 ## 26. Recommended next checkpoint
 
 Phase 2C.2C1 (implementation): create `lib/discovery-contract/` and perform
-the file move described in §12, contingent on owner approval of this
-document and resolution of the zod version question in §24.
+the file move described in §12 and the implementation sequence in §22,
+contingent on owner approval of this document. `lib/db/src/schema/index.ts`
+is not edited as part of that checkpoint (§2, §12, §20), and the zod/v4
+resolution/deduplication/bundle verification in §9/§24 is performed as part
+of that same checkpoint rather than treated as a precondition to starting
+it.
 
 ## 27. Explicit no-implementation decision
 
