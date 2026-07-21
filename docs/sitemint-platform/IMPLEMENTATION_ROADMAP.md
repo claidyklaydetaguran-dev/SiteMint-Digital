@@ -1063,3 +1063,54 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   checkpoint.
 - Reconciled Phases 2C.2B, 2C.2D, and 2C.2E scope accordingly. No
   implementation was approved or performed by this checkpoint.
+
+## Checkpoint 2C.2B — Discovery Domain Model, Shared Contract, Persistence Schema, and Migration (implemented)
+
+> First implementation checkpoint under `DISCOVERY_FORM_HARDENING_PRD.md`.
+> Domain foundation only — no route, component, worker, email, CRM, AI
+> provider, environment variable, or deployment action. The current
+> `/discovery` form and `POST /api/discovery/submit` endpoint are unchanged
+> and remain the live, working intake path. Full technical detail in
+> `docs/sitemint-platform/DISCOVERY_DOMAIN_CONTRACT.md`.
+
+- Added the shared, versioned `DiscoverySubmissionContract` Zod DTO (seven
+  categories per PRD §12), a separate `DiscoveryTransportMeta` schema, a
+  pure deterministic canonicalization utility
+  (`canonicalizeDiscoveryPayload`, version `v1`), and typed safe
+  response/error contracts — all new, internal-only files under
+  `lib/db/src/schema/`, not exported from the shared `lib/db/src/schema/index.ts`
+  barrel and not reachable via any package export this checkpoint.
+- Evolved the existing `discovery_submissions` table additively: fourteen
+  new nullable-by-default columns (schema/form versioning, idempotency key +
+  canonical-payload-hash fields, duplicate fingerprint, the four-state
+  `duplicateReviewStatus` defaulted to `'none'`, and duplicate-resolution
+  audit fields), plus a unique index on `idempotency_key` and ordinary
+  indexes on `duplicate_fingerprint`, `duplicate_review_status`, and
+  `created_at`. The table's existing primary key, columns, and defaults are
+  unchanged; no legacy row is backfilled with a fabricated value.
+- Added two new tables, `discovery_delivery_jobs` and `discovery_ai_briefs`,
+  per the three-table model approved in Checkpoint 2C.2A.1/2C.2A.2, isolated
+  from the main push-scanned schema barrel exactly like the existing voice
+  tables (ADR-05 precedent) — reachable only through a dedicated internal
+  `lib/db/src/schema/discovery/index.ts` barrel used solely by a new,
+  isolated `drizzle.discovery.config.ts`.
+- Generated exactly one hand-authored, additive-only custom migration
+  (`drizzle-kit generate --custom`) containing the new columns, the two new
+  `CREATE TABLE`s, their indexes, foreign keys (`ON DELETE CASCADE` for both
+  new tables' `submission_id`, `ON DELETE SET NULL` for the self-referencing
+  `duplicate_of_submission_id`), and named `CHECK` constraints enforcing
+  every status/type-like column's allowed values at the database level. The
+  migration was reviewed but **not applied** to any database.
+- Added server-only HMAC utilities (`artifacts/api-server/src/lib/discoveryHmac.ts`)
+  for the duplicate fingerprint and idempotency-payload hash, with explicit
+  domain separation and constant-time comparison; key material is always an
+  explicit function argument, never read from `process.env`.
+- Added four focused test files (100+ assertions, all passing) covering the
+  shared contract, canonicalization determinism, HMAC behavior, and static
+  database-contract assertions — run via `tsx` (already an installed
+  dependency), since no test framework exists in this repo and none was
+  added.
+- No package or lockfile changed. No route, worker, email, CRM, or AI
+  provider was wired. No environment variable was added. No production
+  database was contacted. No migration was applied. Activation of any kind
+  is not approved.

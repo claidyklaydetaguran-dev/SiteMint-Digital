@@ -51,7 +51,16 @@ const DEFAULT_LAUNCH_CHECKLIST = [
 
 // ── Deterministic classification ──────────────────────────────────────────────
 
-function buildDeterministicSummary(sub: DiscoverySubmission): {
+// Narrowed to exactly the fields this function reads, so it (and the
+// synthetic `partial` scratch object below) stay valid regardless of future
+// additive columns on discoverySubmissions — see docs/sitemint-platform/
+// DISCOVERY_DOMAIN_CONTRACT.md, "crmDiscovery.ts compatibility exception."
+type DiscoverySubmissionSummaryInput = Pick<
+  DiscoverySubmission,
+  "formData" | "budget" | "timeline" | "companyName" | "contactName" | "leadScore"
+>;
+
+function buildDeterministicSummary(sub: DiscoverySubmissionSummaryInput): {
   aiSummary: string;
   estimatedComplexity: string;
   estimatedBudgetTier: string;
@@ -161,20 +170,12 @@ router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res
 
   const formData = (body.formData as Record<string, unknown>) || {};
 
-  const partial: DiscoverySubmission = {
-    id: 0, createdAt: new Date(), updatedAt: new Date(),
-    contactName, companyName, email,
-    phone: String(body.phone || "") || null,
-    industry: String(body.industry || "") || null,
-    serviceInterest: String(body.serviceInterest || "") || null,
+  const partial: DiscoverySubmissionSummaryInput = {
+    contactName, companyName,
     budget: String(body.budget || "") || null,
     timeline: String(body.timeline || "") || null,
-    decisionMaker: String(body.decisionMaker || "") || null,
-    leadScore: 5, tags: [], status: "New", recommendedPackage: null,
-    formData, generatedProposal: null, generatedSow: null, internalNotes: null,
-    leadId: null, aiSummary: null, estimatedComplexity: null,
-    estimatedBudgetTier: null, suggestedScope: null,
-    crmStatus: "New", preferredContactMethod: null, convertedProjectId: null,
+    leadScore: 5,
+    formData,
   };
 
   const { aiSummary, estimatedComplexity, estimatedBudgetTier, suggestedScope } =
