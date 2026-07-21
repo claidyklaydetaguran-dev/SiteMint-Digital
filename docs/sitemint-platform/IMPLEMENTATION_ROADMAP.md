@@ -1158,3 +1158,32 @@ B1→B2→B3 sequencing in `docs/ai-receptionist/VOICE_PLATFORM_UI_UX.md` §16.
   amended again; this checkpoint is one new, separate commit. No migration
   was applied. No database was contacted. No package or lockfile changed. No
   environment variable changed. Nothing was pushed, deployed, or activated.
+
+## Checkpoint 2C.2C0 — Define Browser-Safe Discovery Contract Boundary (documentation-only)
+
+> Documentation-only checkpoint. No application code, component, route,
+> database schema, migration, package, lockfile, environment variable, or
+> Privacy/Terms page changed. Full detail in
+> `docs/sitemint-platform/DISCOVERY_SHARED_CONTRACT_BOUNDARY.md`.
+
+- Defined the browser-safe boundary needed before the guided "Start Your
+  Project" frontend can import Discovery validation logic: a new dedicated
+  workspace package, `@workspace/discovery-contract` at
+  `lib/discovery-contract/`, recommended over exporting from
+  `@workspace/db/schema`, grafting a subpath onto an unrelated existing
+  package, or duplicating schemas in frontend and backend.
+- Documented the target dependency direction (`web-agency` and `api-server`
+  both depend on `discovery-contract`; `discoveryHmac.ts` and Drizzle
+  persistence stay outside it) and confirmed no cycle is introduced.
+- Documented the proposed package layout, exports, forbidden exports, a
+  clean-cut file-movement plan for `discoveryContract.ts`,
+  `discoveryCanonicalization.ts`, and `discoveryResponses.ts` (verified to
+  have no external consumers beyond their own `lib/db/test/` files today),
+  and the canonicalization/HMAC/database/frontend/API import boundaries.
+- Corrected an unrelated documentation miscount in
+  `docs/sitemint-platform/DISCOVERY_DOMAIN_CONTRACT.md` (the legacy
+  `crmDiscovery.ts` `partial` object literal has twenty-eight properties,
+  not twenty-one).
+- No package was created, no file was moved, and no code changed as a
+  result of this checkpoint. Implementation of the shared package remains
+  unapproved pending owner review.

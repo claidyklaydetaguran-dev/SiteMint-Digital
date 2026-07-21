@@ -260,7 +260,7 @@ change**:
   are byte-for-byte unchanged.
 - The `partial` object literal **keeps its complete original runtime
   construction**, exactly as it existed before Checkpoint 2C.2B (all
-  twenty-one properties: `id`, `createdAt`, `updatedAt`, `contactName`,
+  twenty-eight properties: `id`, `createdAt`, `updatedAt`, `contactName`,
   `companyName`, `email`, `phone`, `industry`, `serviceInterest`, `budget`,
   `timeline`, `decisionMaker`, `leadScore`, `tags`, `status`,
   `recommendedPackage`, `formData`, `generatedProposal`, `generatedSow`,
