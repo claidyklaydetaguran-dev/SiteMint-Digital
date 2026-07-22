@@ -207,6 +207,114 @@
   }
 }
 
+/* Glossy SiteMint button system — shared primary (dark navy/teal → mint,
+   restrained neon edge) and secondary (light/glass, mint border) surfaces
+   used by the hero CTAs, navbar actions, and mobile menu actions. Layered on
+   top of each caller's own utility classes (padding/font-size/layout), which
+   stay unchanged — these classes only own color, elevation, and motion. */
+.platform-preview .pp-btn {
+  position: relative;
+  isolation: isolate;
+  transition: transform var(--sm-duration-fast) var(--sm-easing-standard),
+    box-shadow var(--sm-duration-fast) var(--sm-easing-standard),
+    background-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.platform-preview .pp-btn::before {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto 1px;
+  height: 44%;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, hsl(0 0% 100% / 0.35), transparent);
+  pointer-events: none;
+}
+
+.platform-preview .pp-btn:active {
+  transform: translateY(1px);
+}
+
+.platform-preview .pp-btn:focus-visible {
+  outline: var(--sm-focus-ring-width) solid hsl(var(--sm-color-border-focus));
+  outline-offset: var(--sm-focus-ring-offset);
+}
+
+.platform-preview .pp-btn-primary {
+  background: linear-gradient(135deg, hsl(var(--pp-forest-deep)) 0%, hsl(var(--pp-mint-deep)) 100%);
+  color: hsl(var(--pp-mint-warm-white));
+  box-shadow:
+    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.35),
+    0 8px 20px -8px hsl(var(--pp-mint-emerald) / 0.55);
+}
+
+.platform-preview .pp-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.55),
+    0 10px 26px -6px hsl(var(--pp-mint-emerald) / 0.7);
+}
+
+.platform-preview .pp-btn-secondary {
+  background: hsl(var(--pp-mint-warm-white) / 0.92);
+  color: hsl(var(--pp-forest-deep));
+  border: 1px solid hsl(var(--pp-mint-mist));
+  box-shadow: 0 0 0 1px hsl(var(--pp-mint-fresh) / 0.1);
+}
+
+.platform-preview .pp-btn-secondary:hover {
+  transform: translateY(-1px);
+  border-color: hsl(var(--pp-mint-fresh));
+  box-shadow: 0 0 14px hsl(var(--pp-mint-fresh) / 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-btn:hover,
+  .platform-preview .pp-btn:active {
+    transform: none;
+  }
+}
+
+/* Status indicator — solid mint core dot with a soft pulsing glow ring next
+   to the "connected technology company" eyebrow. The pulse is decorative
+   only; the accessible label lives on the surrounding text/sr-only span. */
+.platform-preview .pp-status-dot {
+  position: relative;
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: hsl(var(--pp-mint-emerald));
+}
+
+.platform-preview .pp-status-dot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+  background: hsl(var(--pp-mint-fresh) / 0.4);
+  animation: pp-status-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pp-status-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.65;
+  }
+  70%,
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-status-dot::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* AI Receptionist demo — simulated waveform. The demo's own phase state
    machine (AiReceptionistDemo.tsx) skips this state entirely under
    prefers-reduced-motion, but the media-query collapse above still

@@ -34,10 +34,14 @@ export function PlatformHero() {
       <div className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[0.42fr_0.58fr] lg:gap-10">
         <div className="pp-reveal">
           <p
-            className="mb-5 inline-flex items-center rounded-[var(--sm-radius-pill)] border px-4 py-1.5 text-xs font-medium uppercase tracking-wide"
+            className="mb-5 inline-flex items-center gap-2 rounded-[var(--sm-radius-pill)] border px-4 py-1.5 text-xs font-medium uppercase tracking-wide"
             style={{ borderColor: "hsl(var(--pp-mint-mist))", backgroundColor: "hsl(var(--pp-mint-pale))", color: "hsl(var(--pp-mint-deep))" }}
           >
-            SiteMint Digital — a connected technology company
+            <span className="pp-status-dot" aria-hidden="true" />
+            <span>
+              SiteMint Digital — a connected technology company
+              <span className="sr-only"> — systems active and connected</span>
+            </span>
           </p>
 
           <h1
@@ -57,16 +61,14 @@ export function PlatformHero() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href={startProjectHref}
-              className="group inline-flex items-center justify-center gap-2 rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold shadow-[var(--sm-shadow-md)] transition-transform hover:-translate-y-0.5"
-              style={{ backgroundColor: "hsl(var(--pp-mint-deep))", color: "hsl(var(--pp-mint-warm-white))" }}
+              className="pp-btn pp-btn-primary group inline-flex items-center justify-center gap-2 rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold"
             >
               Start Your Project
               <ArrowRight size={16} aria-hidden="true" className="transition-transform group-hover:translate-x-1" />
             </Link>
             <Link
               href={workHref}
-              className="inline-flex items-center justify-center rounded-[var(--sm-radius-pill)] border px-6 py-3 text-sm font-semibold transition-colors hover:bg-[hsl(var(--pp-mint-pale))]"
-              style={{ borderColor: "hsl(var(--pp-mint-sage-gray))", color: "hsl(var(--pp-forest-deep))" }}
+              className="pp-btn pp-btn-secondary inline-flex items-center justify-center rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold"
             >
               View Our Work
             </Link>

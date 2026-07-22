@@ -135,15 +135,19 @@ export function PlatformPreviewNavbar({
   }, []);
 
   return (
-    <header
-      className="sticky top-0 z-[var(--sm-z-raised)] border-b transition-colors"
-      style={{
-        borderColor: isScrolled ? "hsl(var(--sm-color-border-default))" : "transparent",
-        backgroundColor: isScrolled ? "hsl(var(--sm-color-bg-elevated) / 0.92)" : "hsl(var(--sm-color-bg-elevated) / 0.6)",
-        backdropFilter: "blur(16px)",
-      }}
-    >
-      <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between px-4 md:px-8">
+    <header className="sticky top-0 z-[var(--sm-z-raised)] px-3 transition-[padding] md:px-6" style={{ paddingTop: isScrolled ? "0.5rem" : "1rem" }}>
+      <div
+        className="mx-auto flex max-w-[1280px] items-center justify-between rounded-[var(--sm-radius-pill)] px-4 transition-[height,box-shadow,background-color] md:px-6"
+        style={{
+          height: isScrolled ? "56px" : "68px",
+          backgroundColor: isScrolled ? "hsl(var(--pp-mint-warm-white) / 0.94)" : "hsl(var(--pp-mint-warm-white) / 0.72)",
+          backdropFilter: "blur(18px)",
+          border: "1px solid hsl(var(--pp-mint-mist) / 0.85)",
+          boxShadow: isScrolled
+            ? "0 8px 24px -8px hsl(var(--pp-forest-deep) / 0.18), 0 0 0 1px hsl(var(--pp-mint-fresh) / 0.16)"
+            : "0 4px 16px -8px hsl(var(--pp-forest-deep) / 0.12), 0 0 0 1px hsl(var(--pp-mint-fresh) / 0.1)",
+        }}
+      >
         <Link href="/platform-preview" className="inline-flex items-center" aria-label="SiteMint Digital home">
           <SiteMintLogo variant="dark" iconSize={30} />
         </Link>
@@ -159,14 +163,11 @@ export function PlatformPreviewNavbar({
           <Link
             href={signInHref}
             aria-label="Sign in to AI Receptionist"
-            className="rounded-[var(--sm-radius-pill)] border border-[hsl(var(--sm-color-border-strong))] px-4 py-2 text-sm font-medium text-[hsl(var(--sm-color-text-primary))] transition-colors hover:bg-[hsl(var(--sm-color-surface-interactive))]"
+            className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-4 py-2 text-sm font-medium"
           >
             Sign In
           </Link>
-          <Link
-            href={startProjectHref}
-            className="rounded-[var(--sm-radius-pill)] bg-[var(--sm-button-primary-background)] px-4 py-2 text-sm font-semibold text-[var(--sm-button-primary-text)] shadow-[var(--sm-shadow-sm)] transition-colors hover:bg-[var(--sm-button-primary-background-hover)]"
-          >
+          <Link href={startProjectHref} className="pp-btn pp-btn-primary rounded-[var(--sm-radius-pill)] px-4 py-2 text-sm font-semibold">
             Start a Project
           </Link>
         </div>

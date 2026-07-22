@@ -168,14 +168,14 @@ export function PlatformPreviewMobileMenu({
           href={signInHref}
           onClick={onClose}
           aria-label="Sign in to AI Receptionist"
-          className="rounded-[var(--sm-radius-pill)] border border-[hsl(var(--sm-color-border-strong))] px-4 py-3 text-center text-sm font-medium text-[hsl(var(--sm-color-text-primary))]"
+          className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-4 py-3 text-center text-sm font-medium"
         >
           Sign In
         </Link>
         <Link
           href={startProjectHref}
           onClick={onClose}
-          className="rounded-[var(--sm-radius-pill)] bg-[var(--sm-button-primary-background)] px-4 py-3 text-center text-sm font-semibold text-[var(--sm-button-primary-text)]"
+          className="pp-btn pp-btn-primary rounded-[var(--sm-radius-pill)] px-4 py-3 text-center text-sm font-semibold"
         >
           Start a Project
         </Link>
