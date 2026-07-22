@@ -29,7 +29,7 @@ export default function PlatformAiReceptionistPreview() {
   usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
 
   return (
-    <PlatformPreviewPageShell>
+    <PlatformPreviewPageShell showThemeToggle>
       <PreviewPageHeader
         eyebrow="Product — AI Receptionist"
         headingId="pp-receptionist-page-heading"

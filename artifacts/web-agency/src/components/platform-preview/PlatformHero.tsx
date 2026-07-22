@@ -1,33 +1,41 @@
 import { Link } from "wouter";
-import { ArrowRight } from "lucide-react";
-import { startProjectHref } from "./navConfig";
-import { BusinessGoalSelector } from "./BusinessGoalSelector";
-import { HeroSystemCanvas } from "./HeroSystemCanvas";
+import { ArrowRight, Bot, Globe, LayoutTemplate, LineChart } from "lucide-react";
+import { startProjectHref, workHref } from "./navConfig";
+import { HeroDeviceComposition } from "./HeroDeviceComposition";
 import { HeroAuroraNetwork } from "./HeroAuroraNetwork";
 
 /**
- * Checkpoint 2A.4 Part 1/2: editorial two-column hero, not centered text
- * over empty space. The living system canvas sits beside the headline on
- * desktop (above the fold, not a scroll away), and the business-goal
- * selector is integrated into the copy column instead of a separate boxed
- * card section. Mobile stacks headline → CTAs → goal selector → simplified
- * vertical canvas, per Part 1's mobile requirements.
+ * Frontend Epic 1 visual redesign V2 — complete hero rebuild on a fixed
+ * light-mint palette (owner rejected the prior dark, washed-out version).
+ * ~42/58 content/visual split on desktop. BusinessGoalSelector was removed
+ * from this file entirely (owner feedback: "priority selector clutters the
+ * hero") — it now lives in its own PostHeroGoalSection immediately after
+ * this one. The prior HeroSystemCanvas (a small bordered icon-list card,
+ * not a real device composition) is replaced by HeroDeviceComposition, an
+ * original illustrative laptop/tablet/phone SiteMint system diagram.
  *
- * CTA hierarchy (Part 2): primary "Build Your SiteMint System" connects to
- * the real Discovery flow; secondary "Explore How It Works" reveals the
- * connected-system explanation below. "Start a Project" remains the
- * navigation's own CTA (PlatformPreviewNavbar, unchanged).
+ * Mobile order (owner-specified, §9): eyebrow → headline → supporting copy
+ * → primary CTA → secondary CTA → honest capability proof row → device
+ * composition last. Achieved with a single DOM order (no reordering
+ * classes needed) since HeroDeviceComposition is already the last child.
  */
+const microProof = [
+  { label: "Websites", icon: Globe },
+  { label: "CRM", icon: Bot },
+  { label: "Automation", icon: LineChart },
+  { label: "AI Systems", icon: LayoutTemplate },
+];
+
 export function PlatformHero() {
   return (
-    <section aria-labelledby="pp-hero-heading" className="relative overflow-hidden px-4 pb-16 pt-14 md:px-8 md:pb-20 md:pt-20">
+    <section aria-labelledby="pp-hero-heading" className="relative overflow-hidden px-4 pb-14 pt-14 md:px-8 md:pb-20 md:pt-20">
       <HeroAuroraNetwork />
 
-      <div className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
+      <div className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[0.42fr_0.58fr] lg:gap-10">
         <div className="pp-reveal">
           <p
             className="mb-5 inline-flex items-center rounded-[var(--sm-radius-pill)] border px-4 py-1.5 text-xs font-medium uppercase tracking-wide"
-            style={{ borderColor: "hsl(150 20% 90% / 0.25)", backgroundColor: "hsl(150 20% 94% / 0.08)", color: "hsl(150 20% 90%)" }}
+            style={{ borderColor: "hsl(var(--pp-mint-mist))", backgroundColor: "hsl(var(--pp-mint-pale))", color: "hsl(var(--pp-mint-deep))" }}
           >
             SiteMint Digital — a connected technology company
           </p>
@@ -35,43 +43,50 @@ export function PlatformHero() {
           <h1
             id="pp-hero-heading"
             className="pp-font-display max-w-xl text-4xl font-semibold leading-[1.08] sm:text-5xl md:text-[3.4rem]"
-            style={{ color: "hsl(150 20% 97%)" }}
+            style={{ color: "hsl(var(--pp-forest-deep))" }}
           >
-            Build smarter. Operate faster. Grow with SiteMint.
+            AI-Powered Websites &amp; Business Systems That Help You Get More Customers
           </h1>
 
-          <p className="mt-6 max-w-md text-base leading-relaxed md:text-lg" style={{ color: "hsl(150 12% 82%)" }}>
-            Intelligent websites, AI-powered customer experiences, and connected business
-            systems designed to help companies attract leads, automate work, and grow.
+          <p className="mt-6 max-w-md text-base leading-relaxed md:text-lg" style={{ color: "hsl(var(--pp-forest-slate))" }}>
+            Custom websites, CRM systems, business automation, and AI-powered customer
+            communication — connected together so leads get captured, followed up, and
+            turned into customers.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href={startProjectHref}
-              className="inline-flex items-center justify-center gap-2 rounded-[var(--sm-radius-pill)] bg-[var(--sm-button-accent-background)] px-6 py-3 text-sm font-semibold text-[var(--sm-button-accent-text)] shadow-[var(--sm-shadow-glow-subtle)] transition-transform hover:-translate-y-0.5"
+              className="group inline-flex items-center justify-center gap-2 rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold shadow-[var(--sm-shadow-md)] transition-transform hover:-translate-y-0.5"
+              style={{ backgroundColor: "hsl(var(--pp-mint-deep))", color: "hsl(var(--pp-mint-warm-white))" }}
             >
-              Build Your SiteMint System
-              <ArrowRight size={16} aria-hidden="true" />
+              Start Your Project
+              <ArrowRight size={16} aria-hidden="true" className="transition-transform group-hover:translate-x-1" />
             </Link>
-            <a
-              href="#pp-ecosystem"
-              className="inline-flex items-center justify-center rounded-[var(--sm-radius-pill)] border px-6 py-3 text-sm font-semibold transition-colors hover:bg-[hsl(150_20%_94%/0.08)]"
-              style={{ borderColor: "hsl(150 20% 90% / 0.35)", color: "hsl(150 20% 94%)" }}
+            <Link
+              href={workHref}
+              className="inline-flex items-center justify-center rounded-[var(--sm-radius-pill)] border px-6 py-3 text-sm font-semibold transition-colors hover:bg-[hsl(var(--pp-mint-pale))]"
+              style={{ borderColor: "hsl(var(--pp-mint-sage-gray))", color: "hsl(var(--pp-forest-deep))" }}
             >
-              Explore How It Works
-            </a>
+              View Our Work
+            </Link>
           </div>
 
-          <div
-            className="mt-10 max-w-md rounded-[var(--sm-radius-lg)] border p-5 shadow-[var(--sm-shadow-lg)] backdrop-blur-md"
-            style={{ borderColor: "hsl(var(--sm-color-border-default))", backgroundColor: "hsl(var(--sm-color-bg-elevated) / 0.94)" }}
-          >
-            <BusinessGoalSelector />
-          </div>
+          <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2" aria-label="What SiteMint builds">
+            {microProof.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.label} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "hsl(var(--pp-forest-slate))" }}>
+                  <Icon size={14} aria-hidden="true" style={{ color: "hsl(var(--pp-mint-deep))" }} />
+                  {item.label}
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
-        <div className="pp-reveal flex justify-center lg:justify-end" style={{ animationDelay: "120ms" }}>
-          <HeroSystemCanvas />
+        <div className="pp-reveal" style={{ animationDelay: "120ms" }}>
+          <HeroDeviceComposition />
         </div>
       </div>
     </section>

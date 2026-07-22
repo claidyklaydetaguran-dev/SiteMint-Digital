@@ -119,10 +119,12 @@ export function PlatformPreviewNavbar({
   theme,
   onToggleTheme,
   onOpenMobileMenu,
+  showThemeToggle = false,
 }: {
   theme: PlatformPreviewTheme;
   onToggleTheme: () => void;
   onOpenMobileMenu: () => void;
+  showThemeToggle?: boolean;
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -142,7 +144,7 @@ export function PlatformPreviewNavbar({
       }}
     >
       <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between px-4 md:px-8">
-        <Link href="/" className="inline-flex items-center" aria-label="SiteMint Digital home">
+        <Link href="/platform-preview" className="inline-flex items-center" aria-label="SiteMint Digital home">
           <SiteMintLogo variant="dark" iconSize={30} />
         </Link>
 
@@ -153,7 +155,7 @@ export function PlatformPreviewNavbar({
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
+          {showThemeToggle && <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />}
           <Link
             href={signInHref}
             aria-label="Sign in to AI Receptionist"
@@ -170,7 +172,7 @@ export function PlatformPreviewNavbar({
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
-          <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
+          {showThemeToggle && <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />}
           <button
             type="button"
             onClick={onOpenMobileMenu}

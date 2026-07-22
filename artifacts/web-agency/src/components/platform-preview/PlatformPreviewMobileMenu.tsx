@@ -11,6 +11,8 @@ import {
   pricingHref,
   type PreviewNavChild,
 } from "./navConfig";
+import { PlatformPreviewThemeToggle } from "./PlatformPreviewThemeToggle";
+import type { PlatformPreviewTheme } from "@/hooks/usePlatformPreviewTheme";
 
 function MobileSection({
   label,
@@ -59,7 +61,17 @@ function MobileSection({
   );
 }
 
-export function PlatformPreviewMobileMenu({ onClose }: { onClose: () => void }) {
+export function PlatformPreviewMobileMenu({
+  onClose,
+  theme,
+  onToggleTheme,
+  showThemeToggle = false,
+}: {
+  onClose: () => void;
+  theme?: PlatformPreviewTheme;
+  onToggleTheme?: () => void;
+  showThemeToggle?: boolean;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -146,6 +158,12 @@ export function PlatformPreviewMobileMenu({ onClose }: { onClose: () => void }) 
       </nav>
 
       <div className="flex flex-col gap-3 px-5 py-6">
+        {showThemeToggle && theme && onToggleTheme && (
+          <div className="flex items-center justify-between rounded-[var(--sm-radius-md)] border border-[hsl(var(--sm-color-border-default))] px-4 py-3">
+            <span className="text-sm font-medium text-[hsl(var(--sm-color-text-primary))]">Theme</span>
+            <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
+          </div>
+        )}
         <Link
           href={signInHref}
           onClick={onClose}

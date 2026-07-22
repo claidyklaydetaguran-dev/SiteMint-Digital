@@ -15,6 +15,28 @@
  */
 @import "@workspace/design-tokens/css";
 
+/*
+ * Homepage-only light-mint palette (Frontend Epic 1 visual redesign V2).
+ * Scoped as --pp-* custom properties so ordinary /platform-preview/* pages
+ * (which reference the existing --sm-* semantic tokens only) are completely
+ * unaffected — nothing here redefines or aliases an --sm-* token. Consumed
+ * via hsl(var(--pp-*)) inline, matching the existing inline-style pattern
+ * already used throughout this component tree.
+ */
+.platform-preview {
+  --pp-mint-warm-white: 150 30% 98%; /* #F8FBFA */
+  --pp-mint-soft-white: 150 20% 96%; /* #F2F7F5 */
+  --pp-mint-pale: 150 28% 93%; /* #E8F4EF */
+  --pp-mint-mist: 152 34% 88%; /* #D8EFE6 */
+  --pp-mint-sage-gray: 140 10% 70%; /* #A9BDB6 */
+  --pp-mint-fresh: 152 62% 65%; /* #4FD6A5 */
+  --pp-mint-emerald: 152 76% 44%; /* #18C98B */
+  --pp-mint-deep: 158 76% 33%; /* #15966F */
+  --pp-forest-deep: 152 42% 10%; /* #10251E */
+  --pp-forest-slate: 154 22% 16%; /* #1C332B */
+  --pp-forest-near-black: 152 30% 5%; /* #07110D */
+}
+
 .platform-preview {
   font-family: var(--sm-font-body);
 }
@@ -157,6 +179,30 @@
   .platform-preview .pp-aurora-drift-slow,
   .platform-preview .pp-aurora-ribbon,
   .platform-preview .pp-node-pulse {
+    animation: none;
+  }
+}
+
+/* Hero device composition — floating capability cards. Slow (10-18s per the
+   motion rules), low-amplitude vertical drift; paused via the
+   `.pp-float-paused` class HeroDeviceComposition applies when off-screen or
+   the tab is hidden (same pattern as HeroAuroraNetwork), in addition to the
+   reduced-motion collapse below. */
+@keyframes pp-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -6px, 0); }
+}
+
+.platform-preview .pp-float {
+  animation: pp-float 12s ease-in-out infinite;
+}
+
+.platform-preview .pp-float-paused .pp-float {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-float {
     animation: none;
   }
 }

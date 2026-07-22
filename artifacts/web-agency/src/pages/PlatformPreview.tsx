@@ -2,11 +2,11 @@ import "@/styles/platform-preview.css";
 import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { PlatformHero } from "@/components/platform-preview/PlatformHero";
+import { PostHeroGoalSection } from "@/components/platform-preview/PostHeroGoalSection";
 import { PlatformPreviewGoalProvider } from "@/components/platform-preview/PlatformPreviewGoalContext";
 import { EcosystemVisual } from "@/components/platform-preview/EcosystemVisual";
 import { ProductsSection } from "@/components/platform-preview/ProductsSection";
 import { ServicesSection } from "@/components/platform-preview/ServicesSection";
-import { ConnectedWorkflowSection } from "@/components/platform-preview/ConnectedWorkflowSection";
 import { SiteMintDifferenceSection } from "@/components/platform-preview/SiteMintDifferenceSection";
 import { SelectedWorkSection } from "@/components/platform-preview/SelectedWorkSection";
 import { ProcessSection } from "@/components/platform-preview/ProcessSection";
@@ -23,10 +23,10 @@ export default function PlatformPreview() {
     <PlatformPreviewPageShell>
       <PlatformPreviewGoalProvider>
         <PlatformHero />
+        <PostHeroGoalSection />
         <EcosystemVisual />
         <ProductsSection />
         <ServicesSection />
-        <ConnectedWorkflowSection />
         <SiteMintDifferenceSection />
         <SelectedWorkSection />
         <ProcessSection />

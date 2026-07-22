@@ -5,12 +5,13 @@ import { useSelectedGoal } from "./PlatformPreviewGoalContext";
 import { startProjectHref } from "./navConfig";
 
 /**
- * The homepage's signature interaction — now integrated directly into the
- * hero (Checkpoint 2A.4 Part 1), not a separate boxed card section below
- * it. Selecting a business priority updates PlatformPreviewGoalContext,
- * which EcosystemVisual, ConnectedWorkflowSection, ProductsSection,
- * ServicesSection, HeroSystemCanvas, and AiReceptionistDemo all read — one
- * control, no per-goal page variant duplicated anywhere.
+ * The homepage's signature interaction. Selecting a business priority
+ * updates PlatformPreviewGoalContext, which EcosystemVisual, ProductsSection,
+ * ServicesSection, and AiReceptionistDemo all read — one control, no
+ * per-goal page variant duplicated anywhere. Hosted by PostHeroGoalSection
+ * as its own dedicated post-hero section (relocated out of the hero per
+ * owner feedback that the selector cluttered it); sized here for that
+ * larger, more deliberate presentation rather than a compact hero widget.
  *
  * Works fully without animation: selection is a plain state change.
  * Keyboard: standard radiogroup pattern (arrow keys move selection).
@@ -29,15 +30,11 @@ export function BusinessGoalSelector() {
   }
 
   return (
-    <div id="pp-goal-selector">
-      <h2 id="pp-goal-selector-heading" className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-text-muted))]">
-        What's your priority right now?
-      </h2>
-
+    <div id="pp-goal-selector" className="w-full max-w-2xl">
       <div
         role="radiogroup"
-        aria-labelledby="pp-goal-selector-heading"
-        className="mt-3 flex flex-wrap gap-2"
+        aria-label="What's your priority right now?"
+        className="flex flex-wrap justify-center gap-3"
       >
         {goals.map((goal, index) => {
           const isSelected = goal.id === selectedGoalId;
@@ -53,11 +50,14 @@ export function BusinessGoalSelector() {
               tabIndex={isSelected ? 0 : -1}
               onClick={() => selectGoal(goal.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`rounded-[var(--sm-radius-pill)] border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                isSelected
-                  ? "border-transparent bg-[var(--sm-button-primary-background)] text-[var(--sm-button-primary-text)]"
-                  : "border-[hsl(var(--sm-color-border-default))] bg-transparent text-[hsl(var(--sm-color-text-secondary))] hover:bg-[hsl(var(--sm-color-surface-interactive))]"
+              className={`rounded-[var(--sm-radius-pill)] border px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                isSelected ? "shadow-[var(--sm-shadow-md)]" : "hover:-translate-y-0.5"
               }`}
+              style={{
+                borderColor: isSelected ? "transparent" : "hsl(var(--pp-mint-mist))",
+                backgroundColor: isSelected ? "hsl(var(--pp-mint-deep))" : "hsl(var(--pp-mint-warm-white))",
+                color: isSelected ? "hsl(var(--pp-mint-warm-white))" : "hsl(var(--pp-forest-deep))",
+              }}
             >
               {goal.label}
             </button>
@@ -65,17 +65,20 @@ export function BusinessGoalSelector() {
         })}
       </div>
 
-      <div role="status" aria-live="polite" className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <p className="text-sm text-[hsl(var(--sm-color-text-secondary))]">{selectedGoal.heroSupportingCopy}</p>
+      <div role="status" aria-live="polite" className="mt-6 flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-center">
+        <p className="text-sm" style={{ color: "hsl(var(--pp-forest-slate))" }}>
+          {selectedGoal.heroSupportingCopy}
+        </p>
         <Link
           href={startProjectHref}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-[hsl(var(--sm-color-action-primary))] hover:underline"
+          className="inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+          style={{ color: "hsl(var(--pp-mint-deep))" }}
         >
           {selectedGoal.ctaLabel}
           <ArrowRight size={13} aria-hidden="true" />
         </Link>
       </div>
-      <p className="mt-1 text-[11px] text-[hsl(var(--sm-color-text-muted))]">
+      <p className="mt-2 text-center text-[11px]" style={{ color: "hsl(var(--pp-mint-sage-gray))" }}>
         Updates this page for this visit only — nothing is tracked or saved.
       </p>
     </div>

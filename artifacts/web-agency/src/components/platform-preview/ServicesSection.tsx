@@ -89,7 +89,7 @@ export function ServicesSection() {
               <Link
                 key={service.id}
                 href="/platform-preview/services"
-                className="group relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 transition-all duration-300 hover:-translate-y-1 hover:border-[hsl(var(--sm-mint-500))] hover:shadow-[var(--sm-shadow-glow-subtle)]"
+                className="group relative flex flex-col rounded-[var(--sm-radius-xl)] border p-8 transition-all duration-300 hover:-translate-y-1 hover:border-[hsl(var(--pp-mint-fresh))] hover:shadow-[var(--sm-shadow-glow-subtle)]"
                 style={{
                   borderColor: isRecommended ? "hsl(var(--sm-color-border-focus))" : "hsl(var(--sm-color-border-default))",
                   backgroundColor: "hsl(var(--sm-color-surface-default))",

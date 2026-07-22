@@ -4,18 +4,20 @@ import { useEffect, useRef, useState } from "react";
  * "Mint Aurora Network" hero background. CSS gradients + one lightweight
  * inline SVG only — no remote image, no WebGL, no video. Deliberately a
  * real background layer behind PlatformHero's copy/CTA column, not a
- * decorative unused component: it owns the section's -z-10 base layer and
- * replaces PlatformHero's previous flat radial-glow + grid treatment.
+ * decorative unused component: it owns the section's -z-10 base layer.
  *
- * Composition: deep navy gradient base, two radial mint glows (brighter on
- * the right, where the hero's HeroSystemCanvas sits), a quiet darker
+ * Composition (light-mint palette, Frontend Epic 1 visual redesign V2):
+ * warm-white/pale-mint gradient base, two radial mint glows (brighter on
+ * the right, where the hero's HeroDeviceComposition sits), a quiet warm-white
  * readability wash behind the left copy column, a low-opacity SVG network
  * of curved paths/nodes concentrated on the right, and one translucent
- * mint ribbon crossing the transition zone.
+ * mint ribbon crossing the transition zone. Uses the homepage-scoped
+ * --pp-* tokens (platform-preview.css) — no other /platform-preview/* page
+ * references these, so this stays a homepage-only visual change.
  *
  * Motion (all paused via prefers-reduced-motion and while off-screen/tab
  * hidden): slow aurora drift (14s), gentle node pulse, tiny device
- * parallax is left to HeroSystemCanvas itself. Cursor spotlight is
+ * parallax is left to HeroDeviceComposition itself. Cursor spotlight is
  * desktop-only (`pointer: fine`) and scoped to this component.
  */
 export function HeroAuroraNetwork() {
@@ -61,22 +63,22 @@ export function HeroAuroraNetwork() {
       className={`pp-aurora pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px] overflow-hidden md:h-[720px] ${active ? "" : "pp-aurora-paused"}`}
       style={{ pointerEvents: "auto" }}
     >
-      {/* 1. Deep navy foundation */}
+      {/* 1. Warm-white / pale-mint foundation */}
       <div
         className="absolute inset-0"
-        style={{ background: "linear-gradient(135deg, hsl(var(--sm-charcoal-950)) 0%, hsl(var(--sm-charcoal-900)) 48%, hsl(var(--sm-charcoal-950)) 100%)" }}
+        style={{ background: "linear-gradient(135deg, hsl(var(--pp-mint-warm-white)) 0%, hsl(var(--pp-mint-soft-white)) 48%, hsl(var(--pp-mint-pale)) 100%)" }}
       />
 
-      {/* 2. Mint aurora glow — brighter, right side (behind device composition) */}
+      {/* 2. Mint glow — brighter, right side (behind device composition) */}
       <div
         className="pp-aurora-drift absolute inset-0"
-        style={{ background: "radial-gradient(circle at 75% 35%, hsl(var(--sm-mint-500) / 0.32), transparent 42%)" }}
+        style={{ background: "radial-gradient(circle at 75% 35%, hsl(var(--pp-mint-fresh) / 0.38), transparent 42%)" }}
       />
 
       {/* 3. Soft secondary glow */}
       <div
         className="pp-aurora-drift-slow absolute inset-0"
-        style={{ background: "radial-gradient(circle at 45% 75%, hsl(var(--sm-mint-300) / 0.16), transparent 38%)" }}
+        style={{ background: "radial-gradient(circle at 45% 75%, hsl(var(--pp-mint-mist) / 0.55), transparent 38%)" }}
       />
 
       {/* 4. Translucent flowing ribbon, diagonal transition zone */}
@@ -84,7 +86,7 @@ export function HeroAuroraNetwork() {
         className="pp-aurora-ribbon absolute inset-0"
         style={{
           background:
-            "linear-gradient(115deg, transparent 38%, hsl(var(--sm-mint-500) / 0.14) 48%, hsl(var(--sm-mint-300) / 0.08) 56%, transparent 66%)",
+            "linear-gradient(115deg, transparent 38%, hsl(var(--pp-mint-emerald) / 0.14) 48%, hsl(var(--pp-mint-fresh) / 0.10) 56%, transparent 66%)",
         }}
       />
 
@@ -95,7 +97,7 @@ export function HeroAuroraNetwork() {
         preserveAspectRatio="xMidYMid slice"
         fill="none"
       >
-        <g stroke="hsl(var(--sm-mint-300))" strokeWidth="1" strokeDasharray="2 5" opacity="0.6">
+        <g stroke="hsl(var(--pp-mint-deep))" strokeWidth="1" strokeDasharray="2 5" opacity="0.35">
           <path className="pp-node-path" d="M620 120 C 780 80, 900 180, 1040 140" />
           <path className="pp-node-path" d="M700 260 C 840 220, 980 320, 1150 260" />
           <path className="pp-node-path" d="M660 420 C 820 400, 960 480, 1120 430" />
@@ -115,7 +117,7 @@ export function HeroAuroraNetwork() {
             cx={cx}
             cy={cy}
             r="3.5"
-            fill="hsl(var(--sm-mint-500))"
+            fill="hsl(var(--pp-mint-emerald))"
           />
         ))}
       </svg>
@@ -125,7 +127,7 @@ export function HeroAuroraNetwork() {
         <div
           className="hidden md:block absolute inset-0 transition-opacity duration-300"
           style={{
-            background: `radial-gradient(circle 260px at ${spotlight.x}% ${spotlight.y}%, hsl(var(--sm-mint-500) / 0.10), transparent 70%)`,
+            background: `radial-gradient(circle 260px at ${spotlight.x}% ${spotlight.y}%, hsl(var(--pp-mint-fresh) / 0.16), transparent 70%)`,
           }}
         />
       )}
@@ -133,13 +135,13 @@ export function HeroAuroraNetwork() {
       {/* 7. Quiet readability wash behind the headline (left ~45%) */}
       <div
         className="absolute inset-y-0 left-0 w-[55%]"
-        style={{ background: "linear-gradient(90deg, hsl(var(--sm-charcoal-950) / 0.55) 0%, transparent 100%)" }}
+        style={{ background: "linear-gradient(90deg, hsl(var(--pp-mint-warm-white) / 0.7) 0%, transparent 100%)" }}
       />
 
       {/* Fade to the page's own canvas background at the bottom edge */}
       <div
         className="absolute inset-x-0 bottom-0 h-1/2"
-        style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--sm-color-bg-canvas)))" }}
+        style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--pp-mint-warm-white)))" }}
       />
     </div>
   );

@@ -103,7 +103,7 @@ export function ProcessSection() {
           <div
             aria-hidden="true"
             className="absolute left-0 top-9 hidden h-px lg:block transition-[width] duration-500 ease-out"
-            style={{ width: `${fillPercent}%`, backgroundColor: "hsl(var(--sm-mint-500))" }}
+            style={{ width: `${fillPercent}%`, backgroundColor: "hsl(var(--pp-mint-deep))" }}
           />
 
           {phases.map((phase, index) => {
@@ -123,7 +123,7 @@ export function ProcessSection() {
                 onKeyDown={(event) => onKeyDown(event, index)}
                 className="relative z-[1] flex flex-col items-start gap-2 rounded-[var(--sm-radius-lg)] border p-6 text-left transition-all duration-300"
                 style={{
-                  borderColor: isSelected ? "hsl(var(--sm-mint-500))" : "hsl(var(--sm-color-border-default))",
+                  borderColor: isSelected ? "hsl(var(--pp-mint-fresh))" : "hsl(var(--sm-color-border-default))",
                   backgroundColor: "hsl(var(--sm-color-surface-default))",
                   boxShadow: isSelected ? "var(--sm-shadow-glow-subtle)" : undefined,
                 }}

@@ -1,13 +1,19 @@
 import { Link } from "wouter";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { portfolioProjects, type PortfolioProject } from "./portfolioProjects";
-import { FeaturedVisual, SupportingVisual } from "./PortfolioVisual";
+import { FeaturedVisual } from "./PortfolioVisual";
 
 /**
- * Data-driven Selected Work (Checkpoint 2B.3). Project content lives in
- * portfolioProjects.ts; this file only composes layout. Adding, replacing,
- * or reordering a project — or later adding Shasta Greene once its asset is
- * approved — is a data change there, not a redesign here.
+ * Data-driven Selected Work. Project content lives in portfolioProjects.ts;
+ * this file only composes layout.
+ *
+ * Frontend Epic 1 visual redesign V2: rewritten from a featured project +
+ * supporting grid to a single large spotlight (the owner's "one large
+ * project spotlight rather than a tiny grid" direction), showing only the
+ * `featured: true` project (Hand Homecare). This is the ONLY place on the
+ * homepage a client portfolio screenshot appears — the hero
+ * (HeroDeviceComposition) is an original illustrative diagram and never
+ * references this or any other client project.
  */
 
 function ProjectCta({ project }: { project: PortfolioProject }) {
@@ -56,28 +62,8 @@ function FeaturedProject({ project }: { project: PortfolioProject }) {
   );
 }
 
-function SupportingProject({ project }: { project: PortfolioProject }) {
-  return (
-    <article className="flex flex-col overflow-hidden rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-surface-default))] p-6">
-      <SupportingVisual project={project} />
-      <div className="mt-6 flex flex-1 flex-col">
-        <span className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-action-primary))]">
-          {project.statusLabel ?? project.category}
-        </span>
-        <h3 className="mt-2 text-base font-semibold text-[hsl(var(--sm-color-text-primary))]">{project.projectName}</h3>
-        <p className="mt-2 flex-1 text-sm leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">{project.summary}</p>
-        <div className="mt-5">
-          <ProjectCta project={project} />
-        </div>
-      </div>
-    </article>
-  );
-}
-
 export function SelectedWorkSection() {
-  const sorted = [...portfolioProjects].sort((a, b) => a.sortOrder - b.sortOrder);
-  const featured = sorted.find((project) => project.featured);
-  const supporting = sorted.filter((project) => !project.featured);
+  const featured = portfolioProjects.find((project) => project.featured);
 
   return (
     <section aria-labelledby="pp-work-heading" className="px-4 py-20 md:px-8 md:py-28">
@@ -88,7 +74,7 @@ export function SelectedWorkSection() {
               Selected work
             </h2>
             <p className="mt-4 text-base text-[hsl(var(--sm-color-text-secondary))]">
-              Real projects SiteMint has delivered, across different industries.
+              A real project SiteMint has delivered — see the full portfolio for more.
             </p>
           </div>
           <Link
@@ -100,17 +86,7 @@ export function SelectedWorkSection() {
           </Link>
         </div>
 
-        {featured && (
-          <div className="mb-6">
-            <FeaturedProject project={featured} />
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {supporting.map((project) => (
-            <SupportingProject key={project.id} project={project} />
-          ))}
-        </div>
+        {featured && <FeaturedProject project={featured} />}
       </div>
     </section>
   );
