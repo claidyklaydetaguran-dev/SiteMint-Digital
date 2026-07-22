@@ -16,86 +16,153 @@
 @import "@workspace/design-tokens/css";
 
 /*
- * Homepage-only ocean-teal palette (Visual redesign V3 — owner feedback:
- * V2's palette read as bright/fluorescent green, "gaming interface" or
- * "crypto site," not SiteMint's intended cool mint/ocean identity. Hue
- * shifted from ~150-160° (green) to ~163-194° (blue-leaning teal/cyan),
- * sourced by sampling the approved hero-devices-remove-bg-io.png (dominant
- * hue ≈180°) and the owner's suggested ocean-teal hex direction. Saturation
- * lowered on the mid-tones so accent teal reads as a restrained highlight,
- * not a saturated wash. Role names are unchanged from V2 so every consumer
- * across the /platform-preview tree (20+ files) recolors automatically —
- * see the pp-ocean, pp-teal, pp-mint, pp-surface, and pp-text semantic
- * aliases below for the names new consumers should prefer.
+ * Homepage-only ocean-navy / cyan-mint palette (Visual redesign V4 — owner
+ * feedback on V3's cool ocean-teal: still reads too green overall. Final
+ * approved palette is deep ocean navy / ocean navy / blue-gray, with a
+ * tightly-restrained cyan-mint accent (#27E9B5) reserved for small elements
+ * only — status dots, icons, fine borders, focus rings, hover highlights —
+ * never large fills, buttons, or broad glows. Sourced from the owner's
+ * "Green Gray Color Palettes" reference image and explicit hex list.
  *
- * Contrast re-verified against WCAG 2.1 for the roles that carry text or
- * serve as a fill under white text: mint-deep as text-on-mint-warm-white
- * measures 4.89:1, white-on-mint-deep fill measures 4.96:1, mint-emerald as
- * a non-text focus-ring/border measures 3.26:1 against mint-warm-white —
- * all clear their respective AA minimums (4.5:1 text, 3:1 non-text).
+ * Legacy role names are unchanged from V2/V3 so every consumer across the
+ * /platform-preview tree (20+ files) recolors automatically — see the new
+ * --pp-navy-950/-800, --pp-slate-600, --pp-cyan-mint(-deep), --pp-mint-pale,
+ * --pp-surface-soft, --pp-white aliases below, which new work should prefer
+ * directly over the legacy mint/forest names.
+ *
+ * WCAG 2.1 contrast verified: navy-800 text on white 14.95:1, navy-950 on
+ * mint-pale 16.49:1, white on navy-950 fill 18.06:1, white on the button
+ * gradient's lightest stop (#234554) 10.24:1, slate-600 on white 8.14:1 —
+ * all comfortably clear the 4.5:1 text minimum. Cyan-mint (#27E9B5) alone
+ * only measures 1.57:1 against white — far under the 3:1 non-text minimum —
+ * so it is never used as an icon/border/dot color directly on light
+ * surfaces; --pp-cyan-mint-deep (a navy-darkened variant, 3.42:1 vs white)
+ * covers that role instead, and pure --pp-cyan-mint is reserved for
+ * decorative glows, thin edge highlights on dark buttons, and accents on
+ * dark surfaces (11.53:1 vs navy-950 — excellent).
  */
 .platform-preview {
-  --pp-mint-warm-white: 163 54% 97%; /* #F5FCFA cool mint-white */
-  --pp-mint-soft-white: 165 46% 95%; /* #EEF9F6 */
-  --pp-mint-pale: 165 53% 94%; /* #E8F8F4 very light mint */
-  --pp-mint-mist: 167 40% 86%; /* #C9E9E1 pale seafoam border */
-  --pp-mint-sage-gray: 184 12% 68%; /* #A3B9BA cool slate-gray */
-  --pp-mint-fresh: 169 45% 58%; /* #69CDBB soft mint teal */
-  --pp-mint-emerald: 176 55% 36%; /* #279488 medium sea teal */
-  --pp-mint-deep: 177 68% 26%; /* #147D78 primary ocean teal */
-  --pp-forest-deep: 182 65% 13%; /* #0B3939 dark ocean teal */
-  --pp-forest-slate: 184 30% 20%; /* #223F41 dark slate teal */
-  --pp-forest-near-black: 194 65% 8%; /* #071F26 deep ocean navy */
+  /* Approved core palette — source of truth, prefer these directly. */
+  --pp-navy-950: 203 76% 8%; /* #051824 deep ocean navy */
+  --pp-navy-800: 204 42% 15%; /* #162936 ocean navy */
+  --pp-navy-700: 198 41% 23%; /* #234554 derived — button-gradient highlight stop */
+  --pp-navy-mid: 201 59% 11%; /* #0B202B derived — dark-section gradient midpoint */
+  --pp-slate-600: 207 26% 31%; /* #3B5265 blue-gray */
+  --pp-cyan-mint: 164 82% 53%; /* #27E9B5 restrained accent only — see usage rules above */
+  --pp-cyan-mint-deep: 165 65% 37%; /* #209c82 derived — icon/dot glyphs on light surfaces (3.42:1 vs white) */
+  --pp-mint-pale: 169 53% 94%; /* #E8F8F5 */
+  --pp-surface-soft: 168 38% 97%; /* #F6FBFA */
+  --pp-white: 0 0% 100%; /* #FFFFFF */
+  --pp-border-pale: 207 12% 85%; /* #D4D9DD derived — slate-600 lightened 78% toward white, for thin borders */
+  --pp-slate-mid: 207 12% 55%; /* #808F9B derived — slate-600 lightened 35%, secondary icons/muted labels */
+
+  /* Legacy role tokens — unchanged names, recolored values, so every
+     existing consumer in this tree recolors without a file edit. */
+  --pp-mint-warm-white: var(--pp-white);
+  --pp-mint-soft-white: var(--pp-surface-soft);
+  --pp-mint-mist: var(--pp-border-pale);
+  --pp-mint-sage-gray: var(--pp-slate-mid);
+  --pp-mint-fresh: var(--pp-cyan-mint);
+  --pp-mint-emerald: var(--pp-cyan-mint);
+  --pp-mint-deep: var(--pp-navy-800);
+  --pp-forest-deep: var(--pp-navy-950);
+  --pp-forest-slate: var(--pp-slate-600);
+  --pp-forest-near-black: var(--pp-navy-950);
 
   /* Semantic aliases — prefer these for new work in this tree. */
-  --pp-ocean-950: var(--pp-forest-near-black);
-  --pp-ocean-800: var(--pp-forest-deep);
-  --pp-teal-600: var(--pp-mint-deep);
-  --pp-teal-500: var(--pp-mint-emerald);
-  --pp-mint-300: var(--pp-mint-fresh);
+  --pp-ocean-950: var(--pp-navy-950);
+  --pp-ocean-800: var(--pp-navy-800);
+  --pp-teal-600: var(--pp-navy-800);
+  --pp-teal-500: var(--pp-cyan-mint-deep);
+  --pp-mint-300: var(--pp-cyan-mint);
   --pp-mint-100: var(--pp-mint-pale);
-  --pp-surface: var(--pp-mint-warm-white);
-  --pp-surface-soft: var(--pp-mint-soft-white);
-  --pp-text: 184 18% 31%; /* #405B5D cool slate text */
-  --pp-text-muted: 184 14% 46%; /* lighter cool slate */
-  --pp-border: var(--pp-mint-mist);
-  --pp-shadow: 194 60% 10%; /* navy-based shadow tint */
-  --pp-glow: var(--pp-mint-fresh);
+  --pp-surface: var(--pp-white);
+  --pp-text: 207 26% 31%; /* = slate-600, cool blue-gray body text */
+  --pp-text-muted: 207 12% 55%; /* = slate-mid */
+  --pp-border: var(--pp-border-pale);
+  --pp-shadow: 203 76% 8%; /* = navy-950, navy-based shadow tint */
+  --pp-glow: var(--pp-cyan-mint);
+
+  /* Aurora background component tokens (components/ui/aurora-background.tsx). */
+  --aurora-navy: 203 76% 8%; /* #051824 */
+  --aurora-ocean: 204 42% 15%; /* #162936 */
+  --aurora-slate: 207 26% 31%; /* #3B5265 */
+  --aurora-cyan: 164 82% 53%; /* #27E9B5 */
+  --aurora-mint: 169 53% 94%; /* #E8F8F5 */
+  --aurora-white: 168 38% 97%; /* #F6FBFA */
 
   /* Scoped override of the shared @workspace/design-tokens semantic layer —
      only applies inside .platform-preview, never touches the package's own
      :root/.dark values (also consumed by artifacts/helpdesk). Recolors
      Products/Services/Pricing/Portfolio/About/Contact/Discovery/Footer and
      every other component in this tree that consumes the shared action or
-     mint primitives, to the same ocean-teal family, without editing each
-     file individually. */
-  --sm-evergreen-900: 177 68% 26%;
-  --sm-evergreen-700: 176 55% 36%;
-  --sm-mint-500: 169 45% 58%;
-  --sm-mint-300: 167 40% 86%;
-  --sm-jade-500: 175 50% 40%;
-  --sm-color-action-primary: 177 68% 26%;
-  --sm-color-action-primary-hover: 182 65% 18%;
-  --sm-color-action-primary-active: 182 65% 14%;
-  --sm-color-border-focus: 176 55% 36%;
-  --sm-color-status-success: 176 58% 30%;
-  --sm-color-text-link: 177 68% 26%;
+     mint primitives, to the same navy/cyan-mint family, without editing
+     each file individually. */
+  --sm-evergreen-900: 204 42% 15%; /* = navy-800 — action/link color is navy, not cyan */
+  --sm-evergreen-700: 165 65% 37%; /* = cyan-mint-deep */
+  --sm-mint-500: 165 65% 37%; /* = cyan-mint-deep, for focus glows on light form fields */
+  --sm-mint-300: 207 12% 85%; /* = border-pale */
+  --sm-jade-500: 204 42% 15%;
+  --sm-color-action-primary: 204 42% 15%;
+  --sm-color-action-primary-hover: 203 76% 12%;
+  --sm-color-action-primary-active: 203 76% 8%;
+  --sm-color-border-focus: 165 65% 37%;
+  --sm-color-status-success: 165 65% 30%;
+  --sm-color-text-link: 204 42% 15%;
+
+  /* Round-5 fix: the shared package's NEUTRAL-derived semantic tokens were
+     never scoped-overridden in any prior round — they still carry the
+     unmodified package's hue ≈150-160° (green) primitives. Confirmed by
+     direct read of ProductsSection.tsx/PlatformPreviewFooter.tsx: card
+     borders (--sm-color-border-default), secondary/muted text, and subtle
+     surfaces all still resolve to green-tinted --sm-neutral-*, which is why
+     ~15+ files (Products/Services/Pricing/Portfolio/About/Contact/
+     Discovery/Footer/process/card components) still read as dull
+     green-gray regardless of the pp-token and action-color fixes above.
+     This is the main page-wide "too washed out" fix. */
+  --sm-color-bg-canvas: 0 0% 100%; /* = white — the literal page canvas (PlatformPreviewPageShell.tsx) */
+  --sm-color-bg-subtle: 168 38% 97%; /* = surface-soft */
+  --sm-color-surface-default: 0 0% 100%; /* = white */
+  --sm-color-surface-muted: 169 53% 94%; /* = mint-pale */
+  --sm-color-surface-interactive: 169 53% 94%; /* = mint-pale */
+  --sm-color-border-default: 207 12% 85%; /* = border-pale */
+  --sm-color-border-subtle: 207 15% 90%;
+  --sm-color-border-strong: 207 12% 55%; /* = slate-mid */
+  --sm-color-text-primary: 203 76% 8%; /* = navy-950 */
+  --sm-color-text-secondary: 207 26% 31%; /* = slate-600 */
+  --sm-color-text-muted: 207 12% 55%; /* = slate-mid */
+
+  /* Round-5: primary CTA color changes to bright cyan-mint per explicit
+     owner override of the earlier "no bright cyan buttons" rule. Overridden
+     directly (literal values, not derived from --sm-color-action-primary/
+     --sm-color-text-inverse) so components using the shared
+     "--sm-button-primary-*" tokens (e.g. ProductsSection.tsx's "See AI
+     Receptionist" link, which bypasses the .pp-btn-primary class) get the
+     same cyan/navy treatment without a file edit — while leaving
+     --sm-color-action-primary (navy, used for links/icons/text-accents) and
+     --sm-color-text-inverse (white, used elsewhere for text on genuinely
+     dark surfaces) undisturbed. */
+  --sm-button-primary-background: #27e9b5;
+  --sm-button-primary-text: #051824;
+  --sm-button-primary-background-hover: #3eefc0;
 }
 
 /* The one legitimately-dark surface in this tree (AI Receptionist preview's
    own light/dark toggle — see PlatformPreviewPageShell.tsx; every other
    /platform-preview page is forced light). Mirrors the shared package's own
    light→dark lightening pattern so action color stays legible on a dark
-   ocean background instead of inheriting the light-mode teal verbatim. */
+   ocean background instead of inheriting the light-mode navy verbatim —
+   here that means brightening toward cyan-mint, which is the approved
+   accent for dark surfaces (11.53:1 vs navy-950). */
 .platform-preview.dark {
-  --sm-evergreen-700: 169 45% 58%;
-  --sm-mint-500: 169 55% 66%;
-  --sm-color-action-primary: 169 45% 58%;
-  --sm-color-action-primary-hover: 169 50% 64%;
-  --sm-color-action-primary-active: 169 50% 50%;
-  --sm-color-border-focus: 169 55% 62%;
-  --sm-color-status-success: 176 50% 52%;
-  --sm-color-text-link: 169 45% 58%;
+  --sm-evergreen-700: 164 82% 53%; /* = cyan-mint */
+  --sm-mint-500: 164 70% 62%;
+  --sm-color-action-primary: 164 82% 53%;
+  --sm-color-action-primary-hover: 164 82% 60%;
+  --sm-color-action-primary-active: 164 82% 46%;
+  --sm-color-border-focus: 164 75% 58%;
+  --sm-color-status-success: 165 60% 48%;
+  --sm-color-text-link: 164 82% 53%;
 }
 
 .platform-preview {
@@ -179,41 +246,19 @@
   top: 1rem;
 }
 
-/* Hero Aurora Network — ambient background motion only. Slow (12-18s per
-   the owner's motion rules), low-amplitude, and always paused via the
+/* Hero Aurora Network — remaining ambient layers (SVG connector network,
+   cursor spotlight, readability washes). Slow (12-18s per the owner's
+   motion rules), low-amplitude, and always paused via the
    `.pp-aurora-paused` class HeroAuroraNetwork applies when its section is
    off-screen or the tab is hidden, in addition to the reduced-motion
-   collapse below. */
-@keyframes pp-aurora-drift {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(-2%, 1.5%, 0) scale(1.04); }
-}
-
-@keyframes pp-aurora-drift-slow {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(1.5%, -2%, 0) scale(1.03); }
-}
-
-@keyframes pp-ribbon-flow {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(1.5%, -1%, 0); }
-}
-
+   collapse below. The prior `.pp-aurora-drift`/`.pp-aurora-drift-slow`/
+   `.pp-aurora-ribbon` glow layers (V2/V3) are removed — that role is now
+   owned by the dedicated AuroraBackground component's `.pp-aurora-ribbon-
+   layer` below, so the hero has one atmospheric system, not two competing
+   ones. */
 @keyframes pp-node-pulse {
   0%, 100% { opacity: 0.35; r: 3px; }
   50% { opacity: 0.9; r: 4.5px; }
-}
-
-.platform-preview .pp-aurora-drift {
-  animation: pp-aurora-drift 14s ease-in-out infinite;
-}
-
-.platform-preview .pp-aurora-drift-slow {
-  animation: pp-aurora-drift-slow 18s ease-in-out infinite;
-}
-
-.platform-preview .pp-aurora-ribbon {
-  animation: pp-ribbon-flow 16s ease-in-out infinite;
 }
 
 .platform-preview .pp-node-pulse {
@@ -221,26 +266,135 @@
   animation: pp-node-pulse 2.4s ease-in-out infinite;
 }
 
-.platform-preview .pp-aurora-paused .pp-aurora-drift,
-.platform-preview .pp-aurora-paused .pp-aurora-drift-slow,
-.platform-preview .pp-aurora-paused .pp-aurora-ribbon,
 .platform-preview .pp-aurora-paused .pp-node-pulse {
   animation-play-state: paused;
 }
 
-@media (max-width: 767px) {
-  /* Mobile simplification: fewer visible layers, no ribbon/parallax. */
-  .platform-preview .pp-aurora-ribbon {
-    display: none;
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-node-pulse {
+    animation: none;
+  }
+}
+
+/* Aurora background — reusable decorative layer (components/ui/aurora-
+   background.tsx). Round-5 rewrite: a single repeating-linear-gradient
+   read as flat, barely-visible stripes. Now built from a stack of
+   elongated radial-gradient ellipses (the standard CSS technique for
+   organic "aurora beam" shapes — wide/flat ellipses positioned diagonally
+   read as flowing curved bands, not a striped grid). No `mix-blend-mode` —
+   `screen` was tried first but mathematically washes toward white against
+   this light hero background (screen-blending any color with a white
+   backdrop trends back to white), which is why an earlier version of this
+   layer was nearly invisible despite high nominal opacity; plain alpha
+   compositing lets the gradient's own colors actually show. Two layers
+   with independent beam positions and keyframes drift out of phase for
+   depth. CSS-only — no canvas/WebGL/JS-driven animation. `will-change` is
+   scoped to these two layers alone. */
+.platform-preview .pp-aurora-ribbon-layer {
+  background-image:
+    radial-gradient(ellipse 95% 16% at 12% 22%, hsl(var(--aurora-cyan) / 0.75) 0%, transparent 68%),
+    radial-gradient(ellipse 85% 13% at 42% 8%, hsl(172 80% 68% / 0.55) 0%, transparent 66%),
+    radial-gradient(ellipse 105% 17% at 68% 28%, hsl(var(--aurora-cyan) / 0.7) 0%, transparent 68%),
+    radial-gradient(ellipse 80% 13% at 92% 48%, hsl(var(--aurora-mint) / 0.6) 0%, transparent 64%),
+    radial-gradient(ellipse 75% 12% at 50% 58%, hsl(var(--aurora-slate) / 0.3) 0%, transparent 62%);
+  background-size: 160% 160%;
+  filter: blur(14px);
+  opacity: 0.95;
+  will-change: background-position, transform;
+  animation: pp-aurora 24s ease-in-out infinite;
+}
+
+.platform-preview .pp-aurora-ribbon-layer-2 {
+  background-image:
+    radial-gradient(ellipse 90% 14% at 55% 15%, hsl(var(--aurora-cyan) / 0.5) 0%, transparent 64%),
+    radial-gradient(ellipse 100% 16% at 80% 35%, hsl(172 75% 70% / 0.45) 0%, transparent 62%),
+    radial-gradient(ellipse 78% 13% at 35% 45%, hsl(var(--aurora-cyan) / 0.4) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 11% at 65% 65%, hsl(var(--aurora-slate) / 0.22) 0%, transparent 58%);
+  background-size: 170% 170%;
+  filter: blur(18px);
+  opacity: 0.7;
+  will-change: background-position, transform;
+  animation: pp-aurora-2 30s ease-in-out infinite;
+  animation-delay: -6s;
+}
+
+.platform-preview .pp-aurora-radial-mask {
+  mask-image: radial-gradient(ellipse 80% 78% at 68% 30%, black 0%, black 35%, transparent 88%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 78% at 68% 30%, black 0%, black 35%, transparent 88%);
+}
+
+/* Shell-level mask (round 6 correction): the hero's own radial mask above
+   concentrates color toward the device (68% x, 30% y) and fades out near
+   the top-left, which is exactly where the floating navbar's logo sits —
+   masking the ribbons there left a plain-white gutter around/behind the
+   navbar even though the ribbon layer was technically present. This mask
+   instead keeps full strength across the entire top band (wide ellipse,
+   centered near y=0, spanning past both edges) so the visible cyan-mint
+   ribbons — not just the pale foundation wash — reach the whole width of
+   the navbar region, then fades down into the hero's own layer. */
+.platform-preview .pp-aurora-nav-mask {
+  mask-image: radial-gradient(ellipse 130% 90% at 50% 6%, black 0%, black 55%, transparent 94%);
+  -webkit-mask-image: radial-gradient(ellipse 130% 90% at 50% 6%, black 0%, black 55%, transparent 94%);
+}
+
+/* Static, untransformed glow reserved for the navbar band itself. The
+   animated ribbon layers above are tuned (background-size/position +
+   rotate/scale keyframes) for the hero's own box and, even under the wider
+   nav mask, don't reliably land visible color across the full width of the
+   navbar's top band at every animation frame — confirmed by screenshot,
+   not assumed. This layer guarantees a real cyan-mint presence behind the
+   entire navbar region regardless of where the animated layers currently
+   sit, so the ribbon layers add motion/depth on top of a color that is
+   always there. */
+.platform-preview .pp-aurora-nav-glow {
+  background-image:
+    radial-gradient(ellipse 90% 70% at 50% 0%, hsl(var(--aurora-cyan) / 0.55) 0%, hsl(var(--pp-cyan-mint-deep) / 0.28) 42%, transparent 82%),
+    radial-gradient(ellipse 60% 45% at 12% 10%, hsl(var(--aurora-cyan) / 0.4) 0%, transparent 75%),
+    radial-gradient(ellipse 60% 45% at 88% 10%, hsl(var(--aurora-cyan) / 0.4) 0%, transparent 75%);
+}
+
+.platform-preview .pp-aurora-paused .pp-aurora-ribbon-layer,
+.platform-preview .pp-aurora-paused .pp-aurora-ribbon-layer-2 {
+  animation-play-state: paused;
+}
+
+@keyframes pp-aurora {
+  0% {
+    background-position: 50% 50%;
+    transform: rotate(-16deg) scale(1.25);
+  }
+  50% {
+    background-position: 100% 60%;
+    transform: rotate(-9deg) scale(1.32);
+  }
+  100% {
+    background-position: 50% 50%;
+    transform: rotate(-16deg) scale(1.25);
+  }
+}
+
+@keyframes pp-aurora-2 {
+  0% {
+    background-position: 40% 55%;
+    transform: rotate(11deg) scale(1.28);
+  }
+  50% {
+    background-position: 65% 25%;
+    transform: rotate(18deg) scale(1.22);
+  }
+  100% {
+    background-position: 40% 55%;
+    transform: rotate(11deg) scale(1.28);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .platform-preview .pp-aurora-drift,
-  .platform-preview .pp-aurora-drift-slow,
-  .platform-preview .pp-aurora-ribbon,
-  .platform-preview .pp-node-pulse {
-    animation: none;
+  .platform-preview .pp-aurora-ribbon-layer,
+  .platform-preview .pp-aurora-ribbon-layer-2 {
+    animation: none !important;
+    transform: none;
+    will-change: auto;
+    background-position: 50% 50%;
   }
 }
 
@@ -289,8 +443,15 @@
   inset: 1px 1px auto 1px;
   height: 44%;
   border-radius: inherit;
-  background: linear-gradient(to bottom, hsl(0 0% 100% / 0.22), transparent);
+  background: linear-gradient(to bottom, hsl(0 0% 100% / 0.35), transparent);
   pointer-events: none;
+  /* Negative z-index (scoped to .pp-btn's own isolate stacking context)
+     guarantees this gloss layer paints BELOW the button's label/icon —
+     z-index:auto positioned descendants otherwise paint after in-flow
+     inline content per the CSS painting-order spec, which would put this
+     overlay above raw text nodes that can't take position/z-index
+     themselves. */
+  z-index: -1;
 }
 
 .platform-preview .pp-btn:active {
@@ -310,34 +471,94 @@
   transform: none;
 }
 
+.platform-preview .pp-btn-primary,
+.platform-preview .pp-btn-secondary {
+  transition-duration: 200ms;
+}
+
 .platform-preview .pp-btn-primary {
-  background: linear-gradient(135deg, hsl(var(--pp-forest-deep)) 0%, hsl(var(--pp-mint-deep)) 55%, hsl(var(--pp-mint-emerald)) 100%);
-  color: hsl(var(--pp-mint-warm-white));
+  background: linear-gradient(135deg, #6ff5d4 0%, #27e9b5 38%, #20d8b2 68%, #22c9c2 100%);
+  color: #051824;
+  border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow:
-    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.22),
-    0 6px 16px -8px hsl(var(--pp-forest-near-black) / 0.45);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(5, 24, 36, 0.1),
+    0 8px 20px rgba(5, 24, 36, 0.16),
+    0 2px 6px rgba(39, 233, 181, 0.2);
 }
 
 .platform-preview .pp-btn-primary:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, hsl(var(--pp-forest-deep)) 0%, hsl(182 65% 20%) 45%, hsl(var(--pp-mint-deep)) 100%);
+  background: linear-gradient(135deg, #8ff9df 0%, #3eefc0 38%, #2fe0bd 68%, #2fd8d0 100%);
   box-shadow:
-    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.32),
-    0 8px 20px -8px hsl(var(--pp-forest-near-black) / 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(5, 24, 36, 0.12),
+    0 10px 24px rgba(5, 24, 36, 0.2),
+    0 3px 8px rgba(39, 233, 181, 0.28);
+}
+
+.platform-preview .pp-btn-primary:active {
+  transform: translateY(0);
+  background: linear-gradient(135deg, #4fdcc0 0%, #1fcf9d 38%, #1bc0a2 68%, #1cb3ac 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(5, 24, 36, 0.14),
+    0 3px 8px rgba(5, 24, 36, 0.18);
+}
+
+.platform-preview .pp-btn-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--pp-white)),
+    0 0 0 4px hsl(var(--pp-navy-950));
 }
 
 .platform-preview .pp-btn-secondary {
-  background: hsl(var(--pp-mint-warm-white) / 0.92);
-  color: hsl(var(--pp-forest-deep));
-  border: 1px solid hsl(var(--pp-mint-mist));
-  box-shadow: 0 1px 3px hsl(var(--pp-shadow) / 0.06);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--pp-white) / 0.94) 0%,
+    hsl(var(--pp-surface-soft) / 0.82) 55%,
+    hsl(var(--pp-mint-pale) / 0.88) 100%
+  );
+  border: 1.5px solid hsl(var(--pp-cyan-mint));
+  color: #051824;
+  backdrop-filter: blur(14px) saturate(130%);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--pp-white) / 0.9),
+    inset 0 -1px 0 hsl(var(--pp-cyan-mint) / 0.1),
+    0 6px 16px hsl(var(--pp-navy-950) / 0.1),
+    0 0 0 1px hsl(var(--pp-cyan-mint) / 0.06);
 }
 
 .platform-preview .pp-btn-secondary:hover {
   transform: translateY(-1px);
-  border-color: hsl(var(--pp-mint-fresh));
-  background: hsl(var(--pp-mint-pale) / 0.7);
-  box-shadow: 0 2px 8px hsl(var(--pp-shadow) / 0.08);
+  border-color: hsl(var(--pp-cyan-mint));
+  background: linear-gradient(
+    135deg,
+    hsl(var(--pp-white) / 0.98) 0%,
+    hsl(var(--pp-mint-pale) / 0.96) 55%,
+    hsl(var(--pp-cyan-mint) / 0.16) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 hsl(var(--pp-white) / 0.95),
+    inset 0 -1px 0 hsl(var(--pp-cyan-mint) / 0.14),
+    0 8px 20px hsl(var(--pp-navy-950) / 0.12),
+    0 0 0 1px hsl(var(--pp-cyan-mint) / 0.12);
+}
+
+.platform-preview .pp-btn-secondary:active {
+  transform: translateY(0);
+  background: linear-gradient(135deg, hsl(var(--pp-white) / 0.96) 0%, hsl(var(--pp-cyan-mint) / 0.22) 100%);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--pp-white) / 0.7),
+    0 2px 6px hsl(var(--pp-navy-950) / 0.12);
+}
+
+.platform-preview .pp-btn-secondary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--pp-white)),
+    0 0 0 4px hsl(var(--pp-navy-950));
 }
 
 @media (prefers-reduced-motion: reduce) {

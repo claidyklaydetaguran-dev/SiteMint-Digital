@@ -128,7 +128,7 @@ export default function PlatformContactPreview() {
                   Preview only — this form does not send or save your information.
                 </p>
 
-                <Button type="submit" className="w-fit">
+                <Button type="submit" className="pp-btn pp-btn-primary w-fit">
                   Send preview message
                 </Button>
               </form>

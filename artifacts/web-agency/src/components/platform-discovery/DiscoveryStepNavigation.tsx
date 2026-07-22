@@ -32,7 +32,7 @@ export function DiscoveryStepNavigation({
           </Button>
         )}
         {!isReviewStep && (
-          <Button type="button" onClick={onContinue}>
+          <Button type="button" className="pp-btn pp-btn-primary" onClick={onContinue}>
             Continue
             <ArrowRight />
           </Button>

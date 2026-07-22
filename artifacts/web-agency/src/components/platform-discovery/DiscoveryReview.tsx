@@ -159,7 +159,7 @@ export function DiscoveryReview({ values, onEditStep, onCompletePreview }: Disco
         only.
       </p>
 
-      <Button type="button" size="lg" className="mt-4" onClick={onCompletePreview}>
+      <Button type="button" size="lg" className="pp-btn pp-btn-primary mt-4" onClick={onCompletePreview}>
         Complete Preview
       </Button>
     </div>

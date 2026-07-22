@@ -1,24 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * "Mint Aurora Network" hero background. CSS gradients + one lightweight
- * inline SVG only — no remote image, no WebGL, no video. Deliberately a
- * real background layer behind PlatformHero's copy/CTA column, not a
- * decorative unused component: it owns the section's -z-10 base layer.
+ * "Ocean Network" hero background. CSS gradient + one lightweight inline
+ * SVG only — no remote image, no WebGL, no video. Deliberately a real
+ * background layer behind PlatformHero's copy/CTA column, not a decorative
+ * unused component: it owns the section's -z-10 base layer.
  *
- * Composition (light-mint palette, Frontend Epic 1 visual redesign V2):
- * warm-white/pale-mint gradient base, two radial mint glows (brighter on
- * the right, where the hero's HeroDeviceComposition sits), a quiet warm-white
- * readability wash behind the left copy column, a low-opacity SVG network
- * of curved paths/nodes concentrated on the right, and one translucent
- * mint ribbon crossing the transition zone. Uses the homepage-scoped
- * --pp-* tokens (platform-preview.css) — no other /platform-preview/* page
- * references these, so this stays a homepage-only visual change.
+ * Composition (navy/cyan-mint palette, V4): white/pale-mint gradient base, a
+ * quiet white readability wash behind the left copy column, and a
+ * low-opacity SVG network of curved paths/nodes concentrated on the right
+ * (a "connected technology company" motif — distinct from, and layered
+ * behind, the animated aurora ribbon effect that AuroraBackground now
+ * supplies via PlatformHero). Uses the homepage-scoped --pp-* tokens
+ * (platform-preview.css) — no other /platform-preview/* page references
+ * these, so this stays a homepage-only visual change.
  *
- * Motion (all paused via prefers-reduced-motion and while off-screen/tab
- * hidden): slow aurora drift (14s), gentle node pulse, tiny device
- * parallax is left to HeroDeviceComposition itself. Cursor spotlight is
- * desktop-only (`pointer: fine`) and scoped to this component.
+ * Motion (paused via prefers-reduced-motion and while off-screen/tab
+ * hidden): gentle node pulse only; tiny device parallax is left to
+ * HeroDeviceComposition itself. Cursor spotlight is desktop-only
+ * (`pointer: fine`) and scoped to this component.
  */
 export function HeroAuroraNetwork() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -63,34 +63,13 @@ export function HeroAuroraNetwork() {
       className={`pp-aurora pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px] overflow-hidden md:h-[720px] ${active ? "" : "pp-aurora-paused"}`}
       style={{ pointerEvents: "auto" }}
     >
-      {/* 1. Warm-white / pale-mint foundation */}
+      {/* 1. White / pale-mint foundation */}
       <div
         className="absolute inset-0"
-        style={{ background: "linear-gradient(135deg, hsl(var(--pp-mint-warm-white)) 0%, hsl(var(--pp-mint-soft-white)) 48%, hsl(var(--pp-mint-pale)) 100%)" }}
+        style={{ background: "linear-gradient(135deg, hsl(var(--pp-white)) 0%, hsl(var(--pp-surface-soft)) 48%, hsl(var(--pp-mint-pale)) 100%)" }}
       />
 
-      {/* 2. Mint glow — brighter, right side (behind device composition) */}
-      <div
-        className="pp-aurora-drift absolute inset-0"
-        style={{ background: "radial-gradient(circle at 75% 35%, hsl(var(--pp-mint-fresh) / 0.38), transparent 42%)" }}
-      />
-
-      {/* 3. Soft secondary glow */}
-      <div
-        className="pp-aurora-drift-slow absolute inset-0"
-        style={{ background: "radial-gradient(circle at 45% 75%, hsl(var(--pp-mint-mist) / 0.55), transparent 38%)" }}
-      />
-
-      {/* 4. Translucent flowing ribbon, diagonal transition zone */}
-      <div
-        className="pp-aurora-ribbon absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(115deg, transparent 38%, hsl(var(--pp-mint-emerald) / 0.14) 48%, hsl(var(--pp-mint-fresh) / 0.10) 56%, transparent 66%)",
-        }}
-      />
-
-      {/* 5. Network pattern — curved paths + nodes, concentrated right side, low opacity */}
+      {/* 2. Network pattern — curved paths + nodes, concentrated right side, low opacity */}
       <svg
         className="absolute inset-0 h-full w-full opacity-[0.28]"
         viewBox="0 0 1280 640"
@@ -122,7 +101,7 @@ export function HeroAuroraNetwork() {
         ))}
       </svg>
 
-      {/* 6. Desktop-only cursor spotlight, contained to this section */}
+      {/* 3. Desktop-only cursor spotlight, contained to this section */}
       {spotlight && (
         <div
           className="hidden md:block absolute inset-0 transition-opacity duration-300"
@@ -132,7 +111,7 @@ export function HeroAuroraNetwork() {
         />
       )}
 
-      {/* 7. Quiet readability wash behind the headline (left ~45%) */}
+      {/* 4. Quiet readability wash behind the headline (left ~45%) */}
       <div
         className="absolute inset-y-0 left-0 w-[55%]"
         style={{ background: "linear-gradient(90deg, hsl(var(--pp-mint-warm-white) / 0.7) 0%, transparent 100%)" }}

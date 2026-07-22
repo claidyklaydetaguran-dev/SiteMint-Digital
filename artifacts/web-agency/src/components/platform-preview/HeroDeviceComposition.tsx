@@ -97,7 +97,7 @@ export function HeroDeviceComposition() {
                 style={{
                   animationDelay: `${index * 900}ms`,
                   borderColor: "hsl(var(--pp-mint-mist))",
-                  backgroundColor: "hsl(var(--pp-mint-warm-white) / 0.96)",
+                  backgroundColor: "hsl(var(--pp-mint-pale) / 0.88)",
                   boxShadow: "0 1px 2px hsl(var(--pp-shadow) / 0.05), 0 10px 24px -12px hsl(var(--pp-shadow) / 0.18)",
                 }}
               >

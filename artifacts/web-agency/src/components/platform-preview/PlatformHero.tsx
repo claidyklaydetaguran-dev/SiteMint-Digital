@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { ArrowRight, Bot, Globe, LayoutTemplate, LineChart } from "lucide-react";
 import { startProjectHref, workHref } from "./navConfig";
 import { HeroDeviceComposition } from "./HeroDeviceComposition";
-import { HeroAuroraNetwork } from "./HeroAuroraNetwork";
+import { AuroraBackground } from "@/components/ui/aurora-background";
 
 /**
  * Frontend Epic 1 visual redesign V2 — complete hero rebuild on a fixed
@@ -29,9 +29,12 @@ const microProof = [
 export function PlatformHero() {
   return (
     <section aria-labelledby="pp-hero-heading" className="relative overflow-hidden px-4 pb-14 pt-14 md:px-8 md:pb-20 md:pt-20">
-      <HeroAuroraNetwork />
-
-      <div className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[0.42fr_0.58fr] lg:gap-10">
+      {/* HeroAuroraNetwork now renders at the page-shell level (round 6),
+          positioned behind both the navbar and this section, so the pale
+          wash + aurora ribbons are visible behind the navbar's own gutter
+          too — one continuous background instead of two separate copies
+          that could visibly seam. See PlatformPreviewPageShell.tsx. */}
+      <AuroraBackground className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[0.42fr_0.58fr] lg:gap-10" showRadialGradient>
         <div className="pp-reveal">
           <p
             className="mb-5 inline-flex items-center gap-2 rounded-[var(--sm-radius-pill)] border px-4 py-1.5 text-xs font-medium uppercase tracking-wide"
@@ -90,7 +93,7 @@ export function PlatformHero() {
         <div className="pp-reveal" style={{ animationDelay: "120ms" }}>
           <HeroDeviceComposition />
         </div>
-      </div>
+      </AuroraBackground>
     </section>
   );
 }

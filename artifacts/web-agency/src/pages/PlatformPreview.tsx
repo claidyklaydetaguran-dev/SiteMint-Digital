@@ -20,7 +20,7 @@ export default function PlatformPreview() {
   usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
 
   return (
-    <PlatformPreviewPageShell>
+    <PlatformPreviewPageShell showHeroAurora>
       <PlatformPreviewGoalProvider>
         <PlatformHero />
         <PostHeroGoalSection />

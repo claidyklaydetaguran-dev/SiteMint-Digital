@@ -121,7 +121,7 @@ export function PlatformDiscoveryShell() {
         <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))]">
           This was a preview; nothing was submitted or saved. No email, database record, or CRM entry was created.
         </p>
-        <Button type="button" className="mt-8" onClick={handleStartOver}>
+        <Button type="button" className="pp-btn pp-btn-primary mt-8" onClick={handleStartOver}>
           Start Over
         </Button>
       </div>

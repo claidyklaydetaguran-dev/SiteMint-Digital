@@ -102,7 +102,10 @@ export function EcosystemVisual() {
       id="pp-ecosystem"
       aria-labelledby="pp-ecosystem-heading"
       className="px-4 py-20 md:px-8 md:py-28"
-      style={{ backgroundColor: "hsl(var(--pp-forest-deep))" }}
+      style={{
+        background:
+          "linear-gradient(135deg, hsl(var(--pp-navy-950)) 0%, hsl(var(--pp-navy-mid)) 50%, hsl(var(--pp-navy-800)) 100%)",
+      }}
       onMouseEnter={() => setInteractionPaused(true)}
       onMouseLeave={() => setInteractionPaused(false)}
       onFocus={() => setInteractionPaused(true)}
@@ -178,20 +181,22 @@ export function EcosystemVisual() {
                   }}
                 >
                   <span
-                    className="flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-pill)] transition-colors duration-300"
+                    className="flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-pill)] border transition-colors duration-300"
                     style={{
-                      backgroundColor: isActive ? "hsl(var(--pp-mint-fresh))" : "hsl(var(--pp-forest-slate))",
-                      color: isActive ? "hsl(var(--pp-forest-deep))" : "hsl(var(--pp-mint-mist))",
+                      borderColor: isActive ? "hsl(var(--pp-mint-fresh))" : "transparent",
+                      backgroundColor: isActive ? "hsl(var(--pp-mint-warm-white) / 0.12)" : "hsl(var(--pp-forest-slate))",
+                      color: isActive ? "hsl(var(--pp-mint-fresh))" : "hsl(var(--pp-mint-mist))",
                     }}
                   >
                     <Icon size={18} aria-hidden="true" />
                   </span>
 
                   <span
-                    className="rounded-[var(--sm-radius-pill)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors"
+                    className="rounded-[var(--sm-radius-pill)] border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors"
                     style={{
-                      backgroundColor: isActive ? "hsl(var(--pp-mint-emerald))" : "hsl(var(--pp-forest-slate))",
-                      color: isActive ? "hsl(var(--pp-forest-deep))" : "hsl(var(--pp-mint-mist))",
+                      borderColor: isActive ? "hsl(var(--pp-mint-fresh))" : "transparent",
+                      backgroundColor: isActive ? "hsl(var(--pp-mint-warm-white) / 0.12)" : "hsl(var(--pp-forest-slate))",
+                      color: isActive ? "hsl(var(--pp-mint-fresh))" : "hsl(var(--pp-mint-mist))",
                     }}
                   >
                     {isConnected ? stage.state : stage.disconnectedState}
