@@ -28,13 +28,20 @@ const microProof = [
 
 export function PlatformHero() {
   return (
-    <section aria-labelledby="pp-hero-heading" className="relative overflow-hidden px-4 pb-14 pt-14 md:px-8 md:pb-20 md:pt-20">
-      {/* HeroAuroraNetwork now renders at the page-shell level (round 6),
-          positioned behind both the navbar and this section, so the pale
-          wash + aurora ribbons are visible behind the navbar's own gutter
-          too — one continuous background instead of two separate copies
-          that could visibly seam. See PlatformPreviewPageShell.tsx. */}
-      <AuroraBackground className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[0.42fr_0.58fr] lg:gap-10" showRadialGradient>
+    <section id="pp-hero-section" aria-labelledby="pp-hero-heading" className="relative overflow-hidden px-4 pb-14 pt-14 md:px-8 md:pb-20 md:pt-20">
+      {/* Round 9 (final): there is exactly ONE decorative background system
+          for the whole navbar+hero region now — HeroAuroraNetwork, rendered
+          at the page-shell level (round 6), sized to dynamically match this
+          section's real rendered height via ResizeObserver (see
+          HeroAuroraNetwork.tsx and its `#pp-hero-section` measurement
+          target above). Two independent background systems (this
+          component's own AuroraBackground plus the shell layer) previously
+          produced a visible seam no amount of width/inset alignment fully
+          removed — AuroraBackground is now a plain pass-through with no
+          background layers of its own; this section stays visually
+          transparent so the single shell-level background shows through
+          for its entire real height, not a fixed pixel guess. */}
+      <AuroraBackground className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-12 lg:grid-cols-[0.42fr_0.58fr] lg:gap-10">
         <div className="pp-reveal">
           <p
             className="mb-5 inline-flex items-center gap-2 rounded-[var(--sm-radius-pill)] border px-4 py-1.5 text-xs font-medium uppercase tracking-wide"
@@ -50,12 +57,12 @@ export function PlatformHero() {
           <h1
             id="pp-hero-heading"
             className="pp-font-display max-w-xl text-4xl font-semibold leading-[1.08] sm:text-5xl md:text-[3.4rem]"
-            style={{ color: "hsl(var(--pp-forest-deep))" }}
+            style={{ color: "hsl(var(--pp-text-on-dark))" }}
           >
             AI-Powered Websites &amp; Business Systems That Help You Get More Customers
           </h1>
 
-          <p className="mt-6 max-w-md text-base leading-relaxed md:text-lg" style={{ color: "hsl(var(--pp-forest-slate))" }}>
+          <p className="mt-6 max-w-md text-base leading-relaxed md:text-lg" style={{ color: "hsl(var(--pp-text-on-dark-muted))" }}>
             Custom websites, CRM systems, business automation, and AI-powered customer
             communication — connected together so leads get captured, followed up, and
             turned into customers.
@@ -81,8 +88,8 @@ export function PlatformHero() {
             {microProof.map((item) => {
               const Icon = item.icon;
               return (
-                <li key={item.label} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "hsl(var(--pp-forest-slate))" }}>
-                  <Icon size={14} aria-hidden="true" style={{ color: "hsl(var(--pp-mint-deep))" }} />
+                <li key={item.label} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "hsl(var(--pp-text-on-dark-muted))" }}>
+                  <Icon size={14} aria-hidden="true" style={{ color: "hsl(var(--aurora-cyan))" }} />
                   {item.label}
                 </li>
               );

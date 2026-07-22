@@ -91,6 +91,21 @@
   --aurora-mint: 169 53% 94%; /* #E8F8F5 */
   --aurora-white: 168 38% 97%; /* #F6FBFA */
 
+  /* Round-9 dark aurora rebuild — reference-matched (Aurora Dev screenshot
+     supplied by owner). The hero background is now overwhelmingly dark by
+     default, with luminous cyan/teal/violet "plume" shapes as the
+     exception, not a pale wash. Text sitting directly on this field
+     (PlatformHero.tsx headline/body/microproof) switches to the
+     text-on-dark tokens; every other hero element (badge chip, buttons,
+     device, floating cards) keeps its own opaque/glass surface, unaffected. */
+  --pp-aurora-dark-0: 210 78% 3%; /* ~#02060A, deepest */
+  --pp-aurora-dark-1: 204 72% 6%; /* ~#03101A */
+  --pp-aurora-dark-2: 198 60% 9%; /* ~#0A1F28 */
+  --pp-aurora-violet: 258 38% 32%; /* restrained indigo/violet undertone, matched to the reference's low-frame diffusion — one supporting tone, kept low-alpha wherever used */
+  --pp-text-on-dark: 0 0% 100%;
+  --pp-text-on-dark-muted: 168 20% 82%;
+  --pp-text-on-dark-faint: 168 14% 72%;
+
   /* Scoped override of the shared @workspace/design-tokens semantic layer —
      only applies inside .platform-preview, never touches the package's own
      :root/.dark values (also consumed by artifacts/helpdesk). Recolors
@@ -290,110 +305,217 @@
    with independent beam positions and keyframes drift out of phase for
    depth. CSS-only — no canvas/WebGL/JS-driven animation. `will-change` is
    scoped to these two layers alone. */
-.platform-preview .pp-aurora-ribbon-layer {
-  background-image:
-    radial-gradient(ellipse 95% 16% at 12% 22%, hsl(var(--aurora-cyan) / 0.75) 0%, transparent 68%),
-    radial-gradient(ellipse 85% 13% at 42% 8%, hsl(172 80% 68% / 0.55) 0%, transparent 66%),
-    radial-gradient(ellipse 105% 17% at 68% 28%, hsl(var(--aurora-cyan) / 0.7) 0%, transparent 68%),
-    radial-gradient(ellipse 80% 13% at 92% 48%, hsl(var(--aurora-mint) / 0.6) 0%, transparent 64%),
-    radial-gradient(ellipse 75% 12% at 50% 58%, hsl(var(--aurora-slate) / 0.3) 0%, transparent 62%);
-  background-size: 160% 160%;
-  filter: blur(14px);
-  opacity: 0.95;
-  will-change: background-position, transform;
-  animation: pp-aurora 24s ease-in-out infinite;
+/* Round-9 dark aurora rebuild (reference: Aurora Dev, owner-supplied
+   screenshot + written motion spec). The reference reads as: overwhelmingly
+   dark near-black field; 2-3 tall, narrow, heavily diffused VERTICAL plume/
+   curtain forms (not radial blobs, not horizontal ribbons); darkness is
+   structural (top strip, both outer edges, roughly half the frame stay
+   plain dark, not just a vignette); a restrained violet/indigo undertone
+   low in the frame alongside the dominant teal/cyan. Every value below is a
+   starting point, tuned against the actual screenshot, not a fixed target —
+   see the CSS custom property block in the token section for the dark/text
+   palette. */
+.platform-preview .pp-aurora-dark-base {
+  background-image: radial-gradient(ellipse 130% 90% at 60% 88%, hsl(var(--pp-aurora-dark-2)) 0%, hsl(var(--pp-aurora-dark-1)) 42%, hsl(var(--pp-aurora-dark-0)) 100%);
 }
 
-.platform-preview .pp-aurora-ribbon-layer-2 {
+/* Plume ellipse math, spelled out because the first pass got this wrong:
+   height/width % are relative to the element's own box (or, with
+   background-size applied, to that scaled-up box — kept mild here, 116%,
+   specifically so the numbers below stay predictable). A gradient's
+   "transparent" stop at N% means the color reaches zero at N% of the
+   ellipse's own radius from its center — so a tall, vertically-centered
+   ellipse still reaches the very top of the box unless the center is
+   pushed low enough and the radius kept small enough that transparent
+   arrives before y=0. These three plumes are centered at y 66-92% with
+   radii kept under ~60% specifically so the top ~25-30% of the box (where
+   the navbar sits) and both outer edges stay clear of direct plume color —
+   darkness there comes from `.pp-aurora-dark-base` and the shadow-folds
+   layer below, not from an absence of plume math. */
+.platform-preview .pp-aurora-plume-a {
   background-image:
-    radial-gradient(ellipse 90% 14% at 55% 15%, hsl(var(--aurora-cyan) / 0.5) 0%, transparent 64%),
-    radial-gradient(ellipse 100% 16% at 80% 35%, hsl(172 75% 70% / 0.45) 0%, transparent 62%),
-    radial-gradient(ellipse 78% 13% at 35% 45%, hsl(var(--aurora-cyan) / 0.4) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 11% at 65% 65%, hsl(var(--aurora-slate) / 0.22) 0%, transparent 58%);
-  background-size: 170% 170%;
-  filter: blur(18px);
+    radial-gradient(ellipse 26% 42% at 66% 64%, hsl(var(--aurora-cyan) / 0.78) 0%, hsl(172 70% 40% / 0.3) 28%, transparent 58%),
+    radial-gradient(ellipse 18% 46% at 72% 48%, hsl(var(--aurora-cyan) / 0.42) 0%, transparent 54%);
+  background-size: 116% 116%;
+  filter: blur(58px);
+  opacity: 0.85;
+  will-change: background-position, transform;
+  animation: pp-plume-a 24s ease-in-out infinite;
+}
+
+.platform-preview .pp-aurora-plume-b {
+  background-image:
+    radial-gradient(ellipse 22% 38% at 42% 72%, hsl(190 66% 40% / 0.4) 0%, hsl(var(--pp-navy-700) / 0.22) 30%, transparent 56%),
+    radial-gradient(ellipse 16% 32% at 35% 60%, hsl(var(--aurora-cyan) / 0.2) 0%, transparent 50%);
+  background-size: 120% 120%;
+  filter: blur(62px);
   opacity: 0.7;
   will-change: background-position, transform;
-  animation: pp-aurora-2 30s ease-in-out infinite;
-  animation-delay: -6s;
+  animation: pp-plume-b 29s ease-in-out infinite;
+  animation-delay: -8s;
 }
 
-.platform-preview .pp-aurora-radial-mask {
-  mask-image: radial-gradient(ellipse 80% 78% at 68% 30%, black 0%, black 35%, transparent 88%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 78% at 68% 30%, black 0%, black 35%, transparent 88%);
-}
-
-/* Shell-level mask (round 6 correction): the hero's own radial mask above
-   concentrates color toward the device (68% x, 30% y) and fades out near
-   the top-left, which is exactly where the floating navbar's logo sits —
-   masking the ribbons there left a plain-white gutter around/behind the
-   navbar even though the ribbon layer was technically present. This mask
-   instead keeps full strength across the entire top band (wide ellipse,
-   centered near y=0, spanning past both edges) so the visible cyan-mint
-   ribbons — not just the pale foundation wash — reach the whole width of
-   the navbar region, then fades down into the hero's own layer. */
-.platform-preview .pp-aurora-nav-mask {
-  mask-image: radial-gradient(ellipse 130% 90% at 50% 6%, black 0%, black 55%, transparent 94%);
-  -webkit-mask-image: radial-gradient(ellipse 130% 90% at 50% 6%, black 0%, black 55%, transparent 94%);
-}
-
-/* Static, untransformed glow reserved for the navbar band itself. The
-   animated ribbon layers above are tuned (background-size/position +
-   rotate/scale keyframes) for the hero's own box and, even under the wider
-   nav mask, don't reliably land visible color across the full width of the
-   navbar's top band at every animation frame — confirmed by screenshot,
-   not assumed. This layer guarantees a real cyan-mint presence behind the
-   entire navbar region regardless of where the animated layers currently
-   sit, so the ribbon layers add motion/depth on top of a color that is
-   always there. */
-.platform-preview .pp-aurora-nav-glow {
+.platform-preview .pp-aurora-plume-c {
   background-image:
-    radial-gradient(ellipse 90% 70% at 50% 0%, hsl(var(--aurora-cyan) / 0.55) 0%, hsl(var(--pp-cyan-mint-deep) / 0.28) 42%, transparent 82%),
-    radial-gradient(ellipse 60% 45% at 12% 10%, hsl(var(--aurora-cyan) / 0.4) 0%, transparent 75%),
-    radial-gradient(ellipse 60% 45% at 88% 10%, hsl(var(--aurora-cyan) / 0.4) 0%, transparent 75%);
+    radial-gradient(ellipse 26% 30% at 56% 90%, hsl(var(--pp-aurora-violet) / 0.5) 0%, hsl(var(--pp-navy-mid) / 0.3) 32%, transparent 60%),
+    radial-gradient(ellipse 18% 22% at 47% 95%, hsl(172 55% 30% / 0.28) 0%, transparent 55%);
+  background-size: 118% 118%;
+  filter: blur(52px);
+  opacity: 0.8;
+  will-change: background-position, transform;
+  animation: pp-plume-c 33s ease-in-out infinite;
+  animation-delay: -15s;
 }
 
-.platform-preview .pp-aurora-paused .pp-aurora-ribbon-layer,
-.platform-preview .pp-aurora-paused .pp-aurora-ribbon-layer-2 {
-  animation-play-state: paused;
+/* Dark shadow folds — structural darkness, not a vignette: reinforces the
+   true top edge (behind the navbar) and both outer edges, plus cuts a fold
+   between the plumes low in the frame. Kept clear of the nav-label band
+   (roughly x 28-65% of the shared navbar box) and the left copy column. */
+.platform-preview .pp-aurora-shadow-folds {
+  background-image:
+    radial-gradient(ellipse 100% 34% at 50% 0%, hsl(var(--pp-aurora-dark-0) / 0.95) 0%, hsl(var(--pp-aurora-dark-0) / 0.6) 55%, transparent 82%),
+    radial-gradient(ellipse 34% 100% at 2% 50%, hsl(var(--pp-aurora-dark-0) / 0.85) 0%, transparent 68%),
+    radial-gradient(ellipse 34% 100% at 98% 30%, hsl(var(--pp-aurora-dark-0) / 0.75) 0%, transparent 66%),
+    radial-gradient(ellipse 44% 55% at 46% 80%, hsl(var(--pp-navy-mid) / 0.4) 0%, transparent 64%);
+  background-size: 130% 130%;
+  filter: blur(40px);
+  opacity: 1;
+  will-change: background-position, transform;
+  animation: pp-aurora-shadow 27s ease-in-out infinite;
+  animation-delay: -13s;
 }
 
-@keyframes pp-aurora {
-  0% {
-    background-position: 50% 50%;
-    transform: rotate(-16deg) scale(1.25);
-  }
-  50% {
-    background-position: 100% 60%;
-    transform: rotate(-9deg) scale(1.32);
-  }
-  100% {
-    background-position: 50% 50%;
-    transform: rotate(-16deg) scale(1.25);
-  }
-}
-
-@keyframes pp-aurora-2 {
-  0% {
-    background-position: 40% 55%;
-    transform: rotate(11deg) scale(1.28);
-  }
-  50% {
-    background-position: 65% 25%;
-    transform: rotate(18deg) scale(1.22);
-  }
-  100% {
-    background-position: 40% 55%;
-    transform: rotate(11deg) scale(1.28);
-  }
+/* Localized pointer glow — the one layer allowed a large independent
+   travel range (see .pp-aurora-parallax-glow below), since a broad,
+   diffused, cursor-following illumination is the actual reference
+   behavior; the plumes/folds above stay nearly stationary so the backdrop
+   never reads as sliding. Oversized box (set inline, see components) so
+   the translate range never reveals a hard edge under its own
+   overflow-hidden ancestor. */
+.platform-preview .pp-aurora-pointer-glow {
+  background-image: radial-gradient(ellipse 55% 50% at 50% 50%, hsl(var(--aurora-cyan) / 0.5) 0%, hsl(172 70% 42% / 0.22) 42%, transparent 76%);
+  filter: blur(70px);
+  opacity: 0.85;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .platform-preview .pp-aurora-ribbon-layer,
-  .platform-preview .pp-aurora-ribbon-layer-2 {
+  .platform-preview .pp-aurora-shadow-folds,
+  .platform-preview .pp-aurora-plume-a,
+  .platform-preview .pp-aurora-plume-b,
+  .platform-preview .pp-aurora-plume-c {
     animation: none !important;
-    transform: none;
     will-change: auto;
+    background-position: 50% 50%;
+  }
+}
+
+/* Very restrained grain to break up smooth gradient banding — a tiled
+   inline feTurbulence SVG, `overlay` blend (not `screen`, which this file
+   already documents as washing color to white against a light backdrop —
+   moot now that the base is dark, but overlay remains the correct choice
+   for texture either way). Slightly higher opacity than the round-8 light
+   version since dark gradients show banding more readily. */
+.platform-preview .pp-aurora-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+/* Pointer-parallax translate classes — read the eased, normalized (-1..1)
+   `--pp-aurora-x/y` custom properties written by
+   usePlatformPreviewAuroraParallax on the page-shell root. Round-9
+   correction: the large plume/fold layers now move only modestly (roughly
+   the same order as round 8's depth parallax) so the composition reads as
+   atmospheric deformation, not the whole background sliding — the
+   pointer-glow class below carries the large, clearly-visible travel
+   range instead. A CSS fallback of `0` keeps every `calc()` safe if the
+   variables are ever unset (coarse pointer / reduced motion, where the
+   controller never attaches). */
+.platform-preview .pp-aurora-parallax-fg {
+  transform: translate3d(calc(var(--pp-aurora-x, 0) * 18px), calc(var(--pp-aurora-y, 0) * 14px), 0);
+  transition: transform 550ms ease-out;
+}
+
+.platform-preview .pp-aurora-parallax-fg-alt {
+  transform: translate3d(calc(var(--pp-aurora-x, 0) * -14px), calc(var(--pp-aurora-y, 0) * 12px), 0);
+  transition: transform 600ms ease-out;
+}
+
+.platform-preview .pp-aurora-parallax-mid {
+  transform: translate3d(calc(var(--pp-aurora-x, 0) * 10px), calc(var(--pp-aurora-y, 0) * 8px), 0);
+  transition: transform 550ms ease-out;
+}
+
+.platform-preview .pp-aurora-parallax-deep {
+  transform: translate3d(calc(var(--pp-aurora-x, 0) * -9px), calc(var(--pp-aurora-y, 0) * -7px), 0);
+  transition: transform 650ms ease-out;
+}
+
+.platform-preview .pp-aurora-parallax-glow {
+  transform: translate3d(calc(var(--pp-aurora-x, 0) * 90px), calc(var(--pp-aurora-y, 0) * 90px), 0);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-aurora-parallax-fg,
+  .platform-preview .pp-aurora-parallax-fg-alt,
+  .platform-preview .pp-aurora-parallax-mid,
+  .platform-preview .pp-aurora-parallax-deep,
+  .platform-preview .pp-aurora-parallax-glow {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+.platform-preview .pp-aurora-paused .pp-aurora-plume-a,
+.platform-preview .pp-aurora-paused .pp-aurora-plume-b,
+.platform-preview .pp-aurora-paused .pp-aurora-plume-c,
+.platform-preview .pp-aurora-paused .pp-aurora-shadow-folds {
+  animation-play-state: paused;
+}
+
+@keyframes pp-plume-a {
+  0%, 100% {
+    background-position: 50% 40%;
+    transform: scaleY(1) translateY(0);
+  }
+  50% {
+    background-position: 55% 55%;
+    transform: scaleY(1.08) translateY(-2%);
+  }
+}
+
+@keyframes pp-plume-b {
+  0%, 100% {
+    background-position: 45% 55%;
+    transform: scaleY(1) translateY(0);
+  }
+  50% {
+    background-position: 40% 42%;
+    transform: scaleY(0.94) translateY(2%);
+  }
+}
+
+@keyframes pp-plume-c {
+  0%, 100% {
+    background-position: 55% 50%;
+    transform: scaleY(1) translateY(0);
+  }
+  50% {
+    background-position: 60% 60%;
+    transform: scaleY(1.05) translateY(-1.5%);
+  }
+}
+
+@keyframes pp-aurora-shadow {
+  0% {
+    background-position: 50% 50%;
+  }
+  50% {
+    background-position: 42% 58%;
+  }
+  100% {
     background-position: 50% 50%;
   }
 }

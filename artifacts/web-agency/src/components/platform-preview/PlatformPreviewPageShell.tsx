@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePlatformPreviewTheme } from "@/hooks/usePlatformPreviewTheme";
+import { usePlatformPreviewAuroraParallax } from "@/hooks/usePlatformPreviewAuroraParallax";
 import { PlatformPreviewNavbar } from "./PlatformPreviewNavbar";
 import { PlatformPreviewMobileMenu } from "./PlatformPreviewMobileMenu";
 import { PlatformPreviewFooter } from "./PlatformPreviewFooter";
@@ -35,6 +36,13 @@ import { HeroAuroraNetwork } from "./HeroAuroraNetwork";
  * could visibly seam against the hero's own copy. Only `PlatformPreview.tsx`
  * (the homepage) passes this true; every other /platform-preview/* page is
  * unaffected.
+ *
+ * Round 8 adds restrained rAF/CSS-variable pointer parallax
+ * (usePlatformPreviewAuroraParallax) on this same root element. Because
+ * `--pp-aurora-x`/`--pp-aurora-y` are plain custom properties, setting them
+ * here is enough for descendant decorative layers in both this shell block
+ * and PlatformHero's own AuroraBackground to read the same eased pointer
+ * position via CSS inheritance — one controller, no duplicate listeners.
  */
 export function PlatformPreviewPageShell({
   children,
@@ -48,6 +56,8 @@ export function PlatformPreviewPageShell({
   const { theme, toggleTheme } = usePlatformPreviewTheme();
   const effectiveTheme = showThemeToggle ? theme : "light";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  usePlatformPreviewAuroraParallax(rootRef, showHeroAurora);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -60,18 +70,10 @@ export function PlatformPreviewPageShell({
 
   return (
     <div
+      ref={rootRef}
       className={`platform-preview relative isolate flex min-h-[100dvh] flex-col bg-[hsl(var(--sm-color-bg-canvas))] text-[hsl(var(--sm-color-text-primary))] ${effectiveTheme === "dark" ? "dark" : ""}`}
     >
-      {showHeroAurora && (
-        <>
-          <HeroAuroraNetwork />
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px] overflow-hidden md:h-[720px]">
-            <div aria-hidden="true" className="pp-aurora-nav-glow absolute inset-0" />
-            <div aria-hidden="true" className="pp-aurora-ribbon-layer pp-aurora-nav-mask absolute inset-0" />
-            <div aria-hidden="true" className="pp-aurora-ribbon-layer-2 pp-aurora-nav-mask absolute inset-0" />
-          </div>
-        </>
-      )}
+      {showHeroAurora && <HeroAuroraNetwork />}
 
       <a href="#pp-main-content" className="pp-skip-link">
         Skip to content

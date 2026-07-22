@@ -140,7 +140,7 @@ export function PlatformPreviewNavbar({
         className="mx-auto flex max-w-[1280px] items-center justify-between rounded-[var(--sm-radius-pill)] px-4 transition-[height,box-shadow,background-color] md:px-6"
         style={{
           height: isScrolled ? "56px" : "68px",
-          backgroundColor: isScrolled ? "hsl(var(--pp-mint-warm-white) / 0.96)" : "hsl(var(--pp-mint-warm-white) / 0.78)",
+          backgroundColor: isScrolled ? "hsl(var(--pp-mint-warm-white) / 0.90)" : "hsl(var(--pp-mint-warm-white) / 0.68)",
           backdropFilter: "blur(18px)",
           border: "1px solid hsl(var(--pp-mint-mist) / 0.9)",
           boxShadow: isScrolled
