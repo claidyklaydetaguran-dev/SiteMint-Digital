@@ -45,6 +45,7 @@ externalPort = 3001
 [userenv.shared]
 CRM_BASE_URL = "https://a4d0d5f2-52ef-4ef5-bb8c-7d4810b97340-00-367ll2vfuepi5.sisko.replit.dev"
 PHONE_PROVIDER = "twilio"
+VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED = "true"
 
 [userenv.development]
 STRIPE_WEBHOOK_SECRET = "whsec_test_receptionist_local_dev_signing_key_for_ci"
