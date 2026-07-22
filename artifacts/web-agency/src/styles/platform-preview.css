@@ -16,25 +16,86 @@
 @import "@workspace/design-tokens/css";
 
 /*
- * Homepage-only light-mint palette (Frontend Epic 1 visual redesign V2).
- * Scoped as --pp-* custom properties so ordinary /platform-preview/* pages
- * (which reference the existing --sm-* semantic tokens only) are completely
- * unaffected — nothing here redefines or aliases an --sm-* token. Consumed
- * via hsl(var(--pp-*)) inline, matching the existing inline-style pattern
- * already used throughout this component tree.
+ * Homepage-only ocean-teal palette (Visual redesign V3 — owner feedback:
+ * V2's palette read as bright/fluorescent green, "gaming interface" or
+ * "crypto site," not SiteMint's intended cool mint/ocean identity. Hue
+ * shifted from ~150-160° (green) to ~163-194° (blue-leaning teal/cyan),
+ * sourced by sampling the approved hero-devices-remove-bg-io.png (dominant
+ * hue ≈180°) and the owner's suggested ocean-teal hex direction. Saturation
+ * lowered on the mid-tones so accent teal reads as a restrained highlight,
+ * not a saturated wash. Role names are unchanged from V2 so every consumer
+ * across the /platform-preview tree (20+ files) recolors automatically —
+ * see the pp-ocean, pp-teal, pp-mint, pp-surface, and pp-text semantic
+ * aliases below for the names new consumers should prefer.
+ *
+ * Contrast re-verified against WCAG 2.1 for the roles that carry text or
+ * serve as a fill under white text: mint-deep as text-on-mint-warm-white
+ * measures 4.89:1, white-on-mint-deep fill measures 4.96:1, mint-emerald as
+ * a non-text focus-ring/border measures 3.26:1 against mint-warm-white —
+ * all clear their respective AA minimums (4.5:1 text, 3:1 non-text).
  */
 .platform-preview {
-  --pp-mint-warm-white: 150 30% 98%; /* #F8FBFA */
-  --pp-mint-soft-white: 150 20% 96%; /* #F2F7F5 */
-  --pp-mint-pale: 150 28% 93%; /* #E8F4EF */
-  --pp-mint-mist: 152 34% 88%; /* #D8EFE6 */
-  --pp-mint-sage-gray: 140 10% 70%; /* #A9BDB6 */
-  --pp-mint-fresh: 152 62% 65%; /* #4FD6A5 */
-  --pp-mint-emerald: 152 76% 44%; /* #18C98B */
-  --pp-mint-deep: 158 76% 33%; /* #15966F */
-  --pp-forest-deep: 152 42% 10%; /* #10251E */
-  --pp-forest-slate: 154 22% 16%; /* #1C332B */
-  --pp-forest-near-black: 152 30% 5%; /* #07110D */
+  --pp-mint-warm-white: 163 54% 97%; /* #F5FCFA cool mint-white */
+  --pp-mint-soft-white: 165 46% 95%; /* #EEF9F6 */
+  --pp-mint-pale: 165 53% 94%; /* #E8F8F4 very light mint */
+  --pp-mint-mist: 167 40% 86%; /* #C9E9E1 pale seafoam border */
+  --pp-mint-sage-gray: 184 12% 68%; /* #A3B9BA cool slate-gray */
+  --pp-mint-fresh: 169 45% 58%; /* #69CDBB soft mint teal */
+  --pp-mint-emerald: 176 55% 36%; /* #279488 medium sea teal */
+  --pp-mint-deep: 177 68% 26%; /* #147D78 primary ocean teal */
+  --pp-forest-deep: 182 65% 13%; /* #0B3939 dark ocean teal */
+  --pp-forest-slate: 184 30% 20%; /* #223F41 dark slate teal */
+  --pp-forest-near-black: 194 65% 8%; /* #071F26 deep ocean navy */
+
+  /* Semantic aliases — prefer these for new work in this tree. */
+  --pp-ocean-950: var(--pp-forest-near-black);
+  --pp-ocean-800: var(--pp-forest-deep);
+  --pp-teal-600: var(--pp-mint-deep);
+  --pp-teal-500: var(--pp-mint-emerald);
+  --pp-mint-300: var(--pp-mint-fresh);
+  --pp-mint-100: var(--pp-mint-pale);
+  --pp-surface: var(--pp-mint-warm-white);
+  --pp-surface-soft: var(--pp-mint-soft-white);
+  --pp-text: 184 18% 31%; /* #405B5D cool slate text */
+  --pp-text-muted: 184 14% 46%; /* lighter cool slate */
+  --pp-border: var(--pp-mint-mist);
+  --pp-shadow: 194 60% 10%; /* navy-based shadow tint */
+  --pp-glow: var(--pp-mint-fresh);
+
+  /* Scoped override of the shared @workspace/design-tokens semantic layer —
+     only applies inside .platform-preview, never touches the package's own
+     :root/.dark values (also consumed by artifacts/helpdesk). Recolors
+     Products/Services/Pricing/Portfolio/About/Contact/Discovery/Footer and
+     every other component in this tree that consumes the shared action or
+     mint primitives, to the same ocean-teal family, without editing each
+     file individually. */
+  --sm-evergreen-900: 177 68% 26%;
+  --sm-evergreen-700: 176 55% 36%;
+  --sm-mint-500: 169 45% 58%;
+  --sm-mint-300: 167 40% 86%;
+  --sm-jade-500: 175 50% 40%;
+  --sm-color-action-primary: 177 68% 26%;
+  --sm-color-action-primary-hover: 182 65% 18%;
+  --sm-color-action-primary-active: 182 65% 14%;
+  --sm-color-border-focus: 176 55% 36%;
+  --sm-color-status-success: 176 58% 30%;
+  --sm-color-text-link: 177 68% 26%;
+}
+
+/* The one legitimately-dark surface in this tree (AI Receptionist preview's
+   own light/dark toggle — see PlatformPreviewPageShell.tsx; every other
+   /platform-preview page is forced light). Mirrors the shared package's own
+   light→dark lightening pattern so action color stays legible on a dark
+   ocean background instead of inheriting the light-mode teal verbatim. */
+.platform-preview.dark {
+  --sm-evergreen-700: 169 45% 58%;
+  --sm-mint-500: 169 55% 66%;
+  --sm-color-action-primary: 169 45% 58%;
+  --sm-color-action-primary-hover: 169 50% 64%;
+  --sm-color-action-primary-active: 169 50% 50%;
+  --sm-color-border-focus: 169 55% 62%;
+  --sm-color-status-success: 176 50% 52%;
+  --sm-color-text-link: 169 45% 58%;
 }
 
 .platform-preview {
@@ -207,11 +268,13 @@
   }
 }
 
-/* Glossy SiteMint button system — shared primary (dark navy/teal → mint,
-   restrained neon edge) and secondary (light/glass, mint border) surfaces
-   used by the hero CTAs, navbar actions, and mobile menu actions. Layered on
-   top of each caller's own utility classes (padding/font-size/layout), which
-   stay unchanged — these classes only own color, elevation, and motion. */
+/* Glossy SiteMint button system — shared primary (deep ocean-teal gradient,
+   restrained sea-glass edge, soft teal shadow — no neon) and secondary
+   (cool white/glass, blue-teal border) surfaces used by every button in this
+   tree: hero CTAs, navbar actions, mobile menu actions, section/card CTAs.
+   Layered on top of each caller's own utility classes (padding/font-size/
+   layout), which stay unchanged — these classes only own color, elevation,
+   and motion. */
 .platform-preview .pp-btn {
   position: relative;
   isolation: isolate;
@@ -226,7 +289,7 @@
   inset: 1px 1px auto 1px;
   height: 44%;
   border-radius: inherit;
-  background: linear-gradient(to bottom, hsl(0 0% 100% / 0.35), transparent);
+  background: linear-gradient(to bottom, hsl(0 0% 100% / 0.22), transparent);
   pointer-events: none;
 }
 
@@ -239,32 +302,42 @@
   outline-offset: var(--sm-focus-ring-offset);
 }
 
+.platform-preview .pp-btn:disabled,
+.platform-preview .pp-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+  box-shadow: none;
+  transform: none;
+}
+
 .platform-preview .pp-btn-primary {
-  background: linear-gradient(135deg, hsl(var(--pp-forest-deep)) 0%, hsl(var(--pp-mint-deep)) 100%);
+  background: linear-gradient(135deg, hsl(var(--pp-forest-deep)) 0%, hsl(var(--pp-mint-deep)) 55%, hsl(var(--pp-mint-emerald)) 100%);
   color: hsl(var(--pp-mint-warm-white));
   box-shadow:
-    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.35),
-    0 8px 20px -8px hsl(var(--pp-mint-emerald) / 0.55);
+    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.22),
+    0 6px 16px -8px hsl(var(--pp-forest-near-black) / 0.45);
 }
 
 .platform-preview .pp-btn-primary:hover {
   transform: translateY(-1px);
+  background: linear-gradient(135deg, hsl(var(--pp-forest-deep)) 0%, hsl(182 65% 20%) 45%, hsl(var(--pp-mint-deep)) 100%);
   box-shadow:
-    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.55),
-    0 10px 26px -6px hsl(var(--pp-mint-emerald) / 0.7);
+    0 0 0 1px hsl(var(--pp-mint-fresh) / 0.32),
+    0 8px 20px -8px hsl(var(--pp-forest-near-black) / 0.5);
 }
 
 .platform-preview .pp-btn-secondary {
   background: hsl(var(--pp-mint-warm-white) / 0.92);
   color: hsl(var(--pp-forest-deep));
   border: 1px solid hsl(var(--pp-mint-mist));
-  box-shadow: 0 0 0 1px hsl(var(--pp-mint-fresh) / 0.1);
+  box-shadow: 0 1px 3px hsl(var(--pp-shadow) / 0.06);
 }
 
 .platform-preview .pp-btn-secondary:hover {
   transform: translateY(-1px);
   border-color: hsl(var(--pp-mint-fresh));
-  box-shadow: 0 0 14px hsl(var(--pp-mint-fresh) / 0.28);
+  background: hsl(var(--pp-mint-pale) / 0.7);
+  box-shadow: 0 2px 8px hsl(var(--pp-shadow) / 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -274,7 +347,7 @@
   }
 }
 
-/* Status indicator — solid mint core dot with a soft pulsing glow ring next
+/* Status indicator — solid teal core dot with a soft pulsing glow ring next
    to the "connected technology company" eyebrow. The pulse is decorative
    only; the accessible label lives on the surrounding text/sr-only span. */
 .platform-preview .pp-status-dot {
@@ -284,7 +357,7 @@
   height: 8px;
   flex-shrink: 0;
   border-radius: 9999px;
-  background: hsl(var(--pp-mint-emerald));
+  background: hsl(var(--pp-mint-deep));
 }
 
 .platform-preview .pp-status-dot::after {
@@ -292,7 +365,7 @@
   position: absolute;
   inset: -5px;
   border-radius: inherit;
-  background: hsl(var(--pp-mint-fresh) / 0.4);
+  background: hsl(var(--pp-mint-fresh) / 0.32);
   animation: pp-status-pulse 2.4s ease-in-out infinite;
 }
 
@@ -313,6 +386,58 @@
     animation: none;
     opacity: 0;
   }
+}
+
+/* Dropdown system — desktop nav panels (NavDropdown in
+   PlatformPreviewNavbar.tsx). Cool-white glass panel, seafoam border, soft
+   layered ocean-teal shadow; rows get a pale-seafoam hover wash plus a left
+   teal indicator rather than a solid green fill. Structure/labels/routes are
+   untouched — this only restyles the existing markup. */
+.platform-preview .pp-dropdown-panel {
+  background: hsl(var(--pp-mint-warm-white) / 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid hsl(var(--pp-mint-mist));
+  border-radius: var(--sm-radius-xl);
+  box-shadow:
+    0 1px 2px hsl(var(--pp-shadow) / 0.06),
+    0 16px 40px -12px hsl(var(--pp-shadow) / 0.22);
+}
+
+.platform-preview .pp-dropdown-item {
+  position: relative;
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+  transition: background-color var(--sm-duration-fast) var(--sm-easing-standard),
+    border-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.platform-preview .pp-dropdown-item:hover,
+.platform-preview .pp-dropdown-item:focus-visible {
+  background-color: hsl(var(--pp-mint-pale) / 0.7);
+  border-left-color: hsl(var(--pp-mint-deep));
+}
+
+.platform-preview .pp-dropdown-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--sm-radius-md);
+  background: hsl(var(--pp-mint-pale));
+  color: hsl(var(--pp-mint-deep));
+}
+
+.platform-preview .pp-nav-trigger {
+  position: relative;
+  transition: color var(--sm-duration-fast) var(--sm-easing-standard),
+    background-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.platform-preview .pp-nav-trigger:hover,
+.platform-preview .pp-nav-trigger[aria-expanded="true"],
+.platform-preview .pp-nav-trigger[aria-current="page"] {
+  background-color: hsl(var(--pp-mint-pale) / 0.8);
+  color: hsl(var(--pp-mint-deep));
 }
 
 /* AI Receptionist demo — simulated waveform. The demo's own phase state

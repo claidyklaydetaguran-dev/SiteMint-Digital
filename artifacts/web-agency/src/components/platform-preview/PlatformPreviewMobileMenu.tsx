@@ -26,12 +26,12 @@ function MobileSection({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="border-b border-[hsl(var(--sm-color-border-default))] py-2">
+    <div className="border-b border-[hsl(var(--pp-mint-mist))] py-2">
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center justify-between rounded-[var(--sm-radius-md)] px-2 py-3 text-left text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]"
+        className="flex w-full items-center justify-between rounded-[var(--sm-radius-md)] px-2 py-3 text-left text-lg font-semibold text-[hsl(var(--pp-forest-deep))]"
       >
         {label}
         <ChevronDown size={18} aria-hidden="true" className={expanded ? "rotate-180 transition-transform" : "transition-transform"} />
@@ -40,7 +40,7 @@ function MobileSection({
         <ul className="flex flex-col gap-1 pb-2 pl-2">
           {items.map((child) =>
             child.disabled ? (
-              <li key={child.label} aria-disabled="true" className="px-2 py-2 text-sm text-[hsl(var(--sm-color-text-muted))]">
+              <li key={child.label} aria-disabled="true" className="px-2 py-2 text-sm text-[hsl(var(--pp-text-muted))]">
                 {child.label} <span className="text-xs">({child.disabledNote})</span>
               </li>
             ) : (
@@ -48,7 +48,7 @@ function MobileSection({
                 <Link
                   href={child.href!}
                   onClick={onNavigate}
-                  className="block rounded-[var(--sm-radius-md)] px-2 py-2 text-sm text-[hsl(var(--sm-color-text-secondary))] hover:bg-[hsl(var(--sm-color-surface-interactive))]"
+                  className="block rounded-[var(--sm-radius-md)] px-2 py-2 text-sm text-[hsl(var(--pp-text))] hover:bg-[hsl(var(--pp-mint-pale)/0.7)]"
                 >
                   {child.label}
                 </Link>
@@ -118,16 +118,16 @@ export function PlatformPreviewMobileMenu({
       aria-modal="true"
       aria-label="Site navigation"
       ref={panelRef}
-      className="fixed inset-0 z-[var(--sm-z-modal)] flex flex-col overflow-y-auto bg-[hsl(var(--sm-color-bg-elevated))] lg:hidden"
+      className="fixed inset-0 z-[var(--sm-z-modal)] flex flex-col overflow-y-auto bg-[hsl(var(--pp-mint-warm-white))] lg:hidden"
     >
       <div className="flex items-center justify-between px-5 py-4">
-        <span className="pp-font-display text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]">Menu</span>
+        <span className="pp-font-display text-lg font-semibold text-[hsl(var(--pp-forest-deep))]">Menu</span>
         <button
           type="button"
           ref={closeButtonRef}
           onClick={onClose}
           aria-label="Close menu"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-md)] border border-[hsl(var(--sm-color-border-default))] text-[hsl(var(--sm-color-text-primary))]"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-md)] border border-[hsl(var(--pp-mint-mist))] text-[hsl(var(--pp-forest-deep))]"
         >
           <X size={18} aria-hidden="true" />
         </button>
@@ -136,20 +136,20 @@ export function PlatformPreviewMobileMenu({
       <nav className="flex-1 px-5">
         <MobileSection label="Products" items={productsNavItems} onNavigate={onClose} />
         <MobileSection label="Services" items={servicesNavItems} onNavigate={onClose} />
-        <div className="border-b border-[hsl(var(--sm-color-border-default))] py-2">
+        <div className="border-b border-[hsl(var(--pp-mint-mist))] py-2">
           <Link
             href={workHref}
             onClick={onClose}
-            className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]"
+            className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--pp-forest-deep))]"
           >
             Work
           </Link>
         </div>
-        <div className="border-b border-[hsl(var(--sm-color-border-default))] py-2">
+        <div className="border-b border-[hsl(var(--pp-mint-mist))] py-2">
           <Link
             href={pricingHref}
             onClick={onClose}
-            className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]"
+            className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--pp-forest-deep))]"
           >
             Pricing
           </Link>
@@ -159,8 +159,8 @@ export function PlatformPreviewMobileMenu({
 
       <div className="flex flex-col gap-3 px-5 py-6">
         {showThemeToggle && theme && onToggleTheme && (
-          <div className="flex items-center justify-between rounded-[var(--sm-radius-md)] border border-[hsl(var(--sm-color-border-default))] px-4 py-3">
-            <span className="text-sm font-medium text-[hsl(var(--sm-color-text-primary))]">Theme</span>
+          <div className="flex items-center justify-between rounded-[var(--sm-radius-md)] border border-[hsl(var(--pp-mint-mist))] px-4 py-3">
+            <span className="text-sm font-medium text-[hsl(var(--pp-forest-deep))]">Theme</span>
             <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
           </div>
         )}

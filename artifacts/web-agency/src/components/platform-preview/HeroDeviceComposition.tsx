@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, Bot, Globe2, LayoutTemplate, UserPlus } from "lucide-react";
+import { Bot, Globe2, TrendingUp, UserPlus } from "lucide-react";
 
 /**
  * Owner-approved transparent hero device photo (laptop/tablet/phone),
@@ -19,11 +19,17 @@ const HERO_IMAGE_SRC = "/hero-devices-remove-bg-io.png";
 const HERO_IMAGE_WIDTH = 1536;
 const HERO_IMAGE_HEIGHT = 1024;
 
+/*
+ * Cards read as live pieces of the platform rather than generic category
+ * labels (owner feedback on the revised direction) — two carry a small
+ * "live" status dot, and the conversion card uses a slightly larger stat
+ * treatment for natural size variation instead of four identical chips.
+ */
 const capabilityCards = [
-  { label: "Custom Websites", icon: LayoutTemplate, position: "top-left" as const },
-  { label: "CRM Systems", icon: UserPlus, position: "top-right" as const },
-  { label: "AI Automation", icon: Bot, position: "bottom-left" as const },
-  { label: "Analytics & Growth", icon: BarChart3, position: "bottom-right" as const },
+  { label: "New Lead", icon: UserPlus, position: "top-left" as const, live: true, stat: false },
+  { label: "Website Live", icon: Globe2, position: "top-right" as const, live: false, stat: false },
+  { label: "Automation Active", icon: Bot, position: "bottom-left" as const, live: true, stat: false },
+  { label: "Conversion +24%", icon: TrendingUp, position: "bottom-right" as const, live: false, stat: true },
 ];
 
 /*
@@ -85,20 +91,32 @@ export function HeroDeviceComposition() {
             return (
               <div
                 key={card.label}
-                className={`pp-float absolute z-[2] flex items-center gap-2 rounded-[var(--sm-radius-lg)] border px-3.5 py-2.5 shadow-[var(--sm-shadow-md)] backdrop-blur-sm ${capabilityPositionClasses[card.position]}`}
+                className={`pp-float absolute z-[2] flex items-center gap-2 rounded-[var(--sm-radius-lg)] border backdrop-blur-sm ${
+                  card.stat ? "px-4 py-3" : "px-3.5 py-2.5"
+                } ${capabilityPositionClasses[card.position]}`}
                 style={{
                   animationDelay: `${index * 900}ms`,
                   borderColor: "hsl(var(--pp-mint-mist))",
                   backgroundColor: "hsl(var(--pp-mint-warm-white) / 0.96)",
+                  boxShadow: "0 1px 2px hsl(var(--pp-shadow) / 0.05), 0 10px 24px -12px hsl(var(--pp-shadow) / 0.18)",
                 }}
               >
                 <span
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--sm-radius-pill)]"
-                  style={{ backgroundColor: "hsl(var(--pp-mint-fresh) / 0.35)", color: "hsl(var(--pp-forest-deep))" }}
+                  className={`relative flex shrink-0 items-center justify-center rounded-[var(--sm-radius-pill)] ${card.stat ? "h-8 w-8" : "h-7 w-7"}`}
+                  style={{ backgroundColor: "hsl(var(--pp-mint-pale))", color: "hsl(var(--pp-mint-deep))" }}
                 >
-                  <Icon size={14} aria-hidden="true" />
+                  <Icon size={card.stat ? 16 : 14} aria-hidden="true" />
+                  {card.live && (
+                    <span
+                      className="pp-status-dot absolute -right-0.5 -top-0.5"
+                      style={{ width: "6px", height: "6px" }}
+                    />
+                  )}
                 </span>
-                <span className="text-xs font-semibold whitespace-nowrap" style={{ color: "hsl(var(--pp-forest-deep))" }}>
+                <span
+                  className={`whitespace-nowrap font-semibold ${card.stat ? "text-sm" : "text-xs"}`}
+                  style={{ color: "hsl(var(--pp-forest-deep))" }}
+                >
                   {card.label}
                 </span>
               </div>
@@ -106,13 +124,13 @@ export function HeroDeviceComposition() {
           })}
         </div>
 
-        {/* Restrained CSS-generated mint ambient glow behind the device photo. */}
+        {/* Restrained CSS-generated ocean-mint ambient glow behind the device photo. */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[85%] w-[95%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
           style={{
             background:
-              "radial-gradient(circle, hsl(var(--pp-mint-fresh) / 0.32) 0%, hsl(var(--pp-mint-emerald) / 0.14) 42%, transparent 72%)",
+              "radial-gradient(circle, hsl(var(--pp-mint-fresh) / 0.2) 0%, hsl(var(--pp-mint-emerald) / 0.08) 42%, transparent 72%)",
           }}
         />
 

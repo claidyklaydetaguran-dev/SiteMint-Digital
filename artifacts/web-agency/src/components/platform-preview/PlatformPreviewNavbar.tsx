@@ -51,7 +51,7 @@ function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?:
     return (
       <Link
         href={item.href!}
-        className="rounded-[var(--sm-radius-pill)] px-3 py-2 text-sm font-medium text-[hsl(var(--sm-color-text-secondary))] transition-colors hover:text-[hsl(var(--sm-color-action-primary))] aria-[current=page]:text-[hsl(var(--sm-color-action-primary))]"
+        className="pp-nav-trigger rounded-[var(--sm-radius-pill)] px-3.5 py-2 text-sm font-medium text-[hsl(var(--pp-text))]"
         aria-current={location === item.href ? "page" : undefined}
       >
         {item.label}
@@ -66,7 +66,7 @@ function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?:
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-[var(--sm-radius-pill)] px-3 py-2 text-sm font-medium text-[hsl(var(--sm-color-text-secondary))] transition-colors hover:text-[hsl(var(--sm-color-action-primary))]"
+        className="pp-nav-trigger inline-flex items-center gap-1 rounded-[var(--sm-radius-pill)] px-3.5 py-2 text-sm font-medium text-[hsl(var(--pp-text))]"
       >
         {item.label}
         <ChevronDown size={14} aria-hidden="true" className={open ? "rotate-180 transition-transform" : "transition-transform"} />
@@ -76,7 +76,7 @@ function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?:
         <div
           role="menu"
           aria-label={item.label}
-          className={`absolute top-full z-[var(--sm-z-dropdown)] mt-2 w-80 rounded-[var(--sm-radius-lg)] border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-bg-elevated))] p-2 shadow-[var(--sm-shadow-lg)] ${
+          className={`pp-dropdown-panel absolute top-full z-[var(--sm-z-dropdown)] mt-2 w-80 p-2 ${
             align === "end" ? "right-0" : "left-1/2 -translate-x-1/2"
           }`}
         >
@@ -86,15 +86,15 @@ function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?:
                 key={child.label}
                 role="menuitem"
                 aria-disabled="true"
-                className="flex flex-col gap-0.5 rounded-[var(--sm-radius-md)] px-3 py-2.5 opacity-60"
+                className="pp-dropdown-item flex flex-col gap-0.5 rounded-[var(--sm-radius-md)] px-3 py-2.5 opacity-60"
               >
-                <span className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">
+                <span className="text-sm font-semibold text-[hsl(var(--pp-forest-deep))]">
                   {child.label}
-                  <span className="ml-2 rounded-[var(--sm-radius-pill)] bg-[hsl(var(--sm-color-surface-muted))] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[hsl(var(--sm-color-text-muted))]">
+                  <span className="ml-2 rounded-[var(--sm-radius-pill)] bg-[hsl(var(--pp-mint-pale))] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[hsl(var(--pp-text-muted))]">
                     {child.disabledNote}
                   </span>
                 </span>
-                <span className="text-xs text-[hsl(var(--sm-color-text-muted))]">{child.description}</span>
+                <span className="text-xs text-[hsl(var(--pp-text-muted))]">{child.description}</span>
               </div>
             ) : (
               <Link
@@ -102,10 +102,10 @@ function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?:
                 href={child.href!}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex flex-col gap-0.5 rounded-[var(--sm-radius-md)] px-3 py-2.5 transition-colors hover:bg-[hsl(var(--sm-color-surface-interactive))]"
+                className="pp-dropdown-item flex flex-col gap-0.5 rounded-[var(--sm-radius-md)] px-3 py-2.5"
               >
-                <span className="text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">{child.label}</span>
-                <span className="text-xs text-[hsl(var(--sm-color-text-muted))]">{child.description}</span>
+                <span className="text-sm font-semibold text-[hsl(var(--pp-forest-deep))]">{child.label}</span>
+                <span className="text-xs text-[hsl(var(--pp-text-muted))]">{child.description}</span>
               </Link>
             ),
           )}
@@ -140,12 +140,12 @@ export function PlatformPreviewNavbar({
         className="mx-auto flex max-w-[1280px] items-center justify-between rounded-[var(--sm-radius-pill)] px-4 transition-[height,box-shadow,background-color] md:px-6"
         style={{
           height: isScrolled ? "56px" : "68px",
-          backgroundColor: isScrolled ? "hsl(var(--pp-mint-warm-white) / 0.94)" : "hsl(var(--pp-mint-warm-white) / 0.72)",
+          backgroundColor: isScrolled ? "hsl(var(--pp-mint-warm-white) / 0.96)" : "hsl(var(--pp-mint-warm-white) / 0.78)",
           backdropFilter: "blur(18px)",
-          border: "1px solid hsl(var(--pp-mint-mist) / 0.85)",
+          border: "1px solid hsl(var(--pp-mint-mist) / 0.9)",
           boxShadow: isScrolled
-            ? "0 8px 24px -8px hsl(var(--pp-forest-deep) / 0.18), 0 0 0 1px hsl(var(--pp-mint-fresh) / 0.16)"
-            : "0 4px 16px -8px hsl(var(--pp-forest-deep) / 0.12), 0 0 0 1px hsl(var(--pp-mint-fresh) / 0.1)",
+            ? "0 1px 2px hsl(var(--pp-shadow) / 0.05), 0 10px 24px -10px hsl(var(--pp-shadow) / 0.2)"
+            : "0 1px 2px hsl(var(--pp-shadow) / 0.04), 0 6px 18px -10px hsl(var(--pp-shadow) / 0.14)",
         }}
       >
         <Link href="/platform-preview" className="inline-flex items-center" aria-label="SiteMint Digital home">
@@ -160,6 +160,7 @@ export function PlatformPreviewNavbar({
 
         <div className="hidden items-center gap-3 lg:flex">
           {showThemeToggle && <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />}
+          <span aria-hidden="true" className="h-6 w-px" style={{ backgroundColor: "hsl(var(--pp-mint-mist))" }} />
           <Link
             href={signInHref}
             aria-label="Sign in to AI Receptionist"
@@ -178,7 +179,8 @@ export function PlatformPreviewNavbar({
             type="button"
             onClick={onOpenMobileMenu}
             aria-label="Open menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-md)] border border-[hsl(var(--sm-color-border-default))] text-[hsl(var(--sm-color-text-primary))]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--sm-radius-md)] border text-[hsl(var(--pp-forest-deep))]"
+            style={{ borderColor: "hsl(var(--pp-mint-mist))" }}
           >
             <Menu size={18} aria-hidden="true" />
           </button>
