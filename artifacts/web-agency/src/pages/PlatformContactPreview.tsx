@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { ArrowRight, CheckCircle2, Mail, Phone } from "lucide-react";
 import "@/styles/platform-preview.css";
-import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
+import { useProductionDocumentMeta } from "@/hooks/useProductionDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { InnerPageHero } from "@/components/platform-preview/InnerPageHero";
 import { InnerPageAtmosphere } from "@/components/platform-preview/InnerPageAtmosphere";
@@ -15,8 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { startProjectHref } from "@/components/platform-preview/navConfig";
 
-const PREVIEW_TITLE = "Contact — SiteMint Platform Preview (Internal, Unpublished)";
-const PREVIEW_DESCRIPTION = "Internal, unpublished preview of the SiteMint contact experience.";
+const PAGE_TITLE = "Contact | SiteMint Digital";
+const PAGE_DESCRIPTION = "Get in touch with SiteMint Digital — send a project inquiry or reach the team directly by email or phone.";
 
 /**
  * Wired to the real, mounted POST /api/contact/submit contract (verified in
@@ -149,7 +149,7 @@ const fieldLabels: Record<keyof ContactFormValues, string> = {
 };
 
 export default function PlatformContactPreview() {
-  usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
+  useProductionDocumentMeta(PAGE_TITLE, PAGE_DESCRIPTION, "/contact");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null);
   const submittingRef = useRef(false);

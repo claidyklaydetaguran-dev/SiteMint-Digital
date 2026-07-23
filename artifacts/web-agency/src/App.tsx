@@ -1,17 +1,9 @@
-import { Layout } from "@/components/layout/Layout";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { useEffect, lazy, Suspense } from "react";
-import { platformPreviewEnabled } from "@/lib/platformPreviewFlag";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home";
-import Services from "@/pages/Services";
-import Pricing from "@/pages/Pricing";
-import Portfolio from "@/pages/Portfolio";
-import About from "@/pages/About";
-import Contact from "@/pages/Contact";
 import Discovery from "@/pages/Discovery";
 import ThankYou from "@/pages/ThankYou";
 import LandingLawyers from "@/pages/LandingLawyers";
@@ -51,25 +43,29 @@ import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 
 const queryClient = new QueryClient();
 
-// Lazy-loaded so its chunk (and the shared design-tokens CSS it imports)
-// only fetches when /platform-preview is actually visited — ordinary routes
-// never pay for this bundle. See docs/sitemint-platform's Phase 2A checkpoint.
+// Production migration (2026-07-23): the approved SiteMint platform redesign
+// is now the main production site. These are the same components that
+// previously rendered at the flag-gated /platform-preview/* routes — reused
+// as-is rather than copied — now serving /, /services, /portfolio,
+// /pricing, /about, /contact directly, unconditionally (no feature flag).
+// Still lazy-loaded so each route's chunk fetches only when actually
+// visited.
 const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
-
-// Lazy-loaded for the same reason as PlatformPreview above — this route's
-// chunk (react-hook-form step components + @workspace/discovery-contract)
-// only fetches when /platform-preview/start-project is actually visited.
-const PlatformDiscoveryPreview = lazy(() => import("@/pages/PlatformDiscoveryPreview"));
-
-// Frontend Epic 1 — the remaining /platform-preview/* customer pages.
-// Same lazy + flag-gated pattern as the two routes above; each fetches only
-// when its own path is visited.
 const PlatformServicesPreview = lazy(() => import("@/pages/PlatformServicesPreview"));
 const PlatformPricingPreview = lazy(() => import("@/pages/PlatformPricingPreview"));
 const PlatformPortfolioPreview = lazy(() => import("@/pages/PlatformPortfolioPreview"));
 const PlatformAboutPreview = lazy(() => import("@/pages/PlatformAboutPreview"));
 const PlatformContactPreview = lazy(() => import("@/pages/PlatformContactPreview"));
-const PlatformAiReceptionistPreview = lazy(() => import("@/pages/PlatformAiReceptionistPreview"));
+
+// NOT migrated to production: PlatformDiscoveryPreview (the guided
+// "Start a Project" form) and PlatformAiReceptionistPreview. See
+// ROLLBACK / handoff notes — PlatformDiscoveryPreview's own shell submits
+// nothing and isn't wired to a live endpoint, so "Start a Project" CTAs
+// point at the real, working /discovery route instead (navConfig.ts's
+// startProjectHref). PlatformAiReceptionistPreview was outside this
+// migration's approved production-route list; Products > AI Receptionist
+// links to the existing working /ai-receptionist landing page instead.
+// Both component files remain in the repo, unreferenced, for later use.
 
 function CrmHomeRedirect() {
   const [, navigate] = useLocation();
@@ -119,111 +115,8 @@ function Router() {
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
 
-      {/* Platform Preview (Phase 2A) — feature-flagged, no main layout (its own
-          shell), never rendered when VITE_SITEMINT_PLATFORM_PREVIEW_ENABLED is
-          unset/false. Fails closed to the app's ordinary not-found page. */}
-      <Route path="/platform-preview">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-
-      {/* Platform Preview — Guided Discovery Form Preview (Phase 2C.2C2):
-          same feature flag, same fail-closed shape as /platform-preview
-          above. Preview-only — no network request, no persistence, not the
-          real /discovery funnel. */}
-      <Route path="/platform-preview/start-project">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformDiscoveryPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-
-      {/* Platform Preview — Frontend Epic 1 customer pages. Same feature
-          flag, same fail-closed shape as the two routes above. */}
-      <Route path="/platform-preview/services">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformServicesPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-      <Route path="/platform-preview/pricing">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformPricingPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-      <Route path="/platform-preview/portfolio">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformPortfolioPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-      <Route path="/platform-preview/about">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformAboutPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-      <Route path="/platform-preview/contact">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformContactPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-      <Route path="/platform-preview/ai-receptionist">
-        {() =>
-          platformPreviewEnabled ? (
-            <Suspense fallback={null}>
-              <PlatformAiReceptionistPreview />
-            </Suspense>
-          ) : (
-            <NotFound />
-          )
-        }
-      </Route>
-
-      {/* Any other /platform-preview/* path — fails closed the same as
-          every route above, whether or not the flag is on. */}
-      <Route path="/platform-preview/:rest*" component={NotFound} />
-
-      {/* Discovery form — no main layout */}
+      {/* Discovery form — the real, working "Start a Project" funnel
+          (posts to /api/discovery/submit). No main layout — self-contained. */}
       <Route path="/discovery" component={Discovery} />
 
       {/* Thank You — no main layout */}
@@ -253,20 +146,53 @@ function Router() {
       </Route>
 
 
-      {/* Public site — with main layout */}
-      <Route>
-        <Layout>
-          <Switch>
-            <Route path="/" component={Home} />
-            <Route path="/services" component={Services} />
-            <Route path="/pricing" component={Pricing} />
-            <Route path="/portfolio" component={Portfolio} />
-            <Route path="/about" component={About} />
-            <Route path="/contact" component={Contact} />
-            <Route component={NotFound} />
-          </Switch>
-        </Layout>
+      {/* Public site — the approved SiteMint platform redesign. Each page
+          component owns its own shell (navbar, footer, theme) via
+          PlatformPreviewPageShell — no main Layout wrapper here. */}
+      <Route path="/">
+        {() => (
+          <Suspense fallback={null}>
+            <PlatformPreview />
+          </Suspense>
+        )}
       </Route>
+      <Route path="/services">
+        {() => (
+          <Suspense fallback={null}>
+            <PlatformServicesPreview />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/portfolio">
+        {() => (
+          <Suspense fallback={null}>
+            <PlatformPortfolioPreview />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/pricing">
+        {() => (
+          <Suspense fallback={null}>
+            <PlatformPricingPreview />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/about">
+        {() => (
+          <Suspense fallback={null}>
+            <PlatformAboutPreview />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/contact">
+        {() => (
+          <Suspense fallback={null}>
+            <PlatformContactPreview />
+          </Suspense>
+        )}
+      </Route>
+
+      <Route component={NotFound} />
     </Switch>
   );
 }

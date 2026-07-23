@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import "@/styles/platform-preview.css";
-import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
+import { useProductionDocumentMeta } from "@/hooks/useProductionDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { InnerPageHero } from "@/components/platform-preview/InnerPageHero";
 import { FeaturedVisual, SupportingVisual } from "@/components/platform-preview/PortfolioVisual";
@@ -10,8 +10,8 @@ import { portfolioProjects, type PortfolioProject } from "@/components/platform-
 import { FinalCtaSection } from "@/components/platform-preview/FinalCtaSection";
 import { startProjectHref } from "@/components/platform-preview/navConfig";
 
-const PREVIEW_TITLE = "Selected Work — SiteMint Platform Preview (Internal, Unpublished)";
-const PREVIEW_DESCRIPTION = "Internal, unpublished preview of SiteMint's approved, real client work.";
+const PAGE_TITLE = "Portfolio | SiteMint Digital";
+const PAGE_DESCRIPTION = "Real client work from SiteMint Digital — websites and systems built for real estate professionals, nonprofits, and service providers.";
 
 const featuredProject = portfolioProjects.find((p) => p.id === "hand-homecare")!;
 const supportingProjects = portfolioProjects.filter((p) => p.id !== "hand-homecare").sort((a, b) => a.sortOrder - b.sortOrder);
@@ -138,7 +138,7 @@ function SupportingCardDark({ project }: { project: PortfolioProject }) {
 }
 
 export default function PlatformPortfolioPreview() {
-  usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
+  useProductionDocumentMeta(PAGE_TITLE, PAGE_DESCRIPTION, "/portfolio");
 
   const oneFilAm = supportingProjects.find((p) => p.id === "onefilam-community")!;
   const herlinda = supportingProjects.find((p) => p.id === "herlinda-valdovinos")!;
@@ -270,7 +270,7 @@ export default function PlatformPortfolioPreview() {
                     Start a Project
                     <ArrowRight size={15} aria-hidden="true" style={{ marginLeft: 6 }} />
                   </Link>
-                  <Link href="/platform-preview/services" className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-5 py-2.5 text-sm font-semibold">
+                  <Link href="/services" className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-5 py-2.5 text-sm font-semibold">
                     See our services
                   </Link>
                 </div>

@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Compass, MessageCircle, Network, TrendingUp, Users } from "lucide-react";
 import "@/styles/platform-preview.css";
-import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
+import { useProductionDocumentMeta } from "@/hooks/useProductionDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { InnerPageHero } from "@/components/platform-preview/InnerPageHero";
 import { InnerPageAtmosphere } from "@/components/platform-preview/InnerPageAtmosphere";
@@ -12,9 +12,9 @@ import { aboutTeam, aboutPrinciples } from "@/components/platform-preview/aboutC
 import { portfolioProjects } from "@/components/platform-preview/portfolioProjects";
 import { SupportingVisual } from "@/components/platform-preview/PortfolioVisual";
 
-const PREVIEW_TITLE = "About — SiteMint Platform Preview (Internal, Unpublished)";
-const PREVIEW_DESCRIPTION =
-  "Internal, unpublished preview of who SiteMint Digital is, how the team thinks, and how the three team members' roles connect.";
+const PAGE_TITLE = "About | SiteMint Digital";
+const PAGE_DESCRIPTION =
+  "Who SiteMint Digital is, how the team thinks, and how Claidy Taguran, Shasta Greene, and Saisa Lorraigne's roles connect on every project.";
 
 function textOnDark(muted = false) {
   return { color: muted ? "hsl(var(--pp-text-on-dark-muted))" : "hsl(var(--pp-text-on-dark))" };
@@ -131,7 +131,7 @@ function TeamRow({ member, index }: { member: (typeof aboutTeam)[number]; index:
 }
 
 export default function PlatformAboutPreview() {
-  usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
+  useProductionDocumentMeta(PAGE_TITLE, PAGE_DESCRIPTION, "/about");
 
   return (
     <PlatformPreviewPageShell footerVariant="dark">

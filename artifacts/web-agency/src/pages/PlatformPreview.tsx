@@ -1,5 +1,5 @@
 import "@/styles/platform-preview.css";
-import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
+import { useProductionDocumentMeta } from "@/hooks/useProductionDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { PlatformHero } from "@/components/platform-preview/PlatformHero";
 import { PostHeroGoalSection } from "@/components/platform-preview/PostHeroGoalSection";
@@ -12,12 +12,12 @@ import { SelectedWorkSection } from "@/components/platform-preview/SelectedWorkS
 import { ProcessSection } from "@/components/platform-preview/ProcessSection";
 import { FinalCtaSection } from "@/components/platform-preview/FinalCtaSection";
 
-const PREVIEW_TITLE = "SiteMint Platform Preview (Internal, Unpublished) | Not the Live Site";
-const PREVIEW_DESCRIPTION =
-  "Internal, unpublished visual prototype of a future SiteMint Digital umbrella homepage. Not indexed, not linked publicly, not the production site.";
+const PAGE_TITLE = "SiteMint Digital | AI-Powered Websites & Business Systems";
+const PAGE_DESCRIPTION =
+  "SiteMint Digital builds AI-powered websites, CRM systems, automation workflows, and custom business applications that help service businesses get more customers and operate smarter.";
 
 export default function PlatformPreview() {
-  usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
+  useProductionDocumentMeta(PAGE_TITLE, PAGE_DESCRIPTION, "/");
 
   return (
     <PlatformPreviewPageShell showHeroAurora>

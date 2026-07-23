@@ -13,7 +13,7 @@ import {
   Workflow,
 } from "lucide-react";
 import "@/styles/platform-preview.css";
-import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
+import { useProductionDocumentMeta } from "@/hooks/useProductionDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { InnerPageHero } from "@/components/platform-preview/InnerPageHero";
 import { InnerPageAtmosphere } from "@/components/platform-preview/InnerPageAtmosphere";
@@ -29,9 +29,9 @@ import {
   type ServiceDetail,
 } from "@/components/platform-preview/servicesDetail";
 
-const PREVIEW_TITLE = "Services — SiteMint Platform Preview (Internal, Unpublished)";
-const PREVIEW_DESCRIPTION =
-  "Internal, unpublished preview of SiteMint's service catalog — websites, applications, CRM, automation, and more.";
+const PAGE_TITLE = "Services | SiteMint Digital";
+const PAGE_DESCRIPTION =
+  "SiteMint Digital's service catalog — websites, custom web applications, CRM systems, business automation, SEO, and ongoing maintenance and support.";
 
 const categoryOrder: ServiceCategory[] = ["presence", "systems", "automation"];
 
@@ -413,7 +413,7 @@ const layoutByCategory: Record<ServiceCategory, (props: { services: ServiceDetai
 };
 
 export default function PlatformServicesPreview() {
-  usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
+  useProductionDocumentMeta(PAGE_TITLE, PAGE_DESCRIPTION, "/services");
 
   return (
     <PlatformPreviewPageShell footerVariant="dark">
@@ -429,7 +429,7 @@ export default function PlatformServicesPreview() {
             Start a Project
             <ArrowRight size={16} aria-hidden="true" style={{ marginLeft: 8 }} />
           </Link>
-          <Link href="/platform-preview/contact" className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold">
+          <Link href="/contact" className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold">
             Talk to us first
           </Link>
         </div>
@@ -572,7 +572,7 @@ export default function PlatformServicesPreview() {
               Start the discovery questionnaire
               <ArrowRight size={16} aria-hidden="true" style={{ marginLeft: 8 }} />
             </Link>
-            <Link href="/platform-preview/contact" className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold">
+            <Link href="/contact" className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-6 py-3 text-sm font-semibold">
               Talk to us first
             </Link>
           </div>

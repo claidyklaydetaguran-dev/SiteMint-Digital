@@ -188,7 +188,7 @@ export function PlatformPreviewNavbar({
             : "0 1px 2px hsl(var(--pp-shadow) / 0.04), 0 6px 18px -10px hsl(var(--pp-shadow) / 0.14)",
         }}
       >
-        <Link href="/platform-preview" className="inline-flex items-center" aria-label="SiteMint Digital home">
+        <Link href="/" className="inline-flex items-center" aria-label="SiteMint Digital home">
           <SiteMintLogo variant="dark" iconSize={30} />
         </Link>
 

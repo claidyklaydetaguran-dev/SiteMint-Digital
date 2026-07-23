@@ -1,14 +1,13 @@
 /**
  * Nav data shared between the desktop navbar and the mobile menu.
  *
- * Frontend Epic 1: every content link (Products/AI Receptionist,
- * Services, Work, Pricing, Company/About/Contact) now points at this
- * preview family's own `/platform-preview/*` sub-pages rather than the
- * production `/services`, `/pricing`, `/portfolio`, `/about`, `/contact`,
- * `/ai-receptionist` routes — so the preview reads as one self-contained
- * site and never silently hands a preview visitor off to production. Only
- * `signInHref` still points outside the preview family, because it is a
- * real authenticated destination the preview intentionally links out to.
+ * Production migration: this approved design now serves the production
+ * routes directly, so every content link (Products/AI Receptionist,
+ * Services, Work, Pricing, Company/About/Contact) points at the real
+ * production paths (`/services`, `/pricing`, `/portfolio`, `/about`,
+ * `/contact`, `/ai-receptionist`) rather than the old `/platform-preview/*`
+ * sub-pages. `signInHref` is unchanged — it already pointed at the real
+ * authenticated destination.
  */
 
 export interface PreviewNavChild {
@@ -29,7 +28,7 @@ export const productsNavItems: PreviewNavChild[] = [
   {
     label: "AI Receptionist",
     description: "Never miss a lead — AI answers, qualifies, and follows up 24/7.",
-    href: "/platform-preview/ai-receptionist",
+    href: "/ai-receptionist",
   },
   {
     label: "AI Toolkit",
@@ -44,24 +43,24 @@ export const productsNavItems: PreviewNavChild[] = [
 ];
 
 export const servicesNavItems: PreviewNavChild[] = [
-  { label: "Websites", description: "Marketing sites built to convert visitors into leads.", href: "/platform-preview/services" },
-  { label: "Web Applications", description: "Custom software for how your business actually runs.", href: "/platform-preview/services" },
-  { label: "CRM Systems", description: "One system of record for every lead and client.", href: "/platform-preview/services" },
-  { label: "Business Automation", description: "Automate the follow-up work that falls through the cracks.", href: "/platform-preview/services" },
-  { label: "SEO & Digital Growth", description: "Foundational SEO built into every page you launch.", href: "/platform-preview/services" },
-  { label: "Maintenance & Support", description: "Ongoing care so your systems keep working.", href: "/platform-preview/services" },
+  { label: "Websites", description: "Marketing sites built to convert visitors into leads.", href: "/services" },
+  { label: "Web Applications", description: "Custom software for how your business actually runs.", href: "/services" },
+  { label: "CRM Systems", description: "One system of record for every lead and client.", href: "/services" },
+  { label: "Business Automation", description: "Automate the follow-up work that falls through the cracks.", href: "/services" },
+  { label: "SEO & Digital Growth", description: "Foundational SEO built into every page you launch.", href: "/services" },
+  { label: "Maintenance & Support", description: "Ongoing care so your systems keep working.", href: "/services" },
 ];
 
 export const companyNavItems: PreviewNavChild[] = [
-  { label: "About", description: "Who we are and how we work.", href: "/platform-preview/about" },
-  { label: "Contact", description: "Get in touch with the team.", href: "/platform-preview/contact" },
+  { label: "About", description: "Who we are and how we work.", href: "/about" },
+  { label: "Contact", description: "Get in touch with the team.", href: "/contact" },
 ];
 
 /** Single source of truth for these two top-level links — read by both
  * PlatformPreviewNavbar's `primaryNavItems` loop and PlatformPreviewMobileMenu,
  * which previously hardcoded the same two paths a second time. */
-export const workHref = "/platform-preview/portfolio";
-export const pricingHref = "/platform-preview/pricing";
+export const workHref = "/portfolio";
+export const pricingHref = "/pricing";
 
 export const primaryNavItems: PreviewNavItem[] = [
   { label: "Products", children: productsNavItems },
@@ -90,10 +89,12 @@ export const primaryNavItems: PreviewNavItem[] = [
 export const signInHref = "/ai-receptionist/dashboard/login";
 
 /**
- * Phase 2C.2C2: points at the flag-gated, preview-only guided discovery
- * form (`/platform-preview/start-project`), not the real `/discovery`
- * funnel — this CTA lives only inside `/platform-preview`, itself gated by
- * `platformPreviewEnabled`, so it can never expose the preview form to a
- * visitor who reached it any other way.
+ * Production migration: the preview's own guided discovery form
+ * (`PlatformDiscoveryShell`) is explicitly non-functional — it submits
+ * nothing and depends on `@workspace/discovery-contract` in a way that
+ * isn't wired to any live endpoint. Rather than ship a primary CTA that
+ * goes nowhere, "Start a Project" points at the real, working `/discovery`
+ * funnel (posts to `/api/discovery/submit`) until the guided form is
+ * actually connected to a live submission path — see DECISION_LOG.md.
  */
-export const startProjectHref = "/platform-preview/start-project";
+export const startProjectHref = "/discovery";

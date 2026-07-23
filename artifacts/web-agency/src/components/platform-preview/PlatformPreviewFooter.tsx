@@ -6,22 +6,22 @@ const footerGroups = [
   {
     heading: "Products",
     links: [
-      { label: "AI Receptionist", href: "/platform-preview/ai-receptionist" },
+      { label: "AI Receptionist", href: "/ai-receptionist" },
     ],
   },
   {
     heading: "Services",
     links: [
-      { label: "All Services", href: "/platform-preview/services" },
+      { label: "All Services", href: "/services" },
       { label: "Pricing", href: pricingHref },
     ],
   },
   {
     heading: "Company",
     links: [
-      { label: "About", href: "/platform-preview/about" },
+      { label: "About", href: "/about" },
       { label: "Work", href: workHref },
-      { label: "Contact", href: "/platform-preview/contact" },
+      { label: "Contact", href: "/contact" },
     ],
   },
 ];
@@ -78,11 +78,7 @@ export function PlatformPreviewFooter({ variant = "light" }: { variant?: "light"
     <footer className={footerClassName} style={footerStyle}>
       <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-10 px-4 md:grid-cols-2 md:px-8 lg:grid-cols-4">
         <div className="lg:col-span-1">
-          {/* Preview-family footer — must stay self-contained (navConfig.ts's
-              own stated intent). Previously pointed at "/" (production
-              homepage), silently leaving the preview; corrected to the
-              preview homepage so the logo never exits the preview family. */}
-          <Link href="/platform-preview" className="inline-flex mb-4">
+          <Link href="/" className="inline-flex mb-4">
             <SiteMintLogo variant="dark" iconSize={30} />
           </Link>
           <p className={headingClassName} style={headingStyle}>

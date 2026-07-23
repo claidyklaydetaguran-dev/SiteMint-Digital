@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Check, ChevronDown, Minus } from "lucide-react";
 import "@/styles/platform-preview.css";
-import { usePlatformPreviewDocumentMeta } from "@/hooks/usePlatformPreviewDocumentMeta";
+import { useProductionDocumentMeta } from "@/hooks/useProductionDocumentMeta";
 import { PlatformPreviewPageShell } from "@/components/platform-preview/PlatformPreviewPageShell";
 import { InnerPageHero } from "@/components/platform-preview/InnerPageHero";
 import { InnerPageAtmosphere } from "@/components/platform-preview/InnerPageAtmosphere";
@@ -10,9 +10,9 @@ import { FinalCtaSection } from "@/components/platform-preview/FinalCtaSection";
 import { startProjectHref } from "@/components/platform-preview/navConfig";
 import { pricingTiers, pricingFactors } from "@/components/platform-preview/pricingTiers";
 
-const PREVIEW_TITLE = "Pricing — SiteMint Platform Preview (Internal, Unpublished)";
-const PREVIEW_DESCRIPTION =
-  "Internal, unpublished preview of SiteMint's pricing and investment direction — Starter, Growth, Premium, and Custom.";
+const PAGE_TITLE = "Pricing | SiteMint Digital";
+const PAGE_DESCRIPTION =
+  "Transparent SiteMint Digital pricing and packages — clear deliverables, timelines, and investment ranges with no hidden fees.";
 
 function textOnDark(muted = false) {
   return { color: muted ? "hsl(var(--pp-text-on-dark-muted))" : "hsl(var(--pp-text-on-dark))" };
@@ -248,7 +248,7 @@ function FaqItem({ item, index }: { item: (typeof faqs)[number]; index: number }
 }
 
 export default function PlatformPricingPreview() {
-  usePlatformPreviewDocumentMeta(PREVIEW_TITLE, PREVIEW_DESCRIPTION);
+  useProductionDocumentMeta(PAGE_TITLE, PAGE_DESCRIPTION, "/pricing");
 
   return (
     <PlatformPreviewPageShell footerVariant="dark">
