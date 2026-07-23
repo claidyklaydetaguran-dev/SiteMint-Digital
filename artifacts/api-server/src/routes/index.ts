@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import discoveryRouter from "./discovery";
+import discoveryV1Router from "./discoveryV1";
 import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
@@ -24,6 +25,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(discoveryRouter);
+router.use(discoveryV1Router);
 router.use(adminRouter);
 router.use(contactRouter);
 router.use(crmRouter);

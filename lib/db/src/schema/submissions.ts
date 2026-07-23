@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb, index, uniqueIndex, check, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, boolean, index, uniqueIndex, check, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -112,6 +112,19 @@ export const discoverySubmissions = pgTable("discovery_submissions", {
   duplicateResolutionReasonCode: text("duplicate_resolution_reason_code"),
 
   privacyPolicyVersion: text("privacy_policy_version"),
+
+  // Module 1B correction — qualification-honesty marker. Nullable, no
+  // default: legacy rows and any row created before this column existed
+  // stay NULL ("scoring state unknown"), never fabricated. The structured
+  // (V1) submission insert explicitly writes `false` ("accepted, not yet
+  // scored"). A future, separately-approved automated-scoring process may
+  // write `true`. Does not change `leadScore`'s own type, nullability, or
+  // default in any way — this column exists specifically because
+  // `leadScore` alone (NOT NULL, default 1) cannot honestly distinguish
+  // "never scored" from "scored as low as possible." Existing CRM/admin
+  // screens do not yet read this column — see the REQUIRED FOLLOW-UP note
+  // in discoveryV1Persistence.ts.
+  isAutomaticallyScored: boolean("is_automatically_scored"),
 }, (table) => [
   uniqueIndex("uq_discovery_submissions_idempotency_key").on(table.idempotencyKey),
   index("ix_discovery_submissions_duplicate_fingerprint").on(table.duplicateFingerprint),

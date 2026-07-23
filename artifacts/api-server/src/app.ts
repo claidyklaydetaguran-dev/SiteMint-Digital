@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./lib/webhookHandlers";
+import { DISCOVERY_V1_BODY_LIMIT, DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler } from "./lib/discoveryV1BodyLimit.js";
 
 const app: Express = express();
 
@@ -57,6 +58,20 @@ app.use("/api/crm/webhooks/resend", express.raw({ type: "application/json" }));
 
 // Capture raw body for receptionist Stripe billing webhook BEFORE json() runs
 app.use("/api/receptionist/billing/webhook", express.raw({ type: "application/json" }));
+
+// Discovery v1 (structured submissions): explicit 64KB body-size cap,
+// tighter than the global default below and enforced by the parser itself
+// (actual bytes streamed, not a trusted Content-Length header — also
+// correctly bounds chunked-encoded and gzip/deflate-decompressed bodies).
+// Registered before the global express.json() so this path's request
+// stream is fully consumed here; the global parser's own body-parser guard
+// (`if (req._body) return next()`) skips re-parsing for this path. See
+// lib/discoveryV1BodyLimit.ts (independently unit-tested with a minimal
+// standalone Express app — no full app, no database) for the shared
+// constants and the error-translation handler registered right after.
+app.use(DISCOVERY_V1_PATH, express.json({ limit: DISCOVERY_V1_BODY_LIMIT }));
+app.use(DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -8,6 +8,18 @@
 -- docs/sitemint-platform/DISCOVERY_DOMAIN_CONTRACT.md for the full contract.
 -- This migration is generated and reviewed only — it is NOT applied to any
 -- database by this checkpoint.
+--
+-- Module 1B correction (structured-submission qualification honesty): adds
+-- one further additive, nullable column below, "is_automatically_scored".
+-- No default — legacy rows stay NULL (scoring state unknown, never
+-- fabricated); the V1 structured-submission insert explicitly writes
+-- false; a future approved scoring process may write true. Does not alter
+-- discovery_submissions.lead_score's existing type, nullability, or
+-- default in any way. See artifacts/api-server/src/lib/
+-- discoveryV1Persistence.ts and the Module 1B handoff for the full
+-- rationale — existing CRM/admin screens do not yet inspect this column
+-- and must be updated to do so before the structured endpoint is deployed
+-- or activated (see REQUIRED FOLLOW-UP note there).
 
 ALTER TABLE "discovery_submissions" ADD COLUMN "schema_version" text;--> statement-breakpoint
 ALTER TABLE "discovery_submissions" ADD COLUMN "form_version" text;--> statement-breakpoint
@@ -23,6 +35,7 @@ ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_resolved_at" timestamp
 ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_resolved_by" text;--> statement-breakpoint
 ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_resolution_reason_code" text;--> statement-breakpoint
 ALTER TABLE "discovery_submissions" ADD COLUMN "privacy_policy_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN "is_automatically_scored" boolean;--> statement-breakpoint
 
 ALTER TABLE "discovery_submissions" ADD CONSTRAINT "discovery_submissions_duplicate_of_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("duplicate_of_submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 
