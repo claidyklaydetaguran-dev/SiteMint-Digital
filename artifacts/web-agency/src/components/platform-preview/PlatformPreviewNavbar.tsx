@@ -115,6 +115,19 @@ function NavDropdown({ item, align = "center" }: { item: PreviewNavItem; align?:
   );
 }
 
+// Enter "scrolled" once scrollY passes this, only return to "resting" once it
+// drops back below the lower constant — the gap between them is deliberate
+// hysteresis so ordinary scroll noise right at one fixed pixel can't flip
+// the state back and forth (that oscillation, not the color transition
+// itself, was the source of the old "snap/flicker" bug).
+const SCROLL_ENTER = 24;
+const SCROLL_EXIT = 8;
+
+function getIsScrolled() {
+  if (typeof window === "undefined") return false;
+  return window.scrollY > SCROLL_ENTER;
+}
+
 export function PlatformPreviewNavbar({
   theme,
   onToggleTheme,
@@ -126,20 +139,47 @@ export function PlatformPreviewNavbar({
   onOpenMobileMenu: () => void;
   showThemeToggle?: boolean;
 }) {
-  const [isScrolled, setIsScrolled] = useState(false);
+  // Lazy initializer reads real scroll position (guarded for non-browser
+  // environments) at mount instead of always starting false — this is what
+  // keeps a refresh partway down a page, or a back/forward navigation with
+  // scroll restored, from rendering "resting" for one frame and then
+  // snapping to "scrolled".
+  const [isScrolled, setIsScrolled] = useState(getIsScrolled);
+  const scrolledRef = useRef(isScrolled);
+  scrolledRef.current = isScrolled;
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 16);
+    function onScroll() {
+      if (rafRef.current !== null) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null;
+        const y = window.scrollY;
+        const next = scrolledRef.current ? y > SCROLL_EXIT : y > SCROLL_ENTER;
+        if (next !== scrolledRef.current) setIsScrolled(next);
+      });
+    }
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+    };
   }, []);
 
   return (
-    <header className="sticky top-0 z-[var(--sm-z-raised)] px-3 transition-[padding] md:px-6" style={{ paddingTop: isScrolled ? "0.5rem" : "1rem" }}>
+    // Outer box is a fixed size at every scroll position — this sticky
+    // element's own padding never changes, so it can never resize (and
+    // therefore never reflow/shift) the content below it.
+    <header className="sticky top-0 z-[var(--sm-z-raised)] px-3 pt-4 md:px-6">
       <div
-        className="mx-auto flex max-w-[1280px] items-center justify-between rounded-[var(--sm-radius-pill)] px-4 transition-[height,box-shadow,background-color] md:px-6"
+        // Height, horizontal padding, and radius are likewise constant in
+        // both states. Only paint properties (background opacity, border
+        // color, shadow) respond to scroll — none of them affect layout,
+        // so there is nothing left that can shift page content or oscillate
+        // near the scroll threshold. `pp-navbar-pill` (styles.css) carries
+        // the actual transition + prefers-reduced-motion gate.
+        className="pp-navbar-pill mx-auto flex h-[68px] max-w-[1280px] items-center justify-between rounded-[var(--sm-radius-pill)] px-4 md:px-6"
         style={{
-          height: isScrolled ? "56px" : "68px",
           backgroundColor: isScrolled ? "hsl(var(--pp-mint-warm-white) / 0.90)" : "hsl(var(--pp-mint-warm-white) / 0.68)",
           backdropFilter: "blur(18px)",
           border: "1px solid hsl(var(--pp-mint-mist) / 0.9)",

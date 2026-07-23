@@ -26,7 +26,12 @@ export const pricingTiers: PricingTier[] = [
     priceFrom: "Starting around $2,995",
     bestFor: "New businesses, local service providers, and professional services that need a trustworthy first website.",
     includes: [
-      "A responsive marketing website (up to ~5 pages)",
+      // Deliberately no numeric page count: this repository has two
+      // conflicting figures for Starter's page limit (this file previously
+      // said "~5 pages"; production Pricing.tsx says "Up to 15 pages" for
+      // the same $2,995 price point). Neither is asserted here pending
+      // owner confirmation of the correct number — see PlatformPricingPreview.tsx.
+      "A focused, responsive marketing website",
       "Mobile-friendly, SEO-foundational build",
       "Contact form connected to your inbox",
       "Launch support and basic training",

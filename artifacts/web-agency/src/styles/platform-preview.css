@@ -783,6 +783,110 @@
   color: hsl(var(--pp-mint-deep));
 }
 
+/* Floating navbar pill (PlatformPreviewNavbar.tsx) — resting/scrolled
+   distinction is background-color/border-color/box-shadow only (all
+   inline styles, all paint properties). This single transition declaration
+   is the only thing animating those changes, so the outer header/pill
+   height and padding stay fixed at every scroll position and can never
+   trigger layout shift or oscillate near the scroll threshold. */
+.platform-preview .pp-navbar-pill {
+  transition: background-color var(--sm-duration-fast) var(--sm-easing-standard),
+    border-color var(--sm-duration-fast) var(--sm-easing-standard),
+    box-shadow var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-navbar-pill {
+    transition: none;
+  }
+}
+
+/* GlassCard (dark inner-page card primitive) — border brightens and a
+   restrained mint glow appears on hover/keyboard-focus, matching the
+   hover language every other card in this tree already uses (lift +
+   edge-glow), just re-pointed at the dark-surface accent tokens. */
+.platform-preview .pp-glass-card:hover,
+.platform-preview .pp-glass-card:focus-within {
+  border-color: hsl(var(--pp-cyan-mint) / 0.5);
+  box-shadow: 0 0 0 1px hsl(var(--pp-cyan-mint) / 0.12), 0 16px 32px -16px hsl(var(--pp-navy-950) / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-glass-card {
+    transition: border-color var(--sm-duration-fast) var(--sm-easing-standard),
+      box-shadow var(--sm-duration-fast) var(--sm-easing-standard);
+    transform: none !important;
+  }
+}
+
+/* InnerPageAtmosphere (dark, static-first background for the five
+   redesigned inner pages). Reuses the homepage's already-approved
+   pp-aurora, pp-cyan-mint, and pp-navy tokens. "hero" is the only
+   variant with any motion (a slow background-position drift); "section"
+   and "transition" are pure static gradients — no keyframes at all — per
+   the "inner pages add zero new animation loops by default" requirement. */
+.platform-preview .pp-inner-atmosphere {
+  background-color: hsl(var(--pp-navy-950));
+}
+
+.platform-preview .pp-inner-atmosphere-hero {
+  background-image:
+    radial-gradient(ellipse at 18% 15%, hsl(var(--pp-cyan-mint) / 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse at 85% 20%, hsl(var(--pp-teal-500) / 0.14) 0%, transparent 62%),
+    radial-gradient(ellipse at 50% 100%, hsl(var(--pp-aurora-violet) / 0.18) 0%, transparent 65%),
+    linear-gradient(180deg, hsl(var(--pp-aurora-dark-0)) 0%, hsl(var(--pp-navy-950)) 55%, hsl(var(--pp-navy-mid)) 100%);
+  animation: pp-inner-atmosphere-drift 40s ease-in-out infinite;
+}
+
+.platform-preview .pp-inner-atmosphere-section {
+  background-image:
+    radial-gradient(ellipse at 80% 0%, hsl(var(--pp-cyan-mint) / 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, hsl(var(--pp-navy-950)) 0%, hsl(var(--pp-navy-800)) 100%);
+}
+
+.platform-preview .pp-inner-atmosphere-transition {
+  background-image: linear-gradient(180deg, hsl(var(--pp-navy-800)) 0%, hsl(var(--pp-navy-950)) 100%);
+}
+
+@keyframes pp-inner-atmosphere-drift {
+  0%, 100% { background-position: 18% 15%, 85% 20%, 50% 100%, 0 0; }
+  50% { background-position: 22% 18%, 80% 24%, 52% 96%, 0 0; }
+}
+
+.platform-preview .pp-inner-atmosphere-paused {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-preview .pp-inner-atmosphere-hero {
+    animation: none;
+  }
+}
+
+/* Portfolio page (Phase 3) — the featured-project mobile device frame
+   (PortfolioVisual.tsx's MobileFrame) uses a light-theme-oriented near-
+   black bezel color (--sm-color-bg-inverse) that has little separation
+   from this panel's own navy-950 background. Rather than editing the
+   shared PortfolioVisual.tsx component (used with different, lighter
+   backdrops elsewhere), a thin mint-tinted ring is added here, scoped to
+   just the featured-panel usage via an exact-class-token selector on the
+   bezel's own distinctive `rounded-[1.5rem]` class. */
+.platform-preview .pp-featured-visual-halo [class~="rounded-[1.5rem]"] {
+  box-shadow: 0 0 0 1px hsl(var(--pp-cyan-mint) / 0.35), 0 8px 24px -8px hsl(var(--pp-navy-950) / 0.6);
+}
+
+/* Services page — light-surface category-jump pills (Phase 2 revision). */
+.platform-preview .pp-services-category-pill {
+  transition: background-color var(--sm-duration-fast) var(--sm-easing-standard),
+    border-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.platform-preview .pp-services-category-pill:hover,
+.platform-preview .pp-services-category-pill:focus-visible {
+  background-color: hsl(var(--pp-mint-pale));
+  border-color: hsl(var(--pp-cyan-mint-deep));
+}
+
 /* AI Receptionist demo — simulated waveform. The demo's own phase state
    machine (AiReceptionistDemo.tsx) skips this state entirely under
    prefers-reduced-motion, but the media-query collapse above still

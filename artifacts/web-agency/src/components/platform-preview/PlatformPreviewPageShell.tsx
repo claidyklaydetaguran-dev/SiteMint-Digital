@@ -43,15 +43,24 @@ import { HeroAuroraNetwork } from "./HeroAuroraNetwork";
  * here is enough for descendant decorative layers in both this shell block
  * and PlatformHero's own AuroraBackground to read the same eased pointer
  * position via CSS inheritance — one controller, no duplicate listeners.
+ *
+ * `footerVariant` (default "light") — a thin passthrough to
+ * PlatformPreviewFooter's own `variant` prop, added for the platform-preview
+ * inner-page dark redesign. Kept intentionally dumb (no routing logic, no
+ * context, no branching beyond the one prop hop) so the homepage's call
+ * site needs no change and stays on the default light footer; the five
+ * redesigned inner pages pass `footerVariant="dark"` explicitly.
  */
 export function PlatformPreviewPageShell({
   children,
   showThemeToggle = false,
   showHeroAurora = false,
+  footerVariant = "light",
 }: {
   children: ReactNode;
   showThemeToggle?: boolean;
   showHeroAurora?: boolean;
+  footerVariant?: "light" | "dark";
 }) {
   const { theme, toggleTheme } = usePlatformPreviewTheme();
   const effectiveTheme = showThemeToggle ? theme : "light";
@@ -99,7 +108,7 @@ export function PlatformPreviewPageShell({
         {children}
       </main>
 
-      <PlatformPreviewFooter />
+      <PlatformPreviewFooter variant={footerVariant} />
     </div>
   );
 }
