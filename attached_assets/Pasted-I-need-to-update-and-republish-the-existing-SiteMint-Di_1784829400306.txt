@@ -1,0 +1,133 @@
+I need to update and republish the existing SiteMint Digital production application.
+
+This is a deployment-only task. Do not modify application code, dependencies, database schema, environment variables, or deployment configuration.
+
+TARGET BRANCH
+claude/sitemint-production-migration-2ddamq
+
+EXPECTED REMOTE HEAD
+292b59e557e6f77fb8653fe71632164b512fd6ee
+
+STEP 1 — INSPECT BEFORE PULLING
+
+Before making any changes:
+
+1. Report the current Git branch.
+2. Report the current HEAD.
+3. Run git status --short.
+4. Fetch origin without merging or rebasing.
+5. Confirm the target remote branch resolves exactly to:
+   292b59e557e6f77fb8653fe71632164b512fd6ee
+6. Inspect the current deployment/build/run configuration without editing it.
+7. Confirm whether sitemintdigital.com is still connected to this Replit project.
+
+If the working tree contains local or uncommitted changes, stop and report them. Do not discard, overwrite, stash, or commit them.
+
+If the remote commit does not match the expected hash, stop.
+
+STEP 2 — CHECK OUT AND PULL
+
+If the checks pass:
+
+1. Check out:
+   claude/sitemint-production-migration-2ddamq
+2. Pull using fast-forward only:
+   git pull --ff-only origin claude/sitemint-production-migration-2ddamq
+3. Confirm local HEAD is exactly:
+   292b59e557e6f77fb8653fe71632164b512fd6ee
+4. Confirm git status --short is empty.
+
+Do not merge, rebase, force-pull, reset, amend, or create a commit.
+
+STEP 3 — INSTALL AND VERIFY
+
+Use the repository’s existing package manager and lockfile.
+
+Run:
+
+- The existing dependency-install command
+- Root workspace typecheck
+- API-server build
+- Web-agency production build
+
+Do not update dependencies or regenerate the lockfile.
+
+Do not:
+
+- Apply or generate a database migration
+- Use db push or automatic schema synchronization
+- Provision DISCOVERY_FINGERPRINT_HMAC_KEY
+- Change DATABASE_URL
+- Create a real submission
+- Send email
+- Synchronize a CRM lead
+- Process delivery jobs
+- Activate PlatformDiscoveryShell
+- Replace the current /discovery frontend
+- Start Phase 2C.2E
+
+STEP 4 — PREVIEW
+
+Start the application using its existing Replit development/preview command.
+
+Check these existing public experiences:
+
+- Homepage
+- Services
+- About
+- Contact
+- Current Discovery page
+- Sign In
+- Existing CRM login boundary
+- Mobile navigation
+- Images, fonts, and primary buttons
+- Browser console for visible runtime errors
+- API health endpoint, if one already exists
+
+Do not submit a real form. Do not test POST /api/v1/discovery-submissions.
+
+Report the preview results and stop before publishing if:
+
+- The app shows a blank screen
+- A build or runtime error appears
+- An existing public route is broken
+- The current Discovery page changes unexpectedly
+- Authentication behavior changes
+- The deployment would require a database migration
+- The production environment is missing a variable required merely to start the existing app
+
+STEP 5 — PUBLISH
+
+If and only if all build and preview checks pass:
+
+1. Publish the existing application using its current deployment type and configuration.
+2. Do not create a new deployment configuration.
+3. Do not disconnect or replace the existing custom domain.
+4. Wait for Provision, Security Checks, Build, Bundle, and Promote to complete.
+5. Verify the generated Replit deployment URL first.
+6. Verify:
+   https://sitemintdigital.com
+7. Verify HTTPS and the www/non-www behavior currently configured.
+8. Repeat the public-route smoke tests against the production domain.
+
+If publishing fails, do not repeatedly change settings. Return the exact failed stage and relevant safe error output.
+
+FINAL REPORT
+
+Return:
+
+- Branch
+- Local HEAD
+- Remote HEAD
+- Whether the working tree is clean
+- Exact install/build/typecheck results
+- Preview smoke-test results
+- Publishing-stage results
+- Replit production URL
+- Custom-domain result for sitemintdigital.com
+- Production smoke-test results
+- Confirmation that no code was changed or committed
+- Confirmation that no migration was applied
+- Confirmation that no secret or environment variable was changed
+- Confirmation that no real submission, email, CRM sync, job processing, or database record occurred
+- Confirmation that Phase 2C.2E was not started

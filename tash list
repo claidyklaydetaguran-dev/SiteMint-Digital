@@ -1,0 +1,48 @@
+  claude/assistants-interface-foundation-r8xxes                                 [m 0147cdb [[34msubrepl-f5y08ph0/claude/assistants-interface-foundation-r8xxes[m] Milestone 1 / Checkpoint B3: assistants interface foundation
+  claude/sitemint-homepage-visual-redesign-v2-5yukpl                            [m ff2163c [[34msubrepl-f5y08ph0/claude/sitemint-homepage-visual-redesign-v2-5yukpl[m: ahead 1] Update artifact configuration for web agency
+  claude/sitemint-phase-2c2b-domain-42pbaq                                      [m a169972 [[34msubrepl-f5y08ph0/claude/sitemint-phase-2c2b-domain-42pbaq[m] SiteMint Platform / Phase 2C.2B.1: preserve CRM runtime compatibility
+* [32mclaude/sitemint-production-migration-2ddamq                                   [m 9118b9c [[34msubrepl-f5y08ph0/claude/sitemint-production-migration-2ddamq[m] feat: promote SiteMint redesign to production routes
+  main                                                                          [m 7897bfe [[34msubrepl-f5y08ph0/main[m: behind 1] Published your App
+  replit-agent                                                                  [m 698706d Update artifact configuration for web agency
+  replit-pre-migration-backup                                                   [m ff2163c [[34msubrepl-f5y08ph0/claude/sitemint-production-migration-2ddamq[m: ahead 1, behind 1] Update artifact configuration for web agency
+  subrepl-f5y08ph0                                                              [m 6a94978 Fix 8 dependency vulnerabilities in pnpm-workspace.yaml
+  [31mremotes/gitsafe-backup/HEAD                                                   [m -> gitsafe-backup/main
+  [31mremotes/gitsafe-backup/main                                                   [m ff2163c Update artifact configuration for web agency
+  [31mremotes/subrepl-f5y08ph0/HEAD                                                 [m -> subrepl-f5y08ph0/main
+  [31mremotes/subrepl-f5y08ph0/claude/assistants-interface-foundation-r8xxes        [m 0147cdb Milestone 1 / Checkpoint B3: assistants interface foundation
+  [31mremotes/subrepl-f5y08ph0/claude/assistants-ui-persistence-api-dal9hg          [m e3df16b Milestone 1 / Checkpoint E2: connect assistants UI to persistence API
+  [31mremotes/subrepl-f5y08ph0/claude/audit-receptionist-repo-268pla                [m 8efd345 Milestone 1 / Checkpoint A: documentation and safety baseline
+  [31mremotes/subrepl-f5y08ph0/claude/dashboard-ui-design-review-c20qzr             [m 596ca13 Milestone 1: preserve approved voice platform UI blueprint
+  [31mremotes/subrepl-f5y08ph0/claude/e3c-publish-workflow-3jvm5y                   [m 63ed3c2 Milestone 1 / Checkpoint E3C: frontend publish workflow
+  [31mremotes/subrepl-f5y08ph0/claude/milestone-1-checkpoint-b1-joualb              [m 3231ba2 Milestone 1 / Checkpoint B1: design system and platform shell
+  [31mremotes/subrepl-f5y08ph0/claude/milestone-1-checkpoint-b2-pe2327              [m 133eac2 Milestone 1 / Checkpoint B2: overview and existing page theming
+  [31mremotes/subrepl-f5y08ph0/claude/milestone-1-checkpoint-e1-gh4lq9              [m 1a0e2e1 Milestone 1 / Checkpoint E1: assistant persistence API
+  [31mremotes/subrepl-f5y08ph0/claude/milestone-1-e3b1-secure-publish-hz9fc6        [m c79f22e Milestone 1 / Checkpoint E3B1: publish state and runtime catalog
+  [31mremotes/subrepl-f5y08ph0/claude/milestone-1-f2a-vapi-adapter-qfturn           [m 100a8b8 Milestone 1 / Checkpoint F2A: Vapi web client adapter
+  [31mremotes/subrepl-f5y08ph0/claude/milestone-1-f2b-readiness-kvbe27              [m 28d5eef Milestone 1 / Checkpoint F2B0: ignore local environment secrets
+  [31mremotes/subrepl-f5y08ph0/claude/phase-2b2-portfolio-assets-8vh4q1             [m 9b94a54 SiteMint Platform / Phase 2B.2.4: record portfolio publication approvals
+  [31mremotes/subrepl-f5y08ph0/claude/secure-provider-publish-orchestration-klxnua  [m f0d643d Milestone 1 / Checkpoint E3B2: secure publish orchestration
+  [31mremotes/subrepl-f5y08ph0/claude/session-y4llve                                [m 8d5040b SiteMint Platform / Phase 2B.3: build data-driven Selected Work experience
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-design-token-audit-r4r2af            [m 3e400e7 SiteMint Platform / Phase 1A.1: resolve design-token decisions
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-frontend-epic-1-customer-experience  [m 5a96993 Frontend Epic 1: complete customer-facing platform preview experience
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-homepage-redesign-trip1r             [m 31f9408 Redesign homepage with a single light, mint-first theme
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-homepage-visual-redesign-v2          [m f6755c7 Redesign SiteMint platform-preview homepage on a fixed light-mint theme
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-homepage-visual-redesign-v2-5yukpl   [m 214c493 feat: add complete SiteMint platform preview redesign
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-1b-tokens-kcb619               [m 26fb4ff SiteMint Platform / Phase 1B.1: correct accessibility token gaps
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-1c-tokens-uy4yb3               [m b4cf742 SiteMint Platform / Phase 1C.1: correct focus and status contrast
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2a-prototype-duvcsn            [m e5608fb SiteMint Platform / Phase 2A.4: elevate premium visual experience
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2b1-audit-wtoai0               [m 0ca3f43 SiteMint Platform / Phase 2B.1.1: correct audit findings and launch classifications
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2c1-audit-xz1cdo               [m 489d6f3 SiteMint Platform / Phase 2C.1.1: reconcile release readiness classifications
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2c2a-audit-euthts              [m 1a75145 SiteMint Platform / Phase 2C.2A.3: finalize Discovery data contract
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2c2b-domain-42pbaq             [m a169972 SiteMint Platform / Phase 2C.2B.1: preserve CRM runtime compatibility
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2c2c0-checkpoint-5tdobj        [m 33570b2 SiteMint Platform / Phase 2C.2C0.1: correct shared contract boundary ADR
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2c2c1-discovery-contract-bbfugl[m f0c0d12 SiteMint Platform / Phase 2C.2C1: create shared Discovery contract package
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-phase-2c2c2-complete-guided-discovery[m ec5da0e SiteMint Platform / Phase 2C.2C2: complete guided discovery form preview
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-platform-blueprint-j6snjs            [m 8a8fcd2 SiteMint Platform / Checkpoint P0.1: resolve blueprint decisions
+  [31mremotes/subrepl-f5y08ph0/claude/sitemint-production-migration-2ddamq          [m 9118b9c feat: promote SiteMint redesign to production routes
+  [31mremotes/subrepl-f5y08ph0/claude/vapi-platform-foundation                      [m 7897bfe Published your App
+  [31mremotes/subrepl-f5y08ph0/claude/vapi-voice-provider-adapter-lvgc0u            [m d5e2e06 Milestone 1 / Checkpoint E3A: Vapi provider adapter
+  [31mremotes/subrepl-f5y08ph0/claude/versioned-voice-migrations-1q9owq             [m a51e6ef Milestone 1 / Checkpoint C: voice schema migrations
+  [31mremotes/subrepl-f5y08ph0/claude/voice-provider-abstraction-1ci4k7             [m 3766646 Milestone 1 / Checkpoint D: voice provider foundation
+  [31mremotes/subrepl-f5y08ph0/claude/voice-test-foundation-f1-y003bo               [m 45f2e94 Milestone 1 / Checkpoint F1: browser test foundation
+  [31mremotes/subrepl-f5y08ph0/main                                                 [m 73c4a54 Add files via upload
