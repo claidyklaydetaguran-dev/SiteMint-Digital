@@ -43,10 +43,15 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Ambient mint glow, decorative only */}
+      {/* Ambient glow — navy tint top, mint haze centre */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-accent/20 blur-3xl dark:bg-accent/10"
+        className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-accent/15 blur-3xl dark:bg-accent/10"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-40 left-1/2 h-60 w-[28rem] -translate-x-1/2 rounded-full opacity-40 blur-2xl"
+        style={{ background: "radial-gradient(ellipse, hsl(204 42% 15% / 0.12), transparent 70%)" }}
       />
 
       <div className="w-full max-w-sm relative">
@@ -58,7 +63,9 @@ export default function Login() {
         {/* Heading */}
         <div className="text-center mb-7">
           <h1 className="font-display text-2xl font-semibold text-foreground">Sign in to SiteMint</h1>
-          <p className="text-sm text-muted-foreground mt-1.5">AI Receptionist Dashboard</p>
+          <p className="text-sm text-muted-foreground mt-1.5">
+            AI Receptionist · Client Dashboard
+          </p>
         </div>
 
         {/* Card */}

@@ -3,6 +3,7 @@ import { X, CheckCircle2, ChevronRight } from "lucide-react";
 
 export interface ChecklistStep {
   label: string;
+  description?: string;
   done: boolean;
   href: string;
 }
@@ -38,26 +39,33 @@ export function GettingStartedChecklist({ title, steps, onDismiss }: GettingStar
         {steps.map((step) => (
           <Link key={step.label} href={step.href}>
             <div
-              className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg cursor-pointer hover:bg-card/60 transition-colors ${
+              className={`flex items-start gap-2.5 py-1.5 px-2 rounded-lg cursor-pointer hover:bg-card/60 transition-colors ${
                 step.done ? "opacity-55" : ""
               }`}
             >
               <div
-                className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                className={`mt-0.5 w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center border ${
                   step.done ? "bg-success border-success" : "border-border bg-card"
                 }`}
               >
                 {step.done && <CheckCircle2 className="h-3 w-3 text-success-foreground" aria-hidden="true" />}
               </div>
-              <span
-                className={`text-xs leading-snug ${
-                  step.done ? "text-muted-foreground line-through" : "text-foreground font-medium"
-                }`}
-              >
-                {step.label}
-              </span>
+              <div className="flex-1 min-w-0">
+                <span
+                  className={`text-xs leading-snug block ${
+                    step.done ? "text-muted-foreground line-through" : "text-foreground font-medium"
+                  }`}
+                >
+                  {step.label}
+                </span>
+                {step.description && !step.done && (
+                  <span className="text-[11px] text-muted-foreground leading-snug block mt-0.5">
+                    {step.description}
+                  </span>
+                )}
+              </div>
               {!step.done && (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto flex-shrink-0" aria-hidden="true" />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true" />
               )}
             </div>
           </Link>
