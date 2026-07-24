@@ -6,7 +6,7 @@ const footerGroups = [
   {
     heading: "Products",
     links: [
-      { label: "AI Receptionist", href: "/ai-receptionist" },
+      { label: "AI Receptionist", href: "/ai-receptionist/dashboard" },
     ],
   },
   {

@@ -28,7 +28,7 @@ export const productsNavItems: PreviewNavChild[] = [
   {
     label: "AI Receptionist",
     description: "Never miss a lead — AI answers, qualifies, and follows up 24/7.",
-    href: "/ai-receptionist",
+    href: "/ai-receptionist/dashboard",
   },
   {
     label: "AI Toolkit",
