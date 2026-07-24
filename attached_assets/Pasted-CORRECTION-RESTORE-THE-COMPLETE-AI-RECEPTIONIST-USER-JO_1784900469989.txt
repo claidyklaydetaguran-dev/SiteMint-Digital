@@ -1,0 +1,130 @@
+CORRECTION — RESTORE THE COMPLETE AI RECEPTIONIST USER JOURNEY
+
+The previous route change was incorrect. I still need a public AI Receptionist landing page.
+
+The required experience is:
+
+1. Public AI Receptionist landing page
+2. Sign Up or Sign In
+3. Authenticated AI Receptionist dashboard
+
+Do not redirect visitors directly from the landing page to the dashboard.
+
+REQUIRED ROUTES
+
+- /ai-receptionist
+  Public AI Receptionist marketing and product landing page
+
+- /ai-receptionist/signup
+  Account registration or access-request page
+
+- /ai-receptionist/dashboard/login
+  Existing dashboard sign-in page
+
+- /ai-receptionist/dashboard
+  Existing authenticated client dashboard
+
+ROUTE AND CTA BEHAVIOR
+
+- Main SiteMint navigation and product links must open /ai-receptionist
+- “Get Started” and “Start Setup” on the landing page must open /ai-receptionist/signup
+- “Sign In” on the landing page must open /ai-receptionist/dashboard/login
+- Successful signup should continue into the appropriate onboarding or dashboard flow
+- Successful login should continue to /ai-receptionist/dashboard
+- Protected dashboard routes must still require authentication
+- Do not create circular redirects
+
+LANDING-PAGE DESIGN
+
+Keep or restore the existing AI Receptionist landing-page content, but redesign it to match the current SiteMint Digital website:
+
+- Ocean navy: #051824, #162936, #3B5265
+- Mint accent: #27E9B5
+- Light surfaces: #E8F8F5, #F6FBFA, #FFFFFF
+- Premium light ocean-mist and sea-glass appearance
+- Same navbar, typography, buttons, spacing, cards, and visual language as SiteMint
+- Mint used only as a restrained accent
+- Remove the old purple gradients and visually mismatched styling
+- Clearly explain what the AI Receptionist does, how calls are handled, and what appears in the dashboard
+- Responsive on desktop, tablet, and 390px mobile
+
+SIGNUP AND SIGN-IN
+
+The signup and sign-in pages must use the same SiteMint theme and palette.
+
+- Keep Sign Up and Sign In as separate, clearly labeled actions
+- If real self-service account creation is already supported, preserve it
+- If signup is not supported by the existing backend, do not fake account creation
+- In that case, create an honest access-request/contact experience and report the limitation
+- Do not route “Sign Up” back to “Sign In” without explanation
+
+DASHBOARD
+
+Keep the newly redesigned authenticated dashboard. Do not replace or remove it.
+
+Preserve:
+
+- Authentication
+- Dashboard functionality
+- Existing APIs and integrations
+- Assistant configuration
+- Call and message activity
+- Existing data structures
+
+ROLL BACK THE INCORRECT CHANGES
+
+Remove these incorrect redirects:
+
+- /ai-receptionist → /ai-receptionist/dashboard
+- /ai-receptionist/signup → /ai-receptionist/dashboard/login
+
+Restore the landing and signup components to normal routing. Update all SiteMint product links so they open the landing page first.
+
+Do not delete the landing-page, signup, dashboard, or login source files.
+
+BOUNDARIES
+
+Do not modify:
+
+- Backend behavior
+- Database or migrations
+- Authentication implementation
+- Voice provider or phone-number integrations
+- Environment variables
+- Discovery form
+- Deployment configuration
+- Unrelated pages
+
+Do not place calls, send messages, purchase numbers, create accounts, or create real records.
+
+VERIFICATION
+
+Run typecheck and production builds for both relevant frontends.
+
+Test:
+
+- /ai-receptionist
+- /ai-receptionist/signup
+- /ai-receptionist/dashboard/login
+- /ai-receptionist/dashboard
+- Landing-page Get Started CTA
+- Landing-page Sign In CTA
+- Protected dashboard behavior
+- Main SiteMint Products link
+- Footer AI Receptionist link
+- Desktop, tablet, and 390px mobile
+- Browser console
+- No redirect loops or broken links
+
+Return:
+
+- Final route map
+- Changed-file list
+- Whether real self-service signup is currently supported
+- Desktop and mobile screenshots of the landing page
+- Signup and sign-in screenshots
+- Dashboard screenshot
+- Typecheck and build results
+- Confirmation that nothing was committed, pushed, published, or deployed
+
+Stop for review.
