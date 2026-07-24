@@ -121,12 +121,12 @@ export default function Login() {
         </div>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
-          Don't have access?{" "}
+          Need an account?{" "}
           <a
-            href="/contact"
+            href="/ai-receptionist/signup"
             className="text-primary hover:underline font-medium transition-colors focus-visible:underline"
           >
-            Contact SiteMint
+            Get started
           </a>
         </p>
       </div>

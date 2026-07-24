@@ -11,10 +11,8 @@ const DiscoveryPage = lazy(() => import("@/pages/DiscoveryPage"));
 import ThankYou from "@/pages/ThankYou";
 import LandingLawyers from "@/pages/LandingLawyers";
 import LandingRealtors from "@/pages/LandingRealtors";
-// LandingReceptionist and LandingReceptionistSignup kept as source for rollback.
-// Routes below redirect to the new helpdesk SPA — do not re-import until rollback.
-// import LandingReceptionist from "@/pages/LandingReceptionist";
-// import LandingReceptionistSignup from "@/pages/LandingReceptionistSignup";
+import LandingReceptionist from "@/pages/LandingReceptionist";
+import LandingReceptionistSignup from "@/pages/LandingReceptionistSignup";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminSubmissionDetail from "@/pages/AdminSubmissionDetail";
@@ -146,14 +144,8 @@ function Router() {
       {/* Landing test pages — no main layout, unlisted */}
       <Route path="/ai-for-lawyers" component={LandingLawyers} />
       <Route path="/ai-for-realtors" component={LandingRealtors} />
-      {/* Old AI Receptionist landing pages — source kept for rollback, not publicly routed.
-          Both redirect to the new helpdesk SPA. */}
-      <Route path="/ai-receptionist/signup">
-        {() => <LegacyRedirect to="/ai-receptionist/dashboard/login" />}
-      </Route>
-      <Route path="/ai-receptionist">
-        {() => <LegacyRedirect to="/ai-receptionist/dashboard" />}
-      </Route>
+      <Route path="/ai-receptionist/signup" component={LandingReceptionistSignup} />
+      <Route path="/ai-receptionist" component={LandingReceptionist} />
 
       {/* ── Legacy AI Receptionist routes — redirect to helpdesk SPA ── */}
       <Route path="/app/login">
