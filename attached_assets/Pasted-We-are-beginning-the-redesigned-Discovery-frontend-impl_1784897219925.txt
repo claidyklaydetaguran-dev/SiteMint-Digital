@@ -1,0 +1,251 @@
+We are beginning the redesigned Discovery frontend implementation in Replit.
+
+GOAL
+
+Make the new SiteMint Discovery form the frontend that will eventually replace the existing legacy form at:
+
+/discovery
+
+For this module, work in preview only. Do not publish yet.
+
+IMPORTANT CURRENT STATE
+
+Branch:
+claude/sitemint-production-migration-2ddamq
+
+Expected HEAD:
+292b59e557e6f77fb8653fe71632164b512fd6ee
+
+The structured backend intake route already exists:
+
+POST /api/v1/discovery-submissions
+
+However:
+
+- The structured Discovery database migration has not been applied
+- DISCOVERY_FINGERPRINT_HMAC_KEY has not been provisioned
+- The delivery worker has not been implemented
+- CRM synchronization and email delivery are not active
+- Existing CRM/admin screens do not yet fully handle isAutomaticallyScored=false
+
+Do not submit to the real structured endpoint during this frontend module.
+
+PHASE 1 — INSPECT FIRST
+
+Before editing:
+
+1. Confirm the branch and HEAD.
+2. Run git status --short.
+3. Do not discard, delete, commit, or overwrite any existing untracked files.
+4. Inspect the current /discovery route and legacy form.
+5. Search for all redesigned Discovery frontend work, including:
+   - PlatformDiscoveryShell
+   - New Discovery components
+   - Discovery steps
+   - State-management code
+   - Validation schemas
+   - API client code
+   - Draft persistence
+   - Progress indicators
+   - Review and confirmation screens
+6. Determine whether the redesigned frontend is:
+   - Complete but feature-gated
+   - Partially implemented
+   - A visual shell only
+   - Not implemented
+7. Compare the new frontend fields with the structured Discovery contract and report:
+   - Fields already supported
+   - Missing fields
+   - Incorrect names or types
+   - Conditional questions
+   - Required versus optional fields
+   - Payload-shape differences
+
+Return the inspection findings before making broad changes.
+
+If the redesigned frontend already exists, reuse and finish it. Do not rebuild it unnecessarily.
+
+PHASE 2 — IMPLEMENT THE REDESIGNED FRONTEND
+
+After inspection, implement or complete a polished multi-step Discovery form using SiteMint’s current production design system.
+
+Design direction:
+
+- Cool ocean navy, cyan-mint accents, white and light sea-glass sections
+- Premium, modern, friendly—not corporate
+- Primary navy tones:
+  - #051824
+  - #162936
+  - #3B5265
+- Mint accent:
+  - #27E9B5
+- Light surfaces:
+  - #E8F8F5
+  - #F6FBFA
+  - #FFFFFF
+- Mint should remain an accent, not a large neon background
+- Responsive at desktop, tablet, and 390px mobile
+- Accessible labels, focus states, keyboard navigation, and error messages
+
+The experience should include:
+
+1. Welcome/introduction screen
+2. Clear estimated completion time
+3. Multi-step progress indicator
+4. Back and Continue controls
+5. Per-step validation
+6. Business information
+7. Project type and requested services
+8. Business goals and current challenges
+9. Website/application requirements
+10. CRM, automation, and integration requirements
+11. Content, branding, and design preferences
+12. Timeline and budget
+13. Contact information
+14. Review-and-edit screen
+15. Submission confirmation screen
+16. Save-draft behavior in localStorage
+17. Restore-draft option
+18. Clear-draft option after confirmed submission
+19. Protection against accidental refresh/navigation when meaningful unsaved information exists
+20. Friendly empty, validation, loading, error, and success states
+
+Use the existing structured Discovery contract as the authoritative source for field names, enums, limits, required fields, normalization, and payload structure. Do not invent incompatible API fields.
+
+COPY REQUIREMENTS
+
+Use natural SiteMint language.
+
+Avoid stiff wording such as:
+
+- “Kindly provide”
+- “Leverage synergies”
+- “Transformative digital ecosystem”
+- Excessively technical explanations
+
+The form should feel like a guided project-planning conversation, not a government application.
+
+Example introduction:
+
+“Tell us what you’re building.
+
+We’ll ask about your business, goals, and the systems you need. Your answers help our team understand the project before we recommend the right approach.”
+
+Do not display a fake calculated package, lead score, qualification result, or guaranteed price.
+
+SUBMISSION SAFETY
+
+For this preview-only module:
+
+- Add a development-safe submission adapter or mock-submit mode
+- The mock must validate and serialize the final structured payload
+- It must not call POST /api/v1/discovery-submissions
+- It must not write to a real database
+- It must not send email
+- It must not create or synchronize a CRM lead
+- It must not process a delivery job
+- Clearly label mock behavior in development only
+- Do not expose development labels in a production build
+
+Do not weaken or bypass the backend’s fingerprint/HMAC requirement.
+
+LEGACY FORM REPLACEMENT
+
+The intended final result is for the redesigned form to own /discovery.
+
+For this preview module:
+
+1. Route /discovery to the redesigned form.
+2. Remove the legacy form from public navigation and normal routing.
+3. Do not permanently delete its source files yet.
+4. Keep it available only through an internal rollback mechanism that is not linked publicly.
+5. Do not create an indexed public legacy URL.
+6. Document the exact files or route change needed to remove the rollback copy after production acceptance.
+
+This is a temporary rollback safeguard, not a second public form.
+
+Do not change the legacy POST /api/discovery/submit endpoint in this frontend module.
+
+BOUNDARIES
+
+Do not:
+
+- Publish or deploy
+- Apply or rewrite any migration
+- Run db push or automatic schema synchronization
+- Provision or change DISCOVERY_FINGERPRINT_HMAC_KEY
+- Change DATABASE_URL
+- Implement the delivery worker
+- Send an email
+- Synchronize a CRM lead
+- Process delivery jobs
+- Create a real submission
+- Change CRM/admin scoring displays
+- Modify AI Receptionist
+- Modify authentication or Sign In
+- Modify unrelated pages
+- Commit or push until review approval
+
+VERIFICATION
+
+After implementation, run:
+
+- Root workspace typecheck
+- Web-agency production build
+- Relevant frontend tests
+- Structured Discovery contract tests
+- Existing backend Discovery tests to confirm no regression
+
+Preview and visually verify:
+
+- 1440px desktop: welcome screen
+- 1440px desktop: a representative middle step
+- 1440px desktop: validation errors
+- 1440px desktop: review screen
+- 1440px desktop: mock confirmation
+- 768px tablet
+- 390px mobile
+- Keyboard-only navigation
+- Browser back/forward behavior
+- Refresh and draft restoration
+- Existing navbar and mobile menu
+- /admin and /admin/crm authentication boundaries
+
+Also confirm:
+
+- /discovery shows the redesigned frontend
+- The legacy form is no longer publicly linked
+- No real endpoint was called
+- No real data was created
+- No migration was applied
+- No secret or environment variable changed
+- No code was committed or pushed
+- Nothing was deployed, published, or republished
+
+FINAL REPORT
+
+Return:
+
+- Initial inspection findings
+- What already existed versus what was newly implemented
+- Complete changed-file list
+- Final route behavior
+- Legacy rollback mechanism
+- Structured payload mapping
+- Validation behavior
+- Draft-storage behavior
+- Accessibility checks
+- Test and build commands with results
+- Preview screenshots
+- git status --short
+- git diff --stat
+- Remaining blockers before production activation
+- Confirmation that no real submission or external side effect occurred
+
+End with exactly one verdict:
+
+- Ready for frontend review
+- Ready with documented limitations
+- Not ready — corrections required
+
+Then stop. Do not commit or publish.
