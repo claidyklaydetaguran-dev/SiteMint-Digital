@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import Discovery from "@/pages/Discovery";
+// Legacy discovery form — kept for internal rollback only (route: /discovery/__legacy).
+// The active /discovery route now points to DiscoveryPage (the guided structured form).
+const Discovery = lazy(() => import("@/pages/Discovery"));
+const DiscoveryPage = lazy(() => import("@/pages/DiscoveryPage"));
 import ThankYou from "@/pages/ThankYou";
 import LandingLawyers from "@/pages/LandingLawyers";
 import LandingRealtors from "@/pages/LandingRealtors";
@@ -115,9 +118,25 @@ function Router() {
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
 
-      {/* Discovery form — the real, working "Start a Project" funnel
-          (posts to /api/discovery/submit). No main layout — self-contained. */}
-      <Route path="/discovery" component={Discovery} />
+      {/* Discovery form — guided, structured "Start a Project" intake.
+          No main layout — self-contained with branded header.
+          ROLLBACK: swap DiscoveryPage back to Discovery to revert instantly. */}
+      <Route path="/discovery">
+        {() => (
+          <Suspense fallback={null}>
+            <DiscoveryPage />
+          </Suspense>
+        )}
+      </Route>
+
+      {/* Legacy discovery form — internal rollback only, not linked publicly. */}
+      <Route path="/discovery/__legacy">
+        {() => (
+          <Suspense fallback={null}>
+            <Discovery />
+          </Suspense>
+        )}
+      </Route>
 
       {/* Thank You — no main layout */}
       <Route path="/thank-you">{() => <ThankYou />}</Route>
