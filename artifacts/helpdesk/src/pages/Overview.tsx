@@ -209,17 +209,20 @@ export default function Overview() {
   const checklistSteps: ChecklistStep[] = hasAgentConfig
     ? [
         {
-          label: "Add a business description",
+          label: "Describe your business",
+          description: "Tells the AI what your business does so it can answer questions accurately.",
           done: Boolean(agentConfig!.businessDescription?.trim()),
           href: "/receptionist",
         },
         {
           label: "Write a greeting message",
+          description: "The first SMS your receptionist sends when someone texts your number.",
           done: Boolean(agentConfig!.greetingMessage?.trim()),
           href: "/receptionist",
         },
         {
           label: "Add qualifying questions",
+          description: "Questions that help the AI score leads before they reach you.",
           done: (agentConfig!.qualifyingQuestions ?? []).length > 0,
           href: "/receptionist",
         },
@@ -236,9 +239,11 @@ export default function Overview() {
             {greeting()}
             {firm?.name ? `, ${firm.name}` : ""}
           </h1>
-          <StatusBadge label="Live on SMS" tone="success" />
+          <StatusBadge label="Receptionist active" tone="success" />
         </div>
-        <p className="text-sm text-muted-foreground mt-0.5">{todayLabel()}</p>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {todayLabel()} · Your AI is answering texts and qualifying leads
+        </p>
       </div>
 
       <div className="px-6 pb-6 flex flex-col gap-5">
@@ -269,11 +274,11 @@ export default function Overview() {
           />
         </div>
 
-        {/* Voice-platform metrics — never fabricated, honest "no data yet" */}
+        {/* Voice-platform metrics — honest "no data yet" states, never fabricated */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <KpiTile label="Calls answered" value="" icon={PhoneCall} unavailable unavailableLabel="Connect voice to enable" />
-          <KpiTile label="Appointments booked" value="" icon={CalendarCheck} unavailable unavailableLabel="Connect voice to enable" />
-          <KpiTile label="Hours saved" value="" icon={Clock3} unavailable unavailableLabel="Available after voice setup" />
+          <KpiTile label="Calls answered" value="" icon={PhoneCall} unavailable unavailableLabel="Voice add-on required" />
+          <KpiTile label="Appointments booked" value="" icon={CalendarCheck} unavailable unavailableLabel="Voice add-on required" />
+          <KpiTile label="Hours saved" value="" icon={Clock3} unavailable unavailableLabel="Enabled after voice setup" />
         </div>
 
         {/* Real-voice provider readiness — honest configured/verified states only */}
