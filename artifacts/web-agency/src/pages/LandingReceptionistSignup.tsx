@@ -277,7 +277,7 @@ export default function LandingReceptionistSignup() {
               {FEATURES.map((f) => (
                 <div key={f.title} className="flex items-start gap-4 bg-white/8 rounded-xl p-4 border border-white/10">
                   <div className="w-8 h-8 rounded-lg bg-white/12 flex items-center justify-center shrink-0 mt-0.5">
-                    <f.icon className="w-4 h-4 text-emerald-300" />
+                    <f.icon className="w-4 h-4 text-cyan-300" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold mb-0.5">{f.title}</p>

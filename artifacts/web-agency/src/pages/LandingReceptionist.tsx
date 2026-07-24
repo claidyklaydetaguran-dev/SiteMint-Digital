@@ -123,7 +123,7 @@ const INDUSTRY_SCRIPTS: IndustryScript[] = [
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const BENEFITS = [
-  { icon: Users,      color: "#6366f1", bg: "rgba(99,102,241,0.12)", title: "Capture leads that go cold",            body: "Most callers don't leave voicemails. When an AI replies in seconds, they stay engaged — and you get the lead instead of the competitor who answers next." },
+  { icon: Users,      color: "#162936", bg: "rgba(22,41,54,0.10)", title: "Capture leads that go cold",            body: "Most callers don't leave voicemails. When an AI replies in seconds, they stay engaged — and you get the lead instead of the competitor who answers next." },
   { icon: Calendar,   color: "#10b981", bg: "rgba(16,185,129,0.12)", title: "Guide conversations toward booking",     body: "The AI asks the right qualifying questions for your business, collects the information you need, and moves toward scheduling." },
   { icon: RefreshCw,  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  title: "Automate follow-up on every lead",      body: "Every conversation is logged. Unanswered leads can be followed up automatically so a busy day never means a lost opportunity." },
   { icon: ShieldCheck, color: "#06b6d4", bg: "rgba(6,182,212,0.12)", title: "Consistent and on-brand, 24/7",          body: "The AI represents your business the way you want — with your tone, your service list, your booking process. No off-script answers, no bad days." },
@@ -224,7 +224,7 @@ function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
   return (
     <div style={{
       width: 280,
-      background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)",
+      background: "linear-gradient(180deg, #051824 0%, #0d2030 100%)",
       borderRadius: 36,
       padding: "12px 6px",
       boxShadow: "0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.12)",
@@ -232,12 +232,12 @@ function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
     }}>
       {/* Notch */}
       <div style={{
-        width: 100, height: 28, background: "#0d1117",
+        width: 100, height: 28, background: "#051824",
         borderRadius: "0 0 20px 20px", margin: "0 auto 8px",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
       }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#1a1a2e" }} />
-        <div style={{ width: 50, height: 6, borderRadius: 3, background: "#1a1a2e" }} />
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0a1a26" }} />
+        <div style={{ width: 50, height: 6, borderRadius: 3, background: "#0a1a26" }} />
       </div>
 
       {/* Screen */}
@@ -260,7 +260,7 @@ function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
         }}>
           <div style={{
             width: 32, height: 32, borderRadius: "50%",
-            background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+            background: "linear-gradient(135deg, #051824 0%, #162936 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 14,
           }}>
@@ -285,7 +285,7 @@ function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
               <div style={{
                 maxWidth: "80%",
                 background: msg.from === "user"
-                  ? "linear-gradient(135deg, #062e71 0%, #1249a8 100%)"
+                  ? "#162936"
                   : "#fff",
                 color: msg.from === "user" ? "#fff" : "#1a1a1a",
                 borderRadius: msg.from === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -293,7 +293,7 @@ function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
                 fontSize: 11,
                 lineHeight: 1.5,
                 boxShadow: msg.from === "user"
-                  ? "0 2px 8px rgba(6,46,113,0.35)"
+                  ? "0 2px 8px rgba(5,24,36,0.35)"
                   : "0 1px 4px rgba(0,0,0,0.12)",
               }}>
                 {msg.text}
@@ -331,10 +331,10 @@ function HeroPhoneMockup({ industryIdx }: { industryIdx: number }) {
           </div>
           <div style={{
             width: 28, height: 28, borderRadius: "50%",
-            background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+            background: "#162936",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <Send style={{ width: 12, height: 12, color: "#fff" }} />
+            <Send style={{ width: 12, height: 12, color: "#27E9B5" }} />
           </div>
         </div>
       </div>
@@ -458,7 +458,7 @@ export default function LandingReceptionist() {
   const scrollToContact = () => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f9ff", overflowX: "hidden", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", overflowX: "hidden", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
 
       <ReceptionistNav />
       <div style={{ height: 82 }} />
@@ -467,7 +467,7 @@ export default function LandingReceptionist() {
           HERO — full-viewport dark immersive section
       ═══════════════════════════════════════════════════════════════════════ */}
       <section style={{
-        background: "linear-gradient(135deg, #020c1f 0%, #041630 40%, #061e48 100%)",
+        background: "linear-gradient(135deg, #051824 0%, #0c1f2e 40%, #162936 100%)",
         position: "relative",
         overflow: "hidden",
         padding: "72px 24px 80px",
@@ -475,14 +475,14 @@ export default function LandingReceptionist() {
         {/* Grid dot pattern */}
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none",
-          backgroundImage: "radial-gradient(circle, rgba(99,102,241,0.18) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, rgba(39,233,181,0.10) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
           maskImage: "radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%)",
         }} />
 
         {/* Glow blobs */}
-        <div style={{ position: "absolute", top: "-10%", left: "5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,46,113,0.45) 0%, transparent 70%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "-5%", right: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "-10%", left: "5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(5,24,36,0.6) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-5%", right: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(39,233,181,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
 
         <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
@@ -492,8 +492,8 @@ export default function LandingReceptionist() {
               <motion.div variants={fadeUp}>
                 <span style={{
                   display: "inline-flex", alignItems: "center", gap: 8,
-                  background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)",
-                  color: "#a5b4fc", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+                  background: "rgba(39,233,181,0.12)", border: "1px solid rgba(39,233,181,0.35)",
+                  color: "#27E9B5", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
                   textTransform: "uppercase", padding: "5px 12px", borderRadius: 100,
                 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
@@ -511,8 +511,7 @@ export default function LandingReceptionist() {
                 Stop losing jobs<br />
                 to{" "}
                 <span style={{
-                  background: "linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #34d399 100%)",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  color: "#27E9B5",
                 }}>voicemail</span>.
               </motion.h1>
 
@@ -537,16 +536,16 @@ export default function LandingReceptionist() {
               <motion.div variants={fadeUp} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <Link href="/ai-receptionist/signup">
                   <button style={{
-                    background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                    color: "#fff", fontSize: 15, fontWeight: 700,
+                    background: "#27E9B5",
+                    color: "#051824", fontSize: 15, fontWeight: 700,
                     padding: "14px 28px", borderRadius: 12, border: "none", cursor: "pointer",
                     display: "flex", alignItems: "center", gap: 8,
-                    boxShadow: "0 4px 24px rgba(99,102,241,0.5), 0 0 0 1px rgba(99,102,241,0.4)",
+                    boxShadow: "0 4px 24px rgba(39,233,181,0.35)",
                     transition: "transform 0.15s, box-shadow 0.15s",
                     letterSpacing: "-0.01em",
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(99,102,241,0.65), 0 0 0 1px rgba(99,102,241,0.4)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(99,102,241,0.5), 0 0 0 1px rgba(99,102,241,0.4)"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(39,233,181,0.5)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(39,233,181,0.35)"; }}
                   >
                     Get early access <ArrowRight style={{ width: 16, height: 16 }} />
                   </button>
@@ -640,7 +639,7 @@ export default function LandingReceptionist() {
       {/* ═══════════════════════════════════════════════════════════════════════
           STATS BAR — bold numbers on near-black
       ═══════════════════════════════════════════════════════════════════════ */}
-      <section style={{ background: "#041230", padding: "48px 24px" }}>
+      <section style={{ background: "#051824", padding: "48px 24px" }}>
         <div style={{ maxWidth: 960, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 32 }}>
           {[
             { num: 70, suffix: "%+", label: "of inbound calls go unanswered", sub: "BrightLocal / Google SMB research", icon: Phone, color: "#f87171" },
@@ -665,13 +664,13 @@ export default function LandingReceptionist() {
       {/* ═══════════════════════════════════════════════════════════════════════
           INDUSTRY DEMO — interactive chat
       ═══════════════════════════════════════════════════════════════════════ */}
-      <section ref={demoRef as React.RefObject<HTMLElement>} id="demo" style={{ padding: "96px 24px", background: "#f8f9ff" }}>
+      <section ref={demoRef as React.RefObject<HTMLElement>} id="demo" style={{ padding: "96px 24px", background: "#F6FBFA" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} variants={stagger}
             style={{ textAlign: "center", marginBottom: 48, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
             <motion.span variants={fadeUp} style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-              color: "#6366f1", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              color: "#162936", background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100,
             }}>Interactive Demo</motion.span>
             <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -693,12 +692,12 @@ export default function LandingReceptionist() {
                     padding: "8px 16px", borderRadius: 100, fontSize: 13, fontWeight: 600,
                     cursor: "pointer", transition: "all 0.2s",
                     background: i === activeIndustry
-                      ? "linear-gradient(135deg, #062e71 0%, #1249a8 100%)"
+                      ? "#162936"
                       : "#fff",
                     color: i === activeIndustry ? "#fff" : "#475569",
                     border: i === activeIndustry ? "1px solid transparent" : "1px solid #e2e8f0",
                     boxShadow: i === activeIndustry
-                      ? "0 4px 16px rgba(6,46,113,0.3)"
+                      ? "0 4px 16px rgba(5,24,36,0.25)"
                       : "0 1px 3px rgba(0,0,0,0.06)",
                   }}>
                     {ind.emoji} {ind.label}
@@ -714,7 +713,7 @@ export default function LandingReceptionist() {
               }}>
                 {/* Header */}
                 <div style={{
-                  background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+                  background: "linear-gradient(135deg, #051824 0%, #162936 100%)",
                   padding: "14px 18px", display: "flex", alignItems: "center", gap: 10,
                 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
@@ -732,10 +731,10 @@ export default function LandingReceptionist() {
                         maxWidth: "80%", borderRadius: msg.from === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                         padding: "10px 14px", fontSize: 13, lineHeight: 1.55,
                         background: msg.from === "user"
-                          ? "linear-gradient(135deg, #062e71 0%, #1249a8 100%)"
+                          ? "#162936"
                           : "#f1f5f9",
                         color: msg.from === "user" ? "#fff" : "#1e293b",
-                        boxShadow: msg.from === "user" ? "0 2px 8px rgba(6,46,113,0.25)" : "none",
+                        boxShadow: msg.from === "user" ? "0 2px 8px rgba(5,24,36,0.22)" : "none",
                       }}>{msg.text}</div>
                     </motion.div>
                   ))}
@@ -765,8 +764,8 @@ export default function LandingReceptionist() {
                   />
                   <button onClick={sendDemoMessage} disabled={demoTyping || !demoInput.trim()}
                     style={{
-                      background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
-                      color: "#fff", border: "none", borderRadius: 12, padding: "10px 14px",
+                      background: "#162936",
+                      color: "#27E9B5", border: "none", borderRadius: 12, padding: "10px 14px",
                       cursor: demoInput.trim() ? "pointer" : "not-allowed", opacity: demoInput.trim() ? 1 : 0.4,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
@@ -802,9 +801,9 @@ export default function LandingReceptionist() {
                     <div style={{
                       maxWidth: "78%", borderRadius: msg.from === "visitor" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                       padding: "9px 13px", fontSize: 12, lineHeight: 1.55,
-                      background: msg.from === "visitor" ? "rgba(255,255,255,0.12)" : "rgba(99,102,241,0.2)",
-                      color: msg.from === "visitor" ? "rgba(255,255,255,0.85)" : "#c7d2fe",
-                      border: msg.from === "visitor" ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(99,102,241,0.3)",
+                      background: msg.from === "visitor" ? "rgba(255,255,255,0.12)" : "rgba(39,233,181,0.12)",
+                      color: msg.from === "visitor" ? "rgba(255,255,255,0.85)" : "#b2f0e4",
+                      border: msg.from === "visitor" ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(39,233,181,0.25)",
                     }}>{msg.text}</div>
                   </motion.div>
                 ))}
@@ -854,8 +853,8 @@ export default function LandingReceptionist() {
             style={{ textAlign: "center", marginBottom: 56, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
             <motion.span variants={fadeUp} style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-              textTransform: "uppercase", color: "#6366f1",
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              textTransform: "uppercase", color: "#162936",
+              background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100,
             }}>Features</motion.span>
             <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -890,14 +889,14 @@ export default function LandingReceptionist() {
       {/* ═══════════════════════════════════════════════════════════════════════
           HOW IT WORKS — numbered steps with connectors
       ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="how-it-works" style={{ padding: "96px 24px", background: "linear-gradient(180deg, #f8f9ff 0%, #eef0ff 100%)" }}>
+      <section id="how-it-works" style={{ padding: "96px 24px", background: "linear-gradient(180deg, #F6FBFA 0%, #E8F8F5 100%)" }}>
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} variants={stagger}
             style={{ textAlign: "center", marginBottom: 56, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
             <motion.span variants={fadeUp} style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-              textTransform: "uppercase", color: "#6366f1",
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              textTransform: "uppercase", color: "#162936",
+              background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100,
             }}>Process</motion.span>
             <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -913,7 +912,7 @@ export default function LandingReceptionist() {
             {/* Connector line */}
             <div style={{
               position: "absolute", top: 44, left: "calc(16.5% + 22px)", right: "calc(16.5% + 22px)",
-              height: 2, background: "linear-gradient(90deg, #6366f1 0%, #a78bfa 100%)",
+              height: 2, background: "linear-gradient(90deg, #27E9B5 0%, #162936 100%)",
               zIndex: 0,
             }} />
             {HOW_IT_WORKS.map((step, i) => (
@@ -921,14 +920,14 @@ export default function LandingReceptionist() {
                 style={{ textAlign: "center", padding: "0 24px", position: "relative", zIndex: 1 }}>
                 <div style={{
                   width: 56, height: 56, borderRadius: "50%",
-                  background: i === 1 ? "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" : "#fff",
+                  background: i === 1 ? "linear-gradient(135deg, #051824 0%, #162936 100%)" : "#fff",
                   border: `2px solid ${i === 1 ? "transparent" : "#e2e8f0"}`,
                   display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px",
-                  boxShadow: i === 1 ? "0 8px 24px rgba(99,102,241,0.4)" : "0 4px 12px rgba(0,0,0,0.08)",
+                  boxShadow: i === 1 ? "0 8px 24px rgba(5,24,36,0.30)" : "0 4px 12px rgba(0,0,0,0.08)",
                 }}>
-                  <step.icon style={{ width: 22, height: 22, color: i === 1 ? "#fff" : "#6366f1" }} />
+                  <step.icon style={{ width: 22, height: 22, color: i === 1 ? "#27E9B5" : "#162936" }} />
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#6366f1", letterSpacing: "0.06em", marginBottom: 8 }}>STEP {step.step}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#27E9B5", letterSpacing: "0.06em", marginBottom: 8 }}>STEP {step.step}</div>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f1729", margin: "0 0 10px", lineHeight: 1.3 }}>{step.title}</h3>
                 <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.65, margin: 0 }}>{step.body}</p>
               </motion.div>
@@ -945,8 +944,8 @@ export default function LandingReceptionist() {
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <span style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-              textTransform: "uppercase", color: "#6366f1",
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              textTransform: "uppercase", color: "#162936",
+              background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100, marginBottom: 16,
             }}>Testimonials</span>
             <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.4rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -960,12 +959,12 @@ export default function LandingReceptionist() {
             ].map((t, i) => (
               <motion.div key={i} initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}
                 style={{
-                  background: "linear-gradient(135deg, #020c1f 0%, #061e48 100%)",
+                  background: "linear-gradient(135deg, #051824 0%, #162936 100%)",
                   borderRadius: 20, padding: "28px",
-                  boxShadow: "0 16px 48px rgba(2,12,31,0.2)",
+                  boxShadow: "0 16px 48px rgba(5,24,36,0.22)",
                   position: "relative", overflow: "hidden",
                 }}>
-                <div style={{ position: "absolute", top: 0, right: 0, width: 120, height: 120, background: "radial-gradient(circle at top right, rgba(99,102,241,0.2) 0%, transparent 70%)" }} />
+                <div style={{ position: "absolute", top: 0, right: 0, width: 120, height: 120, background: "radial-gradient(circle at top right, rgba(39,233,181,0.12) 0%, transparent 70%)" }} />
                 <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Example</div>
                 <div style={{ display: "flex", gap: 2, marginBottom: 16 }}>
                   {Array.from({ length: t.stars }).map((_, j) => (
@@ -986,16 +985,16 @@ export default function LandingReceptionist() {
       {/* ═══════════════════════════════════════════════════════════════════════
           INTEGRATIONS
       ═══════════════════════════════════════════════════════════════════════ */}
-      <section style={{ padding: "56px 24px", background: "#f8f9ff", borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" }}>
+      <section style={{ padding: "56px 24px", background: "#F6FBFA", borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6366f1", marginBottom: 8 }}>Integrations</p>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#162936", marginBottom: 8 }}>Integrations</p>
           <p style={{ fontSize: 14, color: "#64748b", marginBottom: 32 }}>Connects with the tools your business already runs on.</p>
           <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
             {[
               { icon: Calendar, label: "Google Calendar", color: "#4285f4" },
               { icon: Mail,     label: "Email",           color: "#ea4335" },
               { icon: MessageSquare, label: "SMS",        color: "#10b981" },
-              { icon: Globe,    label: "Website Chat",    color: "#6366f1" },
+              { icon: Globe,    label: "Website Chat",    color: "#162936" },
             ].map(({ icon: Icon, label, color }) => (
               <motion.div key={label} whileHover={{ y: -2, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}
                 style={{
@@ -1024,8 +1023,8 @@ export default function LandingReceptionist() {
             style={{ textAlign: "center", marginBottom: 56, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
             <motion.span variants={fadeUp} style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-              textTransform: "uppercase", color: "#6366f1",
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              textTransform: "uppercase", color: "#162936",
+              background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100,
             }}>Pricing</motion.span>
             <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(1.8rem,3.5vw,2.6rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -1062,12 +1061,12 @@ export default function LandingReceptionist() {
 
             {/* Monthly — hero card */}
             <motion.div variants={fadeUp} style={{
-              background: "linear-gradient(135deg, #020c1f 0%, #062e71 100%)",
+              background: "linear-gradient(135deg, #051824 0%, #162936 100%)",
               borderRadius: 24, padding: "36px",
-              boxShadow: "0 20px 60px rgba(6,46,113,0.35), 0 0 0 1px rgba(99,102,241,0.25)",
+              boxShadow: "0 20px 60px rgba(5,24,36,0.30), 0 0 0 1px rgba(39,233,181,0.18)",
               position: "relative", overflow: "hidden",
             }}>
-              <div style={{ position: "absolute", top: -30, right: -30, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)" }} />
+              <div style={{ position: "absolute", top: -30, right: -30, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(39,233,181,0.18) 0%, transparent 70%)" }} />
               <div style={{ position: "relative", zIndex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", margin: 0 }}>Monthly Plan</p>
@@ -1088,11 +1087,11 @@ export default function LandingReceptionist() {
                 </ul>
                 <Link href="/ai-receptionist/signup">
                   <button style={{
-                    width: "100%", background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                    color: "#fff", fontSize: 14, fontWeight: 700, border: "none",
+                    width: "100%", background: "#27E9B5",
+                    color: "#051824", fontSize: 14, fontWeight: 700, border: "none",
                     borderRadius: 12, padding: "14px", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    boxShadow: "0 4px 16px rgba(99,102,241,0.5)",
+                    boxShadow: "0 4px 16px rgba(39,233,181,0.35)",
                     transition: "transform 0.15s, box-shadow 0.15s",
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; }}
@@ -1111,13 +1110,13 @@ export default function LandingReceptionist() {
       {/* ═══════════════════════════════════════════════════════════════════════
           FAQ
       ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="faq" style={{ padding: "96px 24px", background: "linear-gradient(180deg, #f8f9ff 0%, #eef0ff 100%)" }}>
+      <section id="faq" style={{ padding: "96px 24px", background: "linear-gradient(180deg, #F6FBFA 0%, #E8F8F5 100%)" }}>
         <div style={{ maxWidth: 680, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <span style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-              textTransform: "uppercase", color: "#6366f1",
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              textTransform: "uppercase", color: "#162936",
+              background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100, marginBottom: 16,
             }}>FAQ</span>
             <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.4rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: 0, color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -1144,22 +1143,22 @@ export default function LandingReceptionist() {
           FINAL CTA — dark with glow
       ═══════════════════════════════════════════════════════════════════════ */}
       <section style={{
-        background: "linear-gradient(135deg, #020c1f 0%, #041630 50%, #061e48 100%)",
+        background: "linear-gradient(135deg, #051824 0%, #0c1f2e 50%, #162936 100%)",
         padding: "96px 24px", position: "relative", overflow: "hidden",
       }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(99,102,241,0.15) 1px, transparent 1px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(39,233,181,0.10) 1px, transparent 1px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(39,233,181,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
 
         <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
             style={{ display: "flex", flexDirection: "column", gap: 20, alignItems: "center" }}>
             <motion.div variants={fadeUp} style={{
               width: 64, height: 64, borderRadius: 20,
-              background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+              background: "#27E9B5",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 8px 32px rgba(99,102,241,0.5)",
+              boxShadow: "0 8px 32px rgba(39,233,181,0.35)",
             }}>
-              <Phone style={{ width: 28, height: 28, color: "#fff" }} />
+              <Phone style={{ width: 28, height: 28, color: "#051824" }} />
             </motion.div>
             <motion.h2 variants={fadeUp} style={{ fontSize: "clamp(2rem,4vw,3rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.15, letterSpacing: "-0.02em" }}>
               Ready to stop<br />missing calls?
@@ -1170,16 +1169,16 @@ export default function LandingReceptionist() {
             <motion.div variants={fadeUp} style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
               <Link href="/ai-receptionist/signup">
                 <button style={{
-                  background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                  color: "#fff", fontSize: 15, fontWeight: 700,
+                  background: "#27E9B5",
+                  color: "#051824", fontSize: 15, fontWeight: 700,
                   padding: "16px 32px", borderRadius: 14, border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 8,
-                  boxShadow: "0 4px 24px rgba(99,102,241,0.55)",
+                  boxShadow: "0 4px 24px rgba(39,233,181,0.38)",
                   transition: "transform 0.15s, box-shadow 0.15s",
                   letterSpacing: "-0.01em",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 36px rgba(99,102,241,0.7)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(99,102,241,0.55)"; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 36px rgba(39,233,181,0.55)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(39,233,181,0.38)"; }}
                 >
                   Get early access <ArrowRight style={{ width: 16, height: 16 }} />
                 </button>
@@ -1207,8 +1206,8 @@ export default function LandingReceptionist() {
           <div style={{ textAlign: "center", marginBottom: 40 }}>
             <span style={{
               display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-              textTransform: "uppercase", color: "#6366f1",
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+              textTransform: "uppercase", color: "#162936",
+              background: "rgba(39,233,181,0.10)", border: "1px solid rgba(39,233,181,0.30)",
               padding: "4px 12px", borderRadius: 100, marginBottom: 16,
             }}>Get in touch</span>
             <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.4rem)", fontFamily: "Playfair Display, serif", fontWeight: 700, margin: "0 0 10px", color: "#0f1729", letterSpacing: "-0.02em" }}>
@@ -1275,11 +1274,11 @@ export default function LandingReceptionist() {
               )}
               <button type="submit" disabled={submitting}
                 style={{
-                  background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+                  background: "linear-gradient(135deg, #051824 0%, #162936 100%)",
                   color: "#fff", fontSize: 15, fontWeight: 700, border: "none",
                   borderRadius: 12, padding: "15px", cursor: submitting ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  boxShadow: "0 4px 16px rgba(6,46,113,0.35)", opacity: submitting ? 0.7 : 1,
+                  boxShadow: "0 4px 16px rgba(5,24,36,0.30)", opacity: submitting ? 0.7 : 1,
                   transition: "transform 0.15s",
                 }}
                 onMouseEnter={e => { if (!submitting) (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; }}
