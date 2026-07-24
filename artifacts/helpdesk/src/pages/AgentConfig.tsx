@@ -69,11 +69,11 @@ function PhonePreview({
         </p>
       </div>
       {/* Phone frame */}
-      <div className="bg-[#111a15] rounded-[28px] p-2 shadow-lg">
+      <div className="bg-[#051824] rounded-[28px] p-2 shadow-lg">
         <div className="bg-card rounded-[20px] overflow-hidden">
           {/* Notch */}
-          <div className="bg-[#111a15] h-5 flex items-center justify-center">
-            <div className="w-12 h-1 bg-[#2a352f] rounded-full" />
+          <div className="bg-[#051824] h-5 flex items-center justify-center">
+            <div className="w-12 h-1 bg-[#162936] rounded-full" />
           </div>
           {/* Header bar */}
           <div className="bg-muted px-3 py-2 border-b border-border">
@@ -218,13 +218,13 @@ export default function AgentConfig() {
       {/* Page header */}
       <div className="px-6 py-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-foreground">Current SMS Receptionist</h1>
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium">
-            Live on SMS
+          <h1 className="text-lg font-semibold text-foreground">AI Receptionist</h1>
+          <Badge className="bg-statusbadge-success-bg text-statusbadge-success-text border-transparent text-xs font-medium rounded-full px-2">
+            Active
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          This controls your current SMS receptionist.
+          When someone texts your number, your AI sends this greeting, answers questions using your business description, and asks your qualifying questions to score each lead.
         </p>
       </div>
 
@@ -303,14 +303,14 @@ export default function AgentConfig() {
                 <CharCount value={greeting} max={500} />
               </div>
               <Textarea
-                placeholder="Hi! This is the virtual receptionist for [Business]. How can I help you today?"
+                placeholder={`Hi! I'm the virtual assistant for ${config.name || "our business"}. What can I help you with today?`}
                 className="text-sm resize-none min-h-[80px] border-border focus-visible:ring-ring"
                 maxLength={500}
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                The first SMS message sent to callers.
+                The first message texters receive the moment they contact your number. Keep it friendly and clear about who's responding.
               </p>
             </div>
 
@@ -323,14 +323,14 @@ export default function AgentConfig() {
                 <CharCount value={description} max={1000} />
               </div>
               <Textarea
-                placeholder="We are a [type] company that helps customers with…"
+                placeholder="We're a web design agency serving small businesses. We build websites, run SEO, and handle digital marketing. Our packages start at $1,500 and we typically turn around projects in 4–6 weeks."
                 className="text-sm resize-none min-h-[100px] border-border focus-visible:ring-ring"
                 maxLength={1000}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Context the AI uses to answer questions and qualify leads.
+                The AI reads this to answer questions about your services, pricing, and process. The more specific you are, the better it performs.
               </p>
             </div>
 
@@ -350,7 +350,7 @@ export default function AgentConfig() {
                 </button>
               </div>
               <p className="text-[11px] text-muted-foreground mb-3">
-                Questions the AI asks to qualify each lead (up to 6, max 200 chars each).
+                The AI asks these after the greeting to understand what each lead needs. Good questions reveal budget, timeline, and intent — up to 6.
               </p>
               {questions.length === 0 ? (
                 <div className="text-center py-6 border border-dashed border-border rounded-lg text-sm text-muted-foreground">
