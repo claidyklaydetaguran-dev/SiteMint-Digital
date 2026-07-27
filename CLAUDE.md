@@ -2,6 +2,17 @@
 
 > Read this before any development session. Last updated: 2026-07-17.
 
+## Operating contract
+
+- Read `docs/roadmap/ACTIVE.md` and its active PRD before editing.
+- Work on exactly one approved customer journey at a time.
+- Do not create extra phases, milestones, redesigns, or adjacent improvements.
+- Stop if a task unexpectedly requires a new dependency, database change,
+  authentication change, deployment change, or files outside the approved scope.
+- Never merge, push, publish, deploy, or modify production data without explicit
+  owner approval.
+- Once the approved acceptance criteria and verification pass, stop.
+
 ## What lives in this repo
 
 Two products plus internal tooling share one pnpm monorepo and one Express backend:
@@ -78,10 +89,12 @@ Nothing may replace the Twilio Messaging webhook on the intake number.
 - All provider communication goes through the `VoiceProvider` abstraction
   (`artifacts/api-server/src/lib/voice/`). No Vapi type, URL, SDK import, or
   credential may appear outside `VapiVoiceProvider.ts` and the provider factory.
-- `VAPI_API_KEY` is server-only. The browser receives only `VAPI_PUBLIC_KEY`
-  via the authenticated, tenant-scoped web-session endpoint.
-- Feature flag `VOICE_PLATFORM_ENABLED`: on in dev/staging, OFF in production
-  until owner approval. SMS routes are never behind the flag.
+- `VAPI_API_KEY` is server-only. The browser build receives only the Vapi
+  public browser key through `VITE_VAPI_PUBLIC_KEY`.
+- Backend publishing uses `VOICE_PUBLISH_ENABLED`. Dashboard routes, publishing,
+  and browser testing use the three documented `VITE_VOICE_*_ENABLED` build
+  flags. Keep them off in production until owner approval. SMS routes are never
+  behind these flags.
 - Every customer-owned voice table row: `firm_id` NOT NULL + FK to
   `intake_firms.id` + index + `created_at`/`updated_at`. All queries firm-scoped;
   cross-firm access returns 404.
@@ -109,6 +122,7 @@ Nothing may replace the Twilio Messaging webhook on the intake number.
 
 ```bash
 pnpm run typecheck                 # whole workspace
+pnpm run test                      # committed automated tests
 pnpm --filter @workspace/api-server run dev     # backend :8080
 pnpm --filter @workspace/helpdesk run dev       # dashboard :21622
 pnpm --filter @workspace/web-agency run dev     # site+CRM :22065
@@ -120,7 +134,7 @@ Helpdesk build needs env: `PORT=21622 BASE_PATH=/ai-receptionist/dashboard`.
 
 ## Verification gates for any receptionist/voice change
 
-1. `pnpm run typecheck` clean; helpdesk + api-server builds pass.
+1. `pnpm run test` and `pnpm run typecheck` clean; helpdesk + api-server builds pass.
 2. `git diff` on every protected file above = 0 lines.
 3. SMS regression: STOP webhook curl → `<Response></Response>` + conversation
    `opted_out`; login rate limit 10×401 → 429.

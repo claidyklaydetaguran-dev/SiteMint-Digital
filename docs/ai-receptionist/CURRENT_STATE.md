@@ -31,14 +31,18 @@
   from the dashboard.
 - **AgentConfig "Test" tab**: disabled placeholder.
 
-## Voice Platform (approved 2026-07-17)
+## Voice Platform Launch Candidate
 
-Milestone 1 (foundation + first working assistant) is approved and in progress on branch
-`claude/audit-receptionist-repo-268pla`: dark/light design system + new shell, versioned
-migrations for `voice_assistants`/`provider_webhook_events`/`voice_issues`, the
-`VoiceProvider` abstraction with Vapi + fake adapters, assistant CRUD/templates/publish,
-and browser test calls — behind `VOICE_PLATFORM_ENABLED` (off in production). See
-DECISION_LOG.md (2026-07-17 entries) and VOICE_PLATFORM.md.
+Milestone 1 code is complete on `claude/milestone-1-f2b-readiness-kvbe27` and is
+being verified on `feature/ai-receptionist-today-mvp`. It includes the new
+dashboard shell, versioned voice migrations, firm-scoped assistant CRUD, the
+provider-neutral voice layer, Vapi publishing, and real browser microphone calls.
+
+The launch candidate is not yet accepted until staging has the required Vapi
+configuration, the voice migration is applied, and the real browser-call UAT in
+`LAUNCH_CHECKLIST.md` passes. Inbound phone calls, appointment booking, call
+ingestion, transcripts, recordings, CRM handoff, contacts, analytics, and voice
+billing are not implemented in this release.
 
 ## Dead Code — RETIRED (Phase 2A)
 
