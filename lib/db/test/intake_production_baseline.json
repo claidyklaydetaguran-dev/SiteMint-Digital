@@ -1,0 +1,154 @@
+{
+  "_meta": {
+    "purpose": "Literal read-only production baseline for intake_conversations and intake_messages — Checkpoint A2. Static data only; contains no executable migration code and confers no migration capability. Validated against the Replit Development Database only (never production).",
+    "checkpoint": "A2",
+    "pg_version": "PostgreSQL 16.14 (b253d90) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit",
+    "migration_ledger": "none — no __drizzle_migrations table and no drizzle schema exist in production; tables were created outside Drizzle migrate",
+    "row_counts_at_inspection": {
+      "intake_conversations": 0,
+      "intake_messages": 0
+    }
+  },
+  "tables": {
+    "intake_conversations": {
+      "columns": [
+        {
+          "ordinal_position": 1,
+          "column_name": "id",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "is_nullable": "NO",
+          "column_default": "nextval('intake_conversations_id_seq'::regclass)"
+        },
+        {
+          "ordinal_position": 2,
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "udt_name": "timestamptz",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "ordinal_position": 3,
+          "column_name": "last_message_at",
+          "data_type": "timestamp with time zone",
+          "udt_name": "timestamptz",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "ordinal_position": 4,
+          "column_name": "firm_id",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "ordinal_position": 5,
+          "column_name": "caller_phone",
+          "data_type": "text",
+          "udt_name": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "ordinal_position": 6,
+          "column_name": "status",
+          "data_type": "text",
+          "udt_name": "text",
+          "is_nullable": "NO",
+          "column_default": "'in_progress'::text"
+        }
+      ],
+      "primary_key": {
+        "constraint_name": "intake_conversations_pkey",
+        "column_name": "id"
+      },
+      "foreign_key_count": 0,
+      "indexes": [
+        {
+          "indexname": "intake_conversations_pkey",
+          "indexdef": "CREATE UNIQUE INDEX intake_conversations_pkey ON public.intake_conversations USING btree (id)"
+        }
+      ],
+      "sequences": [
+        {
+          "sequence_name": "intake_conversations_id_seq",
+          "data_type": "integer",
+          "start_value": "1",
+          "increment_by": "1",
+          "min_value": "1",
+          "max_value": "2147483647",
+          "cycle": false
+        }
+      ]
+    },
+    "intake_messages": {
+      "columns": [
+        {
+          "ordinal_position": 1,
+          "column_name": "id",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "is_nullable": "NO",
+          "column_default": "nextval('intake_messages_id_seq'::regclass)"
+        },
+        {
+          "ordinal_position": 2,
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "udt_name": "timestamptz",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "ordinal_position": 3,
+          "column_name": "conversation_id",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "ordinal_position": 4,
+          "column_name": "direction",
+          "data_type": "text",
+          "udt_name": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "ordinal_position": 5,
+          "column_name": "body",
+          "data_type": "text",
+          "udt_name": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        }
+      ],
+      "primary_key": {
+        "constraint_name": "intake_messages_pkey",
+        "column_name": "id"
+      },
+      "foreign_key_count": 0,
+      "indexes": [
+        {
+          "indexname": "intake_messages_pkey",
+          "indexdef": "CREATE UNIQUE INDEX intake_messages_pkey ON public.intake_messages USING btree (id)"
+        }
+      ],
+      "sequences": [
+        {
+          "sequence_name": "intake_messages_id_seq",
+          "data_type": "integer",
+          "start_value": "1",
+          "increment_by": "1",
+          "min_value": "1",
+          "max_value": "2147483647",
+          "cycle": false
+        }
+      ]
+    }
+  }
+}
