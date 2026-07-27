@@ -41,9 +41,8 @@ export const voicePublishEnabled: boolean = parseBooleanFlag(
  * boundary, and it carries no provider host, public key, or private key —
  * it is a plain capability switch. Has no effect when `voicePlatformEnabled`
  * is false, since the assistant routes themselves are unavailable in that
- * case. Even when this flag is true, production Test remains fail-closed
- * until a real BrowserVoiceClient is wired in (Checkpoint F2) — see
- * UnavailableBrowserVoiceClient.
+ * case. A configured Vapi public key is also required; otherwise the client
+ * fails closed to the unavailable implementation.
  */
 export const voiceBrowserTestEnabled: boolean = parseBooleanFlag(
   import.meta.env.VITE_VOICE_BROWSER_TEST_ENABLED,

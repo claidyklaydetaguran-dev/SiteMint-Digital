@@ -25,7 +25,7 @@ Feature flag `VOICE_PLATFORM_ENABLED` stays OFF in production until owner approv
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M1 — Foundation + first working assistant** | Checkpoints A–G: docs reconciliation; dark/light design system + collapsible grouped shell + error boundary; versioned migrations for `voice_assistants`/`provider_webhook_events`/`voice_issues`; `VoiceProvider`/`VapiVoiceProvider`/`FakeVoiceProvider`; assistant CRUD + templates + publish + duplicate + guarded delete; browser test call; Vitest + Playwright | **IN PROGRESS** |
+| **M1 — Foundation + first working assistant** | Dark/light shell; versioned voice migrations; provider abstraction; assistant CRUD, templates, publish, duplicate, guarded delete; browser test call; automated unit tests | **CODE COMPLETE — staging configuration, migration, and real-call UAT pending** |
 | M2 — Phone numbers + call ingestion | Voice-only number (never the intake SMS number), assignment, end-of-call ingestion → call logs, transcripts, recording proxy | Planned |
 | M3 — Analysis + shared lead scoring + contacts | Call analysis persistence, tier scoring via `intakeScoring` adapter, Resend voice notifications, contacts, trial voice-minute enforcement | Planned |
 | M4 — Tools + knowledge base + SMS unification | Tool CRUD, KB + docs, SMS agent surfaced as messaging assistant (pipeline untouched), inbox reply composer | Planned |
