@@ -1,6 +1,12 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { LogOut, Menu, Settings as SettingsIcon, CreditCard, Lock } from "lucide-react";
+import {
+  LogOut,
+  Menu,
+  Settings as SettingsIcon,
+  CreditCard,
+  Lock,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -95,7 +101,10 @@ function AccountMenu({
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onLogout} className="flex items-center gap-2">
+        <DropdownMenuItem
+          onClick={onLogout}
+          className="flex items-center gap-2"
+        >
           <LogOut className="h-4 w-4" aria-hidden="true" />
           Sign out
         </DropdownMenuItem>
@@ -125,7 +134,10 @@ function UsageMeter({
     );
   }
 
-  const pct = capCount > 0 ? Math.min(100, Math.round((usedCount / capCount) * 100) || 0) : 0;
+  const pct =
+    capCount > 0
+      ? Math.min(100, Math.round((usedCount / capCount) * 100) || 0)
+      : 0;
 
   if (collapsed) {
     return (
@@ -175,7 +187,9 @@ function NavRow({ item, location }: { item: NavItem; location: string }) {
           className="cursor-not-allowed opacity-60"
         >
           <Icon className="h-4 w-4" aria-hidden="true" />
-          <span className="truncate group-data-[collapsible=icon]:hidden">{item.label}</span>
+          <span className="truncate group-data-[collapsible=icon]:hidden">
+            {item.label}
+          </span>
         </SidebarMenuButton>
         <SidebarMenuBadge>Later</SidebarMenuBadge>
       </SidebarMenuItem>
@@ -186,10 +200,21 @@ function NavRow({ item, location }: { item: NavItem; location: string }) {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild size="lg" isActive={active} tooltip={item.label}>
-        <Link href={item.href} aria-label={item.label} aria-current={active ? "page" : undefined}>
+      <SidebarMenuButton
+        asChild
+        size="lg"
+        isActive={active}
+        tooltip={item.label}
+      >
+        <Link
+          href={item.href}
+          aria-label={item.label}
+          aria-current={active ? "page" : undefined}
+        >
           <Icon className="h-4 w-4" aria-hidden="true" />
-          <span className="truncate group-data-[collapsible=icon]:hidden">{item.label}</span>
+          <span className="truncate group-data-[collapsible=icon]:hidden">
+            {item.label}
+          </span>
         </Link>
       </SidebarMenuButton>
       {item.state === "advanced" && (
@@ -234,7 +259,11 @@ function AppSidebar({
 
       <SidebarContent>
         {NAV_GROUPS.map((group) => {
-          const items = group.items.filter((item) => !item.voiceGated || voicePlatformEnabled);
+          const items = group.items.filter(
+            (item) =>
+              item.state === "live" &&
+              (!item.voiceGated || voicePlatformEnabled),
+          );
           if (items.length === 0) return null;
           return (
             <SidebarGroup key={group.key}>
@@ -253,9 +282,18 @@ function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="gap-2 border-t border-sidebar-border px-2 py-3">
-        <UsageMeter usedCount={usedCount} capCount={capCount} isPaid={isPaid} collapsed={collapsed} />
+        <UsageMeter
+          usedCount={usedCount}
+          capCount={capCount}
+          isPaid={isPaid}
+          collapsed={collapsed}
+        />
         <ThemeToggle collapsed={collapsed} />
-        <AccountMenu firmName={firmName} onLogout={onLogout} compact={collapsed} />
+        <AccountMenu
+          firmName={firmName}
+          onLogout={onLogout}
+          compact={collapsed}
+        />
       </SidebarFooter>
     </Sidebar>
   );
@@ -263,7 +301,13 @@ function AppSidebar({
 
 // ─── Mobile top bar ─────────────────────────────────────────────────────────
 
-function MobileTopbar({ firmName, onLogout }: { firmName: string; onLogout: () => void }) {
+function MobileTopbar({
+  firmName,
+  onLogout,
+}: {
+  firmName: string;
+  onLogout: () => void;
+}) {
   const { setOpenMobile } = useSidebar();
 
   return (
@@ -355,7 +399,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <SidebarInset className="min-w-0">
         <MobileTopbar firmName={me.firm.name} onLogout={handleLogout} />
-        <main role="main" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+        <main
+          role="main"
+          className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+        >
           {children}
         </main>
       </SidebarInset>

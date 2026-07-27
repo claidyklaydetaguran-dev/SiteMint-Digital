@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BrowserVoiceClient, BrowserVoiceEvent, BrowserVoiceStartInput, BrowserVoiceTestState } from "@/lib/browserVoice/types";
+import type {
+  BrowserVoiceClient,
+  BrowserVoiceEvent,
+  BrowserVoiceStartInput,
+  BrowserVoiceTestState,
+} from "@/lib/browserVoice/types";
 import { useBrowserVoiceClientSource } from "@/lib/browserVoice/context";
 import { safeBrowserVoiceErrorMessage } from "@/lib/browserVoice/errors";
 
-const ACTIVE_STATES: ReadonlySet<BrowserVoiceTestState> = new Set(["preparing", "connecting", "connected", "ending"]);
+const ACTIVE_STATES: ReadonlySet<BrowserVoiceTestState> = new Set([
+  "preparing",
+  "connecting",
+  "connected",
+  "ending",
+]);
 
 /**
  * Milestone 1 / Checkpoint F1 (correction pass): the only call site allowed
@@ -31,7 +41,7 @@ export interface UseBrowserVoiceTestResult {
   state: BrowserVoiceTestState;
   errorMessage: string | null;
   elapsedSeconds: number;
-  /** Whether the client this builder would use is able to run a real test at all (never true in production until Checkpoint F2). */
+  /** Whether the configured client can run a real browser voice test. */
   clientAvailable: boolean;
   /** True while preparing/connecting/connected/ending — used to keep Test disabled during an active test. */
   isActive: boolean;
@@ -103,7 +113,9 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
             if (timerRef.current === null) {
               timerRef.current = window.setInterval(() => {
                 if (startedAtRef.current !== null) {
-                  setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
+                  setElapsedSeconds(
+                    Math.floor((Date.now() - startedAtRef.current) / 1000),
+                  );
                 }
               }, 1000);
             }
@@ -119,14 +131,24 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
           break;
         case "permission-denied":
           setState((prev) => {
-            if (prev === "ended" || prev === "error" || prev === "permission_denied") return prev;
+            if (
+              prev === "ended" ||
+              prev === "error" ||
+              prev === "permission_denied"
+            )
+              return prev;
             teardownClient();
             return "permission_denied";
           });
           break;
         case "error":
           setState((prev) => {
-            if (prev === "ended" || prev === "error" || prev === "permission_denied") return prev;
+            if (
+              prev === "ended" ||
+              prev === "error" ||
+              prev === "permission_denied"
+            )
+              return prev;
             setErrorMessage(safeBrowserVoiceErrorMessage());
             teardownClient();
             return "error";
@@ -191,7 +213,8 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
 
   const dismiss = useCallback(() => {
     setState((prev) => {
-      if (prev !== "ended" && prev !== "error" && prev !== "permission_denied") return prev;
+      if (prev !== "ended" && prev !== "error" && prev !== "permission_denied")
+        return prev;
       setErrorMessage(null);
       setElapsedSeconds(0);
       return "idle";
@@ -218,5 +241,16 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
   const clientAvailable = source.available;
   const isActive = ACTIVE_STATES.has(state);
 
-  return { state, errorMessage, elapsedSeconds, clientAvailable, isActive, start, end, dismiss, reset, bestEffortUnloadCleanup };
+  return {
+    state,
+    errorMessage,
+    elapsedSeconds,
+    clientAvailable,
+    isActive,
+    start,
+    end,
+    dismiss,
+    reset,
+    bestEffortUnloadCleanup,
+  };
 }
