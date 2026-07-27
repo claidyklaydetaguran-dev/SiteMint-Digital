@@ -13,26 +13,18 @@ import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import SetupTab from "@/pages/assistant-builder/SetupTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
 import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
-import ToolsTab from "@/pages/assistant-builder/ToolsTab";
-import KnowledgeTab from "@/pages/assistant-builder/KnowledgeTab";
-import TestingTab from "@/pages/assistant-builder/TestingTab";
-import AnalysisTab from "@/pages/assistant-builder/AnalysisTab";
-import AdvancedTab from "@/pages/assistant-builder/AdvancedTab";
 
 export const BUILDER_TABS = [
   { key: "setup", label: "Setup" },
   { key: "prompt", label: "Prompt" },
   { key: "voice-model", label: "Voice & Model" },
-  { key: "tools", label: "Tools" },
-  { key: "knowledge", label: "Knowledge" },
-  { key: "testing", label: "Testing" },
-  { key: "analysis", label: "Analysis" },
-  { key: "advanced", label: "Advanced" },
 ] as const;
 
 export type BuilderTabKey = (typeof BUILDER_TABS)[number]["key"];
 
-export function isBuilderTabKey(value: string | undefined): value is BuilderTabKey {
+export function isBuilderTabKey(
+  value: string | undefined,
+): value is BuilderTabKey {
   return BUILDER_TABS.some((t) => t.key === value);
 }
 
@@ -41,7 +33,11 @@ export interface BuilderTabProps {
   update: (updater: (draft: AssistantDraft) => AssistantDraft) => void;
 }
 
-function TabPanel({ tab, draft, update }: { tab: BuilderTabKey } & BuilderTabProps) {
+function TabPanel({
+  tab,
+  draft,
+  update,
+}: { tab: BuilderTabKey } & BuilderTabProps) {
   switch (tab) {
     case "setup":
       return <SetupTab draft={draft} update={update} />;
@@ -49,16 +45,6 @@ function TabPanel({ tab, draft, update }: { tab: BuilderTabKey } & BuilderTabPro
       return <PromptTab draft={draft} update={update} />;
     case "voice-model":
       return <VoiceModelTab draft={draft} update={update} />;
-    case "tools":
-      return <ToolsTab draft={draft} update={update} />;
-    case "knowledge":
-      return <KnowledgeTab draft={draft} update={update} />;
-    case "testing":
-      return <TestingTab draft={draft} update={update} />;
-    case "analysis":
-      return <AnalysisTab draft={draft} update={update} />;
-    case "advanced":
-      return <AdvancedTab draft={draft} update={update} />;
     default:
       return null;
   }
@@ -102,7 +88,7 @@ interface BuilderShellProps extends BuilderTabProps {
 /**
  * Shared chrome for both the new-unsaved and persisted assistant builder
  * routes: header (name field, status badge, disabled Test/Publish), the
- * eight builder tabs, and the sticky estimate/save footer. Only the parts
+ * launch-candidate builder tabs, and the sticky estimate/save footer. Only the parts
  * that differ between "new" and "persisted" (status badge, save control,
  * banner) are passed in by the caller.
  */
@@ -147,14 +133,20 @@ export function BuilderShell({
               aria-label="Assistant name"
               value={draft.setup.assistantName}
               onChange={(e) =>
-                update((d) => ({ ...d, setup: { ...d.setup, assistantName: e.target.value } }))
+                update((d) => ({
+                  ...d,
+                  setup: { ...d.setup, assistantName: e.target.value },
+                }))
               }
               placeholder="Untitled assistant"
               maxLength={100}
               disabled={contentDisabled}
               className="h-9 max-w-xs text-sm font-semibold"
             />
-            <Badge variant="secondary" className="flex-shrink-0 text-xs font-medium">
+            <Badge
+              variant="secondary"
+              className="flex-shrink-0 text-xs font-medium"
+            >
               {statusBadge}
             </Badge>
           </div>
@@ -170,7 +162,7 @@ export function BuilderShell({
               <UnavailableActionButton
                 icon={Rocket}
                 label="Publish"
-                availability="Publishing available in Checkpoint E3."
+                availability="Save this assistant as a draft before publishing."
               />
             )}
           </div>

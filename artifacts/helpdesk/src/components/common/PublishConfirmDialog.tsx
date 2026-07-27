@@ -43,16 +43,20 @@ export function PublishConfirmDialog({
     >
       <AlertDialogContent className="max-h-[85vh] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle className="break-words">Publish "{assistantName}"?</AlertDialogTitle>
+          <AlertDialogTitle className="break-words">
+            Publish "{assistantName}"?
+          </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-2 text-left text-sm text-muted-foreground">
               <p>Current status: {statusLabel}</p>
               <p>
-                This will create a provider-side voice assistant using the currently saved
-                configuration. It will not assign a phone number or place a call.
+                This will create a provider-side voice assistant using the
+                currently saved configuration. It will not assign a phone number
+                or place a call.
               </p>
               <p>
-                Test calling remains unavailable until Checkpoint F. Do not submit again if
+                After publishing succeeds, you can test the assistant from this
+                page using your browser microphone. Do not submit again if
                 publishing cannot be confirmed.
               </p>
             </div>
@@ -69,7 +73,12 @@ export function PublishConfirmDialog({
             disabled={pending}
             className="gap-1.5"
           >
-            {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+            {pending && (
+              <Loader2
+                className="h-3.5 w-3.5 animate-spin"
+                aria-hidden="true"
+              />
+            )}
             Publish Assistant
           </AlertDialogAction>
         </AlertDialogFooter>
