@@ -1,20 +1,32 @@
 /**
- * Checkpoint A1 — static, no-database ownership-contract assertions for the
- * intake_conversations/intake_messages migration cutover. No live database
- * connection is made anywhere in this file (DATABASE_URL is set to a
- * deliberately non-routable placeholder purely to satisfy drizzle.config.ts's
- * own import-time guard — drizzle-kit's `defineConfig` performs no
- * connection itself). Run via:
+ * Checkpoint A1/A2 — static, no-database, no-module-execution
+ * ownership-contract assertions for the intake_conversations/intake_messages
+ * migration cutover. Deliberately parses the Drizzle config files as plain
+ * text rather than importing/executing them: drizzle.config.ts uses
+ * `path.join(__dirname, ...)`, which is only valid when the file is loaded
+ * through drizzle-kit's own CJS-style config loader (as it always is in
+ * real use) — a direct ESM `import()` of that file (as this test would
+ * otherwise need to do) throws `__dirname is not defined in ES module
+ * scope`, since lib/db/package.json declares `"type": "module"`. That is a
+ * pre-existing property of drizzle.config.ts, not something introduced or
+ * fixed here; this test simply never exercises that code path, and instead
+ * verifies the same facts via source-text inspection, which is more direct
+ * for a static/no-execution test in any case. Run via:
  *   pnpm --filter @workspace/scripts exec tsx lib/db/test/intakeOwnershipContract.test.ts
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-process.env.DATABASE_URL ??= "postgres://placeholder:placeholder@127.0.0.1:1/placeholder";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbRoot = path.join(__dirname, "..");
+
+/** Extracts the string array literal following `key: [ ... ]` in `source`. Throws if not found. */
+function extractStringArray(source: string, key: string): string[] {
+  const match = new RegExp(`${key}\\s*:\\s*\\[([\\s\\S]*?)\\]`).exec(source);
+  if (!match) throw new Error(`Could not find "${key}: [...]" in source`);
+  return [...match[1].matchAll(/"([^"]*)"|'([^']*)'/g)].map((m) => m[1] ?? m[2]);
+}
 
 let failures = 0;
 
@@ -58,49 +70,56 @@ const EXPECTED_LEGACY_TABLES = [
 async function main(): Promise<void> {
   // ── legacy-push tablesFilter is the exact allowlist, excluding both
   // intake tables ─────────────────────────────────────────────────────────
-  const legacyConfigModule = await import(path.join(dbRoot, "drizzle.config.ts"));
-  const legacyConfig = legacyConfigModule.default;
+  const legacyConfigSource = readFileSync(path.join(dbRoot, "drizzle.config.ts"), "utf8");
+  const tablesFilter = extractStringArray(legacyConfigSource, "tablesFilter");
 
-  const tablesFilter: unknown = legacyConfig?.tablesFilter;
-  assert(Array.isArray(tablesFilter), "drizzle.config.ts exports a tablesFilter array");
-
-  if (Array.isArray(tablesFilter)) {
-    const sortedActual = [...tablesFilter].sort();
-    const sortedExpected = [...EXPECTED_LEGACY_TABLES].sort();
-    assert(
-      JSON.stringify(sortedActual) === JSON.stringify(sortedExpected),
-      "tablesFilter contains exactly the expected 25 legacy table names, no more, no fewer",
-    );
-    assert(
-      !tablesFilter.includes("intake_conversations"),
-      "tablesFilter excludes intake_conversations",
-    );
-    assert(
-      !tablesFilter.includes("intake_messages"),
-      "tablesFilter excludes intake_messages",
-    );
-  }
-
+  const sortedActual = [...tablesFilter].sort();
+  const sortedExpected = [...EXPECTED_LEGACY_TABLES].sort();
   assert(
-    JSON.stringify(legacyConfig?.schemaFilter) === JSON.stringify(["public"]),
+    JSON.stringify(sortedActual) === JSON.stringify(sortedExpected),
+    "tablesFilter contains exactly the expected 25 legacy table names, no more, no fewer",
+  );
+  assert(
+    !tablesFilter.includes("intake_conversations"),
+    "tablesFilter excludes intake_conversations",
+  );
+  assert(
+    !tablesFilter.includes("intake_messages"),
+    "tablesFilter excludes intake_messages",
+  );
+
+  const schemaFilter = extractStringArray(legacyConfigSource, "schemaFilter");
+  assert(
+    JSON.stringify(schemaFilter) === JSON.stringify(["public"]),
     "drizzle.config.ts's schemaFilter is exactly ['public']",
   );
 
   // ── candidate config: shape, out path, no credentials ───────────────────
-  const candidateConfigModule = await import(path.join(dbRoot, "drizzle.intake.candidate.config.ts"));
-  const candidateConfig = candidateConfigModule.default;
+  // Comments are stripped before scanning so that explanatory prose
+  // *mentioning* dbCredentials/defineConfig (to say they're intentionally
+  // absent) isn't mistaken for actual usage of them.
+  const candidateConfigSourceRaw = readFileSync(path.join(dbRoot, "drizzle.intake.candidate.config.ts"), "utf8");
+  const candidateConfigSource = candidateConfigSourceRaw
+    .split("\n")
+    .map((line) => line.replace(/\/\/.*$/, ""))
+    .join("\n");
 
+  const outMatch = /out\s*:\s*["']([^"']*)["']/.exec(candidateConfigSource);
   assert(
-    candidateConfig?.out === "./drizzle-intake-candidate",
+    outMatch?.[1] === "./drizzle-intake-candidate",
     "drizzle.intake.candidate.config.ts's out is exactly './drizzle-intake-candidate'",
   );
   assert(
-    candidateConfig !== null && typeof candidateConfig === "object" && !("dbCredentials" in candidateConfig),
+    !/\bdbCredentials\b/.test(candidateConfigSource),
     "drizzle.intake.candidate.config.ts has no dbCredentials field",
   );
   assert(
-    !("url" in (candidateConfig ?? {})),
+    !/^\s*url\s*:/m.test(candidateConfigSource),
     "drizzle.intake.candidate.config.ts has no url field",
+  );
+  assert(
+    !/defineConfig/.test(candidateConfigSource),
+    "drizzle.intake.candidate.config.ts does not use defineConfig (avoids its dbCredentials-requiring type)",
   );
 
   // ── no operational Drizzle config points at the candidate directory ─────
