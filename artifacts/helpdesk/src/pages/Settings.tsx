@@ -33,16 +33,16 @@ export default function Settings() {
   const [activePanel, setActivePanel] = useState<Panel>("members");
 
   return (
-    <div className="flex h-full bg-background">
-      {/* Secondary sidebar */}
-      <div className="w-[220px] flex-shrink-0 border-r border-border bg-card flex flex-col shadow-sm">
-        <div className="px-4 py-4 border-b border-border">
+    <div className="flex h-full flex-col bg-background md:flex-row">
+      {/* Secondary nav: horizontal scrollable bar on mobile, vertical sidebar from md up */}
+      <div className="flex-shrink-0 border-b border-border bg-card shadow-sm md:flex md:w-[220px] md:flex-col md:border-b-0 md:border-r">
+        <div className="hidden px-4 py-4 border-b border-border md:block">
           <h2 className="text-sm font-semibold text-foreground">Settings</h2>
         </div>
-        <div className="flex-1 overflow-y-auto py-3">
+        <div className="flex gap-1 overflow-x-auto px-3 py-2 md:flex-1 md:flex-col md:gap-0 md:overflow-y-auto md:overflow-x-visible md:px-0 md:py-3">
           {NAV.map((group) => (
-            <div key={group.section} className="mb-5">
-              <div className="px-4 mb-1.5">
+            <div key={group.section} className="flex flex-shrink-0 gap-1 md:mb-5 md:block md:gap-0">
+              <div className="hidden px-4 mb-1.5 md:block">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   {group.section}
                 </span>
@@ -50,7 +50,7 @@ export default function Settings() {
               {group.items.map((item) => (
                 <button
                   key={item.id}
-                  className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors text-left ${
+                  className={`flex min-h-11 flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm transition-colors text-left md:w-full md:rounded-none md:px-4 ${
                     activePanel === item.id
                       ? "bg-surface-muted text-primary font-medium"
                       : "text-muted-foreground hover:bg-background hover:text-foreground"
@@ -71,7 +71,7 @@ export default function Settings() {
       </div>
 
       {/* Panel content */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="min-w-0 flex-1 overflow-hidden">
         {activePanel === "members"  && <MembersPanel />}
         {activePanel === "language" && <LanguagePanel />}
       </div>

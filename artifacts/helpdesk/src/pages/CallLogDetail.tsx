@@ -67,7 +67,7 @@ export default function CallLogDetail() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* Transcript */}
           <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
             <h2 className="mb-4 text-sm font-semibold text-foreground">Transcript</h2>
