@@ -16,8 +16,10 @@
 import { Router, type Request, type Response } from "express";
 import {
   verifyVapiWebhookSignature,
+  verifyVapiWebhookBearerSecret,
   VAPI_SIGNATURE_HEADER,
   VAPI_TIMESTAMP_HEADER,
+  VAPI_BEARER_HEADER,
 } from "../lib/voice/webhooks/vapiWebhookAuth.js";
 import { parseVapiServerMessage } from "../lib/voice/webhooks/vapiServerMessage.js";
 import { findFirmIdForVapiAssistant, storeVapiWebhookEvent } from "../lib/voice/webhooks/realCallsRepository.js";
@@ -40,12 +42,20 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
     return;
   }
 
-  const auth = verifyVapiWebhookSignature({
+  // Try HMAC first (Custom Credential, preferred). If HMAC headers are absent
+  // fall back to Bearer secret (serverUrlSecret, DECISION_LOG.md 2026-07-17).
+  let auth = verifyVapiWebhookSignature({
     rawBody,
     signatureHeader: headerValue(req, VAPI_SIGNATURE_HEADER),
     timestampHeader: headerValue(req, VAPI_TIMESTAMP_HEADER),
     secret: process.env["VAPI_WEBHOOK_SECRET"],
   });
+  if (!auth.ok && (auth.reason === "missing_signature" || auth.reason === "missing_timestamp")) {
+    auth = verifyVapiWebhookBearerSecret({
+      bearerHeader: headerValue(req, VAPI_BEARER_HEADER),
+      secret: process.env["VAPI_WEBHOOK_SECRET"],
+    });
+  }
   if (!auth.ok) {
     // Never echo the failure reason to the caller — an attacker probing
     // signature verification gets a uniform, uninformative rejection.

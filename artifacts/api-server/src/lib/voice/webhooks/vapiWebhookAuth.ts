@@ -17,6 +17,13 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const VAPI_SIGNATURE_HEADER = "x-vapi-signature";
 export const VAPI_TIMESTAMP_HEADER = "x-vapi-timestamp";
 
+/**
+ * Header Vapi uses when the assistant or phone number has a `serverUrlSecret`
+ * set (the documented Bearer fallback — see DECISION_LOG.md 2026-07-17).
+ * The raw secret value is sent as-is; verified in constant time.
+ */
+export const VAPI_BEARER_HEADER = "x-vapi-secret";
+
 /** Matches the 300-second skew tolerance recorded in DECISION_LOG.md. */
 export const VAPI_WEBHOOK_TIMESTAMP_TOLERANCE_SEC = 300;
 
@@ -98,4 +105,29 @@ export function verifyVapiWebhookSignature({
   }
 
   return { ok: true };
+}
+
+/**
+ * Verifies the Vapi Bearer secret fallback (DECISION_LOG.md 2026-07-17).
+ * Used when the assistant uses `serverUrlSecret` rather than an HMAC Custom
+ * Credential — Vapi sends the raw secret value in the `x-vapi-secret` header.
+ * Compared in constant time; no replay protection (no timestamp).
+ */
+export function verifyVapiWebhookBearerSecret({
+  bearerHeader,
+  secret,
+}: {
+  bearerHeader: string | undefined;
+  secret: string | undefined;
+}): VapiWebhookAuthResult {
+  if (!secret) return { ok: false, reason: "not_configured" };
+  if (!bearerHeader) return { ok: false, reason: "missing_signature" };
+  const bufA = Buffer.from(secret, "utf8");
+  const bufB = Buffer.from(bearerHeader, "utf8");
+  if (bufA.length === 0 || bufA.length !== bufB.length) {
+    return { ok: false, reason: "signature_mismatch" };
+  }
+  return timingSafeEqual(bufA, bufB)
+    ? { ok: true }
+    : { ok: false, reason: "signature_mismatch" };
 }
