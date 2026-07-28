@@ -98,14 +98,61 @@ describe("foldEventsIntoCallRecord", () => {
     expect(record.isFinal).toBe(true);
   });
 
-  it("still merges a transcript/analysis that arrives in a later event after the call ended", () => {
+  it("still merges a transcript/structured outcome that arrives in a later event after the call ended", () => {
     const events = [
       event(1000, { type: "status-update", status: "ended", endedReason: "customer-ended-call", call: { id: "call_1", assistantId: "asst_1" } }),
-      event(2000, { type: "end-of-call-report", transcript: "late transcript", analysis: { callerName: "Jordan" } }),
+      event(2000, {
+        type: "end-of-call-report",
+        transcript: "late transcript",
+        analysis: { structuredData: { caller: { name: "Jordan" } } },
+      }),
     ];
     const record = foldEventsIntoCallRecord("call_1", events)!;
     expect(record.transcript).toBe("late transcript");
-    expect(record.analysis).toEqual({ callerName: "Jordan" });
+    expect(record.analysisAvailability).toBe("available");
+    expect(record.structuredOutcome?.caller.name).toBe("Jordan");
+  });
+
+  it("upgrades from unavailable to available when a later end-of-call-report delivers analysis (Vapi analysis runs in the background)", () => {
+    const events = [
+      event(1000, {
+        type: "end-of-call-report",
+        transcript: "first delivery, no analysis yet",
+        call: { id: "call_1", assistantId: "asst_1" },
+      }),
+      event(2000, {
+        type: "end-of-call-report",
+        transcript: "first delivery, no analysis yet",
+        analysis: { structuredData: { caller: { name: "Jordan" } } },
+      }),
+    ];
+    const record = foldEventsIntoCallRecord("call_1", events)!;
+    expect(record.analysisAvailability).toBe("available");
+    expect(record.structuredOutcome?.caller.name).toBe("Jordan");
+  });
+
+  it("never regresses an available structured outcome back to unavailable on a later duplicate/invalid delivery", () => {
+    const events = [
+      event(1000, {
+        type: "end-of-call-report",
+        analysis: { structuredData: { caller: { name: "Jordan" } } },
+        call: { id: "call_1", assistantId: "asst_1" },
+      }),
+      event(2000, { type: "end-of-call-report" }), // stale retry with no analysis field at all
+    ];
+    const record = foldEventsIntoCallRecord("call_1", events)!;
+    expect(record.analysisAvailability).toBe("available");
+    expect(record.structuredOutcome?.caller.name).toBe("Jordan");
+  });
+
+  it("reports analysisAvailability unavailable when no end-of-call-report ever carried analysis (the historical-call case)", () => {
+    const events = [
+      event(1000, { type: "status-update", status: "queued", call: { id: "call_1", assistantId: "asst_1" } }),
+      event(2000, { type: "end-of-call-report", transcript: "a transcript with no structured analysis" }),
+    ];
+    const record = foldEventsIntoCallRecord("call_1", events)!;
+    expect(record.analysisAvailability).toBe("unavailable");
+    expect(record.structuredOutcome).toBeUndefined();
   });
 
   it("never overwrites an already-populated transcript with a later empty one", () => {

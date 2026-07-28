@@ -4,6 +4,11 @@
 // one call id already loaded from storage.
 
 import type { ParsedVapiMessage, VapiCallStatus } from "./vapiServerMessage.js";
+import {
+  parseStructuredOutcome,
+  type StructuredOutcome,
+  type StructuredOutcomeAvailability,
+} from "./structuredOutcome.js";
 
 export const INTERNAL_CALL_STATES = [
   "queued",
@@ -114,7 +119,15 @@ export interface RealCallRecord {
   endedReason: string | undefined;
   transcript: string | undefined;
   summary: string | undefined;
-  analysis: unknown;
+  /**
+   * "unavailable" is the honest default for every call that predates
+   * analysisPlan configuration, or where Vapi simply hasn't attached
+   * structured data yet — never confused with a valid "not requested"
+   * result. "invalid" (provider data present but failed validation) reads
+   * identically to "unavailable" everywhere outside diagnostics/logs.
+   */
+  analysisAvailability: StructuredOutcomeAvailability;
+  structuredOutcome: StructuredOutcome | undefined;
 }
 
 /**
@@ -141,7 +154,8 @@ export function foldEventsIntoCallRecord(
   let endedReason: string | undefined;
   let transcript: string | undefined;
   let summary: string | undefined;
-  let analysis: unknown;
+  let analysisAvailability: StructuredOutcomeAvailability = "unavailable";
+  let structuredOutcome: StructuredOutcome | undefined;
   let endedAt: Date | undefined;
 
   const firstEventAt = ordered[0]!.createdAt;
@@ -177,7 +191,21 @@ export function foldEventsIntoCallRecord(
       state = mapVapiStatusToInternalState("ended", message.endedReason);
       if (message.transcript) transcript = message.transcript;
       if (message.summary) summary = message.summary;
-      if (message.analysis !== undefined) analysis = message.analysis;
+
+      // Analysis often isn't ready on the first end-of-call-report delivery
+      // (Vapi: "triggered in the background... typically completes within a
+      // few seconds") — a later redelivery with genuine structured data
+      // upgrades an "unavailable"/"invalid" result, but a stale/duplicate
+      // redelivery can never regress an already-"available" outcome back
+      // down (see eventKey.ts for why a content-updated redelivery isn't
+      // deduped away before it ever reaches this fold).
+      const parsedOutcome = parseStructuredOutcome(message.analysis);
+      if (parsedOutcome.availability === "available") {
+        analysisAvailability = "available";
+        structuredOutcome = parsedOutcome.outcome;
+      } else if (analysisAvailability !== "available") {
+        analysisAvailability = parsedOutcome.availability;
+      }
     }
 
     if (message.type === "hang" && !isFinal) {
@@ -186,12 +214,11 @@ export function foldEventsIntoCallRecord(
       endedAt = event.createdAt;
     }
 
-    // A transcript/summary/analysis can also ride in on a plain
-    // status-update in some Vapi configurations — never overwrite an
-    // already-populated value with an empty one from an earlier event.
+    // A transcript/summary can also ride in on a plain status-update in some
+    // Vapi configurations — never overwrite an already-populated value with
+    // an empty one from an earlier event.
     if (message.transcript && !transcript) transcript = message.transcript;
     if (message.summary && !summary) summary = message.summary;
-    if (message.analysis !== undefined && analysis === undefined) analysis = message.analysis;
   }
 
   const durationSec = endedAt
@@ -213,6 +240,7 @@ export function foldEventsIntoCallRecord(
     endedReason,
     transcript,
     summary,
-    analysis,
+    analysisAvailability,
+    structuredOutcome,
   };
 }

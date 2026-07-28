@@ -28,13 +28,17 @@ function serializeSummary(call: RealCallRecord) {
 }
 
 function serializeDetail(call: RealCallRecord) {
+  // "invalid" is a diagnostics-only distinction — every reader-facing
+  // surface (this API included) treats it exactly like "unavailable".
+  const analysisAvailability = call.analysisAvailability === "invalid" ? "unavailable" : call.analysisAvailability;
   return {
     ...serializeSummary(call),
     assistantId: call.assistantId ?? null,
     endedReason: call.endedReason ?? null,
     transcript: call.transcript ?? null,
     summary: call.summary ?? null,
-    analysis: call.analysis ?? null,
+    analysisAvailability,
+    structuredOutcome: analysisAvailability === "available" ? call.structuredOutcome ?? null : null,
   };
 }
 

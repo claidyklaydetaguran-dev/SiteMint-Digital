@@ -32,12 +32,70 @@ export interface RealCallSummary {
   durationSec: number | null;
 }
 
+export const URGENCY_VALUES = ["low", "normal", "high"] as const;
+export type Urgency = (typeof URGENCY_VALUES)[number];
+
+export const APPOINTMENT_STATUS_VALUES = ["not_requested", "pending_review"] as const;
+export type AppointmentStatus = (typeof APPOINTMENT_STATUS_VALUES)[number];
+
+export const FOLLOW_UP_STATUS_VALUES = ["not_requested", "pending_review"] as const;
+export type FollowUpStatus = (typeof FOLLOW_UP_STATUS_VALUES)[number];
+
+export const DISPOSITION_OUTCOME_VALUES = [
+  "information_requested",
+  "appointment_requested",
+  "message_taken",
+  "spam",
+  "unresolved",
+] as const;
+export type DispositionOutcome = (typeof DISPOSITION_OUTCOME_VALUES)[number];
+
+/** Mirrors artifacts/api-server/src/lib/voice/webhooks/structuredOutcome.ts — the one centralized, versioned, application-facing shape every genuine call's analysis is normalized into. */
+export interface StructuredOutcome {
+  schemaVersion: "1.0";
+  caller: {
+    name: string | null;
+    phoneAvailable: boolean;
+    email: string | null;
+    companyOrBusiness: string | null;
+  };
+  inquiry: {
+    reason: string | null;
+    serviceInterest: string[];
+    businessType: string | null;
+    pricingQuestion: boolean;
+    urgency: Urgency | null;
+  };
+  appointmentRequest: {
+    requested: boolean;
+    preferredDateText: string | null;
+    preferredTimeText: string | null;
+    timezone: string | null;
+    status: AppointmentStatus;
+  };
+  followUp: {
+    requested: boolean;
+    phoneConsent: boolean;
+    smsConsent: boolean;
+    emailConsent: boolean;
+    status: FollowUpStatus;
+  };
+  disposition: {
+    outcome: DispositionOutcome;
+    summary: string | null;
+  };
+}
+
+/** "invalid" is never sent by the server — the API always collapses it into "unavailable" (see receptionistVoiceCalls.ts). */
+export type StructuredOutcomeAvailability = "available" | "unavailable";
+
 export interface RealCallDetail extends RealCallSummary {
   assistantId: string | null;
   endedReason: string | null;
   transcript: string | null;
   summary: string | null;
-  analysis: unknown;
+  analysisAvailability: StructuredOutcomeAvailability;
+  structuredOutcome: StructuredOutcome | null;
 }
 
 export interface VoiceProviderStatus {

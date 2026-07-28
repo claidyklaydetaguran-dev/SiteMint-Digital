@@ -12,6 +12,36 @@ import {
 import { useRealCallDetail } from "@/hooks/useVoiceCalls";
 import type { RealCallDetail, InternalCallState } from "@/lib/voiceCallsApi";
 
+interface TranscriptTurn {
+  speaker: string;
+  text: string;
+}
+
+const TRANSCRIPT_LINE_PATTERN = /^([A-Za-z][A-Za-z ]{0,19}):\s*(.+)$/;
+
+/**
+ * Splits a raw Vapi transcript string into speaker turns when every non-empty
+ * line matches a `Speaker: text` shape. Falls back to `undefined` (render as
+ * one block) for anything else — never guesses at a shape the transcript
+ * doesn't actually have.
+ */
+function parseTranscriptTurns(transcript: string): TranscriptTurn[] | undefined {
+  const lines = transcript.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length < 2) return undefined;
+  const turns: TranscriptTurn[] = [];
+  for (const line of lines) {
+    const match = TRANSCRIPT_LINE_PATTERN.exec(line);
+    if (!match) return undefined;
+    turns.push({ speaker: match[1]!.trim(), text: match[2]!.trim() });
+  }
+  return turns;
+}
+
+function isAssistantSpeaker(speaker: string): boolean {
+  const s = speaker.toLowerCase();
+  return s === "ai" || s.includes("assistant") || s.includes("receptionist");
+}
+
 function NotFound() {
   return (
     <div className="flex h-full flex-col bg-background">
@@ -46,25 +76,10 @@ function formatRealDuration(sec: number | null): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** Best-effort, defensive read of Vapi's optional structured-output analysis — never assumed to have any particular shape. */
-function readAnalysisField(analysis: unknown, key: string): string | undefined {
-  if (typeof analysis !== "object" || analysis === null) return undefined;
-  const record = analysis as Record<string, unknown>;
-  const direct = record[key];
-  if (typeof direct === "string" && direct.trim()) return direct;
-  const nested = record["structuredData"];
-  if (typeof nested === "object" && nested !== null) {
-    const value = (nested as Record<string, unknown>)[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return undefined;
-}
-
 function RealCallDetailView({ call }: { call: RealCallDetail }) {
   const startedAt = new Date(call.startedAt);
-  const callerName = readAnalysisField(call.analysis, "callerName");
-  const requestedService = readAnalysisField(call.analysis, "requestedService");
-  const appointmentRequest = readAnalysisField(call.analysis, "appointmentRequest");
+  const outcome = call.analysisAvailability === "available" ? call.structuredOutcome : null;
+  const transcriptTurns = call.transcript ? parseTranscriptTurns(call.transcript) : undefined;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -99,7 +114,30 @@ function RealCallDetailView({ call }: { call: RealCallDetail }) {
           <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
             <h2 className="mb-4 text-sm font-semibold text-foreground">Transcript</h2>
             {call.transcript ? (
-              <p className="whitespace-pre-wrap text-sm text-foreground">{call.transcript}</p>
+              transcriptTurns ? (
+                <ol className="space-y-3">
+                  {transcriptTurns.map((turn, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span
+                        className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold uppercase ${
+                          isAssistantSpeaker(turn.speaker)
+                            ? "bg-surface-muted text-primary"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {isAssistantSpeaker(turn.speaker) ? "AI" : "C"}
+                      </span>
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground">{turn.speaker}</div>
+                        <p className="mt-0.5 text-sm text-foreground">{turn.text}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm text-foreground">{call.transcript}</p>
+              )
             ) : (
               <p className="text-sm text-muted-foreground">
                 {call.isFinal
@@ -123,28 +161,66 @@ function RealCallDetailView({ call }: { call: RealCallDetail }) {
                 <User className="h-4 w-4 text-primary" aria-hidden="true" />
                 Extracted information
               </h2>
-              {callerName || requestedService ? (
-                <dl className="space-y-2.5 text-sm">
-                  {callerName && (
+              {outcome ? (
+                <div className="space-y-2.5 text-sm">
+                  <dl className="space-y-2.5">
+                  {outcome.caller.name && (
                     <div>
-                      <dt className="text-xs text-muted-foreground">Caller-provided name</dt>
-                      <dd className="text-foreground">{callerName}</dd>
+                      <dt className="text-xs text-muted-foreground">Caller name</dt>
+                      <dd className="text-foreground">{outcome.caller.name}</dd>
                     </div>
                   )}
-                  {requestedService && (
+                  {outcome.caller.companyOrBusiness && (
                     <div>
-                      <dt className="text-xs text-muted-foreground">Requested service</dt>
-                      <dd className="text-foreground">{requestedService}</dd>
+                      <dt className="text-xs text-muted-foreground">Company / business</dt>
+                      <dd className="text-foreground">{outcome.caller.companyOrBusiness}</dd>
                     </div>
                   )}
+                  {outcome.inquiry.businessType && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Business type</dt>
+                      <dd className="text-foreground">{outcome.inquiry.businessType}</dd>
+                    </div>
+                  )}
+                  {outcome.inquiry.reason && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Reason for calling</dt>
+                      <dd className="text-foreground">{outcome.inquiry.reason}</dd>
+                    </div>
+                  )}
+                  {outcome.inquiry.serviceInterest.length > 0 && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Services of interest</dt>
+                      <dd className="text-foreground">{outcome.inquiry.serviceInterest.join(", ")}</dd>
+                    </div>
+                  )}
+                  {outcome.inquiry.pricingQuestion && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Pricing question</dt>
+                      <dd className="text-foreground">Yes</dd>
+                    </div>
+                  )}
+                  {outcome.inquiry.urgency && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Urgency</dt>
+                      <dd className="text-foreground capitalize">{outcome.inquiry.urgency}</dd>
+                    </div>
+                  )}
+                  {outcome.disposition.summary && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Call summary</dt>
+                      <dd className="text-foreground">{outcome.disposition.summary}</dd>
+                    </div>
+                  )}
+                  </dl>
                   <p className="text-xs text-muted-foreground">
-                    Extracted by the assistant during the call — a caller-stated detail, not an
-                    independently confirmed fact.
+                    Extracted by the assistant during the call — caller-stated details, not
+                    independently confirmed facts.
                   </p>
-                </dl>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No structured caller information was extracted for this call.
+                  Structured analysis unavailable for this call.
                 </p>
               )}
             </section>
@@ -154,22 +230,61 @@ function RealCallDetailView({ call }: { call: RealCallDetail }) {
                 <CalendarClock className="h-4 w-4 text-primary" aria-hidden="true" />
                 Appointment / follow-up
               </h2>
-              {appointmentRequest ? (
-                <div className="space-y-2.5 text-sm">
-                  <p className="text-foreground">{appointmentRequest}</p>
-                  <StatusBadge label="Requested — not yet booked" tone="warning" />
-                  <p className="text-xs text-muted-foreground">
-                    Appointment booking isn't connected to a calendar yet — this is the request as
-                    the assistant captured it, not a confirmed booking.
-                  </p>
+              {outcome ? (
+                <div className="space-y-3 text-sm">
+                  {outcome.appointmentRequest.requested ? (
+                    <div className="space-y-2.5">
+                      <dl className="space-y-2.5">
+                        {outcome.appointmentRequest.preferredDateText && (
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Preferred date</dt>
+                            <dd className="text-foreground">{outcome.appointmentRequest.preferredDateText}</dd>
+                          </div>
+                        )}
+                        {outcome.appointmentRequest.preferredTimeText && (
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Preferred time</dt>
+                            <dd className="text-foreground">{outcome.appointmentRequest.preferredTimeText}</dd>
+                          </div>
+                        )}
+                        {outcome.appointmentRequest.timezone && (
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Timezone</dt>
+                            <dd className="text-foreground">{outcome.appointmentRequest.timezone}</dd>
+                          </div>
+                        )}
+                      </dl>
+                      <div className="flex flex-wrap gap-1.5">
+                        <StatusBadge label="Pending review" tone="warning" />
+                        <StatusBadge label="Not booked" tone="neutral" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        A calendar isn't connected — this is the request as the assistant captured
+                        it, not a confirmed booking.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No appointment was requested on this call.</p>
+                  )}
+
+                  <div className="border-t border-border pt-3">
+                    <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Consent
+                    </h3>
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      <li>Phone follow-up: {outcome.followUp.phoneConsent ? "Permitted" : "Not given"}</li>
+                      <li>SMS: {outcome.followUp.smsConsent ? "Consented" : "Not given"}</li>
+                      <li>Email: {outcome.followUp.emailConsent ? "Consented" : "Not given"}</li>
+                    </ul>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No appointment or follow-up was requested on this call.
+                  Structured analysis unavailable for this call.
                 </p>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                SMS and email follow-up are not yet connected — no message was sent for this call.
+                Delivery state: No message sent.
               </p>
             </section>
           </div>

@@ -26,10 +26,18 @@ describe("buildVapiEventKey", () => {
     expect(call1).not.toBe(call2);
   });
 
-  it("collapses repeated end-of-call-report deliveries to one key regardless of payload", () => {
+  it("collapses a byte-identical end-of-call-report redelivery to the same key", () => {
     const first = buildVapiEventKey(msg({ type: "end-of-call-report", transcript: "a" }));
-    const second = buildVapiEventKey(msg({ type: "end-of-call-report", transcript: "a different transcript" }));
+    const second = buildVapiEventKey(msg({ type: "end-of-call-report", transcript: "a" }));
     expect(first).toBe(second);
+  });
+
+  it("gives a content-different end-of-call-report redelivery its own key — analysis arrives on a later delivery and must not be dropped", () => {
+    const withoutAnalysis = buildVapiEventKey(msg({ type: "end-of-call-report", transcript: "a" }));
+    const withAnalysis = buildVapiEventKey(
+      msg({ type: "end-of-call-report", transcript: "a", analysis: { structuredData: { caller: { name: "Jordan" } } } }),
+    );
+    expect(withoutAnalysis).not.toBe(withAnalysis);
   });
 
   it("gives hang its own stable key", () => {

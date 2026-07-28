@@ -25,10 +25,18 @@ export function buildVapiEventKey(message: ParsedVapiMessage): string {
     case "status-update":
       return `${message.call.id}:status-update:${message.status ?? "unknown"}`;
     case "end-of-call-report":
-      // One terminal report per call is expected; a second delivery with
-      // different content is treated as the same logical event and dropped
-      // rather than silently overwriting the first.
-      return `${message.call.id}:end-of-call-report`;
+      // Vapi's own docs note analysis "is triggered in the background and
+      // typically completes within a few seconds" — so a second
+      // end-of-call-report for the same call, arriving once analysis
+      // finishes, is a genuine update (new transcript/summary/analysis
+      // content), not a duplicate, and must not be silently dropped. Keying
+      // on a hash of the content means a byte-identical retry still
+      // collapses to one row, while a content-different redelivery is
+      // stored as its own event and folded in additively (see
+      // callStateModel.ts) rather than overwriting the first.
+      return `${message.call.id}:end-of-call-report:${shortHash(
+        JSON.stringify({ transcript: message.transcript, summary: message.summary, analysis: message.analysis }),
+      )}`;
     case "hang":
       return `${message.call.id}:hang`;
     case "function-call":

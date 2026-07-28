@@ -46,6 +46,19 @@ Twilio voice webhook.
 Requests older or newer than 300 seconds relative to the server clock are
 rejected (`timestamp_out_of_range`), independent of signature validity.
 
+### Bearer secret fallback (the mechanism the first genuine Development call used)
+
+Vapi also supports a simpler assistant/phone-number-level `server.secret`
+(the documented Bearer fallback): Vapi sends the raw secret value verbatim in
+the `x-vapi-secret` header, with no timestamp/replay protection. The route
+tries HMAC first and falls back to this Bearer check only when the HMAC
+headers are entirely absent (`lib/voice/webhooks/vapiWebhookAuth.ts`,
+`verifyVapiWebhookBearerSecret`) — both mechanisms read the same
+`VAPI_WEBHOOK_SECRET` value, compared in constant time. Prefer the HMAC
+Custom Credential for new setups; the Bearer fallback exists because it's
+the simpler mechanism to configure directly on an assistant/number without
+first creating a Custom Credential.
+
 ## Webhook endpoint
 
 `POST /api/voice/webhooks/vapi` (`artifacts/api-server/src/routes/receptionistVoiceWebhook.ts`)
@@ -100,6 +113,117 @@ be set to anything else by any code path, so a real call can never render as
 Demo Mode and vice versa. Demo Mode's fixture data
 (`artifacts/helpdesk/src/lib/demoCallLog.ts`) is a frontend-only constant
 array; it never touches this backend, the database, or these endpoints.
+
+## Structured call outcomes (Milestone 2, structured-analysis pass)
+
+### Provider mechanism
+
+Verified against current Vapi docs (docs.vapi.ai/assistants/call-analysis,
+2026-07): the assistant's `analysisPlan.structuredDataSchema` (a JSON Schema)
+plus `analysisPlan.structuredDataPrompt` produce `call.analysis.structuredData`;
+`analysisPlan.summaryPrompt` produces `call.analysis.summary`. Vapi's own docs
+note analysis "is triggered in the background and typically completes within
+a few seconds" — it is **not guaranteed to be present on the first
+`end-of-call-report` delivery** and may arrive on a second, later delivery of
+the same message type once analysis finishes. `eventKey.ts` keys
+`end-of-call-report` on a content hash (not just call id + type) specifically
+so that second, analysis-bearing delivery is stored as its own event instead
+of being deduped away as a "duplicate" of the first — a byte-identical retry
+still collapses to one row.
+
+### Application-facing contract
+
+`lib/voice/webhooks/structuredOutcome.ts` defines one centralized, versioned
+(`schemaVersion: "1.0"`) shape every genuine call's analysis is normalized
+into — deliberately independent of whatever Vapi's own `structuredDataSchema`
+happens to be, so the provider-side schema can evolve without breaking this
+contract:
+
+```
+{
+  schemaVersion: "1.0",
+  caller: { name, phoneAvailable, email, companyOrBusiness },
+  inquiry: { reason, serviceInterest[], businessType, pricingQuestion, urgency },
+  appointmentRequest: { requested, preferredDateText, preferredTimeText, timezone, status },
+  followUp: { requested, phoneConsent, smsConsent, emailConsent, status },
+  disposition: { outcome, summary },
+}
+```
+
+`parseStructuredOutcome()` treats every field as untrusted: bounded string
+lengths (200/1000 chars), a bounded array size (10 items) for
+`serviceInterest`, enum validation with a null-safe fallback (an unrecognized
+`urgency` or `disposition.outcome` value degrades to `null`/`"unresolved"`
+rather than invalidating the whole record), and unknown fields are stripped
+by construction (only known keys are ever read off the raw payload).
+
+### Availability states
+
+Every real-call record carries `analysisAvailability`:
+
+- **`available`** — valid structured data was present and normalized.
+- **`unavailable`** — no structured data was supplied at all. This is the
+  state for every call made before `analysisPlan` was configured, and for any
+  `end-of-call-report` that simply didn't include one.
+- **`invalid`** (internal/diagnostic only) — structured data was present but
+  failed validation (e.g. `structuredData` itself wasn't an object). The
+  public API and every UI surface collapse this into `unavailable` — a reader
+  never sees a difference between "never attempted" and "attempted but
+  broken," per the requirement that missing/invalid analysis must never be
+  displayed as a negative result ("No appointment requested").
+
+Once a call's `analysisAvailability` reaches `available`, it is never
+regressed back to `unavailable`/`invalid` by a later stale or duplicate
+event — see `foldEventsIntoCallRecord` in `callStateModel.ts`.
+
+### Requested vs. Pending review vs. Booked
+
+Three distinct, never-conflated states:
+
+- **Requested** — the caller expressed interest in an appointment
+  (`appointmentRequest.requested: true`).
+- **Pending review** (`appointmentRequest.status`) — SiteMint has captured
+  the request; a person or later workflow must review it. This is the only
+  non-`not_requested` status this contract can produce.
+- **Booked** — a calendar provider has confirmed an actual calendar event.
+  **No code path in this checkpoint can ever produce this state** — there is
+  no calendar integration. The UI always pairs "Pending review" with an
+  explicit "Not booked" badge so the two are never visually or semantically
+  conflated.
+
+### Consent is channel-specific and never inferred
+
+`followUp.phoneConsent` / `smsConsent` / `emailConsent` are three independent
+booleans. `safeBooleanDefaultFalse()` is the single choke point that enforces
+this: only an explicit provider-supplied boolean `true` counts as consent —
+a phone number being present, an appointment being requested, or an email
+address being mentioned in the transcript are never treated as consent for
+any channel. The UI's "Delivery state" always reads "No message sent" in
+this checkpoint — no SMS, email, or calendar-invite send path exists yet.
+
+### Historical calls
+
+A call made before `analysisPlan` was configured (or whose analysis simply
+never arrived) has no `analysis` field on any of its stored events at all.
+`parseStructuredOutcome(undefined)` returns `unavailable` for exactly this
+reason — the UI shows "Structured analysis unavailable for this call" rather
+than fabricating a result or displaying a false negative. **No historical
+call's stored events are ever rewritten** to backfill a structured outcome —
+if Vapi's API offers a genuine read-only reprocessing/retrieval endpoint for
+a completed call's analysis in the future, that would arrive as a new,
+authentic webhook-shaped event through the normal path, never a manual
+database edit.
+
+### What still requires further integration
+
+- Calendar: no booking integration exists; every appointment request stays
+  "Pending review — Not booked" indefinitely under this contract.
+- SMS / email: no send path exists; `followUp.status` and the UI both always
+  read as unsent regardless of consent.
+- Transfer: not implemented; `disposition.outcome` can record that a
+  transfer was requested via free-text `summary`, but nothing acts on it.
+- CRM handoff: not implemented — a "Pending review" appointment request is
+  not currently surfaced to any CRM/contacts table.
 
 ## Demo Mode
 
@@ -168,12 +292,28 @@ integration configured but not yet verified"** — never "Live" or
   `end-of-call-report` or a terminal `status-update` — this is expected
   while a call is genuinely still in progress.
 
-## Provider-dependent limitations (this checkpoint)
+## Provider-dependent limitations (as of the structured-outcomes pass)
 
-- No real inbound Development call has been completed in this environment —
-  no Vapi or Twilio Development credentials exist here (verified: env var
-  names checked for presence only, values never printed).
-- `developmentPhoneNumberVerified` is hardcoded `false` — no code path
-  today calls the Vapi API to confirm a number is actually imported and
-  routed; that would need to be added once real credentials exist, and
-  always reported honestly rather than inferred.
+- A first genuine inbound Development call was completed and verified
+  end-to-end (Twilio → Vapi → this webhook, `x-vapi-secret` Bearer auth)
+  from a session with access to the Replit Development runtime and secrets —
+  that session's environment is not this one; see below.
+- This checkpoint's code changes (the structured-outcome contract,
+  validation, UI) were built and verified from a Claude Code Remote sandbox
+  with **no** Vapi/Twilio Development credentials, no Replit runtime, and no
+  public ingress — verified: every relevant env var name checked for
+  presence only (all reported missing), no Replit-specific environment
+  variables present, no inbound tunnel available. All verification here is
+  therefore sanitized-fixture verification (signed synthetic webhook
+  payloads against a local Postgres + a local api-server instance), not a
+  genuine provider call — see the commit for this checkpoint for exactly
+  which scenarios were exercised this way.
+- The assistant's live `analysisPlan` (Vapi dashboard configuration) has not
+  been confirmed read-back by this checkpoint — that requires the Vapi
+  Development API key, which isn't available here. Until it is, real calls
+  will keep landing as `analysisAvailability: "unavailable"` even though the
+  application-side contract and UI are ready to display a populated result
+  the moment the assistant is configured and a call supplies one.
+- `developmentPhoneNumberVerified` is still hardcoded `false` — unchanged
+  from Milestone 2 foundation, for the same reason (no code path calls the
+  Vapi API to confirm a number import).
