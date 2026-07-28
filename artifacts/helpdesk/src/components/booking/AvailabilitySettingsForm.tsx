@@ -84,7 +84,7 @@ export function AvailabilitySettingsForm() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div className="rounded-lg border border-statusbadge-info-bg bg-statusbadge-info-bg/40 px-3 py-2 text-xs font-medium text-statusbadge-info-text">
         Development database — these settings are saved to your firm's own durable record and
         persist across server restarts. No real calendar is connected until Google Calendar
@@ -107,22 +107,44 @@ export function AvailabilitySettingsForm() {
           {WEEKDAY_LABELS.map((label, day) => {
             const hours = draft.weeklyHours[day] ?? null;
             return (
-              <div key={day} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
-                <span className="w-24 flex-shrink-0 text-sm text-foreground">{label}</span>
-                {hours ? (
-                  <>
-                    <Input type="time" value={hours.start} onChange={(e) => updateDayHours(day, { ...hours, start: e.target.value })} className="h-8 w-28 text-xs" />
-                    <span className="text-xs text-muted-foreground">to</span>
-                    <Input type="time" value={hours.end} onChange={(e) => updateDayHours(day, { ...hours, end: e.target.value })} className="h-8 w-28 text-xs" />
-                    <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => updateDayHours(day, null)}>Mark closed</Button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xs text-muted-foreground">Closed</span>
-                    <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => updateDayHours(day, { start: "09:00", end: "17:00" })}>
+              <div key={day} className="rounded-lg border border-border px-3 py-2">
+                {/* Day name + toggle button — always on one line */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">{label}</span>
+                  {hours ? (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateDayHours(day, null)}>
+                      Mark closed
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateDayHours(day, { start: "09:00", end: "17:00" })}>
                       Set hours
                     </Button>
-                  </>
+                  )}
+                </div>
+                {/* Time pickers: stacked with Start/End labels on mobile, inline on sm+ */}
+                {hours ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:items-end sm:gap-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Start</span>
+                      <Input
+                        type="time"
+                        value={hours.start}
+                        onChange={(e) => updateDayHours(day, { ...hours, start: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">End</span>
+                      <Input
+                        type="time"
+                        value={hours.end}
+                        onChange={(e) => updateDayHours(day, { ...hours, end: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">Closed</p>
                 )}
               </div>
             );

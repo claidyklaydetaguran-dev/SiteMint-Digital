@@ -90,7 +90,13 @@ export function PublicBookingCalendar({ slug }: { slug: string }) {
   const [smsConsent, setSmsConsent] = useState(false);
   const [emailConsent, setEmailConsent] = useState(false);
   const [resultError, setResultError] = useState<string | null>(null);
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [resultData, setResultData] = useState<{
+    firmName: string;
+    appointmentType: string;
+    startUtc: string;
+    timezone: string;
+    message: string;
+  } | null>(null);
   // Captured once, at first render — a bot-speed check on the server side.
   const formStartedAt = useRef(new Date().toISOString());
 
@@ -147,7 +153,13 @@ export function PublicBookingCalendar({ slug }: { slug: string }) {
         },
         formStartedAt: formStartedAt.current,
       });
-      setResultMessage(result.message);
+      setResultData({
+        firmName: config?.firmName ?? "",
+        appointmentType: result.appointmentType,
+        startUtc: result.startUtc,
+        timezone: result.timezone,
+        message: result.message,
+      });
       setStep("result");
     } catch (err) {
       const message = err instanceof Error ? err.message : "That time is no longer available.";
@@ -186,33 +198,81 @@ export function PublicBookingCalendar({ slug }: { slug: string }) {
     );
   }
 
-  if (step === "result") {
+  if (step === "result" && resultData) {
+    const slotDate = new Date(resultData.startUtc);
+    const requestedDate = slotDate.toLocaleDateString(undefined, {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+      timeZone: resultData.timezone,
+    });
+    const requestedTime = slotDate.toLocaleTimeString(undefined, {
+      hour: "numeric", minute: "2-digit", timeZone: resultData.timezone,
+    });
     return (
-      <div className="rounded-xl border border-border bg-card p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-primary">
-          <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+      <div className="rounded-xl border border-border bg-card p-8">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-primary">
+            <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground">Request received</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {resultData.firmName ? `Your request has been sent to ${resultData.firmName}.` : resultData.message}
+          </p>
         </div>
-        <h3 className="text-base font-semibold text-foreground">Request received</h3>
-        <div className="mt-2 flex justify-center">
-          <StatusBadge label="Pending review — not booked" tone="warning" />
+
+        <dl className="mt-6 divide-y divide-border rounded-lg border border-border text-sm">
+          {resultData.firmName && (
+            <div className="flex justify-between px-4 py-2.5">
+              <dt className="text-muted-foreground">Business</dt>
+              <dd className="font-medium text-foreground">{resultData.firmName}</dd>
+            </div>
+          )}
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Appointment type</dt>
+            <dd className="font-medium text-foreground">{resultData.appointmentType}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Requested date</dt>
+            <dd className="font-medium text-foreground">{requestedDate}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Requested time</dt>
+            <dd className="font-medium text-foreground">{requestedTime}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Timezone</dt>
+            <dd className="font-medium text-foreground">{formatTimezoneLabel(resultData.timezone)}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Status</dt>
+            <dd><StatusBadge label="Pending review" tone="warning" /></dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Booking state</dt>
+            <dd><StatusBadge label="Not booked" tone="neutral" /></dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          This is a request, not a confirmed booking. The business will contact you to confirm.
+        </p>
+        <div className="mt-5 flex justify-center">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setStep("browse");
+              setResultData(null);
+              setSelectedDate(undefined);
+              setSelectedSlot(undefined);
+              setContactName("");
+              setContactPhone("");
+              setContactEmail("");
+              setSmsConsent(false);
+              setEmailConsent(false);
+            }}
+          >
+            Request another time
+          </Button>
         </div>
-        <p className="mx-auto mt-3 max-w-sm text-sm text-muted-foreground">{resultMessage}</p>
-        <Button
-          variant="secondary"
-          className="mt-5"
-          onClick={() => {
-            setStep("browse");
-            setSelectedDate(undefined);
-            setSelectedSlot(undefined);
-            setContactName("");
-            setContactPhone("");
-            setContactEmail("");
-            setSmsConsent(false);
-            setEmailConsent(false);
-          }}
-        >
-          Request another time
-        </Button>
       </div>
     );
   }
