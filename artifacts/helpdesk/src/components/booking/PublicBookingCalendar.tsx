@@ -1,17 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import {
-  useAvailabilityConfig,
-  useAvailabilityDays,
-  useAvailabilitySlots,
-  useSubmitAppointmentRequest,
-} from "@/hooks/useAvailability";
-import type { DayReason } from "@/lib/availabilityApi";
+import { usePublicConfig, usePublicDays, usePublicSlots, useSubmitPublicRequest } from "@/hooks/usePublicScheduling";
+import type { DayReason } from "@/lib/publicSchedulingApi";
 
 type Step = "browse" | "contact" | "review" | "result";
 
@@ -68,15 +63,16 @@ function formatTimezoneLabel(timeZone: string): string {
 }
 
 /**
- * The admin-facing "Booking preview" — the same visual scheduling flow as
- * the public page (see PublicBookingCalendar.tsx), sourced from the same
- * server-side availability engine the voice assistant will use in a later
- * checkpoint. Never invents or assumes availability; every state shown here
- * came back from the API.
+ * The public, unauthenticated customer-facing scheduling page (Checkpoint
+ * B). Sourced from the same server-side availability engine as the admin
+ * Booking preview and (in a later checkpoint) the voice assistant. A
+ * submission here is always honestly reported as "pending review" — never
+ * "confirmed," "scheduled," or "booked" — because no calendar provider has
+ * confirmed anything yet.
  */
-export function BookingCalendar() {
-  const configQuery = useAvailabilityConfig();
-  const config = configQuery.data?.config;
+export function PublicBookingCalendar({ slug }: { slug: string }) {
+  const configQuery = usePublicConfig(slug);
+  const config = configQuery.data;
 
   const [typeId, setTypeId] = useState<string | undefined>(undefined);
   const activeTypeId = typeId ?? config?.appointmentTypes[0]?.id;
@@ -91,13 +87,18 @@ export function BookingCalendar() {
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [emailConsent, setEmailConsent] = useState(false);
   const [resultError, setResultError] = useState<string | null>(null);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  // Captured once, at first render — a bot-speed check on the server side.
+  const formStartedAt = useRef(new Date().toISOString());
 
   const monthStart = dateKeyFor(viewYear, viewMonth, 1);
   const monthEnd = dateKeyFor(viewYear, viewMonth, daysInMonth(viewYear, viewMonth));
-  const daysQuery = useAvailabilityDays(monthStart, monthEnd, activeTypeId);
-  const slotsQuery = useAvailabilitySlots(selectedDate, activeTypeId);
-  const submitMutation = useSubmitAppointmentRequest();
+  const daysQuery = usePublicDays(slug, monthStart, monthEnd, activeTypeId);
+  const slotsQuery = usePublicSlots(slug, selectedDate, activeTypeId);
+  const submitMutation = useSubmitPublicRequest(slug);
 
   const dayByKey = useMemo(() => {
     const map = new Map<string, { reason: DayReason; slotCount: number }>();
@@ -133,19 +134,26 @@ export function BookingCalendar() {
     if (!activeTypeId || !selectedSlot) return;
     setResultError(null);
     try {
-      await submitMutation.mutateAsync({
+      const result = await submitMutation.mutateAsync({
         appointmentTypeId: activeTypeId,
         startUtc: selectedSlot,
-        contact: { name: contactName.trim(), phone: contactPhone.trim() || null, email: contactEmail.trim() || null },
+        contact: {
+          name: contactName.trim(),
+          phone: contactPhone.trim() || null,
+          email: contactEmail.trim() || null,
+          phoneConsent: false,
+          smsConsent,
+          emailConsent,
+        },
+        formStartedAt: formStartedAt.current,
       });
+      setResultMessage(result.message);
       setStep("result");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "That slot is no longer available.";
+      const message = err instanceof Error ? err.message : "That time is no longer available.";
       setResultError(message);
       setStep("browse");
       setSelectedSlot(undefined);
-      // The slot list for this date is now stale (someone else likely took
-      // it) — invalidate by re-selecting the same date to force a refetch.
       const d = selectedDate;
       setSelectedDate(undefined);
       requestAnimationFrame(() => setSelectedDate(d));
@@ -165,7 +173,15 @@ export function BookingCalendar() {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-statusbadge-danger-bg bg-statusbadge-danger-bg/30 p-6 text-sm text-statusbadge-danger-text">
         <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-        Temporarily unavailable — couldn't load availability. Please try again shortly.
+        {configQuery.error instanceof Error ? configQuery.error.message : "This scheduling page could not be found."}
+      </div>
+    );
+  }
+
+  if (config.appointmentTypes.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+        No appointment types are available for online booking right now.
       </div>
     );
   }
@@ -178,12 +194,9 @@ export function BookingCalendar() {
         </div>
         <h3 className="text-base font-semibold text-foreground">Request received</h3>
         <div className="mt-2 flex justify-center">
-          <StatusBadge label="Pending review — not yet booked" tone="warning" />
+          <StatusBadge label="Pending review — not booked" tone="warning" />
         </div>
-        <p className="mx-auto mt-3 max-w-sm text-sm text-muted-foreground">
-          Your preferred time has been sent to the business for review. This is not a confirmed
-          appointment yet — you'll hear back to confirm the final time.
-        </p>
+        <p className="mx-auto mt-3 max-w-sm text-sm text-muted-foreground">{resultMessage}</p>
         <Button
           variant="secondary"
           className="mt-5"
@@ -194,9 +207,11 @@ export function BookingCalendar() {
             setContactName("");
             setContactPhone("");
             setContactEmail("");
+            setSmsConsent(false);
+            setEmailConsent(false);
           }}
         >
-          Book another
+          Request another time
         </Button>
       </div>
     );
@@ -236,7 +251,7 @@ export function BookingCalendar() {
       )}
 
       {step === "contact" || step === "review" ? (
-        <ContactAndReviewSteps
+        <PublicContactAndReviewSteps
           step={step}
           setStep={setStep}
           typeName={config.appointmentTypes.find((t) => t.id === activeTypeId)?.name ?? ""}
@@ -248,6 +263,10 @@ export function BookingCalendar() {
           setContactPhone={setContactPhone}
           contactEmail={contactEmail}
           setContactEmail={setContactEmail}
+          smsConsent={smsConsent}
+          setSmsConsent={setSmsConsent}
+          emailConsent={emailConsent}
+          setEmailConsent={setEmailConsent}
           onSubmit={handleSubmit}
           submitting={submitMutation.isPending}
           onBack={() => { setStep("browse"); setSelectedSlot(undefined); }}
@@ -355,7 +374,7 @@ function LegendDot({ className, label }: { className: string; label: string }) {
   );
 }
 
-function ContactAndReviewSteps({
+function PublicContactAndReviewSteps({
   step,
   setStep,
   typeName,
@@ -367,6 +386,10 @@ function ContactAndReviewSteps({
   setContactPhone,
   contactEmail,
   setContactEmail,
+  smsConsent,
+  setSmsConsent,
+  emailConsent,
+  setEmailConsent,
   onSubmit,
   submitting,
   onBack,
@@ -382,6 +405,10 @@ function ContactAndReviewSteps({
   setContactPhone: (v: string) => void;
   contactEmail: string;
   setContactEmail: (v: string) => void;
+  smsConsent: boolean;
+  setSmsConsent: (v: boolean) => void;
+  emailConsent: boolean;
+  setEmailConsent: (v: boolean) => void;
   onSubmit: () => void;
   submitting: boolean;
   onBack: () => void;
@@ -404,17 +431,30 @@ function ContactAndReviewSteps({
       {step === "contact" ? (
         <div className="space-y-3">
           <div>
-            <Label htmlFor="contact-name" className="text-xs">Name</Label>
-            <Input id="contact-name" value={contactName} onChange={(e) => setContactName(e.target.value)} maxLength={200} className="mt-1 h-10" />
+            <Label htmlFor="public-contact-name" className="text-xs">Name</Label>
+            <Input id="public-contact-name" value={contactName} onChange={(e) => setContactName(e.target.value)} maxLength={200} className="mt-1 h-10" />
           </div>
           <div>
-            <Label htmlFor="contact-phone" className="text-xs">Phone (optional)</Label>
-            <Input id="contact-phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} maxLength={40} className="mt-1 h-10" />
+            <Label htmlFor="public-contact-phone" className="text-xs">Phone (optional)</Label>
+            <Input id="public-contact-phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} maxLength={40} className="mt-1 h-10" />
           </div>
           <div>
-            <Label htmlFor="contact-email" className="text-xs">Email (optional)</Label>
-            <Input id="contact-email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} maxLength={200} className="mt-1 h-10" />
+            <Label htmlFor="public-contact-email" className="text-xs">Email (optional)</Label>
+            <Input id="public-contact-email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} maxLength={200} className="mt-1 h-10" />
           </div>
+          {/* Consent is always opt-in and never inferred from providing a phone/email value. */}
+          {contactPhone.trim() && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              I agree to receive text messages about this appointment request at the number above.
+            </label>
+          )}
+          {contactEmail.trim() && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={emailConsent} onChange={(e) => setEmailConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              I agree to receive email updates about this appointment request at the address above.
+            </label>
+          )}
           <Button className="mt-2 w-full" disabled={!canContinue} onClick={() => setStep("review")}>
             Review
           </Button>
@@ -427,8 +467,8 @@ function ContactAndReviewSteps({
             {contactEmail && <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="text-foreground">{contactEmail}</dd></div>}
           </dl>
           <p className="text-xs text-muted-foreground">
-            Submitting sends a request for this time — it is not confirmed until the business
-            reviews and books it.
+            Submitting sends a request for this time. Your appointment request will be pending
+            review — it is not booked yet.
           </p>
           <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => setStep("contact")}>Edit</Button>

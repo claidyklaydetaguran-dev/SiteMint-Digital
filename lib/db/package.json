@@ -7,13 +7,16 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
     "./schema/voice": "./src/schema/voice/index.ts",
-    "./schema/discovery": "./src/schema/discovery/index.ts"
+    "./schema/discovery": "./src/schema/discovery/index.ts",
+    "./schema/scheduling": "./src/schema/scheduling/index.ts"
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "generate:voice": "drizzle-kit generate --config ./drizzle.voice.config.ts",
-    "migrate:voice": "drizzle-kit migrate --config ./drizzle.voice.config.ts"
+    "migrate:voice": "drizzle-kit migrate --config ./drizzle.voice.config.ts",
+    "generate:scheduling": "drizzle-kit generate --config ./drizzle.scheduling.config.ts",
+    "migrate:scheduling": "drizzle-kit migrate --config ./drizzle.scheduling.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

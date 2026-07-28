@@ -16,10 +16,24 @@ export default function Appointments() {
 
       <div className="flex-1 overflow-y-auto p-6">
         <Tabs defaultValue="preview" className="flex h-full flex-col">
-          <TabsList className="h-10 w-full justify-start gap-6 overflow-x-auto border-0 bg-transparent p-0">
-            <TabsTrigger value="preview" className="data-[state=active]:bg-surface-muted">Booking preview</TabsTrigger>
-            <TabsTrigger value="requests" className="data-[state=active]:bg-surface-muted">Requests</TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-surface-muted">Availability settings</TabsTrigger>
+          {/*
+            Fixed-width, non-scrolling tab bar: each label swaps to a short
+            mobile form via CSS (not overflow-x-auto) so every tab is always
+            fully visible with no horizontal scroll and no discoverability
+            problem to signal in the first place.
+          */}
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 border-0 bg-transparent p-0 sm:flex sm:h-10 sm:w-auto sm:gap-6">
+            <TabsTrigger value="preview" className="min-h-11 text-xs data-[state=active]:bg-surface-muted sm:text-sm">
+              <span className="sm:hidden">Preview</span>
+              <span className="hidden sm:inline">Booking preview</span>
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="min-h-11 text-xs data-[state=active]:bg-surface-muted sm:text-sm">
+              Requests
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="min-h-11 text-xs data-[state=active]:bg-surface-muted sm:text-sm">
+              <span className="sm:hidden">Settings</span>
+              <span className="hidden sm:inline">Availability settings</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="preview" className="mt-4">

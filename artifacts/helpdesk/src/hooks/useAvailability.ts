@@ -8,6 +8,8 @@ import {
   submitAppointmentRequest,
   fetchAppointmentRequests,
   cancelAppointmentRequest,
+  setPublicSchedulingLink,
+  fetchCalendarStatus,
   type AvailabilityConfig,
   type AppointmentContact,
 } from "@/lib/availabilityApi";
@@ -33,6 +35,21 @@ export function useUpdateAvailabilityConfig() {
     onSuccess: () => {
       if (firmId !== undefined) qc.invalidateQueries({ queryKey: [ROOT, "config", firmId] });
     },
+  });
+}
+
+export function useSetPublicSchedulingLink() {
+  return useMutation({
+    mutationFn: (enabled: boolean) => setPublicSchedulingLink(enabled),
+  });
+}
+
+export function useCalendarStatus() {
+  const firmId = useAuthenticatedFirmId();
+  return useQuery({
+    queryKey: firmId !== undefined ? [ROOT, "calendar-status", firmId] : UNRESOLVED_SESSION_KEY,
+    queryFn: fetchCalendarStatus,
+    enabled: firmId !== undefined,
   });
 }
 

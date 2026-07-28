@@ -1,23 +1,50 @@
-// Checkpoint A: authenticated, firm-scoped scheduling endpoints backing both
+// Checkpoint B: authenticated, firm-scoped scheduling endpoints backing both
 // the Availability Settings admin UI and the visual booking-preview
-// calendar. Backed by the in-memory Development store
-// (lib/scheduling/availabilityStore.ts) — no migration, no real calendar
-// provider, no appointment here can ever reach "booked".
+// calendar. Backed by durable, firm-scoped database records
+// (lib/scheduling/schedulingRepository.ts) — Checkpoint A's in-memory store
+// has been fully replaced. No appointment here can become "booked" until a
+// real calendar-provider write integration exists (Checkpoint C).
 
 import { Router, type Request, type Response } from "express";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import {
-  getAvailabilityConfig,
-  setAvailabilityConfig,
   getDayAvailability,
   createHold,
   submitAppointmentRequest,
   listAppointmentRequests,
-  cancelAppointmentRequest,
-  type AppointmentSource,
-} from "../lib/scheduling/availabilityStore.js";
-import type { AvailabilityConfig, DayHours, AppointmentType } from "../lib/scheduling/availabilityEngine.js";
+  cancelAppointmentRequestByPublicId,
+  saveAvailabilitySettings,
+  getSerializedAvailabilitySettings,
+  setPublicSlug,
+  newPublicSlug,
+  type AvailabilitySettingsInput,
+} from "../lib/scheduling/schedulingRepository.js";
+import type { DayHours } from "../lib/scheduling/availabilityEngine.js";
 import { parseDateKey } from "../lib/scheduling/zonedTime.js";
+import { getFreeBusyProvider } from "../lib/calendar/index.js";
+import type { SchedulingAppointmentRequest } from "@workspace/db/schema/scheduling";
+
+/**
+ * Admin-facing serialization: the internal serial `id` is never included —
+ * `publicId` (renamed `id` here for frontend-contract continuity with
+ * Checkpoint A) is the only identifier this or any other response exposes.
+ * Full contact details are included because this endpoint is
+ * `requireReceptionistAuth`-gated to the owning firm only.
+ */
+function serializeRequestForAdmin(row: SchedulingAppointmentRequest) {
+  return {
+    id: row.publicId,
+    firmId: row.firmId,
+    appointmentTypeId: String(row.appointmentTypeId),
+    startUtc: row.requestedStartAt.toISOString(),
+    endUtc: row.requestedEndAt.toISOString(),
+    state: row.status,
+    source: row.source,
+    contact: { name: row.customerName, phone: row.customerPhone, email: row.customerEmail },
+    createdAt: row.createdAt.toISOString(),
+    holdExpiresAt: row.holdExpiresAt ? row.holdExpiresAt.toISOString() : null,
+  };
+}
 
 const router = Router();
 
@@ -44,11 +71,11 @@ function validateDayHours(value: unknown, label: string): DayHours | null {
   return { start, end };
 }
 
-function validateAppointmentType(value: unknown, index: number): AppointmentType {
+function validateAppointmentType(value: unknown, index: number): { id?: string; name: string; durationMin: number } {
   if (!isPlainObject(value)) throw new ValidationError(`appointmentTypes[${index}] must be an object.`);
   const { id, name, durationMin } = value;
-  if (typeof id !== "string" || id.trim().length === 0 || id.length > 50) {
-    throw new ValidationError(`appointmentTypes[${index}].id is required (max 50 chars).`);
+  if (id !== undefined && (typeof id !== "string" || id.length > 50)) {
+    throw new ValidationError(`appointmentTypes[${index}].id must be a string (max 50 chars) if provided.`);
   }
   if (typeof name !== "string" || name.trim().length === 0 || name.length > 100) {
     throw new ValidationError(`appointmentTypes[${index}].name is required (max 100 chars).`);
@@ -56,7 +83,7 @@ function validateAppointmentType(value: unknown, index: number): AppointmentType
   if (typeof durationMin !== "number" || !Number.isInteger(durationMin) || durationMin < 5 || durationMin > 480) {
     throw new ValidationError(`appointmentTypes[${index}].durationMin must be an integer between 5 and 480.`);
   }
-  return { id: id.trim(), name: name.trim(), durationMin };
+  return { ...(typeof id === "string" ? { id } : {}), name: name.trim(), durationMin };
 }
 
 function validateNonNegativeInt(value: unknown, label: string, max: number): number {
@@ -67,10 +94,10 @@ function validateNonNegativeInt(value: unknown, label: string, max: number): num
 }
 
 /** Full server-side validation for an admin-submitted availability config. Every field is untrusted browser input. */
-function validateAvailabilityConfig(body: unknown): AvailabilityConfig {
+function validateAvailabilitySettingsInput(body: unknown): AvailabilitySettingsInput {
   if (!isPlainObject(body)) throw new ValidationError("Request body must be an object.");
 
-  const { timezone, weeklyHours, appointmentTypes, bufferBeforeMin, bufferAfterMin, minNoticeHours, maxAdvanceDays, blockedDates, slotIntervalMin, dailyLimit } = body;
+  const { timezone, weeklyHours, appointmentTypes, bufferBeforeMin, bufferAfterMin, minNoticeHours, maxAdvanceDays, blockedDates, dailyLimit } = body;
 
   if (typeof timezone !== "string" || timezone.trim().length === 0 || timezone.length > 100) {
     throw new ValidationError("timezone is required.");
@@ -94,8 +121,6 @@ function validateAvailabilityConfig(body: unknown): AvailabilityConfig {
     throw new ValidationError(`No more than ${MAX_APPOINTMENT_TYPES} appointment types are supported.`);
   }
   const parsedTypes = appointmentTypes.map((t, i) => validateAppointmentType(t, i));
-  const ids = new Set(parsedTypes.map((t) => t.id));
-  if (ids.size !== parsedTypes.length) throw new ValidationError("appointmentTypes ids must be unique.");
 
   if (!Array.isArray(blockedDates)) throw new ValidationError("blockedDates must be an array.");
   if (blockedDates.length > MAX_BLOCKED_DATES) throw new ValidationError(`No more than ${MAX_BLOCKED_DATES} blocked dates are supported.`);
@@ -105,7 +130,7 @@ function validateAvailabilityConfig(body: unknown): AvailabilityConfig {
     return d;
   });
 
-  const parsed: AvailabilityConfig = {
+  return {
     timezone: timezone.trim(),
     weeklyHours: parsedWeeklyHours,
     appointmentTypes: parsedTypes,
@@ -118,52 +143,74 @@ function validateAvailabilityConfig(body: unknown): AvailabilityConfig {
       return v;
     })(),
     blockedDates: parsedBlockedDates,
-    slotIntervalMin: (() => {
-      const v = validateNonNegativeInt(slotIntervalMin, "slotIntervalMin", 240);
-      if (v < 5) throw new ValidationError("slotIntervalMin must be at least 5.");
-      return v;
-    })(),
     ...(dailyLimit !== undefined && dailyLimit !== null
       ? { dailyLimit: validateNonNegativeInt(dailyLimit, "dailyLimit", 200) }
       : {}),
-  };
-  return parsed;
-}
-
-function serializeConfig(config: AvailabilityConfig) {
-  return {
-    timezone: config.timezone,
-    weeklyHours: config.weeklyHours,
-    appointmentTypes: config.appointmentTypes,
-    bufferBeforeMin: config.bufferBeforeMin,
-    bufferAfterMin: config.bufferAfterMin,
-    minNoticeHours: config.minNoticeHours,
-    maxAdvanceDays: config.maxAdvanceDays,
-    blockedDates: config.blockedDates,
-    slotIntervalMin: config.slotIntervalMin,
-    dailyLimit: config.dailyLimit ?? null,
   };
 }
 
 // ── GET /api/receptionist/availability/config ─────────────────────────────────
 
-router.get("/receptionist/availability/config", requireReceptionistAuth, (req: Request, res: Response) => {
-  res.json({ config: serializeConfig(getAvailabilityConfig(req.firmId!)) });
+router.get("/receptionist/availability/config", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const config = await getSerializedAvailabilitySettings(req.firmId!);
+    res.json({ config });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to read availability config");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ── PUT /api/receptionist/availability/config ─────────────────────────────────
 
-router.put("/receptionist/availability/config", requireReceptionistAuth, (req: Request, res: Response) => {
+router.put("/receptionist/availability/config", requireReceptionistAuth, async (req: Request, res: Response) => {
   try {
-    const config = validateAvailabilityConfig(req.body);
-    setAvailabilityConfig(req.firmId!, config);
-    res.json({ config: serializeConfig(config) });
+    const input = validateAvailabilitySettingsInput(req.body);
+    await saveAvailabilitySettings(req.firmId!, input);
+    const config = await getSerializedAvailabilitySettings(req.firmId!);
+    res.json({ config });
   } catch (err) {
     if (err instanceof ValidationError) {
       res.status(400).json({ error: err.message });
       return;
     }
     req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to update availability config");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PUT /api/receptionist/availability/public-link ────────────────────────────
+// Enables or disables the public scheduling page. Never exposes a
+// sequential internal firm id — the slug is server-generated and opaque.
+
+router.put("/receptionist/availability/public-link", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const enabled = (req.body ?? {})["enabled"] === true;
+  try {
+    if (!enabled) {
+      await setPublicSlug(req.firmId!, null);
+      res.json({ enabled: false, slug: null });
+      return;
+    }
+    const slug = newPublicSlug();
+    await setPublicSlug(req.firmId!, slug);
+    res.json({ enabled: true, slug });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to update public scheduling link");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/receptionist/availability/calendar-status ───────────────────────
+// Honest connection status only — never a calendar id, account email, or
+// any other identifier, connected or not.
+
+router.get("/receptionist/availability/calendar-status", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const provider = getFreeBusyProvider();
+    const connected = await provider.isConnected(req.firmId!);
+    res.json({ connected, provider: connected ? "google" : "none" });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to read calendar connection status");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -181,7 +228,7 @@ function addDays(dateKey: string, count: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-router.get("/receptionist/availability/days", requireReceptionistAuth, (req: Request, res: Response) => {
+router.get("/receptionist/availability/days", requireReceptionistAuth, async (req: Request, res: Response) => {
   const start = req.query["start"];
   const end = req.query["end"];
   const appointmentTypeId = req.query["appointmentTypeId"];
@@ -201,20 +248,26 @@ router.get("/receptionist/availability/days", requireReceptionistAuth, (req: Req
     return;
   }
 
-  const days: { dateKey: string; reason: string; slotCount: number }[] = [];
-  let cursor = start;
-  const now = new Date();
-  for (let i = 0; i < MAX_DAY_RANGE && cursor <= end; i++) {
-    const result = getDayAvailability(req.firmId!, cursor, appointmentTypeId, now);
-    days.push({ dateKey: result.dateKey, reason: result.reason, slotCount: result.slots.length });
-    cursor = addDays(cursor, 1);
+  try {
+    const days: { dateKey: string; reason: string; slotCount: number }[] = [];
+    let cursor = start;
+    const now = new Date();
+    const freeBusyProvider = getFreeBusyProvider();
+    for (let i = 0; i < MAX_DAY_RANGE && cursor <= end; i++) {
+      const result = await getDayAvailability(req.firmId!, cursor, appointmentTypeId, now, freeBusyProvider);
+      days.push({ dateKey: result.dateKey, reason: result.reason, slotCount: result.slots.length });
+      cursor = addDays(cursor, 1);
+    }
+    res.json({ days });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to compute day availability");
+    res.status(500).json({ error: "Internal server error" });
   }
-  res.json({ days });
 });
 
 // ── GET /api/receptionist/availability/slots?date=YYYY-MM-DD&appointmentTypeId=... ──
 
-router.get("/receptionist/availability/slots", requireReceptionistAuth, (req: Request, res: Response) => {
+router.get("/receptionist/availability/slots", requireReceptionistAuth, async (req: Request, res: Response) => {
   const date = req.query["date"];
   const appointmentTypeId = req.query["appointmentTypeId"];
   if (typeof date !== "string" || !DATE_KEY_PATTERN.test(date)) {
@@ -231,17 +284,22 @@ router.get("/receptionist/availability/slots", requireReceptionistAuth, (req: Re
     res.status(400).json({ error: "date is not a valid calendar date" });
     return;
   }
-  const result = getDayAvailability(req.firmId!, date, appointmentTypeId, new Date());
-  res.json({
-    dateKey: result.dateKey,
-    reason: result.reason,
-    slots: result.slots.map((s) => ({ startUtc: s.startUtc.toISOString(), endUtc: s.endUtc.toISOString() })),
-  });
+  try {
+    const result = await getDayAvailability(req.firmId!, date, appointmentTypeId, new Date(), getFreeBusyProvider());
+    res.json({
+      dateKey: result.dateKey,
+      reason: result.reason,
+      slots: result.slots.map((s) => ({ startUtc: s.startUtc.toISOString(), endUtc: s.endUtc.toISOString() })),
+    });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to compute slot availability");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ── POST /api/receptionist/availability/hold ──────────────────────────────────
 
-router.post("/receptionist/availability/hold", requireReceptionistAuth, (req: Request, res: Response) => {
+router.post("/receptionist/availability/hold", requireReceptionistAuth, async (req: Request, res: Response) => {
   const { appointmentTypeId, startUtc } = (req.body ?? {}) as Record<string, unknown>;
   if (typeof appointmentTypeId !== "string" || typeof startUtc !== "string") {
     res.status(400).json({ error: "appointmentTypeId and startUtc are required" });
@@ -252,17 +310,22 @@ router.post("/receptionist/availability/hold", requireReceptionistAuth, (req: Re
     res.status(400).json({ error: "startUtc is not a valid date" });
     return;
   }
-  const result = createHold(req.firmId!, appointmentTypeId, start, new Date());
-  if (!result.ok) {
-    res.status(409).json({ error: "That slot is no longer available." });
-    return;
+  try {
+    const result = await createHold(req.firmId!, appointmentTypeId, start, new Date(), getFreeBusyProvider());
+    if (!result.ok) {
+      res.status(409).json({ error: "That slot is no longer available." });
+      return;
+    }
+    res.status(201).json({ request: serializeRequestForAdmin(result.request) });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to create hold");
+    res.status(500).json({ error: "Internal server error" });
   }
-  res.status(201).json({ request: result.request });
 });
 
 // ── POST /api/receptionist/availability/requests ──────────────────────────────
 
-router.post("/receptionist/availability/requests", requireReceptionistAuth, (req: Request, res: Response) => {
+router.post("/receptionist/availability/requests", requireReceptionistAuth, async (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const { appointmentTypeId, startUtc, contact } = body;
   if (typeof appointmentTypeId !== "string" || typeof startUtc !== "string" || !isPlainObject(contact)) {
@@ -281,36 +344,58 @@ router.post("/receptionist/availability/requests", requireReceptionistAuth, (req
   }
   const phone = typeof contact["phone"] === "string" ? (contact["phone"] as string).trim().slice(0, 40) || null : null;
   const email = typeof contact["email"] === "string" ? (contact["email"] as string).trim().slice(0, 200) || null : null;
-  const source: AppointmentSource = body["source"] === "manual" ? "manual" : "website";
+  const source = body["source"] === "manual" ? "manual" as const : "website" as const;
+  // Consent is never inferred from the presence of a phone/email value —
+  // it must be an explicit true from the client, defaulting to false.
+  const consent = {
+    phoneConsent: contact["phoneConsent"] === true,
+    smsConsent: contact["smsConsent"] === true,
+    emailConsent: contact["emailConsent"] === true,
+  };
 
-  const result = submitAppointmentRequest(req.firmId!, appointmentTypeId, start, { name, phone, email }, source, new Date());
-  if (!result.ok) {
-    res.status(409).json({ error: "That slot is no longer available. Please choose another time." });
-    return;
+  try {
+    const result = await submitAppointmentRequest(req.firmId!, appointmentTypeId, start, { name, phone, email }, consent, source, new Date(), getFreeBusyProvider());
+    if (!result.ok) {
+      res.status(409).json({ error: "That slot is no longer available. Please choose another time." });
+      return;
+    }
+    req.log.info(
+      { firmId: req.firmId, requestId: result.request.publicId, appointmentTypeId },
+      "[receptionist] appointment request captured (pending_review, durable store)",
+    );
+    res.status(201).json({ request: serializeRequestForAdmin(result.request) });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to submit appointment request");
+    res.status(500).json({ error: "Internal server error" });
   }
-  req.log.info(
-    { firmId: req.firmId, requestId: result.request.id, appointmentTypeId },
-    "[receptionist] appointment request captured (pending_review, Development store)",
-  );
-  res.status(201).json({ request: result.request });
 });
 
 // ── GET /api/receptionist/availability/requests ───────────────────────────────
 
-router.get("/receptionist/availability/requests", requireReceptionistAuth, (req: Request, res: Response) => {
-  const requests = listAppointmentRequests(req.firmId!, new Date());
-  res.json({ items: requests });
+router.get("/receptionist/availability/requests", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const items = await listAppointmentRequests(req.firmId!);
+    res.json({ items: items.map(serializeRequestForAdmin) });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to list appointment requests");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-// ── POST /api/receptionist/availability/requests/:id/cancel ──────────────────
+// ── POST /api/receptionist/availability/requests/:publicId/cancel ────────────
 
-router.post("/receptionist/availability/requests/:id/cancel", requireReceptionistAuth, (req: Request, res: Response) => {
-  const cancelled = cancelAppointmentRequest(req.firmId!, req.params.id as string);
-  if (!cancelled) {
-    res.status(404).json({ error: "Request not found" });
-    return;
+router.post("/receptionist/availability/requests/:publicId/cancel", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const cancelled = await cancelAppointmentRequestByPublicId(req.firmId!, req.params.publicId as string);
+    if (!cancelled) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to cancel appointment request");
+    res.status(500).json({ error: "Internal server error" });
   }
-  res.json({ ok: true });
 });
 
 export default router;

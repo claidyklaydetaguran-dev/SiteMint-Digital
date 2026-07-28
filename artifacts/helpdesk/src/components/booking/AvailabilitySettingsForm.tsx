@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useAvailabilityConfig, useUpdateAvailabilityConfig } from "@/hooks/useAvailability";
+import { useAvailabilityConfig, useUpdateAvailabilityConfig, useSetPublicSchedulingLink, useCalendarStatus } from "@/hooks/useAvailability";
 import type { AvailabilityConfig, AppointmentType, DayHours } from "@/lib/availabilityApi";
 
 const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -19,10 +19,9 @@ function cloneConfig(config: AvailabilityConfig): AvailabilityConfig {
 }
 
 /**
- * Development-only settings editor: this saves to the same in-memory,
- * per-process store the booking calendar reads from — it is NOT yet a
- * durable per-firm database setting (that requires a reviewed migration
- * not yet approved). Values reset if the server restarts.
+ * Checkpoint B: saves to durable, firm-scoped Postgres records
+ * (scheduling_availability_settings / _weekly_hours / _appointment_types) —
+ * values persist across server restarts.
  */
 export function AvailabilitySettingsForm() {
   const { toast } = useToast();
@@ -79,7 +78,7 @@ export function AvailabilitySettingsForm() {
   function handleSave() {
     if (!draft) return;
     updateMutation.mutate(draft, {
-      onSuccess: () => toast({ title: "Saved", description: "Availability settings updated (Development preview)." }),
+      onSuccess: () => toast({ title: "Saved", description: "Availability settings updated." }),
       onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" }),
     });
   }
@@ -87,8 +86,9 @@ export function AvailabilitySettingsForm() {
   return (
     <div className="max-w-2xl space-y-6">
       <div className="rounded-lg border border-statusbadge-info-bg bg-statusbadge-info-bg/40 px-3 py-2 text-xs font-medium text-statusbadge-info-text">
-        Development preview — these settings are stored in server memory for this session and are
-        not yet a durable, database-backed setting.
+        Development database — these settings are saved to your firm's own durable record and
+        persist across server restarts. No real calendar is connected until Google Calendar
+        free/busy is enabled, and no appointment here can become "Booked" until then.
       </div>
 
       <section>
@@ -176,10 +176,6 @@ export function AvailabilitySettingsForm() {
           <Input type="number" min={1} max={365} value={draft.maxAdvanceDays} onChange={(e) => setDraft((d) => (d ? { ...d, maxAdvanceDays: Number(e.target.value) } : d))} className="mt-1 h-9 text-sm" />
         </div>
         <div>
-          <Label className="text-xs">Slot interval (min)</Label>
-          <Input type="number" min={5} max={240} value={draft.slotIntervalMin} onChange={(e) => setDraft((d) => (d ? { ...d, slotIntervalMin: Number(e.target.value) } : d))} className="mt-1 h-9 text-sm" />
-        </div>
-        <div>
           <Label className="text-xs">Daily limit (optional)</Label>
           <Input
             type="number"
@@ -215,6 +211,10 @@ export function AvailabilitySettingsForm() {
         />
       </section>
 
+      <CalendarStatusSection />
+
+      <PublicLinkSection />
+
       <div className="flex items-center gap-3 border-t border-border pt-4">
         <Button onClick={handleSave} disabled={updateMutation.isPending}>
           {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save settings"}
@@ -226,5 +226,91 @@ export function AvailabilitySettingsForm() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Honest read-only-calendar connection status — never a calendar id or
+ * account email, connected or not. Availability always falls back safely
+ * (SiteMint rules only) when no calendar is connected.
+ */
+function CalendarStatusSection() {
+  const statusQuery = useCalendarStatus();
+  return (
+    <section className="border-t border-border pt-4">
+      <h3 className="mb-2 text-sm font-semibold text-foreground">Google Calendar (read-only)</h3>
+      {statusQuery.isLoading ? (
+        <p className="text-xs text-muted-foreground">Checking connection…</p>
+      ) : statusQuery.data?.connected ? (
+        <p className="text-xs text-statusbadge-success-text">
+          Connected — busy times from your Development calendar are combined with the rules
+          below. SiteMint never creates, changes, or deletes a calendar event.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Not connected. Availability is calculated from the rules below only. Connecting a
+          calendar requires owner approval for a separate checkpoint.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Enables/disables the public scheduling page. The slug is server-generated
+ * and opaque — never derived from the firm's internal id or name — so
+ * disabling and re-enabling issues a brand-new, unguessable link rather than
+ * reusing or predicting the previous one.
+ */
+function PublicLinkSection() {
+  const { toast } = useToast();
+  const linkMutation = useSetPublicSchedulingLink();
+  const [slug, setSlug] = useState<string | null>(null);
+
+  const publicUrl = slug ? `${window.location.origin}${window.location.pathname.replace(/\/appointments.*$/, "")}/schedule/${slug}` : null;
+
+  return (
+    <section className="border-t border-border pt-4">
+      <h3 className="mb-2 text-sm font-semibold text-foreground">Public scheduling page</h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Generates a link you can share or embed on your own website. Visitors don't need an
+        account — every request they submit lands as Pending review, same as the preview above.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={linkMutation.isPending}
+          onClick={() =>
+            linkMutation.mutate(true, {
+              onSuccess: (res) => {
+                setSlug(res.slug);
+                toast({ title: "Public link enabled" });
+              },
+              onError: (err) => toast({ title: "Failed to enable link", description: err instanceof Error ? err.message : undefined, variant: "destructive" }),
+            })
+          }
+        >
+          {linkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable public link"}
+        </Button>
+        {slug && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() =>
+              linkMutation.mutate(false, {
+                onSuccess: () => { setSlug(null); toast({ title: "Public link disabled" }); },
+              })
+            }
+          >
+            Disable
+          </Button>
+        )}
+      </div>
+      {publicUrl && (
+        <div className="mt-2 rounded-lg bg-surface-muted px-3 py-2 text-xs text-foreground">{publicUrl}</div>
+      )}
+    </section>
   );
 }

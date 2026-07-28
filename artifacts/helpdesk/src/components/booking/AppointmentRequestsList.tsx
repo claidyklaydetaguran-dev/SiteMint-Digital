@@ -7,16 +7,24 @@ import { useAppointmentRequests, useAvailabilityConfig, useCancelAppointmentRequ
 import type { AppointmentRequestState, AppointmentSource } from "@/lib/availabilityApi";
 
 const STATE_LABEL: Record<AppointmentRequestState, string> = {
+  requested: "Requested",
   held: "Held (temporary)",
   pending_review: "Pending review",
+  booked: "Booked",
   cancelled: "Cancelled",
+  rescheduled: "Rescheduled",
+  failed: "Failed",
   expired: "Expired",
 };
 
 const STATE_TONE: Record<AppointmentRequestState, StatusTone> = {
+  requested: "info",
   held: "info",
   pending_review: "warning",
+  booked: "success",
   cancelled: "neutral",
+  rescheduled: "info",
+  failed: "destructive",
   expired: "neutral",
 };
 

@@ -4,12 +4,10 @@
 // existing bookings, compute what's actually available. No DB, no network,
 // no timers — callers own storage and concurrency.
 //
-// Checkpoint A scope: this engine is fully real and fully tested, but it is
-// wired to an in-memory Development configuration/booking store
-// (see availabilityStore.ts) rather than a persisted one, since a durable
-// per-firm settings/appointments table would require a migration that
-// hasn't been approved yet. Swapping the store for a real one later does
-// not change anything in this file.
+// Checkpoint B: wired to durable, firm-scoped Postgres tables via
+// schedulingRepository.ts, which also merges in Google Calendar free/busy
+// ranges and manual blocked periods as ordinary `ExistingBooking` entries.
+// This file itself never changed to support that — it stays pure.
 
 import { utcToZonedParts, zonedTimeToUtc, zonedDateKey, parseDateKey } from "./zonedTime.js";
 

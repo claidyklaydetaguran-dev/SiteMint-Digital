@@ -1,9 +1,9 @@
 /**
- * Checkpoint A: client for the scheduling/availability endpoints. Backed by
- * an in-memory Development store server-side (see
- * lib/scheduling/availabilityStore.ts) — settings and requests reset when
- * the server restarts, and nothing here can ever reach a "booked" state,
- * since no real calendar provider is connected yet.
+ * Checkpoint B: client for the authenticated scheduling/availability
+ * endpoints. Backed by durable, firm-scoped Postgres records server-side
+ * (see lib/scheduling/schedulingRepository.ts) — nothing here can ever
+ * reach a "booked" state until a real calendar-provider write integration
+ * exists.
  */
 
 const API_BASE = "/api";
@@ -28,7 +28,6 @@ export interface AvailabilityConfig {
   minNoticeHours: number;
   maxAdvanceDays: number;
   blockedDates: string[];
-  slotIntervalMin: number;
   dailyLimit: number | null;
 }
 
@@ -59,7 +58,22 @@ export interface DayDetail {
   slots: DaySlot[];
 }
 
-export const APPOINTMENT_REQUEST_STATES = ["held", "pending_review", "cancelled", "expired"] as const;
+// The durable schema's full status enum (see
+// lib/db/src/schema/scheduling.ts). Only held/pending_review/cancelled/
+// expired are reachable via any Checkpoint B code path — requested, booked,
+// rescheduled, and failed are modeled now so the admin UI and schema don't
+// need another migration once a real calendar-provider integration
+// (Checkpoint C) can actually produce them.
+export const APPOINTMENT_REQUEST_STATES = [
+  "requested",
+  "pending_review",
+  "held",
+  "booked",
+  "cancelled",
+  "rescheduled",
+  "failed",
+  "expired",
+] as const;
 export type AppointmentRequestState = (typeof APPOINTMENT_REQUEST_STATES)[number];
 export type AppointmentSource = "website" | "ai_receptionist" | "manual";
 
@@ -109,6 +123,14 @@ export function fetchAvailabilityConfig(): Promise<{ config: AvailabilityConfig 
 
 export function updateAvailabilityConfig(config: AvailabilityConfig): Promise<{ config: AvailabilityConfig }> {
   return apiFetch("/receptionist/availability/config", { method: "PUT", body: JSON.stringify(config) });
+}
+
+export function fetchCalendarStatus(): Promise<{ connected: boolean; provider: "google" | "none" }> {
+  return apiFetch("/receptionist/availability/calendar-status");
+}
+
+export function setPublicSchedulingLink(enabled: boolean): Promise<{ enabled: boolean; slug: string | null }> {
+  return apiFetch("/receptionist/availability/public-link", { method: "PUT", body: JSON.stringify({ enabled }) });
 }
 
 export function fetchAvailabilityDays(start: string, end: string, appointmentTypeId: string): Promise<{ days: DaySummary[] }> {

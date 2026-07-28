@@ -27,6 +27,7 @@ import AssistantBuilder from "@/pages/AssistantBuilder";
 import CallLogs from "@/pages/CallLogs";
 import CallLogDetail from "@/pages/CallLogDetail";
 import Appointments from "@/pages/Appointments";
+import PublicSchedule from "@/pages/PublicSchedule";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      {/* Public, unauthenticated scheduling page — no dashboard chrome, no session cookie required. */}
+      <Route path="/schedule/:slug" component={PublicSchedule} />
       <Route>
         <AppShell>
           <Switch>
