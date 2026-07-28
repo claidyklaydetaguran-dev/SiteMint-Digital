@@ -65,18 +65,23 @@ async function main(): Promise<void> {
     );
   }
 
-  // ── The only *executable* (template-literal) CREATE TABLE SQL anywhere
-  // targets the dedicated ledger — comments mentioning "CREATE TABLE" in
-  // prose are deliberately not matched by this pattern. ────────────────────
-  const executableCreateTablePattern = /`[^`]*CREATE TABLE[^`]*`/gs;
-  const allCreateTableUses = [...combinedSource().matchAll(executableCreateTablePattern)];
-  check("exactly one executable CREATE TABLE SQL literal exists across the utility", allCreateTableUses.length === 1);
-  if (allCreateTableUses[0]) {
+  // ── The only *executable* SQL passed to .query(...) anywhere that
+  // mentions CREATE TABLE targets the dedicated ledger. Anchored to
+  // `.query(` specifically (rather than any backtick pair) so unrelated
+  // template-literal strings elsewhere in the same file — e.g. cli.ts's
+  // human-readable log messages, which also happen to use backticks and may
+  // mention "CREATE TABLE" in prose — can never be mistaken for it. ───────
+  const queryArgPattern = /\.query\(\s*`([^`]*)`/gs;
+  const createTableQueryArgs = [...combinedSource().matchAll(queryArgPattern)]
+    .map((m) => m[1])
+    .filter((sqlArg) => sqlArg.includes("CREATE TABLE"));
+  check("exactly one .query(...) call's SQL literal contains CREATE TABLE", createTableQueryArgs.length === 1);
+  if (createTableQueryArgs[0]) {
     check(
-      "the one executable CREATE TABLE SQL literal targets the dedicated ledger table, not an application table",
-      allCreateTableUses[0][0].includes("LEDGER_SCHEMA") &&
-        !allCreateTableUses[0][0].includes("intake_conversations") &&
-        !allCreateTableUses[0][0].includes("intake_messages"),
+      "that CREATE TABLE SQL literal targets the dedicated ledger table, not an application table",
+      createTableQueryArgs[0].includes("LEDGER_SCHEMA") &&
+        !createTableQueryArgs[0].includes("intake_conversations") &&
+        !createTableQueryArgs[0].includes("intake_messages"),
     );
   }
 

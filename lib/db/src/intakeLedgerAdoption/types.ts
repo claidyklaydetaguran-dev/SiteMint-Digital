@@ -14,19 +14,22 @@ export interface AdoptionDbClient {
   ): Promise<{ rows: Row[] }>;
 }
 
-export type AdoptionMode = "dry-run" | "apply";
+export type AdoptionMode = "dry-run" | "apply" | "rehearse";
 
 export interface AdoptionOptions {
-  /** Must be "apply" and paired with a correct `confirmation` to write anything. Defaults to "dry-run". */
+  /** "apply" and "rehearse" both require a correct `confirmation`. Defaults to "dry-run". Mutually
+   * exclusive at the CLI layer (see cli.ts's parseArgs) — this type does not enforce that itself
+   * because it's a single mode value, not two independent flags, by the time it reaches here. */
   mode: AdoptionMode;
-  /** Required only when mode === "apply". Must exactly equal the value computed by computeConfirmationToken(). */
+  /** Required for "apply" and "rehearse". Must exactly equal the value computed by computeConfirmationToken(). */
   confirmation?: string;
 }
 
 export type AdoptionOutcome =
   | { status: "dry-run-ok"; confirmationToken: string; targetFingerprint: string }
   | { status: "already-adopted"; targetFingerprint: string }
-  | { status: "adopted"; targetFingerprint: string };
+  | { status: "adopted"; targetFingerprint: string }
+  | { status: "rehearsed"; targetFingerprint: string; ledgerWriteExercised: boolean };
 
 export class IntakeAdoptionError extends Error {
   readonly reason: string;

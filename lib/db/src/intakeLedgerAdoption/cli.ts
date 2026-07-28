@@ -10,7 +10,10 @@
 //     scripts/node_modules/.bin/tsx lib/db/src/intakeLedgerAdoption/cli.ts
 //
 // Defaults to dry-run (no flags needed). Apply mode requires BOTH --apply
-// and the exact --confirm=<token> value the dry-run run printed.
+// and the exact --confirm=<token> value the dry-run run printed. Rehearsal
+// mode (--rehearse --confirm=<token>) exercises the identical write path
+// inside a transaction and always rolls it back — never commits. --apply
+// and --rehearse are mutually exclusive.
 import pg from "pg";
 import { runIntakeLedgerAdoption } from "./adopt";
 import { CONNECTION_ENV_VAR } from "./constants";
@@ -19,9 +22,17 @@ import { AdoptionDbClient, AdoptionMode, IntakeAdoptionError } from "./types";
 
 export function parseArgs(argv: string[]): { mode: AdoptionMode; confirmation?: string } {
   const apply = argv.includes("--apply");
+  const rehearse = argv.includes("--rehearse");
+  if (apply && rehearse) {
+    throw new IntakeAdoptionError(
+      "mutually-exclusive-flags",
+      "--apply and --rehearse cannot be combined; choose exactly one",
+    );
+  }
   const confirmArg = argv.find((a) => a.startsWith("--confirm="));
   const confirmation = confirmArg?.slice("--confirm=".length);
-  return { mode: apply ? "apply" : "dry-run", confirmation };
+  const mode: AdoptionMode = apply ? "apply" : rehearse ? "rehearse" : "dry-run";
+  return { mode, confirmation };
 }
 
 async function main(): Promise<void> {
@@ -36,7 +47,19 @@ async function main(): Promise<void> {
   }
 
   const redactedTarget = redactConnectionTarget(connectionString);
-  const { mode, confirmation } = parseArgs(process.argv.slice(2));
+
+  let mode: AdoptionMode;
+  let confirmation: string | undefined;
+  try {
+    ({ mode, confirmation } = parseArgs(process.argv.slice(2)));
+  } catch (err) {
+    if (err instanceof IntakeAdoptionError) {
+      console.error(`REJECTED [${err.reason}]: ${err.message}`);
+      process.exitCode = 1;
+      return;
+    }
+    throw err;
+  }
 
   console.log(`Intake ledger adoption — mode: ${mode}`);
   console.log(`Target host: ${redactedTarget.hostForDisplay} (fingerprint ${redactedTarget.fingerprint})`);
@@ -51,12 +74,21 @@ async function main(): Promise<void> {
       case "dry-run-ok":
         console.log("Dry run OK — no writes made.");
         console.log(`To apply, re-run with: --apply --confirm=${outcome.confirmationToken}`);
+        console.log(`To rehearse (rolled back, no changes persisted), re-run with: --rehearse --confirm=${outcome.confirmationToken}`);
         break;
       case "already-adopted":
         console.log("Already adopted — ledger already contains the exact pinned baseline record. No writes made.");
         break;
       case "adopted":
         console.log("Adopted — wrote exactly one baseline ledger record.");
+        break;
+      case "rehearsed":
+        console.log(
+          outcome.ledgerWriteExercised
+            ? "Rehearsal exercised the full ledger write path (CREATE SCHEMA, CREATE TABLE, INSERT) inside a transaction."
+            : "Rehearsal found the ledger already adopted; re-verified structure inside a transaction.",
+        );
+        console.log("REHEARSAL ROLLED BACK — NO CHANGES PERSISTED");
         break;
     }
   } catch (err) {

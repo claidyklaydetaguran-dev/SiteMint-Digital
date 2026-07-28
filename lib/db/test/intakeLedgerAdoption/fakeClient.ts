@@ -19,6 +19,10 @@ export interface FakeClientOptions {
   ledgerTableExists?: boolean;
   /** If set, an unexpected ledger table column shape is simulated (e.g. hash nullable). */
   ledgerTableShape?: "expected" | "unexpected";
+  /** Whether the shared drizzle.__drizzle_migrations ledger (voice/discovery) appears to exist. */
+  sharedLedgerExists?: boolean;
+  /** Row count reported for the shared ledger. */
+  sharedLedgerRowCount?: number;
 }
 
 const baseline = JSON.parse(readFileSync(BASELINE_JSON_PATH, "utf8")) as {
@@ -51,16 +55,40 @@ const baseline = JSON.parse(readFileSync(BASELINE_JSON_PATH, "utf8")) as {
 
 /** Records every query issued, in order, so tests can assert on
  * transaction/lock usage (BEGIN, advisory lock, COMMIT/ROLLBACK order). */
+/** Snapshot of every piece of state a real Postgres transaction would roll
+ * back: row data, the id sequence's *logical* position for this fake (real
+ * Postgres sequences are NOT rolled back, but that only affects id gaps,
+ * never correctness — see adopt.ts), and DDL-visible existence flags. */
+interface TxSnapshot {
+  ledgerRows: LedgerRow[];
+  nextId: number;
+  ledgerTableExists: boolean;
+}
+
 export class FakeAdoptionClient implements AdoptionDbClient {
   readonly calls: Array<{ text: string; params: readonly unknown[] | undefined }> = [];
   private ledgerRows: LedgerRow[];
   private nextId = 1;
   private opts: FakeClientOptions;
+  private txSnapshot: TxSnapshot | null = null;
 
   constructor(opts: FakeClientOptions = {}) {
-    this.opts = { tablesExist: true, ledgerTableExists: false, ledgerTableShape: "expected", ...opts };
+    this.opts = {
+      tablesExist: true,
+      ledgerTableExists: false,
+      ledgerTableShape: "expected",
+      sharedLedgerExists: false,
+      sharedLedgerRowCount: 0,
+      ...opts,
+    };
     this.ledgerRows = [...(opts.ledgerRows ?? [])];
     this.nextId = this.ledgerRows.length > 0 ? Math.max(...this.ledgerRows.map((r) => r.id)) + 1 : 1;
+  }
+
+  /** Lets a test mutate the shared ledger mid-run to simulate a concurrent
+   * voice/discovery migration, proving rehearsal's drift detection works. */
+  setSharedLedgerRowCount(n: number): void {
+    this.opts.sharedLedgerRowCount = n;
   }
 
   async query<Row extends object = Record<string, unknown>>(
@@ -70,11 +98,38 @@ export class FakeAdoptionClient implements AdoptionDbClient {
     this.calls.push({ text, params });
     const sql = text.trim().replace(/\s+/g, " ");
 
-    if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+    if (sql === "BEGIN") {
+      this.txSnapshot = {
+        ledgerRows: this.ledgerRows.map((r) => ({ ...r })),
+        nextId: this.nextId,
+        ledgerTableExists: Boolean(this.opts.ledgerTableExists),
+      };
+      return { rows: [] as Row[] };
+    }
+    if (sql === "COMMIT") {
+      this.txSnapshot = null;
+      return { rows: [] as Row[] };
+    }
+    if (sql === "ROLLBACK") {
+      if (this.txSnapshot) {
+        this.ledgerRows = this.txSnapshot.ledgerRows;
+        this.nextId = this.txSnapshot.nextId;
+        this.opts.ledgerTableExists = this.txSnapshot.ledgerTableExists;
+        this.txSnapshot = null;
+      }
       return { rows: [] as Row[] };
     }
     if (sql.startsWith("SELECT pg_advisory_xact_lock")) {
       return { rows: [] as Row[] };
+    }
+
+    if (sql.includes("table_schema = 'drizzle'") && sql.includes("table_name = '__drizzle_migrations'")) {
+      return {
+        rows: this.opts.sharedLedgerExists ? [{ table_name: "__drizzle_migrations" }] : ([] as Row[]),
+      } as { rows: Row[] };
+    }
+    if (sql.includes("FROM drizzle.__drizzle_migrations")) {
+      return { rows: [{ cnt: String(this.opts.sharedLedgerRowCount ?? 0) }] as unknown as Row[] };
     }
 
     if (sql.includes("FROM information_schema.tables") && sql.includes("table_name = ANY")) {
