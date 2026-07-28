@@ -65,6 +65,13 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       strictPort: true,
       host: "0.0.0.0",
       allowedHosts: true,
+      // Local dev only: production serves the dashboard and /api behind the
+      // same origin (see CLAUDE.md), so this proxy exists purely so `pnpm
+      // --filter @workspace/helpdesk run dev` can reach a locally running
+      // api-server on its own port without changing any request paths.
+      proxy: process.env.API_PROXY_TARGET
+        ? { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: true } }
+        : undefined,
       fs: {
         strict: true,
       },

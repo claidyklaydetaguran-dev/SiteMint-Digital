@@ -24,6 +24,8 @@ import Assistants from "@/pages/Assistants";
 import AssistantCreate from "@/pages/AssistantCreate";
 import AssistantBuilderNew from "@/pages/AssistantBuilderNew";
 import AssistantBuilder from "@/pages/AssistantBuilder";
+import CallLogs from "@/pages/CallLogs";
+import CallLogDetail from "@/pages/CallLogDetail";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +75,8 @@ function Router() {
                 <Route path="/assistants/new" component={AssistantCreate} />
                 <Route path="/assistants/new/:tab" component={AssistantBuilderNew} />
                 <Route path="/assistants/:id/:tab?" component={AssistantBuilder} />
+                <Route path="/logs" component={CallLogs} />
+                <Route path="/logs/:id" component={CallLogDetail} />
               </>
             )}
             {comingSoonRoutes.map((item) => (
