@@ -10,6 +10,8 @@ import { KpiTile } from "@/components/common/KpiTile";
 import { RecentConversationList } from "@/components/common/RecentConversationList";
 import { GettingStartedChecklist, type ChecklistStep } from "@/components/common/GettingStartedChecklist";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { VoiceProviderStatusCard } from "@/components/common/VoiceProviderStatusCard";
+import { voicePlatformEnabled } from "@/lib/featureFlags";
 import {
   MessageSquare,
   Flame,
@@ -273,6 +275,9 @@ export default function Overview() {
           <KpiTile label="Appointments booked" value="" icon={CalendarCheck} unavailable unavailableLabel="Connect voice to enable" />
           <KpiTile label="Hours saved" value="" icon={Clock3} unavailable unavailableLabel="Available after voice setup" />
         </div>
+
+        {/* Real-voice provider readiness — honest configured/verified states only */}
+        {voicePlatformEnabled && <VoiceProviderStatusCard />}
 
         {/* This week's activity trend — derived from real timestamps */}
         <WeekTrend conversations={convs} />

@@ -59,6 +59,10 @@ app.use("/api/crm/webhooks/resend", express.raw({ type: "application/json" }));
 // Capture raw body for receptionist Stripe billing webhook BEFORE json() runs
 app.use("/api/receptionist/billing/webhook", express.raw({ type: "application/json" }));
 
+// Capture raw body for the Vapi voice webhook BEFORE json() runs — signature
+// verification (lib/voice/webhooks/vapiWebhookAuth.ts) needs the exact bytes.
+app.use("/api/voice/webhooks/vapi", express.raw({ type: "application/json" }));
+
 // Discovery v1 (structured submissions): explicit 64KB body-size cap,
 // tighter than the global default below and enforced by the parser itself
 // (actual bytes streamed, not a trusted Content-Length header — also
