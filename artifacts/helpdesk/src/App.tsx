@@ -26,6 +26,7 @@ import AssistantBuilderNew from "@/pages/AssistantBuilderNew";
 import AssistantBuilder from "@/pages/AssistantBuilder";
 import CallLogs from "@/pages/CallLogs";
 import CallLogDetail from "@/pages/CallLogDetail";
+import Appointments from "@/pages/Appointments";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ function Router() {
                 <Route path="/assistants/:id/:tab?" component={AssistantBuilder} />
                 <Route path="/logs" component={CallLogs} />
                 <Route path="/logs/:id" component={CallLogDetail} />
+                <Route path="/appointments" component={Appointments} />
               </>
             )}
             {comingSoonRoutes.map((item) => (

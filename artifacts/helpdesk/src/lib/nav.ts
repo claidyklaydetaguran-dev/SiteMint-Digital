@@ -106,9 +106,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         key: "appointments", label: "Appointments", href: "/appointments", icon: CalendarDays,
-        state: "comingSoon", voiceGated: true,
-        description: "See and manage the bookings your assistant makes.",
-        availability: "Arriving in a later milestone",
+        state: "live", voiceGated: true,
+        description: "Visual booking calendar, requests, and availability rules. Development preview — no real calendar is connected yet.",
       },
       { key: "conversations", label: "Conversations", href: "/conversations", icon: MessageSquare, state: "live", voiceGated: false },
       { key: "receptionist", label: "Current SMS Receptionist", href: "/receptionist", icon: Bot, state: "live", voiceGated: false },

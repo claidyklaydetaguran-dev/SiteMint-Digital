@@ -21,6 +21,7 @@ import receptionistAgentConfigRouter from "./receptionistAgentConfig";
 import receptionistVoiceAssistantsRouter from "./receptionistVoiceAssistants";
 import receptionistVoiceWebhookRouter from "./receptionistVoiceWebhook";
 import receptionistVoiceCallsRouter from "./receptionistVoiceCalls";
+import receptionistAvailabilityRouter from "./receptionistAvailability";
 import helpdeskRouter from "./helpdesk";
 
 const router: IRouter = Router();
@@ -47,6 +48,7 @@ router.use(receptionistAgentConfigRouter);
 router.use(receptionistVoiceAssistantsRouter);
 router.use(receptionistVoiceWebhookRouter);
 router.use(receptionistVoiceCallsRouter);
+router.use(receptionistAvailabilityRouter);
 router.use(helpdeskRouter);
 
 export default router;
