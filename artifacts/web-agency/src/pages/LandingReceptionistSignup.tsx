@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { DASHBOARD_URLS } from "@/lib/routes";
 import { motion } from "framer-motion";
 import { ReceptionistNav } from "@/components/layout/ReceptionistNav";
 import { Button } from "@/components/ui/button";
@@ -99,7 +100,9 @@ export default function LandingReceptionistSignup() {
         }),
       }).catch(() => {});
 
-      window.location.href = "/ai-receptionist/dashboard/";
+      // Cross-application navigation into the dashboard SPA, resolved through
+      // the centralised path layer. Signup contract and behaviour unchanged.
+      window.location.href = DASHBOARD_URLS.root;
     } catch {
       setError("Network error — please try again.");
     } finally {
@@ -250,7 +253,7 @@ export default function LandingReceptionistSignup() {
 
               <p className="text-[11px] text-muted-foreground text-center">
                 Already have an account?{" "}
-                <a href="/ai-receptionist/dashboard/login" className="text-primary hover:underline">Sign in</a>
+                <a href={DASHBOARD_URLS.login} className="text-primary hover:underline">Sign in</a>
               </p>
             </form>
           </div>

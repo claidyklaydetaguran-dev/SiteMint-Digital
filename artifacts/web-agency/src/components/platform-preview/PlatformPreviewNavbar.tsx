@@ -201,13 +201,17 @@ export function PlatformPreviewNavbar({
         <div className="hidden items-center gap-3 lg:flex">
           {showThemeToggle && <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />}
           <span aria-hidden="true" className="h-6 w-px" style={{ backgroundColor: "hsl(var(--pp-mint-mist))" }} />
-          <Link
+          {/* Cross-application document navigation. Deliberately an <a>, not a
+              <Link>: the dashboard is a separate app with its own base, and a
+              <Link> would prepend this app's router base — the doubled prefix
+              Gate 3 observed. */}
+          <a
             href={signInHref}
             aria-label="Sign in to AI Receptionist"
             className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-4 py-2 text-sm font-medium"
           >
             Sign In
-          </Link>
+          </a>
           <Link href={startProjectHref} className="pp-btn pp-btn-primary rounded-[var(--sm-radius-pill)] px-4 py-2 text-sm font-semibold">
             Start a Project
           </Link>

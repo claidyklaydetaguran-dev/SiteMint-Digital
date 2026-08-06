@@ -40,9 +40,18 @@
   --sm-info-500: 199 80% 44%;
 
   /* Typography primitives */
-  --sm-font-display: 'Playfair Display', 'Plus Jakarta Sans', serif;
-  --sm-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --sm-font-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Frontend V2 Phase 1: these previously named 'Playfair Display' and
+     'Plus Jakarta Sans', which both consuming apps loaded from
+     fonts.googleapis.com as render-blocking third-party requests. No
+     self-hosted variable font exists in this repository, so the approved
+     system stack is used instead — zero font requests, no invisible-text
+     period, no new dependency. `--sm-font-display` keeps its name (it is
+     referenced widely) but is no longer a serif face; display character now
+     comes from scale, weight, and spacing. Token names and count unchanged,
+     so this stays additive under §Token Governance. */
+  --sm-font-display: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --sm-font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --sm-font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 
   --sm-weight-regular: 400;
   --sm-weight-medium: 500;

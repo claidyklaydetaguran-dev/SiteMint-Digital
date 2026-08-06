@@ -8,7 +8,6 @@ import {
   servicesNavItems,
   startProjectHref,
   workHref,
-  pricingHref,
   type PreviewNavChild,
 } from "./navConfig";
 import { PlatformPreviewThemeToggle } from "./PlatformPreviewThemeToggle";
@@ -145,15 +144,9 @@ export function PlatformPreviewMobileMenu({
             Work
           </Link>
         </div>
-        <div className="border-b border-[hsl(var(--pp-mint-mist))] py-2">
-          <Link
-            href={pricingHref}
-            onClick={onClose}
-            className="block rounded-[var(--sm-radius-md)] px-2 py-3 text-lg font-semibold text-[hsl(var(--pp-forest-deep))]"
-          >
-            Pricing
-          </Link>
-        </div>
+        {/* Frontend V2 Phase 1, owner decision 4: the "Pricing" entry was
+            removed. `/pricing` is deferred out of the approved public
+            navigation and IA until real scope and prices are approved. */}
         <MobileSection label="Company" items={companyNavItems} onNavigate={onClose} />
       </nav>
 
@@ -164,14 +157,16 @@ export function PlatformPreviewMobileMenu({
             <PlatformPreviewThemeToggle theme={theme} onToggle={onToggleTheme} />
           </div>
         )}
-        <Link
+        {/* Cross-application document navigation — <a>, never <Link>.
+            See navConfig.ts's signInHref note. */}
+        <a
           href={signInHref}
           onClick={onClose}
           aria-label="Sign in to AI Receptionist"
           className="pp-btn pp-btn-secondary rounded-[var(--sm-radius-pill)] px-4 py-3 text-center text-sm font-medium"
         >
           Sign In
-        </Link>
+        </a>
         <Link
           href={startProjectHref}
           onClick={onClose}

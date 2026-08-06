@@ -10,6 +10,8 @@
  * authenticated destination.
  */
 
+import { ROUTES, START_PROJECT_ROUTE, DASHBOARD_URLS } from "@/lib/routes";
+
 export interface PreviewNavChild {
   label: string;
   description: string;
@@ -28,7 +30,7 @@ export const productsNavItems: PreviewNavChild[] = [
   {
     label: "AI Receptionist",
     description: "Never miss a lead — AI answers, qualifies, and follows up 24/7.",
-    href: "/ai-receptionist",
+    href: ROUTES.aiReceptionist,
   },
   {
     label: "AI Toolkit",
@@ -43,30 +45,43 @@ export const productsNavItems: PreviewNavChild[] = [
 ];
 
 export const servicesNavItems: PreviewNavChild[] = [
-  { label: "Websites", description: "Marketing sites built to convert visitors into leads.", href: "/services" },
-  { label: "Web Applications", description: "Custom software for how your business actually runs.", href: "/services" },
-  { label: "CRM Systems", description: "One system of record for every lead and client.", href: "/services" },
-  { label: "Business Automation", description: "Automate the follow-up work that falls through the cracks.", href: "/services" },
-  { label: "SEO & Digital Growth", description: "Foundational SEO built into every page you launch.", href: "/services" },
-  { label: "Maintenance & Support", description: "Ongoing care so your systems keep working.", href: "/services" },
+  { label: "Websites", description: "Marketing sites built to convert visitors into leads.", href: ROUTES.services },
+  { label: "Web Applications", description: "Custom software for how your business actually runs.", href: ROUTES.services },
+  { label: "CRM Systems", description: "One system of record for every lead and client.", href: ROUTES.services },
+  { label: "Business Automation", description: "Automate the follow-up work that falls through the cracks.", href: ROUTES.services },
+  { label: "SEO & Digital Growth", description: "Foundational SEO built into every page you launch.", href: ROUTES.services },
+  { label: "Maintenance & Support", description: "Ongoing care so your systems keep working.", href: ROUTES.services },
 ];
 
 export const companyNavItems: PreviewNavChild[] = [
-  { label: "About", description: "Who we are and how we work.", href: "/about" },
-  { label: "Contact", description: "Get in touch with the team.", href: "/contact" },
+  { label: "About", description: "Who we are and how we work.", href: ROUTES.about },
+  { label: "Contact", description: "Get in touch with the team.", href: ROUTES.contact },
 ];
 
-/** Single source of truth for these two top-level links — read by both
+/** Single source of truth for this top-level link — read by both
  * PlatformPreviewNavbar's `primaryNavItems` loop and PlatformPreviewMobileMenu,
- * which previously hardcoded the same two paths a second time. */
-export const workHref = "/portfolio";
-export const pricingHref = "/pricing";
+ * which previously hardcoded the same path a second time.
+ *
+ * Frontend V2 Phase 1: paths now come from the centralised route layer rather
+ * than being spelled out here a second time. */
+export const workHref = ROUTES.work;
 
+/**
+ * Frontend V2 Phase 1, owner decision 4: `/pricing` is **deferred**. It leaves
+ * the approved public navigation and information architecture — no navbar
+ * entry, no mobile-menu entry, no footer entry — because there is no approved
+ * package scope or pricing, and V2 ships no pricing table until there is.
+ *
+ * The route itself still resolves and `PlatformPricingPreview` is retained as
+ * a rollback reference; only its *navigation* is withdrawn. Deleting the
+ * source is a separate, later owner decision, not Phase 1 work. The
+ * `/ai-for-lawyers` and `/ai-for-realtors` verticals are deferred the same
+ * way — they were already absent from this file.
+ */
 export const primaryNavItems: PreviewNavItem[] = [
   { label: "Products", children: productsNavItems },
   { label: "Services", children: servicesNavItems },
   { label: "Work", href: workHref },
-  { label: "Pricing", href: pricingHref },
   { label: "Company", children: companyNavItems },
 ];
 
@@ -85,8 +100,14 @@ export const primaryNavItems: PreviewNavItem[] = [
  * (e.g. an AI Toolkit account area), this should become a small product-
  * access menu instead of a single direct link — do not add a second menu
  * item before that destination is verified real.
+ *
+ * Frontend V2 Phase 1: this is a **cross-application** URL — the helpdesk
+ * dashboard is a separate Vite app with its own BASE_PATH, so this path must
+ * not acquire web-agency's router base. It now comes from the centralised path
+ * layer and **must be rendered with `<a href>`, never `<Link>`**: a `<Link>`
+ * prepends the router base and produces the doubled prefix Gate 3 observed.
  */
-export const signInHref = "/ai-receptionist/dashboard/login";
+export const signInHref = DASHBOARD_URLS.login;
 
 /**
  * Production migration: the preview's own guided discovery form
@@ -96,5 +117,9 @@ export const signInHref = "/ai-receptionist/dashboard/login";
  * goes nowhere, "Start a Project" points at the real, working `/discovery`
  * funnel (posts to `/api/discovery/submit`) until the guided form is
  * actually connected to a live submission path — see DECISION_LOG.md.
+ *
+ * Frontend V2 Phase 1, owner decision 3: Discovery stays public at `/discovery`
+ * and is SiteMint's primary "Start Your Project" flow. Every public primary CTA
+ * resolves here through the centralised route layer.
  */
-export const startProjectHref = "/discovery";
+export const startProjectHref = START_PROJECT_ROUTE;

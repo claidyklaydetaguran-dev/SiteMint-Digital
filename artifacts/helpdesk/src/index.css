@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap');
+/* Frontend V2 Phase 1: the render-blocking Google Fonts @import (Plus Jakarta
+   Sans + Playfair Display) was removed here, and the matching <link> was
+   removed from index.html. The font stack now comes from the shared
+   @workspace/design-tokens primitives, which Phase 1 moved to a system stack —
+   no remote font request, and no new dependency. */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@workspace/design-tokens/css";

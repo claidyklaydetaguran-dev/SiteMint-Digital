@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+/* Frontend V2 Phase 1: the render-blocking Google Fonts @import (Plus Jakarta
+   Sans + Playfair Display) was removed here, and the Inter <link> was removed
+   from index.html. No self-hosted variable font exists in the repository, so
+   Phase 1 ships the approved system stack — zero font requests, no
+   invisible-text period, and no new dependency. See styles/tokens-v2.css. */
+@import "./styles/tokens-v2.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -153,9 +158,13 @@
   --crm-header: 222 47% 11%;
   --crm-content: 210 17% 95%;
 
-  --app-font-sans: 'Plus Jakarta Sans', sans-serif;
-  --app-font-serif: 'Playfair Display', serif;
-  --app-font-mono: Menlo, monospace;
+  /* Frontend V2 Phase 1: system stack, no remote font request. `--app-font-serif`
+     keeps its name (many components reference it) but no longer pulls Playfair
+     Display over the network — the editorial character comes from scale,
+     weight, and spacing instead. */
+  --app-font-sans: var(--v2-font-sans);
+  --app-font-serif: var(--v2-font-sans);
+  --app-font-mono: var(--v2-font-mono);
   --radius: 0rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.02);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.04);
