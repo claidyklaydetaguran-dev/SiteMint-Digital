@@ -7,6 +7,8 @@
 /* Frontend V2 Phase 2: the shared public shell (header, drawer, footer, skip
    link). Consumes only the --v2-* tokens imported above. */
 @import "./styles/v2-shell.css";
+/* Frontend V2 Phase 3: homepage presentation, same token-only rules. */
+@import "./styles/v2-home.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";

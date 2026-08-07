@@ -28,11 +28,16 @@ import {
   type V2NavItem,
 } from "./publicNav";
 
-/** True when `href` is the active location, ignoring any `#fragment`. */
+/**
+ * True when `href` is the current page.
+ *
+ * In-page anchors are deliberately never "current": `Process` points at
+ * `/#process`, which shares the homepage's path, so treating it as a page match
+ * marked both `Home` and `Process` as `aria-current="page"` at the same time.
+ */
 function isActive(location: string, href?: string): boolean {
-  if (!href) return false;
-  const path = href.split("#")[0];
-  return path === "/" ? location === "/" : location === path;
+  if (!href || href.includes("#")) return false;
+  return location === href;
 }
 
 function DesktopItem({ item, location }: { item: V2NavItem; location: string }) {

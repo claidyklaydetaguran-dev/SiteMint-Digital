@@ -1,0 +1,768 @@
+/**
+ * Frontend V2 Phase 3 — homepage presentation.
+ *
+ * Every value is a `--v2-*` token. Typography, spacing, rules, and alignment do
+ * the design work: no section is wrapped in a container box for its own sake,
+ * there are no three-consecutive-card-grids, no gradients beyond none, no
+ * glass, no radius above 16px, and no shadow used decoratively.
+ *
+ * Surface plan (INFORMATION-ARCHITECTURE.md §2): warm white default,
+ * off-white and mint-mist for restrained differentiation, and deep navy on
+ * exactly one section (`--feature`) plus the footer.
+ */
+
+/* ── Section scaffolding ────────────────────────────────────────────────── */
+
+.v2-section {
+  padding-block: var(--v2-section-y-mobile);
+  background: var(--v2-color-canvas);
+}
+
+.v2-section--alt {
+  background: var(--v2-color-surface-alt);
+}
+
+.v2-section--accent {
+  background: var(--v2-color-surface-accent);
+}
+
+.v2-section--feature {
+  background: var(--v2-color-surface-feature);
+  color: var(--v2-color-text-on-feature);
+}
+
+.v2-wrap {
+  max-width: var(--v2-container);
+  margin: 0 auto;
+  padding-inline: var(--v2-gutter);
+}
+
+.v2-wrap--narrow {
+  max-width: 56rem;
+}
+
+@media (min-width: 768px) {
+  .v2-section {
+    padding-block: var(--v2-section-y-tablet);
+  }
+}
+
+@media (min-width: 1024px) {
+  .v2-section {
+    padding-block: var(--v2-section-y);
+  }
+}
+
+/* ── Type roles ─────────────────────────────────────────────────────────── */
+
+.v2-display {
+  margin: 0;
+  max-width: 18ch;
+  font-size: var(--v2-text-display);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.v2-h2 {
+  margin: 0 0 var(--v2-space-4);
+  max-width: 24ch;
+  font-size: var(--v2-text-h2);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.v2-h3 {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+}
+
+.v2-lede {
+  margin: var(--v2-space-4) 0 0;
+  max-width: var(--v2-measure);
+  font-size: var(--v2-text-body-lg);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+.v2-body-muted {
+  margin: 0;
+  max-width: var(--v2-measure);
+  color: var(--v2-color-text-muted);
+  line-height: var(--v2-leading-body);
+}
+
+.v2-eyebrow {
+  margin: 0 0 var(--v2-space-3);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.v2-eyebrow--on-dark {
+  color: var(--v2-color-action);
+}
+
+.v2-h2--on-dark {
+  color: var(--v2-color-text-on-feature);
+}
+
+.v2-lede--on-dark {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+/* The thesis statement is set as type, not as a boxed card. */
+.v2-statement {
+  max-width: 34ch;
+  margin: 0;
+  font-size: var(--v2-text-h1);
+  line-height: var(--v2-leading-heading);
+}
+
+.v2-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-2);
+  min-height: 44px;
+  color: var(--v2-color-text);
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  text-decoration: none;
+  border-radius: var(--v2-radius-control);
+}
+
+.v2-textlink:hover,
+.v2-textlink:focus-visible {
+  text-decoration: underline;
+}
+
+.v2-textlink:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+.v2-textlink__icon,
+.v2-btn__icon {
+  width: 16px;
+  height: 16px;
+}
+
+.v2-btn__icon {
+  margin-inline-start: var(--v2-space-2);
+}
+
+/* ── Readiness tiers — colour is never the only signal; each carries text. ─ */
+
+.v2-tier {
+  display: inline-flex;
+  align-items: center;
+  /* The tier pill sits in a grid area in two of its three call sites; without
+     both of these it stretches the full column and reads as an input field. */
+  align-self: flex-start;
+  justify-self: start;
+  width: fit-content;
+  margin: 0;
+  padding: var(--v2-space-1) var(--v2-space-2);
+  border-radius: var(--v2-radius-control);
+  border: var(--v2-border-width) solid var(--v2-color-border-strong);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.v2-tier--available {
+  background: var(--v2-mint-100);
+  border-color: transparent;
+  color: var(--v2-navy-900);
+}
+
+.v2-tier--in-development,
+.v2-tier--planned {
+  background: transparent;
+  color: var(--v2-color-text-muted);
+}
+
+.v2-section--feature .v2-tier--in-development,
+.v2-section--feature .v2-tier--planned {
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+/* ── 2. Hero ────────────────────────────────────────────────────────────── */
+
+.v2-hero__grid {
+  display: grid;
+  gap: var(--v2-space-12);
+}
+
+.v2-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-3);
+  margin-top: var(--v2-space-8);
+}
+
+@media (min-width: 1024px) {
+  .v2-hero__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--v2-space-16);
+  }
+}
+
+/* One restrained entrance. Nothing repeats it, and nothing loops. */
+.v2-enter {
+  animation: v2-enter var(--v2-duration-hero) var(--v2-ease-entrance) both;
+}
+
+.v2-enter--delayed {
+  animation-delay: 120ms;
+}
+
+@keyframes v2-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* ── Hero system composition ────────────────────────────────────────────── */
+
+.v2-sys {
+  margin: 0;
+  padding: var(--v2-space-6);
+  background: var(--v2-color-surface);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-card);
+}
+
+.v2-sys__caption {
+  margin-bottom: var(--v2-space-6);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.v2-sys__list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-sys__stage {
+  display: grid;
+  gap: 0;
+}
+
+.v2-sys__node {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "index label"
+    "index detail"
+    "index tier";
+  align-items: start;
+  column-gap: var(--v2-space-3);
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-color-canvas);
+}
+
+.v2-sys__index {
+  grid-area: index;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--v2-mint-100);
+  color: var(--v2-navy-900);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+}
+
+.v2-sys__icon {
+  display: none;
+}
+
+.v2-sys__label {
+  grid-area: label;
+  margin: 0;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+}
+
+.v2-sys__detail {
+  grid-area: detail;
+  margin: var(--v2-space-1) 0 0;
+  font-size: var(--v2-text-micro);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+.v2-sys__node .v2-tier {
+  grid-area: tier;
+  margin-top: var(--v2-space-2);
+}
+
+/* The labelled connector between stages — a rule, not a decorative graphic. */
+.v2-sys__edge {
+  display: block;
+  width: var(--v2-border-width);
+  height: var(--v2-space-4);
+  margin-inline-start: calc(var(--v2-space-3) + 12px);
+  background: var(--v2-color-border-strong);
+}
+
+/* ── 4. Business outcomes — rule-separated rows, not a card grid. ────────── */
+
+.v2-outcomes {
+  display: grid;
+  gap: 0;
+  margin: var(--v2-space-8) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-outcomes__item {
+  padding-block: var(--v2-space-6);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+@media (min-width: 768px) {
+  .v2-outcomes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--v2-space-12);
+  }
+}
+
+/* ── 5. What SiteMint builds — four columns divided by rules. ───────────── */
+
+.v2-builds {
+  display: grid;
+  gap: var(--v2-space-8);
+  margin: var(--v2-space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-builds__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-space-2);
+  padding-top: var(--v2-space-6);
+  border-top: 2px solid var(--v2-color-text);
+}
+
+.v2-builds__icon {
+  width: 24px;
+  height: 24px;
+  color: var(--v2-color-text);
+}
+
+.v2-builds__item .v2-textlink {
+  margin-top: auto;
+}
+
+@media (min-width: 640px) {
+  .v2-builds {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--v2-space-8);
+  }
+}
+
+@media (min-width: 1024px) {
+  .v2-builds {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ── 6. Interactive workflow ────────────────────────────────────────────── */
+
+.v2-flow__tabs {
+  display: grid;
+  gap: var(--v2-space-3);
+  margin-top: var(--v2-space-8);
+}
+
+.v2-flow__tab {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "step label"
+    "step summary"
+    "step tier";
+  column-gap: var(--v2-space-3);
+  /* 44px minimum target height comes from the padding plus content. */
+  min-height: 44px;
+  padding: var(--v2-space-4);
+  text-align: start;
+  background: transparent;
+  border: var(--v2-border-width) solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--v2-radius-control);
+  color: var(--v2-color-text-on-feature);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color var(--v2-duration-workflow) var(--v2-ease-standard),
+    border-color var(--v2-duration-workflow) var(--v2-ease-standard);
+}
+
+.v2-flow__tab:hover,
+.v2-flow__tab:focus-visible {
+  border-color: var(--v2-color-action);
+}
+
+.v2-flow__tab:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+.v2-flow__tab[aria-selected="true"] {
+  background: var(--v2-navy-700);
+  border-color: var(--v2-color-action);
+}
+
+.v2-flow__step {
+  grid-area: step;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--v2-color-action);
+  color: var(--v2-navy-900);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+}
+
+.v2-flow__tab-icon {
+  display: none;
+}
+
+.v2-flow__tab-label {
+  grid-area: label;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+}
+
+.v2-flow__tab-summary {
+  grid-area: summary;
+  margin-top: var(--v2-space-1);
+  font-size: var(--v2-text-micro);
+  line-height: var(--v2-leading-body);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.v2-flow__tab .v2-tier {
+  grid-area: tier;
+  margin-top: var(--v2-space-2);
+}
+
+.v2-flow__panel {
+  display: flex;
+  gap: var(--v2-space-4);
+  margin-top: var(--v2-space-6);
+  padding: var(--v2-space-6);
+  background: var(--v2-navy-700);
+  border-inline-start: 2px solid var(--v2-color-action);
+  border-radius: var(--v2-radius-control);
+  animation: v2-panel-in var(--v2-duration-workflow) var(--v2-ease-standard);
+}
+
+.v2-flow__panel:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+@keyframes v2-panel-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.v2-flow__panel-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--v2-color-action);
+}
+
+.v2-flow__panel-title {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+}
+
+.v2-flow__panel-body {
+  margin: 0;
+  max-width: var(--v2-measure);
+  color: rgba(255, 255, 255, 0.82);
+  line-height: var(--v2-leading-body);
+}
+
+.v2-flow__panel-note {
+  margin: var(--v2-space-3) 0 0;
+  font-size: var(--v2-text-small);
+  color: rgba(255, 255, 255, 0.62);
+}
+
+@media (min-width: 768px) {
+  .v2-flow__tabs {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+}
+
+/* ── 7. Receptionist readiness ──────────────────────────────────────────── */
+
+.v2-split {
+  display: grid;
+  gap: var(--v2-space-12);
+}
+
+.v2-split .v2-btn {
+  margin-top: var(--v2-space-8);
+}
+
+.v2-status {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-status__item {
+  padding-block: var(--v2-space-6);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-status__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-3);
+  margin-bottom: var(--v2-space-2);
+}
+
+.v2-status__head .v2-h3 {
+  margin: 0;
+}
+
+@media (min-width: 1024px) {
+  .v2-split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: var(--v2-space-16);
+    align-items: start;
+  }
+}
+
+/* ── 8. Selected work — image + text rows, alternating on wide screens. ─── */
+
+.v2-work {
+  display: grid;
+  gap: var(--v2-space-12);
+  margin: var(--v2-space-12) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-work__item {
+  display: grid;
+  gap: var(--v2-space-6);
+  align-items: center;
+}
+
+.v2-work__shot {
+  width: 100%;
+  height: auto;
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-card);
+  background: var(--v2-color-surface);
+}
+
+.v2-work__meta {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.v2-work__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  margin: var(--v2-space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-work__tags li {
+  padding: var(--v2-space-1) var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border-strong);
+  border-radius: var(--v2-radius-control);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-color-text-muted);
+}
+
+@media (min-width: 900px) {
+  .v2-work__item {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: var(--v2-space-12);
+  }
+  .v2-work__item:nth-child(even) .v2-work__shot {
+    order: 2;
+  }
+}
+
+/* ── 9. Process — a numbered rail, not five identical cards. ────────────── */
+
+.v2-process {
+  display: grid;
+  gap: 0;
+  margin: var(--v2-space-8) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-process__step {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: var(--v2-space-4);
+  padding-block: var(--v2-space-6);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-process__num {
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-color-text-muted);
+}
+
+/* ── 10. Team ───────────────────────────────────────────────────────────── */
+
+.v2-team {
+  display: grid;
+  gap: var(--v2-space-8);
+  margin: var(--v2-space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-team__photo {
+  width: 100%;
+  max-width: 18rem;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--v2-radius-card);
+  margin-bottom: var(--v2-space-4);
+  background: var(--v2-color-surface);
+}
+
+@media (min-width: 768px) {
+  .v2-team {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── 11. FAQ ────────────────────────────────────────────────────────────── */
+
+.v2-faq {
+  margin-top: var(--v2-space-8);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-faq__item {
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.v2-faq__q {
+  display: flex;
+  align-items: center;
+  /* 44px minimum target. */
+  min-height: 44px;
+  padding-block: var(--v2-space-4);
+  font-size: var(--v2-text-body-lg);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  cursor: pointer;
+  list-style: none;
+}
+
+.v2-faq__q::-webkit-details-marker {
+  display: none;
+}
+
+.v2-faq__q::after {
+  content: "+";
+  margin-inline-start: auto;
+  padding-inline-start: var(--v2-space-4);
+  font-weight: var(--v2-weight-regular);
+  color: var(--v2-color-text-muted);
+}
+
+.v2-faq__item[open] .v2-faq__q::after {
+  content: "−";
+}
+
+.v2-faq__q:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+.v2-faq__a {
+  margin: 0;
+  padding-bottom: var(--v2-space-6);
+  max-width: var(--v2-measure);
+  color: var(--v2-color-text-muted);
+  line-height: var(--v2-leading-body);
+}
+
+/* ── 12. Final CTA — light, with the one mint action. ───────────────────── */
+
+.v2-cta__inner {
+  text-align: center;
+}
+
+.v2-cta__inner .v2-h2,
+.v2-cta__inner .v2-lede {
+  margin-inline: auto;
+}
+
+.v2-cta__inner .v2-btn {
+  margin-top: var(--v2-space-8);
+}
+
+/* ── Reduced motion — the entrance and the panel settle both collapse. ──── */
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-enter,
+  .v2-flow__panel {
+    animation: none;
+  }
+  .v2-flow__tab {
+    transition: none;
+  }
+}

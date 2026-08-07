@@ -26,6 +26,10 @@ import { DashboardShell } from "@/shells/DashboardShell";
  */
 
 // ── Public marketing ────────────────────────────────────────────────────────
+// Frontend V2 Phase 3: the rebuilt homepage. `PlatformPreview` is retained as
+// a rollback reference and is no longer routed — ROLLBACK: swap HomeV2 back to
+// PlatformPreview below and drop `chrome="v2"` to revert instantly.
+const HomeV2 = lazy(() => import("@/pages/HomeV2"));
 const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
 const PlatformServicesPreview = lazy(() => import("@/pages/PlatformServicesPreview"));
 const PlatformPricingPreview = lazy(() => import("@/pages/PlatformPricingPreview"));
@@ -263,8 +267,8 @@ function Router() {
           header/footer; PublicShell is the seam where it will attach. */}
       <Route path={ROUTES.home}>
         {() => (
-          <PublicShell routeLabel="The homepage">
-            <PlatformPreview />
+          <PublicShell routeLabel="The homepage" chrome="v2">
+            <HomeV2 />
           </PublicShell>
         )}
       </Route>

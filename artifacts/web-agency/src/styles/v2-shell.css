@@ -81,6 +81,8 @@
 .v2-header__brand {
   display: inline-flex;
   align-items: center;
+  /* 44×44 minimum target — the logo mark alone is only 30px tall. */
+  min-height: 44px;
   text-decoration: none;
   border-radius: var(--v2-radius-control);
 }
