@@ -190,10 +190,13 @@ function Router() {
         )}
       </Route>
 
-      {/* Thank You — no main layout */}
+      {/* Thank You — Phase 2: first surface on the shared V2 chrome. It never
+          had a shared header or footer of its own, so adopting the V2 shell
+          adds navigation where there was none rather than replacing a design
+          that a later phase still owns. */}
       <Route path={ROUTES.thankYou}>
         {() => (
-          <PublicShell routeLabel="Thank you">
+          <PublicShell routeLabel="Thank you" chrome="v2">
             <ThankYou />
           </PublicShell>
         )}
@@ -302,9 +305,11 @@ function Router() {
         )}
       </Route>
 
+      {/* 404 — also chrome-less before Phase 2, so it adopts the V2 shell for
+          the same reason. CONTENT-SPECIFICATION.md §7: never a blank screen. */}
       <Route>
         {() => (
-          <PublicShell routeLabel="This page">
+          <PublicShell routeLabel="This page" chrome="v2">
             <NotFound />
           </PublicShell>
         )}

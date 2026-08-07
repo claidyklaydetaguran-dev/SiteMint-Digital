@@ -120,6 +120,48 @@ export const DASHBOARD_URLS = {
 } as const;
 
 /**
+ * Frontend V2 Phase 2 — named homepage section ids.
+ *
+ * The V2 homepage is one document, so several approved navigation targets are
+ * in-page section anchors rather than separate routes. Centralising the ids
+ * here keeps `id={…}` on the section and `href` in the navigation from drifting
+ * apart, and preserves the rule that **no component composes an in-app URL by
+ * hand**.
+ */
+export const HOME_SECTIONS = {
+  main: "main-content",
+  work: "selected-work",
+  process: "process",
+  faq: "faq",
+} as const;
+
+export type HomeSectionKey = keyof typeof HOME_SECTIONS;
+
+/**
+ * Base-relative link to a homepage section, e.g. `"/#process"`.
+ *
+ * Router-path kind (see the header): `wouter` prepends `ROUTER_BASE` itself, so
+ * this deliberately returns the bare path.
+ */
+export function homeSection(key: HomeSectionKey): string {
+  return `${ROUTES.home}#${HOME_SECTIONS[key]}`;
+}
+
+/**
+ * Base-relative link to a section of the Services page.
+ *
+ * Phase 2 note: the approved IA gives Solutions two dedicated destinations
+ * (`/solutions/websites-apps`, `/solutions/crm-automation`) built from the
+ * existing `/services` content. Those pages are a later phase's work; until
+ * they exist, the two Solutions entries address the corresponding regions of
+ * the live Services page rather than pointing at a route that would render a
+ * blank screen.
+ */
+export function servicesSection(anchor: string): string {
+  return `${ROUTES.services}#${anchor}`;
+}
+
+/**
  * Base-aware URL for a file served verbatim from `public/`.
  *
  * Prefer importing the asset instead — Vite then hashes and rewrites it

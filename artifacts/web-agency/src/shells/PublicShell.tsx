@@ -9,33 +9,64 @@
  * public shell is precisely what put all 26 CRM pages into the public entry
  * bundle; keeping this module's import graph clean is what keeps them out.
  *
- * Phase 1 is foundations only: this shell owns the route boundary (loading
- * fallback + error recovery) and nothing visual. Each public page still renders
- * its own `PlatformPreviewPageShell` chrome. Phase 2 replaces that with the
- * shared V2 header/nav/footer — the seam is here, ready.
+ * Phase 2 attaches the shared V2 chrome (skip link, header/nav, footer) at this
+ * seam, behind an explicit `chrome` opt-in:
+ *
+ * - `chrome="none"` (**default**) — the page renders its own chrome. Every
+ *   surface that still uses `PlatformPreviewPageShell` stays on this, so
+ *   Phase 2 changes not one pixel of a page it has not rebuilt.
+ * - `chrome="v2"` — this shell renders the shared header and footer around the
+ *   page. Routes migrate to it as each surface is rebuilt.
+ *
+ * The `<main>` element and its skip-link target live here rather than in each
+ * page, so the landmark structure is identical on every V2 surface.
  */
 
 import { Suspense, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
+import { SiteHeader } from "@/components/v2/SiteHeader";
+import { SiteFooter } from "@/components/v2/SiteFooter";
+import { HOME_SECTIONS } from "@/lib/routes";
 
 interface PublicShellProps {
   children: ReactNode;
   /** Human name of the surface, used by the recovery panel. */
   routeLabel?: string;
+  /** Which chrome wraps the page. See the module comment. */
+  chrome?: "none" | "v2";
 }
 
-export function PublicShell({ children, routeLabel }: PublicShellProps) {
+export function PublicShell({ children, routeLabel, chrome = "none" }: PublicShellProps) {
   const [location] = useLocation();
 
+  const boundary = (
+    <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
+      <Suspense fallback={<RouteFallback label={routeLabel ?? "Loading page"} />}>
+        {children}
+      </Suspense>
+    </RouteErrorBoundary>
+  );
+
+  if (chrome !== "v2") {
+    return (
+      <div className="v2-public-shell" data-shell="public">
+        {boundary}
+      </div>
+    );
+  }
+
   return (
-    <div className="v2-public-shell" data-shell="public">
-      <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
-        <Suspense fallback={<RouteFallback label={routeLabel ?? "Loading page"} />}>
-          {children}
-        </Suspense>
-      </RouteErrorBoundary>
+    <div className="v2-public-shell v2-shell" data-shell="public" data-chrome="v2">
+      <a className="v2-skip" href={`#${HOME_SECTIONS.main}`}>
+        Skip to main content
+      </a>
+      <SiteHeader />
+      <main id={HOME_SECTIONS.main} className="v2-shell__main" tabIndex={-1}>
+        {boundary}
+      </main>
+      <SiteFooter />
     </div>
   );
 }

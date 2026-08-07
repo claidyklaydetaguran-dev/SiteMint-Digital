@@ -4,6 +4,9 @@
    Phase 1 ships the approved system stack — zero font requests, no
    invisible-text period, and no new dependency. See styles/tokens-v2.css. */
 @import "./styles/tokens-v2.css";
+/* Frontend V2 Phase 2: the shared public shell (header, drawer, footer, skip
+   link). Consumes only the --v2-* tokens imported above. */
+@import "./styles/v2-shell.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
