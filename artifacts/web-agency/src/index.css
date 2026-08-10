@@ -12,6 +12,9 @@
 /* Frontend V2 Phase 4: AI Receptionist landing presentation. Namespaced
    `air-*`, and consumes the shared `.v2-*` roles rather than restating them. */
 @import "./styles/v2-air.css";
+/* Frontend V2 Phase 5: AI Receptionist signup presentation. Namespaced `sg-*`,
+   token-only, and carries no authentication logic of its own. */
+@import "./styles/v2-signup.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
