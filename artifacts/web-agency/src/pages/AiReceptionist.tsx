@@ -42,6 +42,7 @@ import { ArrowRight } from "lucide-react";
 import { ROUTES, START_PROJECT_ROUTE } from "@/lib/routes";
 import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
 import { ResponseTrail } from "@/components/air/ResponseTrail";
+import { ResponseOverview } from "@/components/air/ResponseOverview";
 import {
   CORE_JOBS,
   HUMAN_CONTROL,
@@ -62,31 +63,48 @@ export default function AiReceptionist() {
           capabilities above the fold, where it cannot be missed or mistaken
           for small print. */}
       <section className="v2-section v2-hero air-hero" aria-labelledby="air-hero-heading">
-        <div className="v2-wrap">
-          <p className="v2-eyebrow">AI Receptionist</p>
-          <h1 id="air-hero-heading" className="v2-display air-hero__title">
-            Every lead deserves a timely response.
-          </h1>
-          <p className="v2-lede air-hero__lede">
-            SiteMint's AI Receptionist helps businesses respond to inquiries,
-            qualify leads, organize conversations, and keep opportunities from
-            being forgotten. SMS is available now, with voice and deeper CRM
-            connections being developed.
-          </p>
+        <div className="v2-wrap air-hero__grid">
+          <div className="air-hero__copy">
+            <p className="v2-eyebrow">AI Receptionist</p>
+            <h1 id="air-hero-heading" className="v2-display air-hero__title">
+              Every lead deserves a timely response.
+            </h1>
+            {/* Phase 4.1 product-truth correction. The Phase 4 wording — "SMS
+                is available now, with voice and deeper CRM connections being
+                developed" — put voice and CRM in one clause and made the CRM
+                capability sound as though it were already under construction.
+                CRM is *planned*. The three tiers are now stated separately and
+                in their real order, and "planned" is never softened into
+                "being developed" or "coming soon". */}
+            <p className="v2-lede air-hero__lede">
+              SiteMint's AI Receptionist helps businesses respond to inquiries,
+              qualify leads, and keep conversations organized. SMS is available
+              now. Voice is in development, while connected CRM and automated
+              follow-up are planned.
+            </p>
 
-          <div className="v2-hero__actions air-hero__actions">
-            <Link
-              href={ROUTES.aiReceptionistSignup}
-              className="v2-btn v2-btn--primary"
-            >
-              Create Your Receptionist
-            </Link>
-            <a href={`#${HOW_IT_WORKS}`} className="v2-btn v2-btn--secondary">
-              See How It Works
-              <ArrowRight aria-hidden="true" className="v2-btn__icon" />
-            </a>
+            <div className="v2-hero__actions air-hero__actions">
+              <Link
+                href={ROUTES.aiReceptionistSignup}
+                className="v2-btn v2-btn--primary"
+              >
+                Create Your Receptionist
+              </Link>
+              <a href={`#${HOW_IT_WORKS}`} className="v2-btn v2-btn--secondary">
+                See How It Works
+                <ArrowRight aria-hidden="true" className="v2-btn__icon" />
+              </a>
+            </div>
           </div>
 
+          {/* Phase 4.1: the right half was empty. It now carries the compact
+              end-to-end summary of the shipped SMS path — a summary of the
+              trail below, not a duplicate of it. On mobile the grid collapses
+              and this stacks under the CTAs as an ordinary list. */}
+          <ResponseOverview />
+        </div>
+
+        <div className="v2-wrap">
           {/* Three tiers, one row, in descending availability. The tier is
               carried by the chip's text, not by its colour alone. */}
           <div className="air-ledger">
