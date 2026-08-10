@@ -503,9 +503,78 @@ check(
 check("the open drawer is a labelled modal dialog", shellSrc.includes('role: "dialog" as const') && shellSrc.includes('"aria-label": "Dashboard navigation"'));
 check("Escape closes the drawer", shellSrc.includes('if (event.key === "Escape")'));
 check("Tab is confined to the open drawer", shellSrc.includes('if (event.key !== "Tab") return;'));
-check("focus moves into the drawer on open", shellSrc.includes("first?.focus()"));
+check("focus moves into the drawer on open", shellCode.includes("target?.focus()"));
 check("focus returns to the trigger on close", shellSrc.includes("triggerRef.current?.focus()"));
 check("a closed drawer is removed from the tab order", shellSrc.includes("rail.inert = !isDesktop && !drawerOpen"));
+
+// ── The drawer's own close control ─────────────────────────────────────────
+//
+// The top bar's open control cannot double as the close control: the drawer is
+// `position: fixed` over the top bar, so that button is painted behind an open
+// drawer, and it sits outside `railRef`, so the focus trap excludes it. The
+// way out has to live inside the drawer.
+
+const closeButton = /<button\s+ref=\{closeRef\}[\s\S]*?<\/button>/.exec(shellCode)?.[0] ?? "";
+
+check("the drawer renders its own close control", closeButton.length > 0);
+check(
+  "it is a real semantic button, not a clickable div or link",
+  closeButton.startsWith("<button") && closeButton.includes('type="button"'),
+);
+check(
+  'it has the accessible name "Close navigation"',
+  /<span className="sd-sr">Close navigation<\/span>/.test(closeButton),
+);
+check(
+  "its icon is hidden from assistive technology, so the name is not doubled",
+  /<X className="sd-railbtn__icon" aria-hidden="true" \/>/.test(closeButton),
+);
+check("activating it closes the drawer", closeButton.includes("onClick={closeDrawer}"));
+check(
+  "closeDrawer both closes and returns focus to the menu trigger",
+  /const closeDrawer = useCallback\(\(\) => \{\s*setDrawerOpen\(false\);\s*triggerRef\.current\?\.focus\(\);/.test(
+    shellCode,
+  ),
+);
+check(
+  "it is rendered only in drawer mode — a permanent desktop rail has nothing to close",
+  /\{!isDesktop && \(\s*<button\s+ref=\{closeRef\}/.test(shellCode),
+);
+check(
+  "it receives initial focus when the drawer opens, ahead of every destination",
+  shellCode.includes("closeRef.current ??") && shellCode.includes("target?.focus()"),
+);
+check(
+  "the inert flag is cleared before focus is moved, or the focus move is refused",
+  shellCode.indexOf("rail.inert = !isDesktop && !drawerOpen") <
+    shellCode.indexOf("target?.focus()"),
+);
+check(
+  "it precedes the navigation destinations in the drawer's tab order",
+  shellCode.indexOf("ref={closeRef}") < shellCode.indexOf("<RailNav"),
+);
+check(
+  "it reserves a 44x44 target and takes the rail's own focus ring",
+  /\.sd-rail__close \{[^}]*width: 44px;[^}]*height: 44px;/.test(cssSrc) &&
+    /\.sd-rail__close \{[^}]*color: var\(--sd-rail-text\)/.test(cssSrc),
+);
+check(
+  "no glow, shadow, float or oversized treatment on it",
+  !/\.sd-rail__close[^}]*(box-shadow|filter|position: (fixed|absolute)|transform: scale)/.test(cssSrc),
+);
+check(
+  "the top bar control now only opens, so the occluded X can no longer be the way out",
+  shellCode.includes("onClick={() => setDrawerOpen(true)}") &&
+    !shellCode.includes("setDrawerOpen((open) => !open)"),
+);
+check(
+  "the backdrop still dismisses, but it is no longer the only visible way out",
+  shellCode.includes('className="sd-scrim"') && shellCode.includes("onClick={closeDrawer}"),
+);
+check(
+  "the drawer's navigation destinations are unchanged by this control",
+  shellCode.includes("<RailNav location={location} onNavigate={closeIfDrawer} />"),
+);
 check(
   "scroll lock compensates for the scrollbar so it cannot shift the layout",
   shellSrc.includes("window.innerWidth - documentElement.clientWidth") && shellSrc.includes("paddingRight"),

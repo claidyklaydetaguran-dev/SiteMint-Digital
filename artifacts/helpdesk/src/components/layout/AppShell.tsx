@@ -177,6 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const railRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window === "undefined" || window.matchMedia(DESKTOP_QUERY).matches,
   );
@@ -258,19 +259,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [drawerOpen]);
 
-  // Move focus into the drawer when it opens.
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const first = railRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])");
-    first?.focus();
-  }, [drawerOpen]);
-
   // A closed drawer is fully removed from the tab order and the a11y tree.
+  //
+  // This must be declared *before* the focus effect below. Effects run in
+  // declaration order, and `.focus()` is refused inside an `inert` subtree —
+  // so if the flag were cleared second, the opening drawer would still be
+  // inert at the moment focus was attempted and focus would silently stay on
+  // `<body>`. Ordering them this way is what makes the focus move land.
   useEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
     rail.inert = !isDesktop && !drawerOpen;
   }, [isDesktop, drawerOpen, me]);
+
+  // Move focus into the drawer when it opens — onto the close control, so the
+  // way out is the first thing a keyboard or screen-reader user reaches.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const target =
+      closeRef.current ??
+      railRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])");
+    target?.focus();
+  }, [drawerOpen]);
 
   if (isLoading) {
     return (
@@ -321,12 +331,32 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {/* Text-only wordmark, matching the V2 sign-in bar exactly, so the
             brand does not change shape between signing in and arriving. */}
-        <Link href="/" className="sd-rail__brand" onClick={closeIfDrawer}>
-          {/* One flex item, so the space between the two words survives. */}
-          <span>
-            SiteMint <span className="sd-rail__brand-accent">AI Receptionist</span>
-          </span>
-        </Link>
+        <div className="sd-rail__head">
+          <Link href="/" className="sd-rail__brand" onClick={closeIfDrawer}>
+            {/* One flex item, so the space between the two words survives. */}
+            <span>
+              SiteMint <span className="sd-rail__brand-accent">AI Receptionist</span>
+            </span>
+          </Link>
+
+          {/* Drawer mode only: on desktop the rail is permanent, so a close
+              control would dismiss nothing. The previous chrome relied on the
+              top bar's button toggling to an X, but the drawer is
+              `position: fixed` over that bar — the X was painted behind the
+              drawer and, being outside `railRef`, the focus trap made it
+              unreachable too. The way out now lives inside the drawer. */}
+          {!isDesktop && (
+            <button
+              ref={closeRef}
+              type="button"
+              className="sd-rail__close"
+              onClick={closeDrawer}
+            >
+              <X className="sd-railbtn__icon" aria-hidden="true" />
+              <span className="sd-sr">Close navigation</span>
+            </button>
+          )}
+        </div>
 
         {/* Workspace identity comes only from the authenticated session. There
             is no placeholder business name and no generated avatar. */}
@@ -354,20 +384,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="sd-column">
         <header className="sd-topbar">
+          {/* Opens only. While the drawer is open this button is covered by it
+              and excluded from the focus trap, so it can never be the way out —
+              the drawer's own close control is. */}
           <button
             ref={triggerRef}
             type="button"
             className="sd-topbar__button"
             aria-expanded={drawerOpen}
             aria-controls="sd-rail"
-            onClick={() => setDrawerOpen((open) => !open)}
+            onClick={() => setDrawerOpen(true)}
           >
-            {drawerOpen ? (
-              <X className="sd-railbtn__icon" aria-hidden="true" />
-            ) : (
-              <Menu className="sd-railbtn__icon" aria-hidden="true" />
-            )}
-            <span className="sd-sr">{drawerOpen ? "Close navigation" : "Open navigation"}</span>
+            <Menu className="sd-railbtn__icon" aria-hidden="true" />
+            <span className="sd-sr">Open navigation</span>
           </button>
           <span className="sd-topbar__title">{me.firm.name}</span>
           <span className="sd-topbar__spacer" aria-hidden="true" />

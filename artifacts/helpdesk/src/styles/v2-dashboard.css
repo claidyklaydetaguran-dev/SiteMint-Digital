@@ -246,17 +246,50 @@
   --sd-focus-color: var(--sd-rail-accent);
 }
 
+.sd-rail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-height: 56px;
+  padding: var(--sd-space-2) var(--sd-space-2) var(--sd-space-2) var(--sd-space-4);
+  border-bottom: 1px solid var(--sd-rail-border);
+}
 .sd-rail__brand {
   display: flex;
   align-items: center;
-  min-height: 56px;
-  padding: var(--sd-space-3) var(--sd-space-4);
-  border-bottom: 1px solid var(--sd-rail-border);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
   color: var(--sd-rail-text);
   font-size: var(--sd-text-body);
   font-weight: 600;
   letter-spacing: -0.01em;
   text-decoration: none;
+}
+
+/* Drawer close control. Same square-button language as the top bar's open
+   control, so the pair reads as one affordance from both sides. */
+.sd-rail__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--sd-rail-border);
+  border-radius: var(--sd-radius-control);
+  background: transparent;
+  color: var(--sd-rail-text);
+  cursor: pointer;
+  transition:
+    background-color var(--sd-dur-fast) var(--sd-ease),
+    border-color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-rail__close:hover {
+    background: var(--sd-rail-hover);
+    border-color: var(--sd-rail-accent);
+  }
 }
 .sd-rail__brand-accent {
   color: var(--sd-rail-accent);
