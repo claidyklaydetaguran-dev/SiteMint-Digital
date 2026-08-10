@@ -64,6 +64,10 @@
   --v2-text-h1: clamp(1.875rem, 1.5rem + 1.4vw, 2.5rem); /* 30 → 40px */
   --v2-text-h2: clamp(1.5rem, 1.3rem + 0.8vw, 1.875rem); /* 24 → 30px */
   --v2-text-h3: clamp(1.1875rem, 1.1rem + 0.3vw, 1.375rem); /* 19 → 22px */
+  /* Phase 3.1 (additive): the hero and feature-panel reading size. Nothing
+     existing is redefined — this is one new step above body-lg, added because
+     the 18px lede was measurably too quiet at 1440 and 1920. */
+  --v2-text-body-xl: 1.25rem; /* 20px */
   --v2-text-body-lg: 1.125rem; /* 18px */
   --v2-text-body: 1rem; /* 16px */
   --v2-text-small: 0.875rem; /* 14px */

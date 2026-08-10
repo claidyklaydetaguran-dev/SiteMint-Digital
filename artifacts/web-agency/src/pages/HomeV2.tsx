@@ -189,45 +189,71 @@ export default function HomeV2() {
         </div>
       </section>
 
-      {/* ── 4. Business outcomes ──────────────────────────────────────────── */}
+      {/* ── 4. Business outcomes — a numbered editorial ledger. ───────────── */}
       <section className="v2-section" aria-labelledby="outcomes-heading">
         <div className="v2-wrap">
-          <p className="v2-eyebrow">What changes</p>
-          <h2 id="outcomes-heading" className="v2-h2">
-            What a connected system actually changes
-          </h2>
+          <div className="v2-head">
+            <p className="v2-eyebrow">What changes</p>
+            <h2 id="outcomes-heading" className="v2-h2">
+              What a connected system actually changes
+            </h2>
+          </div>
 
-          <ul className="v2-outcomes">
-            {outcomes.map((item) => (
+          <ol className="v2-outcomes">
+            {outcomes.map((item, index) => (
               <li key={item.title} className="v2-outcomes__item">
-                <h3 className="v2-h3">{item.title}</h3>
-                <p className="v2-body-muted">{item.body}</p>
+                <span className="v2-outcomes__num" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="v2-outcomes__text">
+                  <h3 className="v2-h3">{item.title}</h3>
+                  <p className="v2-body-muted">{item.body}</p>
+                </div>
               </li>
             ))}
-          </ul>
+          </ol>
         </div>
       </section>
 
-      {/* ── 5. What SiteMint builds ───────────────────────────────────────── */}
+      {/* ── 5. What SiteMint builds — four parts of one system on a spine. ── */}
       <section className="v2-section v2-section--alt" aria-labelledby="builds-heading">
         <div className="v2-wrap">
-          <p className="v2-eyebrow">Scope</p>
-          <h2 id="builds-heading" className="v2-h2">
-            What SiteMint builds
-          </h2>
+          <div className="v2-head">
+            <p className="v2-eyebrow">Scope</p>
+            <h2 id="builds-heading" className="v2-h2">
+              What SiteMint builds
+            </h2>
+          </div>
 
           <ul className="v2-builds">
-            {buildItems.map((item) => {
+            {buildItems.map((item, index) => {
               const Icon = item.icon;
               return (
                 <li key={item.title} className="v2-builds__item">
-                  <Icon aria-hidden="true" className="v2-builds__icon" />
-                  <h3 className="v2-h3">{item.title}</h3>
-                  <p className="v2-body-muted">{item.body}</p>
-                  <Link href={item.href} className="v2-textlink">
-                    Learn more
-                    <ArrowRight aria-hidden="true" className="v2-textlink__icon" />
-                  </Link>
+                  <span className="v2-builds__marker" aria-hidden="true">
+                    <Icon className="v2-builds__icon" />
+                  </span>
+                  <div className="v2-builds__body">
+                    <div className="v2-builds__names">
+                      <p className="v2-builds__index" aria-hidden="true">
+                        {String(index + 1).padStart(2, "0")}
+                      </p>
+                      <h3 className="v2-h3">{item.title}</h3>
+                    </div>
+                    <div className="v2-builds__prose">
+                      <p className="v2-body-muted">{item.body}</p>
+                      <Link href={item.href} className="v2-textlink">
+                        <span>
+                          Learn more
+                          <span className="v2-visually-hidden">
+                            {" "}
+                            about {item.title}
+                          </span>
+                        </span>
+                        <ArrowRight aria-hidden="true" className="v2-textlink__icon" />
+                      </Link>
+                    </div>
+                  </div>
                 </li>
               );
             })}
@@ -241,7 +267,7 @@ export default function HomeV2() {
       {/* ── 7. AI Receptionist feature, with mandatory readiness labelling ── */}
       <section className="v2-section" aria-labelledby="receptionist-heading">
         <div className="v2-wrap v2-split">
-          <div>
+          <div className="v2-split__intro">
             <p className="v2-eyebrow">AI Receptionist</p>
             <h2 id="receptionist-heading" className="v2-h2">
               An inquiry gets a reply, and the details get captured
@@ -258,9 +284,17 @@ export default function HomeV2() {
             </Link>
           </div>
 
+          {/* The shipped capability is given the whole first block; what is not
+              shipped is demoted to a smaller secondary list. The wording of
+              every tier is unchanged and still comes from `readiness.ts`. */}
           <ul className="v2-status">
-            {CAPABILITY_STATUS.map((item) => (
-              <li key={item.capability} className="v2-status__item">
+            {CAPABILITY_STATUS.map((item, index) => (
+              <li
+                key={item.capability}
+                className={`v2-status__item v2-status__item--${
+                  index === 0 ? "lead" : "secondary"
+                }`}
+              >
                 <div className="v2-status__head">
                   <h3 className="v2-h3">{item.capability}</h3>
                   <span className={`v2-tier v2-tier--${item.tier}`}>
@@ -281,50 +315,92 @@ export default function HomeV2() {
         id={HOME_SECTIONS.work}
       >
         <div className="v2-wrap">
-          <p className="v2-eyebrow">Selected work</p>
-          <h2 id="work-heading" className="v2-h2">
-            Projects we have built
-          </h2>
-          <p className="v2-lede">
-            We publish the problem, what we built, and what it connects to. We do
-            not publish performance figures we cannot substantiate.
-          </p>
+          <div className="v2-head">
+            <p className="v2-eyebrow">Selected work</p>
+            <h2 id="work-heading" className="v2-h2">
+              Projects we have built
+            </h2>
+            <p className="v2-lede">
+              We publish the problem, what we built, and what it connects to. We do
+              not publish performance figures we cannot substantiate.
+            </p>
+          </div>
 
+          {/* One curated index rather than alternating rows. Every screenshot
+              sits in the same frame at the same ratio; the only thing that
+              varies is how a shot is fitted inside it, which is read from the
+              already-verified project data (`imageFit`, `visualMode`, and the
+              approved focal position) rather than decided here. A portrait
+              capture is contained on a neutral plate instead of being cropped
+              or stretched to imitate a desktop shot. */}
           <ul className="v2-work">
             {portfolioProjects.map((project) => {
               const asset = project.desktopAsset ?? project.mobileAsset;
+              const portrait = project.visualMode === "mobile-only";
+              const position = project.desktopAsset
+                ? project.desktopPosition
+                : project.mobilePosition;
               return (
                 <li key={project.id} className="v2-work__item">
                   {asset && (
-                    <img
-                      className="v2-work__shot"
-                      src={withBase(asset.src)}
-                      width={asset.width}
-                      height={asset.height}
-                      alt={asset.alt}
-                      loading="lazy"
-                      decoding="async"
-                    />
+                    <div
+                      className={`v2-work__frame${
+                        portrait ? " v2-work__frame--portrait" : ""
+                      }`}
+                    >
+                      <img
+                        className={[
+                          "v2-work__shot",
+                          portrait
+                            ? "v2-work__shot--contain"
+                            : `v2-work__shot--${project.imageFit}`,
+                          position === "top center" ? "v2-work__shot--top" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        src={withBase(asset.src)}
+                        width={asset.width}
+                        height={asset.height}
+                        alt={asset.alt}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
                   )}
                   <div className="v2-work__body">
                     <p className="v2-work__meta">
-                      {project.category} · {project.industry}
+                      <span className="v2-work__category">{project.category}</span>
+                      <span className="v2-work__industry">{project.industry}</span>
                     </p>
                     <h3 className="v2-h3">{project.projectName}</h3>
                     <p className="v2-body-muted">{project.summary}</p>
-                    <ul className="v2-work__tags">
+
+                    <p className="v2-work__tags-label" id={`contribution-${project.id}`}>
+                      What we contributed
+                    </p>
+                    <ul
+                      className="v2-work__tags"
+                      aria-labelledby={`contribution-${project.id}`}
+                    >
                       {project.contribution.map((c) => (
                         <li key={c}>{c}</li>
                       ))}
                     </ul>
+
                     {project.publicUrl && (
                       <a
-                        className="v2-textlink"
+                        className="v2-textlink v2-work__link"
                         href={project.publicUrl}
                         target="_blank"
                         rel="noreferrer noopener"
                       >
-                        {project.ctaLabel}
+                        <span>
+                          {project.ctaLabel}
+                          <span className="v2-visually-hidden">
+                            {" "}
+                            — {project.projectName} (opens in a new tab)
+                          </span>
+                        </span>
                         <ArrowUpRight
                           aria-hidden="true"
                           className="v2-textlink__icon"
@@ -346,18 +422,26 @@ export default function HomeV2() {
         id={HOME_SECTIONS.process}
       >
         <div className="v2-wrap">
-          <p className="v2-eyebrow">How we work</p>
-          <h2 id="process-heading" className="v2-h2">
-            The SiteMint process
-          </h2>
+          <div className="v2-head">
+            <p className="v2-eyebrow">How we work</p>
+            <h2 id="process-heading" className="v2-h2">
+              The SiteMint process
+            </h2>
+          </div>
 
+          {/* A continuous rail carries the five phases, so the section reads as
+              one sequence rather than five rows that happen to be stacked. The
+              rail is a 1px rule behind the markers — not a diagram that has to
+              be re-laid-out on a phone. */}
           <ol className="v2-process">
             {processPhases.map((phase, index) => (
               <li key={phase.label} className="v2-process__step">
-                <span className="v2-process__num" aria-hidden="true">
-                  {String(index + 1).padStart(2, "0")}
+                <span className="v2-process__marker" aria-hidden="true">
+                  <span className="v2-process__num">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                 </span>
-                <div>
+                <div className="v2-process__text">
                   <h3 className="v2-h3">{phase.label}</h3>
                   <p className="v2-body-muted">{phase.body}</p>
                 </div>
@@ -370,25 +454,33 @@ export default function HomeV2() {
       {/* ── 10. Team ──────────────────────────────────────────────────────── */}
       <section className="v2-section v2-section--accent" aria-labelledby="team-heading">
         <div className="v2-wrap">
-          <p className="v2-eyebrow">Who you work with</p>
-          <h2 id="team-heading" className="v2-h2">
-            The team
-          </h2>
+          <div className="v2-head">
+            <p className="v2-eyebrow">Who you work with</p>
+            <h2 id="team-heading" className="v2-h2">
+              The team
+            </h2>
+          </div>
 
+          {/* One portrait ratio for all three, filling the column, so the three
+              differently-shot photographs read as one set. `loading="lazy"` is
+              kept exactly as it shipped — the portraits were verified to render
+              in the preview, so there is no runtime defect to work around. */}
           <ul className="v2-team">
             {team.map((person) => (
               <li key={person.name} className="v2-team__item">
-                <img
-                  className="v2-team__photo"
-                  src={withBase(person.photo)}
-                  alt={`${person.name}, ${person.role} at SiteMint Digital`}
-                  loading="lazy"
-                  decoding="async"
-                  width={320}
-                  height={320}
-                />
+                <div className="v2-team__frame">
+                  <img
+                    className="v2-team__photo"
+                    src={withBase(person.photo)}
+                    alt={`${person.name}, ${person.role} at SiteMint Digital`}
+                    loading="lazy"
+                    decoding="async"
+                    width={320}
+                    height={400}
+                  />
+                </div>
                 <h3 className="v2-h3">{person.name}</h3>
-                <p className="v2-body-muted">{person.role}</p>
+                <p className="v2-team__role">{person.role}</p>
               </li>
             ))}
           </ul>
@@ -399,7 +491,12 @@ export default function HomeV2() {
       <FaqSection />
 
       {/* ── 12. Final project CTA ─────────────────────────────────────────── */}
-      <section className="v2-section v2-cta" aria-labelledby="cta-heading">
+      {/* The last light section carries the accent tint, so the page steps
+          warm white → mint mist → navy footer instead of ending abruptly. */}
+      <section
+        className="v2-section v2-section--accent v2-cta"
+        aria-labelledby="cta-heading"
+      >
         <div className="v2-wrap v2-wrap--narrow v2-cta__inner">
           <h2 id="cta-heading" className="v2-h2">
             Tell us what your business is trying to fix

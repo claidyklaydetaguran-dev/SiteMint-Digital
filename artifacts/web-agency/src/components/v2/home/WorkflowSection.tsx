@@ -103,14 +103,16 @@ export function WorkflowSection() {
   return (
     <section className="v2-section v2-section--feature" aria-labelledby="workflow-heading">
       <div className="v2-wrap">
-        <p className="v2-eyebrow v2-eyebrow--on-dark">The mechanism</p>
-        <h2 id="workflow-heading" className="v2-h2 v2-h2--on-dark">
-          Follow one inquiry all the way through
-        </h2>
-        <p className="v2-lede v2-lede--on-dark">
-          Select a step to see what happens at that point. Nothing moves on its
-          own — this stays wherever you leave it.
-        </p>
+        <div className="v2-head">
+          <p className="v2-eyebrow v2-eyebrow--on-dark">The mechanism</p>
+          <h2 id="workflow-heading" className="v2-h2 v2-h2--on-dark">
+            Follow one inquiry all the way through
+          </h2>
+          <p className="v2-lede v2-lede--on-dark">
+            Select a step to see what happens at that point. Nothing moves on its
+            own — this stays wherever you leave it.
+          </p>
+        </div>
 
         <div
           className="v2-flow__tabs"
@@ -119,7 +121,6 @@ export function WorkflowSection() {
         >
           {steps.map((step, index) => {
             const selected = step.id === activeId;
-            const Icon = step.icon;
             return (
               <button
                 key={step.id}
@@ -139,7 +140,6 @@ export function WorkflowSection() {
                 <span className="v2-flow__step" aria-hidden="true">
                   {index + 1}
                 </span>
-                <Icon aria-hidden="true" className="v2-flow__tab-icon" />
                 <span className="v2-flow__tab-label">{step.label}</span>
                 <span className="v2-flow__tab-summary">{step.summary}</span>
                 {step.tier !== "available" && (
@@ -160,13 +160,26 @@ export function WorkflowSection() {
           tabIndex={0}
           key={active.id}
         >
-          <ActiveIcon aria-hidden="true" className="v2-flow__panel-icon" />
-          <div>
-            <h3 className="v2-flow__panel-title">{active.label}</h3>
+          <div className="v2-flow__panel-main">
+            <p className="v2-flow__panel-step">
+              Stage {activeIndex + 1} of {steps.length}
+            </p>
+            <h3 className="v2-flow__panel-title">
+              <ActiveIcon aria-hidden="true" className="v2-flow__panel-icon" />
+              <span>{active.label}</span>
+            </h3>
             <p className="v2-flow__panel-body">{active.detail}</p>
-            {active.tier !== "available" && (
-              <p className="v2-flow__panel-note">{READINESS[active.tier].note}</p>
-            )}
+          </div>
+
+          {/* The resulting state of the system at this stage. Every word here
+              comes from the shared readiness source, so a stage can never be
+              described as more available in the panel than on its tab. */}
+          <div className="v2-flow__panel-state">
+            <p className="v2-flow__panel-state-label">What this means today</p>
+            <span className={`v2-tier v2-tier--${active.tier}`}>
+              {READINESS[active.tier].label}
+            </span>
+            <p className="v2-flow__panel-note">{READINESS[active.tier].note}</p>
           </div>
         </div>
       </div>

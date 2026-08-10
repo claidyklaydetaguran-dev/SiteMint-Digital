@@ -55,10 +55,12 @@ export function FaqSection() {
   return (
     <section className="v2-section" aria-labelledby="faq-heading" id="faq">
       <div className="v2-wrap v2-wrap--narrow">
-        <p className="v2-eyebrow">Questions</p>
-        <h2 id="faq-heading" className="v2-h2">
-          Frequently asked questions
-        </h2>
+        <div className="v2-head">
+          <p className="v2-eyebrow">Questions</p>
+          <h2 id="faq-heading" className="v2-h2">
+            Frequently asked questions
+          </h2>
+        </div>
 
         <div className="v2-faq">
           {faqs.map((item) => (
