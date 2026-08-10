@@ -1,0 +1,589 @@
+/**
+ * Frontend V2 Phase 6 — AI Receptionist sign-in presentation.
+ *
+ * Companion to `web-agency/src/styles/v2-signup.css`: same palette, same type
+ * scale, same 8-point spacing, same focus ring, same 44px minimum target. No
+ * new colour, no new font, no remote request, no gradient, no image, no
+ * decorative motion, no radius above 16px. Namespaced `si-*`.
+ *
+ * Why the tokens are redeclared here rather than imported. `tokens-v2.css`
+ * lives inside web-agency, a separate Vite application; helpdesk cannot import
+ * across that boundary, and creating a shared package would be a new
+ * dependency. The values below are copied verbatim from that file — the test
+ * suite asserts they still match, so the two cannot drift.
+ *
+ * Why they are scoped to `.si-page` rather than `:root`. The dashboard follows
+ * the operating system's colour scheme (`index.html` puts `.dark` on
+ * `<html>`), and the approved V2 authentication treatment is light-forward
+ * regardless. Scoping the tokens — and `color-scheme: light`, so native
+ * controls and the scrollbar follow — makes this page light without touching
+ * one dashboard surface. Nothing here leaks past the sign-in route.
+ *
+ * Composition. Sign-in has two fields, so the page deliberately does *not*
+ * repeat the signup page's full-width two-column grid, which would leave half
+ * a 1440 viewport holding nothing. Instead the heading block runs full measure
+ * above one bounded card, and the card itself is split: the form takes the
+ * larger pane, and the readiness ladder sits beside it on pale mint. The card
+ * is the only bordered object on the page.
+ */
+
+.si-page {
+  /* ── Palette — verbatim from tokens-v2.css ─────────────────────────────── */
+  --v2-warm-white: #fdfcfa;
+  --v2-offwhite: #f6fbfa;
+  --v2-mint-mist: #f0f9f6;
+  --v2-mint-100: #e8f8f5;
+  --v2-mint-500: #27e9b5;
+  --v2-navy-900: #051824;
+  --v2-slate-500: #3b5265;
+  --v2-white: #ffffff;
+
+  --v2-color-canvas: var(--v2-warm-white);
+  --v2-color-surface: var(--v2-white);
+  --v2-color-surface-accent: var(--v2-mint-mist);
+  --v2-color-text: var(--v2-navy-900);
+  --v2-color-text-muted: var(--v2-slate-500);
+  --v2-color-text-on-action: var(--v2-navy-900);
+  --v2-color-action: var(--v2-mint-500);
+  --v2-color-border: rgba(59, 82, 101, 0.12);
+  --v2-color-border-strong: rgba(59, 82, 101, 0.24);
+
+  /* Failure state. Navy-leaning red so it belongs to this palette, and dark
+     enough for 4.5:1 on both the white and the mint-mist surface. */
+  --v2-color-danger: #9c2233;
+  --v2-color-danger-surface: #fdf2f3;
+
+  --v2-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --v2-text-h1: clamp(1.875rem, 1.5rem + 1.4vw, 2.5rem);
+  --v2-text-body-lg: 1.125rem;
+  --v2-text-body: 1rem;
+  --v2-text-small: 0.875rem;
+  --v2-text-micro: 0.75rem;
+
+  --v2-weight-regular: 400;
+  --v2-weight-medium: 500;
+  --v2-weight-semibold: 600;
+
+  --v2-leading-heading: 1.2;
+  --v2-leading-body: 1.6;
+  --v2-tracking-micro: 0.06em;
+
+  --v2-space-1: 0.25rem;
+  --v2-space-2: 0.5rem;
+  --v2-space-3: 0.75rem;
+  --v2-space-4: 1rem;
+  --v2-space-6: 1.5rem;
+  --v2-space-8: 2rem;
+  --v2-space-12: 3rem;
+  --v2-space-16: 4rem;
+
+  /* Narrower than the marketing container (1200px): this is a task, not a page
+     to browse, and a wider measure strands the card in open space. The bar and
+     the content share it so every edge on the page lines up. */
+  --v2-measure-page: 64rem;
+  --v2-gutter: var(--v2-space-6);
+
+  --v2-radius-control: 6px;
+  --v2-radius-card: 10px;
+
+  --v2-shadow-1: 0 1px 2px rgba(5, 24, 36, 0.06);
+
+  --v2-focus-ring-width: 2px;
+  --v2-focus-ring-offset: 2px;
+  --v2-focus-ring-color: var(--v2-mint-500);
+
+  --v2-duration-control: 150ms;
+  --v2-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* The page is light-forward whatever the dashboard's theme resolves to. */
+  color-scheme: light;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-color-canvas);
+  color: var(--v2-color-text);
+  font-family: var(--v2-font-sans);
+}
+
+/* ── Auth chrome — the mirror of the signup page's bar ────────────────────── */
+
+.si-bar {
+  border-bottom: 1px solid var(--v2-color-border);
+  background: var(--v2-color-canvas);
+}
+
+.si-bar__inner {
+  /* Shares the content measure below it, so the brand and the create-account
+     link line up with the card's edges instead of floating wider than it. */
+  max-width: var(--v2-measure-page);
+  margin: 0 auto;
+  padding: var(--v2-space-3) var(--v2-gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-4);
+}
+
+.si-bar__brand,
+.si-bar__create {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text);
+  text-decoration: none;
+}
+
+.si-bar__brand-accent {
+  color: var(--v2-color-text-muted);
+  margin-left: 0.25em;
+}
+
+.si-bar__create {
+  padding-inline: var(--v2-space-3);
+  margin-right: calc(var(--v2-space-3) * -1);
+}
+
+.si-bar__brand:hover,
+.si-bar__create:hover,
+.si-back:hover {
+  text-decoration: underline;
+}
+
+.si-bar__brand:focus-visible,
+.si-bar__create:focus-visible,
+.si-back:focus-visible,
+.si-alt__link:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+  border-radius: var(--v2-radius-control);
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.si-main {
+  flex: 1;
+  padding-block: var(--v2-space-8) var(--v2-space-12);
+}
+
+.si-wrap {
+  max-width: var(--v2-measure-page);
+  margin: 0 auto;
+  padding-inline: var(--v2-gutter);
+}
+
+@media (min-width: 1024px) {
+  .si-main {
+    padding-block: var(--v2-space-12) var(--v2-space-16);
+  }
+}
+
+/* ── Heading block ───────────────────────────────────────────────────────── */
+
+.si-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-2);
+  min-height: 44px;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text-muted);
+  text-decoration: none;
+}
+
+.si-back:hover {
+  color: var(--v2-color-text);
+}
+
+.si-back__icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.si-title {
+  margin: var(--v2-space-4) 0 var(--v2-space-3);
+  max-width: 20ch;
+  font-size: var(--v2-text-h1);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* The one deliberate flourish on the page: a flat pale-mint rule seated under
+   the capability that is actually live, so the heading itself carries the
+   product truth the rest of the page states in words. `box-decoration-break`
+   keeps it intact when the phrase wraps. Not a gradient, not an animation, and
+   it survives forced-colours because the words are unchanged without it. */
+.si-title__live {
+  box-shadow: inset 0 -0.32em 0 var(--v2-mint-100);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.si-lede {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--v2-text-body-lg);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+/* ── The card — the only bordered object on the page ─────────────────────── */
+
+.si-card {
+  margin-top: var(--v2-space-8);
+  border: 1px solid var(--v2-color-border-strong);
+  border-radius: var(--v2-radius-card);
+  background: var(--v2-color-surface);
+  box-shadow: var(--v2-shadow-1);
+  /* Clips the mint pane to the rounded corner without a second radius. */
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .si-card {
+    /* The form is the task, so it takes the larger pane. */
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+}
+
+.si-form-pane {
+  padding: var(--v2-space-6);
+}
+
+@media (min-width: 900px) {
+  .si-form-pane {
+    padding: var(--v2-space-8);
+  }
+}
+
+.si-form {
+  display: grid;
+  gap: var(--v2-space-4);
+  max-width: 26rem;
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+
+.si-field {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.si-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--v2-space-2);
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text);
+}
+
+/* The word "Required" carries the requirement — never an asterisk or colour. */
+.si-req {
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-medium);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.si-input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--v2-space-2) var(--v2-space-3);
+  border: 1px solid var(--v2-color-border-strong);
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-color-surface);
+  color: var(--v2-color-text);
+  font-family: inherit;
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-leading-body);
+  transition: border-color var(--v2-duration-control) var(--v2-ease-standard);
+}
+
+.si-input::placeholder {
+  color: var(--v2-color-text-muted);
+  opacity: 0.75;
+}
+
+.si-input:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+  border-color: var(--v2-color-text);
+}
+
+/* Invalidity is carried by the border *and* by the message below the field,
+   so it never depends on colour alone. */
+.si-input--invalid {
+  border-color: var(--v2-color-danger);
+}
+
+.si-input--password {
+  /* Room for the visibility toggle. */
+  padding-right: 3rem;
+}
+
+.si-password {
+  position: relative;
+  display: flex;
+}
+
+.si-password__toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--v2-color-text-muted);
+  cursor: pointer;
+  border-radius: var(--v2-radius-control);
+}
+
+.si-password__toggle:hover {
+  color: var(--v2-color-text);
+}
+
+.si-password__toggle:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: calc(var(--v2-focus-ring-offset) * -1);
+}
+
+.si-password__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.si-error {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-danger);
+}
+
+/* ── Form-level alert ────────────────────────────────────────────────────── */
+
+.si-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--v2-space-2) var(--v2-space-3);
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-color-danger);
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-color-danger-surface);
+}
+
+.si-alert:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+/* The word "Error" states the condition in text, so nothing depends on the
+   colour of the panel. */
+.si-alert__label {
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-danger);
+}
+
+.si-alert__text {
+  flex: 1 1 12rem;
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text);
+}
+
+/* ── Submit ──────────────────────────────────────────────────────────────── */
+
+.si-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v2-space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--v2-space-6);
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-color-action);
+  color: var(--v2-color-text-on-action);
+  font-family: inherit;
+  font-size: var(--v2-text-body);
+  font-weight: var(--v2-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--v2-duration-control) var(--v2-ease-standard);
+}
+
+.si-submit:hover:not(:disabled) {
+  background: #1fd0a2;
+}
+
+.si-submit:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+/* Disabled has to stay legible, not dimmed to grey-on-grey: navy text on a
+   pale mint field, with a visible border so the control still reads as a
+   button. */
+.si-submit:disabled {
+  background: var(--v2-mint-100);
+  border-color: var(--v2-color-border-strong);
+  color: var(--v2-color-text);
+  cursor: progress;
+}
+
+.si-submit__spinner {
+  width: 1rem;
+  height: 1rem;
+  animation: si-spin 900ms linear infinite;
+}
+
+@keyframes si-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.si-hint {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+/* ── Create-account route ────────────────────────────────────────────────── */
+
+.si-alt {
+  margin: var(--v2-space-6) 0 0;
+  padding-top: var(--v2-space-6);
+  border-top: 1px solid var(--v2-color-border);
+  max-width: 26rem;
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+.si-alt__link {
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--v2-color-action);
+}
+
+.si-alt__link:hover {
+  text-decoration-color: var(--v2-color-text);
+}
+
+/* ── Readiness pane ──────────────────────────────────────────────────────── */
+
+.si-status {
+  display: flex;
+  flex-direction: column;
+  padding: var(--v2-space-6);
+  background: var(--v2-color-surface-accent);
+  border-top: 1px solid var(--v2-color-border);
+}
+
+@media (min-width: 900px) {
+  .si-status {
+    padding: var(--v2-space-8) var(--v2-space-6);
+    border-top: 0;
+    border-left: 1px solid var(--v2-color-border);
+  }
+}
+
+.si-status__title {
+  margin: 0 0 var(--v2-space-4);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+/* The ladder: one continuous rule down the list, mint only on the tier that
+   has actually shipped. The tier word is always present, so the colour adds
+   emphasis and never carries the meaning. */
+.si-status__list {
+  display: grid;
+  gap: var(--v2-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.si-status__item {
+  padding-left: var(--v2-space-4);
+  border-left: 2px solid var(--v2-color-border-strong);
+}
+
+.si-status__item--available {
+  border-left-color: var(--v2-color-action);
+}
+
+.si-status__name {
+  display: block;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+.si-status__tier {
+  display: block;
+  margin-top: var(--v2-space-1);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-medium);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+/* Pinned to the foot of the pane. When the form column is the taller of the
+   two, the leftover height falls between the ladder and this caveat instead of
+   trailing off the bottom as dead space. */
+.si-status__note {
+  /* `auto` absorbs the free height; the padding keeps a rule-to-text gap even
+     when there is none to absorb. */
+  margin: auto 0 0;
+  padding-top: var(--v2-space-6);
+  border-top: 1px solid var(--v2-color-border);
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .si-input,
+  .si-submit {
+    transition: none;
+  }
+
+  /* The spinner is the only motion on the page; it becomes a static mark and
+     the button's own text continues to announce the state. */
+  .si-submit__spinner {
+    animation: none;
+  }
+}

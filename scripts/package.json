@@ -7,7 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "seed-ai-toolkit-product": "tsx ./src/seed-ai-toolkit-product.ts",
     "test-receptionist-billing": "tsx ./src/test-receptionist-billing.ts",
-    "test": "tsx ../artifacts/web-agency/src/pages/signup/signupContract.test.ts",
+    "test": "tsx ../artifacts/web-agency/src/pages/signup/signupContract.test.ts && tsx ../artifacts/helpdesk/src/pages/login/loginContract.test.ts",
     "test-legacy-api-server": "tsx ./src/run-legacy-api-tests.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
