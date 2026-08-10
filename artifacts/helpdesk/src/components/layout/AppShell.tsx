@@ -1,376 +1,289 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+/**
+ * Frontend V2 Phase 7 — the authenticated dashboard shell.
+ *
+ * Replaces the shadcn `ui/sidebar` composition (SidebarProvider + Sheet +
+ * cookie-persisted rail state) with a purpose-built shell. `ui/sidebar.tsx` had
+ * exactly one consumer — this file — and is left in place untouched as a
+ * rollback reference, the same pattern Phase 1 established for deferred routes.
+ *
+ * The rewrite exists to fix three real structural defects in the previous
+ * chrome, each verified in the baseline capture:
+ *
+ *  1. **Two `<main>` landmarks.** `SidebarInset` renders a `<main>` and the
+ *     shell rendered another `<main role="main">` inside it. There is now one.
+ *  2. **No `<nav>` landmark at all.** The navigation was a plain `<div>` tree,
+ *     so it could not be reached by landmark navigation. It is now a labelled
+ *     `<nav>` containing a real list.
+ *  3. **No skip link**, so a keyboard user traversed the whole navigation on
+ *     every route. The skip link is now the first thing in the tab order.
+ *
+ * ── Preserved exactly ─────────────────────────────────────────────────────
+ * The session query (`GET /api/receptionist/auth/me` via `useSession`), the
+ * loading gate, the redirect to `/login` on a session error, the logout call
+ * (`POST /api/receptionist/auth/logout` then `queryClient.clear()` then
+ * `/login`), the firm-scoped data (`me.firm.*` only ever from the server
+ * session), the trial usage figures, the appearance control, and the container
+ * the child routes render into. No endpoint, method, payload, response shape,
+ * route, or authorisation behaviour is changed by this file.
+ *
+ * Authenticated content is still never painted before authorisation resolves:
+ * the component returns the loading state while `isLoading`, and `null` on
+ * error, exactly as before.
+ */
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useLocation } from "wouter";
-import {
-  LogOut,
-  Menu,
-  Settings as SettingsIcon,
-  CreditCard,
-  Lock,
-} from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarSeparator,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { SiteMintLogo } from "@/components/SiteMintLogo";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { LogOut, Menu, Monitor, Moon, Sun, X } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useSession, useLogout } from "@/hooks/useSession";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
-import { NAV_GROUPS, isNavItemActive, type NavItem } from "@/lib/nav";
+import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboardNav";
+import "@/styles/v2-dashboard.css";
 
-const SIDEBAR_WIDTH_VARS = {
-  "--sidebar-width": "248px",
-  "--sidebar-width-icon": "72px",
-} as CSSProperties;
+const DESKTOP_QUERY = "(min-width: 64rem)";
 
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
+// ─── Navigation ────────────────────────────────────────────────────────────
 
-// ─── Account menu (Settings / Billing / Sign out) ──────────────────────────
+function RailNav({ location, onNavigate }: { location: string; onNavigate: () => void }) {
+  const groups = visibleNavGroups(voicePlatformEnabled);
 
-function AccountMenu({
-  firmName,
-  onLogout,
-  compact = false,
-}: {
-  firmName: string;
-  onLogout: () => void;
-  compact?: boolean;
-}) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left hover-elevate active-elevate-2"
-          aria-label={`Account menu for ${firmName}`}
-        >
-          <Avatar className="h-8 w-8 flex-shrink-0">
-            <AvatarFallback className="bg-surface-muted text-primary text-xs font-semibold">
-              {initials(firmName)}
-            </AvatarFallback>
-          </Avatar>
-          {!compact && (
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-              {firmName}
-            </span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-48">
-        <DropdownMenuLabel className="truncate">{firmName}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/settings" className="flex items-center gap-2">
-            <SettingsIcon className="h-4 w-4" aria-hidden="true" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/billing" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" aria-hidden="true" />
-            Billing
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={onLogout}
-          className="flex items-center gap-2"
-        >
-          <LogOut className="h-4 w-4" aria-hidden="true" />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <nav className="sd-rail__nav" aria-label="Dashboard">
+      {groups.map((group) => (
+        <div key={group.key} className="sd-rail__group" role="group" aria-label={group.label}>
+          {group.showLabel && <span className="sd-rail__grouplabel">{group.label}</span>}
+          <ul className="sd-rail__list">
+            {group.items.map((item) => {
+              const active = isNavItemActive(item, location);
+              const Icon = item.icon;
+              return (
+                <li key={item.key}>
+                  <Link
+                    href={item.href!}
+                    className="sd-navlink"
+                    aria-current={active ? "page" : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Icon className="sd-navlink__icon" aria-hidden="true" />
+                    <span className="sd-navlink__label">{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
   );
 }
 
-// ─── Usage meter ────────────────────────────────────────────────────────────
+// ─── Trial usage ───────────────────────────────────────────────────────────
 
 function UsageMeter({
-  usedCount,
-  capCount,
   isPaid,
-  collapsed,
+  used,
+  limit,
+  onNavigate,
 }: {
-  usedCount: number;
-  capCount: number;
   isPaid: boolean;
-  collapsed: boolean;
+  used: number;
+  limit: number;
+  onNavigate: () => void;
 }) {
   if (isPaid) {
-    return collapsed ? null : (
-      <div className="rounded-lg border border-border bg-surface-muted px-3 py-2 text-xs font-semibold text-primary">
-        Pro plan
-      </div>
-    );
+    return <div className="sd-usage__plan">Pro plan</div>;
   }
 
-  const pct =
-    capCount > 0
-      ? Math.min(100, Math.round((usedCount / capCount) * 100) || 0)
-      : 0;
-
-  if (collapsed) {
-    return (
-      <Link
-        href="/billing"
-        className="flex items-center justify-center rounded-lg border border-border py-1.5 text-[10px] font-semibold text-muted-foreground hover-elevate active-elevate-2"
-        aria-label={`Trial usage: ${usedCount} of ${capCount} conversations used`}
-        title={`${usedCount} of ${capCount} conversations used`}
-      >
-        {pct}%
-      </Link>
-    );
-  }
+  const percent = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
   return (
     <Link
       href="/billing"
-      className="block rounded-lg border border-border p-3 hover-elevate active-elevate-2"
-      aria-label={`Trial usage: ${usedCount} of ${capCount} conversations used. Upgrade.`}
+      className="sd-usage"
+      onClick={onNavigate}
+      aria-label={`Trial usage: ${used} of ${limit} conversations used. Open billing.`}
     >
-      <div className="mb-1.5 flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">
-          {usedCount} of {capCount} conversations
+      <span className="sd-usage__row">
+        <span className="sd-usage__count">
+          {used} of {limit} conversations
         </span>
-        <span className="font-semibold text-primary">Upgrade →</span>
-      </div>
-      <Progress value={pct} className="h-1.5" />
+        <span className="sd-usage__cta" aria-hidden="true">
+          Billing
+        </span>
+      </span>
+      <span className="sd-usage__track">
+        <span
+          className="sd-usage__fill"
+          style={{ transform: `scaleX(${percent / 100})` }}
+        />
+      </span>
     </Link>
   );
 }
 
-// ─── Nav item row ───────────────────────────────────────────────────────────
+// ─── Appearance ────────────────────────────────────────────────────────────
 
-function NavRow({ item, location }: { item: NavItem; location: string }) {
-  const active = isNavItemActive(item, location);
-  const Icon = item.icon;
+const THEMES = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "System", Icon: Monitor },
+] as const;
 
-  if (item.state === "later") {
-    return (
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          size="lg"
-          disabled
-          aria-disabled="true"
-          aria-label={`${item.label} — Later`}
-          tooltip={`${item.label} — Later`}
-          className="cursor-not-allowed opacity-60"
+/**
+ * Rail-native replacement for the dropdown appearance menu. Same three
+ * options and the same `next-themes` contract; a radio group rather than a
+ * menu, so the choice is never hidden behind an extra interaction and the
+ * current value is announced.
+ */
+function AppearanceControl() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const current = mounted ? (theme ?? "system") : "system";
+
+  return (
+    <div className="sd-appearance" role="radiogroup" aria-label="Appearance">
+      {THEMES.map(({ value, label, Icon }) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={current === value}
+          aria-label={label}
+          className="sd-appearance__option"
+          data-selected={current === value}
+          onClick={() => setTheme(value)}
         >
-          <Icon className="h-4 w-4" aria-hidden="true" />
-          <span className="truncate group-data-[collapsible=icon]:hidden">
-            {item.label}
-          </span>
-        </SidebarMenuButton>
-        <SidebarMenuBadge>Later</SidebarMenuBadge>
-      </SidebarMenuItem>
-    );
-  }
-
-  if (!item.href) return null;
-
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        size="lg"
-        isActive={active}
-        tooltip={item.label}
-      >
-        <Link
-          href={item.href}
-          aria-label={item.label}
-          aria-current={active ? "page" : undefined}
-        >
-          <Icon className="h-4 w-4" aria-hidden="true" />
-          <span className="truncate group-data-[collapsible=icon]:hidden">
-            {item.label}
-          </span>
-        </Link>
-      </SidebarMenuButton>
-      {item.state === "advanced" && (
-        <SidebarMenuBadge>
-          <Lock className="h-3 w-3" aria-hidden="true" />
-        </SidebarMenuBadge>
-      )}
-    </SidebarMenuItem>
+          <Icon className="sd-railbtn__icon" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
   );
 }
 
-// ─── Sidebar body (shared between desktop rail + mobile sheet) ────────────
-
-function AppSidebar({
-  location,
-  firmName,
-  usedCount,
-  capCount,
-  isPaid,
-  onLogout,
-}: {
-  location: string;
-  firmName: string;
-  usedCount: number;
-  capCount: number;
-  isPaid: boolean;
-  onLogout: () => void;
-}) {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
-
-  return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-2 py-3">
-        <div className="flex items-center justify-between gap-2 px-1">
-          <Link href="/" className="min-w-0">
-            <SiteMintLogo iconSize={28} showWordmark={!collapsed} />
-          </Link>
-          <SidebarTrigger className="hidden md:flex" />
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent>
-        {NAV_GROUPS.map((group) => {
-          const items = group.items.filter(
-            (item) =>
-              item.state === "live" &&
-              (!item.voiceGated || voicePlatformEnabled),
-          );
-          if (items.length === 0) return null;
-          return (
-            <SidebarGroup key={group.key}>
-              <SidebarGroupLabel className="uppercase tracking-wider">
-                {group.label}
-              </SidebarGroupLabel>
-              {collapsed && <SidebarSeparator className="mb-1" />}
-              <SidebarMenu>
-                {items.map((item) => (
-                  <NavRow key={item.key} item={item} location={location} />
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          );
-        })}
-      </SidebarContent>
-
-      <SidebarFooter className="gap-2 border-t border-sidebar-border px-2 py-3">
-        <UsageMeter
-          usedCount={usedCount}
-          capCount={capCount}
-          isPaid={isPaid}
-          collapsed={collapsed}
-        />
-        <ThemeToggle collapsed={collapsed} />
-        <AccountMenu
-          firmName={firmName}
-          onLogout={onLogout}
-          compact={collapsed}
-        />
-      </SidebarFooter>
-    </Sidebar>
-  );
-}
-
-// ─── Mobile top bar ─────────────────────────────────────────────────────────
-
-function MobileTopbar({
-  firmName,
-  onLogout,
-}: {
-  firmName: string;
-  onLogout: () => void;
-}) {
-  const { setOpenMobile } = useSidebar();
-
-  return (
-    <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-border bg-card px-3 md:hidden">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-11 w-11"
-        onClick={() => setOpenMobile(true)}
-        aria-label="Open navigation"
-      >
-        <Menu className="h-5 w-5" aria-hidden="true" />
-      </Button>
-      <SiteMintLogo iconSize={24} showWordmark />
-      <AccountMenu firmName={firmName} onLogout={onLogout} compact />
-    </header>
-  );
-}
-
-// ─── Root shell ─────────────────────────────────────────────────────────────
-
-function CloseDrawerOnNavigate() {
-  const [location] = useLocation();
-  const { isMobile, setOpenMobile } = useSidebar();
-
-  useEffect(() => {
-    if (isMobile) setOpenMobile(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
-
-  return null;
-}
+// ─── Shell ─────────────────────────────────────────────────────────────────
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const { data: me, isLoading, isError } = useSession();
   const logout = useLogout();
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof document === "undefined") return true;
-    const match = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
-    if (match) return match[1] === "true";
-    // No persisted preference yet: default to an icon rail below the
-    // desktop breakpoint (tablet), expanded at/above it.
-    return typeof window === "undefined" || window.innerWidth >= 1024;
-  });
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window === "undefined" || window.matchMedia(DESKTOP_QUERY).matches,
+  );
 
   useEffect(() => {
-    if (!isLoading && isError) {
-      navigate("/login");
-    }
+    const mq = window.matchMedia(DESKTOP_QUERY);
+    const onChange = () => {
+      setIsDesktop(mq.matches);
+      if (mq.matches) setDrawerOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // Session failure is the only unauthenticated signal the dashboard has, and
+  // its destination is unchanged.
+  useEffect(() => {
+    if (!isLoading && isError) navigate("/login");
   }, [isLoading, isError, navigate]);
+
+  // Close on navigation, then hand focus back to the control that opened it.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location]);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  // Escape closes; Tab is confined to the drawer while it is open.
+  useEffect(() => {
+    if (!drawerOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDrawer();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const rail = railRef.current;
+      if (!rail) return;
+      const focusable = rail.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || !rail.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [drawerOpen, closeDrawer]);
+
+  // Scroll lock that cannot shift the layout: the width the scrollbar was
+  // occupying is given back as padding for exactly as long as it is hidden.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const { body, documentElement } = document;
+    const gap = window.innerWidth - documentElement.clientWidth;
+    const prevOverflow = body.style.overflow;
+    const prevPadding = body.style.paddingRight;
+    body.style.overflow = "hidden";
+    if (gap > 0) body.style.paddingRight = `${gap}px`;
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPadding;
+    };
+  }, [drawerOpen]);
+
+  // Move focus into the drawer when it opens.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const first = railRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])");
+    first?.focus();
+  }, [drawerOpen]);
+
+  // A closed drawer is fully removed from the tab order and the a11y tree.
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    rail.inert = !isDesktop && !drawerOpen;
+  }, [isDesktop, drawerOpen, me]);
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <SiteMintLogo iconSize={36} showWordmark={false} />
+      <div className="sd-app sd-app--boot">
+        <div className="sd-boot" role="status" aria-live="polite">
+          <span className="sd-boot__mark" aria-hidden="true" />
+          <span className="sd-boot__text">Loading your dashboard…</span>
+        </div>
       </div>
     );
   }
 
-  if (isError || !me) {
-    return null;
-  }
+  if (isError || !me) return null;
 
   const handleLogout = async () => {
     await logout();
@@ -378,34 +291,92 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const isPaid = me.firm.planTier === "paid";
-  const usedCount = me.conversationCount;
-  const capCount = me.firm.trialConversationsLimit;
+  const closeIfDrawer = () => {
+    if (!isDesktop) setDrawerOpen(false);
+  };
 
   return (
-    <SidebarProvider
-      open={sidebarOpen}
-      onOpenChange={setSidebarOpen}
-      style={SIDEBAR_WIDTH_VARS}
-      className="min-h-screen"
-    >
-      <CloseDrawerOnNavigate />
-      <AppSidebar
-        location={location}
-        firmName={me.firm.name}
-        usedCount={usedCount}
-        capCount={capCount}
-        isPaid={isPaid}
-        onLogout={handleLogout}
-      />
-      <SidebarInset className="min-w-0">
-        <MobileTopbar firmName={me.firm.name} onLogout={handleLogout} />
-        <main
-          role="main"
-          className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
-        >
+    <div className="sd-app">
+      <a className="sd-skip" href="#sd-main">
+        Skip to main content
+      </a>
+
+      {drawerOpen && !isDesktop && (
+        <div
+          className="sd-scrim"
+          data-open={drawerOpen}
+          onClick={closeDrawer}
+          aria-hidden="true"
+        />
+      )}
+
+      <div
+        ref={railRef}
+        id="sd-rail"
+        className="sd-rail"
+        data-open={drawerOpen ? "true" : "false"}
+        {...(!isDesktop
+          ? { role: "dialog" as const, "aria-modal": true, "aria-label": "Dashboard navigation" }
+          : {})}
+      >
+        {/* Text-only wordmark, matching the V2 sign-in bar exactly, so the
+            brand does not change shape between signing in and arriving. */}
+        <Link href="/" className="sd-rail__brand" onClick={closeIfDrawer}>
+          {/* One flex item, so the space between the two words survives. */}
+          <span>
+            SiteMint <span className="sd-rail__brand-accent">AI Receptionist</span>
+          </span>
+        </Link>
+
+        {/* Workspace identity comes only from the authenticated session. There
+            is no placeholder business name and no generated avatar. */}
+        <div className="sd-rail__workspace">
+          <span className="sd-eyebrow">Workspace</span>
+          <span className="sd-rail__workspace-name">{me.firm.name}</span>
+        </div>
+
+        <RailNav location={location} onNavigate={closeIfDrawer} />
+
+        <div className="sd-rail__foot">
+          <UsageMeter
+            isPaid={isPaid}
+            used={me.conversationCount}
+            limit={me.firm.trialConversationsLimit}
+            onNavigate={closeIfDrawer}
+          />
+          <AppearanceControl />
+          <button type="button" className="sd-railbtn" onClick={handleLogout}>
+            <LogOut className="sd-railbtn__icon" aria-hidden="true" />
+            Sign out
+          </button>
+        </div>
+      </div>
+
+      <div className="sd-column">
+        <header className="sd-topbar">
+          <button
+            ref={triggerRef}
+            type="button"
+            className="sd-topbar__button"
+            aria-expanded={drawerOpen}
+            aria-controls="sd-rail"
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            {drawerOpen ? (
+              <X className="sd-railbtn__icon" aria-hidden="true" />
+            ) : (
+              <Menu className="sd-railbtn__icon" aria-hidden="true" />
+            )}
+            <span className="sd-sr">{drawerOpen ? "Close navigation" : "Open navigation"}</span>
+          </button>
+          <span className="sd-topbar__title">{me.firm.name}</span>
+          <span className="sd-topbar__spacer" aria-hidden="true" />
+        </header>
+
+        <main id="sd-main" className="sd-workspace" tabIndex={-1}>
           {children}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </div>
   );
 }

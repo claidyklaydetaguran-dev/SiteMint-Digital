@@ -1,0 +1,1322 @@
+/**
+ * Frontend V2 Phase 7 — the authenticated dashboard foundation.
+ *
+ * Companion to `v2-signin.css` and web-agency's `v2-signup.css`: same palette,
+ * same 8-point spacing, same focus ring, same 44px minimum target, same
+ * system font stack. No new colour family, no remote request, no gradient, no
+ * image, no video, no decorative loop.
+ *
+ * Why the tokens are redeclared here rather than imported. `tokens-v2.css`
+ * lives inside web-agency, a separate Vite application; helpdesk cannot import
+ * across that boundary and creating a shared package would be a new
+ * dependency. The values are copied verbatim; `overviewContract.test.ts`
+ * asserts they still match, so the two cannot drift.
+ *
+ * Why they are scoped to `.sd-app` rather than `:root`. The dashboard honours
+ * the operating system's colour scheme through the existing `ThemeProvider`
+ * (which puts `.dark` on `<html>`), and that control is a shipped feature this
+ * phase preserves. So the layer defines a light-forward default and a
+ * navy-based dark counterpart, and touches nothing outside the shell — every
+ * child route still renders exactly as it did.
+ *
+ * Namespaced `sd-*` (SiteMint dashboard) so it cannot collide with the
+ * `--v2-*` public tokens, the app's shadcn variables, or `si-*` on sign-in.
+ *
+ * ── Composition ───────────────────────────────────────────────────────────
+ * A persistent ink-navy rail carries identity, navigation and account; the
+ * workspace beside it stays warm white so the working area is calm and the
+ * chrome is unmistakably chrome. Navy therefore appears exactly once, as
+ * structure — never as a content surface.
+ *
+ * ── Motion rules (the whole system) ───────────────────────────────────────
+ *  1. Only `transform`, `opacity`, `background-color`, `border-color` and
+ *     `color` are ever animated. No layout property, no blur, no
+ *     background-position, no filter.
+ *  2. One entrance, one group. The workspace fades and rises 8px once, on
+ *     mount. Cards are not staggered and sections are not revealed on scroll.
+ *  3. Frequent interactions are fast (120–160ms); the drawer, the one motion
+ *     a person waits on, is 220ms. Nothing exceeds 240ms.
+ *  4. Hover transforms are gated behind `(hover: hover) and (pointer: fine)`
+ *     so a touch device never inherits a stuck hover state.
+ *  5. Nothing loops. There is no ambient movement anywhere in this file.
+ *  6. `prefers-reduced-motion: reduce` removes every transition and every
+ *     transform; the interface is fully usable and fully legible with all
+ *     animation off, and no content depends on an entrance having run.
+ */
+
+.sd-app {
+  /* ── Palette — verbatim from tokens-v2.css ─────────────────────────────── */
+  --v2-warm-white: #fdfcfa;
+  --v2-offwhite: #f6fbfa;
+  --v2-mint-mist: #f0f9f6;
+  --v2-mint-100: #e8f8f5;
+  --v2-mint-500: #27e9b5;
+  --v2-navy-900: #051824;
+  --v2-navy-700: #162936;
+  --v2-slate-500: #3b5265;
+  --v2-white: #ffffff;
+
+  /* ── Semantic roles — light-forward default ────────────────────────────── */
+  --sd-canvas: var(--v2-warm-white);
+  --sd-surface: var(--v2-white);
+  --sd-surface-alt: var(--v2-offwhite);
+  --sd-surface-accent: var(--v2-mint-mist);
+  --sd-text: var(--v2-navy-900);
+  --sd-text-muted: var(--v2-slate-500);
+  --sd-border: rgba(59, 82, 101, 0.12);
+  --sd-border-strong: rgba(59, 82, 101, 0.24);
+
+  --sd-accent: var(--v2-mint-500);
+  --sd-accent-ink: var(--v2-navy-900);
+  --sd-accent-soft: var(--v2-mint-100);
+
+  /* The navy rail and everything printed on it. */
+  --sd-rail: var(--v2-navy-900);
+  --sd-rail-text: #e8f2f0;
+  --sd-rail-muted: #8ba4b2;
+  --sd-rail-border: rgba(145, 255, 255, 0.13);
+  --sd-rail-hover: rgba(145, 255, 255, 0.08);
+  --sd-rail-active: rgba(39, 233, 181, 0.14);
+  --sd-rail-accent: #4dfed1;
+
+  /* Attention and failure. Amber and red appear only for a real warning or a
+     real error — never for emphasis, and never as the only signal. */
+  --sd-warn: #8a5200;
+  --sd-warn-surface: #fdf6ec;
+  --sd-warn-border: rgba(138, 82, 0, 0.28);
+  --sd-danger: #9c2233;
+  --sd-danger-surface: #fdf2f3;
+  --sd-danger-border: rgba(156, 34, 51, 0.28);
+
+  /* Unavailable and planned capabilities: muted neutral, never mint. */
+  --sd-muted-surface: var(--v2-offwhite);
+  --sd-muted-text: #5c7181;
+
+  --sd-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --sd-text-h1: 1.5rem;
+  --sd-text-h2: 0.9375rem;
+  --sd-text-figure: 2rem;
+  --sd-text-body: 0.875rem;
+  --sd-text-small: 0.8125rem;
+  --sd-text-micro: 0.6875rem;
+
+  --sd-tracking-eyebrow: 0.1em;
+
+  --sd-space-1: 0.25rem;
+  --sd-space-2: 0.5rem;
+  --sd-space-3: 0.75rem;
+  --sd-space-4: 1rem;
+  --sd-space-5: 1.25rem;
+  --sd-space-6: 1.5rem;
+  --sd-space-8: 2rem;
+  --sd-space-10: 2.5rem;
+
+  --sd-radius-control: 6px;
+  --sd-radius-card: 10px;
+  --sd-shadow-1: 0 1px 2px rgba(5, 24, 36, 0.06);
+
+  --sd-focus-width: 2px;
+  --sd-focus-offset: 2px;
+  --sd-focus-color: var(--v2-mint-500);
+
+  --sd-rail-width: 15.5rem;
+  --sd-measure: 68rem;
+
+  --sd-dur-fast: 120ms;
+  --sd-dur-control: 160ms;
+  --sd-dur-drawer: 220ms;
+  --sd-dur-enter: 240ms;
+  --sd-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  color-scheme: light;
+  font-family: var(--sd-font);
+  color: var(--sd-text);
+  background: var(--sd-canvas);
+  /* The shell owns the viewport and `main` is the scroll container, exactly as
+     the previous chrome arranged it — every child route keeps the scrolling
+     context it was written against. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+}
+
+/* ── Dark counterpart ──────────────────────────────────────────────────────
+   Navy-based, not neutral black: the dark dashboard stays inside the same
+   palette rather than becoming a different product. */
+:where(.dark) .sd-app {
+  --sd-canvas: #071e2b;
+  --sd-surface: #0c2735;
+  --sd-surface-alt: #0a2230;
+  --sd-surface-accent: #0e2f3c;
+  --sd-text: #eaf4f2;
+  --sd-text-muted: #9db6c3;
+  --sd-border: rgba(145, 255, 255, 0.14);
+  --sd-border-strong: rgba(145, 255, 255, 0.26);
+
+  --sd-accent: #4dfed1;
+  --sd-accent-ink: var(--v2-navy-900);
+  --sd-accent-soft: rgba(77, 254, 209, 0.14);
+
+  --sd-rail: #041521;
+
+  --sd-warn: #f0c07a;
+  --sd-warn-surface: rgba(240, 180, 41, 0.1);
+  --sd-warn-border: rgba(240, 180, 41, 0.32);
+  --sd-danger: #ff9aa5;
+  --sd-danger-surface: rgba(255, 138, 150, 0.1);
+  --sd-danger-border: rgba(255, 138, 150, 0.32);
+
+  --sd-muted-surface: rgba(145, 255, 255, 0.05);
+  --sd-muted-text: #8ea7b5;
+
+  --sd-focus-color: #4dfed1;
+  --sd-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}
+
+/* ── Shared primitives ─────────────────────────────────────────────────────*/
+
+.sd-app *,
+.sd-app *::before,
+.sd-app *::after {
+  box-sizing: border-box;
+}
+
+.sd-app :focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+  border-radius: var(--sd-radius-control);
+}
+
+/* Visually hidden, still announced. */
+.sd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link — the first thing in the tab order, invisible until focused. */
+.sd-skip {
+  position: absolute;
+  left: var(--sd-space-4);
+  top: var(--sd-space-4);
+  z-index: 60;
+  transform: translateY(-200%);
+  background: var(--sd-accent);
+  color: var(--sd-accent-ink);
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border-radius: var(--sd-radius-control);
+  text-decoration: none;
+  transition: transform var(--sd-dur-control) var(--sd-ease);
+}
+.sd-skip:focus-visible {
+  transform: translateY(0);
+}
+
+/* ── The navy rail ─────────────────────────────────────────────────────────*/
+
+.sd-rail {
+  width: var(--sd-rail-width);
+  flex: 0 0 var(--sd-rail-width);
+  background: var(--sd-rail);
+  color: var(--sd-rail-text);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  border-right: 1px solid var(--sd-rail-border);
+
+  /* On navy, the light-mode mint ring sits too close to the active row's mint
+     tint. The rail uses the brighter accent so focus is unmistakable against
+     both the plain and the active background. */
+  --sd-focus-color: var(--sd-rail-accent);
+}
+
+.sd-rail__brand {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border-bottom: 1px solid var(--sd-rail-border);
+  color: var(--sd-rail-text);
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.sd-rail__brand-accent {
+  color: var(--sd-rail-accent);
+}
+
+/* Workspace identity. Only rendered when the session actually supplies a
+   firm name — there is no placeholder business name and no avatar image. */
+.sd-rail__workspace {
+  padding: var(--sd-space-4);
+  border-bottom: 1px solid var(--sd-rail-border);
+}
+.sd-eyebrow {
+  display: block;
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-rail-muted);
+}
+.sd-rail__workspace-name {
+  display: block;
+  margin-top: var(--sd-space-1);
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--sd-rail-text);
+  overflow-wrap: anywhere;
+}
+
+.sd-rail__nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--sd-space-4) var(--sd-space-3);
+}
+
+.sd-rail__group + .sd-rail__group {
+  margin-top: var(--sd-space-5);
+}
+.sd-rail__grouplabel {
+  display: block;
+  padding: 0 var(--sd-space-3) var(--sd-space-2);
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-rail-muted);
+}
+.sd-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-navlink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  min-height: 44px;
+  padding: var(--sd-space-2) var(--sd-space-3);
+  border-radius: var(--sd-radius-control);
+  color: var(--sd-rail-muted);
+  font-size: var(--sd-text-body);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color var(--sd-dur-fast) var(--sd-ease),
+    color var(--sd-dur-fast) var(--sd-ease);
+}
+.sd-navlink__icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  opacity: 0.85;
+}
+.sd-navlink__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The active indicator: a mint bar that scales in from the vertical centre.
+   Transform and opacity only, so it never triggers layout. */
+.sd-navlink::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: 0 2px 2px 0;
+  background: var(--sd-rail-accent);
+  opacity: 0;
+  transform: scaleY(0.3);
+  transition:
+    opacity var(--sd-dur-control) var(--sd-ease),
+    transform var(--sd-dur-control) var(--sd-ease);
+}
+.sd-navlink[aria-current="page"]::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.sd-navlink[aria-current="page"] {
+  background: var(--sd-rail-active);
+  color: var(--sd-rail-text);
+  font-weight: 600;
+}
+.sd-navlink[aria-current="page"] .sd-navlink__icon {
+  opacity: 1;
+  color: var(--sd-rail-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sd-navlink:hover {
+    background: var(--sd-rail-hover);
+    color: var(--sd-rail-text);
+  }
+}
+
+.sd-rail__foot {
+  border-top: 1px solid var(--sd-rail-border);
+  padding: var(--sd-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+}
+
+/* Trial usage. A real meter over real counts; nothing is shown for a paid
+   plan beyond the plan's name. */
+.sd-usage {
+  display: block;
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-rail-border);
+  border-radius: var(--sd-radius-control);
+  text-decoration: none;
+  color: var(--sd-rail-text);
+  transition: border-color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-usage:hover {
+    border-color: var(--sd-rail-accent);
+  }
+}
+.sd-usage__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sd-space-2);
+  font-size: var(--sd-text-micro);
+  color: var(--sd-rail-muted);
+}
+.sd-usage__count {
+  font-variant-numeric: tabular-nums;
+}
+.sd-usage__cta {
+  font-weight: 600;
+  color: var(--sd-rail-accent);
+}
+.sd-usage__row {
+  display: flex;
+}
+.sd-usage__track {
+  display: block;
+  margin-top: var(--sd-space-2);
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(145, 255, 255, 0.16);
+  overflow: hidden;
+}
+.sd-usage__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--sd-rail-accent);
+  transform-origin: left center;
+  transition: transform var(--sd-dur-enter) var(--sd-ease);
+}
+.sd-usage__plan {
+  padding: var(--sd-space-2) var(--sd-space-3);
+  border: 1px solid var(--sd-rail-border);
+  border-radius: var(--sd-radius-control);
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-rail-accent);
+}
+
+.sd-railbtn {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sd-space-2) var(--sd-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-control);
+  background: transparent;
+  color: var(--sd-rail-muted);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--sd-dur-fast) var(--sd-ease),
+    color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-railbtn:hover {
+    background: var(--sd-rail-hover);
+    color: var(--sd-rail-text);
+  }
+}
+.sd-railbtn__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+/* Appearance — three radios, not a menu, so the current mode is visible and
+   the choice is never behind an extra interaction. */
+.sd-appearance {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--sd-rail-border);
+  border-radius: var(--sd-radius-control);
+}
+.sd-appearance__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sd-rail-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--sd-dur-fast) var(--sd-ease),
+    color var(--sd-dur-fast) var(--sd-ease);
+}
+.sd-appearance__option[data-selected="true"] {
+  background: var(--sd-rail-active);
+  color: var(--sd-rail-accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-appearance__option:hover {
+    background: var(--sd-rail-hover);
+    color: var(--sd-rail-text);
+  }
+}
+
+/* ── Boot state — shown only while authorisation is resolving ──────────────*/
+
+.sd-app--boot {
+  align-items: center;
+  justify-content: center;
+}
+.sd-boot {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  color: var(--sd-text-muted);
+  font-size: var(--sd-text-small);
+}
+.sd-boot__mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--sd-accent);
+  animation: sd-pulse 1.4s var(--sd-ease) infinite;
+}
+
+/* ── Mobile drawer ─────────────────────────────────────────────────────────*/
+
+.sd-topbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+  min-height: 56px;
+  flex: 0 0 auto;
+  padding: var(--sd-space-2) var(--sd-space-3);
+  background: var(--sd-rail);
+  color: var(--sd-rail-text);
+  border-bottom: 1px solid var(--sd-rail-border);
+}
+.sd-topbar__spacer {
+  flex: 0 0 44px;
+}
+.sd-topbar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid var(--sd-rail-border);
+  border-radius: var(--sd-radius-control);
+  background: transparent;
+  color: var(--sd-rail-text);
+  cursor: pointer;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sd-topbar__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+}
+
+.sd-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(5, 24, 36, 0.5);
+  opacity: 0;
+  transition: opacity var(--sd-dur-drawer) var(--sd-ease);
+}
+.sd-scrim[data-open="true"] {
+  opacity: 1;
+}
+
+/* ── Workspace ─────────────────────────────────────────────────────────────*/
+
+/* The column beside the rail: an optional top bar, then the scrolling main. */
+.sd-column {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sd-workspace {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sd-canvas);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.sd-workspace:focus {
+  outline: none;
+}
+
+/* The single entrance. One group, one time, 8px. Content is fully present and
+   readable before it runs — this only softens arrival. */
+@keyframes sd-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sd-enter {
+  animation: sd-enter var(--sd-dur-enter) var(--sd-ease) both;
+}
+
+/* ── Overview page ─────────────────────────────────────────────────────────*/
+
+.sd-page {
+  width: 100%;
+  max-width: var(--sd-measure);
+  margin: 0 auto;
+  padding: var(--sd-space-8) var(--sd-space-6) var(--sd-space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-8);
+}
+
+.sd-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+}
+.sd-page__title {
+  margin: 0;
+  font-size: var(--sd-text-h1);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--sd-text);
+}
+.sd-page__meta {
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-h2 {
+  margin: 0;
+  font-size: var(--sd-text-h2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sd-text);
+}
+
+.sd-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-4);
+}
+.sd-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+}
+
+.sd-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-1);
+  min-height: 44px;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--sd-border-strong);
+  transition: border-color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-link:hover {
+    border-color: var(--sd-accent);
+  }
+}
+
+/* ── Status rail: the readiness signature ──────────────────────────────────
+   The one element on the page whose shape changes with the truth. When the
+   receptionist is configured it is a single confident line; when something is
+   outstanding it opens into the outstanding steps. */
+
+.sd-status {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+  box-shadow: var(--sd-shadow-1);
+  overflow: hidden;
+}
+.sd-status[data-state="answering"],
+.sd-status[data-state="configured"] {
+  background: var(--sd-surface-accent);
+  border-color: rgba(39, 233, 181, 0.3);
+}
+.sd-status[data-state="incomplete"] {
+  background: var(--sd-warn-surface);
+  border-color: var(--sd-warn-border);
+}
+.sd-status[data-state="unknown"] {
+  background: var(--sd-muted-surface);
+}
+
+.sd-status__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-5) var(--sd-space-5);
+}
+.sd-status__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--sd-accent);
+}
+.sd-status[data-state="incomplete"] .sd-status__dot {
+  background: var(--sd-warn);
+}
+.sd-status[data-state="unknown"] .sd-status__dot {
+  background: var(--sd-muted-text);
+}
+.sd-status__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.sd-status__title {
+  margin: 0;
+  font-size: var(--sd-text-h2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sd-text);
+}
+.sd-status__detail {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text-muted);
+}
+.sd-status[data-state="incomplete"] .sd-status__detail {
+  color: var(--sd-warn);
+}
+.sd-status__count {
+  flex: 0 0 auto;
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--sd-space-5) var(--sd-space-4);
+  display: flex;
+  flex-direction: column;
+}
+.sd-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-3) 0;
+  border-top: 1px solid var(--sd-warn-border);
+}
+.sd-step__mark {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--sd-warn);
+}
+.sd-step[data-done="true"] .sd-step__mark {
+  color: var(--sd-text-muted);
+}
+.sd-step__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sd-step__label {
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sd-step[data-done="true"] .sd-step__label {
+  font-weight: 500;
+  color: var(--sd-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--sd-border-strong);
+}
+.sd-step__detail {
+  margin: 2px 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+.sd-status__foot {
+  padding: 0 var(--sd-space-5) var(--sd-space-5);
+}
+.sd-step__action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--sd-space-3);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-accent);
+  color: var(--sd-accent-ink);
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform var(--sd-dur-fast) var(--sd-ease),
+    box-shadow var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-step__action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(5, 24, 36, 0.14);
+  }
+}
+.sd-step__action:active {
+  transform: translateY(0);
+}
+
+/* ── Attention list — only real, actionable problems ───────────────────────*/
+
+.sd-attention {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+}
+.sd-attention__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-4) var(--sd-space-5);
+  border: 1px solid var(--sd-warn-border);
+  border-left-width: 3px;
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-warn-surface);
+}
+.sd-attention__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--sd-warn);
+}
+.sd-attention__body {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.sd-attention__title {
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sd-attention__detail {
+  margin: 2px 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.5;
+  color: var(--sd-warn);
+}
+.sd-attention__action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--sd-space-4);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface);
+  color: var(--sd-text);
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-attention__action:hover {
+    border-color: var(--sd-text);
+  }
+}
+
+/* ── Figure row — numbers without boxes ────────────────────────────────────
+   Deliberately not four cards. The figures sit on the canvas, separated by
+   hairlines, so the page reads as an instrument rather than a card grid. */
+
+.sd-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--sd-border);
+  border-bottom: 1px solid var(--sd-border);
+}
+.sd-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+  padding: var(--sd-space-5) var(--sd-space-5) var(--sd-space-5) 0;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sd-figure + .sd-figure {
+  padding-left: var(--sd-space-5);
+  border-left: 1px solid var(--sd-border);
+}
+@media (hover: hover) and (pointer: fine) {
+  a.sd-figure:hover {
+    background: var(--sd-surface-alt);
+  }
+}
+.sd-figure__value {
+  align-self: flex-start;
+  font-size: var(--sd-text-figure);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text);
+}
+/* Emphasis is a short mint rule under the numeral itself, not a coloured
+   numeral and not a full-width bar — the number keeps full contrast and the
+   accent stays the size of the thing it marks. */
+.sd-figure[data-emphasis="true"][data-nonzero="true"] .sd-figure__value {
+  padding-bottom: 3px;
+  border-bottom: 3px solid var(--sd-accent);
+}
+.sd-figure__value[data-empty="true"] {
+  font-size: var(--sd-text-body);
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0;
+  color: var(--sd-text-muted);
+}
+.sd-figure__label {
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+
+/* ── Conversation list ─────────────────────────────────────────────────────*/
+
+.sd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+  box-shadow: var(--sd-shadow-1);
+  overflow: hidden;
+}
+.sd-list__item + .sd-list__item {
+  border-top: 1px solid var(--sd-border);
+}
+.sd-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  min-height: 56px;
+  padding: var(--sd-space-3) var(--sd-space-4);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-row:hover {
+    background: var(--sd-surface-alt);
+  }
+}
+.sd-row__who {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd-row__when {
+  flex: 0 0 auto;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tier chips. Mint is reserved for Hot — the one tier that means act now.
+   Every other tier is neutral, so the accent keeps its meaning. */
+.sd-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sd-space-2);
+  border-radius: 999px;
+  border: 1px solid var(--sd-border-strong);
+  background: transparent;
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sd-text-muted);
+  white-space: nowrap;
+}
+.sd-chip[data-tier="Hot"] {
+  background: var(--sd-accent);
+  border-color: transparent;
+  color: var(--sd-accent-ink);
+}
+.sd-chip[data-tier="Needs Review"] {
+  border-color: var(--sd-warn-border);
+  color: var(--sd-warn);
+}
+
+/* ── Capability ladder — the product-readiness statement ───────────────────*/
+
+.sd-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface-alt);
+  overflow: hidden;
+}
+.sd-ladder__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sd-space-2) var(--sd-space-3);
+  padding: var(--sd-space-3) var(--sd-space-4);
+}
+.sd-ladder__item + .sd-ladder__item {
+  border-top: 1px solid var(--sd-border);
+}
+.sd-ladder__name {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 500;
+  color: var(--sd-text);
+}
+.sd-ladder__item[data-tier="planned"] .sd-ladder__name,
+.sd-ladder__item[data-tier="in-development"] .sd-ladder__name {
+  color: var(--sd-muted-text);
+}
+/* The tier chip is the only status signal, and it is a word — never a colour
+   alone, and never a control that looks operable. */
+.sd-tier {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sd-space-2);
+  border-radius: 999px;
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--sd-border-strong);
+  background: var(--sd-muted-surface);
+  color: var(--sd-muted-text);
+  white-space: nowrap;
+}
+.sd-tier[data-tier="available"] {
+  background: var(--sd-accent);
+  border-color: transparent;
+  color: var(--sd-accent-ink);
+}
+
+/* ── Empty, loading and error ──────────────────────────────────────────────*/
+
+.sd-empty {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+  padding: var(--sd-space-8) var(--sd-space-5);
+  text-align: center;
+}
+.sd-empty__title {
+  margin: 0;
+  font-size: var(--sd-text-h2);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sd-empty__detail {
+  margin: var(--sd-space-2) auto 0;
+  max-width: 32rem;
+  font-size: var(--sd-text-small);
+  line-height: 1.6;
+  color: var(--sd-text-muted);
+}
+
+.sd-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-4) var(--sd-space-5);
+  border: 1px solid var(--sd-danger-border);
+  border-left-width: 3px;
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-danger-surface);
+}
+.sd-error__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--sd-danger);
+}
+.sd-error__body {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.sd-error__title {
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sd-error__detail {
+  margin: 2px 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.5;
+  color: var(--sd-danger);
+}
+.sd-error__action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--sd-space-4);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface);
+  color: var(--sd-text);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sd-error__action:hover {
+    border-color: var(--sd-text);
+  }
+}
+
+/* Skeletons. A calm opacity pulse — no shimmer sweep, because a moving
+   highlight animates background-position and implies progress that is not
+   being measured. */
+@keyframes sd-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.sd-skel {
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-border);
+  animation: sd-pulse 1.6s var(--sd-ease) infinite;
+}
+.sd-skel--title {
+  height: 1.75rem;
+  width: 12rem;
+}
+.sd-skel--status {
+  height: 5.5rem;
+  border-radius: var(--sd-radius-card);
+}
+.sd-skel--figures {
+  height: 5.5rem;
+}
+.sd-skel--list {
+  height: 17.5rem;
+  border-radius: var(--sd-radius-card);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────*/
+
+@media (max-width: 63.99rem) {
+  .sd-topbar {
+    display: flex;
+  }
+  .sd-rail {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    height: 100%;
+    width: min(var(--sd-rail-width), 88vw);
+    flex-basis: auto;
+    transform: translateX(-100%);
+    transition: transform var(--sd-dur-drawer) var(--sd-ease);
+  }
+  .sd-rail[data-open="true"] {
+    transform: translateX(0);
+  }
+  /* A closed drawer is removed from the accessibility tree and the tab order
+     by `inert` on the element itself; this only stops it painting. */
+  .sd-rail[data-open="false"] {
+    visibility: hidden;
+    transition:
+      transform var(--sd-dur-drawer) var(--sd-ease),
+      visibility 0s linear var(--sd-dur-drawer);
+  }
+  .sd-page {
+    padding: var(--sd-space-6) var(--sd-space-4) var(--sd-space-8);
+    gap: var(--sd-space-6);
+  }
+}
+
+@media (max-width: 40rem) {
+  .sd-figures {
+    grid-template-columns: 1fr;
+  }
+  .sd-figure {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sd-space-4);
+    padding: var(--sd-space-4) 0;
+  }
+  .sd-figure + .sd-figure {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--sd-border);
+  }
+  .sd-figure__value {
+    order: 2;
+  }
+  .sd-status__head {
+    padding: var(--sd-space-4);
+  }
+  .sd-steps {
+    padding: 0 var(--sd-space-4) var(--sd-space-3);
+  }
+  .sd-status__foot {
+    padding: 0 var(--sd-space-4) var(--sd-space-4);
+  }
+  .sd-step__action {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* When the viewport is short — a phone in landscape, or 200% zoom — the rail
+   scrolls rather than clipping its footer. */
+@media (max-height: 34rem) {
+  .sd-rail {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+   Every non-essential movement is removed. The drawer still changes state
+   instantly, the skeleton still reads as a placeholder, and nothing depends
+   on an animation having played. */
+@media (prefers-reduced-motion: reduce) {
+  .sd-app *,
+  .sd-app *::before,
+  .sd-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .sd-enter {
+    animation: none;
+  }
+  .sd-skel {
+    animation: none;
+    opacity: 0.75;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .sd-step__action:hover {
+      transform: none;
+    }
+  }
+}
+
+/* ── Forced colours ────────────────────────────────────────────────────────*/
+@media (forced-colors: active) {
+  .sd-navlink[aria-current="page"]::before {
+    background: Highlight;
+  }
+  .sd-chip,
+  .sd-tier {
+    border: 1px solid CanvasText;
+  }
+}
