@@ -9,6 +9,9 @@
 @import "./styles/v2-shell.css";
 /* Frontend V2 Phase 3: homepage presentation, same token-only rules. */
 @import "./styles/v2-home.css";
+/* Frontend V2 Phase 4: AI Receptionist landing presentation. Namespaced
+   `air-*`, and consumes the shared `.v2-*` roles rather than restating them. */
+@import "./styles/v2-air.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";

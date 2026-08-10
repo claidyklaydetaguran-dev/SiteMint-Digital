@@ -1,0 +1,561 @@
+/**
+ * Frontend V2 Phase 4 — AI Receptionist landing presentation.
+ *
+ * Every value is a `--v2-*` token: no new colour, no new font, no new scale
+ * step, no remote request, no gradient, no glass, no radius above 16px, and no
+ * shadow used decoratively. The page shares the homepage's editorial rules —
+ * the mint eyebrow rule, the 8-point spacing, the hairline borders — so it
+ * reads as the same publication, and earns its own identity from one
+ * composition rather than a second aesthetic.
+ *
+ * Namespaced `air-*` so nothing here can reach the homepage or the shell.
+ * Where a role already exists (`.v2-h2`, `.v2-tier`, `.v2-btn`, `.v2-faq`),
+ * this file consumes it instead of restating it.
+ *
+ * Motion: none is introduced. The page has no entrance animation, no scroll
+ * effect, and no continuous motion. The only transitions are the token-defined
+ * ones already carried by `.v2-btn`.
+ */
+
+/* ── Hero ───────────────────────────────────────────────────────────────────
+   Single column rather than the homepage's two-column split: the readiness
+   ledger is the anchor, and giving it the full measure is what puts the honest
+   status of the product above the fold instead of beside it. */
+
+.air-hero {
+  background: var(--v2-color-canvas);
+}
+
+.air-hero__title {
+  max-width: 20ch;
+}
+
+.air-hero__lede {
+  font-size: var(--v2-text-body-xl);
+  max-width: 60ch;
+}
+
+.air-hero__actions {
+  margin-top: var(--v2-space-8);
+}
+
+/* ── Readiness ledger ───────────────────────────────────────────────────────
+   A hairline-ruled row, not three cards. The available capability is given
+   visual weight the other two are not: a mint spine, a heavier name, and the
+   solid chip. Availability is never carried by colour alone — the chip text
+   states the tier in every case. */
+
+.air-ledger {
+  margin-top: var(--v2-space-16);
+  border-top: var(--v2-border-width) solid var(--v2-color-border-strong);
+  padding-top: var(--v2-space-6);
+}
+
+.air-ledger__title {
+  margin: 0 0 var(--v2-space-6);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.air-ledger__list {
+  display: grid;
+  gap: var(--v2-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.air-ledger__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--v2-space-2);
+  padding-left: var(--v2-space-4);
+  border-left: 2px solid var(--v2-color-border);
+}
+
+.air-ledger__item--available {
+  border-left-color: var(--v2-color-action);
+}
+
+.air-ledger__name {
+  margin: 0;
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+.air-ledger__note {
+  margin: 0;
+  max-width: 42ch;
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+@media (min-width: 768px) {
+  .air-ledger__list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--v2-space-6);
+  }
+}
+
+/* ── Five core jobs ─────────────────────────────────────────────────────────
+   A specification list: term on the left, plain description on the right,
+   hairline between rows. The in-development row is deliberately quieter — its
+   name is muted and its chip is outlined — so the shipped four never read as
+   equal to the one that is not built. */
+
+.air-jobs {
+  margin: 0;
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.air-jobs__row {
+  display: grid;
+  gap: var(--v2-space-2);
+  padding-block: var(--v2-space-6);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.air-jobs__term {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-3);
+  margin: 0;
+}
+
+.air-jobs__name {
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+.air-jobs__row--in-development .air-jobs__name,
+.air-jobs__row--planned .air-jobs__name {
+  color: var(--v2-color-text-muted);
+}
+
+.air-jobs__desc {
+  margin: 0;
+  max-width: var(--v2-measure);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+@media (min-width: 768px) {
+  .air-jobs__row {
+    grid-template-columns: 16rem 1fr;
+    gap: var(--v2-space-8);
+    align-items: baseline;
+  }
+
+  .air-jobs__term {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--v2-space-2);
+  }
+}
+
+/* ── The response trail ─────────────────────────────────────────────────────
+   One continuous rail, with people on one side of it and the receptionist on
+   the other, so the trail visibly opens and closes on the human side. The rail
+   is a 1px rule, not a graphic; the nodes sit on it; the last node is filled
+   navy because that is the moment the system stops and a person takes over. */
+
+.air-trail__disclaimer {
+  margin: var(--v2-space-4) 0 0;
+  max-width: var(--v2-measure);
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+.air-trail {
+  position: relative;
+  margin: var(--v2-space-12) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--v2-space-12);
+}
+
+/* The rail. Inset top and bottom so it begins and ends at a node rather than
+   running off into the section padding. */
+.air-trail::before {
+  content: "";
+  position: absolute;
+  top: var(--v2-space-6);
+  bottom: var(--v2-space-6);
+  left: 1.25rem;
+  width: var(--v2-border-width);
+  background: var(--v2-color-border-strong);
+}
+
+.air-trail__stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: var(--v2-space-4);
+  align-items: start;
+}
+
+.air-trail__marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+
+.air-trail__node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  border-radius: 50%;
+  border: var(--v2-border-width) solid var(--v2-color-border-strong);
+  background: var(--v2-color-surface);
+  color: var(--v2-color-text);
+}
+
+.air-trail__node-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* The handoff node is the one filled marker on the page — the composition's
+   full stop. */
+.air-trail__stage--handoff .air-trail__node {
+  background: var(--v2-navy-900);
+  border-color: var(--v2-navy-900);
+  color: var(--v2-white);
+}
+
+.air-trail__index {
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  color: var(--v2-color-text-muted);
+}
+
+.air-trail__panel {
+  min-width: 0;
+}
+
+.air-trail__role {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.air-trail__title {
+  margin-bottom: var(--v2-space-4);
+}
+
+/* Example messages are editorial pull-quotes under a visible label — never
+   chat bubbles, and never presented as a real conversation. */
+.air-trail__example {
+  margin: 0 0 var(--v2-space-4);
+  padding-left: var(--v2-space-4);
+  border-left: 2px solid var(--v2-color-action);
+}
+
+.air-trail__example-label {
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.air-trail__quote {
+  margin: var(--v2-space-2) 0 0;
+}
+
+.air-trail__quote p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--v2-text-body-lg);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text);
+}
+
+.air-trail__body {
+  margin-bottom: var(--v2-space-4);
+}
+
+/* Inline flow rather than a flex row: the label is a run-in prefix to the
+   sentence, so a long state line wraps as ordinary text instead of stranding
+   the label alone on its own line, and it inherits the panel's alignment on
+   the mirrored side without any extra rule. */
+.air-trail__state {
+  margin: 0;
+  padding-top: var(--v2-space-3);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+  max-width: var(--v2-measure);
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+.air-trail__state-label {
+  margin-right: var(--v2-space-2);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text);
+}
+
+/* Desktop: the rail moves to the centre and the panels alternate across it, so
+   the direction of the exchange is spatial. */
+@media (min-width: 1024px) {
+  .air-trail::before {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .air-trail__stage {
+    grid-template-columns: 1fr 5rem 1fr;
+    gap: 0;
+    align-items: center;
+  }
+
+  .air-trail__marker {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .air-trail__panel {
+    grid-row: 1;
+  }
+
+  .air-trail__stage[data-side="human"] .air-trail__panel {
+    grid-column: 1;
+    padding-right: var(--v2-space-8);
+    text-align: right;
+  }
+
+  /* Mirrored so the lead's side reads inward toward the rail. */
+  .air-trail__stage[data-side="human"] .air-trail__example {
+    padding-left: 0;
+    padding-right: var(--v2-space-4);
+    border-left: 0;
+    border-right: 2px solid var(--v2-color-action);
+  }
+
+  .air-trail__stage[data-side="human"] .air-trail__quote p,
+  .air-trail__stage[data-side="human"] .air-trail__body {
+    margin-left: auto;
+  }
+
+  .air-trail__stage[data-side="human"] .air-trail__state {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .air-trail__stage[data-side="system"] .air-trail__panel {
+    grid-column: 3;
+    padding-left: var(--v2-space-8);
+  }
+}
+
+/* ── The boundary of the shipped path ───────────────────────────────────────
+   Part of the signature, not a disclaimer beneath it: the trail's honest limit
+   is drawn inside the same composition. */
+
+.air-boundary {
+  margin-top: var(--v2-space-16);
+  padding: var(--v2-space-8);
+  border: var(--v2-border-width) solid var(--v2-color-border-strong);
+  border-radius: var(--v2-radius-card);
+  background: var(--v2-color-surface-alt);
+}
+
+.air-boundary__title {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+.air-boundary__intro {
+  margin-bottom: var(--v2-space-8);
+}
+
+.air-boundary__list {
+  display: grid;
+  gap: var(--v2-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.air-boundary__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-3);
+  margin-bottom: var(--v2-space-2);
+}
+
+.air-boundary__name {
+  margin: 0;
+  font-size: var(--v2-text-body);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+@media (min-width: 768px) {
+  .air-boundary__list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── Human control — the single navy section. ───────────────────────────── */
+
+.air-control__list {
+  display: grid;
+  gap: var(--v2-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.air-control__item {
+  padding-top: var(--v2-space-6);
+  border-top: var(--v2-border-width) solid rgba(255, 255, 255, 0.24);
+}
+
+.air-control__name {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text-on-feature);
+}
+
+.air-control__body {
+  margin: 0;
+  max-width: var(--v2-measure);
+  line-height: var(--v2-leading-body);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+@media (min-width: 768px) {
+  .air-control__list {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--v2-space-8) var(--v2-space-12);
+  }
+}
+
+/* ── Business scenarios ─────────────────────────────────────────────────── */
+
+.air-scenarios {
+  display: grid;
+  gap: var(--v2-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.air-scenarios__item {
+  padding-top: var(--v2-space-4);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.air-scenarios__sector {
+  margin: 0 0 var(--v2-space-2);
+  font-size: var(--v2-text-body);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+@media (min-width: 768px) {
+  .air-scenarios {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--v2-space-8) var(--v2-space-12);
+  }
+}
+
+@media (min-width: 1024px) {
+  .air-scenarios {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── What it connects to ────────────────────────────────────────────────── */
+
+.air-prose {
+  margin: 0 0 var(--v2-space-4);
+  max-width: var(--v2-measure);
+  line-height: var(--v2-leading-body);
+}
+
+.air-prose__tier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-3);
+  margin-top: var(--v2-space-6);
+  margin-bottom: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-color-text-muted);
+}
+
+/* ── Setup ──────────────────────────────────────────────────────────────────
+   Numbered because these genuinely are ordered: the questions cannot be set
+   before the business is described. */
+
+.air-setup {
+  display: grid;
+  gap: var(--v2-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.air-setup__step {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: var(--v2-space-4);
+  align-items: start;
+  padding-top: var(--v2-space-4);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.air-setup__num {
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  color: var(--v2-color-text-muted);
+}
+
+@media (min-width: 768px) {
+  .air-setup {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--v2-space-8) var(--v2-space-12);
+  }
+}
+
+/* ── Final CTA ──────────────────────────────────────────────────────────── */
+
+.air-cta__actions {
+  justify-content: center;
+  margin-top: var(--v2-space-8);
+}
