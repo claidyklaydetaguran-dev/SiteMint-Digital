@@ -46,6 +46,8 @@ import {
   isSelectableDay,
   monthRange,
   nextView,
+  publicLinkActions,
+  publicLinkUrlVisible,
   publicScheduleUrl,
   requestStateLabel,
   requestStateTone,
@@ -419,7 +421,7 @@ const MUTATIONS: [string, string, RegExp, RegExp][] = [
   ["request submit", calendarCode, /const handleSubmit = useCallback\(async \(\) => \{[\s\S]*?\}, \[/, /submitMutation\.isPending\) return;/],
   ["cancel", listCode, /const confirmCancel = useCallback\(async \(id: string\) => \{[\s\S]*?\}, \[/, /if \(pendingId !== null\) return;/],
   ["config save", formCode, /const handleSave = useCallback\(async \(\) => \{[\s\S]*?\}, \[/, /save === "pending"\) return;/],
-  ["public link", formCode, /const set = useCallback\(async \(enabled: boolean\) => \{[\s\S]*?\}, \[/, /state === "pending"\) return;/],
+  ["public link", formCode, /const set = useCallback\(async \(enabled: boolean\) => \{[\s\S]*?\}, \[/, /if \(pending !== null\) return;/],
 ];
 
 for (const [name, src, body, guard] of MUTATIONS) {
@@ -674,6 +676,80 @@ check(
   /className="sa-announce" role="status" aria-live="polite"/.test(listCode.replace(/\s+/g, " ")),
 );
 
+/* ── The complete successful-cancellation sequence ──────────────────────────
+   Owner review found a frame announcing "Request cancelled." while the affected
+   row still read "Pending review" and still offered "Cancel request". The cause
+   was the QA fixture, whose requests GET replayed a pristine list and so never
+   reflected the write; the production path does move the row
+   (`cancelAppointmentRequestByPublicId` sets status "cancelled", and the list
+   route serialises that status). These assertions pin every link in the chain
+   that has to hold for the rendered result to match the announcement. */
+
+check(
+  "step 1 — the row control only opens the confirmation, it never posts",
+  /onClick=\{\(\) => askToCancel\(req\.id\)\}/.test(listCode) &&
+    /const askToCancel = \(id: string\) => \{[\s\S]{0,200}setConfirming\(id\);/.test(listCode) &&
+    !/const askToCancel[\s\S]{0,200}mutateAsync/.test(listCode),
+);
+
+check(
+  "step 2 — exactly one POST is issued, and only from the confirm control",
+  (listCode.match(/cancelMutation\.mutateAsync\(/g) ?? []).length === 1 &&
+    /onClick=\{\(\) => confirmCancel\(req\.id\)\}/.test(listCode),
+);
+
+check(
+  "step 3 — success is recorded only after the POST resolves, never optimistically",
+  /await cancelMutation\.mutateAsync\(id\);\s*setOutcome\(\{ kind: "cancelled" \}\);/.test(listCode) &&
+    !/onMutate|setQueryData|optimistic/i.test(listCode),
+);
+
+check(
+  "step 4 — success invalidates the requests query, so a refetch must follow",
+  /mutationFn: \(id: string\) => cancelAppointmentRequest\(id\)/.test(hooksSrc) &&
+    /onSuccess: \(\) => \{\s*if \(firmId !== undefined\) qc\.invalidateQueries\(\{ queryKey: \[ROOT, "requests", firmId\] \}\);/
+      .test(hooksSrc),
+);
+
+check(
+  "step 5 — the rows rendered are the refetched ones, held in no local copy",
+  /const items = data\?\.items \?\? \[\];/.test(listCode) &&
+    !/useState[^\n]*items|setItems\(/.test(listCode),
+);
+
+check(
+  "step 6 — a row's status is the server's state, never the local outcome",
+  /\{requestStateLabel\(req\.state\)\}/.test(listCode) &&
+    !/outcome[\s\S]{0,80}requestStateLabel|requestStateLabel\([^)]*outcome/.test(listCode),
+);
+
+eq(
+  "step 7 — a refetched cancelled row reads Cancelled and offers no cancellation",
+  { label: requestStateLabel("cancelled"), cancellable: canCancel("cancelled") },
+  { label: "Cancelled", cancellable: false },
+);
+
+check(
+  "step 7 — the row's cancel control is gated on that same predicate",
+  /\{canCancel\(req\.state\) && !open && \(/.test(listCode),
+);
+
+check(
+  "the success announcement carries no action the product cannot perform",
+  REQUESTS.cancelledAnnouncement === "Request cancelled." &&
+    !/notif|calendar|email|text|sms|refund|inform|told|let them know/i
+      .test(REQUESTS.cancelledAnnouncement) &&
+    /Nobody is told, and nothing else changes\./.test(REQUESTS.cancelConfirmDetail),
+);
+
+check(
+  "a 404 stays a distinct outcome and never renders the success sentence",
+  /status === 404 \? "missing" : "failed"/.test(listCode) &&
+    /outcome\.kind === "cancelled" \? REQUESTS\.cancelledAnnouncement/.test(listCode) &&
+    REQUESTS.cancelMissingTitle !== REQUESTS.cancelledAnnouncement &&
+    /Nothing changed\./.test(REQUESTS.cancelMissingDetail),
+);
+
 check(
   "no approve, confirm, reject, reschedule, assign, remind, export, note, filter or search control exists",
   !/>\s*(Approve|Confirm|Reject|Decline|Reschedule|Assign|Add to calendar|Send reminder|Remind|Email client|Text client|Export|Add note|Filter|Search)\b/i
@@ -789,19 +865,146 @@ section("Public link — no read endpoint, so no guessed state");
 
 check(
   "the initial state is unknown rather than a guessed off position",
-  /useState<PublicLinkState>\("unknown"\)/.test(formCode) &&
+  /useState<PublicLinkKnownState>\("unknown"\)/.test(formCode) &&
     /PUBLIC_LINK\.unknownDetail/.test(formCode),
 );
 
 check(
+  "the unknown state says plainly that the current position cannot be read",
+  /can't read whether the link is currently on/.test(PUBLIC_LINK.unknownDetail),
+);
+
+/* ── Which commands are offered, per known state ─────────────────────────────
+   The owner-review defect: both "Turn on public link" and "Turn off public
+   link" stayed on screen after the server had established the state, so the
+   section kept asking a question it already had the answer to. */
+
+eq(
+  "unknown offers both state-setting commands, since neither position is known",
+  publicLinkActions("unknown"),
+  { enable: true, disable: true },
+);
+eq(
+  "a known enabled state offers only the command that turns it off",
+  publicLinkActions("enabled"),
+  { enable: false, disable: true },
+);
+eq(
+  "a known disabled state offers only the command that turns it on",
+  publicLinkActions("disabled"),
+  { enable: true, disable: false },
+);
+
+check(
+  "the rendered commands are driven by that function, not by both being fixed",
+  /const actions = publicLinkActions\(known\)/.test(formCode) &&
+    /\{actions\.enable && \(/.test(formCode) &&
+    /\{actions\.disable && \(/.test(formCode),
+);
+
+check(
+  "each command names the state it sets rather than toggling an unknown one",
+  PUBLIC_LINK.enableLabel === "Turn on public link" &&
+    PUBLIC_LINK.disableLabel === "Turn off public link" &&
+    /role="group" aria-label=\{PUBLIC_LINK\.commandsLabel\}/.test(formCode),
+);
+
+check(
+  "neither command is styled as the recommended one",
+  (() => {
+    const group = /<div className="sa-link__actions"[\s\S]*?<\/div>/.exec(formCode)?.[0] ?? "";
+    const classes = [...group.matchAll(/className="(sa-button[^"]*)"/g)].map((m) => m[1]);
+    return classes.length === 2 && classes.every((c) => c === "sa-button");
+  })(),
+);
+
+/* ── The URL follows the state, and only the server's slug ─────────────────── */
+
+check(
+  "a URL is shown only in a known enabled state that carries a server slug",
+  publicLinkUrlVisible("enabled", "hv-3k9qp2r7") &&
+    !publicLinkUrlVisible("disabled", "hv-3k9qp2r7") &&
+    !publicLinkUrlVisible("unknown", "hv-3k9qp2r7") &&
+    !publicLinkUrlVisible("enabled", null) &&
+    !publicLinkUrlVisible("enabled", "   "),
+);
+
+check(
+  "the disabled state drops the slug, so no URL can outlive it",
+  /setSlug\(res\.enabled \? res\.slug : null\)/.test(formCode),
+);
+
+check(
   "the slug is only ever the one the server returned",
-  /setSlug\(res\.slug\)/.test(formCode) &&
+  /setSlug\(res\.enabled \? res\.slug : null\)/.test(formCode) &&
     !/Math\.random|crypto\.randomUUID|slugify|toLowerCase\(\)\.replace/.test(formCode),
+);
+
+eq(
+  "a server slug becomes a URL under the configured prefix",
+  publicScheduleUrl("http://x", "/ai-receptionist/dashboard/appointments", "hv-3k9qp2r7"),
+  "http://x/ai-receptionist/dashboard/schedule/hv-3k9qp2r7",
+);
+eq(
+  "no slug means no URL, under any base",
+  [publicScheduleUrl("http://x", "/appointments", null),
+   publicScheduleUrl("http://x", "/appointments", "")],
+  [null, null],
 );
 
 check(
   "no copy, share or email affordance was invented for the link",
   !/clipboard|navigator\.share|mailto:|Copy link|Share link/i.test(formCode),
+);
+
+/* ── Mutation behaviour ────────────────────────────────────────────────────── */
+
+check(
+  "one PUT per explicit activation, guarded against a second while in flight",
+  /if \(pending !== null\) return;/.test(formCode) &&
+    (formCode.match(/linkMutation\.mutateAsync\(/g) ?? []).length === 1,
+);
+
+check(
+  "no mutation is reachable from render, mount, view change, focus or animation",
+  !/useEffect\([\s\S]{0,300}linkMutation/.test(formCode) &&
+    !/onFocus=|onAnimation|onTransition/.test(formCode) &&
+    /onClick=\{\(\) => set\(true\)\}/.test(formCode) &&
+    /onClick=\{\(\) => set\(false\)\}/.test(formCode),
+);
+
+check(
+  "the command being written is disabled and marked busy while it runs",
+  /disabled=\{pending !== null\}/.test(formCode) &&
+    /aria-busy=\{pending === true\}/.test(formCode) &&
+    /aria-busy=\{pending === false\}/.test(formCode) &&
+    /pending === true \? PUBLIC_LINK\.pendingLabel/.test(formCode) &&
+    /pending === false \? PUBLIC_LINK\.pendingLabel/.test(formCode),
+);
+
+check(
+  "nothing about the public link retries automatically",
+  !/retry|setTimeout\([\s\S]{0,80}set\(/.test(formCode),
+);
+
+check(
+  "a failure preserves the last truthful known state instead of replacing it",
+  // `setFailed(true)` alone in the catch — `known` and `slug` are untouched, so
+  // the state the server last established is still what is displayed.
+  /catch \{\s*setFailed\(true\);\s*\}/.test(formCode) &&
+    !/catch \{[\s\S]{0,120}setKnown\(/.test(formCode) &&
+    !/catch \{[\s\S]{0,120}setSlug\(/.test(formCode),
+);
+
+check(
+  "the pending flag is always cleared, success or failure",
+  /finally \{\s*setPending\(null\);\s*\}/.test(formCode),
+);
+
+check(
+  "success and failure are both announced through a polite live region",
+  /className="sa-announce"\s+role="status"\s+aria-live="polite"/.test(formCode) &&
+    /hidden=\{state === "unknown" \|\| state === "pending"\}/.test(formCode),
 );
 
 check(
@@ -955,6 +1158,64 @@ check(
       const block = cssCode.slice(at, cssCode.indexOf("}", at));
       return /min-height: 44px|min-width: 44px/.test(block);
     });
+  })(),
+);
+
+/* ── Empty states ───────────────────────────────────────────────────────────
+   Owner review found a stray empty dashed rectangle beside the "No appointment
+   types yet" copy: `.sa-empty` was a full-measure dashed box with centred text,
+   so most of it was blank ruled space that read as a missing tile or a drop
+   target. It is now sized to its words. */
+
+check(
+  "an empty state is a card sized to its content, not a full-measure box",
+  (() => {
+    const at = cssCode.indexOf(".sa-empty {");
+    if (at === -1) return false;
+    const block = cssCode.slice(at, cssCode.indexOf("}", at));
+    return /border: 1px solid var\(--sd-border\)/.test(block) &&
+      !/dashed|dotted/.test(block) &&
+      /max-width:/.test(block) &&
+      /text-align: left/.test(block);
+  })(),
+);
+
+check(
+  "no dashed or dotted rule is drawn anywhere in this stylesheet",
+  !/border[^;:]*:\s*[^;]*\b(dashed|dotted)\b/.test(cssCode),
+);
+
+check(
+  "an empty state contains only real text — no icon slot, asset or placeholder",
+  (() => {
+    // Both empty states in this route, taken from source rather than trusted.
+    const blocks = (calendarCode + listCode).match(/<section className="sa-empty"[\s\S]*?<\/section>/g) ?? [];
+    return blocks.length === 2 && blocks.every((b) =>
+      !/<img|<svg|<i\b|<picture|<canvas|aria-hidden="true"|Icon|placeholder|&nbsp;/i.test(b) &&
+      /sa-empty__title/.test(b) && /sa-empty__detail/.test(b) &&
+      // Nothing but the title and the detail.
+      (b.match(/<(div|span|p|h2)\b/g) ?? []).length === 2);
+  })(),
+);
+
+check(
+  "the empty booking preview names the exact place an appointment type is added",
+  PREVIEW.noTypesTitle === "No appointment types yet" &&
+    /Add one under Availability\./.test(PREVIEW.noTypesDetail) &&
+    views().some((v) => v.label === "Availability"),
+);
+
+check(
+  "the empty state inherits theme, motion and zoom behaviour from shell tokens",
+  (() => {
+    const at = cssCode.indexOf(".sa-empty {");
+    const block = cssCode.slice(at, cssCode.indexOf("}", at));
+    // rem sizing and shell surface/border tokens: light, dark, zoom and
+    // reduced motion are then all the shell's existing behaviour.
+    return /background: var\(--sd-surface\)/.test(block) &&
+      /max-width: \d+(\.\d+)?rem/.test(block) &&
+      !/px\)/.test(block.replace(/1px solid/, "")) &&
+      !/animation|transition/.test(block);
   })(),
 );
 

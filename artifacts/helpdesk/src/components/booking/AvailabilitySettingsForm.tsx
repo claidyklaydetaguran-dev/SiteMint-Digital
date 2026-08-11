@@ -33,10 +33,13 @@ import {
   WEEKDAY_NAMES,
   calendarCopy,
   fieldForError,
+  publicLinkActions,
+  publicLinkUrlVisible,
   publicScheduleUrl,
   saveErrorDetail,
   type CalendarState,
   type ConfigField,
+  type PublicLinkKnownState,
   type PublicLinkState,
 } from "@/pages/appointments/appointmentsContract";
 
@@ -434,76 +437,116 @@ function CalendarConnection() {
 }
 
 /**
- * `PUT .../public-link` is the only endpoint; there is no GET. So the current
- * state is genuinely unknown on arrival and is described that way. The slug is
- * server-generated and is never invented, guessed or derived here — without one
- * from a response there is no URL to show.
+ * `PUT .../public-link` is the only endpoint; there is no GET.
+ *
+ * So the section has three honest positions, not two. On arrival the state is
+ * genuinely unknown: it says so, and offers both commands — each named for the
+ * state it sets, neither drawn as a toggle sitting in a guessed position. Once
+ * a response has established the state, that becomes the only thing shown, and
+ * only the command that would change it remains.
+ *
+ * A failure does not become a fourth position. Nothing was observed to change,
+ * so the last state the server established survives and is still displayed
+ * beneath the failure sentence — losing it would turn a failed write into a
+ * second, silent loss of knowledge.
+ *
+ * The slug is server-generated and is never invented, guessed or derived here.
+ * It is dropped the moment the link is turned off, so a stale URL can never
+ * outlive the state that made it real.
  */
 function PublicLink() {
   const linkMutation = useSetPublicSchedulingLink();
-  const [state, setState] = useState<PublicLinkState>("unknown");
+  const [known, setKnown] = useState<PublicLinkKnownState>("unknown");
   const [slug, setSlug] = useState<string | null>(null);
+  // The value being written, or null when nothing is in flight. Holding the
+  // value rather than a boolean lets the pending label sit on the one command
+  // that was activated.
+  const [pending, setPending] = useState<boolean | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const set = useCallback(async (enabled: boolean) => {
-    if (state === "pending") return;
-    setState("pending");
+    if (pending !== null) return;
+    setPending(enabled);
+    setFailed(false);
     try {
       const res = await linkMutation.mutateAsync(enabled);
-      setSlug(res.slug);
-      setState(res.enabled ? "enabled" : "disabled");
+      // The server's answer is the only thing that moves the known state.
+      setSlug(res.enabled ? res.slug : null);
+      setKnown(res.enabled ? "enabled" : "disabled");
     } catch {
-      setState("failed");
+      setFailed(true);
+    } finally {
+      setPending(null);
     }
-  }, [linkMutation, state]);
+  }, [linkMutation, pending]);
 
-  const url = typeof window === "undefined"
+  const actions = publicLinkActions(known);
+  const showUrl = publicLinkUrlVisible(known, slug);
+  const url = !showUrl || typeof window === "undefined"
     ? null
     : publicScheduleUrl(window.location.origin, window.location.pathname, slug);
+
+  const state: PublicLinkState = pending !== null ? "pending" : failed ? "failed" : known;
 
   return (
     <section className="sa-section sa-section--ruled" aria-labelledby="sa-link-h">
       <h2 className="sa-section__title" id="sa-link-h">{PUBLIC_LINK.heading}</h2>
       <p className="sa-section__help">{PUBLIC_LINK.detail}</p>
-      {state === "unknown" && <p className="sa-section__help">{PUBLIC_LINK.unknownDetail}</p>}
+      {known === "unknown" && <p className="sa-section__help">{PUBLIC_LINK.unknownDetail}</p>}
 
-      <div className="sa-link__actions">
-        <button
-          type="button"
-          className="sa-button"
-          onClick={() => set(true)}
-          disabled={state === "pending"}
-          aria-busy={state === "pending"}
-        >
-          {state === "pending" ? PUBLIC_LINK.pendingLabel : PUBLIC_LINK.enableLabel}
-        </button>
-        <button
-          type="button"
-          className="sa-button sa-button--quiet"
-          onClick={() => set(false)}
-          disabled={state === "pending"}
-        >
-          {PUBLIC_LINK.disableLabel}
-        </button>
+      <div className="sa-link__actions" role="group" aria-label={PUBLIC_LINK.commandsLabel}>
+        {actions.enable && (
+          <button
+            type="button"
+            className="sa-button"
+            onClick={() => set(true)}
+            disabled={pending !== null}
+            aria-busy={pending === true}
+          >
+            {pending === true ? PUBLIC_LINK.pendingLabel : PUBLIC_LINK.enableLabel}
+          </button>
+        )}
+        {actions.disable && (
+          <button
+            type="button"
+            /* Equal weight with the enable command, not the quiet variant it
+               used to wear. Neither command is the recommended one — that is
+               the whole point of a state this workspace cannot read — and once
+               only one remains, a borderless button reads as a stray link and
+               sits inset from the section's edge by its own padding. */
+            className="sa-button"
+            onClick={() => set(false)}
+            disabled={pending !== null}
+            aria-busy={pending === false}
+          >
+            {pending === false ? PUBLIC_LINK.pendingLabel : PUBLIC_LINK.disableLabel}
+          </button>
+        )}
       </div>
 
-      <div className="sa-announce" role="status" aria-live="polite" hidden={state === "unknown" || state === "pending"}>
-        {state === "enabled" && (
+      <div
+        className="sa-announce"
+        role="status"
+        aria-live="polite"
+        hidden={state === "unknown" || state === "pending"}
+      >
+        {failed && (
+          <div className="sa-notice" data-tone="error">
+            <p className="sa-notice__title">{PUBLIC_LINK.failedTitle}</p>
+            <p className="sa-notice__detail">{PUBLIC_LINK.failedDetail}</p>
+          </div>
+        )}
+        {known === "enabled" && (
           <div className="sa-notice" data-tone="ok">
             <p className="sa-notice__title">{PUBLIC_LINK.enabledTitle}</p>
             <p className="sa-notice__detail">{PUBLIC_LINK.enabledDetail}</p>
             {url !== null && <p className="sa-link__url">{url}</p>}
           </div>
         )}
-        {state === "disabled" && (
+        {known === "disabled" && (
           <div className="sa-notice" data-tone="neutral">
             <p className="sa-notice__title">{PUBLIC_LINK.disabledTitle}</p>
             <p className="sa-notice__detail">{PUBLIC_LINK.disabledDetail}</p>
-          </div>
-        )}
-        {state === "failed" && (
-          <div className="sa-notice" data-tone="error">
-            <p className="sa-notice__title">{PUBLIC_LINK.failedTitle}</p>
-            <p className="sa-notice__detail">{PUBLIC_LINK.failedDetail}</p>
           </div>
         )}
       </div>

@@ -322,7 +322,9 @@ export const PUBLIC_LINK = {
   heading: "Public scheduling page",
   detail:
     "A link clients can use without an account. Requests from it arrive here the same way.",
-  unknownDetail: "This workspace can't read whether the link is currently on.",
+  unknownDetail:
+    "This workspace can't read whether the link is currently on. Choose the state to set.",
+  commandsLabel: "Set the public link",
   enableLabel: "Turn on public link",
   disableLabel: "Turn off public link",
   pendingLabel: "Saving…",
@@ -335,6 +337,36 @@ export const PUBLIC_LINK = {
 } as const;
 
 export type PublicLinkState = "unknown" | "pending" | "enabled" | "disabled" | "failed";
+
+/** What the last server answer established. `unknown` until one arrives. */
+export type PublicLinkKnownState = "unknown" | "enabled" | "disabled";
+
+/**
+ * Which state-setting commands the section offers.
+ *
+ * With no GET there is no position to draw on arrival, so both commands are
+ * offered and neither is a toggle: each one names the state it sets. Once a
+ * response has established the state, only the command that would change it
+ * remains — offering the one that sets the state it is already in would imply
+ * this workspace is unsure, when for once it is not.
+ */
+export function publicLinkActions(
+  known: PublicLinkKnownState,
+): { enable: boolean; disable: boolean } {
+  return { enable: known !== "enabled", disable: known !== "disabled" };
+}
+
+/**
+ * The URL is shown only when the server has said the link is on *and* it sent a
+ * slug. A slug from an earlier answer is never carried into a disabled state,
+ * and one is never invented — see `publicScheduleUrl`.
+ */
+export function publicLinkUrlVisible(
+  known: PublicLinkKnownState,
+  slug: string | null | undefined,
+): boolean {
+  return known === "enabled" && typeof slug === "string" && slug.trim() !== "";
+}
 
 /**
  * Build the public scheduling URL from the slug the server generated, under

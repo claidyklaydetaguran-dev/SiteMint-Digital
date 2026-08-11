@@ -185,11 +185,21 @@
 .sa-announce[hidden],
 .sa-outcome[hidden] { display: none; }
 
+/* An empty state is a sentence and its instruction, not a container waiting to
+   be filled. The dashed full-measure box this replaced drew a large blank
+   region to the left of its centred text — an empty bordered element that read
+   as a missing tile or a drop target, and it carried no icon, no action and no
+   asset to justify the space. What is left is sized to the words: a quiet
+   surface card on the same border and radius as every other panel here,
+   left-aligned to the reading edge and held to one comfortable measure. */
 .sa-empty {
-  border: 1px dashed var(--sd-border-strong);
+  align-self: flex-start;
+  max-width: 34rem;
+  border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-card);
-  padding: var(--sd-space-8) var(--sd-space-6);
-  text-align: center;
+  background: var(--sd-surface);
+  padding: var(--sd-space-5) var(--sd-space-5);
+  text-align: left;
 }
 .sa-empty__title {
   margin: 0;
@@ -198,8 +208,7 @@
   color: var(--sd-text);
 }
 .sa-empty__detail {
-  margin: var(--sd-space-2) auto 0;
-  max-width: 28rem;
+  margin: var(--sd-space-2) 0 0;
   font-size: var(--sd-text-small);
   line-height: 1.6;
   color: var(--sd-text-muted);
