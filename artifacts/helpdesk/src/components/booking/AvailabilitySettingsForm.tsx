@@ -1,15 +1,48 @@
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { useAvailabilityConfig, useUpdateAvailabilityConfig, useSetPublicSchedulingLink, useCalendarStatus } from "@/hooks/useAvailability";
-import type { AvailabilityConfig, AppointmentType, DayHours } from "@/lib/availabilityApi";
+/**
+ * Frontend V2 Phase 13 — the Availability view.
+ *
+ * The rules the server uses to compute availability, edited against the exact
+ * existing `PUT .../availability/config` contract: the same field names, the
+ * same shape, the whole config on every save. The server is the authority on
+ * what is valid. A rejected value is never quietly rewritten into an accepted
+ * one — the 400's own sentence is shown, at the field it names when it names
+ * one and at the form otherwise, and the value the operator typed stays on
+ * screen so they can see what was refused.
+ *
+ * There is no `<form>` element and every control is `type="button"`, so no
+ * stray Enter keypress in a text field can submit the settings. Saving happens
+ * only when the Save button is activated.
+ *
+ * Two sibling sections read their own state: the calendar connection
+ * (`GET .../calendar-status`, one request when this view first opens) and the
+ * public scheduling link, which has no read endpoint at all and therefore says
+ * so instead of drawing a toggle in a guessed position.
+ */
 
-const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCalendarStatus,
+  useSetPublicSchedulingLink,
+  useUpdateAvailabilityConfig,
+} from "@/hooks/useAvailability";
+import type { AvailabilityConfig, DayHours } from "@/lib/availabilityApi";
+import {
+  AVAILABILITY,
+  CALENDAR,
+  PUBLIC_LINK,
+  WEEKDAY_NAMES,
+  calendarCopy,
+  fieldForError,
+  publicScheduleUrl,
+  saveErrorDetail,
+  type CalendarState,
+  type ConfigField,
+  type PublicLinkState,
+} from "@/pages/appointments/appointmentsContract";
 
-function cloneConfig(config: AvailabilityConfig): AvailabilityConfig {
+type SaveState = "idle" | "pending" | "saved" | "invalid" | "failed";
+
+function clone(config: AvailabilityConfig): AvailabilityConfig {
   return {
     ...config,
     weeklyHours: { ...config.weeklyHours },
@@ -18,321 +51,462 @@ function cloneConfig(config: AvailabilityConfig): AvailabilityConfig {
   };
 }
 
-/**
- * Checkpoint B: saves to durable, firm-scoped Postgres records
- * (scheduling_availability_settings / _weekly_hours / _appointment_types) —
- * values persist across server restarts.
- */
-export function AvailabilitySettingsForm() {
-  const { toast } = useToast();
-  const configQuery = useAvailabilityConfig();
+export function AvailabilitySettingsForm({
+  config,
+  isLoading,
+  isError,
+}: {
+  config: AvailabilityConfig | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}) {
   const updateMutation = useUpdateAvailabilityConfig();
   const [draft, setDraft] = useState<AvailabilityConfig | null>(null);
+  const [save, setSave] = useState<SaveState>("idle");
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const seeded = useRef(false);
+  const resultRef = useRef<HTMLDivElement | null>(null);
 
+  // Seeded once, from the config the page already fetched. Later renders must
+  // not overwrite edits in progress.
   useEffect(() => {
-    if (configQuery.data && !draft) setDraft(cloneConfig(configQuery.data.config));
-  }, [configQuery.data, draft]);
+    if (!seeded.current && config) {
+      seeded.current = true;
+      setDraft(clone(config));
+    }
+  }, [config]);
 
-  if (configQuery.isLoading || !draft) {
-    return (
-      <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading settings…
-      </div>
-    );
-  }
+  const patch = (next: Partial<AvailabilityConfig>) =>
+    setDraft((d) => (d ? { ...d, ...next } : d));
 
-  function updateDayHours(day: number, hours: DayHours | null) {
+  const setDay = (day: number, hours: DayHours | null) =>
     setDraft((d) => (d ? { ...d, weeklyHours: { ...d.weeklyHours, [day]: hours } } : d));
-  }
 
-  function updateType(index: number, patch: Partial<AppointmentType>) {
+  const setType = (index: number, key: "name" | "durationMin", value: string) =>
     setDraft((d) => {
       if (!d) return d;
       const types = [...d.appointmentTypes];
-      types[index] = { ...types[index]!, ...patch };
+      const current = types[index]!;
+      types[index] = key === "name"
+        ? { ...current, name: value }
+        : { ...current, durationMin: value === "" ? 0 : Number(value) };
       return { ...d, appointmentTypes: types };
     });
+
+  const num = (value: string, fallback: number) => (value === "" ? fallback : Number(value));
+
+  /** One PUT per activation. Guarded, and the button is disabled while pending. */
+  const handleSave = useCallback(async () => {
+    if (!draft || save === "pending") return;
+    setSave("pending");
+    setErrorText(null);
+    try {
+      const res = await updateMutation.mutateAsync(draft);
+      // Show what the server stored, so any normalisation is visible rather
+      // than hidden behind the values that were typed.
+      setDraft(clone(res.config));
+      setSave("saved");
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      const message = err instanceof Error ? err.message : null;
+      setErrorText(message);
+      setSave(status === 400 ? "invalid" : "failed");
+    } finally {
+      resultRef.current?.focus();
+    }
+  }, [draft, save, updateMutation]);
+
+  if (isLoading || (!draft && !isError)) {
+    return <p className="sa-status" role="status" aria-live="polite">{AVAILABILITY.loading}</p>;
   }
 
-  function addType() {
-    setDraft((d) =>
-      d
-        ? { ...d, appointmentTypes: [...d.appointmentTypes, { id: `type-${Date.now()}`, name: "New appointment type", durationMin: 30 }] }
-        : d,
+  if (isError || !draft) {
+    return (
+      <div className="sa-notice" data-tone="error" role="alert">
+        <p className="sa-notice__title">{AVAILABILITY.failed}</p>
+      </div>
     );
   }
 
-  function removeType(index: number) {
-    setDraft((d) => (d ? { ...d, appointmentTypes: d.appointmentTypes.filter((_, i) => i !== index) } : d));
-  }
-
-  function addBlockedDate(dateKey: string) {
-    if (!dateKey) return;
-    setDraft((d) => (d && !d.blockedDates.includes(dateKey) ? { ...d, blockedDates: [...d.blockedDates, dateKey].sort() } : d));
-  }
-
-  function removeBlockedDate(dateKey: string) {
-    setDraft((d) => (d ? { ...d, blockedDates: d.blockedDates.filter((k) => k !== dateKey) } : d));
-  }
-
-  function handleSave() {
-    if (!draft) return;
-    updateMutation.mutate(draft, {
-      onSuccess: () => toast({ title: "Saved", description: "Availability settings updated." }),
-      onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" }),
-    });
-  }
+  const badField: ConfigField | null = save === "invalid" ? fieldForError(errorText) : null;
+  const fieldError = (field: ConfigField) =>
+    badField === field ? saveErrorDetail(errorText) : null;
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="rounded-lg border border-statusbadge-info-bg bg-statusbadge-info-bg/40 px-3 py-2 text-xs font-medium text-statusbadge-info-text">
-        Development database — these settings are saved to your firm's own durable record and
-        persist across server restarts. No real calendar is connected until Google Calendar
-        free/busy is enabled, and no appointment here can become "Booked" until then.
-      </div>
+    <div className="sa-settings">
+      <p className="sa-settings__detail">{AVAILABILITY.detail}</p>
 
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-foreground">Timezone</h3>
-        <Input
-          value={draft.timezone}
-          onChange={(e) => setDraft((d) => (d ? { ...d, timezone: e.target.value } : d))}
-          placeholder="America/Los_Angeles"
-          className="h-9 max-w-xs text-sm"
-        />
+      {/* Time zone */}
+      <section className="sa-section" aria-labelledby="sa-tz-h">
+        <h2 className="sa-section__title" id="sa-tz-h">{AVAILABILITY.timezoneHeading}</h2>
+        <div className="sa-field">
+          <label className="sa-field__label" htmlFor="sa-tz">{AVAILABILITY.timezoneLabel}</label>
+          <input
+            id="sa-tz"
+            className="sa-input sa-input--wide"
+            value={draft.timezone}
+            maxLength={100}
+            aria-invalid={fieldError("timezone") !== null}
+            aria-describedby={fieldError("timezone") !== null ? "sa-tz-error" : "sa-tz-help"}
+            onChange={(e) => patch({ timezone: e.target.value })}
+          />
+          {fieldError("timezone") !== null ? (
+            <p className="sa-field__error" id="sa-tz-error">{fieldError("timezone")}</p>
+          ) : (
+            <p className="sa-field__help" id="sa-tz-help">{AVAILABILITY.timezoneHelp}</p>
+          )}
+        </div>
       </section>
 
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-foreground">Weekly hours</h3>
-        <div className="space-y-2">
-          {WEEKDAY_LABELS.map((label, day) => {
+      {/* Weekly hours */}
+      <section className="sa-section" aria-labelledby="sa-hours-h">
+        <h2 className="sa-section__title" id="sa-hours-h">{AVAILABILITY.hoursHeading}</h2>
+        <p className="sa-section__help">{AVAILABILITY.hoursHelp}</p>
+        {fieldError("weeklyHours") !== null && (
+          <p className="sa-field__error">{fieldError("weeklyHours")}</p>
+        )}
+        <div className="sa-days__legend" aria-hidden="true">
+          <span />
+          <span>{AVAILABILITY.startLabel}</span>
+          <span>{AVAILABILITY.endLabel}</span>
+        </div>
+        <ul className="sa-days">
+          {WEEKDAY_NAMES.map((label, day) => {
             const hours = draft.weeklyHours[day] ?? null;
             return (
-              <div key={day} className="rounded-lg border border-border px-3 py-2">
-                {/* Day name + toggle button — always on one line */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{label}</span>
-                  {hours ? (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateDayHours(day, null)}>
-                      Mark closed
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateDayHours(day, { start: "09:00", end: "17:00" })}>
-                      Set hours
-                    </Button>
-                  )}
-                </div>
-                {/* Time pickers: stacked with Start/End labels on mobile, inline on sm+ */}
+              <li key={label} className="sa-days__row">
+                <span className="sa-days__name">{label}</span>
                 {hours ? (
-                  <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:items-end sm:gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Start</span>
-                      <Input
-                        type="time"
-                        value={hours.start}
-                        onChange={(e) => updateDayHours(day, { ...hours, start: e.target.value })}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">End</span>
-                      <Input
-                        type="time"
-                        value={hours.end}
-                        onChange={(e) => updateDayHours(day, { ...hours, end: e.target.value })}
-                        className="h-8 text-xs"
-                      />
-                    </div>
+                  <div className="sa-days__hours">
+                    {/* Labelled once above; each input keeps its own label for
+                        assistive technology, hidden visually rather than dropped. */}
+                    <label className="sa-vh" htmlFor={`sa-start-${day}`}>{`${label} ${AVAILABILITY.startLabel}`}</label>
+                    <input
+                      id={`sa-start-${day}`}
+                      className="sa-input sa-input--time"
+                      type="time"
+                      value={hours.start}
+                      onChange={(e) => setDay(day, { ...hours, start: e.target.value })}
+                    />
+                    <label className="sa-vh" htmlFor={`sa-end-${day}`}>{`${label} ${AVAILABILITY.endLabel}`}</label>
+                    <input
+                      id={`sa-end-${day}`}
+                      className="sa-input sa-input--time"
+                      type="time"
+                      value={hours.end}
+                      onChange={(e) => setDay(day, { ...hours, end: e.target.value })}
+                    />
+                    <button type="button" className="sa-button sa-button--quiet" onClick={() => setDay(day, null)}>
+                      {AVAILABILITY.markClosed}
+                    </button>
                   </div>
                 ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">Closed</p>
+                  <div className="sa-days__hours">
+                    <span className="sa-days__closed">{AVAILABILITY.closed}</span>
+                    <button type="button" className="sa-button sa-button--quiet" onClick={() => setDay(day, { start: "09:00", end: "17:00" })}>
+                      {AVAILABILITY.setHours}
+                    </button>
+                  </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </section>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Appointment types</h3>
-          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={addType}>
-            <Plus className="h-3.5 w-3.5" /> Add type
-          </Button>
-        </div>
-        <div className="space-y-2">
+      {/* Appointment types */}
+      <section className="sa-section" aria-labelledby="sa-types-h">
+        <h2 className="sa-section__title" id="sa-types-h">{AVAILABILITY.typesHeading}</h2>
+        <p className="sa-section__help">{AVAILABILITY.typesHelp}</p>
+        {fieldError("appointmentTypes") !== null && (
+          <p className="sa-field__error">{fieldError("appointmentTypes")}</p>
+        )}
+        <ul className="sa-types">
           {draft.appointmentTypes.map((type, i) => (
-            <div key={type.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
-              <Input value={type.name} onChange={(e) => updateType(i, { name: e.target.value })} className="h-8 flex-1 min-w-[10rem] text-xs" />
-              <Input
-                type="number"
-                min={5}
-                max={480}
-                value={type.durationMin}
-                onChange={(e) => updateType(i, { durationMin: Number(e.target.value) })}
-                className="h-8 w-20 text-xs"
-              />
-              <span className="text-xs text-muted-foreground">min</span>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => removeType(i)} aria-label="Remove type" disabled={draft.appointmentTypes.length <= 1}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            <li key={type.id} className="sa-types__row">
+              <div className="sa-field sa-field--grow">
+                <label className="sa-field__label" htmlFor={`sa-type-name-${i}`}>{AVAILABILITY.typeNameLabel}</label>
+                <input
+                  id={`sa-type-name-${i}`}
+                  className="sa-input"
+                  value={type.name}
+                  maxLength={100}
+                  onChange={(e) => setType(i, "name", e.target.value)}
+                />
+              </div>
+              <div className="sa-field sa-field--tight">
+                <label className="sa-field__label" htmlFor={`sa-type-min-${i}`}>{AVAILABILITY.typeDurationLabel}</label>
+                <input
+                  id={`sa-type-min-${i}`}
+                  className="sa-input sa-input--num"
+                  type="number"
+                  inputMode="numeric"
+                  min={5}
+                  max={480}
+                  value={type.durationMin}
+                  onChange={(e) => setType(i, "durationMin", e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="sa-button sa-button--quiet"
+                onClick={() => patch({ appointmentTypes: draft.appointmentTypes.filter((_, n) => n !== i) })}
+                disabled={draft.appointmentTypes.length <= 1}
+              >
+                {AVAILABILITY.removeType}
+              </button>
+            </li>
           ))}
+        </ul>
+        <button
+          type="button"
+          className="sa-button"
+          onClick={() => patch({
+            appointmentTypes: [...draft.appointmentTypes, { id: `new-${draft.appointmentTypes.length + 1}`, name: "", durationMin: 30 }],
+          })}
+        >
+          {AVAILABILITY.addType}
+        </button>
+      </section>
+
+      {/* Limits */}
+      <section className="sa-section" aria-labelledby="sa-limits-h">
+        <h2 className="sa-section__title" id="sa-limits-h">{AVAILABILITY.limitsHeading}</h2>
+        <div className="sa-grid">
+          <NumberField id="sa-bb" label={AVAILABILITY.bufferBeforeLabel} value={draft.bufferBeforeMin} min={0} max={240}
+            error={fieldError("bufferBeforeMin")} onChange={(v) => patch({ bufferBeforeMin: num(v, 0) })} />
+          <NumberField id="sa-ba" label={AVAILABILITY.bufferAfterLabel} value={draft.bufferAfterMin} min={0} max={240}
+            error={fieldError("bufferAfterMin")} onChange={(v) => patch({ bufferAfterMin: num(v, 0) })} />
+          <NumberField id="sa-mn" label={AVAILABILITY.minNoticeLabel} value={draft.minNoticeHours} min={0} max={720}
+            error={fieldError("minNoticeHours")} onChange={(v) => patch({ minNoticeHours: num(v, 0) })} />
+          <NumberField id="sa-ma" label={AVAILABILITY.maxAdvanceLabel} value={draft.maxAdvanceDays} min={1} max={365}
+            error={fieldError("maxAdvanceDays")} onChange={(v) => patch({ maxAdvanceDays: num(v, 1) })} />
+          <NumberField id="sa-dl" label={AVAILABILITY.dailyLimitLabel} value={draft.dailyLimit ?? ""} min={0} max={200}
+            help={AVAILABILITY.dailyLimitHelp} error={fieldError("dailyLimit")}
+            onChange={(v) => patch({ dailyLimit: v === "" ? null : Number(v) })} />
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs">Buffer before (min)</Label>
-          <Input type="number" min={0} max={240} value={draft.bufferBeforeMin} onChange={(e) => setDraft((d) => (d ? { ...d, bufferBeforeMin: Number(e.target.value) } : d))} className="mt-1 h-9 text-sm" />
-        </div>
-        <div>
-          <Label className="text-xs">Buffer after (min)</Label>
-          <Input type="number" min={0} max={240} value={draft.bufferAfterMin} onChange={(e) => setDraft((d) => (d ? { ...d, bufferAfterMin: Number(e.target.value) } : d))} className="mt-1 h-9 text-sm" />
-        </div>
-        <div>
-          <Label className="text-xs">Minimum notice (hours)</Label>
-          <Input type="number" min={0} max={720} value={draft.minNoticeHours} onChange={(e) => setDraft((d) => (d ? { ...d, minNoticeHours: Number(e.target.value) } : d))} className="mt-1 h-9 text-sm" />
-        </div>
-        <div>
-          <Label className="text-xs">Booking window (days ahead)</Label>
-          <Input type="number" min={1} max={365} value={draft.maxAdvanceDays} onChange={(e) => setDraft((d) => (d ? { ...d, maxAdvanceDays: Number(e.target.value) } : d))} className="mt-1 h-9 text-sm" />
-        </div>
-        <div>
-          <Label className="text-xs">Daily limit (optional)</Label>
-          <Input
-            type="number"
-            min={0}
-            max={200}
-            value={draft.dailyLimit ?? ""}
-            onChange={(e) => setDraft((d) => (d ? { ...d, dailyLimit: e.target.value === "" ? null : Number(e.target.value) } : d))}
-            className="mt-1 h-9 text-sm"
+      {/* Blocked dates */}
+      <section className="sa-section" aria-labelledby="sa-blocked-h">
+        <h2 className="sa-section__title" id="sa-blocked-h">{AVAILABILITY.blockedHeading}</h2>
+        <p className="sa-section__help">{AVAILABILITY.blockedHelp}</p>
+        {fieldError("blockedDates") !== null && (
+          <p className="sa-field__error">{fieldError("blockedDates")}</p>
+        )}
+        {draft.blockedDates.length === 0 ? (
+          <p className="sa-muted">{AVAILABILITY.blockedNone}</p>
+        ) : (
+          <ul className="sa-blocked">
+            {draft.blockedDates.map((key) => (
+              <li key={key} className="sa-blocked__item">
+                <span>{key}</span>
+                <button
+                  type="button"
+                  className="sa-blocked__remove"
+                  aria-label={`${AVAILABILITY.blockedRemove} ${key}`}
+                  onClick={() => patch({ blockedDates: draft.blockedDates.filter((d) => d !== key) })}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="sa-field sa-field--tight">
+          <label className="sa-field__label" htmlFor="sa-blocked-add">{AVAILABILITY.blockedAdd}</label>
+          <input
+            id="sa-blocked-add"
+            className="sa-input sa-input--date"
+            type="date"
+            value=""
+            onChange={(e) => {
+              const key = e.target.value;
+              if (key && !draft.blockedDates.includes(key)) {
+                patch({ blockedDates: [...draft.blockedDates, key].sort() });
+              }
+            }}
           />
         </div>
       </section>
 
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-foreground">Blocked dates (holidays, time off)</h3>
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {draft.blockedDates.map((dateKey) => (
-            <span key={dateKey} className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs text-foreground">
-              {dateKey}
-              <button type="button" onClick={() => removeBlockedDate(dateKey)} aria-label={`Remove ${dateKey}`} className="text-muted-foreground hover:text-foreground">
-                ×
-              </button>
-            </span>
-          ))}
-          {draft.blockedDates.length === 0 && <span className="text-xs text-muted-foreground">None</span>}
-        </div>
-        <Input
-          type="date"
-          className="h-8 w-40 text-xs"
-          onChange={(e) => {
-            addBlockedDate(e.target.value);
-            e.target.value = "";
-          }}
-        />
-      </section>
+      {/* Save */}
+      <div className="sa-save">
+        <button
+          type="button"
+          className="sa-button sa-button--primary"
+          onClick={handleSave}
+          disabled={save === "pending"}
+          aria-busy={save === "pending"}
+        >
+          {save === "pending" ? AVAILABILITY.savePendingLabel : AVAILABILITY.saveLabel}
+        </button>
+      </div>
 
-      <CalendarStatusSection />
-
-      <PublicLinkSection />
-
-      <div className="flex items-center gap-3 border-t border-border pt-4">
-        <Button onClick={handleSave} disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save settings"}
-        </Button>
-        {updateMutation.isError && (
-          <span className="text-xs text-statusbadge-danger-text">
-            {updateMutation.error instanceof Error ? updateMutation.error.message : "Save failed."}
-          </span>
+      <div className="sa-announce" ref={resultRef} tabIndex={-1} role="status" aria-live="polite" hidden={save === "idle" || save === "pending"}>
+        {save === "saved" && (
+          <div className="sa-notice" data-tone="ok">
+            <p className="sa-notice__title">{AVAILABILITY.saveSuccessTitle}</p>
+            <p className="sa-notice__detail">{AVAILABILITY.saveSuccessDetail}</p>
+          </div>
+        )}
+        {save === "invalid" && (
+          <div className="sa-notice" data-tone="error">
+            <p className="sa-notice__title">{AVAILABILITY.saveInvalidTitle}</p>
+            <p className="sa-notice__detail">{saveErrorDetail(errorText)}</p>
+          </div>
+        )}
+        {save === "failed" && (
+          <div className="sa-notice" data-tone="error">
+            <p className="sa-notice__title">{AVAILABILITY.saveFailedTitle}</p>
+            <p className="sa-notice__detail">{AVAILABILITY.saveFailedDetail}</p>
+          </div>
         )}
       </div>
+
+      <CalendarConnection />
+      <PublicLink />
+    </div>
+  );
+}
+
+function NumberField({
+  id, label, value, min, max, help, error, onChange,
+}: {
+  id: string;
+  label: string;
+  value: number | string;
+  min: number;
+  max: number;
+  help?: string;
+  error: string | null;
+  onChange: (value: string) => void;
+}) {
+  const describedBy = error !== null ? `${id}-error` : help ? `${id}-help` : undefined;
+  return (
+    <div className="sa-field">
+      <label className="sa-field__label" htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        className="sa-input sa-input--num"
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        aria-invalid={error !== null}
+        aria-describedby={describedBy}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {error !== null ? (
+        <p className="sa-field__error" id={`${id}-error`}>{error}</p>
+      ) : help ? (
+        <p className="sa-field__help" id={`${id}-help`}>{help}</p>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Honest read-only-calendar connection status — never a calendar id or
- * account email, connected or not. Availability always falls back safely
- * (SiteMint rules only) when no calendar is connected.
+ * `{ connected, provider }` and nothing else — the endpoint returns no calendar
+ * id, no account email and no token, so there is none to leak. Connected means
+ * busy times may be consulted while computing availability. It has never meant
+ * writing an event, and is not worded as though it might.
  */
-function CalendarStatusSection() {
+function CalendarConnection() {
   const statusQuery = useCalendarStatus();
+  const state: CalendarState = statusQuery.isLoading
+    ? "checking"
+    : statusQuery.isError
+      ? "failed"
+      : statusQuery.data?.connected === true
+        ? "connected"
+        : "disconnected";
+  const copy = calendarCopy(state);
+
   return (
-    <section className="border-t border-border pt-4">
-      <h3 className="mb-2 text-sm font-semibold text-foreground">Google Calendar (read-only)</h3>
-      {statusQuery.isLoading ? (
-        <p className="text-xs text-muted-foreground">Checking connection…</p>
-      ) : statusQuery.data?.connected ? (
-        <p className="text-xs text-statusbadge-success-text">
-          Connected — busy times from your Development calendar are combined with the rules
-          below. SiteMint never creates, changes, or deletes a calendar event.
-        </p>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Not connected. Availability is calculated from the rules below only. Connecting a
-          calendar requires owner approval for a separate checkpoint.
-        </p>
-      )}
+    <section className="sa-section sa-section--ruled" aria-labelledby="sa-cal-h">
+      <h2 className="sa-section__title" id="sa-cal-h">{CALENDAR.heading}</h2>
+      <p className="sa-connection" data-state={state}>{copy.heading}</p>
+      {copy.detail !== "" && <p className="sa-section__help">{copy.detail}</p>}
     </section>
   );
 }
 
 /**
- * Enables/disables the public scheduling page. The slug is server-generated
- * and opaque — never derived from the firm's internal id or name — so
- * disabling and re-enabling issues a brand-new, unguessable link rather than
- * reusing or predicting the previous one.
+ * `PUT .../public-link` is the only endpoint; there is no GET. So the current
+ * state is genuinely unknown on arrival and is described that way. The slug is
+ * server-generated and is never invented, guessed or derived here — without one
+ * from a response there is no URL to show.
  */
-function PublicLinkSection() {
-  const { toast } = useToast();
+function PublicLink() {
   const linkMutation = useSetPublicSchedulingLink();
+  const [state, setState] = useState<PublicLinkState>("unknown");
   const [slug, setSlug] = useState<string | null>(null);
 
-  const publicUrl = slug ? `${window.location.origin}${window.location.pathname.replace(/\/appointments.*$/, "")}/schedule/${slug}` : null;
+  const set = useCallback(async (enabled: boolean) => {
+    if (state === "pending") return;
+    setState("pending");
+    try {
+      const res = await linkMutation.mutateAsync(enabled);
+      setSlug(res.slug);
+      setState(res.enabled ? "enabled" : "disabled");
+    } catch {
+      setState("failed");
+    }
+  }, [linkMutation, state]);
+
+  const url = typeof window === "undefined"
+    ? null
+    : publicScheduleUrl(window.location.origin, window.location.pathname, slug);
 
   return (
-    <section className="border-t border-border pt-4">
-      <h3 className="mb-2 text-sm font-semibold text-foreground">Public scheduling page</h3>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Generates a link you can share or embed on your own website. Visitors don't need an
-        account — every request they submit lands as Pending review, same as the preview above.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={linkMutation.isPending}
-          onClick={() =>
-            linkMutation.mutate(true, {
-              onSuccess: (res) => {
-                setSlug(res.slug);
-                toast({ title: "Public link enabled" });
-              },
-              onError: (err) => toast({ title: "Failed to enable link", description: err instanceof Error ? err.message : undefined, variant: "destructive" }),
-            })
-          }
+    <section className="sa-section sa-section--ruled" aria-labelledby="sa-link-h">
+      <h2 className="sa-section__title" id="sa-link-h">{PUBLIC_LINK.heading}</h2>
+      <p className="sa-section__help">{PUBLIC_LINK.detail}</p>
+      {state === "unknown" && <p className="sa-section__help">{PUBLIC_LINK.unknownDetail}</p>}
+
+      <div className="sa-link__actions">
+        <button
+          type="button"
+          className="sa-button"
+          onClick={() => set(true)}
+          disabled={state === "pending"}
+          aria-busy={state === "pending"}
         >
-          {linkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable public link"}
-        </Button>
-        {slug && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() =>
-              linkMutation.mutate(false, {
-                onSuccess: () => { setSlug(null); toast({ title: "Public link disabled" }); },
-              })
-            }
-          >
-            Disable
-          </Button>
+          {state === "pending" ? PUBLIC_LINK.pendingLabel : PUBLIC_LINK.enableLabel}
+        </button>
+        <button
+          type="button"
+          className="sa-button sa-button--quiet"
+          onClick={() => set(false)}
+          disabled={state === "pending"}
+        >
+          {PUBLIC_LINK.disableLabel}
+        </button>
+      </div>
+
+      <div className="sa-announce" role="status" aria-live="polite" hidden={state === "unknown" || state === "pending"}>
+        {state === "enabled" && (
+          <div className="sa-notice" data-tone="ok">
+            <p className="sa-notice__title">{PUBLIC_LINK.enabledTitle}</p>
+            <p className="sa-notice__detail">{PUBLIC_LINK.enabledDetail}</p>
+            {url !== null && <p className="sa-link__url">{url}</p>}
+          </div>
+        )}
+        {state === "disabled" && (
+          <div className="sa-notice" data-tone="neutral">
+            <p className="sa-notice__title">{PUBLIC_LINK.disabledTitle}</p>
+            <p className="sa-notice__detail">{PUBLIC_LINK.disabledDetail}</p>
+          </div>
+        )}
+        {state === "failed" && (
+          <div className="sa-notice" data-tone="error">
+            <p className="sa-notice__title">{PUBLIC_LINK.failedTitle}</p>
+            <p className="sa-notice__detail">{PUBLIC_LINK.failedDetail}</p>
+          </div>
         )}
       </div>
-      {publicUrl && (
-        <div className="mt-2 rounded-lg bg-surface-muted px-3 py-2 text-xs text-foreground">{publicUrl}</div>
-      )}
     </section>
   );
 }
