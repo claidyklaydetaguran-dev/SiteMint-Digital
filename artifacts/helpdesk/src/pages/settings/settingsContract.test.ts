@@ -391,8 +391,12 @@ eq(
   ],
 );
 
-eq("a paid plan reuses Billing's verified label", planLabel("paid"), "Pro (Paid)");
-eq("a trial plan reuses Billing's verified label", planLabel("trial"), "Free Trial");
+// Phase 12 removed the invented product name "Pro" at this, its only source;
+// Billing imports this same helper, so both routes read the plan identically.
+eq("a paid plan reads as a neutral verified label", planLabel("paid"), "Paid plan");
+eq("a trial plan reuses the shared verified label", planLabel("trial"), "Free Trial");
+eq("the plan label never names a product this repository does not have",
+  /pro|premium|enterprise|unlimited/i.test(planLabel("paid") ?? ""), false);
 
 eq(
   "an unrecognised plan is echoed verbatim, never renamed",
@@ -829,18 +833,60 @@ if (!existsSync(distDir)) {
 } else {
   const settingsChunks = readdirSync(distDir).filter((f) => /^Settings-.*\.js$/.test(f));
   check("exactly one Settings route chunk is emitted", settingsChunks.length === 1);
-  const built = settingsChunks.map((f) => readFileSync(path.join(distDir, f), "utf8")).join("\n");
+
+  /**
+   * The Settings route's built graph: its own chunk plus the sibling chunks it
+   * statically imports, excluding the shared application entry.
+   *
+   * Phase 12 made `settingsContract.ts` a genuinely shared module — Billing
+   * imports `planLabel` from it so one account cannot be named two different
+   * things on two routes — and Vite therefore emits it as its own chunk rather
+   * than inlining it here. The assertions below are unchanged in what they
+   * require; only where they look has been corrected, because "inside
+   * `Settings-*.js`" stopped being the same question as "in what this route
+   * ships". Following the imports is strictly the stronger check: a banned
+   * phrase can no longer escape detection by being hoisted into a shared chunk.
+   */
+  const routeGraph = (entry: string, includeEntryChunk: boolean): string[] => {
+    const seen = new Set<string>();
+    const queue = [entry];
+    while (queue.length > 0) {
+      const file = queue.shift()!;
+      if (seen.has(file) || !existsSync(path.join(distDir, file))) continue;
+      seen.add(file);
+      const src = readFileSync(path.join(distDir, file), "utf8");
+      for (const m of src.matchAll(/from\s*["']\.\/([^"']+\.js)["']/g)) {
+        if (includeEntryChunk || !/^index-/.test(m[1]!)) queue.push(m[1]!);
+      }
+    }
+    return [...seen];
+  };
+  const join = (files: string[]) =>
+    files.map((f) => readFileSync(path.join(distDir, f), "utf8")).join("\n");
+
+  /* Everything the route actually ships, entry chunk included — the right scope
+     for "is the approved wording present". `settingsContract` is now imported by
+     the shell as well as by two routes, so Vite folds it into the entry chunk;
+     that is where the notice legitimately lives. */
+  const built = join(routeGraph(settingsChunks[0]!, true));
+  /* The route's own code, entry excluded — the right scope for "did an invented
+     phrase come back", since the shared entry carries unrelated app code. */
+  const routeOnly = join(routeGraph(settingsChunks[0]!, false));
+
+  check("no removed phrase survives into the built Settings code", bannedHits(routeOnly).length === 0);
   check(
-    "no removed phrase survives into the built Settings chunk",
-    bannedHits(built).length === 0,
-  );
-  check(
-    "the built chunk contains the approved preference notice",
+    "the built output contains the approved preference notice",
     built.includes("Account preferences are not available"),
   );
   check(
     "the built chunk references no settings endpoint",
-    !/receptionist\/settings|api\/settings/.test(built),
+    !/receptionist\/settings|api\/settings/.test(routeOnly),
+  );
+  // Targeted, whole-bundle: the invented product name must exist nowhere at all.
+  const wholeBundle = join(readdirSync(distDir).filter((f) => f.endsWith(".js")));
+  check(
+    "the invented product name is absent from every emitted chunk",
+    !/Pro plan|Pro \(Paid\)/.test(wholeBundle),
   );
 }
 

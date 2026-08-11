@@ -44,6 +44,11 @@ import { useTheme } from "next-themes";
 import { useSession, useLogout } from "@/hooks/useSession";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboardNav";
+// Phase 12: the rail's plan name comes from the same helper Settings and
+// Billing use, so one account cannot be called three different things in three
+// places. It previously read "Pro plan" — a product this repository does not
+// have; see `pages/settings/settingsContract.ts` for the evidence.
+import { planLabel } from "@/pages/settings/settingsContract";
 import "@/styles/v2-dashboard.css";
 
 const DESKTOP_QUERY = "(min-width: 64rem)";
@@ -87,17 +92,19 @@ function RailNav({ location, onNavigate }: { location: string; onNavigate: () =>
 
 function UsageMeter({
   isPaid,
+  planTier,
   used,
   limit,
   onNavigate,
 }: {
   isPaid: boolean;
+  planTier: string;
   used: number;
   limit: number;
   onNavigate: () => void;
 }) {
   if (isPaid) {
-    return <div className="sd-usage__plan">Pro plan</div>;
+    return <div className="sd-usage__plan">{planLabel(planTier) ?? ""}</div>;
   }
 
   const percent = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
@@ -370,6 +377,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sd-rail__foot">
           <UsageMeter
             isPaid={isPaid}
+            planTier={me.firm.planTier}
             used={me.conversationCount}
             limit={me.firm.trialConversationsLimit}
             onNavigate={closeIfDrawer}

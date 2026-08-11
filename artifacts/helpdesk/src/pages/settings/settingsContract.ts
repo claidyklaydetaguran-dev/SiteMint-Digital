@@ -79,10 +79,18 @@ export const NOT_AVAILABLE = "Not available";
  * The plan tier, labelled only where a label is verified.
  *
  * `intake_firms.plan_tier` is a free-text column defaulting to `"trial"`, and
- * the two values the product actually uses are already labelled by the Billing
- * page: `"paid"` reads "Pro (Paid)" and `"trial"` reads "Free Trial". Those two
- * labels are reused verbatim so the same plan cannot be named two different
- * things in two places.
+ * the product uses exactly two values. This helper is the single mapping for
+ * both of them, shared with the Billing workspace
+ * (`pages/billing/billingContract.ts`) so the same plan cannot be named two
+ * different things in two places.
+ *
+ * Phase 11 originally read `"paid"` as "Pro (Paid)", reusing what the Billing
+ * page said at the time. Phase 12 established that "Pro" names a product this
+ * repository does not have — no schema column, no route and no document
+ * distinguishes a "Pro" tier, and the sole implemented difference between
+ * `trial` and `paid` is the conversation cap in `routes/intakeAgent.ts`. The
+ * invented product name was removed at this, its only source, so both routes
+ * now read "Paid plan".
  *
  * Anything else is returned **exactly as the server sent it**. Inventing a
  * marketing name for an unrecognised tier would be a claim about a plan this
@@ -93,7 +101,7 @@ export const NOT_AVAILABLE = "Not available";
 export function planLabel(planTier: string | null | undefined): string | null {
   const raw = (planTier ?? "").trim();
   if (raw === "") return null;
-  if (raw === "paid") return "Pro (Paid)";
+  if (raw === "paid") return "Paid plan";
   if (raw === "trial") return "Free Trial";
   return raw;
 }
