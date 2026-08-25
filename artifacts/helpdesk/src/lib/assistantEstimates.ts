@@ -1,15 +1,27 @@
 /**
  * Business-friendly voice/model presets plus advisory cost and latency
  * figures. Every number here is a planning estimate, not measured or
- * fetched data — Checkpoint B3 never calls a provider or pricing API.
+ * fetched data — nothing in this module calls a provider or a pricing API.
+ *
+ * AR-001I: the preset *identity* now lives in
+ * `pages/assistants/assistantsContract.ts`, which mirrors the api-server's
+ * `SITEMINT_PRESET_KEYS`. This module supplies only the presentation for
+ * each supported preset. The former fifth entry, "Custom", is gone: the
+ * server catalog deliberately excludes it, so it could be selected but never
+ * published, and its description pointed at an "Advanced tab" that nothing
+ * imports. A config that already stores it is handled as a retired preset
+ * (see `isRetiredVoicePreset`), never silently re-labelled as one of these.
  */
 
-export type VoicePresetId =
-  | "natural-balanced"
-  | "fast-response"
-  | "highest-intelligence"
-  | "budget-friendly"
-  | "custom";
+// Type-only, deliberately: this module must stay importable by the contract
+// test, which runs under `tsx` where the `@/` alias does not resolve. A type
+// import is erased before it can be resolved at runtime.
+import type {
+  StoredVoicePresetId,
+  SupportedVoicePresetId,
+} from "@/pages/assistants/assistantsContract";
+
+export type VoicePresetId = SupportedVoicePresetId;
 
 export interface CostCategoryEstimate {
   label: "Model" | "Voice" | "Transcription" | "Runtime";
@@ -116,30 +128,20 @@ export const VOICE_MODEL_PRESETS: VoicePreset[] = [
       { label: "Transport", ms: 90 },
     ],
   },
-  {
-    id: "custom",
-    label: "Custom",
-    friendlyDescription: "Configure each layer yourself under the Advanced tab.",
-    costRangeLow: 0.05,
-    costRangeHigh: 0.25,
-    costBreakdown: [
-      { label: "Model", share: 0.4 },
-      { label: "Voice", share: 0.25 },
-      { label: "Transcription", share: 0.2 },
-      { label: "Runtime", share: 0.15 },
-    ],
-    latencyMs: 900,
-    latencyBreakdown: [
-      { label: "Transcription", ms: 180 },
-      { label: "Reasoning", ms: 400 },
-      { label: "Voice synthesis", ms: 220 },
-      { label: "Transport", ms: 100 },
-    ],
-  },
 ];
 
-export function getVoicePreset(id: VoicePresetId): VoicePreset {
-  return VOICE_MODEL_PRESETS.find((p) => p.id === id) ?? VOICE_MODEL_PRESETS[0];
+/**
+ * Exact lookup. Returns `undefined` for a stored-but-retired preset rather
+ * than substituting a supported one — a caller must show the recovery state,
+ * not a set of estimates belonging to a preset the customer never chose.
+ */
+export function findVoicePreset(id: StoredVoicePresetId | string): VoicePreset | undefined {
+  return VOICE_MODEL_PRESETS.find((p) => p.id === id);
+}
+
+/** Presentation order is the catalog order; the test asserts the two match key for key. */
+export function voicePresetIds(): readonly string[] {
+  return VOICE_MODEL_PRESETS.map((p) => p.id);
 }
 
 export interface LatencyBand {

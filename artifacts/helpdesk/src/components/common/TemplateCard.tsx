@@ -1,5 +1,6 @@
 import type { AssistantTemplate } from "@/lib/assistantTemplates";
 import { Button } from "@/components/ui/button";
+import { CREATE } from "@/pages/assistants/assistantsContract";
 
 interface TemplateCardProps {
   template: AssistantTemplate;
@@ -33,7 +34,7 @@ export function TemplateCard({ template, onSelect }: TemplateCardProps) {
         variant={template.id === "blank" ? "outline" : "default"}
         className="mt-4 h-9 w-full text-sm"
       >
-        {template.id === "blank" ? "Start from blank" : "Select template"}
+        {template.id === "blank" ? CREATE.startBlank : CREATE.select}
       </Button>
     </div>
   );

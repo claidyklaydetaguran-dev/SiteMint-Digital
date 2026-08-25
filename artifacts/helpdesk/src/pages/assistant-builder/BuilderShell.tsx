@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { UnavailableActionButton } from "@/components/common/UnavailableActionButton";
 import { CostBreakdown } from "@/components/common/CostBreakdown";
 import { LatencyMeter } from "@/components/common/LatencyMeter";
-import { getVoicePreset } from "@/lib/assistantEstimates";
+import { findVoicePreset } from "@/lib/assistantEstimates";
+import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 
 import SetupTab from "@/pages/assistant-builder/SetupTab";
@@ -107,7 +108,10 @@ export function BuilderShell({
   testPanel,
   contentDisabled = false,
 }: BuilderShellProps) {
-  const preset = getVoicePreset(draft.voiceModel.preset);
+  // Undefined when the saved config carries a retired preset. The footer
+  // then says the estimates are unavailable rather than showing figures
+  // belonging to a preset the customer never chose.
+  const preset = findVoicePreset(draft.voiceModel.preset);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -209,8 +213,16 @@ export function BuilderShell({
       <div className="flex-shrink-0 border-t border-border bg-card px-6 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="grid flex-1 grid-cols-2 gap-4 sm:flex sm:gap-8">
-            <CostBreakdown preset={preset} compact />
-            <LatencyMeter latencyMs={preset.latencyMs} compact />
+            {preset === undefined ? (
+              <p className="col-span-2 self-center text-[11px] text-muted-foreground">
+                {PRESET_RECOVERY.estimatesUnavailable}
+              </p>
+            ) : (
+              <>
+                <CostBreakdown preset={preset} compact />
+                <LatencyMeter latencyMs={preset.latencyMs} compact />
+              </>
+            )}
           </div>
           {footerRight}
         </div>

@@ -22,6 +22,13 @@ import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
 import { browserTestDisabledReason } from "@/lib/browserVoice/eligibility";
+import {
+  BUILDER,
+  PRESET_RECOVERY,
+  assistantHref,
+  isSupportedVoicePreset,
+  lastSyncedNote,
+} from "@/pages/assistants/assistantsContract";
 
 export type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
@@ -53,10 +60,16 @@ function formatSyncedAt(iso: string | null): string | null {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function formatProviderName(provider: string | null): string {
-  if (!provider) return "the voice provider";
-  return provider.length > 0 ? provider[0].toUpperCase() + provider.slice(1) : provider;
-}
+/**
+ * AR-001I removed `formatProviderName`. It rendered the vendor's own name
+ * into the customer's banner, which is an internal provider identifier the
+ * customer has no action to take on. The two banner sentences it appeared in
+ * also each ended with a fixed "Assigned phone number: Available after Phone
+ * Numbers setup." — a claim no response supplied and no endpoint supports.
+ * Both sentences now come from the contract module and say only what the
+ * `provider`/`providerAssistantId` pair actually proves: whether a
+ * provider-side assistant exists.
+ */
 
 export default function AssistantBuilder() {
   const params = useParams<{ id: string; tab?: string }>();
@@ -238,6 +251,8 @@ export default function AssistantBuilder() {
     voicePublishEnabled &&
     !!assistant &&
     !!numericId &&
+    !!draft &&
+    isSupportedVoicePreset(draft.voiceModel.preset) &&
     !isDirty &&
     isNameValid &&
     !updateMutation.isPending &&
@@ -253,6 +268,11 @@ export default function AssistantBuilder() {
     if (!numericId) return "Save this assistant as a draft before publishing.";
     if (isDirty) return "Save your changes before publishing.";
     if (!isNameValid) return "Enter a valid assistant name before publishing.";
+    // Checked before the in-flight reasons so a retired preset is named as
+    // the blocker rather than being hidden behind a transient one. The server
+    // would reject it with `unsupported_preset` anyway; this only says so
+    // before the customer spends a publish attempt on it.
+    if (!isSupportedVoicePreset(draft.voiceModel.preset)) return PRESET_RECOVERY.publishBlocked;
     if (updateMutation.isPending) return "Saving is in progress. Publish will be available once saving finishes.";
     if (publishMutation.isPending) return "Publishing is already in progress.";
     if (assistant.status === "publishing") return "Publishing is already in progress.";
@@ -450,7 +470,7 @@ export default function AssistantBuilder() {
         draft={draft}
         update={update}
         tab={tab}
-        onTabChange={(t) => navigate(`/assistants/${numericId}/${t}`)}
+        onTabChange={(t) => navigate(assistantHref(numericId!, t))}
         backHref="/assistants"
         statusBadge={statusLabel}
         announcement={announcement}
@@ -491,6 +511,15 @@ export default function AssistantBuilder() {
                 replace it with the values currently in the builder.
               </div>
             )}
+            {!isSupportedVoicePreset(draft.voiceModel.preset) && (
+              <div
+                role="status"
+                className="mt-2 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning"
+              >
+                <span className="font-semibold">{PRESET_RECOVERY.title}.</span>{" "}
+                {PRESET_RECOVERY.detail}
+              </div>
+            )}
             {assistant.status === "error" && assistant.syncError && (
               <div role="status" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
                 <span className="font-semibold">Publish failed:</span> {safeSyncErrorMessage(assistant.syncError)}
@@ -527,14 +556,13 @@ export default function AssistantBuilder() {
             )}
             {assistant.status === "published" ? (
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Connected to {formatProviderName(assistant.provider)}.
-                {syncedAtDisplay ? ` Last synced ${syncedAtDisplay}.` : ""}
-                {" "}Assigned phone number: Available after Phone Numbers setup.
+                {BUILDER.linkedNote}
+                {syncedAtDisplay ? ` ${lastSyncedNote(syncedAtDisplay)}` : ""}
               </p>
             ) : (
               !deletable && (
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Not connected. Assigned phone number: Available after Phone Numbers setup.
+                  {BUILDER.notLinkedNote}
                 </p>
               )
             )}
@@ -549,7 +577,7 @@ export default function AssistantBuilder() {
             )}
             {isDirty && assistant.status !== "publishing" && (
               <p className="max-w-xs text-right text-[11px] text-muted-foreground">
-                Save your changes before publishing.
+                {BUILDER.savePrompt}
               </p>
             )}
             <Button onClick={handleSave} disabled={saveDisabled} className="h-9 gap-1.5 text-sm">
