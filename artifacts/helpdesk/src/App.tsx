@@ -10,6 +10,7 @@ import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAssistantSessionGuard } from "@/hooks/useAssistants";
 import { ROUTER_BASE, ROUTES } from "@/lib/routes";
+import { voiceRoutePages } from "@/routes/voiceRoutes";
 import { DashboardShell } from "@/shells/DashboardShell";
 import { AuthShell } from "@/shells/AuthShell";
 import { PublicShell } from "@/shells/PublicShell";
@@ -19,7 +20,9 @@ import { PublicShell } from "@/shells/PublicShell";
  *
  * The dashboard previously shipped as a single chunk: 17 direct page imports,
  * zero lazy boundaries. Every page is now `lazy()`, imported inline at its own
- * call site (never through a barrel, which would defeat the split).
+ * call site (never through a barrel, which would defeat the split) — except the
+ * voice-platform pages, whose imports live behind the AR-001J build boundary so
+ * that a default-gated build does not emit them at all.
  *
  * Route paths, ordering, auth behaviour, and the voice-platform gating are
  * unchanged from the protected baseline.
@@ -34,13 +37,19 @@ const Contacts = lazy(() => import("@/pages/Contacts"));
 const ContactDetail = lazy(() => import("@/pages/ContactDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Billing = lazy(() => import("@/pages/Billing"));
-const Assistants = lazy(() => import("@/pages/Assistants"));
-const AssistantCreate = lazy(() => import("@/pages/AssistantCreate"));
-const AssistantBuilderNew = lazy(() => import("@/pages/AssistantBuilderNew"));
-const AssistantBuilder = lazy(() => import("@/pages/AssistantBuilder"));
-const CallLogs = lazy(() => import("@/pages/CallLogs"));
-const CallLogDetail = lazy(() => import("@/pages/CallLogDetail"));
-const Appointments = lazy(() => import("@/pages/Appointments"));
+// The seven voice-platform pages are the one exception, and AR-001J is why:
+// an `import()` written here is emitted by every build, so a default-gated
+// build shipped chunks it could never load. They come from the build boundary
+// instead, which removes their imports from the graph — see routes/voiceRoutes.
+const {
+  Assistants,
+  AssistantCreate,
+  AssistantBuilderNew,
+  AssistantBuilder,
+  CallLogs,
+  CallLogDetail,
+  Appointments,
+} = voiceRoutePages;
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient();

@@ -1319,8 +1319,40 @@ if (!existsSync(distDir)) {
   const files = readdirSync(distDir);
   const listChunks = files.filter((f) => /^CallLogs-.*\.js$/.test(f));
   const detailChunks = files.filter((f) => /^CallLogDetail-.*\.js$/.test(f));
-  check("exactly one Call Logs list chunk is emitted", listChunks.length === 1);
-  check("exactly one Call Logs detail chunk is emitted", detailChunks.length === 1);
+  /**
+   * Which build produced these assets, read from the flag literal the bundler
+   * baked into the entry chunk — never from the presence of the chunks under
+   * test, which would make the assertion circular. A build with the variable
+   * unset folds the parser away entirely, and is reported as indeterminate
+   * rather than guessed at.
+   */
+  const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
+    const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
+    if (entryChunks.length !== 1) return "indeterminate";
+    const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
+    const parsed =
+      /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}\s*(?:const|let|var) \w+=\1\(([^)]*)\)/.exec(
+        entrySrc,
+      );
+    if (parsed === null) return "indeterminate";
+    return parsed[2] === '"true"' ? "voice-enabled" : "default-gated";
+  })();
+
+  /**
+   * AR-001J. `App.tsx` used to import every page unconditionally, so a
+   * default-gated build emitted both Call Logs chunks and simply never
+   * fetched them. The imports now sit behind the build boundary, so the
+   * expectation is per-variant. Phase 14's own subject is unchanged.
+   */
+  if (buildVariant === "default-gated") {
+    eq("AR-001J — a default-gated build emits no Call Logs list chunk", listChunks.length, 0);
+    eq("AR-001J — a default-gated build emits no Call Logs detail chunk", detailChunks.length, 0);
+  } else if (buildVariant === "indeterminate") {
+    console.log("  SKIP  the build variant could not be read from the entry chunk");
+  } else {
+    check("exactly one Call Logs list chunk is emitted", listChunks.length === 1);
+    check("exactly one Call Logs detail chunk is emitted", detailChunks.length === 1);
+  }
 
   /**
    * Whole-bundle, and deliberately outside the per-chunk block below: the

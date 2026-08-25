@@ -1281,7 +1281,46 @@ if (!existsSync(distDir)) {
   console.log("  SKIP  no built output present (run a production build to include these)");
 } else {
   const chunks = readdirSync(distDir).filter((f) => /^Appointments-.*\.js$/.test(f));
-  check("exactly one Appointments route chunk is emitted", chunks.length === 1);
+
+  /**
+   * Which build produced these assets, read from the flag literal the bundler
+   * baked into the entry chunk — never from the presence of the chunks under
+   * test, which would make the assertion circular. A build with the variable
+   * unset folds the parser away entirely, and is reported as indeterminate
+   * rather than guessed at.
+   */
+  const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
+    const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
+    if (entryChunks.length !== 1) return "indeterminate";
+    const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
+    const parsed =
+      /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}\s*(?:const|let|var) \w+=\1\(([^)]*)\)/.exec(
+        entrySrc,
+      );
+    if (parsed === null) return "indeterminate";
+    return parsed[2] === '"true"' ? "voice-enabled" : "default-gated";
+  })();
+
+  /**
+   * AR-001J. `App.tsx` used to import every page unconditionally, so a
+   * default-gated build emitted the Appointments chunk and simply never
+   * fetched it. The import now sits behind the build boundary, so which
+   * chunks exist depends on the build, and the expectation is per-variant.
+   * Phase 13's own subject — what the Appointments route contains — is
+   * unchanged, and is asserted against the build that contains it.
+   */
+  if (buildVariant === "default-gated") {
+    eq("AR-001J — a default-gated build emits no Appointments chunk", chunks.length, 0);
+    eq(
+      "AR-001J — a default-gated build emits no Appointments stylesheet",
+      readdirSync(distDir).filter((f) => /^Appointments-.*\.css$/.test(f)).length,
+      0,
+    );
+  } else if (buildVariant === "indeterminate") {
+    console.log("  SKIP  the build variant could not be read from the entry chunk");
+  } else {
+    check("exactly one Appointments route chunk is emitted", chunks.length === 1);
+  }
 
   if (chunks.length === 1) {
     /**

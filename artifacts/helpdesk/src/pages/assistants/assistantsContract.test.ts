@@ -253,6 +253,7 @@ const appSrc = read("artifacts/helpdesk/src/App.tsx");
 const routesSrc = read("artifacts/helpdesk/src/lib/routes.ts");
 const navSrc = read("artifacts/helpdesk/src/lib/nav.ts");
 const flagsSrc = read("artifacts/helpdesk/src/lib/featureFlags.ts");
+const voiceRoutesSrc = read("artifacts/helpdesk/src/routes/voiceRoutes.ts");
 const scriptsPkgSrc = read("scripts/package.json");
 
 const runtimeCatalogSrc = read("artifacts/api-server/src/lib/voicePublishing/runtimeCatalog.ts");
@@ -426,16 +427,35 @@ check(
   ),
 );
 /**
- * Worth stating explicitly, because it is what "the default build excludes
- * Assistants" does and does not mean here: every page is lazily imported
- * unconditionally, so a default-gated build still *emits* the Assistants
- * chunk. What the gate removes is the route — the component is never
- * rendered and the chunk is never fetched. Unchanged by AR-001I.
+ * AR-001J corrected what this used to assert. Every page was lazily imported
+ * from `App.tsx` unconditionally, so a default-gated build still *emitted*
+ * the Assistants chunk: the gate removed the route, never the code. The
+ * import now lives behind the build boundary, whose condition is a literal
+ * the bundler can fold, so a default-gated build does not emit it at all.
+ *
+ * AR-001I's own subject is untouched. The route registration above, the page,
+ * and its contract are exactly as AR-001I left them; only the place the
+ * import is written has moved.
  */
 check(
-  "page components are lazily imported outside the gate, so chunk emission is unaffected by it",
-  /const Assistants = lazy\(\(\) => import\("@\/pages\/Assistants"\)\);/.test(appSrc) &&
-    appSrc.indexOf("const Assistants = lazy(") < appSrc.indexOf("voicePlatformEnabled &&"),
+  "App.tsx no longer imports the Assistants page unconditionally",
+  !/import\("@\/pages\/Assistants"\)/.test(appSrc) &&
+    appSrc.includes('import { voiceRoutePages } from "@/routes/voiceRoutes";'),
+);
+check(
+  "the boundary gates that import on a literal the bundler can fold, not a function call",
+  /const VOICE_BUILD_ENABLED = import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED === "true";/.test(
+    voiceRoutesSrc,
+  ) &&
+    /VOICE_BUILD_ENABLED[\s\S]{0,80}\?[\s\S]{0,240}import\("@\/pages\/Assistants"\)/.test(
+      voiceRoutesSrc,
+    ),
+);
+check(
+  "all four Assistants routes still resolve through that one boundary",
+  ["Assistants", "AssistantCreate", "AssistantBuilderNew", "AssistantBuilder"].every((page) =>
+    voiceRoutesSrc.includes(`${page}: lazy(() => import("@/pages/${page}"))`),
+  ),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1290,22 +1310,47 @@ if (!existsSync(distDir)) {
     .join("\n");
 
   /**
-   * The Assistants chunks are emitted by *every* build, gated or not.
-   * `App.tsx` calls `lazy(() => import(...))` for every page unconditionally,
-   * and only the `<Route>` registration sits behind `voicePlatformEnabled`.
-   * So the gate is a runtime one: a default build ships the chunk and never
-   * loads it, because no route ever renders the component and nothing in the
-   * navigation links to it.
-   *
-   * That is pre-existing behaviour and is unchanged here — `App.tsx` is
-   * outside AR-001I's authorised scope and was not touched. The assertion
-   * that matters, that the routes are registered only inside the gate, is
-   * made against source in the "Route registration" section above.
-   *
-   * Everything below therefore holds for the default-gated build and the
-   * voice-enabled build alike, and this suite is run against both.
+   * Which build produced these assets, read from the flag literal the bundler
+   * baked into the entry chunk — never from the presence of the chunks under
+   * test, which would make the assertion circular. A build with the variable
+   * unset folds the parser away entirely, and is reported as indeterminate
+   * rather than guessed at.
    */
-  {
+  const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
+    const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
+    if (entryChunks.length !== 1) return "indeterminate";
+    const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
+    const parsed =
+      /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}\s*(?:const|let|var) \w+=\1\(([^)]*)\)/.exec(
+        entrySrc,
+      );
+    if (parsed === null) return "indeterminate";
+    return parsed[2] === '"true"' ? "voice-enabled" : "default-gated";
+  })();
+
+  /**
+   * AR-001J. The Assistants chunks used to be emitted by every build, gated or
+   * not, because `App.tsx` imported the pages unconditionally. They now exist
+   * only in a build that registers their routes, so the expectation below is
+   * per-variant rather than one rule for both.
+   *
+   * The whole-bundle absence checks for the default-gated variant — no retired
+   * wording, no credential, no test-only fake — live in
+   * `src/routes/voiceBoundaryContract.test.ts`, which asserts them over the
+   * entire default bundle rather than around these chunks.
+   */
+  if (buildVariant === "default-gated") {
+    eq("AR-001J — a default-gated build emits no Assistants list chunk", listChunks.length, 0);
+    eq("AR-001J — a default-gated build emits no template-picker chunk", createChunks.length, 0);
+    eq("AR-001J — a default-gated build emits no persisted-builder chunk", builderChunks.length, 0);
+    eq("AR-001J — a default-gated build emits no unsaved-builder chunk", builderNewChunks.length, 0);
+    check(
+      "AR-001J — a default-gated build emits no provider SDK chunk",
+      !files.some((f) => /^vapi-.*\.js$/.test(f)) && !everyEmittedJs.includes("api.vapi.ai"),
+    );
+  } else if (buildVariant === "indeterminate") {
+    console.log("  SKIP  the build variant could not be read from the entry chunk");
+  } else {
     check("exactly one Assistants list chunk is emitted", listChunks.length === 1);
     check("exactly one template-picker chunk is emitted", createChunks.length === 1);
     check("exactly one persisted-builder chunk is emitted", builderChunks.length === 1);
