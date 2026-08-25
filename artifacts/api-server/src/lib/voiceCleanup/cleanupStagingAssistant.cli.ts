@@ -38,8 +38,9 @@ import {
 const USAGE = `
 Staging provider cleanup — removes ONE assistant's remote provider resource.
 
-  --firm-id=<n>        required
-  --assistant-id=<n>   required
+  --firm-id=<n>        required; positive decimal integer, no sign, no leading
+                       zero, no exponent, no whitespace (e.g. 1, 42)
+  --assistant-id=<n>   required; same strict format as --firm-id
   --confirm=<id>       required with --execute; must equal the recorded provider assistant id
   --execute            perform the deletion (omitted = dry run)
 
@@ -57,8 +58,13 @@ async function main(): Promise<number> {
     return 1;
   }
 
+  // Identifier parsing is strict (AR-001E) and yields `undefined` for a
+  // missing OR malformed value, so both are refused here — before the dynamic
+  // imports below load `@workspace/db` (which opens a connection pool) and
+  // before any provider is constructed. Nothing at all happens on this path.
   const args = parseCleanupArgs(process.argv.slice(2));
   if (args.firmId === undefined || args.assistantId === undefined) {
+    console.error("Refusing to run: --firm-id and --assistant-id must both be positive decimal integers.");
     console.error(USAGE);
     return 1;
   }

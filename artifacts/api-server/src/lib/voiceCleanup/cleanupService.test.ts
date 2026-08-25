@@ -19,6 +19,7 @@ import {
   exitCodeFor,
   formatCleanupResult,
   parseCleanupArgs,
+  parseStrictPositiveInteger,
   CLEANUP_ELIGIBLE_STATUSES,
   CLEANUP_SUPPORTED_PROVIDERS,
   STAGING_CLEANUP_ENV_VAR,
@@ -379,26 +380,88 @@ describe("definitive deletion", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-describe("authoritative not-found", () => {
-  it("treats a provider NOT_FOUND as an already-absent resource and reconciles", async () => {
+describe("AR-001E — a 404 is not proof of absence", () => {
+  it("classifies NOT_FOUND as uncertain and writes nothing at all", async () => {
     const repository = new CleanupFakeRepository({ seed: [seed()] });
     const provider = new ScriptedDeleteProvider({ kind: "error", code: "NOT_FOUND" });
     const result = await cleanupStagingAssistant(execRequest, deps(repository, provider));
 
     expect(result).toEqual({
-      ok: true,
-      status: "cleaned",
-      remote: "already_absent",
+      ok: false,
+      status: "uncertain",
+      code: "NOT_FOUND",
       firmId: FIRM_ID,
       assistantId: ASSISTANT_ID,
       providerAssistantId: REMOTE_ID,
     });
-    expect(repository.inner.peek(FIRM_ID, ASSISTANT_ID)?.status).toBe("draft");
-    expect(formatCleanupResult(result)).toContain("already absent");
+    expect(repository.clearCalls, "a 404 must trigger zero local writes").toBe(0);
+    expect(provider.deleteCalls).toHaveLength(1);
   });
 
-  it("does not fabricate provider confirmation for any other code", async () => {
-    for (const code of ["CONFLICT", "PROVIDER_ERROR", "TIMEOUT"] as VoiceProviderErrorCode[]) {
+  it("preserves the provider id, the provider, and the status after a 404", async () => {
+    const repository = new CleanupFakeRepository({ seed: [seed()] });
+    await cleanupStagingAssistant(
+      execRequest,
+      deps(repository, new ScriptedDeleteProvider({ kind: "error", code: "NOT_FOUND" })),
+    );
+
+    const row = repository.inner.peek(FIRM_ID, ASSISTANT_ID)!;
+    expect(row.providerAssistantId).toBe(REMOTE_ID);
+    expect(row.provider).toBe("vapi");
+    expect(row.status).toBe("published");
+  });
+
+  it("exits nonzero after a 404", async () => {
+    const repository = new CleanupFakeRepository({ seed: [seed()] });
+    const result = await cleanupStagingAssistant(
+      execRequest,
+      deps(repository, new ScriptedDeleteProvider({ kind: "error", code: "NOT_FOUND" })),
+    );
+    expect(exitCodeFor(result)).toBe(1);
+  });
+
+  it("tells the operator the truth about the 404 and instructs them to stop", async () => {
+    const repository = new CleanupFakeRepository({ seed: [seed()] });
+    const result = await cleanupStagingAssistant(
+      execRequest,
+      deps(repository, new ScriptedDeleteProvider({ kind: "error", code: "NOT_FOUND" })),
+    );
+    const output = formatCleanupResult(result);
+
+    expect(output).toContain("UNCERTAIN");
+    expect(output).toContain("HTTP 404");
+    expect(output).toContain("does not document");
+    expect(output).toContain("STOP HERE");
+    // No success claim.
+    expect(output).not.toMatch(/CLEANED|already absent|succeeded|has been deleted/i);
+    expect(output).toContain("it is NOT known whether the remote assistant was deleted");
+    // Re-running is forbidden, not invited, and no acknowledgement flag exists.
+    expect(output).toMatch(/Do not re-run this command/i);
+    expect(output).not.toMatch(/try again|--accept-not-found|acknowledge/i);
+  });
+
+  it("offers no success result shape that a 404 could reach", async () => {
+    // `already_absent` was AR-001C's success carrier for a 404. Nothing in the
+    // module may produce it any more, for any provider outcome.
+    const outcomes: Array<{ kind: "ok" } | { kind: "error"; code: VoiceProviderErrorCode } | { kind: "unnormalized" }> =
+      [
+        { kind: "ok" },
+        { kind: "unnormalized" },
+        ...(["NOT_FOUND", "CONFLICT", "PROVIDER_ERROR", "TIMEOUT", "NETWORK_ERROR", "AUTHENTICATION_FAILED"] as const).map(
+          (code) => ({ kind: "error", code }) as const,
+        ),
+      ];
+
+    for (const outcome of outcomes) {
+      const repository = new CleanupFakeRepository({ seed: [seed()] });
+      const result = await cleanupStagingAssistant(execRequest, deps(repository, new ScriptedDeleteProvider(outcome)));
+      expect(JSON.stringify(result)).not.toContain("already_absent");
+      expect(formatCleanupResult(result)).not.toContain("already absent");
+    }
+  });
+
+  it("does not fabricate provider confirmation for any failure code", async () => {
+    for (const code of ["NOT_FOUND", "CONFLICT", "PROVIDER_ERROR", "TIMEOUT"] as VoiceProviderErrorCode[]) {
       const repository = new CleanupFakeRepository({ seed: [seed()] });
       const result = await cleanupStagingAssistant(
         execRequest,
@@ -461,7 +524,7 @@ describe("definitive provider failure — local state untouched", () => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 describe("uncertain provider outcome — never assume deletion", () => {
-  const UNCERTAIN: VoiceProviderErrorCode[] = ["TIMEOUT", "NETWORK_ERROR", "PROVIDER_ERROR"];
+  const UNCERTAIN: VoiceProviderErrorCode[] = ["TIMEOUT", "NETWORK_ERROR", "PROVIDER_ERROR", "NOT_FOUND"];
 
   it.each(UNCERTAIN)("%s leaves local state unchanged and exits nonzero", async (code) => {
     const repository = new CleanupFakeRepository({ seed: [seed()] });
@@ -535,28 +598,50 @@ describe("partial success — remote gone, local reconcile failed", () => {
     if (!result.ok) expect(result.status).toBe("local_reconcile_failed");
   });
 
-  it("a later run finishes the job by observing the resource already absent", async () => {
-    // First run: remote deleted, local write fails.
+  it("reports remote deletion as confirmed and local reconciliation as incomplete", async () => {
     const repository = new CleanupFakeRepository({ seed: [seed()], failClear: true });
-    const first = await cleanupStagingAssistant(execRequest, deps(repository, new ScriptedDeleteProvider({ kind: "ok" })));
-    expect(first.ok).toBe(false);
-    expect(repository.inner.peek(FIRM_ID, ASSISTANT_ID)?.providerAssistantId).toBe(REMOTE_ID);
+    const result = await cleanupStagingAssistant(execRequest, deps(repository, new ScriptedDeleteProvider({ kind: "ok" })));
+    const output = formatCleanupResult(result);
 
-    // Second run against the same row, provider now reports NOT_FOUND.
-    const recovery = new CleanupFakeRepository({ seed: [seed()] });
-    const second = await cleanupStagingAssistant(
-      execRequest,
-      deps(recovery, new ScriptedDeleteProvider({ kind: "error", code: "NOT_FOUND" })),
-    );
-    expect(second.ok).toBe(true);
-    if (second.ok && second.status === "cleaned") expect(second.remote).toBe("already_absent");
-    expect(recovery.inner.peek(FIRM_ID, ASSISTANT_ID)?.status).toBe("draft");
+    expect(output).toContain("PARTIAL");
+    expect(output).toContain("Remote deletion IS confirmed");
+    expect(output).toContain("Local reconciliation is incomplete");
+    expect(output).toContain("provider dashboard");
+    expect(output).toContain("separately authorized procedure");
+  });
+
+  it("does not recommend a blind re-run, because a second 404 would prove nothing", async () => {
+    // AR-001C told the operator to re-run and let the resulting 404 finish the
+    // job. AR-001E removed that advice: the second DELETE's 404 is undocumented
+    // and cannot confirm the first deletion.
+    const repository = new CleanupFakeRepository({ seed: [seed()], failClear: true });
+    const result = await cleanupStagingAssistant(execRequest, deps(repository, new ScriptedDeleteProvider({ kind: "ok" })));
+    const output = formatCleanupResult(result);
+
+    expect(output).toContain("Do NOT re-run this command");
+    expect(output).not.toMatch(/already absent|it will observe|re-run this command to finish/i);
+  });
+
+  it("prefers a stale local link over an orphaned remote resource", async () => {
+    const repository = new CleanupFakeRepository({ seed: [seed()], failClear: true });
+    await cleanupStagingAssistant(execRequest, deps(repository, new ScriptedDeleteProvider({ kind: "ok" })));
+
+    const row = repository.inner.peek(FIRM_ID, ASSISTANT_ID)!;
+    expect(row.providerAssistantId).toBe(REMOTE_ID);
+    expect(row.provider).toBe("vapi");
+  });
+
+  it("issues no second delete of its own after a failed reconcile", async () => {
+    const repository = new CleanupFakeRepository({ seed: [seed()], failClear: true });
+    const provider = new ScriptedDeleteProvider({ kind: "ok" });
+    await cleanupStagingAssistant(execRequest, deps(repository, provider));
+    expect(provider.deleteCalls).toHaveLength(1);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 describe("race and duplicate protection", () => {
-  it("two simultaneous cleanups delete once each but reconcile exactly once", async () => {
+  it("a concurrent runner that sees a 404 reconciles nothing", async () => {
     const repository = new CleanupFakeRepository({ seed: [seed()] });
     const providerA = new ScriptedDeleteProvider({ kind: "ok" });
     const providerB = new ScriptedDeleteProvider({ kind: "error", code: "NOT_FOUND" });
@@ -566,10 +651,11 @@ describe("race and duplicate protection", () => {
       cleanupStagingAssistant(execRequest, deps(repository, providerB)),
     ]);
 
-    // Both observe a definitively-absent remote; the conditional update means
-    // the second reconcile matches zero rows rather than clearing twice.
+    // Only the runner holding a documented success may write. The 404 runner
+    // stops at "uncertain", so exactly one reconcile is attempted in total.
     const outcomes = [a.status, b.status].sort();
-    expect(outcomes).toEqual(["cleaned", "local_reconcile_failed"]);
+    expect(outcomes).toEqual(["cleaned", "uncertain"]);
+    expect(repository.clearCalls).toBe(1);
     expect(repository.inner.peek(FIRM_ID, ASSISTANT_ID)?.status).toBe("draft");
   });
 
@@ -602,12 +688,111 @@ describe("race and duplicate protection", () => {
   });
 
   it("never clears the provider id before the remote outcome is definitive", async () => {
-    for (const code of ["TIMEOUT", "NETWORK_ERROR", "PROVIDER_ERROR", "AUTHENTICATION_FAILED"] as VoiceProviderErrorCode[]) {
+    for (const code of [
+      "TIMEOUT",
+      "NETWORK_ERROR",
+      "PROVIDER_ERROR",
+      "AUTHENTICATION_FAILED",
+      "NOT_FOUND",
+    ] as VoiceProviderErrorCode[]) {
       const repository = new CleanupFakeRepository({ seed: [seed()] });
       await cleanupStagingAssistant(execRequest, deps(repository, new ScriptedDeleteProvider({ kind: "error", code })));
       expect(repository.clearCalls, `${code} must not reconcile`).toBe(0);
       expect(repository.inner.peek(FIRM_ID, ASSISTANT_ID)?.providerAssistantId).toBe(REMOTE_ID);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+describe("AR-001E — strict CLI identifier parsing", () => {
+  it("accepts canonical positive decimal integers", () => {
+    expect(parseStrictPositiveInteger("1")).toBe(1);
+    expect(parseStrictPositiveInteger("42")).toBe(42);
+    expect(parseStrictPositiveInteger("9007199254740991")).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it.each([
+    ["a missing value", undefined],
+    ["an empty string", ""],
+    ["zero", "0"],
+    ["a negative value", "-1"],
+    ["a negative zero", "-0"],
+    ["a decimal", "1.5"],
+    ["a trailing decimal point", "1."],
+    ["exponent notation", "1e3"],
+    ["uppercase exponent notation", "1E3"],
+    ["hexadecimal", "0x10"],
+    ["octal", "0o10"],
+    ["binary", "0b10"],
+    ["an explicit plus sign", "+1"],
+    ["a leading zero", "01"],
+    ["leading whitespace", " 1"],
+    ["trailing whitespace", "1 "],
+    ["surrounding whitespace", "  1  "],
+    ["a newline", "1\n"],
+    ["Infinity", "Infinity"],
+    ["NaN", "NaN"],
+    ["a bare word", "abc"],
+    ["trailing characters", "1abc"],
+    ["a separator", "1_000"],
+    ["a thousands comma", "1,000"],
+    ["one past MAX_SAFE_INTEGER", "9007199254740992"],
+    ["a very large integer", "99999999999999999999"],
+  ])("rejects %s", (_label, raw) => {
+    expect(parseStrictPositiveInteger(raw as string | undefined)).toBeUndefined();
+  });
+
+  it.each([
+    "",
+    "0",
+    "-1",
+    "1.5",
+    "1e3",
+    "0x10",
+    "+1",
+    "01",
+    " 1 ",
+    "Infinity",
+    "NaN",
+    "abc",
+    "9007199254740992",
+  ])("leaves --firm-id=%s undefined so the CLI stops before any import", (raw) => {
+    const args = parseCleanupArgs([`--firm-id=${raw}`, "--assistant-id=42"]);
+    expect(args.firmId).toBeUndefined();
+    // This is the property the CLI's guard depends on: a malformed id is
+    // indistinguishable from a missing one, and `NaN` never reaches it.
+    expect(Number.isNaN(args.firmId as number)).toBe(false);
+  });
+
+  it.each(["", "0", "-1", "1.5", "1e3", "0x10", "+1", "01", " 1 ", "Infinity", "NaN", "9007199254740992"])(
+    "leaves --assistant-id=%s undefined",
+    (raw) => {
+      expect(parseCleanupArgs(["--firm-id=7", `--assistant-id=${raw}`]).assistantId).toBeUndefined();
+    },
+  );
+
+  it("parses a fully valid invocation", () => {
+    const args = parseCleanupArgs(["--firm-id=7", "--assistant-id=42", `--confirm=${REMOTE_ID}`, "--execute"]);
+    expect(args).toEqual({
+      firmId: 7,
+      assistantId: 42,
+      confirmProviderAssistantId: REMOTE_ID,
+      execute: true,
+    });
+  });
+
+  it("still refuses a rejected identifier at the service layer, as defence in depth", async () => {
+    const repository = new CleanupFakeRepository({ seed: [seed()] });
+    const provider = new ScriptedDeleteProvider({ kind: "ok" });
+    for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+      const result = await cleanupStagingAssistant(
+        { ...execRequest, firmId: bad },
+        deps(repository, provider),
+      );
+      expect(result).toEqual({ ok: false, status: "ineligible", reason: "invalid_identifiers" });
+    }
+    expect(repository.inner.calls.getPublishState).toBe(0);
+    expect(provider.deleteCalls).toHaveLength(0);
   });
 });
 
@@ -619,10 +804,32 @@ describe("output safety", () => {
     { ok: false, status: "ineligible", reason: "confirmation_mismatch" },
     { ok: false, status: "provider_failed", code: "AUTHENTICATION_FAILED", firmId: FIRM_ID, assistantId: ASSISTANT_ID, providerAssistantId: REMOTE_ID },
     { ok: false, status: "uncertain", code: "TIMEOUT", firmId: FIRM_ID, assistantId: ASSISTANT_ID, providerAssistantId: REMOTE_ID },
+    { ok: false, status: "uncertain", code: "NOT_FOUND", firmId: FIRM_ID, assistantId: ASSISTANT_ID, providerAssistantId: REMOTE_ID },
+    { ok: false, status: "provider_failed", code: "VALIDATION_FAILED", firmId: FIRM_ID, assistantId: ASSISTANT_ID, providerAssistantId: REMOTE_ID },
     { ok: false, status: "local_reconcile_failed", remote: "deleted", firmId: FIRM_ID, assistantId: ASSISTANT_ID, providerAssistantId: REMOTE_ID },
   ];
 
-  it.each(results.map((r) => [r.status, r] as const))("%s output carries no credential, host, prompt, or config", (_s, result) => {
+  it("gives a 400/422 rejection definitive wording with no mandatory investigation", () => {
+    const output = formatCleanupResult({
+      ok: false,
+      status: "provider_failed",
+      code: "VALIDATION_FAILED",
+      firmId: FIRM_ID,
+      assistantId: ASSISTANT_ID,
+      providerAssistantId: REMOTE_ID,
+    });
+
+    expect(output).toContain("PROVIDER REFUSED");
+    expect(output).toContain("The remote outcome is known");
+    expect(output).toContain("nothing was deleted");
+    expect(output).toContain("Local state is unchanged");
+    // Definitive: never described as unknown, and no dashboard step is demanded.
+    expect(output).not.toMatch(/UNCERTAIN|is NOT known|unknown outcome/i);
+    expect(output).not.toMatch(/dashboard|investigat/i);
+    expect(output).toContain("Nothing was retried");
+  });
+
+  it.each(results.map((r) => [`${r.status}:${"code" in r ? r.code : r.status}`, r] as const))("%s output carries no credential, host, prompt, or config", (_s, result) => {
     const output = formatCleanupResult(result);
     expect(output.length).toBeGreaterThan(0);
     expect(output).not.toMatch(/api\.vapi\.ai|vapi\.ai|daily\.co|Bearer|api[ _-]?key|apikey|authorization|postgres|DATABASE_URL|receptionist_session/i);

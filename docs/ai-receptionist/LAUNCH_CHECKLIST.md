@@ -120,26 +120,82 @@ provider link, so cleanup is an explicit operator step.
 The command is dry-run by default and refuses to run unless
 `VOICE_STAGING_CLEANUP_ENABLED=true` and `NODE_ENV` is not `production`.
 
+### Manual provider-dashboard pre-check (required before any real deletion)
+
+Do this in the Vapi dashboard **before** running the command with `--execute`.
+It is not automated and must not be: no linked-resource API is assumed to
+exist, and none may be invented to skip this step.
+
+- [ ] Confirm the provider assistant ID, character for character, against the
+      dry-run output.
+- [ ] Confirm the Vapi organization / workspace the assistant belongs to is the
+      staging one, not any other organization.
+- [ ] Confirm **zero phone numbers** reference the assistant.
+- [ ] Confirm **zero squads** reference the assistant.
+- [ ] Confirm **zero workflows** reference the assistant.
+- [ ] Record who performed the check, and when, alongside this checklist.
+- [ ] **Stop if any link exists.** Remove the link first, or escalate — do not
+      delete a linked assistant.
+
+Vapi does not document what deleting an assistant does to a resource that
+references it. Never assume deletion cascades to a phone number, squad, or
+workflow, and never assume it leaves them intact either.
+
+### Run the command
+
 ```bash
 pnpm --filter @workspace/scripts run cleanup-staging-assistant -- --firm-id=<n> --assistant-id=<n>
 ```
 
+`--firm-id` and `--assistant-id` must be positive decimal integers — no sign,
+no leading zero, no exponent, no whitespace. A malformed identifier is refused
+before the database module is loaded.
+
 - [ ] Read the dry-run output and copy the reported provider assistant id.
+- [ ] Complete the pre-check above.
 - [ ] Re-run with `--confirm=<that id> --execute`.
 - [ ] Confirm the command reports `CLEANED` and exits 0.
 - [ ] Confirm the assistant is a draft again, then delete it normally.
 - [ ] Confirm the assistant is gone from the provider account.
 
+`CLEANED` is reported only when Vapi returned its one documented success for
+this endpoint: HTTP `200` carrying a JSON assistant object whose `id` is
+exactly the id that was requested. Every other response — any other 2xx, an
+empty or unparseable body, a missing or mismatched id — is reported as
+uncertain and changes nothing locally.
+
 Stop rules — do not improvise past any of these:
 
 - **UNCERTAIN**: the remote outcome is unknown. Do not re-run to "make sure", and do
   not assume deletion. Verify the resource in the provider account first.
-- **PROVIDER REFUSED**: nothing was deleted and local state is unchanged. Resolve the
-  cause before re-running.
-- **PARTIAL**: the remote resource is gone but the local row was not reconciled.
-  Re-run the same command; it will observe the resource already absent and finish.
+- **UNCERTAIN with `providerErrorCode: NOT_FOUND`**: the provider answered HTTP 404.
+  Vapi does not document whether that means the assistant is absent, inaccessible,
+  or owned by a different organization, so **a 404 does not authorize local
+  reconciliation**. Nothing was written. Stop and escalate to the owner; do not
+  re-run, and do not edit the row by hand.
+- **PROVIDER REFUSED**: the request was definitively rejected. Nothing was deleted
+  and local state is unchanged. Resolve the cause before re-running. No
+  provider-dashboard investigation is required for this outcome — the remote
+  outcome is known.
+- **PARTIAL**: remote deletion is confirmed but the local row was not reconciled.
+  Blindly rerunning cannot repair this: the second `DELETE` would answer 404, which
+  proves nothing. Verify the assistant's absence in the provider dashboard, then
+  reconcile local state only under a separately authorized procedure. A stale local
+  link is the safer end state; do not clear it to tidy up.
 - Never use the voice rollback SQL as cleanup. Dropping the tables destroys the only
   record of the provider assistant id and orphans the remote resource permanently.
+
+### Handling the identifiers
+
+- `--confirm=<providerAssistantId>` is typed on the command line and will be
+  retained in shell history. Treat provider assistant IDs as operationally
+  sensitive identifiers: they name a real remote resource and appear nowhere in
+  the dashboard.
+- Clear or exclude the history entry afterwards on any shared operator machine.
+- Secrets, API keys, connection strings, tokens, and session cookies must never
+  appear in the command, in its arguments, or in anything pasted into a log,
+  ticket, or this checklist. The command is designed to need none of them on the
+  command line: `VAPI_API_KEY` and `DATABASE_URL` are read from the environment.
 
 ## Rollback
 
