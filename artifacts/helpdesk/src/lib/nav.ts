@@ -122,7 +122,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         key: "logs", label: "Call Logs", href: "/logs", icon: ScrollText,
         state: "live", voiceGated: true,
-        description: "Calls, transcripts, and outcomes for your assistant. Shows sample data until live calling is connected.",
+        description: "Review stored call records and analysis.",
       },
       {
         key: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3,

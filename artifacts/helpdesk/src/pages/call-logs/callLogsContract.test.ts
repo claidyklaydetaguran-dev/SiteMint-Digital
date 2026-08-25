@@ -69,6 +69,8 @@ import {
   visibleNavGroups,
 } from "../../components/layout/dashboardNav.js";
 
+import { NAV_GROUPS } from "../../lib/nav.js";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/pages/call-logs → src/pages → src → helpdesk → artifacts → repo root
 const repoRoot = path.resolve(here, "../../../../..");
@@ -1112,23 +1114,198 @@ check(
   /item\.state === "live" && \(!item\.voiceGated \|\| voiceEnabled\) && Boolean\(item\.href\)/.test(dashboardNavSrc),
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+section("Navigation — the corrected Call Logs description");
+// ═══════════════════════════════════════════════════════════════════════════
+
 /**
- * `lib/nav.ts` is a protected file and still carries an unsupported sentence
- * on the Call Logs entry — "Shows sample data until live calling is
- * connected." Phase 14 may not edit it, so this asserts the only thing that
- * keeps the sentence away from a reader: `description` is rendered *solely*
- * for `comingSoon` and `advanced` destinations, and Call Logs is `live`. If
- * anyone ever renders a live item's description, this fails loudly rather than
- * quietly shipping the claim. The sentence itself needs a separate,
- * owner-approved change to a protected file.
+ * The Call Logs nav entry used to end with a sentence promising sample data
+ * until calling was hooked up. Both halves are now false: the demo fixture is
+ * deleted, the route renders only stored API records, and nothing on this
+ * surface reads provider status, so the product cannot know — let alone
+ * promise — that calling is connected. Phase 14 requires a prohibited claim to
+ * be absent from source and from the bundle, not merely unrendered, so the
+ * sentence is gone and its absence is pinned here.
+ *
+ * It is assembled from fragments rather than written out: a literal would put
+ * the exact byte sequence this correction removes back into the tree, and into
+ * the grep an owner review runs over it.
+ */
+const OBSOLETE_NAV_SENTENCE =
+  ["Shows", "sample", "data", "until", "live", "calling", "is", "connected."].join(" ");
+
+const CORRECTED_NAV_DESCRIPTION = "Review stored call records and analysis.";
+
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
+const CALL_LOGS_NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => item.key === "logs");
+
+eq("exactly one Call Logs navigation record exists", CALL_LOGS_NAV_ITEMS.length, 1);
+
+const callLogsNav = CALL_LOGS_NAV_ITEMS[0]!;
+
+check(
+  "the obsolete sentence is absent from lib/nav.ts",
+  !navSrc.includes(OBSOLETE_NAV_SENTENCE),
+);
+
+eq(
+  "no navigation entry anywhere still carries the obsolete sentence",
+  ALL_NAV_ITEMS
+    .filter((item) =>
+      `${item.description ?? ""} ${item.availability ?? ""}`.includes(OBSOLETE_NAV_SENTENCE))
+    .map((item) => item.key),
+  [],
+);
+
+check(
+  "the obsolete sentence is absent from every string this route can render",
+  !renderable.join("\n").includes(OBSOLETE_NAV_SENTENCE),
+);
+
+eq(
+  "the Call Logs description is the corrected wording, exactly",
+  callLogsNav.description,
+  CORRECTED_NAV_DESCRIPTION,
+);
+
+/**
+ * The claim categories the owner named, probed against the corrected sentence
+ * on its own. `BANNED` above is the same net cast wider over the whole route;
+ * this is the narrow, explicit statement of what this one description may not
+ * say, so a future edit to it fails here by name.
+ */
+const NAV_CLAIM_PROBES: [string, RegExp][] = [
+  ["sample data", /\bsamples?\b/i],
+  ["demo data", /\bdemos?\b|\bmock/i],
+  ["live calling", /\blive\b/i],
+  ["connected calling", /\bconnect(s|ed|ing|ion)?\b/i],
+  ["operational calling", /\boperational\b|\bworking\b|\bactive\b|\bonline\b|\banswers? calls?\b|\btaking calls\b/i],
+  ["a configured phone number", /\bphone number\b|\bconfigured\b|\bprovisioned\b|\bnumber is\b/i],
+  ["provider readiness", /\bprovider\b|\bready\b|\bvapi\b|\btwilio\b/i],
+];
+
+eq(
+  "the corrected description makes none of the prohibited calling claims",
+  NAV_CLAIM_PROBES.filter(([, re]) => re.test(callLogsNav.description!)).map(([name]) => name),
+  [],
+);
+
+eq(
+  "the corrected description trips none of the route's own banned claims either",
+  bannedHits(callLogsNav.description!),
+  [],
+);
+
+/**
+ * Truthful, not merely inoffensive: every noun in the replacement is something
+ * this route demonstrably has. "Stored call records" are what the two GET
+ * endpoints asserted at the top of this file return — the server's own rows,
+ * never anything live — and "analysis" is the API's `analysisAvailability`
+ * field, which the detail page renders including its honest unavailable case.
  */
 check(
-  "the unsupported nav description is still present, and still unrendered",
-  navSrc.includes("Shows sample data until live calling is connected.") &&
+  "each thing the corrected description names is backed by the route's own surface",
+  ROUTER_CALLS.some((c) => c.includes('"/receptionist/voice/calls"')) &&
+    ROUTER_CALLS.some((c) => c.includes('"/receptionist/voice/calls/:callId"')) &&
+    LIST.heading === "Call records" &&
+    detailCode.includes("ANALYSIS_UNAVAILABLE") &&
+    /analysisAvailability/.test(apiSrc) &&
+    !/provider-status/.test(listCode + detailCode),
+);
+
+eq(
+  "no other Call Logs navigation property moved",
+  {
+    key: callLogsNav.key,
+    label: callLogsNav.label,
+    href: callLogsNav.href,
+    state: callLogsNav.state,
+    voiceGated: callLogsNav.voiceGated,
+    availability: callLogsNav.availability ?? null,
+  },
+  {
+    key: "logs",
+    label: "Call Logs",
+    href: "/logs",
+    state: "live",
+    voiceGated: true,
+    availability: null,
+  },
+);
+
+eq(
+  "the navigation groups, their items and their order are unchanged",
+  NAV_GROUPS.map((group) => [group.key, group.items.map((item) => item.key)]),
+  [
+    ["overview", ["overview"]],
+    ["build", ["assistants", "tools", "phone-numbers", "voice-library", "knowledge", "squads"]],
+    ["operate", ["appointments", "conversations", "receptionist", "contacts", "outbound"]],
+    ["observe", ["logs", "analytics", "testing", "structured-outputs", "issues"]],
+    ["manage", ["integrations", "billing", "settings", "api-keys"]],
+  ],
+);
+
+eq(
+  "every other navigation description is byte-for-byte what it was",
+  ALL_NAV_ITEMS
+    .filter((item) => item.key !== "logs" && item.description !== undefined)
+    .map((item) => [item.key, item.description]),
+  [
+    ["assistants", "Build and manage AI voice assistants for your business."],
+    ["tools", "Assign actions your assistant can take during a call, like booking or transferring."],
+    ["phone-numbers", "Get a SiteMint number or connect one you already own."],
+    ["voice-library", "Browse and preview voices for your assistant."],
+    ["knowledge", "Give your assistant reference material to draw on during calls."],
+    ["appointments", "Visual booking calendar, requests, and availability rules. Development preview — no real calendar is connected yet."],
+    ["analytics", "Business metrics — calls answered, appointments booked, hours saved."],
+    ["testing", "Test your assistant with a browser call or a text conversation."],
+    ["structured-outputs", "Data your assistant extracts and structures from each call."],
+    ["integrations", "Connect Google Calendar, Google Sheets, and other accounts."],
+    ["api-keys", "Manage API credentials for advanced integrations."],
+  ],
+);
+
+check(
+  "no navigation entry re-introduces demo, sample or fixture framing",
+  !ALL_NAV_ITEMS.some((item) =>
+    /\bdemo\b|\bsample\b|\bmock|\bfixture\b/i.test(
+      `${item.label} ${item.description ?? ""} ${item.availability ?? ""}`,
+    ),
+  ),
+);
+
+/**
+ * The set of descriptions the app actually renders is unchanged by this
+ * correction, and Call Logs is still not in it: `description` reaches a reader
+ * through exactly one JSX site, for `comingSoon` and `advanced` destinations
+ * only, and the shell renders none at all. The corrected sentence is therefore
+ * inert, which is why no Call Logs screen changes.
+ */
+eq(
+  "the only navigation descriptions the app renders are the coming-soon and advanced ones",
+  ALL_NAV_ITEMS
+    .filter((item) => item.href && (item.state === "comingSoon" || item.state === "advanced"))
+    .map((item) => item.key),
+  ["tools", "phone-numbers", "voice-library", "knowledge", "analytics", "testing",
+    "structured-outputs", "integrations", "api-keys"],
+);
+
+check(
+  "Call Logs is live, so its description stays unrendered — through the one render site",
+  callLogsNav.state === "live" &&
     (appSrc.match(/description=\{item\.description\}/g) ?? []).length === 1 &&
     /comingSoonRoutes = voicePlatformEnabled\s*\?\s*NAV_GROUPS[\s\S]*?item\.state === "comingSoon" \|\| item\.state === "advanced"/
       .test(appSrc) &&
     !/description/.test(read("artifacts/helpdesk/src/components/layout/AppShell.tsx")),
+);
+
+eq(
+  "no production-renderable navigation string carries the obsolete sentence",
+  ALL_NAV_ITEMS
+    .filter((item) => item.href && (item.state === "comingSoon" || item.state === "advanced"))
+    .flatMap((item) => [item.label, item.description ?? "", item.availability ?? ""])
+    .filter((s) => s.includes(OBSOLETE_NAV_SENTENCE)),
+  [],
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1144,6 +1321,25 @@ if (!existsSync(distDir)) {
   const detailChunks = files.filter((f) => /^CallLogDetail-.*\.js$/.test(f));
   check("exactly one Call Logs list chunk is emitted", listChunks.length === 1);
   check("exactly one Call Logs detail chunk is emitted", detailChunks.length === 1);
+
+  /**
+   * Whole-bundle, and deliberately outside the per-chunk block below: the
+   * navigation description ships in the entry chunk of *every* build —
+   * including the default-gated one, where no Call Logs route is registered at
+   * all — so this is the assertion that covers the gated build too.
+   */
+  const everyEmittedJs = files.filter((f) => f.endsWith(".js"))
+    .map((f) => readFileSync(path.join(distDir, f), "utf8")).join("\n");
+
+  check(
+    "the obsolete sentence is absent from every emitted JavaScript file",
+    !everyEmittedJs.includes(OBSOLETE_NAV_SENTENCE),
+  );
+
+  check(
+    "the corrected Call Logs navigation description is what the bundle carries",
+    everyEmittedJs.includes(CORRECTED_NAV_DESCRIPTION),
+  );
 
   if (listChunks.length === 1 && detailChunks.length === 1) {
     /**
