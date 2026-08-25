@@ -98,8 +98,14 @@ Nothing may replace the Twilio Messaging webhook on the intake number.
 - Every customer-owned voice table row: `firm_id` NOT NULL + FK to
   `intake_firms.id` + index + `created_at`/`updated_at`. All queries firm-scoped;
   cross-firm access returns 404.
-- `VOICE_PROVIDER=fake` (FakeVoiceProvider) for automated tests and for dev
-  without credentials.
+- No production `VOICE_PROVIDER` selection branch exists, and none may be added.
+  `createProductionVoiceProvider()` constructs `VapiVoiceProvider` unconditionally;
+  nothing in the application reads a `VOICE_PROVIDER` variable. `FakeVoiceProvider`
+  and `VoiceProviderRegistry` exist but are consumed only by tests.
+- Test providers reach the publish path solely through the explicit
+  `PublishServiceDependencies` injection seam (`createProvider`), and the browser
+  test path solely through `BrowserVoiceClientSource`. A fake must never be wired
+  into production implicitly, by environment variable, or by any silent fallback.
 
 ## Database rules
 

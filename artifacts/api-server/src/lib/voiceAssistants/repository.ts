@@ -382,4 +382,54 @@ export const voiceAssistantRepository = {
 
     return row ?? null;
   },
+
+  /**
+   * AR-001C: returns a provider-linked assistant to a clean editable draft
+   * after its remote resource has been *definitively* removed. Called only by
+   * the operator cleanup command (lib/voiceCleanup), never by a route.
+   *
+   * The predicate is the safety property. It matches on firm id, assistant id
+   * AND the exact provider assistant id the caller just deleted, so a row that
+   * changed underneath the caller — republished, reclaimed, or already
+   * reconciled by a concurrent run — matches zero rows and returns null rather
+   * than clearing an identity the caller never verified. A single conditional
+   * UPDATE means there is no check-then-write window at all.
+   *
+   * The user's configuration and firm ownership are preserved; only provider
+   * identity, attempt ownership, and sync bookkeeping are cleared. The
+   * resulting row satisfies the 'draft' branch of
+   * ck_voice_assistants_publish_invariants (provider, provider_assistant_id,
+   * publish_attempt_id and publish_started_at all NULL), so no migration and
+   * no invariant relaxation is required — and the existing draft-delete
+   * contract in deleteByIdForFirm applies to it afterward.
+   */
+  async clearProviderLinkForFirm(
+    firmId: number,
+    id: number,
+    expectedProviderAssistantId: string,
+  ): Promise<VoiceAssistant | null> {
+    const now = new Date();
+    const [row] = await db
+      .update(voiceAssistants)
+      .set({
+        status: "draft",
+        provider: null,
+        providerAssistantId: null,
+        publishAttemptId: null,
+        publishStartedAt: null,
+        syncError: null,
+        lastSyncedAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(voiceAssistants.id, id),
+          eq(voiceAssistants.firmId, firmId),
+          eq(voiceAssistants.providerAssistantId, expectedProviderAssistantId),
+        ),
+      )
+      .returning();
+
+    return row ?? null;
+  },
 };

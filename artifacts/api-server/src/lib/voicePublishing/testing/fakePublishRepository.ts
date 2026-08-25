@@ -310,4 +310,35 @@ export class FakePublishRepository {
     const row = this.rows.get(this.key(firmId, id));
     return row ? ({ ...row } as VoiceAssistant) : null;
   };
+
+  /**
+   * AR-001C: applies exactly the cleared-draft shape the real
+   * `clearProviderLinkForFirm` writes. The caller owns the conditional
+   * predicate; this performs only the write half.
+   */
+  applyCleared(firmId: number, id: number): VoiceAssistant | null {
+    const row = this.rows.get(this.key(firmId, id));
+    if (!row) return null;
+    const now = this.nowFn();
+    const next = {
+      ...row,
+      status: "draft",
+      provider: null,
+      providerAssistantId: null,
+      publishAttemptId: null,
+      publishStartedAt: null,
+      syncError: null,
+      lastSyncedAt: null,
+      updatedAt: now,
+    } as VoiceAssistant;
+    this.rows.set(this.key(firmId, id), next);
+    return { ...next } as VoiceAssistant;
+  }
+
+  /** AR-001C: simulates a concurrent writer landing a different provider identity mid-cleanup. */
+  forceProviderAssistantId(firmId: number, id: number, providerAssistantId: string): void {
+    const row = this.rows.get(this.key(firmId, id));
+    if (!row) return;
+    this.rows.set(this.key(firmId, id), { ...row, providerAssistantId } as VoiceAssistant);
+  }
 }
