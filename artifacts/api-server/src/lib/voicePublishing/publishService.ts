@@ -15,6 +15,10 @@ import { VoiceProviderError, type VoiceProviderErrorCode } from "../voice/errors
 import type { VoiceProvider } from "../voice/VoiceProvider.js";
 import { validateVapiAssistantName } from "../voice/providers/vapi/types.js";
 import {
+  loadVoiceArtifactPolicyFromEnv,
+  type VoiceArtifactPolicy,
+} from "../voice/providers/vapi/artifactPolicy.js";
+import {
   voiceAssistantRepository,
   STALE_PUBLISHING_THRESHOLD_MS,
   type ClaimForPublishResult,
@@ -58,6 +62,13 @@ export interface PublishServiceDependencies {
   isEnabled: () => boolean;
   /** Explicit runtime-catalog load + validation. Never read at module import time. */
   loadCatalog: () => RuntimeCatalog;
+  /**
+   * Explicit artifact-policy load + validation. Never read at module import
+   * time. Server-owned: the value comes from the process environment, never
+   * from the request body, the persisted assistant config, or any other
+   * caller-influenced source.
+   */
+  loadArtifactPolicy: () => VoiceArtifactPolicy;
   /** Explicit, lazy production-provider construction. No network request occurs during construction. */
   createProvider: () => VoiceProvider;
   repository: PublishRepositoryDependency;
@@ -75,6 +86,7 @@ export interface PublishServiceDependencies {
 export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   isEnabled: isVoicePublishEnabled,
   loadCatalog: loadRuntimeCatalogFromEnv,
+  loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -307,6 +319,20 @@ export async function publishAssistant(
   let catalog: RuntimeCatalog;
   try {
     catalog = deps.loadCatalog();
+  } catch {
+    return failure("publish_disabled");
+  }
+
+  // AR-001G: the artifact policy is server configuration, exactly like the
+  // runtime catalog, and is validated in the same pre-claim step. A missing or
+  // invalid policy therefore stops the publish here — before the atomic claim,
+  // before any database write, and before any provider request — rather than
+  // letting the request reach Vapi and inherit its permissive recording and
+  // transcript defaults. The resolved value is not carried forward: the
+  // provider adapter re-reads it for the actual request body, so there is no
+  // way for a policy validated here to differ from the one that is sent.
+  try {
+    deps.loadArtifactPolicy();
   } catch {
     return failure("publish_disabled");
   }

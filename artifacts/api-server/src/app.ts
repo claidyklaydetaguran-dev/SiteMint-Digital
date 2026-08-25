@@ -1,9 +1,9 @@
 import express, { type Express } from "express";
-import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { createCorsMiddleware, resolveCorsPolicy } from "./lib/corsPolicy.js";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { DISCOVERY_V1_BODY_LIMIT, DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler } from "./lib/discoveryV1BodyLimit.js";
 
@@ -28,7 +28,14 @@ app.use(
     },
   }),
 );
-app.use(cors({ origin: true, credentials: true }));
+// AR-001G: an explicit, exact-match credentialed CORS allowlist replaces the
+// former `cors({ origin: true, credentials: true })`, which reflected every
+// browser origin back while also allowing credentials. `resolveCorsPolicy` is
+// called here, during module evaluation, deliberately: `index.ts` imports this
+// module before it calls `app.listen()`, so a production deployment with a
+// missing or malformed `CORS_ALLOWED_ORIGINS` fails to start rather than
+// starting with a policy that trusts everyone.
+app.use(createCorsMiddleware(resolveCorsPolicy(process.env)));
 app.use(cookieParser());
 
 // Register Stripe webhook route BEFORE express.json() -- it needs the raw Buffer body

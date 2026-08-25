@@ -11,8 +11,9 @@
 import { VoiceProviderError } from "../../errors";
 import { validateAssistantInput, validateProviderAssistantId } from "../../validation";
 import type { VoiceProvider } from "../../VoiceProvider";
-import type { VoiceAssistantDeleteResult, VoiceAssistantInput, VoiceAssistantResult } from "../../types";
+import type { JsonObject, VoiceAssistantDeleteResult, VoiceAssistantInput, VoiceAssistantResult } from "../../types";
 import { VAPI_PROVIDER_KEY, type VapiProviderConfig } from "./config";
+import { buildVapiArtifactPlan, loadVoiceArtifactPolicyFromEnv } from "./artifactPolicy";
 import { buildVapiAssistantRequestBody, mapVapiAssistantResponse } from "./mapper";
 import { validateVapiAssistantName, validateVapiRuntimeConfig } from "./types";
 
@@ -199,11 +200,29 @@ export class VapiVoiceProvider implements VoiceProvider {
     throw mapStatusToError(status);
   }
 
+  /**
+   * Resolves the server-owned artifact policy for one outgoing request.
+   *
+   * Read here, at the point of use, rather than captured at construction:
+   * `providerFactory.createProductionVoiceProvider()` is shared with the
+   * operator cleanup command, which only ever deletes and must keep working
+   * without an artifact policy configured. Binding the policy to construction
+   * would have made cleanup depend on it.
+   *
+   * This throws before any `fetch` is dispatched, so a missing or invalid
+   * policy can never result in a provider request. The publish service checks
+   * the same policy earlier still, before it claims the row; this is the
+   * backstop that holds for any other caller.
+   */
+  private resolveArtifactPlan(): JsonObject {
+    return buildVapiArtifactPlan(loadVoiceArtifactPolicyFromEnv());
+  }
+
   async createAssistant(input: VoiceAssistantInput): Promise<VoiceAssistantResult> {
     const validated = validateAssistantInput(input);
     const name = validateVapiAssistantName(validated.name);
     const runtimeConfig = validateVapiRuntimeConfig(validated.config);
-    const body = buildVapiAssistantRequestBody(name, runtimeConfig);
+    const body = buildVapiAssistantRequestBody(name, runtimeConfig, this.resolveArtifactPlan());
     const raw = await this.request("POST", "/assistant", body);
     return mapVapiAssistantResponse(raw);
   }
@@ -219,7 +238,7 @@ export class VapiVoiceProvider implements VoiceProvider {
     const validated = validateAssistantInput(input);
     const name = validateVapiAssistantName(validated.name);
     const runtimeConfig = validateVapiRuntimeConfig(validated.config);
-    const body = buildVapiAssistantRequestBody(name, runtimeConfig);
+    const body = buildVapiAssistantRequestBody(name, runtimeConfig, this.resolveArtifactPlan());
     const raw = await this.request("PATCH", `/assistant/${encodeURIComponent(id)}`, body);
     return mapVapiAssistantResponse(raw);
   }

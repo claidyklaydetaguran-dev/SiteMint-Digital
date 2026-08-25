@@ -91,6 +91,14 @@ Nothing may replace the Twilio Messaging webhook on the intake number.
   credential may appear outside `VapiVoiceProvider.ts` and the provider factory.
 - `VAPI_API_KEY` is server-only. The browser build receives only the Vapi
   public browser key through `VITE_VAPI_PUBLIC_KEY`.
+- Provider artifact capture is server-owned via `VOICE_ARTIFACT_POLICY`
+  (`none` | `transcript_only` | `full`). It is never accepted in an API body,
+  never read from a persisted assistant config, and never defaulted — a missing
+  or invalid value fails the publish before the assistant row is claimed and
+  before any provider request. `none` sends an explicit Vapi `artifactPlan`
+  disabling recording and transcript retention; only `none` is approved for
+  AR-001. Never add a client, firm, or request-body override, and never let a
+  request reach Vapi without an explicit `artifactPlan`.
 - Backend publishing uses `VOICE_PUBLISH_ENABLED`. Dashboard routes, publishing,
   and browser testing use the three documented `VITE_VOICE_*_ENABLED` build
   flags. Keep them off in production until owner approval. SMS routes are never
@@ -146,7 +154,28 @@ Helpdesk build needs env: `PORT=21622 BASE_PATH=/ai-receptionist/dashboard`.
    `opted_out`; login rate limit 10×401 → 429.
 4. No browser console errors on any dashboard route.
 
+## Server security configuration (fail-closed — do not weaken)
+
+- **CORS**: `CORS_ALLOWED_ORIGINS` is a comma-separated list of bare origins and
+  is **required** when `NODE_ENV=production` — an empty or invalid value fails
+  startup before the port opens. Only exactly listed origins get credentialed
+  approval; loopback with an explicit port is additionally allowed outside
+  production. Never restore `cors({ origin: true, ... })`, never reflect an
+  arbitrary origin alongside credentials, and never pair credentials with a
+  wildcard.
+- **Admin auth**: `ADMIN_PASSWORD` is required; there is no literal fallback in
+  any environment and none may be reintroduced. Unset means admin login is
+  unavailable (`503`), never guessable. Comparison is timing-safe over fixed-width
+  digests. Never log or return the secret.
+- **Stripe boot sync**: `STRIPE_BOOT_SYNC_ENABLED` defaults to `false` and only
+  the exact string `true` enables it. When off, startup acquires no connector,
+  registers no webhook, and runs no backfill. The internal startup database
+  migration is separate and unaffected, as is user-initiated billing checkout.
+
 ## Secrets
 
 Never commit secrets, API keys, credentials, `.env` files, generated tokens,
 customer data, or database exports. `.env.example` documents required vars.
+`.env.example` does not yet list the AR-001G variables above; the staging
+secret-name profile in `docs/ai-receptionist/LAUNCH_CHECKLIST.md` §2/§2a is
+authoritative until it does.

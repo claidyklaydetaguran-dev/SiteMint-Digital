@@ -16,7 +16,8 @@
     "generate:voice": "drizzle-kit generate --config ./drizzle.voice.config.ts",
     "migrate:voice": "drizzle-kit migrate --config ./drizzle.voice.config.ts",
     "generate:scheduling": "drizzle-kit generate --config ./drizzle.scheduling.config.ts",
-    "migrate:scheduling": "drizzle-kit migrate --config ./drizzle.scheduling.config.ts"
+    "migrate:scheduling": "drizzle-kit migrate --config ./drizzle.scheduling.config.ts",
+    "migrate:discovery": "drizzle-kit migrate --config ./drizzle.discovery.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

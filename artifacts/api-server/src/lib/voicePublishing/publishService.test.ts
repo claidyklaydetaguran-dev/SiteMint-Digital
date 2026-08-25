@@ -33,6 +33,8 @@ vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 import { publishAssistant, type PublishServiceDependencies } from "./publishService.js";
 import { buildPublishRouteError, type PublishRouteErrorCode } from "./publishHttpErrors.js";
 import type { RuntimeCatalog, RuntimeCatalogPreset } from "./types.js";
+import { parseVoiceArtifactPolicy, type VoiceArtifactPolicy } from "../voice/providers/vapi/artifactPolicy.js";
+import { VoiceProviderError } from "../voice/errors.js";
 import { FakeVoiceProvider } from "../voice/FakeVoiceProvider.js";
 import type { VoiceProvider } from "../voice/VoiceProvider.js";
 import type { Clock } from "../voice/types.js";
@@ -125,6 +127,7 @@ function deps(overrides: {
   provider?: VoiceProvider;
   isEnabled?: () => boolean;
   loadCatalog?: () => RuntimeCatalog;
+  loadArtifactPolicy?: () => VoiceArtifactPolicy;
   createProvider?: () => VoiceProvider;
   clock?: Clock;
 }): PublishServiceDependencies {
@@ -132,6 +135,8 @@ function deps(overrides: {
   return {
     isEnabled: overrides.isEnabled ?? (() => true),
     loadCatalog: overrides.loadCatalog ?? catalog,
+    // AR-001G: the only policy approved for AR-001 staging.
+    loadArtifactPolicy: overrides.loadArtifactPolicy ?? ((): VoiceArtifactPolicy => "none"),
     createProvider: overrides.createProvider ?? (() => provider),
     repository: overrides.repository,
     clock: overrides.clock ?? fixedClock,
@@ -247,6 +252,105 @@ describe("preconditions — nothing is claimed or called before configuration su
     expect(result).toEqual({ ok: false, error: buildPublishRouteError("publish_disabled") });
     expect(repository.calls.claimForPublish).toBe(0);
     expect(repository.peek(FIRM_ID, ASSISTANT_ID)?.status).toBe("draft");
+  });
+
+  // ── AR-001G: artifact policy is a pre-claim precondition ──────────────────
+
+  it("causes no provider activity when the policy is missing and publishing is disabled", async () => {
+    const repository = new FakePublishRepository({ seed: [seedDraft()] });
+    const provider = new ScriptedVoiceProvider({ outcomes: [] });
+    let policyReads = 0;
+    const result = await publishAssistant(
+      FIRM_ID,
+      ASSISTANT_ID,
+      deps({
+        repository,
+        provider,
+        isEnabled: () => false,
+        loadArtifactPolicy: () => {
+          policyReads += 1;
+          return parseVoiceArtifactPolicy(undefined);
+        },
+      }),
+    );
+
+    expect(result).toEqual({ ok: false, error: buildPublishRouteError("publish_disabled") });
+    // The disabled flag short-circuits first, so the missing policy is not
+    // even reached — and nothing at all is attempted.
+    expect(policyReads).toBe(0);
+    expect(repository.calls.claimForPublish).toBe(0);
+    expect(provider.createCallCount).toBe(0);
+  });
+
+  it("returns publish_disabled when the artifact policy is missing", async () => {
+    const repository = new FakePublishRepository({ seed: [seedDraft()] });
+    const provider = new ScriptedVoiceProvider({ outcomes: [] });
+    const result = await publishAssistant(
+      FIRM_ID,
+      ASSISTANT_ID,
+      deps({
+        repository,
+        provider,
+        loadArtifactPolicy: () => {
+          throw new VoiceProviderError("NOT_CONFIGURED", "VOICE_ARTIFACT_POLICY is not set.");
+        },
+      }),
+    );
+
+    expect(result).toEqual({ ok: false, error: buildPublishRouteError("publish_disabled") });
+    // The whole point: no claim, no row transition, and no provider request.
+    expect(repository.calls.claimForPublish).toBe(0);
+    expect(provider.createCallCount).toBe(0);
+    expect(repository.peek(FIRM_ID, ASSISTANT_ID)?.status).toBe("draft");
+  });
+
+  it("returns publish_disabled when the artifact policy is invalid", async () => {
+    const repository = new FakePublishRepository({ seed: [seedDraft()] });
+    const provider = new ScriptedVoiceProvider({ outcomes: [] });
+    const result = await publishAssistant(
+      FIRM_ID,
+      ASSISTANT_ID,
+      deps({
+        repository,
+        provider,
+        loadArtifactPolicy: () => parseVoiceArtifactPolicy("record-everything"),
+      }),
+    );
+
+    expect(result).toEqual({ ok: false, error: buildPublishRouteError("publish_disabled") });
+    expect(repository.calls.claimForPublish).toBe(0);
+    expect(provider.createCallCount).toBe(0);
+  });
+
+  it("checks the artifact policy even before provider construction", async () => {
+    const repository = new FakePublishRepository({ seed: [seedDraft()] });
+    let providerConstructed = 0;
+    const result = await publishAssistant(
+      FIRM_ID,
+      ASSISTANT_ID,
+      deps({
+        repository,
+        loadArtifactPolicy: () => parseVoiceArtifactPolicy(undefined),
+        createProvider: () => {
+          providerConstructed += 1;
+          return new FakeVoiceProvider(fixedClock);
+        },
+      }),
+    );
+
+    expect(result).toEqual({ ok: false, error: buildPublishRouteError("publish_disabled") });
+    expect(providerConstructed).toBe(0);
+  });
+
+  it("proceeds when the approved staging policy is configured", async () => {
+    const repository = new FakePublishRepository({ seed: [seedDraft()] });
+    const result = await publishAssistant(
+      FIRM_ID,
+      ASSISTANT_ID,
+      deps({ repository, loadArtifactPolicy: () => parseVoiceArtifactPolicy("none") }),
+    );
+
+    expect(result.ok).toBe(true);
   });
 });
 
