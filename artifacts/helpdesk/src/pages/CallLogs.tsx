@@ -1,197 +1,220 @@
-import type { ReactNode } from "react";
+/**
+ * Frontend V2 Phase 14 — the Call Logs list.
+ *
+ * Mounted at `ROUTES.logs` (`/logs`, base-relative) inside the Phase 7
+ * `DashboardShell`, and registered only when `VITE_VOICE_PLATFORM_ENABLED` is
+ * true. That gate, the navigation entry (`voiceGated: true`) and the
+ * feature-flag helper are untouched by this phase: in a default production
+ * build this route does not exist and Call Logs is absent from navigation.
+ *
+ * ── Product classification ────────────────────────────────────────────────
+ * A read-only viewer for stored call records. Every row comes from
+ * `GET /api/receptionist/voice/calls`. Nothing on this page places, answers,
+ * transfers, retries or records a call, reaches a provider, sends a message,
+ * books anything, or writes any row — and there is no endpoint behind it that
+ * could. `call-logs/callLogsContract.ts` owns every string it can display.
+ *
+ * The four fabricated "Demo Mode" calls this page used to render, and the
+ * header line claiming the assistant answers calls, are removed. Nothing
+ * replaces them: with no records the page says there are no records.
+ *
+ * ── Requests ──────────────────────────────────────────────────────────────
+ * `useSession()` reads the React Query entry the shell already fetched, so
+ * this page issues no second `/auth/me`. `useRealCallsList()` is enabled only
+ * once a firm id has resolved, and issues exactly one GET. There is no poll,
+ * no refetch interval, no prefetch, no provider-status read, and no request
+ * that an animation, a transition or a route change can cause. The only
+ * repeat read is the Try again button, which runs on explicit activation.
+ */
+
 import { Link } from "wouter";
-import { PhoneCall, ChevronRight, PhoneOff } from "lucide-react";
-import { StatusBadge, type StatusTone } from "@/components/common/StatusBadge";
-import { DemoModeBanner } from "@/components/common/DemoModeBanner";
-import { EmptyState } from "@/components/common/EmptyState";
-import {
-  DEMO_CALLS,
-  demoOutcomeTone,
-  formatDemoDuration,
-  formatDemoOutcome,
-} from "@/lib/demoCallLog";
+import { useCallback, useState } from "react";
+import { useSession } from "@/hooks/useSession";
 import { useRealCallsList } from "@/hooks/useVoiceCalls";
-import { voicePlatformEnabled } from "@/lib/featureFlags";
 import type { RealCallSummary } from "@/lib/voiceCallsApi";
+import {
+  LIST,
+  PAGE,
+  callHref,
+  formatDuration,
+  formatListTime,
+  machineTime,
+  recordCount,
+  stateAccessibleName,
+  stateLabel,
+  stateTone,
+} from "@/pages/call-logs/callLogsContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-call-logs.css";
 
-function formatWhen(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatRealDuration(sec: number | null): string {
-  if (sec === null) return "—";
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function realStateTone(state: RealCallSummary["state"]): StatusTone {
-  switch (state) {
-    case "completed":
-      return "success";
-    case "in_progress":
-    case "ringing":
-    case "connecting":
-    case "queued":
-      return "info";
-    case "no_answer":
-    case "busy":
-    case "canceled":
-      return "warning";
-    case "failed":
-    case "provider_error":
-      return "destructive";
-  }
-}
-
-function CallRow({
-  href,
-  name,
-  subtitle,
-  when,
-  duration,
-  badgeLabel,
-  badgeTone,
-}: {
-  href: string;
-  name: string;
-  subtitle: string;
-  when: string;
-  duration: string;
-  badgeLabel: string;
-  badgeTone: StatusTone;
-}) {
+function CallRow({ call }: { call: RealCallSummary }) {
+  const label = stateLabel(call);
   return (
-    <Link
-      href={href}
-      className="block border-b border-border px-4 py-3.5 last:border-0 hover:bg-surface-muted focus-visible:bg-surface-muted sm:grid sm:min-h-11 sm:grid-cols-[minmax(0,1fr)_9rem_5rem_11rem_1.5rem] sm:items-center sm:gap-4"
-    >
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-surface-muted text-primary">
-          <PhoneCall className="h-4 w-4" aria-hidden="true" />
+    // The row's left rule carries the state's tone. It is the only colour on
+    // the row, and the state is always spelled out in its own cell as well, so
+    // nothing here is legible by colour alone.
+    <tr className="sc-row" role="row" data-tone={stateTone(call.state)}>
+      <td className="sc-cell sc-cell--caller" role="cell">
+        <span className="sc-cell__label" aria-hidden="true">
+          {LIST.colCaller}
         </span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-foreground">{name}</span>
-          <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+        {/* The link is the row's only interactive element; it stretches over
+            the row so the whole line is clickable, while focus stays on a real
+            anchor and the focus ring is drawn around the row. */}
+        <Link href={callHref(call.callId)} className="sc-link">
+          <span className="sc-link__text">{call.callerNumberDisplay}</span>
+          <span className="sd-sr"> — {LIST.openRecord}</span>
+        </Link>
+      </td>
+
+      <td className="sc-cell sc-cell--time" role="cell">
+        <span className="sc-cell__label" aria-hidden="true">
+          {LIST.colStarted}
         </span>
-      </span>
+        <time className="sc-fig" dateTime={machineTime(call.startedAt)}>
+          {formatListTime(call.startedAt)}
+        </time>
+      </td>
 
-      <span className="mt-2 flex items-center gap-3 pl-10 text-xs text-muted-foreground sm:mt-0 sm:contents sm:pl-0 sm:text-sm">
-        <span className="sm:block">{when}</span>
-        <span className="tabular-nums sm:block">{duration}</span>
-      </span>
+      <td className="sc-cell sc-cell--duration" role="cell">
+        <span className="sc-cell__label" aria-hidden="true">
+          {LIST.colDuration}
+        </span>
+        {/* A measured length is a figure; an absent one is a phrase, and the
+            two are set differently so a column of numbers stays scannable. */}
+        {typeof call.durationSec === "number" ? (
+          <span className="sc-fig">{formatDuration(call.durationSec)}</span>
+        ) : (
+          <span className="sc-absent-inline">{formatDuration(null)}</span>
+        )}
+      </td>
 
-      <span className="mt-2 flex items-center gap-2 pl-10 sm:mt-0 sm:pl-0">
-        <StatusBadge label={badgeLabel} tone={badgeTone} />
-      </span>
-      <ChevronRight
-        className="mt-2 hidden h-4 w-4 flex-shrink-0 text-muted-foreground sm:mt-0 sm:block sm:justify-self-end"
-        aria-hidden="true"
-      />
-    </Link>
-  );
-}
-
-function CallTableHeader() {
-  return (
-    <div className="hidden grid-cols-[minmax(0,1fr)_9rem_5rem_11rem_1.5rem] items-center gap-4 border-b border-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:grid">
-      <span>Caller</span>
-      <span>When</span>
-      <span>Duration</span>
-      <span>Outcome</span>
-      <span className="sr-only">Open</span>
-    </div>
-  );
-}
-
-function Section({ title, badge, children }: { title: string; badge?: ReactNode; children: ReactNode }) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-        {badge}
-      </div>
-      <div className="overflow-hidden rounded-xl border border-border bg-card">{children}</div>
-    </div>
+      <td className="sc-cell sc-cell--state" role="cell">
+        <span className="sc-cell__label" aria-hidden="true">
+          {LIST.colState}
+        </span>
+        <span className="sc-state">
+          <span className="sc-state__text">{label}</span>
+          <span className="sd-sr">{stateAccessibleName(label)}</span>
+        </span>
+      </td>
+    </tr>
   );
 }
 
 export default function CallLogs() {
-  const { data: realCalls, isLoading: realCallsLoading } = useRealCallsList();
-  const items = realCalls?.items ?? [];
+  const { data: me, isLoading: sessionLoading } = useSession();
+  const calls = useRealCallsList();
+  const [announcement, setAnnouncement] = useState("");
 
-  return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="flex-shrink-0 border-b border-border bg-card px-6 py-4">
-        <h1 className="text-lg font-semibold text-foreground">Call Logs</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Calls your voice assistant answers, with transcripts and outcomes.
+  /**
+   * The only repeat read on this route. It performs another GET of the same
+   * list endpoint and nothing else: no provider call, no mutation, no
+   * navigation. `isRefetching` clears the pending state on success and on
+   * failure alike.
+   */
+  const retry = useCallback(() => {
+    setAnnouncement(LIST.announceRetrying);
+    void calls
+      .refetch()
+      .then((result) => {
+        setAnnouncement(result.isError ? LIST.announceFailed : LIST.announceLoaded);
+      })
+      .catch(() => setAnnouncement(LIST.announceFailed));
+  }, [calls]);
+
+  if (sessionLoading) {
+    return (
+      <div className="sd-page">
+        <p className="sc-loading" role="status" aria-live="polite">
+          {PAGE.sessionLoading}
         </p>
       </div>
+    );
+  }
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-6">
-        {voicePlatformEnabled && (
-          <Section
-            title="Real calls"
-            badge={<StatusBadge label="Vapi + Twilio" tone="info" />}
-          >
-            {realCallsLoading ? (
-              <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p>
-            ) : items.length === 0 ? (
-              <EmptyState
-                icon={PhoneOff}
-                title="No real calls yet"
-                description="Once a Development phone number is connected to Vapi and verified end to end, real inbound calls will appear here."
-                className="py-10"
-              />
-            ) : (
-              <>
-                <CallTableHeader />
-                {items.map((call) => (
-                  <CallRow
-                    key={call.callId}
-                    href={`/logs/${call.callId}`}
-                    name={call.callerNumberDisplay}
-                    subtitle="Vapi + Twilio (Development)"
-                    when={formatWhen(call.startedAt)}
-                    duration={formatRealDuration(call.durationSec)}
-                    badgeLabel={call.stateLabel}
-                    badgeTone={realStateTone(call.state)}
-                  />
-                ))}
-              </>
-            )}
-          </Section>
+  // The shell redirects to /login on a session error; rendering nothing keeps
+  // every authenticated shape out of the frame until authorisation resolves.
+  if (!me) return null;
+
+  const items = calls.data?.items ?? [];
+  const showTable = !calls.isLoading && !calls.isError && items.length > 0;
+
+  return (
+    <div className="sd-page sd-enter">
+      <div className="sd-page__head">
+        <div>
+          <span className="sd-eyebrow">{PAGE.eyebrow}</span>
+          <h1 className="sd-page__title">{PAGE.title}</h1>
+          <p className="sc-lede">{PAGE.detail}</p>
+        </div>
+      </div>
+
+      <section className="sc-sheet" aria-labelledby="sc-sheet-heading">
+        <h2 className="sd-sr" id="sc-sheet-heading">
+          {LIST.heading}
+        </h2>
+
+        {/* The count sits with the sheet it counts, not in the page head. */}
+        {showTable && <p className="sc-count">{recordCount(items.length)}</p>}
+
+        {/* Targeted announcement region: it carries retry progress and the
+            retry result only, never the page. */}
+        <p className="sd-sr" role="status" aria-live="polite">
+          {announcement}
+        </p>
+
+        {calls.isLoading && (
+          <p className="sc-loading" role="status" aria-live="polite">
+            {LIST.loading}
+          </p>
         )}
 
-        <Section
-          title="Demo Mode"
-          badge={<StatusBadge label="Sample data" tone="neutral" />}
-        >
-          <div className="border-b border-border bg-surface-muted px-4 py-2">
-            <DemoModeBanner text="phone calls, transcripts, and appointment booking aren't connected to a live number yet — these are sample records showing what this screen will look like." />
+        {calls.isError && (
+          <div className="sc-error" role="alert">
+            <p className="sc-error__title">{LIST.errorTitle}</p>
+            <p className="sc-error__detail">{LIST.errorDetail}</p>
+            <button type="button" className="sc-retry" onClick={retry} disabled={calls.isRefetching}>
+              {calls.isRefetching ? LIST.retryPendingLabel : LIST.retryLabel}
+            </button>
           </div>
-          <CallTableHeader />
-          {DEMO_CALLS.map((call) => (
-            <CallRow
-              key={call.id}
-              href={`/logs/${call.id}`}
-              name={call.callerName}
-              subtitle={call.callerPhone}
-              when={formatWhen(call.startedAt)}
-              duration={formatDemoDuration(call.durationSec)}
-              badgeLabel={formatDemoOutcome(call.outcome)}
-              badgeTone={demoOutcomeTone(call.outcome)}
-            />
-          ))}
-        </Section>
-      </div>
+        )}
+
+        {!calls.isLoading && !calls.isError && items.length === 0 && (
+          <div className="sc-empty">
+            <p className="sc-empty__title">{LIST.emptyTitle}</p>
+            <p className="sc-empty__detail">{LIST.emptyDetail}</p>
+          </div>
+        )}
+
+        {showTable && (
+          <div className="sc-tablewrap">
+            <table className="sc-table" role="table">
+              <thead className="sc-table__head" role="rowgroup">
+                <tr role="row">
+                  <th scope="col" role="columnheader" className="sc-col sc-col--caller">
+                    {LIST.colCaller}
+                  </th>
+                  <th scope="col" role="columnheader" className="sc-col sc-col--time">
+                    {LIST.colStarted}
+                  </th>
+                  <th scope="col" role="columnheader" className="sc-col sc-col--duration">
+                    {LIST.colDuration}
+                  </th>
+                  <th scope="col" role="columnheader" className="sc-col sc-col--state">
+                    {LIST.colState}
+                  </th>
+                </tr>
+              </thead>
+              <tbody role="rowgroup">
+                {items.map((call) => (
+                  <CallRow key={call.callId} call={call} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
