@@ -70,6 +70,9 @@ import {
   PROVIDER_LINKED,
   PROVIDER_NOT_LINKED,
   RETIRED_VOICE_PRESET_IDS,
+  SAVE_PROMPT_EITHER,
+  SAVE_PROMPT_PUBLISH,
+  SAVE_PROMPT_TEST,
   SUPPORTED_VOICE_PRESET_IDS,
   VOICE_MODEL,
   assistantHref,
@@ -111,6 +114,14 @@ import {
 import type { BrowserVoiceEvent } from "../../lib/browserVoice/types.js";
 
 import { VOICE_NAV, navGroupsWith } from "../../lib/nav.js";
+
+/**
+ * AR-001J owner review, correction A. The build classifier below now calls
+ * the application's own parser instead of restating its rule inline, so all
+ * three neighbouring built-output suites classify through one truth table
+ * and none of them can drift away from it.
+ */
+import { parseBooleanFlag } from "../../lib/featureFlags.js";
 
 /**
  * The complete navigation architecture, voice records included. AR-001J's
@@ -651,6 +662,108 @@ check(
   "the provider link says only whether a provider-side assistant exists",
   BUILDER.linkedNote === "Linked to the voice provider." &&
     BUILDER.notLinkedNote === "Not linked to a voice provider.",
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+section("Correction B — the unsaved-changes prompt names a reachable action");
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * AR-001I shipped one sentence for this — "Save your changes before
+ * publishing." — held in `BUILDER` and rendered whenever the draft was dirty.
+ * It is not a publish control, so AR-001J's build boundary left it alone, and
+ * a build with `VITE_VOICE_PUBLISH_ENABLED` off both rendered and shipped
+ * guidance about an action it cannot perform.
+ *
+ * Every assertion in this section fails against that build: `BUILDER` no
+ * longer carries the sentence, the wording is selected from the same two
+ * folded constants that decide whether either subordinate action exists, and
+ * a build with neither renders nothing rather than a sentence naming one.
+ */
+
+eq("the publish wording is unchanged, and is now its own constant", SAVE_PROMPT_PUBLISH, "Save your changes before publishing.");
+eq("the browser-test wording names testing, not publishing", SAVE_PROMPT_TEST, "Save your changes before testing.");
+eq("the both-enabled wording names neither", SAVE_PROMPT_EITHER, "Save your changes before continuing.");
+
+check(
+  "the three sentences differ, so no build can silently borrow another's wording",
+  new Set([SAVE_PROMPT_PUBLISH, SAVE_PROMPT_TEST, SAVE_PROMPT_EITHER]).size === 3,
+);
+
+check(
+  "BUILDER no longer carries an unsaved-changes sentence of its own",
+  !("savePrompt" in BUILDER) &&
+    !Object.values(BUILDER).some((v) => /Save your changes/.test(v)),
+);
+
+check(
+  "all three sentences stay in the module's enumerable string surface",
+  [SAVE_PROMPT_PUBLISH, SAVE_PROMPT_TEST, SAVE_PROMPT_EITHER].every((s) =>
+    everyRenderableString().includes(s),
+  ),
+);
+
+/**
+ * The selection itself. It is a ternary over the two constants the builder
+ * already composes from `featureFlags.ts`, not a function call and not a
+ * runtime read, because only that shape lets Rollup resolve it to one literal
+ * and drop the other two — which is what keeps publish wording out of a
+ * publish-disabled bundle rather than merely off the screen.
+ */
+check(
+  "the builder selects the sentence from the two build constants, as a foldable ternary",
+  /const unsavedChangesPrompt: string \| null = publishInBuild\s*\?\s*browserTestInBuild\s*\?\s*SAVE_PROMPT_EITHER\s*:\s*SAVE_PROMPT_PUBLISH\s*:\s*browserTestInBuild\s*\?\s*SAVE_PROMPT_TEST\s*:\s*null;/.test(
+    builderCode,
+  ),
+);
+
+check(
+  "and renders nothing at all when neither subordinate action is in the build",
+  /\{unsavedChangesPrompt !== null && isDirty && assistant\.status !== "publishing" && \(/.test(
+    builderCode,
+  ) && /\{unsavedChangesPrompt\}/.test(builderCode),
+);
+
+check(
+  "no builder file renders a fixed publish-only save sentence any more",
+  !/BUILDER\.savePrompt/.test(journeyCode) &&
+    ![builderCode, builderNewCode, shellCode].some((c) =>
+      /"Save your changes before (publishing|testing|continuing)\."/.test(c),
+    ),
+);
+
+check(
+  "the attempted-publish reason is the same constant, so the two cannot drift",
+  /if \(isDirty\) return SAVE_PROMPT_PUBLISH;/.test(builderCode),
+);
+
+check(
+  "the attempted-test reason still names testing and is still the eligibility module's",
+  /if \(isDirty\) return "Save your changes before testing\.";/.test(
+    read("artifacts/helpdesk/src/lib/browserVoice/eligibility.ts"),
+  ) && /browserTestDisabledReason\(\{/.test(builderCode),
+);
+
+/**
+ * Displaying a hint may not do anything. The paragraph renders a constant and
+ * a boolean the builder already had — no state is set, no query is fetched,
+ * no mutation is issued, and nothing is written back to the draft.
+ */
+check(
+  "showing the prompt performs no state change, request or mutation",
+  !/unsavedChangesPrompt[\s\S]{0,400}(mutate|refetch|useEffect|setState|set[A-Z])/.test(
+    builderCode.slice(builderCode.indexOf("unsavedChangesPrompt !== null")),
+  ),
+);
+
+check(
+  "and no placeholder, disabled stand-in or unavailable notice replaces it",
+  !/coming soon|not available in this build|unavailable/i.test(
+    builderCode.slice(
+      Math.max(0, builderCode.indexOf("unsavedChangesPrompt !== null") - 200),
+      builderCode.indexOf("unsavedChangesPrompt !== null") + 400,
+    ),
+  ),
 );
 
 // The vendor's own name is an internal identifier the customer cannot act on.
@@ -1349,10 +1462,9 @@ if (!existsSync(distDir)) {
     // Vite resolves its environment, so the chunks follow `parseBooleanFlag`
     // exactly. A spelling the parser rejects — `"1"`, `"yes"` — no longer
     // leaves the gated chunks emitted-but-unroutable; it removes them, like
-    // any other false value. One rule, and it is the parser's.
-    return raw !== undefined && raw.trim().toLowerCase() === "true"
-      ? "voice-enabled"
-      : "default-gated";
+    // any other false value. One rule, and — as of the owner review — it is
+    // literally the parser's, called rather than restated.
+    return parseBooleanFlag(raw) ? "voice-enabled" : "default-gated";
   })();
 
   /**
@@ -1374,6 +1486,13 @@ if (!existsSync(distDir)) {
     check(
       "AR-001J — a default-gated build emits no provider SDK chunk",
       !files.some((f) => /^vapi-.*\.js$/.test(f)) && !everyEmittedJs.includes("api.vapi.ai"),
+    );
+    eq(
+      "correction B — a default-gated build emits no unsaved-changes sentence at all",
+      [SAVE_PROMPT_PUBLISH, SAVE_PROMPT_TEST, SAVE_PROMPT_EITHER].filter((s) =>
+        everyEmittedJs.includes(s),
+      ),
+      [],
     );
   } else if (buildVariant === "indeterminate") {
     console.log("  SKIP  the build variant could not be read from the entry chunk");

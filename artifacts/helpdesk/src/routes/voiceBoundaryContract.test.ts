@@ -93,6 +93,9 @@ const appointmentsTestSrc = read(
   "artifacts/helpdesk/src/pages/appointments/appointmentsContract.test.ts",
 );
 const callLogsTestSrc = read("artifacts/helpdesk/src/pages/call-logs/callLogsContract.test.ts");
+const assistantsContractSrc = read(
+  "artifacts/helpdesk/src/pages/assistants/assistantsContract.ts",
+);
 
 /**
  * Source with comments stripped. Both `App.tsx` and the boundary explain the
@@ -1004,6 +1007,38 @@ check(
     !/Publishing is not enabled in this environment\./.test(builderNewCode),
 );
 
+/**
+ * Owner-review correction B. The unsaved-changes prompt was the last piece of
+ * subordinate-action copy that was not selected by a subordinate flag: it sat
+ * in `BUILDER`, was rendered from the draft being dirty, and therefore named
+ * publishing in builds that cannot publish. It is now chosen by the same two
+ * folded constants as the controls themselves — and `null`, not an empty
+ * string, when neither applies, so the paragraph is removed rather than
+ * rendered blank.
+ */
+check(
+  "the unsaved-changes prompt is selected by the same two build constants as the controls",
+  /const unsavedChangesPrompt: string \| null = publishInBuild\s*\?\s*browserTestInBuild\s*\?\s*SAVE_PROMPT_EITHER\s*:\s*SAVE_PROMPT_PUBLISH\s*:\s*browserTestInBuild\s*\?\s*SAVE_PROMPT_TEST\s*:\s*null;/.test(
+    builderCode,
+  ) &&
+    /\{unsavedChangesPrompt !== null && isDirty/.test(builderCode) &&
+    !/BUILDER\.savePrompt/.test(builderCode),
+);
+
+check(
+  "and the three sentences are the contract module's, not literals in the page",
+  /export const SAVE_PROMPT_PUBLISH = "Save your changes before publishing\.";/.test(
+    assistantsContractSrc,
+  ) &&
+    /export const SAVE_PROMPT_TEST = "Save your changes before testing\.";/.test(
+      assistantsContractSrc,
+    ) &&
+    /export const SAVE_PROMPT_EITHER = "Save your changes before continuing\.";/.test(
+      assistantsContractSrc,
+    ) &&
+    !/savePrompt:/.test(assistantsContractSrc),
+);
+
 check(
   "but every server-owned status the builder reports survives, gate or no gate",
   /BUILDER\.linkedNote/.test(builderCode) &&
@@ -1083,6 +1118,10 @@ const BROWSER_TEST_ONLY_COPY = [
   "A browser test is already active.",
   "Save and publish this assistant before testing.",
   "Publish this assistant before testing.",
+  // Owner-review correction B: the unsaved-changes prompt's browser-test
+  // wording. It is also the eligibility module's attempted-test reason, and
+  // both leave the build with the flag.
+  "Save your changes before testing.",
 ];
 
 /**
@@ -1105,7 +1144,21 @@ const PUBLISH_ONLY_COPY = [
   "Publishing could not be confirmed for this assistant.",
   "Publishing is in progress. Do not submit again.",
   " was published.",
+  // Owner-review correction B. This one is the whole defect: AR-001I held it
+  // in `BUILDER.savePrompt` and rendered it from the draft being dirty, so it
+  // shipped in every platform build whatever the publish flag said. It is now
+  // selected by the publish flag like the rest of this list, and this entry is
+  // what fails against the build that shipped it unconditionally.
+  "Save your changes before publishing.",
 ];
+
+/**
+ * The both-enabled wording. It belongs to neither list above because it is
+ * emitted exactly when *both* subordinate flags are on: with only one of them
+ * the build carries that feature's own sentence instead, and with neither it
+ * carries none. Asserted on its own, below, in both directions.
+ */
+const SAVE_PROMPT_EITHER_COPY = "Save your changes before continuing.";
 
 /**
  * Server-owned status the builder must keep whatever the flags say, so the
@@ -1411,6 +1464,21 @@ if (!existsSync(distDir)) {
       [],
     );
 
+    /**
+     * Correction B, in the build that has no builder at all. The publish
+     * wording used to reach here too — it lived in the Assistants contract
+     * module, which the default build kept because other pages import it.
+     */
+    eq(
+      "no unsaved-changes sentence survives into a default-gated build",
+      [
+        "Save your changes before publishing.",
+        "Save your changes before testing.",
+        SAVE_PROMPT_EITHER_COPY,
+      ].filter((s) => everyAsset.includes(s)),
+      [],
+    );
+
     eq(
       "no provider host, microphone, WebRTC or WebSocket capability is emitted",
       PROVIDER_AND_MEDIA.filter((s) => everyJs.includes(s)),
@@ -1590,6 +1658,40 @@ if (!existsSync(distDir)) {
         [],
       );
 
+      /**
+       * Correction B's remaining case, and the one that proves the prompt is
+       * genuinely selected rather than merely re-worded: the neutral sentence
+       * exists only where both subordinate actions do, so a single-feature
+       * build cannot fall back to it and a build with neither cannot carry it.
+       */
+      eq(
+        `both subordinate features ${publishBuilt && testBuilt ? "on" : "not both on"} —` +
+          " the neutral save sentence is emitted exactly then",
+        everyAsset.includes(SAVE_PROMPT_EITHER_COPY),
+        publishBuilt && testBuilt,
+      );
+
+      /**
+       * The case the two lists above cannot state on their own: a build that
+       * has the Assistants builder but neither subordinate action. Before this
+       * correction it still carried "Save your changes before publishing.",
+       * because that sentence was a fixed property of the builder rather than
+       * a consequence of the publish flag. Now it carries no unsaved-changes
+       * sentence at all — and renders none, rather than rendering an empty
+       * line where one used to be.
+       */
+      if (!publishBuilt && !testBuilt) {
+        eq(
+          "neither subordinate feature — no unsaved-changes sentence of any kind is emitted",
+          [
+            "Save your changes before publishing.",
+            "Save your changes before testing.",
+            SAVE_PROMPT_EITHER_COPY,
+          ].filter((s) => everyAsset.includes(s)),
+          [],
+        );
+      }
+
       eq(
         "the assistant's server-owned status stays readable whatever either flag says",
         PROVIDER_STATUS_COPY.filter((s) => !everyAsset.includes(s)),
@@ -1715,6 +1817,35 @@ check(
   ),
 );
 
+/**
+ * Owner-review correction A. Canonicalisation made "the parser rejects it"
+ * and "the bundler removed it" the same statement, but two of these three
+ * suites still classified a rejected non-canonical spelling — `"1"`, `"yes"`,
+ * whitespace — as voice-enabled, which was true before canonicalisation and
+ * is not now. All three classify through the application's own parser: one
+ * truth table, called rather than restated, so none of them can drift away
+ * from it again.
+ */
+eq(
+  "all three built-output suites classify the build through parseBooleanFlag itself",
+  [assistantsTestSrc, appointmentsTestSrc, callLogsTestSrc].filter(
+    (src) =>
+      !/import \{ parseBooleanFlag \} from "\.\.\/\.\.\/lib\/featureFlags\.js";/.test(src) ||
+      !/return parseBooleanFlag\(raw\) \? "voice-enabled" : "default-gated";/.test(src),
+  ).length,
+  0,
+);
+
+eq(
+  "and none of them still treats a rejected spelling as a voice-enabled build",
+  [assistantsTestSrc, appointmentsTestSrc, callLogsTestSrc].filter((src) =>
+    /raw === undefined \|\| raw === "" \|\| raw === "false" \? "default-gated" : "voice-enabled"/.test(
+      src,
+    ),
+  ).length,
+  0,
+);
+
 check(
   "AR-001I still pins the Assistants navigation record this file derives",
   assistantsTestSrc.includes('key: "assistants", label: "Assistants", href: "\\/assistants"') &&
@@ -1808,20 +1939,35 @@ section("Registration — this file runs in the standard aggregate command");
 //  • The absence of an *empty* toolbar slot where a hidden control used to sit
 //    is a rendering fact, not a static one. It is evidenced by the local QA
 //    captures, not by this file.
-//  • `pages/appointments/appointmentsContract.test.ts` and
-//    `pages/call-logs/callLogsContract.test.ts` still classify a non-canonical
-//    rejected spelling (`"1"`) as `voice-enabled`. That was correct before
-//    canonicalisation and is not any more. Both files are outside this
-//    refinement's authorised set, so neither was touched; they are run against
-//    canonical-spelling builds, where their classification is exact. The
-//    one-line change that would extend them is the one made here to
-//    `pages/assistants/assistantsContract.test.ts`.
-//  • `BUILDER.savePrompt` — "Save your changes before publishing." — is the
-//    unsaved-changes prompt AR-001I shipped, not a publish control, so it is
-//    emitted whatever the publish flag says. Its wording references publishing
-//    in a build that cannot publish. Editing product copy in
-//    `pages/assistants/assistantsContract.ts` is outside this refinement's
-//    authorised scope, so it is reported rather than changed.
+//  • Both defects the previous pass reported here are fixed, and the two
+//    sections above fail against the builds that carried them:
+//      - `pages/appointments/appointmentsContract.test.ts` and
+//        `pages/call-logs/callLogsContract.test.ts` classified a rejected
+//        non-canonical spelling (`"1"`, `"yes"`, whitespace) as
+//        `voice-enabled`. All three built-output suites now call
+//        `parseBooleanFlag` itself, so there is one truth table rather than
+//        three restatements of it, and "the parser rejects it" and "the
+//        bundler removed it" are the same statement they became when
+//        `vite.config.ts` started canonicalising.
+//      - `BUILDER.savePrompt` — "Save your changes before publishing." — was
+//        the unsaved-changes prompt, not a publish control, so it was emitted
+//        and rendered whatever the publish flag said. It is now three
+//        sentences in the contract module selected by the same two folded
+//        constants as the controls, and `null` when neither subordinate
+//        feature is built, which removes the paragraph rather than emptying
+//        it.
+//  • The both-enabled wording is deliberately neutral ("Save your changes
+//    before continuing."). The prompt is rendered from the draft being dirty,
+//    not from an activation, so at the moment it appears there is no attempted
+//    action to name; an ineligible activation is observable only inside the
+//    shared `PublishButton`/`BrowserTestButton` guards, which are outside this
+//    correction's authorised set. Guidance that does name the attempted action
+//    is unchanged: each control's tooltip and screen-reader reason still read
+//    "Save your changes before publishing." / "Save your changes before
+//    testing." while the draft is dirty.
+//  • That the removed paragraph leaves no empty line in the action column is a
+//    rendering fact, not a static one, and is evidenced by the local QA
+//    captures rather than by this file.
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

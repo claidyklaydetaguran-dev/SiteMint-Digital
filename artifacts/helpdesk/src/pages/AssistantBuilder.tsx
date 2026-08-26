@@ -25,6 +25,9 @@ import { browserTestDisabledReason } from "@/lib/browserVoice/eligibility";
 import {
   BUILDER,
   PRESET_RECOVERY,
+  SAVE_PROMPT_EITHER,
+  SAVE_PROMPT_PUBLISH,
+  SAVE_PROMPT_TEST,
   assistantHref,
   isSupportedVoicePreset,
   lastSyncedNote,
@@ -91,6 +94,40 @@ function formatSyncedAt(iso: string | null): string | null {
  */
 const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+
+/**
+ * -- AR-001J owner review, correction B: a truthful unsaved-changes prompt --
+ *
+ * The dirty-draft hint beside Save Draft used to be a fixed sentence naming
+ * publishing. It is not a publish control, so the build boundary above left
+ * it in place, and a build with publishing disabled rendered -- and shipped
+ * -- guidance about an action it cannot perform.
+ *
+ * Saving is the precondition of both subordinate actions, so the sentence
+ * follows the same two constants that decide whether either action exists in
+ * this build. The selection is a ternary over folded literals, so exactly one
+ * string reaches the bundle: a publish-only build carries no testing wording,
+ * a browser-test-only build carries no publishing wording, and a build with
+ * neither carries no sentence at all and renders nothing in its place --
+ * `null` removes the paragraph, it does not leave an empty one.
+ *
+ * `SAVE_PROMPT_EITHER` is the both-enabled wording and is deliberately
+ * neutral; the reasoning is recorded beside the three sentences in
+ * `pages/assistants/assistantsContract.ts`. Guidance naming the attempted
+ * action is unchanged and still comes from each control's own disabled
+ * reason.
+ *
+ * This decides wording only. Saving, publishing, browser testing, their
+ * confirmations, their single-flight guards and every provider check behave
+ * exactly as before, and nothing here issues a request or mutates anything.
+ */
+const unsavedChangesPrompt: string | null = publishInBuild
+  ? browserTestInBuild
+    ? SAVE_PROMPT_EITHER
+    : SAVE_PROMPT_PUBLISH
+  : browserTestInBuild
+    ? SAVE_PROMPT_TEST
+    : null;
 
 /**
  * The builder always calls one browser-test hook and one publish hook, so
@@ -322,7 +359,10 @@ export default function AssistantBuilder() {
     ? () => {
         if (!assistant || !draft) return undefined;
         if (!numericId) return "Save this assistant as a draft before publishing.";
-        if (isDirty) return "Save your changes before publishing.";
+        // The same sentence the dirty-draft hint uses when this build can
+        // publish, by identity rather than by coincidence: this one is tied to
+        // an attempted publish, and the two must never drift apart.
+        if (isDirty) return SAVE_PROMPT_PUBLISH;
         if (!isNameValid) return "Enter a valid assistant name before publishing.";
         // Checked before the in-flight reasons so a retired preset is named as
         // the blocker rather than being hidden behind a transient one. The server
@@ -644,9 +684,9 @@ export default function AssistantBuilder() {
                 {saveError}
               </p>
             )}
-            {isDirty && assistant.status !== "publishing" && (
+            {unsavedChangesPrompt !== null && isDirty && assistant.status !== "publishing" && (
               <p className="max-w-xs text-right text-[11px] text-muted-foreground">
-                {BUILDER.savePrompt}
+                {unsavedChangesPrompt}
               </p>
             )}
             <Button onClick={handleSave} disabled={saveDisabled} className="h-9 gap-1.5 text-sm">

@@ -72,6 +72,15 @@ import {
 import { VOICE_NAV, navGroupsWith } from "../../lib/nav.js";
 
 /**
+ * AR-001J owner review, correction A. The build classifier below reads the
+ * flag through the application's own parser rather than through a second
+ * copy of its rule — there is exactly one truth table in the client, and a
+ * test that restates it can drift away from it, which is what this
+ * correction repairs.
+ */
+import { parseBooleanFlag } from "../../lib/featureFlags.js";
+
+/**
  * The complete navigation architecture, voice records included. AR-001J's
  * correction makes `NAV_GROUPS` build-selected — outside a bundler every flag
  * takes its documented default of false, so the ambient catalogue is the
@@ -1341,6 +1350,20 @@ if (!existsSync(distDir)) {
    * with and read through the same truth table. An undeclared run still falls
    * back to the old echo — a non-canonical spelling keeps the parser in the
    * bundle — and reports indeterminate rather than guessing.
+   *
+   * ── AR-001J owner review, correction A ──────────────────────────────────
+   *
+   * This classifier used to split the false spellings in two: `""`,
+   * `"false"` and unset counted as removed, and every other rejected
+   * spelling — `"1"`, `"yes"`, `"on"`, `"true1"`, whitespace — counted as
+   * built-in, because before canonicalisation those really did leave the
+   * gated chunks emitted and unroutable. `vite.config.ts` now applies
+   * `parseBooleanFlag`'s table once, before Vite resolves its environment and
+   * therefore before Rollup constructs the module graph, so a rejected
+   * spelling produces exactly the build its canonical form produces and there
+   * is nothing left for a second rule to describe. The classification is
+   * therefore the parser's own, called rather than restated, and the built
+   * canonical value is what it is deciding about.
    */
   const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
     const raw = ((): string | undefined | null => {
@@ -1358,12 +1381,7 @@ if (!existsSync(distDir)) {
     })();
 
     if (raw === null) return "indeterminate";
-    if (raw !== undefined && raw.trim().toLowerCase() === "true") return "voice-enabled";
-    // Only the three spellings the bundler can decide remove the gated chunks.
-    // Any other rejected spelling leaves them emitted but unroutable, which is
-    // the emission this file asserts about — so it belongs with the built-in
-    // variant, not the removed one. The runtime gate is false either way.
-    return raw === undefined || raw === "" || raw === "false" ? "default-gated" : "voice-enabled";
+    return parseBooleanFlag(raw) ? "voice-enabled" : "default-gated";
   })();
 
   /**

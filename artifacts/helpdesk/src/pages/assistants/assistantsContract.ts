@@ -169,8 +169,43 @@ export function providerLinkLabel(assistant: {
 export const BUILDER = {
   linkedNote: "Linked to the voice provider.",
   notLinkedNote: "Not linked to a voice provider.",
-  savePrompt: "Save your changes before publishing.",
 } as const;
+
+/* ── Unsaved-changes prompt ────────────────────────────────────────────────
+
+   AR-001J owner review, correction B.
+
+   AR-001I shipped one sentence here — "Save your changes before publishing."
+   — rendered beside Save Draft whenever the draft was dirty. It is not a
+   publish control, so the AR-001J build boundary left it alone, and it was
+   therefore emitted and rendered in builds that cannot publish at all. It
+   named an action the customer had no way to take.
+
+   Saving is a precondition of the two subordinate actions, so the truthful
+   sentence is the one that matches what this build can actually do. The
+   three below are the whole table; which one applies is decided in
+   `pages/AssistantBuilder.tsx`, beside the two constants that already decide
+   whether each feature is in the build at all, and the selection is a
+   ternary over folded literals so the two the build cannot use are removed
+   rather than shipped unreachable.
+
+   `EITHER` is the both-enabled wording, and it is deliberately neutral. This
+   line is rendered from the draft being dirty, not from an activation, so at
+   the moment it first appears there is no attempted action to name; and the
+   only place an activation of an ineligible control is observable is inside
+   the shared `PublishButton`/`BrowserTestButton` guards, which are outside
+   this correction's authorised set. Guidance tied to the attempted action
+   does already exist and is unchanged: each control carries its own
+   tooltip + screen-reader reason, and while the draft is dirty those read
+   "Save your changes before publishing." and "Save your changes before
+   testing." respectively.
+
+   Nothing here changes when a save happens, what it sends, or what either
+   subordinate action does. It is one line of copy. */
+
+export const SAVE_PROMPT_PUBLISH = "Save your changes before publishing.";
+export const SAVE_PROMPT_TEST = "Save your changes before testing.";
+export const SAVE_PROMPT_EITHER = "Save your changes before continuing.";
 
 export function lastSyncedNote(display: string): string {
   return `Last synced ${display}.`;
@@ -256,6 +291,12 @@ export function everyRenderableString(): string[] {
     ...Object.values(CREATE),
     PROVIDER_LINKED,
     PROVIDER_NOT_LINKED,
+    // All three unsaved-changes sentences, not just the one a given build
+    // selects: this surface exists so a banned phrase cannot hide in copy the
+    // module can produce, and every one of them is copy it can produce.
+    SAVE_PROMPT_PUBLISH,
+    SAVE_PROMPT_TEST,
+    SAVE_PROMPT_EITHER,
     ESTIMATE_CHIP,
     GUIDANCE_CHIP,
     ESTIMATE_HEADING,
