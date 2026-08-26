@@ -110,7 +110,16 @@ import {
 } from "../../lib/browserVoice/testing/FakeBrowserVoiceClient.js";
 import type { BrowserVoiceEvent } from "../../lib/browserVoice/types.js";
 
-import { NAV_GROUPS } from "../../lib/nav.js";
+import { VOICE_NAV, navGroupsWith } from "../../lib/nav.js";
+
+/**
+ * The complete navigation architecture, voice records included. AR-001J's
+ * correction makes `NAV_GROUPS` build-selected — outside a bundler every flag
+ * takes its documented default of false, so the ambient catalogue is the
+ * default-gated one — and a test that needs the enabled architecture composes
+ * it from the same single source rather than from a second copy.
+ */
+const ALL_NAV_GROUPS = navGroupsWith(VOICE_NAV);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/pages/assistants → src/pages → src → helpdesk → artifacts → repo root
@@ -338,19 +347,19 @@ section("Feature gates — default-off, and unchanged by AR-001I");
 
 check(
   "the voice flag still defaults false and is still parsed from VITE_VOICE_PLATFORM_ENABLED",
-  /voicePlatformEnabled: boolean = parseBooleanFlag\(\s*import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED,?\s*\)/.test(
+  /voicePlatformEnabled: boolean = NO_BUILD_ENV[\s\S]{0,500}parseBooleanFlag\(import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED\)/.test(
     flagsSrc,
   ),
 );
 check(
   "the publish flag still defaults false and is still parsed from VITE_VOICE_PUBLISH_ENABLED",
-  /voicePublishEnabled: boolean = parseBooleanFlag\(\s*import\.meta\.env\.VITE_VOICE_PUBLISH_ENABLED,?\s*\)/.test(
+  /voicePublishEnabled: boolean = NO_BUILD_ENV[\s\S]{0,500}parseBooleanFlag\(import\.meta\.env\.VITE_VOICE_PUBLISH_ENABLED\)/.test(
     flagsSrc,
   ),
 );
 check(
   "the browser-test flag still defaults false and is still parsed from VITE_VOICE_BROWSER_TEST_ENABLED",
-  /voiceBrowserTestEnabled: boolean = parseBooleanFlag\(\s*import\.meta\.env\.VITE_VOICE_BROWSER_TEST_ENABLED,?\s*\)/.test(
+  /voiceBrowserTestEnabled: boolean = NO_BUILD_ENV[\s\S]{0,500}parseBooleanFlag\(import\.meta\.env\.VITE_VOICE_BROWSER_TEST_ENABLED\)/.test(
     flagsSrc,
   ),
 );
@@ -361,7 +370,7 @@ check(
 );
 check(
   "AR-001I added no flag and removed none",
-  (flagsSrc.match(/import\.meta\.env\.VITE_/g) ?? []).length === 3,
+  [...new Set(flagsSrc.match(/import\.meta\.env\.VITE_[A-Z_]+/g) ?? [])].length === 3,
 );
 check(
   "no Assistants file reads import.meta.env directly",
@@ -422,7 +431,7 @@ check(
 );
 check(
   "AR-001I changed no navigation data",
-  NAV_GROUPS.flatMap((group) => group.items).some(
+  ALL_NAV_GROUPS.flatMap((group) => group.items).some(
     (item) => item.key === "assistants" && item.href === "/assistants",
   ),
 );
@@ -443,11 +452,10 @@ check(
     appSrc.includes('import { voiceRoutePages } from "@/routes/voiceRoutes";'),
 );
 check(
-  "the boundary gates that import on a literal the bundler can fold, not a function call",
-  /const VOICE_BUILD_ENABLED = import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED === "true";/.test(
-    voiceRoutesSrc,
-  ) &&
-    /VOICE_BUILD_ENABLED[\s\S]{0,80}\?[\s\S]{0,240}import\("@\/pages\/Assistants"\)/.test(
+  "the boundary gates that import on the shared foldable flag, not a parser call of its own",
+  /import \{ voicePlatformEnabled \} from "@\/lib\/featureFlags";/.test(voiceRoutesSrc) &&
+    !/VITE_/.test(voiceRoutesSrc.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+    /voicePlatformEnabled[\s\S]{0,40}\?[\s\S]{0,240}import\("@\/pages\/Assistants"\)/.test(
       voiceRoutesSrc,
     ),
 );
@@ -1310,22 +1318,39 @@ if (!existsSync(distDir)) {
     .join("\n");
 
   /**
-   * Which build produced these assets, read from the flag literal the bundler
-   * baked into the entry chunk — never from the presence of the chunks under
-   * test, which would make the assertion circular. A build with the variable
-   * unset folds the parser away entirely, and is reported as indeterminate
-   * rather than guessed at.
+   * Which build produced these assets — never read from the presence of the
+   * chunks under test, which would make the assertion circular.
+   *
+   * The AR-001J correction folds every voice flag to a literal, so the parser
+   * call this used to read out of the entry chunk is, by design, no longer
+   * there in a canonically-flagged build. The variant is therefore declared
+   * by whoever produced the build, under the same variable name it was built
+   * with and read through the same truth table. An undeclared run still falls
+   * back to the old echo — a non-canonical spelling keeps the parser in the
+   * bundle — and reports indeterminate rather than guessing.
    */
   const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
-    const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
-    if (entryChunks.length !== 1) return "indeterminate";
-    const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
-    const parsed =
-      /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}\s*(?:const|let|var) \w+=\1\(([^)]*)\)/.exec(
+    const raw = ((): string | undefined | null => {
+      if (process.env.AR001J_DECLARED === "1") {
+        return process.env.AR001J_VITE_VOICE_PLATFORM_ENABLED;
+      }
+      const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
+      if (entryChunks.length !== 1) return null;
+      const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
+      const parser = /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}/.exec(
         entrySrc,
       );
-    if (parsed === null) return "indeterminate";
-    return parsed[2] === '"true"' ? "voice-enabled" : "default-gated";
+      if (parser === null) return null;
+      return new RegExp(`${parser[1]}\\("([^"]*)"\\)`).exec(entrySrc)?.[1] ?? null;
+    })();
+
+    if (raw === null) return "indeterminate";
+    if (raw !== undefined && raw.trim().toLowerCase() === "true") return "voice-enabled";
+    // Only the three spellings the bundler can decide remove the gated chunks.
+    // Any other rejected spelling leaves them emitted but unroutable, which is
+    // the emission this file asserts about — so it belongs with the built-in
+    // variant, not the removed one. The runtime gate is false either way.
+    return raw === undefined || raw === "" || raw === "false" ? "default-gated" : "voice-enabled";
   })();
 
   /**

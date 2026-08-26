@@ -69,7 +69,16 @@ import {
   visibleNavGroups,
 } from "../../components/layout/dashboardNav.js";
 
-import { NAV_GROUPS } from "../../lib/nav.js";
+import { VOICE_NAV, navGroupsWith } from "../../lib/nav.js";
+
+/**
+ * The complete navigation architecture, voice records included. AR-001J's
+ * correction makes `NAV_GROUPS` build-selected — outside a bundler every flag
+ * takes its documented default of false, so the ambient catalogue is the
+ * default-gated one — and a test that needs the enabled architecture composes
+ * it from the same single source rather than from a second copy.
+ */
+const ALL_NAV_GROUPS = navGroupsWith(VOICE_NAV);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/pages/call-logs → src/pages → src → helpdesk → artifacts → repo root
@@ -239,7 +248,7 @@ section("Feature gating is untouched");
 
 check(
   "the voice flag still defaults false and is still parsed from VITE_VOICE_PLATFORM_ENABLED",
-  /voicePlatformEnabled: boolean = parseBooleanFlag\(\s*import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED,?\s*\)/
+  /voicePlatformEnabled: boolean = NO_BUILD_ENV[\s\S]{0,500}parseBooleanFlag\(import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED\)/
     .test(flagsSrc) && /if \(typeof value !== "string"\) return false;/.test(flagsSrc),
 );
 
@@ -256,12 +265,14 @@ check(
 
 check(
   "a voice-enabled build shows Call Logs in navigation",
-  visibleNavDestinations(true).includes("/logs"),
+  visibleNavDestinations(true, ALL_NAV_GROUPS).includes("/logs"),
 );
 
 check(
   "Call Logs still belongs to the Observe group",
-  visibleNavGroups(true).some((g) => g.key === "observe" && g.items.some((i) => i.href === "/logs")),
+  visibleNavGroups(true, ALL_NAV_GROUPS).some(
+    (g) => g.key === "observe" && g.items.some((i) => i.href === "/logs"),
+  ),
 );
 
 eq(
@@ -1136,7 +1147,7 @@ const OBSOLETE_NAV_SENTENCE =
 
 const CORRECTED_NAV_DESCRIPTION = "Review stored call records and analysis.";
 
-const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
+const ALL_NAV_ITEMS = ALL_NAV_GROUPS.flatMap((group) => group.items);
 const CALL_LOGS_NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => item.key === "logs");
 
 eq("exactly one Call Logs navigation record exists", CALL_LOGS_NAV_ITEMS.length, 1);
@@ -1235,7 +1246,7 @@ eq(
 
 eq(
   "the navigation groups, their items and their order are unchanged",
-  NAV_GROUPS.map((group) => [group.key, group.items.map((item) => item.key)]),
+  ALL_NAV_GROUPS.map((group) => [group.key, group.items.map((item) => item.key)]),
   [
     ["overview", ["overview"]],
     ["build", ["assistants", "tools", "phone-numbers", "voice-library", "knowledge", "squads"]],
@@ -1320,22 +1331,39 @@ if (!existsSync(distDir)) {
   const listChunks = files.filter((f) => /^CallLogs-.*\.js$/.test(f));
   const detailChunks = files.filter((f) => /^CallLogDetail-.*\.js$/.test(f));
   /**
-   * Which build produced these assets, read from the flag literal the bundler
-   * baked into the entry chunk — never from the presence of the chunks under
-   * test, which would make the assertion circular. A build with the variable
-   * unset folds the parser away entirely, and is reported as indeterminate
-   * rather than guessed at.
+   * Which build produced these assets — never read from the presence of the
+   * chunks under test, which would make the assertion circular.
+   *
+   * The AR-001J correction folds every voice flag to a literal, so the parser
+   * call this used to read out of the entry chunk is, by design, no longer
+   * there in a canonically-flagged build. The variant is therefore declared
+   * by whoever produced the build, under the same variable name it was built
+   * with and read through the same truth table. An undeclared run still falls
+   * back to the old echo — a non-canonical spelling keeps the parser in the
+   * bundle — and reports indeterminate rather than guessing.
    */
   const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
-    const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
-    if (entryChunks.length !== 1) return "indeterminate";
-    const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
-    const parsed =
-      /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}\s*(?:const|let|var) \w+=\1\(([^)]*)\)/.exec(
+    const raw = ((): string | undefined | null => {
+      if (process.env.AR001J_DECLARED === "1") {
+        return process.env.AR001J_VITE_VOICE_PLATFORM_ENABLED;
+      }
+      const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
+      if (entryChunks.length !== 1) return null;
+      const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
+      const parser = /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}/.exec(
         entrySrc,
       );
-    if (parsed === null) return "indeterminate";
-    return parsed[2] === '"true"' ? "voice-enabled" : "default-gated";
+      if (parser === null) return null;
+      return new RegExp(`${parser[1]}\\("([^"]*)"\\)`).exec(entrySrc)?.[1] ?? null;
+    })();
+
+    if (raw === null) return "indeterminate";
+    if (raw !== undefined && raw.trim().toLowerCase() === "true") return "voice-enabled";
+    // Only the three spellings the bundler can decide remove the gated chunks.
+    // Any other rejected spelling leaves them emitted but unroutable, which is
+    // the emission this file asserts about — so it belongs with the built-in
+    // variant, not the removed one. The runtime gate is false either way.
+    return raw === undefined || raw === "" || raw === "false" ? "default-gated" : "voice-enabled";
   })();
 
   /**
@@ -1355,10 +1383,17 @@ if (!existsSync(distDir)) {
   }
 
   /**
-   * Whole-bundle, and deliberately outside the per-chunk block below: the
-   * navigation description ships in the entry chunk of *every* build —
-   * including the default-gated one, where no Call Logs route is registered at
-   * all — so this is the assertion that covers the gated build too.
+   * Whole-bundle, and deliberately outside the per-chunk block below.
+   *
+   * Phase 14 asserted the navigation description shipped in the entry chunk of
+   * *every* build, the default-gated one included. AR-001J's owner-review
+   * correction is precisely that it no longer does: the voice-gated records are
+   * selected into the catalogue by the same folded flag that selects the
+   * routes, so a default build carries none of their text. The corrected
+   * sentence is therefore required of the build that can render it and
+   * forbidden of the one that cannot — strictly stronger than the old
+   * unconditional check, not weaker. The obsolete sentence stays banned
+   * everywhere, unconditionally.
    */
   const everyEmittedJs = files.filter((f) => f.endsWith(".js"))
     .map((f) => readFileSync(path.join(distDir, f), "utf8")).join("\n");
@@ -1368,10 +1403,17 @@ if (!existsSync(distDir)) {
     !everyEmittedJs.includes(OBSOLETE_NAV_SENTENCE),
   );
 
-  check(
-    "the corrected Call Logs navigation description is what the bundle carries",
-    everyEmittedJs.includes(CORRECTED_NAV_DESCRIPTION),
-  );
+  if (buildVariant === "voice-enabled") {
+    check(
+      "the corrected Call Logs navigation description is what the bundle carries",
+      everyEmittedJs.includes(CORRECTED_NAV_DESCRIPTION),
+    );
+  } else if (buildVariant === "default-gated") {
+    check(
+      "a default-gated build carries no Call Logs navigation description at all",
+      !everyEmittedJs.includes(CORRECTED_NAV_DESCRIPTION),
+    );
+  }
 
   if (listChunks.length === 1 && detailChunks.length === 1) {
     /**

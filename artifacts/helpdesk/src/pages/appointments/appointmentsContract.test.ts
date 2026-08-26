@@ -244,7 +244,7 @@ check(
 check(
   "the voice flag still defaults to false when unset or invalid",
   /value\.trim\(\)\.toLowerCase\(\) === "true"/.test(flagsSrc) &&
-    /voicePlatformEnabled: boolean = parseBooleanFlag\(\s*import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED,?\s*\)/
+    /voicePlatformEnabled: boolean = NO_BUILD_ENV[\s\S]{0,500}parseBooleanFlag\(import\.meta\.env\.VITE_VOICE_PLATFORM_ENABLED\)/
       .test(flagsSrc),
 );
 
@@ -1283,22 +1283,39 @@ if (!existsSync(distDir)) {
   const chunks = readdirSync(distDir).filter((f) => /^Appointments-.*\.js$/.test(f));
 
   /**
-   * Which build produced these assets, read from the flag literal the bundler
-   * baked into the entry chunk — never from the presence of the chunks under
-   * test, which would make the assertion circular. A build with the variable
-   * unset folds the parser away entirely, and is reported as indeterminate
-   * rather than guessed at.
+   * Which build produced these assets — never read from the presence of the
+   * chunks under test, which would make the assertion circular.
+   *
+   * The AR-001J correction folds every voice flag to a literal, so the parser
+   * call this used to read out of the entry chunk is, by design, no longer
+   * there in a canonically-flagged build. The variant is therefore declared
+   * by whoever produced the build, under the same variable name it was built
+   * with and read through the same truth table. An undeclared run still falls
+   * back to the old echo — a non-canonical spelling keeps the parser in the
+   * bundle — and reports indeterminate rather than guessing.
    */
   const buildVariant = ((): "default-gated" | "voice-enabled" | "indeterminate" => {
-    const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
-    if (entryChunks.length !== 1) return "indeterminate";
-    const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
-    const parsed =
-      /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}\s*(?:const|let|var) \w+=\1\(([^)]*)\)/.exec(
+    const raw = ((): string | undefined | null => {
+      if (process.env.AR001J_DECLARED === "1") {
+        return process.env.AR001J_VITE_VOICE_PLATFORM_ENABLED;
+      }
+      const entryChunks = readdirSync(distDir).filter((f) => /^index-.*\.js$/.test(f));
+      if (entryChunks.length !== 1) return null;
+      const entrySrc = readFileSync(path.join(distDir, entryChunks[0]!), "utf8");
+      const parser = /function (\w+)\(\w+\)\{[^{}]*trim\(\)\.toLowerCase\(\)==="true"\}/.exec(
         entrySrc,
       );
-    if (parsed === null) return "indeterminate";
-    return parsed[2] === '"true"' ? "voice-enabled" : "default-gated";
+      if (parser === null) return null;
+      return new RegExp(`${parser[1]}\\("([^"]*)"\\)`).exec(entrySrc)?.[1] ?? null;
+    })();
+
+    if (raw === null) return "indeterminate";
+    if (raw !== undefined && raw.trim().toLowerCase() === "true") return "voice-enabled";
+    // Only the three spellings the bundler can decide remove the gated chunks.
+    // Any other rejected spelling leaves them emitted but unroutable, which is
+    // the emission this file asserts about — so it belongs with the built-in
+    // variant, not the removed one. The runtime gate is false either way.
+    return raw === undefined || raw === "" || raw === "false" ? "default-gated" : "voice-enabled";
   })();
 
   /**

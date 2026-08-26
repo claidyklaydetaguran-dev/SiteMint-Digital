@@ -21,11 +21,43 @@ export interface BrowserVoiceClientSource {
 }
 
 /**
+ * ── AR-001J correction C: the SDK is built in only where it can be used ────
+ *
+ * `createProductionBrowserVoiceClientSource()` was called unconditionally at
+ * module scope. A call expression is opaque to the bundler, so `vapi/factory`
+ * stayed in the graph whatever the flags said, and with it the
+ * `import("@vapi-ai/web")` that factory holds. A build with the platform on
+ * and browser testing **off** therefore still emitted the Vapi browser SDK
+ * chunk — roughly 300 kB of provider client, WebRTC and `getUserMedia` — for
+ * an action that build makes permanently unavailable.
+ *
+ * Both flags are now foldable constants (see `lib/featureFlags.ts`), so this
+ * selection collapses at build time: with either flag off the factory loses
+ * its only reference and Rollup drops the factory, the Vapi client, its
+ * config reader and the dynamic import together. With both on, nothing about
+ * the seam changes — the SDK is still reached only through that dynamic
+ * import, still from inside `VapiBrowserVoiceClient#start()`, and so is still
+ * never fetched until a browser test is explicitly activated.
+ *
+ * `productionSource` below keeps its own runtime checks unchanged: this is a
+ * build boundary, never a substitute for the fail-closed behaviour.
+ */
+const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+
+/** The standing source for any build that cannot run a browser test. */
+const unavailableSource: BrowserVoiceClientSource = {
+  available: false,
+  create: () => new UnavailableBrowserVoiceClient(),
+};
+
+/**
  * Constructing this doesn't touch the SDK, network, or microphone — it only
  * closes over the (cheap, config-only) Vapi client source for use once both
  * flags are on.
  */
-const vapiSource = createProductionBrowserVoiceClientSource();
+const vapiSource: BrowserVoiceClientSource = browserTestInBuild
+  ? createProductionBrowserVoiceClientSource()
+  : unavailableSource;
 
 /**
  * Milestone 1 / Checkpoint F2A (correction): fails closed to the standing
