@@ -102,7 +102,25 @@ function section(name: string): void {
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
 const HOUR = 3600_000;
-const iso = (hoursAgo: number) => new Date(Date.now() - hoursAgo * HOUR).toISOString();
+/**
+ * One reference instant for every timestamp in this file.
+ *
+ * `iso` used to read `Date.now()` on each call, so an assertion that built a
+ * fixture with `iso(1)` and its expected value with `iso(1)` was comparing two
+ * separately sampled clocks. Whenever the millisecond ticked between those two
+ * calls the ISO strings differed and
+ * "lastActivityAt is the most recent lastMessageAt, not the first row" failed —
+ * against production behaviour that was correct every time, since
+ * `latestActivity` returns the winning row's own string unmodified.
+ *
+ * Capturing the instant once makes fixture and expectation equal by
+ * construction, so the equality below stays exact: no tolerance, no retry, no
+ * mocked global clock. The only production window these feed is the seven-day
+ * cutoff in `buildActivityFigures`, which the fixtures straddle by hours and
+ * days, so pinning the reference changes nothing any assertion measures.
+ */
+const NOW = Date.now();
+const iso = (hoursAgo: number) => new Date(NOW - hoursAgo * HOUR).toISOString();
 
 function conversation(over: Partial<OverviewConversation> = {}): OverviewConversation {
   return {
