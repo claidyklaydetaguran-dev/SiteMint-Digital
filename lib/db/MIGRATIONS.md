@@ -29,6 +29,7 @@ Run from the repository root. Every one of these reads `DATABASE_URL`.
 
 | Command | Manages | Mode |
 |---|---|---|
+| `pnpm --filter @workspace/db run migrate:fresh` | **all of the below, in the required order** | Canonical fresh-database initialisation; stops at the first failure |
 | `pnpm --filter @workspace/db run push` | CRM + intake + discovery base tables | Push — applies immediately, no history |
 | `pnpm --filter @workspace/db run push-force` | same | Push, skipping prompts — **never** use outside a scratch database |
 | `pnpm --filter @workspace/db run generate:voice` | `voice_*` | Generates SQL from a schema diff; no database connection |
@@ -66,15 +67,47 @@ migration first fails on a missing relation.
    `discovery_submissions`, `form_submissions`.
 2. `pnpm --filter @workspace/db run migrate:voice` — `voice_assistants`,
    `provider_webhook_events`, `voice_issues`, each FK → `intake_firms(id)`.
-3. `pnpm --filter @workspace/db run migrate:scheduling` — the five
-   `scheduling_*` tables; FKs → `intake_firms(id)` and, internally,
-   `scheduling_appointment_types(id)`.
-4. `pnpm --filter @workspace/db run migrate:discovery` — additive columns on
+3. `pnpm --filter @workspace/db run migrate:discovery` — additive columns on
    `discovery_submissions` plus `discovery_delivery_jobs` and
    `discovery_ai_briefs`.
+4. `pnpm --filter @workspace/db run migrate:scheduling` — the five
+   `scheduling_*` tables; FKs → `intake_firms(id)` and, internally,
+   `scheduling_appointment_types(id)`.
 
-Steps 2, 3 and 4 are independent of one another and may be run in any order
-among themselves. **Step 1 must precede all three.**
+**Run them in exactly this order.** Step 1 must precede the other three, and
+steps 2–4 are **chronological, not interchangeable**. An earlier version of
+this document said they could be run in any order among themselves; that was
+wrong, and following it silently loses the discovery migration.
+
+All four domains record into the *same* journal table,
+`drizzle.__drizzle_migrations` (§6), and drizzle-kit decides what is pending by
+comparing each journal entry's `when` against the newest `created_at` already
+recorded — a global watermark, not a per-domain set difference. Applying a
+domain whose migration is newer therefore makes every older domain look
+already-applied. The committed `when` values are:
+
+| `when` | domain | tag |
+|---|---|---|
+| 1784372011129 | voice | `0000_military_komodo` |
+| 1784444570582 | voice | `0001_empty_sage` |
+| 1784601043137 | discovery | `0000_discovery-domain-contract` |
+| 1785251267367 | scheduling | `0000_superb_rhodey` |
+
+Running scheduling before discovery pushes the watermark past discovery's
+timestamp. `migrate:discovery` then prints `[✓] migrations applied
+successfully!` and applies nothing, leaving `discovery_delivery_jobs` and
+`discovery_ai_briefs` uncreated; re-running it does not help. This was
+confirmed on a fresh database during AR-001O.
+
+Prefer the single canonical command, which applies all four steps in this
+order and stops at the first failure:
+
+```bash
+pnpm --filter @workspace/db run migrate:fresh
+```
+
+`lib/db/migrationOrderContract.test.ts` pins the order, the shared-journal
+identity, and the chronology of the committed journals.
 
 ### Scheduling order note
 

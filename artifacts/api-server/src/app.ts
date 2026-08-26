@@ -6,6 +6,7 @@ import { logger } from "./lib/logger";
 import { createCorsMiddleware, resolveCorsPolicy } from "./lib/corsPolicy.js";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { DISCOVERY_V1_BODY_LIMIT, DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler } from "./lib/discoveryV1BodyLimit.js";
+import { openAiUnavailableErrorHandler } from "./lib/openAiUnavailable.js";
 
 const app: Express = express();
 
@@ -87,5 +88,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// AR-001O: the one place an unconfigured optional OpenAI integration becomes a
+// truthful 503 rather than a generic 500. Registered after the router so it
+// covers every OpenAI-dependent route without any of them checking the
+// environment for themselves.
+app.use(openAiUnavailableErrorHandler);
 
 export default app;
