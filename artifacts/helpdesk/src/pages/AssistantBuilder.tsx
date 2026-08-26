@@ -12,13 +12,13 @@ import { BrowserTestConfirmDialog } from "@/components/common/BrowserTestConfirm
 import { BrowserTestPanel } from "@/components/common/BrowserTestPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAssistantDetail, useUpdateAssistant, usePublishAssistant } from "@/hooks/useAssistants";
-import { useBrowserVoiceTest } from "@/hooks/useBrowserVoiceTest";
+import { useBrowserVoiceTest, type UseBrowserVoiceTestResult } from "@/hooks/useBrowserVoiceTest";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, hydrateConfigToDraft } from "@/lib/assistantConfig";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
-import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
+import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
 import { browserTestDisabledReason } from "@/lib/browserVoice/eligibility";
@@ -71,6 +71,63 @@ function formatSyncedAt(iso: string | null): string | null {
  * provider-side assistant exists.
  */
 
+/**
+ * -- AR-001J final refinement, owner decision B --------------------------
+ *
+ * Publishing and browser testing are subordinate to the platform flag, and
+ * a build without either shows nothing for it: no control, no dialog, no
+ * unavailable-explanation, and none of the code behind them. Both constants
+ * are compositions of the foldable flag constants in `lib/featureFlags.ts`,
+ * so Rollup resolves each to a literal and removes every branch it does not
+ * select -- the control, its confirmation dialog, its copy, and (for the
+ * browser test) the whole voice-client seam that used to reach the provider
+ * SDK.
+ *
+ * Neither constant is a security boundary. The backend keeps its own
+ * `publish_disabled` authority, the provider client keeps its own
+ * fail-closed checks, and the status this page reports still comes from the
+ * server. Assistant setup, prompt, voice/model configuration, saving, status
+ * and provider-link information are untouched by both.
+ */
+const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
+const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+
+/**
+ * The builder always calls one browser-test hook and one publish hook, so
+ * the hook order is fixed for any build. Which one it calls is decided here,
+ * at module scope, by a constant -- so a build without the feature never
+ * pulls in its state machine, its copy or its client at all, and a build
+ * with it behaves exactly as AR-001I left it.
+ */
+const NO_BROWSER_TEST: UseBrowserVoiceTestResult = {
+  state: "idle",
+  errorMessage: null,
+  elapsedSeconds: 0,
+  clientAvailable: false,
+  isActive: false,
+  start: () => {},
+  end: () => {},
+  dismiss: () => {},
+  reset: () => {},
+  bestEffortUnloadCleanup: () => {},
+};
+
+function useNoBrowserVoiceTest(): UseBrowserVoiceTestResult {
+  return NO_BROWSER_TEST;
+}
+
+const useBuilderBrowserTest: () => UseBrowserVoiceTestResult = browserTestInBuild
+  ? useBrowserVoiceTest
+  : useNoBrowserVoiceTest;
+
+type BuilderPublishMutation = Pick<ReturnType<typeof usePublishAssistant>, "isPending" | "mutate">;
+
+const NO_PUBLISH: BuilderPublishMutation = { isPending: false, mutate: () => {} };
+
+const useBuilderPublish: (id: number | undefined) => BuilderPublishMutation = publishInBuild
+  ? usePublishAssistant
+  : () => NO_PUBLISH;
+
 export default function AssistantBuilder() {
   const params = useParams<{ id: string; tab?: string }>();
   const [, navigate] = useLocation();
@@ -82,7 +139,7 @@ export default function AssistantBuilder() {
 
   const { data: assistant, isLoading, isError, error, refetch } = useAssistantDetail(numericId);
   const updateMutation = useUpdateAssistant(numericId ?? -1);
-  const publishMutation = usePublishAssistant(numericId);
+  const publishMutation = useBuilderPublish(numericId);
 
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
   const [baseline, setBaseline] = useState<{ name: string; draft: AssistantDraft } | null>(null);
@@ -99,7 +156,7 @@ export default function AssistantBuilder() {
   const testInFlightRef = useRef(false);
 
   const firmId = useAuthenticatedFirmId();
-  const browserTest = useBrowserVoiceTest();
+  const browserTest = useBuilderBrowserTest();
 
   useEffect(() => {
     if (!params.tab && numericId !== undefined) {
@@ -247,8 +304,7 @@ export default function AssistantBuilder() {
   };
 
   const publishEligible =
-    voicePlatformEnabled &&
-    voicePublishEnabled &&
+    publishInBuild &&
     !!assistant &&
     !!numericId &&
     !!draft &&
@@ -262,28 +318,29 @@ export default function AssistantBuilder() {
     !assistant.provider &&
     !assistant.providerAssistantId;
 
-  function publishDisabledReason(): string | undefined {
-    if (!voicePublishEnabled) return "Publishing is not enabled in this environment.";
-    if (!assistant || !draft) return undefined;
-    if (!numericId) return "Save this assistant as a draft before publishing.";
-    if (isDirty) return "Save your changes before publishing.";
-    if (!isNameValid) return "Enter a valid assistant name before publishing.";
-    // Checked before the in-flight reasons so a retired preset is named as
-    // the blocker rather than being hidden behind a transient one. The server
-    // would reject it with `unsupported_preset` anyway; this only says so
-    // before the customer spends a publish attempt on it.
-    if (!isSupportedVoicePreset(draft.voiceModel.preset)) return PRESET_RECOVERY.publishBlocked;
-    if (updateMutation.isPending) return "Saving is in progress. Publish will be available once saving finishes.";
-    if (publishMutation.isPending) return "Publishing is already in progress.";
-    if (assistant.status === "publishing") return "Publishing is already in progress.";
-    if (assistant.status === "published") return "This assistant has already been published.";
-    if (assistant.status === "publish_uncertain")
-      return "Publishing could not be confirmed for this assistant. Contact support before taking another action.";
-    if (assistant.status === "unknown") return "This assistant's status could not be determined.";
-    if (assistant.provider || assistant.providerAssistantId)
-      return "This assistant is already connected to a voice provider.";
-    return "Publishing is not available right now.";
-  }
+  const publishDisabledReason: () => string | undefined = publishInBuild
+    ? () => {
+        if (!assistant || !draft) return undefined;
+        if (!numericId) return "Save this assistant as a draft before publishing.";
+        if (isDirty) return "Save your changes before publishing.";
+        if (!isNameValid) return "Enter a valid assistant name before publishing.";
+        // Checked before the in-flight reasons so a retired preset is named as
+        // the blocker rather than being hidden behind a transient one. The server
+        // would reject it with `unsupported_preset` anyway; this only says so
+        // before the customer spends a publish attempt on it.
+        if (!isSupportedVoicePreset(draft.voiceModel.preset)) return PRESET_RECOVERY.publishBlocked;
+        if (updateMutation.isPending) return "Saving is in progress. Publish will be available once saving finishes.";
+        if (publishMutation.isPending) return "Publishing is already in progress.";
+        if (assistant.status === "publishing") return "Publishing is already in progress.";
+        if (assistant.status === "published") return "This assistant has already been published.";
+        if (assistant.status === "publish_uncertain")
+          return "Publishing could not be confirmed for this assistant. Contact support before taking another action.";
+        if (assistant.status === "unknown") return "This assistant's status could not be determined.";
+        if (assistant.provider || assistant.providerAssistantId)
+          return "This assistant is already connected to a voice provider.";
+        return "Publishing is not available right now.";
+      }
+    : () => undefined;
 
   const openPublishDialog = () => {
     if (!publishEligible || publishMutation.isPending) return;
@@ -297,57 +354,61 @@ export default function AssistantBuilder() {
     restoreFocusToPublishButton();
   };
 
-  const confirmPublish = () => {
-    // `publishMutation.isPending` only flips after React commits the mutation's
-    // internal state update, so two clicks arriving in the same tick (a fast
-    // double-click, or a click event that fires again before re-render) can
-    // both read `isPending` as still false. `publishInFlightRef` is a plain
-    // mutable ref, set synchronously here, so it closes that race — this is
-    // the only thing standing between "one confirm click" and two POSTs.
-    if (publishInFlightRef.current || publishMutation.isPending) return;
-    publishInFlightRef.current = true;
-    publishMutation.mutate(undefined, {
-      onSuccess: () => {
-        setPublishBanner(null);
-        setPublishDialogOpen(false);
-        restoreFocusToPublishButton();
-        toast({ title: "Assistant published", description: `"${draft?.setup.assistantName ?? "Assistant"}" was published.` });
-      },
-      onError: (err) => {
-        setPublishDialogOpen(false);
-        restoreFocusToPublishButton();
-        const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
-        const code = apiErr?.code;
-        // already_published / publish_in_progress / assistant_not_found resolve
-        // themselves once the detail refetch (triggered by the mutation's
-        // onSettled) lands — no separate transient banner needed for those.
-        if (code === "already_published" || code === "publish_in_progress" || code === "assistant_not_found") {
-          return;
-        }
-        const message = publishRouteErrorMessage(code, apiErr?.message ?? "Something went wrong while publishing. Please try again.");
-        setPublishBanner(message);
-      },
-      onSettled: () => {
-        publishInFlightRef.current = false;
-      },
-    });
-  };
+  const confirmPublish: () => void = publishInBuild
+    ? () => {
+        // `publishMutation.isPending` only flips after React commits the mutation's
+        // internal state update, so two clicks arriving in the same tick (a fast
+        // double-click, or a click event that fires again before re-render) can
+        // both read `isPending` as still false. `publishInFlightRef` is a plain
+        // mutable ref, set synchronously here, so it closes that race — this is
+        // the only thing standing between "one confirm click" and two POSTs.
+        if (publishInFlightRef.current || publishMutation.isPending) return;
+        publishInFlightRef.current = true;
+        publishMutation.mutate(undefined, {
+          onSuccess: () => {
+            setPublishBanner(null);
+            setPublishDialogOpen(false);
+            restoreFocusToPublishButton();
+            toast({ title: "Assistant published", description: `"${draft?.setup.assistantName ?? "Assistant"}" was published.` });
+          },
+          onError: (err) => {
+            setPublishDialogOpen(false);
+            restoreFocusToPublishButton();
+            const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
+            const code = apiErr?.code;
+            // already_published / publish_in_progress / assistant_not_found resolve
+            // themselves once the detail refetch (triggered by the mutation's
+            // onSettled) lands — no separate transient banner needed for those.
+            if (code === "already_published" || code === "publish_in_progress" || code === "assistant_not_found") {
+              return;
+            }
+            const message = publishRouteErrorMessage(code, apiErr?.message ?? "Something went wrong while publishing. Please try again.");
+            setPublishBanner(message);
+          },
+          onSettled: () => {
+            publishInFlightRef.current = false;
+          },
+        });
+      }
+    : () => {};
 
   const restoreFocusToTestButton = () => {
     requestAnimationFrame(() => testButtonRef.current?.focus());
   };
 
-  const testDisabledReason = assistant
-    ? browserTestDisabledReason({
-        assistant,
-        isDirty,
-        savePending: updateMutation.isPending,
-        publishPending: publishMutation.isPending,
-        clientAvailable: browserTest.clientAvailable,
-        testActive: browserTest.isActive,
-      })
-    : "Save and publish this assistant before testing.";
-  const testEligible = voicePlatformEnabled && testDisabledReason === undefined;
+  const testDisabledReason: string | undefined = browserTestInBuild
+    ? assistant
+      ? browserTestDisabledReason({
+          assistant,
+          isDirty,
+          savePending: updateMutation.isPending,
+          publishPending: publishMutation.isPending,
+          clientAvailable: browserTest.clientAvailable,
+          testActive: browserTest.isActive,
+        })
+      : "Save and publish this assistant before testing."
+    : undefined;
+  const testEligible = browserTestInBuild && testDisabledReason === undefined;
 
   const openTestDialog = () => {
     if (!testEligible || browserTest.isActive) return;
@@ -359,17 +420,19 @@ export default function AssistantBuilder() {
     restoreFocusToTestButton();
   };
 
-  const confirmTest = () => {
-    // Mirrors confirmPublish's synchronous ref guard: rapid confirm clicks in
-    // the same tick must still produce exactly one client.start() call.
-    if (testInFlightRef.current || browserTest.isActive) return;
-    if (!assistant?.providerAssistantId || assistant.provider !== "vapi") return;
-    testInFlightRef.current = true;
-    setTestDialogOpen(false);
-    restoreFocusToTestButton();
-    browserTest.start({ provider: "vapi", providerAssistantId: assistant.providerAssistantId });
-    testInFlightRef.current = false;
-  };
+  const confirmTest: () => void = browserTestInBuild
+    ? () => {
+        // Mirrors confirmPublish's synchronous ref guard: rapid confirm clicks in
+        // the same tick must still produce exactly one client.start() call.
+        if (testInFlightRef.current || browserTest.isActive) return;
+        if (!assistant?.providerAssistantId || assistant.provider !== "vapi") return;
+        testInFlightRef.current = true;
+        setTestDialogOpen(false);
+        restoreFocusToTestButton();
+        browserTest.start({ provider: "vapi", providerAssistantId: assistant.providerAssistantId });
+        testInFlightRef.current = false;
+      }
+    : () => {};
 
   if (!isValidId) {
     return (
@@ -433,18 +496,18 @@ export default function AssistantBuilder() {
   const syncedAtDisplay = formatSyncedAt(assistant.lastSyncedAt);
 
   let statusLabel: string;
-  if (publishMutation.isPending) statusLabel = "Publishing…";
+  if (publishInBuild && publishMutation.isPending) statusLabel = "Publishing…";
   else if (updateMutation.isPending) statusLabel = "Saving…";
   else if (isDirty) statusLabel = "Unsaved changes";
   else statusLabel = `${STATUS_LABEL[assistant.status]} · Saved`;
 
-  const announcement = publishMutation.isPending
+  const announcement = publishInBuild && publishMutation.isPending
     ? "Publishing is in progress. Do not submit again."
     : assistant.status === "publish_uncertain"
       ? "Publishing could not be confirmed. Do not publish again. Contact support before taking another action."
       : assistant.status === "publishing"
         ? "Publishing is already in progress."
-        : publishBanner
+        : publishInBuild && publishBanner
           ? `Publish failed: ${publishBanner}`
           : updateMutation.isPending
             ? "Saving…"
@@ -476,32 +539,38 @@ export default function AssistantBuilder() {
         announcement={announcement}
         contentDisabled={publishMutation.isPending || browserTest.isActive}
         publishControl={
-          <PublishButton
-            ref={publishButtonRef}
-            eligible={publishEligible}
-            pending={publishMutation.isPending}
-            disabledReason={publishDisabledReason()}
-            onClick={openPublishDialog}
-          />
+          publishInBuild ? (
+            <PublishButton
+              ref={publishButtonRef}
+              eligible={publishEligible}
+              pending={publishMutation.isPending}
+              disabledReason={publishDisabledReason()}
+              onClick={openPublishDialog}
+            />
+          ) : undefined
         }
         testControl={
-          <BrowserTestButton
-            ref={testButtonRef}
-            eligible={testEligible}
-            active={browserTest.isActive}
-            disabledReason={testDisabledReason}
-            onClick={openTestDialog}
-          />
+          browserTestInBuild ? (
+            <BrowserTestButton
+              ref={testButtonRef}
+              eligible={testEligible}
+              active={browserTest.isActive}
+              disabledReason={testDisabledReason}
+              onClick={openTestDialog}
+            />
+          ) : undefined
         }
         testPanel={
-          <BrowserTestPanel
-            state={browserTest.state}
-            assistantName={draft.setup.assistantName || "Untitled assistant"}
-            elapsedSeconds={browserTest.elapsedSeconds}
-            errorMessage={browserTest.errorMessage}
-            onEnd={browserTest.end}
-            onDismiss={browserTest.dismiss}
-          />
+          browserTestInBuild ? (
+            <BrowserTestPanel
+              state={browserTest.state}
+              assistantName={draft.setup.assistantName || "Untitled assistant"}
+              elapsedSeconds={browserTest.elapsedSeconds}
+              errorMessage={browserTest.errorMessage}
+              onEnd={browserTest.end}
+              onDismiss={browserTest.dismiss}
+            />
+          ) : undefined
         }
         headerBanner={
           <>
@@ -591,20 +660,24 @@ export default function AssistantBuilder() {
           </div>
         }
       />
-      <PublishConfirmDialog
-        open={publishDialogOpen}
-        assistantName={draft.setup.assistantName || "Untitled assistant"}
-        statusLabel={STATUS_LABEL[assistant.status]}
-        pending={publishMutation.isPending}
-        onCancel={cancelPublishDialog}
-        onConfirm={confirmPublish}
-      />
-      <BrowserTestConfirmDialog
-        open={testDialogOpen}
-        assistantName={draft.setup.assistantName || "Untitled assistant"}
-        onCancel={cancelTestDialog}
-        onConfirm={confirmTest}
-      />
+      {publishInBuild && (
+        <PublishConfirmDialog
+          open={publishDialogOpen}
+          assistantName={draft.setup.assistantName || "Untitled assistant"}
+          statusLabel={STATUS_LABEL[assistant.status]}
+          pending={publishMutation.isPending}
+          onCancel={cancelPublishDialog}
+          onConfirm={confirmPublish}
+        />
+      )}
+      {browserTestInBuild && (
+        <BrowserTestConfirmDialog
+          open={testDialogOpen}
+          assistantName={draft.setup.assistantName || "Untitled assistant"}
+          onCancel={cancelTestDialog}
+          onConfirm={confirmTest}
+        />
+      )}
     </>
   );
 }

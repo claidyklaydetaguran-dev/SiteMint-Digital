@@ -10,10 +10,34 @@ import { LatencyMeter } from "@/components/common/LatencyMeter";
 import { findVoicePreset } from "@/lib/assistantEstimates";
 import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
+import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled } from "@/lib/featureFlags";
 
 import SetupTab from "@/pages/assistant-builder/SetupTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
 import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
+
+/**
+ * ── AR-001J final refinement, owner decision B ───────────────────────────
+ *
+ * A build that cannot publish, or cannot run a browser test, shows no control
+ * for it — not a disabled one, not a tooltip explaining a future capability,
+ * and not an empty slot where one used to be. The customer sees the
+ * functionality this build actually offers.
+ *
+ * Both constants are compositions of the foldable flag constants in
+ * `lib/featureFlags.ts`, so each is a literal by the time Rollup sees it. The
+ * whole action row, the standing placeholders, their icons and the browser-test
+ * panel slot therefore leave the build entirely when their flag is off, rather
+ * than being rendered and hidden. When a flag is on, nothing about the control
+ * changes — the same component, the same props, the same placement.
+ *
+ * The row itself is conditional, not just its children: an empty flex
+ * container would still consume the header's `justify-between` slot and leave
+ * a visible gap where the actions were.
+ */
+const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
+const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+const anyBuilderActionInBuild = publishInBuild || browserTestInBuild;
 
 export const BUILDER_TABS = [
   { key: "setup", label: "Setup" },
@@ -154,25 +178,29 @@ export function BuilderShell({
               {statusBadge}
             </Badge>
           </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
-            {testControl ?? (
-              <UnavailableActionButton
-                icon={PlayCircle}
-                label="Test"
-                availability="Save and publish this assistant before testing."
-              />
-            )}
-            {publishControl ?? (
-              <UnavailableActionButton
-                icon={Rocket}
-                label="Publish"
-                availability="Save this assistant as a draft before publishing."
-              />
-            )}
-          </div>
+          {anyBuilderActionInBuild && (
+            <div className="flex flex-shrink-0 items-center gap-2">
+              {browserTestInBuild &&
+                (testControl ?? (
+                  <UnavailableActionButton
+                    icon={PlayCircle}
+                    label="Test"
+                    availability="Save and publish this assistant before testing."
+                  />
+                ))}
+              {publishInBuild &&
+                (publishControl ?? (
+                  <UnavailableActionButton
+                    icon={Rocket}
+                    label="Publish"
+                    availability="Save this assistant as a draft before publishing."
+                  />
+                ))}
+            </div>
+          )}
         </div>
         {headerBanner && <div className="mt-3">{headerBanner}</div>}
-        {testPanel && <div className="mt-3">{testPanel}</div>}
+        {browserTestInBuild && testPanel && <div className="mt-3">{testPanel}</div>}
       </div>
 
       {/* Tabs + content */}

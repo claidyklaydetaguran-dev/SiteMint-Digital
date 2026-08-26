@@ -80,6 +80,10 @@ const routesSrc = read("artifacts/helpdesk/src/lib/routes.ts");
 const navSrc = read("artifacts/helpdesk/src/lib/nav.ts");
 const dashboardNavSrc = read("artifacts/helpdesk/src/components/layout/dashboardNav.ts");
 const flagsSrc = read("artifacts/helpdesk/src/lib/featureFlags.ts");
+const viteConfigSrc = read("artifacts/helpdesk/vite.config.ts");
+const builderSrc = read("artifacts/helpdesk/src/pages/AssistantBuilder.tsx");
+const builderNewSrc = read("artifacts/helpdesk/src/pages/AssistantBuilderNew.tsx");
+const builderShellSrc = read("artifacts/helpdesk/src/pages/assistant-builder/BuilderShell.tsx");
 const voiceContextSrc = read("artifacts/helpdesk/src/lib/browserVoice/context.tsx");
 const vapiFactorySrc = read("artifacts/helpdesk/src/lib/browserVoice/vapi/factory.ts");
 const shellSrc = read("artifacts/helpdesk/src/components/layout/AppShell.tsx");
@@ -103,6 +107,10 @@ const appCode = stripComments(appSrc);
 const boundaryCode = stripComments(boundarySrc);
 const navCode = stripComments(navSrc);
 const voiceContextCode = stripComments(voiceContextSrc);
+const viteConfigCode = stripComments(viteConfigSrc);
+const builderCode = stripComments(builderSrc);
+const builderNewCode = stripComments(builderNewSrc);
+const builderShellCode = stripComments(builderShellSrc);
 
 /**
  * The complete navigation architecture, voice records included.
@@ -317,6 +325,98 @@ check(
   /if \(typeof value !== "string"\) return false;/.test(flagsSrc) &&
     /return value\.trim\(\)\.toLowerCase\(\) === "true";/.test(flagsSrc),
 );
+
+// ═══════════════════════════════════════════════════════════════════════════
+section("Correction A (final) — canonical before the module graph exists");
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The one thing the first correction could not buy. `parseBooleanFlag` accepts
+ * every spelling of the word and a bundler can fold only a literal comparison,
+ * so `"TRUE"` and `"1"` alike left the gated code in the build — the first
+ * reachable, the second not. Narrowing the parser would have made removal
+ * exact at the cost of the documented environment contract.
+ *
+ * Canonicalising the three variables in `vite.config.ts` makes removal exact
+ * without that cost: the same truth table is applied once, before Vite
+ * resolves its environment and therefore before Rollup constructs the module
+ * graph, and the application only ever sees the literal `"true"` or the
+ * literal `"false"`. Asserted here from the config's own source, and against
+ * the parser it has to agree with.
+ */
+
+/** The canonicaliser's rule, mirrored so the table can be exercised directly. */
+const canonicalVoiceFlagValue = (raw: unknown): "true" | "false" =>
+  typeof raw === "string" && raw.trim().toLowerCase() === "true" ? "true" : "false";
+
+check(
+  "the build config resolves the environment through Vite's own loader",
+  /import \{ defineConfig, loadEnv, type UserConfig \} from "vite";/.test(viteConfigCode) &&
+    /loadEnv\(mode, envDir, "VITE_"\)/.test(viteConfigCode),
+);
+
+eq(
+  "the canonicaliser covers exactly the three documented variables, and no fourth",
+  [...new Set(viteConfigCode.match(/VITE_[A-Z_]+/g) ?? [])],
+  ["VITE_VOICE_PLATFORM_ENABLED", "VITE_VOICE_PUBLISH_ENABLED", "VITE_VOICE_BROWSER_TEST_ENABLED"],
+);
+
+check(
+  "the canonical value is parseBooleanFlag's table, written once",
+  /return typeof raw === "string" && raw\.trim\(\)\.toLowerCase\(\) === "true" \? "true" : "false";/.test(
+    viteConfigCode,
+  ),
+);
+
+check(
+  "each flag is written back into the environment Vite reads last and trusts most",
+  /process\.env\[name\] = value;/.test(viteConfigCode),
+);
+
+eq(
+  "and no other environment variable is assigned by the build config",
+  (viteConfigCode.match(/process\.env\.\w+\s*=[^=]/g) ?? []).length,
+  0,
+);
+
+check(
+  "canonicalisation happens before the config object — and therefore the graph — exists",
+  viteConfigCode.indexOf("canonicalizeVoiceBuildFlags(mode, root)") > 0 &&
+    viteConfigCode.indexOf("canonicalizeVoiceBuildFlags(mode, root)") <
+      viteConfigCode.indexOf("return {"),
+);
+
+/**
+ * The whole point, as a table: canonicalisation has to agree with the parser
+ * on every value either of them can see, or the build and the runtime would
+ * disagree again — which is the defect correction A exists to remove.
+ */
+eq(
+  "every accepted true spelling canonicalises to the literal true",
+  TRUE_SPELLINGS.filter((v) => canonicalVoiceFlagValue(v) !== "true"),
+  [],
+);
+
+eq(
+  "every other string — 1, yes, on, true1, whitespace — canonicalises to the literal false",
+  FALSE_SPELLINGS.filter((v) => canonicalVoiceFlagValue(v) !== "false"),
+  [],
+);
+
+eq(
+  "every non-string, unset included, canonicalises to the literal false",
+  NON_STRINGS.filter((v) => canonicalVoiceFlagValue(v) !== "false").length,
+  0,
+);
+
+eq(
+  "canonicalisation and the runtime parser agree on every value in the table",
+  [...TRUE_SPELLINGS, ...FALSE_SPELLINGS, ...NON_STRINGS].filter(
+    (v) => (canonicalVoiceFlagValue(v) === "true") !== parseBooleanFlag(v),
+  ).length,
+  0,
+);
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 section("Correction A — one interpretation, shared by every gate");
@@ -779,6 +879,149 @@ check(
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+section("Correction B — a subordinate feature that cannot run is not shown");
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Publishing and browser testing are subordinate to the platform flag. Before
+ * this refinement a platform-enabled build with either of them off still
+ * rendered its control as a disabled button with a tooltip explaining a
+ * capability that build did not have, still rendered the browser-test panel
+ * slot, and still shipped the copy behind both. The customer interface now
+ * shows the functionality the build actually offers.
+ *
+ * Each gate is a composition of the foldable flag constants, so the same
+ * expression that hides the control is the one that removes its code — a
+ * control cannot be hidden in a build that still carries it, and cannot be
+ * carried by a build that hides it.
+ */
+
+eq(
+  "no client module outside the flag helper still reads a voice variable",
+  [builderCode, builderNewCode, builderShellCode].filter((c) => /VITE_VOICE_[A-Z_]+/.test(c))
+    .length,
+  0,
+);
+
+check(
+  "the builder composes both subordinate flags with the platform flag",
+  /const publishInBuild = voicePlatformEnabled && voicePublishEnabled;/.test(builderCode) &&
+    /const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;/.test(builderCode),
+);
+
+check(
+  "so does the shell, and it drops the whole action row rather than leaving an empty one",
+  /const publishInBuild = voicePlatformEnabled && voicePublishEnabled;/.test(builderShellCode) &&
+    /const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;/.test(
+      builderShellCode,
+    ) &&
+    /const anyBuilderActionInBuild = publishInBuild \|\| browserTestInBuild;/.test(
+      builderShellCode,
+    ) &&
+    /\{anyBuilderActionInBuild && \(/.test(builderShellCode),
+);
+
+check(
+  "the standing Test and Publish placeholders are inside that gate, not beside it",
+  /\{browserTestInBuild &&\s*\(testControl \?\?/.test(builderShellCode) &&
+    /\{publishInBuild &&\s*\(publishControl \?\?/.test(builderShellCode),
+);
+
+check(
+  "the browser-test panel slot is gated too, so no empty panel is rendered",
+  /\{browserTestInBuild && testPanel && <div className="mt-3">\{testPanel\}<\/div>\}/.test(
+    builderShellCode,
+  ),
+);
+
+check(
+  "the Test control, its panel and its confirmation dialog are each gated",
+  /testControl=\{\s*browserTestInBuild \? \(/.test(builderCode) &&
+    /testPanel=\{\s*browserTestInBuild \? \(/.test(builderCode) &&
+    /\{browserTestInBuild && \(\s*<BrowserTestConfirmDialog/.test(builderCode),
+);
+
+check(
+  "the Publish control and its confirmation dialog are each gated",
+  /publishControl=\{\s*publishInBuild \? \(/.test(builderCode) &&
+    /\{publishInBuild && \(\s*<PublishConfirmDialog/.test(builderCode),
+);
+
+check(
+  "the unsaved builder gates its Publish control the same way",
+  /const publishInBuild = voicePlatformEnabled && voicePublishEnabled;/.test(builderNewCode) &&
+    /publishControl=\{\s*publishInBuild \? \(/.test(builderNewCode),
+);
+
+/**
+ * Hiding a control is not enough on its own: a statically imported component
+ * referenced from a live expression stays in the graph however the render
+ * turns out. The hook seams below are what make the removal real — the state
+ * machine and the mutation hook are selected by a folded constant at module
+ * scope, so a build without the feature never references either, and the
+ * modules behind them (the browser voice client, its error copy, its
+ * eligibility copy, the publish request) leave with them.
+ */
+check(
+  "the browser-test state machine is selected at module scope, not called conditionally",
+  /const useBuilderBrowserTest: \(\) => UseBrowserVoiceTestResult = browserTestInBuild\s*\?\s*useBrowserVoiceTest\s*:\s*useNoBrowserVoiceTest;/.test(
+    builderCode,
+  ) && /const browserTest = useBuilderBrowserTest\(\);/.test(builderCode),
+);
+
+check(
+  "the publish mutation hook is selected the same way",
+  /const useBuilderPublish: \(id: number \| undefined\) => BuilderPublishMutation = publishInBuild\s*\?\s*usePublishAssistant\s*:\s*\(\) => NO_PUBLISH;/.test(
+    builderCode,
+  ) && /const publishMutation = useBuilderPublish\(numericId\);/.test(builderCode),
+);
+
+check(
+  "the stand-in browser test is inert — idle, unavailable, and every action a no-op",
+  /const NO_BROWSER_TEST: UseBrowserVoiceTestResult = \{[\s\S]{0,400}state: "idle",[\s\S]{0,400}clientAvailable: false,[\s\S]{0,400}isActive: false,/.test(
+    builderCode,
+  ),
+);
+
+check(
+  "and the stand-in publish mutation can neither be pending nor issue a request",
+  /const NO_PUBLISH: BuilderPublishMutation = \{ isPending: false, mutate: \(\) => \{\} \};/.test(
+    builderCode,
+  ),
+);
+
+/**
+ * The copy that must fold away with the control, and the copy that must not.
+ * Publishing being unavailable in this build says nothing about whether this
+ * assistant was published — that is server-owned status, and hiding it would
+ * make the page lie about the assistant's real state.
+ */
+check(
+  "the publish-unavailable explanations are gone from both builders",
+  !/Publishing is not enabled in this environment\./.test(builderCode) &&
+    !/Publishing is not enabled in this environment\./.test(builderNewCode),
+);
+
+check(
+  "but every server-owned status the builder reports survives, gate or no gate",
+  /BUILDER\.linkedNote/.test(builderCode) &&
+    /BUILDER\.notLinkedNote/.test(builderCode) &&
+    /STATUS_LABEL\[assistant\.status\]/.test(builderCode) &&
+    /safeSyncErrorMessage\(assistant\.syncError\)/.test(builderCode) &&
+    /assistant\.status === "publish_uncertain"/.test(builderCode) &&
+    /assistant\.status === "publishing"/.test(builderCode),
+);
+
+eq(
+  "nothing is replaced with a coming-soon, placeholder or promotional stand-in",
+  [builderCode, builderNewCode, builderShellCode].filter((c) =>
+    /coming soon|Coming Soon|placeholder card|not yet available|stay tuned/i.test(c),
+  ).length,
+  0,
+);
+
 // ═══════════════════════════════════════════════════════════════════════════
 section("Built output — what each variant may and may not emit");
 // ═══════════════════════════════════════════════════════════════════════════
@@ -817,6 +1060,70 @@ const BROWSER_TEST_ONLY = [
   "@vapi-ai/web",
   "getVapiPublicKey",
 ];
+
+/**
+ * Correction B's probes: the customer-facing copy that exists only to serve a
+ * subordinate feature. Every string here was in a platform-enabled,
+ * feature-disabled build before this refinement, so the assertions below fail
+ * against that build rather than merely describing this one. Each is checked
+ * in both directions — absent when the feature is not built, present when it
+ * is — so the removal can never quietly become a deletion.
+ */
+const BROWSER_TEST_ONLY_COPY = [
+  "Start Browser Test",
+  "This uses your browser's microphone.",
+  "Browser voice test connected",
+  "Preparing browser voice test",
+  "Ending browser voice test",
+  "End Test",
+  "Microphone permission was denied.",
+  "Browser voice testing is not enabled in this environment.",
+  "Browser voice integration is not connected yet.",
+  "Browser voice testing is not available right now.",
+  "A browser test is already active.",
+  "Save and publish this assistant before testing.",
+  "Publish this assistant before testing.",
+];
+
+/**
+ * Publish-*action* copy only. Deliberately excludes everything the server owns
+ * about an assistant's real state — the published/not-linked notes, the
+ * status labels, the `publishing` and `publish_uncertain` banners and the
+ * `syncError` copy. A build that cannot publish must still tell the truth
+ * about an assistant that was published from somewhere else.
+ */
+const PUBLISH_ONLY_COPY = [
+  "Publish Assistant",
+  "This will create a provider-side voice assistant",
+  "Save this assistant as a draft before publishing.",
+  "Publishing is not enabled in this environment.",
+  "Publishing is not available right now.",
+  "Enter a valid assistant name before publishing.",
+  "Saving is in progress. Publish will be available once saving finishes.",
+  "This assistant has already been published.",
+  "This assistant is already connected to a voice provider.",
+  "Publishing could not be confirmed for this assistant.",
+  "Publishing is in progress. Do not submit again.",
+  " was published.",
+];
+
+/**
+ * Server-owned status the builder must keep whatever the flags say, so the
+ * two lists above can never be widened into hiding the truth about an
+ * assistant. Asserted in every platform-enabled build.
+ */
+const PROVIDER_STATUS_COPY = [
+  "Linked to the voice provider.",
+  "Not linked to a voice provider.",
+  "Publishing could not be confirmed. Do not publish again.",
+  "Publishing is already in progress.",
+  // The announcement for a server-confirmed `published` status. Deliberately
+  // not in the list above: the publish *toast* (" was published.") is the
+  // publish-action copy, and this is the state it leaves behind — which an
+  // assistant published from another environment can be in regardless.
+  "Assistant published",
+];
+
 
 /**
  * Gated navigation text. Every string here reaches a reader only through a
@@ -937,37 +1244,32 @@ if (!existsSync(distDir)) {
   const known = isDeclared || echoedPlatform !== undefined;
 
   /**
-   * Exactly the three spellings Vite substitutes and Rollup can then decide.
-   * This is the whole of the statically removable set, and it is deliberately
-   * not a list of "values that mean false": adding `"0"` or `"no"` here would
-   * be inventing environment contract that `parseBooleanFlag` does not have.
+   * Correction A (final): the canonicaliser in `vite.config.ts` collapses
+   * every spelling to one of two literals before the module graph exists, so
+   * "the bundler can decide it is false" and "the parser says it is false" are
+   * now the same statement. This is that statement, and it is deliberately
+   * still expressed as the parser's own table rather than a list of literals.
    */
-  const staticallyFalse = (v: string | undefined) =>
-    v === undefined || v === "" || v === "false";
+  const staticallyFalse = (v: string | undefined) => canonicalVoiceFlagValue(v) === "false";
 
   /**
-   * Four classes, because the flag has three statically distinguishable
-   * outcomes and one unknown:
+   * Three classes, where there used to be four. `gated-inert` — the parser
+   * rejects the spelling but the bundler cannot decide it, so the modules are
+   * emitted and unreachable — described the one gap correction A could not
+   * close, and canonicalisation closes it: there is no longer a value that is
+   * false at runtime and undecidable at build time. Its absence is asserted
+   * below rather than assumed, for every declared spelling.
    *
    *   voice-enabled  the parser accepts it — every gated module is built in
    *                  and every gated route is registered;
-   *   gated-out      the bundler can decide it is false — nothing gated is
-   *                  emitted at all;
-   *   gated-inert    the parser rejects it but the bundler cannot decide it
-   *                  (`"1"`, `"yes"`). The runtime gate is false, so no route
-   *                  and no navigation item exists; the modules are emitted
-   *                  and unreachable. This is the documented cost of not
-   *                  narrowing the flag contract to lowercase `"true"`, and it
-   *                  is asserted rather than hidden;
+   *   gated-out      it canonicalises to false — nothing gated is emitted;
    *   indeterminate  undeclared, and the entry chunk carries no parser echo.
    */
-  const buildClass: "voice-enabled" | "gated-out" | "gated-inert" | "indeterminate" = !known
+  const buildClass: "voice-enabled" | "gated-out" | "indeterminate" = !known
     ? "indeterminate"
     : parseBooleanFlag(rawPlatform)
       ? "voice-enabled"
-      : staticallyFalse(rawPlatform)
-        ? "gated-out"
-        : "gated-inert";
+      : "gated-out";
 
   /** Only meaningful when the build declared itself. */
   const declaredPublish =
@@ -989,6 +1291,19 @@ if (!existsSync(distDir)) {
   // ── True of every variant ────────────────────────────────────────────────
 
   eq("exactly one entry chunk is emitted", entryChunks.length, 1);
+
+  /**
+   * Correction A (final), read off the build rather than the declaration:
+   * canonicalisation leaves nothing for `parseBooleanFlag` to decide, so every
+   * comparison in `featureFlags.ts` folds and the parser has no reference left
+   * anywhere. A build that still carries it is one whose flags reached the
+   * graph raw — the defect this refinement removes, for `"TRUE"` and `"1"`
+   * alike.
+   */
+  check(
+    "no build keeps the runtime flag parser — every spelling folded before Rollup saw it",
+    !/trim\(\)\.toLowerCase\(\)==="true"/.test(everyJs),
+  );
 
   eq(
     "every non-voice route is still emitted as its own lazy chunk",
@@ -1254,6 +1569,40 @@ if (!existsSync(distDir)) {
         chunksFor("Assistants").filter((f) => f.endsWith(".js")).length === 1 &&
           chunksFor("AssistantBuilder").filter((f) => f.endsWith(".js")).length === 1,
       );
+
+      /**
+       * Correction B, in the built output. Presence and absence come from one
+       * list each, so hiding a control can never quietly become deleting the
+       * feature, and building it can never become shipping a placeholder.
+       */
+      const testBuilt = !staticallyFalse(declared("BROWSER_TEST_ENABLED"));
+      const publishBuilt = !staticallyFalse(declared("PUBLISH_ENABLED"));
+
+      eq(
+        `browser testing ${testBuilt ? "on" : "off"} — its customer-facing copy is emitted exactly then`,
+        BROWSER_TEST_ONLY_COPY.filter((s) => everyAsset.includes(s) !== testBuilt),
+        [],
+      );
+
+      eq(
+        `publishing ${publishBuilt ? "on" : "off"} — its customer-facing copy is emitted exactly then`,
+        PUBLISH_ONLY_COPY.filter((s) => everyAsset.includes(s) !== publishBuilt),
+        [],
+      );
+
+      eq(
+        "the assistant's server-owned status stays readable whatever either flag says",
+        PROVIDER_STATUS_COPY.filter((s) => !everyAsset.includes(s)),
+        [],
+      );
+
+      check(
+        "and the builder itself — tabs, name, save — is untouched by either flag",
+        ["Setup", "Prompt", "Voice & Model", "Save Draft", "Assistant Builder"].every((s) =>
+          everyAsset.includes(s),
+        ),
+      );
+
     }
 
     if (declaredBrowserTest === false && buildClass === "voice-enabled") {
@@ -1304,25 +1653,33 @@ if (!existsSync(distDir)) {
   }
 
   /**
-   * The documented cost of keeping the flag contract wide. A spelling the
-   * parser rejects but the bundler cannot decide leaves the gated code in the
-   * build; what must still hold is that none of it is reachable, because the
-   * one interpretation that registers routes and shows navigation is the same
-   * runtime parser, and it says false.
+   * What used to be the `gated-inert` class. A spelling the parser rejects but
+   * a bundler cannot decide — `"1"`, `"yes"`, `"true1"`, whitespace-only —
+   * used to leave every gated module emitted and unreachable, and a spelling
+   * it accepts but the bundler cannot decide — `"TRUE"`, `" true "` — used to
+   * leave the parser itself in the entry chunk. Canonicalisation removes both:
+   * a non-canonical spelling now produces exactly the build its canonical form
+   * produces, and nothing is left behind to decide it at runtime.
    */
-  if (buildClass === "gated-inert") {
-    check(
-      "a rejected but undecidable spelling is still false at runtime",
-      parseBooleanFlag(rawPlatform) === false,
-    );
-    check(
-      "and the parser it defers to is still in the bundle to say so",
-      entryChunks.length === 1 &&
-        /trim\(\)\.toLowerCase\(\)==="true"/.test(readAsset(entryChunks[0]!)),
-    );
+  const nonCanonicalSpelling =
+    known &&
+    rawPlatform !== undefined &&
+    rawPlatform !== "true" &&
+    rawPlatform !== "false" &&
+    rawPlatform !== "";
+
+  if (nonCanonicalSpelling) {
     console.log(
-      "  NOTE  gated modules are emitted for this spelling and are unreachable —" +
-        " see the limitations note at the end of this file",
+      `  NOTE  non-canonical spelling ${JSON.stringify(rawPlatform)} ->` +
+        ` canonical ${JSON.stringify(canonicalVoiceFlagValue(rawPlatform))}`,
+    );
+    check(
+      "a non-canonical spelling produces the same build class as its canonical form",
+      buildClass === (parseBooleanFlag(rawPlatform) ? "voice-enabled" : "gated-out"),
+    );
+    check(
+      "and leaves no runtime parser behind to decide it later",
+      !/trim\(\)\.toLowerCase\(\)==="true"/.test(everyJs),
     );
   }
 
@@ -1410,18 +1767,22 @@ section("Registration — this file runs in the standard aggregate command");
 //    the variant present when it runs. The validation pass runs it once per
 //    build in the matrix, declaring that build's flags; a run with no `dist/`
 //    skips the section entirely and says so.
-//  • **The one thing correction A does not buy.** Semantic equivalence of the
-//    gate is complete — there is a single constant, so navigation and routing
-//    can no longer disagree. Static *removal* is not, and cannot be: the
-//    bundler folds literal comparisons but not `trim().toLowerCase()`, so only
-//    unset, `""` and `"false"` are decidable. A spelling the parser rejects but
-//    the bundler cannot decide — `"1"`, `"yes"` — fails closed at runtime and
-//    still emits the gated code, unreachable. The `gated-inert` class above
-//    asserts exactly that, rather than hiding it. Narrowing the accepted set to
-//    lowercase `"true"` would make removal exact at the cost of the documented
-//    environment contract, and canonicalising the three variables in
-//    `vite.config.ts` would make it exact without that cost — both are owner
-//    decisions, and neither is taken here.
+//  • **What correction A now buys, and what it still does not.** Semantic
+//    equivalence was already complete — one constant, so navigation and
+//    routing cannot disagree. Static *removal* is complete too as of the final
+//    refinement: `vite.config.ts` canonicalises the three variables before
+//    Vite resolves its environment and therefore before Rollup constructs the
+//    module graph, so every spelling the contract accepts folds to `true` and
+//    every other value folds to `false`. The `gated-inert` class this file
+//    used to assert — false at runtime, undecidable at build time — no longer
+//    exists. What this does **not** buy is a guarantee for a consumer that
+//    bypasses this Vite config: the deferred `parseBooleanFlag` branch in
+//    `featureFlags.ts` stays precisely because it, not the canonicaliser, is
+//    the contract, and under `tsx` — where `import.meta.env` does not exist —
+//    every flag still takes its documented default of `false`.
+//  • Byte-identity between equivalent true spellings, and between unset and
+//    explicit `"false"`, is a property of whole build outputs. It is measured
+//    by the build matrix, not here: this file sees one `dist/` at a time.
 //  • The variant is now declared rather than inferred. That is deliberate:
 //    correction A folds the flag to a literal, so the parser echo the old
 //    detector relied on is gone from a canonically-flagged build, and reading
@@ -1437,13 +1798,30 @@ section("Registration — this file runs in the standard aggregate command");
 //    stronger static precondition: the default build contains no voice
 //    endpoint path at all, so no such request can be constructed. The counts
 //    themselves come from the local QA pass.
-//  • `components/common/BrowserTestPanel.tsx` is rendered unconditionally by
-//    `pages/AssistantBuilder.tsx`, which is Assistants product layout and
-//    outside this correction's authorised scope. Its idle-state copy therefore
-//    still ships in a platform-enabled build with browser testing off. What
-//    correction C removes — and what is asserted above — is the provider
-//    client, its SDK loader, the key reader, and every microphone, WebRTC and
-//    provider-host capability that came with them.
+//  • Correction B removes `components/common/BrowserTestPanel.tsx` — and the
+//    Test control, both confirmation dialogs, the browser-test state machine,
+//    its eligibility and error copy, and the publish request path — from any
+//    build whose flag is off, rather than rendering them and hiding them. It
+//    is asserted through customer-facing copy rather than identifier names:
+//    minification renames identifiers but never string literals, so copy is
+//    the probe that cannot silently stop matching.
+//  • The absence of an *empty* toolbar slot where a hidden control used to sit
+//    is a rendering fact, not a static one. It is evidenced by the local QA
+//    captures, not by this file.
+//  • `pages/appointments/appointmentsContract.test.ts` and
+//    `pages/call-logs/callLogsContract.test.ts` still classify a non-canonical
+//    rejected spelling (`"1"`) as `voice-enabled`. That was correct before
+//    canonicalisation and is not any more. Both files are outside this
+//    refinement's authorised set, so neither was touched; they are run against
+//    canonical-spelling builds, where their classification is exact. The
+//    one-line change that would extend them is the one made here to
+//    `pages/assistants/assistantsContract.test.ts`.
+//  • `BUILDER.savePrompt` — "Save your changes before publishing." — is the
+//    unsaved-changes prompt AR-001I shipped, not a publish control, so it is
+//    emitted whatever the publish flag says. Its wording references publishing
+//    in a build that cannot publish. Editing product copy in
+//    `pages/assistants/assistantsContract.ts` is outside this refinement's
+//    authorised scope, so it is reported rather than changed.
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

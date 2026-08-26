@@ -31,12 +31,25 @@
  *   • unset, `""` and `"false"` fold to `false`, so a default build drops
  *     every gated module, chunk and navigation record;
  *   • `"true"` folds to `true`;
- *   • any other spelling is not statically decidable, so the gated modules
- *     stay in the build and `parseBooleanFlag` decides at runtime exactly as
- *     it always has. Every spelling it accepts (`"TRUE"`, `" true "`) still
- *     enables the feature *and* has the code present to serve it; every
- *     spelling it rejects (`"1"`, `"yes"`) still fails closed. A rejected
- *     non-canonical spelling costs bundle size, never behaviour.
+ *   • any other spelling falls through to `parseBooleanFlag`, whose truth
+ *     table is unchanged: every spelling it accepts still enables the
+ *     feature and every spelling it rejects still fails closed.
+ *
+ * ── AR-001J final refinement, owner decision A ───────────────────────────
+ *
+ * That last case used to be the boundary's one remaining limitation: a
+ * spelling the bundler could not decide left the gated code in the build,
+ * reachable or not. `vite.config.ts` now applies exactly the truth table
+ * below once, before Vite resolves its environment and therefore before
+ * Rollup constructs the module graph, so these three variables reach this
+ * file only ever as the literal `"true"` or the literal `"false"`.
+ *
+ * The public contract is unchanged — the environment still accepts every
+ * spelling it documented — but the deferred branch below is now unreachable
+ * in any Vite build, and every value therefore removes or keeps the gated
+ * code exactly as its meaning says it should. The branch stays because it,
+ * not the canonicaliser, is the contract: it keeps this module correct
+ * under any consumer, and it is what the canonicaliser is written to match.
  *
  * `typeof import.meta.env === "undefined"` is the no-bundler case. The
  * committed `tsx` contract tests import this module and its consumers

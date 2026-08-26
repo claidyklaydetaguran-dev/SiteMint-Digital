@@ -1345,12 +1345,14 @@ if (!existsSync(distDir)) {
     })();
 
     if (raw === null) return "indeterminate";
-    if (raw !== undefined && raw.trim().toLowerCase() === "true") return "voice-enabled";
-    // Only the three spellings the bundler can decide remove the gated chunks.
-    // Any other rejected spelling leaves them emitted but unroutable, which is
-    // the emission this file asserts about — so it belongs with the built-in
-    // variant, not the removed one. The runtime gate is false either way.
-    return raw === undefined || raw === "" || raw === "false" ? "default-gated" : "voice-enabled";
+    // AR-001J final refinement: `vite.config.ts` canonicalises the flag before
+    // Vite resolves its environment, so the chunks follow `parseBooleanFlag`
+    // exactly. A spelling the parser rejects — `"1"`, `"yes"` — no longer
+    // leaves the gated chunks emitted-but-unroutable; it removes them, like
+    // any other false value. One rule, and it is the parser's.
+    return raw !== undefined && raw.trim().toLowerCase() === "true"
+      ? "voice-enabled"
+      : "default-gated";
   })();
 
   /**
