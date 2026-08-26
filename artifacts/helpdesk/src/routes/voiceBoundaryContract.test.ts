@@ -48,6 +48,27 @@
  *      A platform-enabled build with `VITE_VOICE_BROWSER_TEST_ENABLED=false`
  *      now emits no SDK chunk at all.
  *
+ * ── AR-001M: strict built-output mode ────────────────────────────────────
+ *
+ * The built-output section below asserts whichever build happens to be in
+ * `dist/`, and prints SKIP when there is none. That is right for the
+ * aggregate test command, which runs against whatever a developer last built,
+ * and useless as a release gate: a gate that passes on an absent build proves
+ * nothing.
+ *
+ * `AR001M_STRICT=1` turns the same assertions into a gate. The caller declares
+ * what it built — variant name, expected class, and where the output is — and
+ * strict mode fails on a missing or empty dist, an undeclared variant, an
+ * indeterminate class, a class that disagrees with the declaration, an
+ * applicable section that did not execute, and any SKIP at all. It ends with
+ * one machine-readable summary line, so the committed matrix runner
+ * (`scripts/src/run-voice-boundary-matrix.ts`) can verify each arm rather than
+ * trust an exit code.
+ *
+ * Nothing about an ordinary run changes. Every assertion added for strict mode
+ * is behind the `strict` flag, so the aggregate command's assertion counts,
+ * its SKIP notices and its exit status are exactly what they were.
+ *
  * It never performs a network request, never signs in, never creates a session,
  * never contacts Vapi, Twilio, Stripe, Google or any other provider, never
  * loads a provider SDK, and never touches a database.
@@ -150,6 +171,46 @@ function eq<T>(label: string, actual: T, expected: T): void {
 
 function section(name: string): void {
   console.log(`\n── ${name} ${"─".repeat(Math.max(0, 66 - name.length))}`);
+}
+
+// ─── AR-001M — strict built-output mode ────────────────────────────────────
+
+/** Off unless the caller asks for it; the matrix runner always does. */
+const strict = process.env.AR001M_STRICT === "1";
+const declaredVariant = process.env.AR001M_VARIANT;
+const declaredClass = process.env.AR001M_DECLARED_CLASS;
+
+let skipped = 0;
+
+/**
+ * A skip is information in an ordinary run and a failure in a gate. The
+ * ordinary notice is unchanged; a strict run says both that the section was
+ * skipped and that skipping is not allowed, and counts it as a failure.
+ */
+function skip(label: string): void {
+  skipped++;
+  if (strict) {
+    failures.push(`skipped, which AR-001M strict mode does not allow: ${label}`);
+    console.log(`  FAIL  ${label} (a SKIP is a failure under AR-001M strict mode)`);
+    return;
+  }
+  console.log(`  SKIP  ${label}`);
+}
+
+/** Adds an assertion only in strict mode, so ordinary counts never move. */
+function strictCheck(label: string, condition: boolean): void {
+  if (strict) check(label, condition);
+}
+
+/**
+ * Which built-output arms actually ran. Strict mode compares this against the
+ * arms the declared flags say should run, so "the section executed" is proven
+ * rather than assumed: a conditional that quietly stopped matching would
+ * otherwise be indistinguishable from a clean pass.
+ */
+const armsRun = new Set<string>();
+function arm(name: string): void {
+  armsRun.add(name);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1251,11 +1312,41 @@ const GATED_ONLY_ICONS: [string, string][] = [
   );
 }
 
-const distDir = path.join(repoRoot, "artifacts/helpdesk/dist/public/assets");
-const indexHtmlPath = path.join(repoRoot, "artifacts/helpdesk/dist/public/index.html");
+/**
+ * AR-001M: the matrix builds each variant into its own operating-system
+ * temporary directory and points this file at it, so a gate never writes into
+ * the worktree and never disturbs a pre-existing `dist/`. Unset, the path is
+ * the package's own build output, exactly as before.
+ */
+const distRoot = process.env.AR001M_DIST_DIR
+  ? path.resolve(process.env.AR001M_DIST_DIR)
+  : path.join(repoRoot, "artifacts/helpdesk/dist/public");
+const distDir = path.join(distRoot, "assets");
+const indexHtmlPath = path.join(distRoot, "index.html");
+
+strictCheck(
+  "strict: the build variant is declared",
+  declaredVariant !== undefined && declaredVariant !== "",
+);
+strictCheck(
+  "strict: the expected build class is declared",
+  declaredClass === "gated-out" || declaredClass === "voice-enabled",
+);
+strictCheck("strict: the declared built output exists", existsSync(distDir));
+strictCheck(
+  "strict: the declared built output is not empty",
+  existsSync(distDir) && readdirSync(distDir).length > 0,
+);
+
+/** Reported in the strict summary; the runner reads it back. */
+let reportedBuildClass = "no-built-output";
+let builtOutputChecks = 0;
+const assertionsBeforeBuiltOutput = passed + failures.length;
+
 if (!existsSync(distDir)) {
-  console.log("  SKIP  no built output present (run a production build to include these)");
+  skip("no built output present (run a production build to include these)");
 } else {
+  arm("built-output");
   const files = readdirSync(distDir);
   const readAsset = (f: string) => readFileSync(path.join(distDir, f), "utf8");
   const everyJs = files.filter((f) => f.endsWith(".js")).map(readAsset).join("\n");
@@ -1341,6 +1432,29 @@ if (!existsSync(distDir)) {
       `, browserTest=${JSON.stringify(declared("BROWSER_TEST_ENABLED"))})`,
   );
 
+  reportedBuildClass = buildClass;
+
+  /**
+   * AR-001M: three statements have to agree before a strict run passes — what
+   * the caller intended, what the application's own parser makes of the flag
+   * that build was given, and what Rollup actually emitted. The declaration is
+   * an independent input rather than something read out of the assets, so
+   * comparing it against a chunk census is not the circular inference the
+   * detector above is written to avoid.
+   */
+  const observedClass = GATED_PAGE_MODULES.some((m) => chunksFor(m).length > 0)
+    ? "voice-enabled"
+    : "gated-out";
+  strictCheck("strict: the build class is determinate", buildClass !== "indeterminate");
+  strictCheck(
+    `strict: the build class is the declared one (declared ${declaredClass}, got ${buildClass})`,
+    buildClass === declaredClass,
+  );
+  strictCheck(
+    `strict: the emitted chunks corroborate the declared class (observed ${observedClass})`,
+    observedClass === declaredClass,
+  );
+
   // ── True of every variant ────────────────────────────────────────────────
 
   eq("exactly one entry chunk is emitted", entryChunks.length, 1);
@@ -1407,6 +1521,7 @@ if (!existsSync(distDir)) {
   // ── The base the build was mounted on ────────────────────────────────────
 
   if (existsSync(indexHtmlPath)) {
+    arm("entry-document");
     const html = readFileSync(indexHtmlPath, "utf8");
     const srcs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]!);
     const assetRefs = srcs.filter((s) => s.includes("/assets/"));
@@ -1441,6 +1556,7 @@ if (!existsSync(distDir)) {
   // ── The default-gated build: nothing gated may exist ─────────────────────
 
   if (buildClass === "gated-out") {
+    arm("gated-out");
     eq(
       "no gated route chunk or stylesheet is emitted at all",
       GATED_PAGE_MODULES.flatMap((m) => chunksFor(m)),
@@ -1548,7 +1664,8 @@ if (!existsSync(distDir)) {
 
   // ── Any build that kept the gated code: it must exist, and stay lazy ─────
 
-  if (buildClass === "voice-enabled" || buildClass === "gated-inert") {
+  if (buildClass === "voice-enabled") {
+    arm("voice-enabled");
     eq(
       "every gated page is emitted as exactly one lazy chunk of its own",
       GATED_PAGE_MODULES.filter((m) => chunksFor(m).filter((f) => f.endsWith(".js")).length !== 1),
@@ -1618,6 +1735,7 @@ if (!existsSync(distDir)) {
      * defect, and dropping it with the flag on would break AR-001A.
      */
     if (isDeclared) {
+      arm("declared-flags");
       const sdkExpected = !staticallyFalse(declared("BROWSER_TEST_ENABLED"));
       eq(
         "the provider SDK chunk is emitted exactly when browser testing is built in",
@@ -1681,6 +1799,7 @@ if (!existsSync(distDir)) {
        * line where one used to be.
        */
       if (!publishBuilt && !testBuilt) {
+        arm("neither-subordinate");
         eq(
           "neither subordinate feature — no unsaved-changes sentence of any kind is emitted",
           [
@@ -1708,6 +1827,7 @@ if (!existsSync(distDir)) {
     }
 
     if (declaredBrowserTest === false && buildClass === "voice-enabled") {
+      arm("browser-test-off");
       eq("browser testing off — no provider SDK chunk is emitted", sdkChunks, []);
 
       eq(
@@ -1724,6 +1844,7 @@ if (!existsSync(distDir)) {
     }
 
     if (sdkChunks.length === 1) {
+      arm("provider-sdk");
 
       check("the SDK stays out of the entry chunk", !entrySrc.includes("api.vapi.ai"));
 
@@ -1771,6 +1892,7 @@ if (!existsSync(distDir)) {
     rawPlatform !== "";
 
   if (nonCanonicalSpelling) {
+    arm("non-canonical-spelling");
     console.log(
       `  NOTE  non-canonical spelling ${JSON.stringify(rawPlatform)} ->` +
         ` canonical ${JSON.stringify(canonicalVoiceFlagValue(rawPlatform))}`,
@@ -1786,9 +1908,56 @@ if (!existsSync(distDir)) {
   }
 
   if (buildClass === "indeterminate") {
-    console.log("  SKIP  the build class was neither declared nor readable from the entry chunk");
+    skip("the build class was neither declared nor readable from the entry chunk");
+  }
+
+  /**
+   * AR-001M's coverage proof. The expected set is derived from the declaration
+   * alone, so a section that silently stopped matching shows up as a missing
+   * arm rather than as a shorter — and still green — run, and a section that
+   * ran when this variant should never reach it shows up as an extra one.
+   */
+  if (strict) {
+    const rawDeclared = declared("PLATFORM_ENABLED");
+    const expectedArms = new Set(["built-output", "entry-document"]);
+    if (parseBooleanFlag(rawDeclared)) {
+      expectedArms.add("voice-enabled");
+      expectedArms.add("declared-flags");
+      expectedArms.add(
+        parseBooleanFlag(declared("BROWSER_TEST_ENABLED")) ? "provider-sdk" : "browser-test-off",
+      );
+      if (
+        !parseBooleanFlag(declared("PUBLISH_ENABLED")) &&
+        !parseBooleanFlag(declared("BROWSER_TEST_ENABLED"))
+      ) {
+        expectedArms.add("neither-subordinate");
+      }
+    } else {
+      expectedArms.add("gated-out");
+    }
+    if (
+      rawDeclared !== undefined &&
+      rawDeclared !== "true" &&
+      rawDeclared !== "false" &&
+      rawDeclared !== ""
+    ) {
+      expectedArms.add("non-canonical-spelling");
+    }
+
+    eq(
+      "strict: every built-output section this variant declares actually executed",
+      [...expectedArms].filter((name) => !armsRun.has(name)).sort(),
+      [],
+    );
+    eq(
+      "strict: no built-output section ran that this variant does not declare",
+      [...armsRun].filter((name) => !expectedArms.has(name)).sort(),
+      [],
+    );
   }
 }
+
+builtOutputChecks = passed + failures.length - assertionsBeforeBuiltOutput;
 
 // ═══════════════════════════════════════════════════════════════════════════
 section("The neighbouring contracts still describe this boundary");
@@ -1895,9 +2064,17 @@ section("Registration — this file runs in the standard aggregate command");
 //
 //  • The built-output section asserts whichever build happens to be in
 //    `dist/`. It cannot build the matrix itself, so each rule is proven for
-//    the variant present when it runs. The validation pass runs it once per
-//    build in the matrix, declaring that build's flags; a run with no `dist/`
-//    skips the section entirely and says so.
+//    the variant present when it runs; a run with no `dist/` skips the section
+//    entirely and says so. As of AR-001M that matrix is committed —
+//    `scripts/src/run-voice-boundary-matrix.ts`, `pnpm run
+//    test:voice-boundary:matrix` — and runs this file once per variant with
+//    `AR001M_STRICT=1`, where a missing build, an undeclared variant, an
+//    indeterminate class and any SKIP are all failures rather than notices.
+//  • Strict mode's class agreement is a three-way one: the runner's declared
+//    expectation, this file's reading of the flag through `parseBooleanFlag`,
+//    and a census of the emitted chunks. The first is an independent input, so
+//    the comparison is not circular — but all three describe the same build,
+//    and none of them can prove a variant the matrix does not build.
 //  • **What correction A now buys, and what it still does not.** Semantic
 //    equivalence was already complete — one constant, so navigation and
 //    routing cannot disagree. Static *removal* is complete too as of the final
@@ -1970,6 +2147,25 @@ section("Registration — this file runs in the standard aggregate command");
 //    captures rather than by this file.
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
+if (strict) {
+  /**
+   * One machine-readable line for the matrix runner: the variant it was told
+   * it was checking, the class it actually resolved, the class it was told to
+   * expect, and the counts a gate has to see — how many assertions ran, how
+   * many of them were built-output assertions, and how many sections were
+   * skipped, which must be zero.
+   */
+  console.log(
+    `AR001M SUMMARY variant=${declaredVariant ?? "<undeclared>"}` +
+      ` class=${reportedBuildClass}` +
+      ` declaredClass=${declaredClass ?? "<undeclared>"}` +
+      ` checks=${passed + failures.length}` +
+      ` builtOutputChecks=${builtOutputChecks}` +
+      ` passed=${passed}` +
+      ` failures=${failures.length}` +
+      ` skips=${skipped}`,
+  );
+}
 if (failures.length > 0) {
   console.log("\nFailures:");
   for (const f of failures) console.log(`  - ${f}`);
