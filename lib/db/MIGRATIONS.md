@@ -109,6 +109,33 @@ pnpm --filter @workspace/db run migrate:fresh
 `lib/db/migrationOrderContract.test.ts` pins the order, the shared-journal
 identity, and the chronology of the committed journals.
 
+### Why the discovery migration is idempotent
+
+Ordering alone is not enough. `discovery_submissions` is reachable from the
+shared barrel (`src/schema/index.ts` re-exports `./submissions`), so step 1
+already creates the table **and** all 15 of the Phase-2C.2B columns, both of
+its constraints and all four of its indexes. Step 3 then tried to add them a
+second time and aborted on its very first statement, so the fresh-database
+sequence could not succeed in any order: after push the columns already
+existed, before push the table did not.
+
+Every statement in `0000_discovery-domain-contract.sql` is therefore
+idempotent — `ADD COLUMN IF NOT EXISTS`, `CREATE [UNIQUE] INDEX IF NOT
+EXISTS`, `CREATE TABLE IF NOT EXISTS`, and a `DO $$ … EXCEPTION WHEN
+duplicate_object THEN null; END $$;` guard for the two constraint forms
+Postgres offers no `IF NOT EXISTS` for. No column, type, default,
+nullability, constraint body, index definition, statement order, or the
+journal timestamp changed.
+
+Editing a migration that a database has already recorded is safe **for this
+migrator only**, and the contract test pins the reason: drizzle-kit 0.31.10
+delegates to drizzle-orm 0.45.2 `PgDialect.migrate`, which decides pending
+work solely from `created_at` vs the journal `when`, and which stores each
+migration's sha256 but never reads it back to compare. There is no checksum
+validation to fail and no path that re-runs an already-recorded migration.
+Do not assume this of a future drizzle version — section 6 of the contract
+test fails first if it changes.
+
 ### Scheduling order note
 
 `scheduling_appointment_requests` references `scheduling_appointment_types`.
@@ -127,12 +154,13 @@ and backfill step — not this internal migration.
 
 ### Discovery migration status
 
-`0000_discovery-domain-contract.sql` is **generated and reviewed only**. As of
-this document it has never been applied to any database. It is additive:
-new nullable/defaulted columns on `discovery_submissions`, plus two new
-tables. No table is dropped or renamed, no existing column is altered or
-removed, no data is modified or backfilled, and `form_submissions` is
-untouched.
+`0000_discovery-domain-contract.sql` has **never been applied to production**,
+and no approved plan applies it there. Under AR-001O it is applied to the
+isolated `SiteMint-Voice-Staging` development database only, as part of
+`migrate:fresh` on an empty database. It is additive: new
+nullable/defaulted columns on `discovery_submissions`, plus two new tables.
+No table is dropped or renamed, no existing column is altered or removed, no
+data is modified or backfilled, and `form_submissions` is untouched.
 
 ## 4. Before running anything: identify the database
 

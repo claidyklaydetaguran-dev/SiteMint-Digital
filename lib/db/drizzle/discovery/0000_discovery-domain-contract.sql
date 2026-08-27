@@ -21,32 +21,58 @@
 -- and must be updated to do so before the structured endpoint is deployed
 -- or activated (see REQUIRED FOLLOW-UP note there).
 
-ALTER TABLE "discovery_submissions" ADD COLUMN "schema_version" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "form_version" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "idempotency_key" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "idempotency_payload_hash" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "idempotency_payload_hash_key_version" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "idempotency_canonicalization_version" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_fingerprint" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "fingerprint_key_version" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_review_status" text DEFAULT 'none' NOT NULL;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_of_submission_id" integer;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_resolved_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_resolved_by" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "duplicate_resolution_reason_code" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "privacy_policy_version" text;--> statement-breakpoint
-ALTER TABLE "discovery_submissions" ADD COLUMN "is_automatically_scored" boolean;--> statement-breakpoint
+--
+-- AR-001O correction 2 (idempotency). `discovery_submissions` IS reachable
+-- from the shared schema barrel (lib/db/src/schema/index.ts re-exports
+-- ./submissions), so `drizzle-kit push` already creates all 15 columns
+-- below, both constraints and all four indexes on it. Running this
+-- migration after push therefore aborted on its very first statement, and
+-- running it before push was impossible because the table did not exist yet.
+-- Every statement here is now idempotent — ADD COLUMN IF NOT EXISTS,
+-- CREATE [UNIQUE] INDEX IF NOT EXISTS, CREATE TABLE IF NOT EXISTS, and a
+-- guarded DO block for the two constraint forms Postgres offers no
+-- IF NOT EXISTS for. No column, type, default, nullability, constraint
+-- definition, index definition, statement order, or the journal timestamp
+-- (1784601043137) is changed. The installed migrator
+-- (drizzle-kit 0.31.10 -> drizzle-orm 0.45.2 PgDialect.migrate) stores each
+-- migration's sha256 but never reads it back for comparison; it decides
+-- pending work solely from `created_at` vs the journal `when`. Editing this
+-- file therefore cannot re-run it on a database where it is already
+-- recorded, and cannot be rejected as a hash mismatch.
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "schema_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "form_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "idempotency_key" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "idempotency_payload_hash" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "idempotency_payload_hash_key_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "idempotency_canonicalization_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "duplicate_fingerprint" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "fingerprint_key_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "duplicate_review_status" text DEFAULT 'none' NOT NULL;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "duplicate_of_submission_id" integer;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "duplicate_resolved_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "duplicate_resolved_by" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "duplicate_resolution_reason_code" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "privacy_policy_version" text;--> statement-breakpoint
+ALTER TABLE "discovery_submissions" ADD COLUMN IF NOT EXISTS "is_automatically_scored" boolean;--> statement-breakpoint
 
-ALTER TABLE "discovery_submissions" ADD CONSTRAINT "discovery_submissions_duplicate_of_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("duplicate_of_submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "discovery_submissions" ADD CONSTRAINT "discovery_submissions_duplicate_of_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("duplicate_of_submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 
-ALTER TABLE "discovery_submissions" ADD CONSTRAINT "ck_discovery_submissions_duplicate_review_status" CHECK ("discovery_submissions"."duplicate_review_status" IN ('none', 'pending', 'cleared', 'confirmed_duplicate'));--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "discovery_submissions" ADD CONSTRAINT "ck_discovery_submissions_duplicate_review_status" CHECK ("discovery_submissions"."duplicate_review_status" IN ('none', 'pending', 'cleared', 'confirmed_duplicate'));
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 
-CREATE UNIQUE INDEX "uq_discovery_submissions_idempotency_key" ON "discovery_submissions" USING btree ("idempotency_key");--> statement-breakpoint
-CREATE INDEX "ix_discovery_submissions_duplicate_fingerprint" ON "discovery_submissions" USING btree ("duplicate_fingerprint");--> statement-breakpoint
-CREATE INDEX "ix_discovery_submissions_duplicate_review_status" ON "discovery_submissions" USING btree ("duplicate_review_status");--> statement-breakpoint
-CREATE INDEX "ix_discovery_submissions_created_at" ON "discovery_submissions" USING btree ("created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_discovery_submissions_idempotency_key" ON "discovery_submissions" USING btree ("idempotency_key");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_submissions_duplicate_fingerprint" ON "discovery_submissions" USING btree ("duplicate_fingerprint");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_submissions_duplicate_review_status" ON "discovery_submissions" USING btree ("duplicate_review_status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_submissions_created_at" ON "discovery_submissions" USING btree ("created_at");--> statement-breakpoint
 
-CREATE TABLE "discovery_delivery_jobs" (
+CREATE TABLE IF NOT EXISTS "discovery_delivery_jobs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"submission_id" integer NOT NULL,
 	"job_type" text NOT NULL,
@@ -68,7 +94,7 @@ CREATE TABLE "discovery_delivery_jobs" (
 );
 --> statement-breakpoint
 
-CREATE TABLE "discovery_ai_briefs" (
+CREATE TABLE IF NOT EXISTS "discovery_ai_briefs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"submission_id" integer NOT NULL,
 	"brief_version" integer NOT NULL,
@@ -95,14 +121,22 @@ CREATE TABLE "discovery_ai_briefs" (
 );
 --> statement-breakpoint
 
-ALTER TABLE "discovery_delivery_jobs" ADD CONSTRAINT "discovery_delivery_jobs_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "discovery_ai_briefs" ADD CONSTRAINT "discovery_ai_briefs_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "discovery_delivery_jobs" ADD CONSTRAINT "discovery_delivery_jobs_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "discovery_ai_briefs" ADD CONSTRAINT "discovery_ai_briefs_submission_id_discovery_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."discovery_submissions"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 
-CREATE UNIQUE INDEX "uq_discovery_delivery_jobs_submission_job_type" ON "discovery_delivery_jobs" USING btree ("submission_id","job_type");--> statement-breakpoint
-CREATE INDEX "ix_discovery_delivery_jobs_status_next_attempt_at" ON "discovery_delivery_jobs" USING btree ("status","next_attempt_at");--> statement-breakpoint
-CREATE INDEX "ix_discovery_delivery_jobs_submission_id" ON "discovery_delivery_jobs" USING btree ("submission_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_discovery_delivery_jobs_submission_job_type" ON "discovery_delivery_jobs" USING btree ("submission_id","job_type");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_delivery_jobs_status_next_attempt_at" ON "discovery_delivery_jobs" USING btree ("status","next_attempt_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_delivery_jobs_submission_id" ON "discovery_delivery_jobs" USING btree ("submission_id");--> statement-breakpoint
 
-CREATE UNIQUE INDEX "uq_discovery_ai_briefs_submission_brief_version" ON "discovery_ai_briefs" USING btree ("submission_id","brief_version");--> statement-breakpoint
-CREATE INDEX "ix_discovery_ai_briefs_status_next_attempt_at" ON "discovery_ai_briefs" USING btree ("status","next_attempt_at");--> statement-breakpoint
-CREATE INDEX "ix_discovery_ai_briefs_human_review_status" ON "discovery_ai_briefs" USING btree ("human_review_status");--> statement-breakpoint
-CREATE INDEX "ix_discovery_ai_briefs_submission_id" ON "discovery_ai_briefs" USING btree ("submission_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_discovery_ai_briefs_submission_brief_version" ON "discovery_ai_briefs" USING btree ("submission_id","brief_version");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_ai_briefs_status_next_attempt_at" ON "discovery_ai_briefs" USING btree ("status","next_attempt_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_ai_briefs_human_review_status" ON "discovery_ai_briefs" USING btree ("human_review_status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ix_discovery_ai_briefs_submission_id" ON "discovery_ai_briefs" USING btree ("submission_id");
