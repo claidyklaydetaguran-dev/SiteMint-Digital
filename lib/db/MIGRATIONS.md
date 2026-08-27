@@ -14,14 +14,88 @@ This package uses **two different** Drizzle Kit mechanisms against the same
 database. They are not interchangeable, and the separation is a safety
 boundary (ADR-05, `docs/ai-receptionist/DATABASE_STRATEGY.md`).
 
-| Mechanism | Config | Schema barrel | Tables it can see |
+| Mechanism | Config | Schema barrel | Tables it manages |
 |---|---|---|---|
 | **Push** (diff-and-apply, no history) | `drizzle.config.ts` | `src/schema/index.ts` | `intake_*`, `crm_*`, `discovery_submissions`, `form_submissions` — the shared barrel only |
 | **Versioned migrations** (numbered SQL + journal) | `drizzle.voice.config.ts`, `drizzle.scheduling.config.ts`, `drizzle.discovery.config.ts` | dedicated per-domain barrels | `voice_*`, `scheduling_*`, discovery domain-contract objects |
 
-The domain tables are **not exported from the shared barrel**. That is what
-makes it structurally impossible for `drizzle-kit push` to discover, create,
-alter, or drop them — push literally cannot see them.
+The domain tables are **not exported from the shared barrel**. That stops push
+creating or altering them. It does **not** stop push dropping them.
+
+### The push boundary is `tablesFilter`, not the barrel
+
+An earlier version of this section said the barrel made it "structurally
+impossible" for push to touch the domain tables, and that push "literally
+cannot see them". That was wrong, and wrong in the one direction that destroys
+schema.
+
+`drizzle-kit push` is a whole-schema reconciler. It introspects every table in
+the managed schema and diffs it against the barrel; anything present in the
+database that the barrel does not export is a **deletion candidate**. Absence
+from the barrel is therefore not protection — it is the trigger. Measured on an
+isolated staging database under AR-001O: a second
+`pnpm --filter @workspace/db run migrate:fresh` dropped all ten
+domain-migration-owned tables (public base tables 37 → 27) while printing only
+its success line and exiting 0. The shared journal was untouched, so every
+domain migration still reported as applied and re-running them recreated
+nothing.
+
+The real boundary is `tablesFilter` in `drizzle.config.ts`:
+
+| Pattern | Protects |
+|---|---|
+| `!voice_*` | `voice_assistants`, `voice_issues`, and any future `voice_*` table |
+| `!provider_webhook_events` | `provider_webhook_events` |
+| `!discovery_ai_briefs` | `discovery_ai_briefs` |
+| `!discovery_delivery_jobs` | `discovery_delivery_jobs` |
+| `!scheduling_*` | all five `scheduling_*` tables, and any future one |
+
+Each entry is a minimatch glob matched against the bare table name; a leading
+`!` negates it. drizzle-kit applies the filter while **introspecting the
+database**, so an excluded table never enters the "current database" snapshot at
+all: push cannot create, alter, rename or drop it, and it can never become a
+deletion candidate, because there is nothing on either side of the diff to
+compare.
+
+`discovery_*` is deliberately **not** a wildcard. `discovery_submissions` is
+barrel-owned and must stay managed by push — the discovery migration only adds
+columns to it — so the two discovery domain tables are excluded by exact name.
+
+`schemaFilter` is pinned to `["public"]` in the same config. That is what keeps
+the Stripe connector's `stripe` schema outside the managed set. Never set it to
+`[]`: an empty list removes the WHERE clause from drizzle's introspection
+queries and pulls in every schema in the database.
+
+`migrationOrderContract.test.ts` section 11 fails if a required exclusion is
+removed or weakened, if `discovery_submissions` is ever excluded, or if a
+barrel-owned family stops being managed.
+
+### Expected: a trailing `DROP SEQUENCE` error once the domain tables exist
+
+drizzle-kit drops a serial column's owned sequence from the introspected
+snapshot inside the same per-table loop that `tablesFilter` short-circuits. An
+excluded table's `<table>_id_seq` therefore stays in the snapshot with nothing
+in the barrel to match it, and push appends a `DROP SEQUENCE` for each one.
+PostgreSQL refuses every one of them:
+
+```
+ERROR:  cannot drop sequence voice_assistants_id_seq because other objects depend on it
+DETAIL:  default value for column id of table voice_assistants depends on sequence voice_assistants_id_seq
+```
+
+That is noisy, not dangerous:
+
+* the sequence drops are assembled **last**, after every table statement, so no
+  barrel change is ever skipped because of them;
+* push runs statements outside a transaction and stops at the first failure, so
+  nothing is created, altered or dropped;
+* push reports the error and still exits 0, so `migrate:fresh` continues to the
+  domain migrations.
+
+Treat a `cannot drop sequence … because other objects depend on it` line at the
+end of `push` as **expected output** on any run where the domain tables already
+exist. Anything else — above all a `DROP TABLE` — is not, and is a stop
+condition (section 9).
 
 ## 2. Exact commands
 

@@ -13,9 +13,19 @@ import { discoverySubmissions } from "./submissions";
 // ever created by this checkpoint. This table is deliberately NOT exported
 // from the shared push-scanned barrel (../index.ts) — it is reachable only
 // through ./discovery/index.ts, the dedicated versioned-migration barrel, so
-// `pnpm --filter @workspace/db run push` can never discover or alter it
+// `pnpm --filter @workspace/db run push` can never create or alter it
 // (same isolation the voice tables already rely on, see ADR-05 in
 // docs/ai-receptionist/DATABASE_STRATEGY.md).
+//
+// Absence from the barrel does NOT protect them from deletion. push
+// reconciles the whole managed schema: anything it introspects that the
+// barrel does not export is a drop candidate, which is how a second
+// `migrate:fresh` removed all ten domain-migration-owned tables on staging
+// (AR-001O correction 4). Deletion protection comes from the exact-name
+// `!discovery_ai_briefs` and `!discovery_delivery_jobs` entries in
+// ./drizzle.config.ts's `tablesFilter`. A `discovery_*` wildcard would be
+// wrong: discovery_submissions IS barrel-owned and must stay managed by
+// push. Do not remove or widen these entries.
 
 export const DISCOVERY_DELIVERY_JOB_TYPES = [
   "client_acknowledgment_email",

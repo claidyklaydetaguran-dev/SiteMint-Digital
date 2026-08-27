@@ -9,9 +9,19 @@ import path from "path";
 // dedicated discovery schema barrel (./src/schema/discovery/index.ts) rather
 // than the shared application schema barrel (./src/schema/index.ts). The two
 // new tables are NOT exported from the shared barrel, so the legacy CRM/
-// intake `drizzle-kit push` config (./drizzle.config.ts) cannot discover,
+// intake `drizzle-kit push` config (./drizzle.config.ts) cannot
 // create, alter, or synchronize them — mirroring drizzle.voice.config.ts and
 // ADR-05 (docs/ai-receptionist/DATABASE_STRATEGY.md).
+//
+// Absence from the barrel does NOT protect them from deletion. push
+// reconciles the whole managed schema: anything it introspects that the
+// barrel does not export is a drop candidate, which is how a second
+// `migrate:fresh` removed all ten domain-migration-owned tables on staging
+// (AR-001O correction 4). Deletion protection comes from the exact-name
+// `!discovery_ai_briefs` and `!discovery_delivery_jobs` entries in
+// ./drizzle.config.ts's `tablesFilter`. A `discovery_*` wildcard would be
+// wrong: discovery_submissions IS barrel-owned and must stay managed by
+// push. Do not remove or widen these entries.
 //
 // Never run `drizzle-kit push` with this config — discovery tables are
 // versioned-migration-only, per docs/sitemint-platform/

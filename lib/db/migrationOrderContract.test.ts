@@ -28,6 +28,16 @@
  * from the journal timestamp alone without ever comparing the stored hash,
  * importing the runner must still target no database, and a second complete
  * run must remain a safe no-op.
+ *
+ * AR-001O correction 4 added section 11. Second-run safety needed one more
+ * property than correction 2 assumed: `push` does not merely "converge by
+ * construction", it reconciles the whole managed schema and drops anything the
+ * shared barrel does not export. On staging that removed all ten
+ * domain-migration-owned tables while the journal still reported them applied.
+ * Section 11 pins the `tablesFilter` exclusions that now protect them, proves
+ * the boundary against table names derived from the committed migrations and
+ * the shared barrel rather than hand-typed lists, and fails if the installed
+ * drizzle-kit stops implementing the filter the way the boundary depends on.
  */
 
 import { spawnSync } from "node:child_process";
@@ -502,6 +512,310 @@ check(
 check(
   "the runner applies discovery immediately before scheduling",
   scriptOrder.indexOf("migrate:scheduling") - scriptOrder.indexOf("migrate:discovery") === 1,
+);
+
+// ── 11. The base push config's domain-table exclusion boundary ──────────────
+//
+// AR-001O correction 4. Absence from the shared barrel does not protect a table
+// from `drizzle-kit push` — it is exactly what marks it for deletion, and a
+// second `migrate:fresh` proved it by dropping all ten domain-migration-owned
+// tables on staging. The only thing that protects them is `tablesFilter` in
+// drizzle.config.ts. These assertions fail if a required exclusion is removed
+// or weakened, if `discovery_submissions` is ever excluded, if a barrel-owned
+// table stops being managed, or if the installed drizzle-kit stops
+// implementing the filter the way this boundary depends on.
+
+const baseConfigSource = readFileSync(join(here, "drizzle.config.ts"), "utf8");
+
+function configArray(key: string): string[] {
+  const match = baseConfigSource.match(new RegExp(`${key}:\\s*\\[([^\\]]*)\\]`));
+  return match ? [...match[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]) : [];
+}
+
+const tablesFilter = configArray("tablesFilter");
+const schemaFilter = configArray("schemaFilter");
+
+/**
+ * Mirrors the installed drizzle-kit's push-time table filter exactly
+ * (`pgPushIntrospect` -> `filter` in drizzle-kit's bin.cjs):
+ *
+ *   no patterns            -> keep everything
+ *   a negated pattern      -> contributes `false` when the bare pattern matches
+ *   any pattern that hits  -> contributes `true`
+ *   nothing contributed    -> drop the table
+ *
+ * A minimatch matcher built from `!foo` reports `negate` and returns the
+ * inverted result from `.match()`, which is why the two branches below are not
+ * mutually exclusive. Section 11's installed-source assertions fail if that
+ * shape ever changes, and `patterns use only mirrored glob syntax` fails if a
+ * pattern needs a minimatch feature this mirror does not implement.
+ */
+function mirrorGlob(pattern: string): RegExp {
+  const body = pattern.replace(/[.+^${}()|[\]\\?]/g, "\\$&").replace(/\*/g, "[^/]*");
+  return new RegExp(`^${body}$`);
+}
+
+function pushKeepsTable(patterns: string[], tableName: string): boolean {
+  if (patterns.length === 0) return true;
+  const flags: boolean[] = [];
+  for (const pattern of patterns) {
+    const negate = pattern.startsWith("!");
+    const matched = negate
+      ? !mirrorGlob(pattern.slice(1)).test(tableName)
+      : mirrorGlob(pattern).test(tableName);
+    if (negate && !matched) flags.push(false);
+    if (matched) flags.push(true);
+  }
+  return flags.length > 0 ? flags.every(Boolean) : false;
+}
+
+// The protected set is derived from the committed migrations, never hand-typed.
+
+function tablesCreatedBy(domain: string): string[] {
+  const journal = readJson("drizzle", domain, "meta", "_journal.json");
+  return (journal.entries as Array<{ tag: string }>).flatMap((entry) => {
+    const sql = readFileSync(join(here, "drizzle", domain, `${entry.tag}.sql`), "utf8");
+    return [...sql.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?"([^"]+)"/g)].map((m) => m[1]);
+  });
+}
+
+const voiceTables = tablesCreatedBy("voice");
+const discoveryTables = tablesCreatedBy("discovery");
+const schedulingTables = tablesCreatedBy("scheduling");
+const domainTables = [...voiceTables, ...discoveryTables, ...schedulingTables];
+
+check(
+  "the committed migrations create exactly ten domain tables",
+  domainTables.length === 10,
+  domainTables.join(","),
+);
+check(
+  "the scheduling migration creates exactly five scheduling_* tables",
+  schedulingTables.length === 5 && schedulingTables.every((t) => t.startsWith("scheduling_")),
+  schedulingTables.join(","),
+);
+check(
+  "the voice migrations create voice_assistants, provider_webhook_events, voice_issues",
+  ["voice_assistants", "provider_webhook_events", "voice_issues"].every((t) =>
+    voiceTables.includes(t),
+  ),
+  voiceTables.join(","),
+);
+check(
+  "the discovery migration creates the two discovery domain tables",
+  discoveryTables.length === 2 &&
+    ["discovery_delivery_jobs", "discovery_ai_briefs"].every((t) => discoveryTables.includes(t)),
+  discoveryTables.join(","),
+);
+
+// The barrel-owned set is derived from the shared barrel, never hand-typed.
+
+const barrelModules = [...barrelSource.matchAll(/export \* from "\.\/([^"]+)"/g)].map((m) => m[1]);
+const barrelTables = [
+  ...new Set(
+    barrelModules.flatMap((mod) => {
+      const source = readFileSync(join(here, "src", "schema", `${mod}.ts`), "utf8");
+      return [...source.matchAll(/pgTable\(\s*"([^"]+)"/g)].map((m) => m[1]);
+    }),
+  ),
+];
+
+check("the shared barrel resolves to real table names", barrelTables.length > 20, `${barrelTables.length}`);
+check(
+  "no barrel-owned table is also created by a domain migration",
+  barrelTables.every((t) => !domainTables.includes(t)),
+  barrelTables.filter((t) => domainTables.includes(t)).join(","),
+);
+
+// ── the required exclusions ──
+
+const REQUIRED_EXCLUSIONS = [
+  "!voice_*",
+  "!provider_webhook_events",
+  "!discovery_ai_briefs",
+  "!discovery_delivery_jobs",
+  "!scheduling_*",
+];
+
+check(
+  "drizzle.config.ts declares a tablesFilter",
+  tablesFilter.length > 0,
+  JSON.stringify(tablesFilter),
+);
+for (const pattern of REQUIRED_EXCLUSIONS) {
+  check(`tablesFilter still excludes ${pattern}`, tablesFilter.includes(pattern));
+}
+check(
+  "tablesFilter declares no pattern beyond the required exclusions",
+  tablesFilter.every((p) => REQUIRED_EXCLUSIONS.includes(p)),
+  JSON.stringify(tablesFilter.filter((p) => !REQUIRED_EXCLUSIONS.includes(p))),
+);
+check(
+  "every pattern is an exclusion — a positive pattern would drop every barrel table",
+  tablesFilter.every((p) => p.startsWith("!")),
+);
+check(
+  "patterns use only the glob syntax this mirror implements",
+  tablesFilter.every((p) => /^![A-Za-z0-9_]+\*?$/.test(p)),
+  JSON.stringify(tablesFilter.filter((p) => !/^![A-Za-z0-9_]+\*?$/.test(p))),
+);
+check(
+  "no discovery_* wildcard — it would exclude barrel-owned discovery_submissions",
+  !tablesFilter.includes("!discovery_*"),
+);
+
+// ── the boundary actually holds ──
+
+const unprotected = domainTables.filter((t) => pushKeepsTable(tablesFilter, t));
+check(
+  "push cannot see any of the ten domain tables",
+  unprotected.length === 0,
+  unprotected.join(","),
+);
+
+const unmanaged = barrelTables.filter((t) => !pushKeepsTable(tablesFilter, t));
+check(
+  "push still manages every barrel-owned table",
+  unmanaged.length === 0,
+  unmanaged.join(","),
+);
+
+check(
+  "discovery_submissions stays managed by push",
+  pushKeepsTable(tablesFilter, "discovery_submissions"),
+);
+
+check(
+  "a future voice_* table is protected without a config change",
+  !pushKeepsTable(tablesFilter, "voice_call_recordings"),
+);
+check(
+  "a future scheduling_* table is protected without a config change",
+  !pushKeepsTable(tablesFilter, "scheduling_reminders"),
+);
+check(
+  "a future barrel-owned table is still managed",
+  pushKeepsTable(tablesFilter, "crm_invoices"),
+);
+
+// Removing or weakening any single required exclusion must leave a domain
+// table exposed — that is what makes this section a regression gate rather
+// than a restatement of the config.
+for (const pattern of REQUIRED_EXCLUSIONS) {
+  const weakened = tablesFilter.filter((p) => p !== pattern);
+  const exposed = domainTables.filter((t) => pushKeepsTable(weakened, t));
+  check(
+    `removing ${pattern} would expose a domain table`,
+    exposed.length > 0,
+    exposed.join(","),
+  );
+}
+
+// ── the schema boundary that keeps Stripe out ──
+
+check(
+  "schemaFilter is pinned to public, so the stripe schema is never managed",
+  schemaFilter.length === 1 && schemaFilter[0] === "public",
+  JSON.stringify(schemaFilter),
+);
+check(
+  "drizzle.config.ts still points push at the shared barrel",
+  /schema: path\.join\(__dirname, "\.\/src\/schema\/index\.ts"\)/.test(baseConfigSource),
+);
+check(
+  "drizzle.config.ts still refuses to load without DATABASE_URL",
+  /if \(!process\.env\.DATABASE_URL\)/.test(baseConfigSource),
+);
+check(
+  "only the base config carries a tablesFilter — the domain configs never push",
+  configs
+    .filter((c) => c !== "drizzle.config.ts")
+    .every((c) => !/^\s*tablesFilter\s*:/m.test(readFileSync(join(here, c), "utf8"))),
+);
+
+// ── the canonical second run preserves the inventory ──
+
+check(
+  "migrate:fresh step 1 is push against the filtered base config",
+  steps[0].args.join(" ") === "push --config ./drizzle.config.ts",
+  steps[0].args.join(" "),
+);
+check(
+  "no later migrate:fresh step runs push",
+  steps.slice(1).every((s) => !s.args.includes("push")),
+);
+check(
+  "the runner still stops at the first failing step",
+  /No later step was run/.test(readFileSync(join(here, "src", "migrate-fresh.mjs"), "utf8")),
+);
+
+// ── the installed drizzle-kit still implements the filter we rely on ─────────
+
+const drizzleKit = (() => {
+  // drizzle-kit's "exports" map does not expose ./package.json, so resolve the
+  // exported ./api entry point and read its siblings out of the same directory.
+  const require_ = createRequire(import.meta.url);
+  let dir: string;
+  try {
+    dir = dirname(require_.resolve("drizzle-kit/api"));
+  } catch {
+    return { version: "", bin: "" };
+  }
+  let version = "";
+  let bin = "";
+  try {
+    version = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).version ?? "";
+  } catch {
+    /* leave empty — the assertion below reports it */
+  }
+  try {
+    bin = readFileSync(join(dir, "bin.cjs"), "utf8");
+  } catch {
+    /* leave empty — the assertion below reports it */
+  }
+  return { version, bin };
+})();
+
+check("the installed drizzle-kit is readable", drizzleKit.bin.length > 0);
+check(
+  "the installed drizzle-kit is the audited 0.31.x line",
+  /^0\.31\./.test(drizzleKit.version),
+  drizzleKit.version,
+);
+check(
+  "push still accepts tablesFilter and defaults schemaFilter to public",
+  /tablesFilter: unionType\(\[stringType\(\), stringType\(\)\.array\(\)\]\)\.optional\(\)/.test(
+    drizzleKit.bin,
+  ) && /schemaFilter: unionType\(\[[\s\S]{0,80}?\.default\(\["public"\]\)/.test(drizzleKit.bin),
+);
+check(
+  "push forwards tablesFilter into the database introspection",
+  /pgPushIntrospect\d*\(db, tablesFilter, schemasFilter/.test(drizzleKit.bin),
+);
+check(
+  "the filter is a minimatch matcher list that honours negation",
+  /matchers = filters\.map\([\s\S]{0,80}new Minimatch\(it\)/.test(drizzleKit.bin) &&
+    /if \(matcher\.negate\) \{[\s\S]{0,120}flags\.push\(false\)/.test(drizzleKit.bin),
+);
+check(
+  "an unmatched table is dropped from the snapshot, not kept",
+  /if \(flags\.length > 0\) \{[\s\S]{0,80}return flags\.every\(Boolean\);[\s\S]{0,40}\}[\s\S]{0,40}return false;/.test(
+    drizzleKit.bin,
+  ),
+);
+check(
+  "an excluded table never enters the introspected snapshot at all",
+  /const tableName = row\.table_name;[\s\S]{0,80}if \(!tablesFilter\(tableName\)\) return res\(""\)/.test(
+    drizzleKit.bin,
+  ),
+);
+check(
+  "drizzle-kit itself uses the leading-! exclusion form",
+  /return \["!geography_columns", "!geometry_columns", "!spatial_ref_sys"\]/.test(drizzleKit.bin),
+);
+check(
+  "introspection is still scoped by schemaFilter, so stripe is unreachable",
+  /const where = schemaFilters\.map\(\(\w+\) => `n\.nspname = '\$\{\w+\}'`\)/.test(drizzleKit.bin),
 );
 
 // ── Result ───────────────────────────────────────────────────────────────────

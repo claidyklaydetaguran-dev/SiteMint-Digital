@@ -9,8 +9,15 @@ import path from "path";
 // rather than the shared application schema barrel (./src/schema/index.ts).
 // The three voice tables are NOT exported from the shared barrel, so the
 // legacy CRM/intake `drizzle-kit push` config (./drizzle.config.ts) cannot
-// discover, create, alter, or synchronize them (see
+// create, alter, or synchronize them (see
 // docs/ai-receptionist/DATABASE_STRATEGY.md, ADR-05).
+//
+// Absence from the barrel does NOT protect them from deletion. push
+// reconciles the whole managed schema: anything it introspects that the
+// barrel does not export is a drop candidate, which is how a second
+// `migrate:fresh` removed all ten domain-migration-owned tables on staging
+// (AR-001O correction 4). Deletion protection comes from the `!voice_*`
+// entry in ./drizzle.config.ts's `tablesFilter`. Do not remove it.
 //
 // Never run `drizzle-kit push` with this config — voice tables are
 // versioned-migration-only.
