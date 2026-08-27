@@ -70,32 +70,72 @@ queries and pulls in every schema in the database.
 removed or weakened, if `discovery_submissions` is ever excluded, or if a
 barrel-owned family stops being managed.
 
-### Expected: a trailing `DROP SEQUENCE` error once the domain tables exist
+### `migrate:fresh` runs push only to bootstrap an empty database
 
-drizzle-kit drops a serial column's owned sequence from the introspected
-snapshot inside the same per-table loop that `tablesFilter` short-circuits. An
-excluded table's `<table>_id_seq` therefore stays in the snapshot with nothing
-in the barrel to match it, and push appends a `DROP SEQUENCE` for each one.
-PostgreSQL refuses every one of them:
+`drizzle-kit push` is **bootstrap-only**. The canonical runner
+(`src/migrate-fresh.mjs`) classifies the connected database *before* it changes
+anything, and executes step 1 only when that database is genuinely empty:
+
+| Classified state | Condition | What runs |
+|---|---|---|
+| **fresh** | the shared journal is absent or holds no rows, **and** no table stands in `public` | push, then voice, discovery, scheduling |
+| **initialized** | the shared journal holds committed rows **and** all 27 barrel-owned base tables exist | voice, discovery, scheduling only — push is skipped |
+| **unsafe** | anything else | nothing at all — the runner exits nonzero before any mutation |
+
+On an initialized database the runner prints, before the ordered migrations:
+
+```
+Base schema already initialized; skipping drizzle-kit push
+```
+
+Classification reads the PostgreSQL catalog directly through the
+already-installed `pg` dependency — `to_regclass` on the shared journal,
+`count(*)` of its rows, and the `public` base-table list from `pg_class`. It
+never parses drizzle-kit's human-formatted output and never infers state from an
+exit code. It fails closed, changing nothing, when the journal is empty but
+tables already stand, when the journal is populated but a barrel-owned sentinel
+is missing, when the catalog cannot be read, or on any other state it cannot
+classify confidently. It does **not** try to repair an ambiguous database.
+
+A bootstrap is also verified rather than trusted: after push reports success the
+runner re-reads the catalog, and refuses to run a single domain migration if the
+barrel-owned tables are still missing. An exit code is not proof.
+
+**`migrate:fresh` is not a general schema-drift repair command.** An existing
+database must evolve through committed migrations — ordered, reviewable and
+journalled. If the shared barrel gains a table, run `push` deliberately and on
+purpose; `migrate:fresh` reports the database as drifted and stops, rather than
+reconciling it silently.
+
+`tablesFilter` above is unchanged and remains a **defense-in-depth** boundary for
+the one run where push still executes — the bootstrap. It is no longer the only
+thing standing between a rerun and the ten domain tables, because a rerun no
+longer runs push at all.
+
+### The `DROP SEQUENCE` errors are gone, and must stay gone
+
+An earlier version of this section called them expected output. They were not.
+
+drizzle-kit drops a serial column's owned sequence from the introspected snapshot
+inside the same per-table loop that `tablesFilter` short-circuits. An excluded
+table's `<table>_id_seq` therefore stayed in the snapshot with nothing in the
+barrel to match it, and push appended a `DROP SEQUENCE` for each one. PostgreSQL
+refused every one of them with `2BP01`:
 
 ```
 ERROR:  cannot drop sequence voice_assistants_id_seq because other objects depend on it
 DETAIL:  default value for column id of table voice_assistants depends on sequence voice_assistants_id_seq
 ```
 
-That is noisy, not dangerous:
+Eight destructive statements that failed only because something else happened to
+depend on their target, reported through an exit code that could not see them —
+push swallows the error and still exits 0 — is not acceptable steady-state
+output. Since correction 5 an initialized `migrate:fresh` starts no push child
+process at all, so **no `DROP SEQUENCE` line may appear on an initialized
+rerun.** If one does, the runner classified the database wrongly: stop, and treat
+it as a stop condition (section 9).
 
-* the sequence drops are assembled **last**, after every table statement, so no
-  barrel change is ever skipped because of them;
-* push runs statements outside a transaction and stops at the first failure, so
-  nothing is created, altered or dropped;
-* push reports the error and still exits 0, so `migrate:fresh` continues to the
-  domain migrations.
-
-Treat a `cannot drop sequence … because other objects depend on it` line at the
-end of `push` as **expected output** on any run where the domain tables already
-exist. Anything else — above all a `DROP TABLE` — is not, and is a stop
-condition (section 9).
+A `DROP TABLE` was never acceptable and still is not.
 
 ## 2. Exact commands
 
@@ -103,7 +143,7 @@ Run from the repository root. Every one of these reads `DATABASE_URL`.
 
 | Command | Manages | Mode |
 |---|---|---|
-| `pnpm --filter @workspace/db run migrate:fresh` | **all of the below, in the required order** | Canonical fresh-database initialisation; stops at the first failure |
+| `pnpm --filter @workspace/db run migrate:fresh` | **all of the below, in the required order** | Canonical initialisation. Classifies the database first; push runs only to bootstrap an empty one. Stops at the first failure |
 | `pnpm --filter @workspace/db run push` | CRM + intake + discovery base tables | Push — applies immediately, no history |
 | `pnpm --filter @workspace/db run push-force` | same | Push, skipping prompts — **never** use outside a scratch database |
 | `pnpm --filter @workspace/db run generate:voice` | `voice_*` | Generates SQL from a schema diff; no database connection |
@@ -173,8 +213,10 @@ successfully!` and applies nothing, leaving `discovery_delivery_jobs` and
 `discovery_ai_briefs` uncreated; re-running it does not help. This was
 confirmed on a fresh database during AR-001O.
 
-Prefer the single canonical command, which applies all four steps in this
-order and stops at the first failure:
+Prefer the single canonical command. On an empty database it applies all four
+steps in this order; on an already-initialised one it skips step 1 entirely and
+applies only steps 2-4, which the journal watermark then resolves as no-ops.
+Either way it stops at the first failure:
 
 ```bash
 pnpm --filter @workspace/db run migrate:fresh
@@ -182,6 +224,10 @@ pnpm --filter @workspace/db run migrate:fresh
 
 `lib/db/migrationOrderContract.test.ts` pins the order, the shared-journal
 identity, and the chronology of the committed journals.
+`lib/db/migrateFreshStateContract.test.ts` pins the state model: that an empty
+database bootstraps with exactly one push, that an initialised one skips push,
+that every ambiguous state fails closed before mutating anything, and that no
+connection component can reach a log line.
 
 ### Why the discovery migration is idempotent
 
@@ -367,6 +413,11 @@ Stop and escalate, changing nothing further, if any of these hold:
 - Post-migration row counts differ from the baseline.
 - You are about to run `push` or `push-force` against anything that is not a
   CRM/intake schema you own.
+- A `DROP SEQUENCE` or `2BP01` line appears during a `migrate:fresh` rerun on an
+  initialised database. That run should start no push child process at all, so
+  the runner classified the database wrongly.
+- `migrate:fresh` reports the database as `unsafe`. Do not re-run it and do not
+  try to make the state fit; inspect the database and decide deliberately.
 
 ## 10. Absolute rules
 
@@ -377,5 +428,7 @@ Stop and escalate, changing nothing further, if any of these hold:
 - Never seed customer data. Use synthetic records only.
 - Never commit or print `DATABASE_URL`, credentials, or a database export.
 - Never modify or renumber an already-applied migration; add a new one.
+- Never use `migrate:fresh` to reconcile an existing database. It bootstraps an
+  empty one and otherwise only applies committed migrations.
 - No migration execution without separate owner authorization naming the
   environment.
