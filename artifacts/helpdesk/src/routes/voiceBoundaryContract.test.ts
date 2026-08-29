@@ -117,6 +117,8 @@ const callLogsTestSrc = read("artifacts/helpdesk/src/pages/call-logs/callLogsCon
 const assistantsContractSrc = read(
   "artifacts/helpdesk/src/pages/assistants/assistantsContract.ts",
 );
+/** AR-001V.1: the client API surface, for the provider-id confinement checks. */
+const assistantsApiSrc = read("artifacts/helpdesk/src/lib/assistantsApi.ts");
 
 /**
  * Source with comments stripped. Both `App.tsx` and the boundary explain the
@@ -135,6 +137,7 @@ const viteConfigCode = stripComments(viteConfigSrc);
 const builderCode = stripComments(builderSrc);
 const builderNewCode = stripComments(builderNewSrc);
 const builderShellCode = stripComments(builderShellSrc);
+const assistantsApiCode = stripComments(assistantsApiSrc);
 
 /**
  * The complete navigation architecture, voice records included.
@@ -420,9 +423,16 @@ check(
 );
 
 eq(
-  "the canonicaliser covers exactly the three documented variables, and no fourth",
+  "the canonicaliser covers exactly the four documented variables, and no fifth",
   [...new Set(viteConfigCode.match(/VITE_[A-Z_]+/g) ?? [])],
-  ["VITE_VOICE_PLATFORM_ENABLED", "VITE_VOICE_PUBLISH_ENABLED", "VITE_VOICE_BROWSER_TEST_ENABLED"],
+  [
+    "VITE_VOICE_PLATFORM_ENABLED",
+    "VITE_VOICE_PUBLISH_ENABLED",
+    "VITE_VOICE_BROWSER_TEST_ENABLED",
+    // AR-001V.1: the fourth capability. Pinned by name and by count, so a
+    // fifth cannot be added to either place without editing this list.
+    "VITE_VOICE_SYNC_ENABLED",
+  ],
 );
 
 check(
@@ -487,9 +497,16 @@ section("Correction A — one interpretation, shared by every gate");
 // ═══════════════════════════════════════════════════════════════════════════
 
 eq(
-  "featureFlags.ts reads exactly the three documented variables, and no fourth",
+  "featureFlags.ts reads exactly the four documented variables, and no fifth",
   [...new Set(flagsSrc.match(/VITE_[A-Z_]+/g) ?? [])],
-  ["VITE_VOICE_PLATFORM_ENABLED", "VITE_VOICE_PUBLISH_ENABLED", "VITE_VOICE_BROWSER_TEST_ENABLED"],
+  [
+    "VITE_VOICE_PLATFORM_ENABLED",
+    "VITE_VOICE_PUBLISH_ENABLED",
+    "VITE_VOICE_BROWSER_TEST_ENABLED",
+    // AR-001V.1: the fourth capability. Pinned by name and by count, so a
+    // fifth cannot be added to either place without editing this list.
+    "VITE_VOICE_SYNC_ENABLED",
+  ],
 );
 
 /**
@@ -975,16 +992,68 @@ check(
     /const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;/.test(builderCode),
 );
 
+/**
+ * AR-001V added a third builder action — provider synchronization — and
+ * AR-001V.1 gave it its own flag. It updates a resource that already exists
+ * rather than creating one, so it is deliberately independent of publishing
+ * while staying subordinate to the platform flag, and the server enforces its
+ * own separate `VOICE_SYNC_ENABLED` regardless of what any build believes.
+ *
+ * The guarantee this assertion exists to protect is unchanged and still
+ * checked in full: each subordinate flag is composed with the platform flag,
+ * and the action row is rendered only when at least one action is in the
+ * build, so a build with none of them still drops the row rather than leaving
+ * an empty one.
+ */
 check(
   "so does the shell, and it drops the whole action row rather than leaving an empty one",
   /const publishInBuild = voicePlatformEnabled && voicePublishEnabled;/.test(builderShellCode) &&
     /const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;/.test(
       builderShellCode,
     ) &&
-    /const anyBuilderActionInBuild = publishInBuild \|\| browserTestInBuild;/.test(
+    /const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;/.test(builderShellCode) &&
+    /const anyBuilderActionInBuild = publishInBuild \|\| browserTestInBuild \|\| syncInBuild;/.test(
       builderShellCode,
     ) &&
     /\{anyBuilderActionInBuild && \(/.test(builderShellCode),
+);
+
+check(
+  "the synchronization control is inside that same gate",
+  /\{syncInBuild && syncControl\}/.test(builderShellCode),
+);
+
+check(
+  "the builder composes the synchronization flag the same way, independently of publishing",
+  /const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;/.test(builderCode) &&
+    !/const syncInBuild = [^;]*voicePublishEnabled/.test(builderCode),
+);
+
+/**
+ * AR-001V.1: the provider assistant id must not be reachable from an ordinary
+ * assistant response. The client DTO carries a boolean instead, and the id has
+ * exactly one client entry point — the browser-test session fetch, which is
+ * called from the confirm handler and nowhere else.
+ */
+const assistantDtoBlock = (() => {
+  const start = assistantsApiCode.indexOf("export interface AssistantDto");
+  const end = assistantsApiCode.indexOf("}", start);
+  return start >= 0 && end > start ? assistantsApiCode.slice(start, end) : "";
+})();
+
+check(
+  "the assistant DTO exposes provider linkage as a boolean, never the provider id",
+  assistantDtoBlock.length > 0 &&
+    /providerLinked: boolean;/.test(assistantDtoBlock) &&
+    !/providerAssistantId/.test(assistantDtoBlock),
+);
+
+check(
+  "the browser-test session is fetched from the confirm handler, not on page load",
+  /export async function fetchBrowserTestSession/.test(assistantsApiCode) &&
+    /const confirmTest[\s\S]{0,2000}fetchBrowserTestSession\(numericId\)/.test(builderCode) &&
+    !/useEffect\([^)]*fetchBrowserTestSession/.test(builderCode) &&
+    !/useQuery\([^)]*fetchBrowserTestSession/.test(builderCode),
 );
 
 check(

@@ -3,7 +3,7 @@ import { voiceBrowserTestEnabled } from "@/lib/featureFlags";
 
 export interface BrowserTestEligibilityInput {
   /** Undefined/null for the new-unsaved builder route. */
-  assistant: Pick<AssistantDto, "status" | "provider" | "providerAssistantId"> | null | undefined;
+  assistant: Pick<AssistantDto, "status" | "provider" | "providerLinked"> | null | undefined;
   isDirty: boolean;
   savePending: boolean;
   publishPending: boolean;
@@ -31,11 +31,11 @@ export function browserTestDisabledReason(input: BrowserTestEligibilityInput): s
   if (assistant.status === "unknown") return "Publish this assistant before testing.";
   if (assistant.status !== "published") return "Publish this assistant before testing.";
 
-  if (!assistant.providerAssistantId && (!assistant.provider || assistant.provider === "vapi")) {
+  if (!assistant.providerLinked && (!assistant.provider || assistant.provider === "vapi")) {
     return "The published provider connection is incomplete.";
   }
   if (assistant.provider !== "vapi") return "Browser testing is not available for this provider.";
-  if (!assistant.providerAssistantId) return "The published provider connection is incomplete.";
+  if (!assistant.providerLinked) return "The published provider connection is incomplete.";
 
   if (!voiceBrowserTestEnabled) return "Browser voice testing is not enabled in this environment.";
   if (!clientAvailable) return "Browser voice integration is not connected yet.";

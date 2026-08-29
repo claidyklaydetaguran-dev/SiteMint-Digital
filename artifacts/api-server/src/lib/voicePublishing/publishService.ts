@@ -39,7 +39,15 @@ export interface PublishedAssistantDto {
   id: number;
   status: string;
   provider: string;
-  providerAssistantId: string;
+  /**
+   * AR-001V.2: the provider assistant id is NOT returned here. A successful
+   * publish only needs to tell the browser that the assistant is now published
+   * and linked; the id itself is issued exclusively by the authenticated,
+   * feature-gated browser-test session endpoint, after an explicit owner
+   * confirmation. Publishing still records the id server-side — this changes
+   * what is disclosed, never what is stored or sent to the provider.
+   */
+  providerLinked: true;
   lastSyncedAt: string;
 }
 
@@ -128,7 +136,10 @@ function success(row: VoiceAssistant): PublishServiceResult {
       id: row.id,
       status: row.status,
       provider: row.provider as string,
-      providerAssistantId: row.providerAssistantId as string,
+      // Only ever reached from finalizePublished, whose predicate guarantees a
+      // nonblank provider assistant id — so this is a fact about the row, not
+      // a constant, and it is deliberately the only thing said about the id.
+      providerLinked: true,
       lastSyncedAt: (row.lastSyncedAt as Date).toISOString(),
     },
   };

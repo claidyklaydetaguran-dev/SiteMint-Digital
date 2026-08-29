@@ -380,8 +380,8 @@ check(
     /value\.trim\(\)\.toLowerCase\(\) === "true"/.test(flagsSrc),
 );
 check(
-  "AR-001I added no flag and removed none",
-  [...new Set(flagsSrc.match(/import\.meta\.env\.VITE_[A-Z_]+/g) ?? [])].length === 3,
+  "the flag helper declares exactly the four voice capability flags",
+  [...new Set(flagsSrc.match(/import\.meta\.env\.VITE_[A-Z_]+/g) ?? [])].length === 4,
 );
 check(
   "no Assistants file reads import.meta.env directly",
@@ -776,9 +776,9 @@ check(
   !/\{assistant\.providerAssistantId\}|\{.*providerAssistantId.*\}<\//.test(journeyCode),
 );
 
-eq("an unlinked assistant reads as not linked", providerLinkLabel({ provider: null, providerAssistantId: null }), PROVIDER_NOT_LINKED);
-eq("a half-linked assistant reads as not linked", providerLinkLabel({ provider: "vapi", providerAssistantId: null }), PROVIDER_NOT_LINKED);
-eq("only a complete pair reads as linked", providerLinkLabel({ provider: "vapi", providerAssistantId: "a" }), PROVIDER_LINKED);
+eq("an unlinked assistant reads as not linked", providerLinkLabel({ provider: null, providerLinked: false }), PROVIDER_NOT_LINKED);
+eq("a half-linked assistant reads as not linked", providerLinkLabel({ provider: "vapi", providerLinked: false }), PROVIDER_NOT_LINKED);
+eq("only a complete pair reads as linked", providerLinkLabel({ provider: "vapi", providerLinked: true }), PROVIDER_LINKED);
 
 // ═══════════════════════════════════════════════════════════════════════════
 section("Browser test — described truthfully, and needing no phone number");

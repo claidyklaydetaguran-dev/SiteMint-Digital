@@ -365,10 +365,21 @@ describe("success", () => {
     if (!result.ok) return;
     expect(result.assistant.status).toBe("published");
     expect(result.assistant.provider).toBe("fake");
-    expect(result.assistant.providerAssistantId).toBe("fake_asst_000001");
+    // AR-001V.2: a successful publish reports that a provider link now exists
+    // and nothing more. The id is recorded on the row below, but is disclosed
+    // only by the authenticated, feature-gated browser-test session endpoint.
+    expect(result.assistant.providerLinked).toBe(true);
+    expect(result.assistant).not.toHaveProperty("providerAssistantId");
+    expect(Object.keys(result.assistant).sort()).toEqual(
+      ["id", "lastSyncedAt", "provider", "providerLinked", "status"].sort(),
+    );
+    expect(JSON.stringify(result.assistant)).not.toContain("fake_asst_000001");
     expect(result.assistant.lastSyncedAt).toBe(FIXED_NOW.toISOString());
 
     const row = repository.peek(FIRM_ID, ASSISTANT_ID);
+    // The id is still persisted server-side — this change disclosed less, it
+    // did not store less or send anything different to the provider.
+    expect(row?.providerAssistantId).toBe("fake_asst_000001");
     expect(row?.status).toBe("published");
     expect(row?.publishAttemptId).toBeNull();
     expect(row?.publishStartedAt).toBeNull();

@@ -10,7 +10,7 @@ import { LatencyMeter } from "@/components/common/LatencyMeter";
 import { findVoicePreset } from "@/lib/assistantEstimates";
 import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
-import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled } from "@/lib/featureFlags";
+import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 
 import SetupTab from "@/pages/assistant-builder/SetupTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
@@ -37,7 +37,15 @@ import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
  */
 const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
-const anyBuilderActionInBuild = publishInBuild || browserTestInBuild;
+/**
+ * AR-001V: the provider-synchronization control is gated by the platform flag
+ * alone. It is neither a publish nor a browser test — it updates a resource
+ * that already exists — and the server independently refuses to contact the
+ * provider unless VOICE_PUBLISH_ENABLED is true, so nothing here can reach a
+ * provider on its own.
+ */
+const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;
+const anyBuilderActionInBuild = publishInBuild || browserTestInBuild || syncInBuild;
 
 export const BUILDER_TABS = [
   { key: "setup", label: "Setup" },
@@ -99,6 +107,12 @@ interface BuilderShellProps extends BuilderTabProps {
    * default, since testing is never eligible for an unpersisted assistant.
    */
   testControl?: ReactNode;
+  /**
+   * AR-001V: the provider-synchronization control for this builder instance.
+   * Omitted entirely by the new/unsaved builder, where no published provider
+   * resource exists to update.
+   */
+  syncControl?: ReactNode;
   /** Milestone 1 / Checkpoint F1: the active browser-test panel, rendered below the header banner when a test is in progress or has just ended. */
   testPanel?: ReactNode;
   /**
@@ -129,6 +143,7 @@ export function BuilderShell({
   announcement,
   publishControl,
   testControl,
+  syncControl,
   testPanel,
   contentDisabled = false,
 }: BuilderShellProps) {
@@ -196,6 +211,7 @@ export function BuilderShell({
                     availability="Save this assistant as a draft before publishing."
                   />
                 ))}
+              {syncInBuild && syncControl}
             </div>
           )}
         </div>

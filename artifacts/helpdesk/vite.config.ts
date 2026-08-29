@@ -41,6 +41,10 @@ const VOICE_BUILD_FLAGS = [
   "VITE_VOICE_PLATFORM_ENABLED",
   "VITE_VOICE_PUBLISH_ENABLED",
   "VITE_VOICE_BROWSER_TEST_ENABLED",
+  // AR-001V.1: synchronization of an already-published assistant is its own
+  // capability, so it gets its own flag and the same canonicalisation. It is
+  // subordinate to the platform flag and independent of the publish flag.
+  "VITE_VOICE_SYNC_ENABLED",
 ] as const;
 
 /**

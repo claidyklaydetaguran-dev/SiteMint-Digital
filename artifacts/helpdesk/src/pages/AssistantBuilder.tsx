@@ -10,15 +10,16 @@ import { PublishConfirmDialog } from "@/components/common/PublishConfirmDialog";
 import { BrowserTestButton } from "@/components/common/BrowserTestButton";
 import { BrowserTestConfirmDialog } from "@/components/common/BrowserTestConfirmDialog";
 import { BrowserTestPanel } from "@/components/common/BrowserTestPanel";
+import { SyncAssistantButton, SyncConfirmDialog } from "@/components/common/SyncAssistantControls";
 import { useToast } from "@/hooks/use-toast";
-import { useAssistantDetail, useUpdateAssistant, usePublishAssistant } from "@/hooks/useAssistants";
+import { useAssistantDetail, useUpdateAssistant, usePublishAssistant, useSyncAssistant } from "@/hooks/useAssistants";
 import { useBrowserVoiceTest, type UseBrowserVoiceTestResult } from "@/hooks/useBrowserVoiceTest";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
-import { AssistantApiRequestError } from "@/lib/assistantsApi";
+import { AssistantApiRequestError, normalizeSyncRouteErrorCode, fetchBrowserTestSession } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, hydrateConfigToDraft } from "@/lib/assistantConfig";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
-import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled } from "@/lib/featureFlags";
+import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
 import { browserTestDisabledReason } from "@/lib/browserVoice/eligibility";
@@ -94,6 +95,17 @@ function formatSyncedAt(iso: string | null): string | null {
  */
 const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+/**
+ * AR-001V.1: synchronization is its own capability with its own flag —
+ * independent of publishing, subordinate to the platform flag, and folded to
+ * a literal so a disabled build drops the control, its dialog, its mutation
+ * hook and its copy entirely.
+ */
+const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;
+
+/** Static, provider-free message. A failed session fetch never shows a response body. */
+const BROWSER_TEST_SESSION_ERROR =
+  "Couldn't start the browser test. Please try again.";
 
 /**
  * -- AR-001J owner review, correction B: a truthful unsaved-changes prompt --
@@ -161,6 +173,23 @@ type BuilderPublishMutation = Pick<ReturnType<typeof usePublishAssistant>, "isPe
 
 const NO_PUBLISH: BuilderPublishMutation = { isPending: false, mutate: () => {} };
 
+/**
+ * AR-001V.1: same fixed-hook-order technique for synchronization. A build with
+ * `VITE_VOICE_SYNC_ENABLED` off calls the inert hook, so the real mutation, its
+ * client function and its error copy never enter the graph.
+ */
+type BuilderSyncMutation = Pick<ReturnType<typeof useSyncAssistant>, "isPending" | "mutate">;
+
+const NO_SYNC: BuilderSyncMutation = { isPending: false, mutate: () => {} };
+
+function useNoSyncAssistant(): BuilderSyncMutation {
+  return NO_SYNC;
+}
+
+const useBuilderSync: (id: number | undefined) => BuilderSyncMutation = syncInBuild
+  ? useSyncAssistant
+  : useNoSyncAssistant;
+
 const useBuilderPublish: (id: number | undefined) => BuilderPublishMutation = publishInBuild
   ? usePublishAssistant
   : () => NO_PUBLISH;
@@ -177,6 +206,7 @@ export default function AssistantBuilder() {
   const { data: assistant, isLoading, isError, error, refetch } = useAssistantDetail(numericId);
   const updateMutation = useUpdateAssistant(numericId ?? -1);
   const publishMutation = useBuilderPublish(numericId);
+  const syncMutation = useBuilderSync(numericId);
 
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
   const [baseline, setBaseline] = useState<{ name: string; draft: AssistantDraft } | null>(null);
@@ -185,6 +215,11 @@ export default function AssistantBuilder() {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishBanner, setPublishBanner] = useState<string | null>(null);
   const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncBanner, setSyncBanner] = useState<string | null>(null);
+  const [testSessionError, setTestSessionError] = useState<string | null>(null);
+  const syncButtonRef = useRef<HTMLButtonElement | null>(null);
+  const syncInFlightRef = useRef(false);
   const hydratedIdRef = useRef<number | null>(null);
   const announcedErrorRef = useRef<string | null>(null);
   const publishButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -274,7 +309,7 @@ export default function AssistantBuilder() {
   resetBrowserTestRef.current = browserTest.reset;
   const tenantResetKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    const key = `${firmId ?? "unresolved"}:${numericId ?? "none"}:${assistant?.providerAssistantId ?? "none"}:${assistant?.status ?? "none"}`;
+    const key = `${firmId ?? "unresolved"}:${numericId ?? "none"}:${assistant?.providerLinked ?? "none"}:${assistant?.status ?? "none"}`;
     if (tenantResetKeyRef.current === null) {
       tenantResetKeyRef.current = key;
       return;
@@ -282,7 +317,7 @@ export default function AssistantBuilder() {
     if (tenantResetKeyRef.current === key) return;
     tenantResetKeyRef.current = key;
     resetBrowserTestRef.current();
-  }, [firmId, numericId, assistant?.providerAssistantId, assistant?.status]);
+  }, [firmId, numericId, assistant?.providerLinked, assistant?.status]);
 
   // Milestone 1 / Checkpoint E3C: while the server-confirmed status is
   // "publishing", poll the ordinary GET detail endpoint (never the publish
@@ -353,7 +388,7 @@ export default function AssistantBuilder() {
     !browserTest.isActive &&
     isPublishableStatus(assistant.status) &&
     !assistant.provider &&
-    !assistant.providerAssistantId;
+    !assistant.providerLinked;
 
   const publishDisabledReason: () => string | undefined = publishInBuild
     ? () => {
@@ -376,11 +411,90 @@ export default function AssistantBuilder() {
         if (assistant.status === "publish_uncertain")
           return "Publishing could not be confirmed for this assistant. Contact support before taking another action.";
         if (assistant.status === "unknown") return "This assistant's status could not be determined.";
-        if (assistant.provider || assistant.providerAssistantId)
+        if (assistant.provider || assistant.providerLinked)
           return "This assistant is already connected to a voice provider.";
         return "Publishing is not available right now.";
       }
     : () => undefined;
+
+  // ── AR-001V: provider synchronization for an already-published assistant ──
+  //
+  // Eligibility is intentionally narrow, and every part of it is a fact the
+  // server re-checks independently: the row must be published, linked to the
+  // vapi provider with a confirmed provider id, have no unsaved local edits
+  // (otherwise the payload sent would not be the one shown), and be in a state
+  // that actually differs from what the provider confirmed.
+  const syncDisabledReason: string | undefined = (() => {
+    if (!assistant) return "Save this assistant before updating the voice provider.";
+    if (assistant.status !== "published") return "Publish this assistant before updating the voice provider.";
+    if (assistant.provider !== "vapi" || !assistant.providerLinked)
+      return "This assistant has no confirmed provider connection to update.";
+    if (isDirty) return "Save your changes before updating the voice provider.";
+    if (updateMutation.isPending || publishMutation.isPending) return "Wait for the current action to finish.";
+    if (browserTest.isActive) return "End the browser test before updating the voice provider.";
+    if (assistant.providerSyncState === "synchronizing") return "An update is already in progress.";
+    if (assistant.providerSyncState === "synchronized") return "The voice provider already has this configuration.";
+    if (assistant.providerSyncState === "not_published")
+      return "Publish this assistant before updating the voice provider.";
+    return undefined;
+  })();
+
+  const syncEligible = syncDisabledReason === undefined;
+
+  const restoreFocusToSyncButton = () => {
+    syncButtonRef.current?.focus();
+  };
+
+  const openSyncDialog = () => {
+    if (!syncEligible || syncMutation.isPending) return;
+    setSyncBanner(null);
+    setSyncDialogOpen(true);
+  };
+
+  const cancelSyncDialog = () => {
+    if (syncMutation.isPending) return;
+    setSyncDialogOpen(false);
+    restoreFocusToSyncButton();
+  };
+
+  const confirmSync = () => {
+    // Same reasoning as confirmPublish: `isPending` only flips after React
+    // commits, so a synchronous ref is the only thing that makes two clicks in
+    // one tick produce at most one provider update.
+    if (syncInFlightRef.current || syncMutation.isPending) return;
+    syncInFlightRef.current = true;
+    syncMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        setSyncBanner(null);
+        setSyncDialogOpen(false);
+        restoreFocusToSyncButton();
+        toast({
+          title: result.providerRequestSent ? "Voice provider updated" : "Already up to date",
+          description: result.providerRequestSent
+            ? "The voice provider is now running this configuration."
+            : "The voice provider already had this configuration, so nothing was sent.",
+        });
+      },
+      onError: (err) => {
+        setSyncDialogOpen(false);
+        restoreFocusToSyncButton();
+        const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
+        // `AssistantApiRequestError.code` is typed against the publish
+        // allowlist, so the sync codes are re-narrowed here rather than
+        // widening that shared type.
+        const code = normalizeSyncRouteErrorCode(apiErr?.code);
+        // These two resolve themselves once the detail refetch triggered by
+        // the mutation's onSettled lands — no transient banner needed.
+        if (code === "sync_in_progress" || code === "assistant_not_found") return;
+        setSyncBanner(
+          apiErr?.message ?? "Something went wrong while updating the voice provider. Please try again.",
+        );
+      },
+      onSettled: () => {
+        syncInFlightRef.current = false;
+      },
+    });
+  };
 
   const openPublishDialog = () => {
     if (!publishEligible || publishMutation.isPending) return;
@@ -465,12 +579,33 @@ export default function AssistantBuilder() {
         // Mirrors confirmPublish's synchronous ref guard: rapid confirm clicks in
         // the same tick must still produce exactly one client.start() call.
         if (testInFlightRef.current || browserTest.isActive) return;
-        if (!assistant?.providerAssistantId || assistant.provider !== "vapi") return;
+        if (!assistant?.providerLinked || assistant.provider !== "vapi" || numericId === undefined) return;
         testInFlightRef.current = true;
         setTestDialogOpen(false);
         restoreFocusToTestButton();
-        browserTest.start({ provider: "vapi", providerAssistantId: assistant.providerAssistantId });
-        testInFlightRef.current = false;
+        // AR-001V.1: the provider assistant id is no longer carried by the
+        // assistant DTO. It is fetched here, from the dedicated endpoint,
+        // only because the owner just confirmed this dialog — never on page
+        // load, never on mount, never speculatively. The server checks its
+        // own VOICE_BROWSER_TEST_ENABLED flag and the firm scope again, and
+        // is authoritative; this call is the only place in the client that
+        // ever holds the id, and it is passed straight to the client seam
+        // without being stored in state, a query cache, or the URL.
+        void fetchBrowserTestSession(numericId)
+          .then((session) => {
+            if (session.provider !== "vapi" || !session.providerAssistantId) {
+              setTestSessionError(BROWSER_TEST_SESSION_ERROR);
+              return;
+            }
+            browserTest.start({ provider: "vapi", providerAssistantId: session.providerAssistantId });
+          })
+          .catch(() => {
+            // Never surfaces the response body: it could carry provider text.
+            setTestSessionError(BROWSER_TEST_SESSION_ERROR);
+          })
+          .finally(() => {
+            testInFlightRef.current = false;
+          });
       }
     : () => {};
 
@@ -539,7 +674,21 @@ export default function AssistantBuilder() {
   if (publishInBuild && publishMutation.isPending) statusLabel = "Publishing…";
   else if (updateMutation.isPending) statusLabel = "Saving…";
   else if (isDirty) statusLabel = "Unsaved changes";
-  else statusLabel = `${STATUS_LABEL[assistant.status]} · Saved`;
+  // AR-001V requirement 16. A published row is only ever labelled "· Saved"
+  // when the provider is proven to be running this exact configuration.
+  // Every other synchronization state — including "unknown", which is what a
+  // missing digest or an unreadable catalog produces — gets its own honest
+  // label instead, so the badge can never assert agreement we cannot show.
+  else if (assistant.status === "published" && assistant.providerSyncState !== "synchronized") {
+    statusLabel =
+      assistant.providerSyncState === "synchronizing"
+        ? "Updating voice provider…"
+        : assistant.providerSyncState === "interrupted"
+          ? "Voice provider update interrupted"
+        : assistant.providerSyncState === "sync_failed"
+          ? "Voice provider update failed"
+          : "Not sent to voice provider";
+  } else statusLabel = `${STATUS_LABEL[assistant.status]} · Saved`;
 
   const announcement = publishInBuild && publishMutation.isPending
     ? "Publishing is in progress. Do not submit again."
@@ -600,6 +749,15 @@ export default function AssistantBuilder() {
             />
           ) : undefined
         }
+        syncControl={syncInBuild ? (
+          <SyncAssistantButton
+            ref={syncButtonRef}
+            eligible={syncEligible}
+            pending={syncMutation.isPending}
+            disabledReason={syncDisabledReason}
+            onClick={openSyncDialog}
+          />
+        ) : undefined}
         testPanel={
           browserTestInBuild ? (
             <BrowserTestPanel
@@ -663,6 +821,22 @@ export default function AssistantBuilder() {
                 {publishBanner}
               </div>
             )}
+            {browserTestInBuild && testSessionError && (
+              <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+                {testSessionError}
+              </div>
+            )}
+            {syncBanner && (
+              <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+                {syncBanner}
+              </div>
+            )}
+            {assistant.status === "published" && !isDirty && assistant.providerSyncState === "local_changes" && (
+              <div role="status" className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
+                This configuration is saved here but has not been sent to the voice provider. The provider is still
+                running the last configuration it confirmed.
+              </div>
+            )}
             {assistant.status === "published" ? (
               <p className="mt-2 text-[11px] text-muted-foreground">
                 {BUILDER.linkedNote}
@@ -708,6 +882,14 @@ export default function AssistantBuilder() {
           pending={publishMutation.isPending}
           onCancel={cancelPublishDialog}
           onConfirm={confirmPublish}
+        />
+      )}
+      {syncInBuild && (
+        <SyncConfirmDialog
+          open={syncDialogOpen}
+          assistantName={draft.setup.assistantName || "Untitled assistant"}
+          onCancel={cancelSyncDialog}
+          onConfirm={confirmSync}
         />
       )}
       {browserTestInBuild && (

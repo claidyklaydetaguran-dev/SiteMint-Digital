@@ -154,9 +154,9 @@ export const PROVIDER_NOT_LINKED = "Not linked";
 
 export function providerLinkLabel(assistant: {
   provider: string | null;
-  providerAssistantId: string | null;
+  providerLinked: boolean;
 }): string {
-  return assistant.provider && assistant.providerAssistantId
+  return assistant.provider && assistant.providerLinked
     ? PROVIDER_LINKED
     : PROVIDER_NOT_LINKED;
 }
@@ -307,7 +307,7 @@ export function everyRenderableString(): string[] {
     moreActionsAccessibleName("Front Desk"),
     deleteDialogTitle("Front Desk"),
     lastSyncedNote("Aug 25, 2026, 4:20 PM"),
-    providerLinkLabel({ provider: null, providerAssistantId: null }),
-    providerLinkLabel({ provider: "vapi", providerAssistantId: "abc" }),
+    providerLinkLabel({ provider: null, providerLinked: false }),
+    providerLinkLabel({ provider: "vapi", providerLinked: true }),
   ];
 }

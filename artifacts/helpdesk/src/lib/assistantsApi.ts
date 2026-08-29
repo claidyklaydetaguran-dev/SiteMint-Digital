@@ -43,12 +43,54 @@ export interface AssistantDto {
   templateKey: string;
   status: AssistantStatus;
   provider: string | null;
-  providerAssistantId: string | null;
+  /**
+   * AR-001V.1: the provider assistant id is deliberately NOT part of this DTO
+   * — ordinary list and detail responses now carry only whether a provider
+   * resource exists. The id itself comes from
+   * `fetchBrowserTestSession()` alone, once, after the owner confirms Start
+   * Browser Test.
+   */
+  providerLinked: boolean;
   config: Record<string, unknown>;
   lastSyncedAt: string | null;
   syncError: string | null;
+  /**
+   * AR-001V: server-derived provider-synchronization state. The digest it is
+   * derived from never crosses this boundary — only the answer does.
+   * Anything other than `"synchronized"` must NOT be rendered as saved and
+   * published.
+   */
+  providerSyncState: ProviderSyncState;
+  /** Safe static code, or null. Never provider text, payloads, or identifiers. */
+  providerSyncError: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Mirrors PROVIDER_SYNC_STATES in the backend (read-only reference, never imported). */
+export const PROVIDER_SYNC_STATES = [
+  "not_published",
+  "synchronizing",
+  "interrupted",
+  "synchronized",
+  "local_changes",
+  "sync_failed",
+  "unknown",
+] as const;
+
+export type ProviderSyncState = (typeof PROVIDER_SYNC_STATES)[number];
+
+const PROVIDER_SYNC_STATE_SET: ReadonlySet<string> = new Set(PROVIDER_SYNC_STATES);
+
+/**
+ * Defensive re-parse. An unrecognized value becomes `"unknown"`, never
+ * `"synchronized"` — a malformed or downgraded server response can therefore
+ * never make the UI claim the provider is up to date.
+ */
+export function normalizeProviderSyncState(value: unknown): ProviderSyncState {
+  return typeof value === "string" && PROVIDER_SYNC_STATE_SET.has(value)
+    ? (value as ProviderSyncState)
+    : "unknown";
 }
 
 /**
@@ -58,15 +100,26 @@ export interface AssistantDto {
  * this before the DTO reaches a query cache or component.
  */
 function normalizeAssistantDto(raw: AssistantDto): AssistantDto {
-  return { ...raw, status: normalizeAssistantStatus(raw.status) };
+  return {
+    ...raw,
+    status: normalizeAssistantStatus(raw.status),
+    providerSyncState: normalizeProviderSyncState(raw.providerSyncState),
+  };
 }
 
-/** The minimal safe fields the E3B2 publish endpoint returns on success. Never the full assistant shape. */
+/**
+ * The minimal safe fields the E3B2 publish endpoint returns on success. Never
+ * the full assistant shape.
+ *
+ * AR-001V.2: `providerAssistantId` was removed. Showing "published" needs only
+ * the status and the fact that a provider link now exists; the id itself
+ * reaches a browser exclusively through `fetchBrowserTestSession()`.
+ */
 export interface PublishedAssistantResult {
   id: number;
   status: AssistantStatus;
   provider: string | null;
-  providerAssistantId: string | null;
+  providerLinked: boolean;
   lastSyncedAt: string | null;
 }
 
@@ -286,4 +339,95 @@ export async function publishAssistant(id: number): Promise<PublishedAssistantRe
     { method: "POST", headers: { Accept: "application/json" } },
   );
   return normalizePublishedResult(result.assistant);
+}
+
+/** The minimal safe fields the AR-001V sync endpoint returns. Carries no provider assistant id and no provider response. */
+export interface SynchronizedAssistantResult {
+  id: number;
+  status: AssistantStatus;
+  providerConfigSynchronized: true;
+  /** False when the payload already matched and the server made no provider request. */
+  providerRequestSent: boolean;
+  lastSyncedAt: string | null;
+}
+
+/** The exact static codes the AR-001V sync route can return. See syncErrors.ts (backend, read-only). */
+export const SYNC_ROUTE_ERROR_CODES = [
+  "sync_disabled",
+  "invalid_request",
+  "assistant_not_found",
+  "assistant_not_published",
+  "provider_link_missing",
+  "unsupported_provider",
+  "assistant_config_invalid",
+  "unsupported_preset",
+  "sync_in_progress",
+  "provider_authentication_failed",
+  "provider_rate_limited",
+  "provider_request_rejected",
+  "provider_timeout",
+  "provider_network_error",
+  "provider_result_uncertain",
+  "local_finalize_failed",
+  "unknown_sync_error",
+  "internal_error",
+] as const;
+
+export type SyncRouteErrorCode = (typeof SYNC_ROUTE_ERROR_CODES)[number];
+
+const SYNC_ROUTE_ERROR_CODE_SET: ReadonlySet<string> = new Set(SYNC_ROUTE_ERROR_CODES);
+
+export function normalizeSyncRouteErrorCode(value: unknown): SyncRouteErrorCode | undefined {
+  return typeof value === "string" && SYNC_ROUTE_ERROR_CODE_SET.has(value)
+    ? (value as SyncRouteErrorCode)
+    : undefined;
+}
+
+/**
+ * AR-001V: POST .../sync. Sends no request body — never firmId, an attempt id,
+ * a provider, a providerAssistantId, a config, or a digest. Like publish it
+ * deliberately accepts no AbortSignal: unmounting the builder must never
+ * appear to cancel a provider update that is genuinely still running, and the
+ * caller never retries it automatically.
+ */
+export async function syncAssistant(id: number): Promise<SynchronizedAssistantResult> {
+  if (!ASSISTANT_ID_PATTERN.test(String(id)) || !Number.isSafeInteger(id) || id <= 0) {
+    throw new AssistantApiRequestError(0, GENERIC_ERROR_MESSAGE);
+  }
+  const result = await request<{ assistant: SynchronizedAssistantResult }>(
+    `/receptionist/voice/assistants/${id}/sync`,
+    { method: "POST", headers: { Accept: "application/json" } },
+  );
+  return { ...result.assistant, status: normalizeAssistantStatus(result.assistant.status) };
+}
+
+/**
+ * AR-001V.1: the browser-test session. Two fields, nothing else — the Web SDK
+ * needs the provider assistant id and nothing in this response may be used to
+ * assemble a transient assistant.
+ */
+export interface BrowserTestSessionDto {
+  provider: string;
+  providerAssistantId: string;
+}
+
+/**
+ * AR-001V.1: fetches the minimum metadata a browser test needs.
+ *
+ * Call this ONLY from the confirm handler of the browser-test dialog. It must
+ * never be called on page load, on mount, on hover, or speculatively: the
+ * whole point of the endpoint is that the provider assistant id reaches the
+ * browser once, in response to a deliberate owner action, and only while the
+ * server's own browser-test flag is on. It issues no provider request and
+ * touches no microphone.
+ */
+export async function fetchBrowserTestSession(id: number): Promise<BrowserTestSessionDto> {
+  if (!ASSISTANT_ID_PATTERN.test(String(id)) || !Number.isSafeInteger(id) || id <= 0) {
+    throw new AssistantApiRequestError(0, GENERIC_ERROR_MESSAGE);
+  }
+  const result = await request<{ session: BrowserTestSessionDto }>(
+    `/receptionist/voice/assistants/${id}/browser-test-session`,
+    { method: "GET", headers: { Accept: "application/json" } },
+  );
+  return result.session;
 }

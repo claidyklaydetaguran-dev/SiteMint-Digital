@@ -11,7 +11,7 @@
  * prove the boundary across every meaningful flag combination, but with a
  * session-only script that no longer exists; nothing committed reproduced it.
  *
- * This runner is that proof, committed. For each of the sixteen variants it
+ * This runner is that proof, committed. For each of the twenty variants it
  *
  *   1. declares up front which build class the variant must produce,
  *   2. builds the helpdesk with exactly that variant's environment,
@@ -62,6 +62,8 @@ interface Variant {
   readonly platform: string | null;
   readonly publish: string | null;
   readonly browserTest: string | null;
+  /** AR-001V.1: the fourth capability flag. `null` leaves it unset. */
+  readonly sync: string | null;
   readonly basePath: string;
   /** The class this variant must produce, declared rather than inferred. */
   readonly expect: BuildClass;
@@ -70,7 +72,7 @@ interface Variant {
 }
 
 /**
- * The sixteen variants, in the order they are built. The order matters once:
+ * The twenty variants, in the order they are built. The order matters once:
  * the root-base build sits between the two configured-prefix all-enabled
  * builds, so the last variant proves the prefix build is restored exactly
  * rather than merely re-derived.
@@ -87,6 +89,7 @@ const MATRIX: readonly Variant[] = [
     platform: null,
     publish: null,
     browserTest: null,
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -97,6 +100,7 @@ const MATRIX: readonly Variant[] = [
     platform: "false",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -107,6 +111,7 @@ const MATRIX: readonly Variant[] = [
     platform: "1",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -117,6 +122,7 @@ const MATRIX: readonly Variant[] = [
     platform: "yes",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -127,6 +133,7 @@ const MATRIX: readonly Variant[] = [
     platform: "on",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -137,6 +144,7 @@ const MATRIX: readonly Variant[] = [
     platform: "true1",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -147,6 +155,7 @@ const MATRIX: readonly Variant[] = [
     platform: "   ",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "gated-out",
     group: "default",
@@ -157,6 +166,7 @@ const MATRIX: readonly Variant[] = [
     platform: "true",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "platform-only",
@@ -167,6 +177,7 @@ const MATRIX: readonly Variant[] = [
     platform: "TRUE",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "platform-only",
@@ -177,6 +188,7 @@ const MATRIX: readonly Variant[] = [
     platform: "TrUe",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "platform-only",
@@ -187,6 +199,7 @@ const MATRIX: readonly Variant[] = [
     platform: "  true  ",
     publish: "false",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "platform-only",
@@ -197,6 +210,7 @@ const MATRIX: readonly Variant[] = [
     platform: "true",
     publish: "true",
     browserTest: "false",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "publish-only",
@@ -207,6 +221,7 @@ const MATRIX: readonly Variant[] = [
     platform: "true",
     publish: "false",
     browserTest: "true",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "browser-test-only",
@@ -217,6 +232,7 @@ const MATRIX: readonly Variant[] = [
     platform: "true",
     publish: "true",
     browserTest: "true",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "all-enabled-prefix",
@@ -227,6 +243,7 @@ const MATRIX: readonly Variant[] = [
     platform: "true",
     publish: "true",
     browserTest: "true",
+    sync: null,
     basePath: "/",
     expect: "voice-enabled",
     group: "all-enabled-root",
@@ -237,9 +254,61 @@ const MATRIX: readonly Variant[] = [
     platform: "true",
     publish: "true",
     browserTest: "true",
+    sync: null,
     basePath: CONFIGURED_PREFIX,
     expect: "voice-enabled",
     group: "all-enabled-prefix",
+  },
+  // ── AR-001V.1: the fourth capability ────────────────────────────────────
+  //
+  // Synchronization is subordinate to the platform flag and independent of
+  // publishing, so three properties are worth building rather than asserting:
+  // it cannot leak anything into a gated-out build on its own; it produces a
+  // build genuinely distinct from platform-only; and turning it on grants
+  // nothing that publishing grants.
+  {
+    name: "m17_sync_without_platform",
+    what: 'sync "true" but platform off — must be byte-identical to the default class',
+    platform: "false",
+    publish: "false",
+    browserTest: "false",
+    sync: "true",
+    basePath: CONFIGURED_PREFIX,
+    expect: "gated-out",
+    group: "default",
+  },
+  {
+    name: "m18_platform_sync",
+    what: 'platform "true", sync "true"; publish and browser test off',
+    platform: "true",
+    publish: "false",
+    browserTest: "false",
+    sync: "true",
+    basePath: CONFIGURED_PREFIX,
+    expect: "voice-enabled",
+    group: "platform-sync",
+  },
+  {
+    name: "m19_platform_sync_repeat",
+    what: "same as m18 — proves the sync-enabled build is deterministic",
+    platform: "true",
+    publish: "false",
+    browserTest: "false",
+    sync: "true",
+    basePath: CONFIGURED_PREFIX,
+    expect: "voice-enabled",
+    group: "platform-sync",
+  },
+  {
+    name: "m20_platform_sync_false",
+    what: 'platform "true", sync explicitly "false" — same build as sync unset',
+    platform: "true",
+    publish: "false",
+    browserTest: "false",
+    sync: "false",
+    basePath: CONFIGURED_PREFIX,
+    expect: "voice-enabled",
+    group: "platform-only",
   },
 ];
 
@@ -352,7 +421,7 @@ const viteBin = ((): string => {
 })();
 
 const preflight: string[] = [];
-if (MATRIX.length !== 16) preflight.push(`the matrix declares ${MATRIX.length} variants, not 16`);
+if (MATRIX.length !== 20) preflight.push(`the matrix declares ${MATRIX.length} variants, not 20`);
 if (new Set(MATRIX.map((v) => v.name)).size !== MATRIX.length) {
   preflight.push("two variants share a name");
 }
@@ -398,6 +467,7 @@ try {
         VITE_VOICE_PLATFORM_ENABLED: variant.platform,
         VITE_VOICE_PUBLISH_ENABLED: variant.publish,
         VITE_VOICE_BROWSER_TEST_ENABLED: variant.browserTest,
+        VITE_VOICE_SYNC_ENABLED: variant.sync,
         BASE_PATH: variant.basePath,
       }),
     );
@@ -452,6 +522,7 @@ try {
         AR001J_VITE_VOICE_PLATFORM_ENABLED: variant.platform,
         AR001J_VITE_VOICE_PUBLISH_ENABLED: variant.publish,
         AR001J_VITE_VOICE_BROWSER_TEST_ENABLED: variant.browserTest,
+        AR001J_VITE_VOICE_SYNC_ENABLED: variant.sync,
         AR001J_BASE_PATH: variant.basePath,
       }),
     );

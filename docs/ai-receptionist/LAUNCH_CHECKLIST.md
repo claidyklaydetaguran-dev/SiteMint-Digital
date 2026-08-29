@@ -43,7 +43,34 @@ Set these as staging secrets or build variables. Never paste their values into a
 | `VITE_VOICE_PLATFORM_ENABLED` | Dashboard build | `true` |
 | `VITE_VOICE_PUBLISH_ENABLED` | Dashboard build | `true` |
 | `VITE_VOICE_BROWSER_TEST_ENABLED` | Dashboard build | `true` |
+| `VOICE_SYNC_ENABLED` | API runtime | `false` — see AR-001V.1 below |
+| `VITE_VOICE_SYNC_ENABLED` | Dashboard build | `false` — see AR-001V.1 below |
+| `VOICE_BROWSER_TEST_ENABLED` | API runtime | `false` — see AR-001V.1 below |
 | `VITE_VAPI_PUBLIC_KEY` | Dashboard build | Vapi public browser key (staging organization) |
+
+### AR-001V.1 — three independent voice capabilities
+
+Each capability has its own switch, each defaults to `false`, and each accepts
+only the exact literal string `true`. Granting one never grants another.
+
+| Capability | Server switch (authoritative) | Client build switch |
+|---|---|---|
+| Publish a **new** assistant (`createAssistant`) | `VOICE_PUBLISH_ENABLED` | `VITE_VOICE_PUBLISH_ENABLED` |
+| Update an **already-published** assistant (`updateAssistant`) | `VOICE_SYNC_ENABLED` | `VITE_VOICE_SYNC_ENABLED` |
+| Issue browser-test metadata (the provider assistant id) | `VOICE_BROWSER_TEST_ENABLED` | `VITE_VOICE_BROWSER_TEST_ENABLED` |
+
+The server switch is the boundary; the client switch only decides whether the
+code and control are built at all. With a server switch off, a crafted request
+is refused before any database claim, provider construction, or credential
+read — for the browser-test endpoint, before the row is even looked up, so the
+existence of an assistant cannot be probed.
+
+All three `VITE_*` flags are canonicalised to the literal `"true"`/`"false"` by
+`artifacts/helpdesk/vite.config.ts` before Rollup builds the module graph, so a
+`false` value removes the gated code rather than merely hiding it. The committed
+16-variant build matrix
+(`pnpm --filter @workspace/scripts run test:voice-boundary:matrix`) covers the
+combinations.
 
 ### `CORS_ALLOWED_ORIGINS` (required in production)
 

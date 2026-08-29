@@ -131,3 +131,30 @@ export const voiceBrowserTestEnabled: boolean = NO_BUILD_ENV
         import.meta.env.VITE_VOICE_BROWSER_TEST_ENABLED === undefined
       ? false
       : parseBooleanFlag(import.meta.env.VITE_VOICE_BROWSER_TEST_ENABLED);
+
+/**
+ * AR-001V.1: gates the frontend control that sends an already-published
+ * assistant's saved configuration to the voice provider. Defaults false
+ * (production-safe) when unset or invalid, and follows exactly the same
+ * foldable shape as the three flags above, so a disabled build drops the
+ * control, its confirmation dialog, its mutation hook and its copy.
+ *
+ * It is deliberately independent of `voicePublishEnabled`: publishing creates
+ * a new provider assistant, synchronizing updates one that already exists, and
+ * granting either must never grant the other. It remains subordinate to
+ * `voicePlatformEnabled`, since the assistant routes do not exist without it.
+ *
+ * Like the others this is a plain capability switch, carrying no provider
+ * host, public key, or private key. The server enforces its own separate
+ * `VOICE_SYNC_ENABLED` and is authoritative — this flag only decides whether
+ * the client offers the action.
+ */
+export const voiceSyncEnabled: boolean = NO_BUILD_ENV
+  ? false
+  : import.meta.env.VITE_VOICE_SYNC_ENABLED === "true"
+    ? true
+    : import.meta.env.VITE_VOICE_SYNC_ENABLED === "false" ||
+        import.meta.env.VITE_VOICE_SYNC_ENABLED === "" ||
+        import.meta.env.VITE_VOICE_SYNC_ENABLED === undefined
+      ? false
+      : parseBooleanFlag(import.meta.env.VITE_VOICE_SYNC_ENABLED);

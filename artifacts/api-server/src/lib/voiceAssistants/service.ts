@@ -7,6 +7,7 @@ import type { VoiceAssistant } from "@workspace/db/schema/voice";
 import { voiceAssistantRepository } from "./repository.js";
 import { validateCreateBody, validateRouteId, validateUpdateBody } from "./validation.js";
 import { AssistantApiError } from "./errors.js";
+import { deriveProviderSyncState, type ProviderSyncState } from "./providerSyncState.js";
 
 const MAX_NAME_LENGTH = 100;
 const COPY_SUFFIX = " Copy";
@@ -17,10 +18,27 @@ export interface AssistantDto {
   templateKey: string;
   status: string;
   provider: string | null;
-  providerAssistantId: string | null;
+  /**
+   * AR-001V.1: the provider assistant id is NOT in this DTO. Ordinary list and
+   * detail reads answer only whether a provider resource exists, because that
+   * is the only thing the dashboard needs in order to render status, gate
+   * delete, and decide eligibility. The id itself is handed out solely by the
+   * dedicated browser-test session endpoint, after an explicit owner
+   * confirmation, and only while the server-side browser-test flag is on.
+   */
+  providerLinked: boolean;
   config: Record<string, unknown>;
   lastSyncedAt: string | null;
   syncError: string | null;
+  /**
+   * AR-001V. Derived, never stored: whether the provider is running what this
+   * row currently says. The digest itself is not exposed — the client only
+   * needs the answer, and a state string cannot be mistaken for a credential
+   * or a provider identifier.
+   */
+  providerSyncState: ProviderSyncState;
+  /** Safe static code from PROVIDER_SYNC_ERROR_CODES, or null. Never provider text. */
+  providerSyncError: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,10 +50,16 @@ function toDto(row: VoiceAssistant): AssistantDto {
     templateKey: row.templateKey,
     status: row.status,
     provider: row.provider,
-    providerAssistantId: row.providerAssistantId,
+    providerLinked:
+      row.provider !== null &&
+      row.provider.trim().length > 0 &&
+      row.providerAssistantId !== null &&
+      row.providerAssistantId.trim().length > 0,
     config: row.config,
     lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null,
     syncError: row.syncError,
+    providerSyncState: deriveProviderSyncState(row),
+    providerSyncError: row.providerSyncError,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
