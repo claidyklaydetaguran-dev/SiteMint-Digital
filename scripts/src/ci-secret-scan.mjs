@@ -33,6 +33,10 @@ const RULES = [
       // legacy suite touches no database.
       "artifacts/api-server/test/discoveryLegacyRoute.test.ts",
       "scripts/src/run-legacy-api-tests.ts",
+      // P9 guard fixtures: percent-encoded synthetic credentials ("se%3Acret")
+      // proving the URL->PG* decomposition and the drill-target refusal
+      // matrix. No real host or password appears.
+      "lib/db/deployRecoveryContract.test.ts",
       // ci:ci on a job-scoped throwaway Postgres service container that holds
       // no data and dies with the CI job. Caught by this scanner's own first
       // real run — allowlisted rather than weakening the rule.

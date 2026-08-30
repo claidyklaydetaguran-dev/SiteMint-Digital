@@ -20,7 +20,10 @@
     "migrate:scheduling": "node ./src/migrate-guard.mjs scheduling",
     "generate:discovery": "drizzle-kit generate --config ./drizzle.discovery.config.ts",
     "migrate:discovery": "node ./src/migrate-guard.mjs discovery",
-    "baseline:journals": "node ./src/baseline-journals.mjs"
+    "baseline:journals": "node ./src/baseline-journals.mjs",
+    "preflight": "node ./src/migrate-preflight.mjs",
+    "backup": "node ./src/db-backup.mjs",
+    "restore:drill": "node ./src/db-restore-drill.mjs"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
