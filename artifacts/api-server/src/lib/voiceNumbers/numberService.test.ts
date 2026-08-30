@@ -120,7 +120,14 @@ describe("resolveAssistantForNumber", () => {
     expect(
       await resolveAssistantForNumber("pn-1", routing(number({ state: "inventory", firmId: null, assignedAssistantId: null }))),
     ).toEqual({ ok: false, reason: "not_assigned" });
-    expect(await resolveAssistantForNumber("pn-1", routing(number(), undefined))).toEqual({
+    // Built inline: passing undefined through the helper would re-trigger
+    // its default parameter and hand the assistant a provider id anyway.
+    expect(
+      await resolveAssistantForNumber("pn-1", {
+        findByProviderNumberId: async () => number(),
+        findAssistantProviderId: async () => undefined,
+      }),
+    ).toEqual({
       ok: false,
       reason: "assistant_unlinked",
     });
