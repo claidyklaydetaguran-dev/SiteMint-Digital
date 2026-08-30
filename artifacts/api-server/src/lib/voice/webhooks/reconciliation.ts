@@ -20,12 +20,12 @@
 // process is gated by VOICE_RECONCILIATION_ENABLED ("true" exactly; default
 // off) per the program's disabled-by-default rule.
 
+// Import discipline: this module must be importable with no DATABASE_URL —
+// the classifier is pure and the sweep's collaborators are injectable. The
+// default (production) collaborators therefore load @workspace/db lazily,
+// inside the call, never at module import time.
 import type { RealCallRecord } from "./callStateModel.js";
-import { listRealCallsForFirm } from "./realCallsRepository.js";
-import { db } from "@workspace/db";
-import { providerWebhookEvents } from "@workspace/db/schema/voice";
-import { and, eq, gt } from "drizzle-orm";
-import { openVoiceIssue, type OpenVoiceIssueResult } from "../../voiceIssues/voiceIssueService.js";
+import type { OpenVoiceIssueInput, OpenVoiceIssueResult } from "../../voiceIssues/voiceIssueService.js";
 
 export const VOICE_RECONCILIATION_ENABLED_ENV_VAR = "VOICE_RECONCILIATION_ENABLED";
 
@@ -81,16 +81,31 @@ export interface SweepDeps {
   /** Folded call records for one firm. Injectable for tests. */
   listCallsForFirm?: (firmId: number) => Promise<RealCallRecord[]>;
   /** Issue sink. Injectable for tests. */
-  openIssue?: typeof openVoiceIssue;
+  openIssue?: (input: OpenVoiceIssueInput) => Promise<OpenVoiceIssueResult>;
   logger?: (event: string, meta: Record<string, unknown>) => void;
 }
 
 async function defaultListActiveFirmIds(since: Date): Promise<number[]> {
+  const [{ db }, { providerWebhookEvents }, { and, eq, gt }] = await Promise.all([
+    import("@workspace/db"),
+    import("@workspace/db/schema/voice"),
+    import("drizzle-orm"),
+  ]);
   const rows = await db
     .selectDistinct({ firmId: providerWebhookEvents.firmId })
     .from(providerWebhookEvents)
     .where(and(eq(providerWebhookEvents.provider, "vapi"), gt(providerWebhookEvents.createdAt, since)));
   return rows.map((r) => r.firmId);
+}
+
+async function defaultListCallsForFirm(firmId: number): Promise<RealCallRecord[]> {
+  const { listRealCallsForFirm } = await import("./realCallsRepository.js");
+  return listRealCallsForFirm(firmId);
+}
+
+async function defaultOpenIssue(input: OpenVoiceIssueInput): Promise<OpenVoiceIssueResult> {
+  const { openVoiceIssue } = await import("../../voiceIssues/voiceIssueService.js");
+  return openVoiceIssue(input);
 }
 
 export interface SweepSummary {
@@ -106,8 +121,8 @@ export interface SweepSummary {
 export async function runVoiceReconciliationOnce(deps: SweepDeps = {}): Promise<SweepSummary> {
   const now = deps.now?.() ?? new Date();
   const listFirms = deps.listActiveFirmIds ?? defaultListActiveFirmIds;
-  const listCalls = deps.listCallsForFirm ?? listRealCallsForFirm;
-  const openIssue = deps.openIssue ?? openVoiceIssue;
+  const listCalls = deps.listCallsForFirm ?? defaultListCallsForFirm;
+  const openIssue = deps.openIssue ?? defaultOpenIssue;
 
   const since = new Date(now.getTime() - RECONCILIATION_LOOKBACK_MS);
   const firmIds = await listFirms(since);

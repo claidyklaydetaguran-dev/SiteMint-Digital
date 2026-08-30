@@ -4,7 +4,11 @@
 // and the disabled-by-default server-URL attachment representation.
 
 import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Hoisted above every import: the real module must never evaluate (repo
+// pattern — @workspace/db throws at import time without DATABASE_URL).
+vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 
 import {
   authenticateVapiWebhook,
