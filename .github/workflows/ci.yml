@@ -1,0 +1,117 @@
+# SiteMint CI — the machine-enforced version of the gates this repository has
+# been running by hand since the AR-001 program (CLAUDE.md "Verification gates").
+#
+# Design constraints:
+#   - Linux runner deliberately mirrors the Linux QA toolchain (Node 24.x,
+#     pnpm 10.26.x) because pnpm-workspace.yaml prunes Windows esbuild/rollup
+#     binaries — Windows can typecheck but cannot run the full suite.
+#   - No repository secrets are read anywhere in this workflow; the disposable
+#     Postgres service exists only for the journal proofs and dies with the job.
+#   - The helpdesk build here is the DISABLED build (all VITE_VOICE_* flags
+#     false); the built-output scan then proves the provider boundary holds in
+#     the artifact actually produced, not just in source.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci_journals
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Frozen dependency install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Aggregate test suite
+        run: pnpm run test
+
+      - name: Disposable-database journal proofs
+        env:
+          # The suite refuses to start unless TEST_DATABASE_URL is set and
+          # differs from DATABASE_URL (which is deliberately unset here). It
+          # creates and drops its own databases on this throwaway service.
+          TEST_DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci_journals
+        run: pnpm --filter @workspace/scripts run test:journals
+
+      - name: api-server build
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: helpdesk disabled build
+        env:
+          PORT: "21622"
+          BASE_PATH: /ai-receptionist/dashboard
+          VITE_VOICE_PLATFORM_ENABLED: "false"
+          VITE_VOICE_PUBLISH_ENABLED: "false"
+          VITE_VOICE_SYNC_ENABLED: "false"
+          VITE_VOICE_BROWSER_TEST_ENABLED: "false"
+        run: pnpm --filter @workspace/helpdesk run build
+
+      - name: Built-output boundary scan (disabled build)
+        run: node scripts/src/ci-built-output-scan.mjs artifacts/helpdesk/dist/public
+
+      - name: Secret scan
+        run: node scripts/src/ci-secret-scan.mjs
+
+      - name: Whitespace check
+        run: git diff --check
+
+  voice-matrix:
+    name: voice-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Frozen dependency install
+        run: pnpm install --frozen-lockfile
+
+      - name: Voice build-boundary matrix (20 variants, strict)
+        run: pnpm --filter @workspace/scripts run test:voice-boundary:matrix
