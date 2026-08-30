@@ -89,3 +89,24 @@ as P3 (fixed in `99b594e`).
 | New env contract (all inert) | `VOICE_SMS_ENABLED`, `VOICE_TWILIO_ACCOUNT_SID`/`_AUTH_TOKEN`/`_FROM_NUMBER` (loader structurally refuses any value equal to its INTAKE_TWILIO_* counterpart), `VOICE_SMS_OWNER_FIRM_ID` (interim single-number tenant mapping until P6) |
 | Deferred live gate | Creating any Twilio resource, sending any SMS, and the missed-call text-back policy (rows default `blocked_no_consent` — enabling is an owner policy decision) |
 | Residual risks | Inbound consent tenant-mapping is env-pinned until P6's number inventory; outbox send-loop logic is DB-bound and exercised at unit level via transport/consent fakes only until an integration harness (P9) |
+
+P5 addendum: PR #10 merged as `875ffd46fa54007f971e4078b3cf91351314951a`.
+In-phase CI catch with a durable lesson: voice `0002` was hand-authored
+without a meta snapshot, so `drizzle-kit generate` re-emitted its objects
+into 0003 (duplicate-object failures in the journal proofs). Fixed by
+stripping the re-emitted statements from 0003 BEFORE it was recorded
+anywhere (hash immutability only binds once applied/committed); 0003's
+snapshot heals the chain. Two more proofs converted from pins to DERIVED
+(journal legacy-row count; sequence-proof base timestamp).
+
+## P6 — Numbers, transfers, and call policy (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p6-numbers-transfers (merge SHA recorded in the P7 addendum) |
+| Migration | voice `0004_lying_jamie_braddock` — voice_numbers (lifecycle CHECKs incl. `(state='inventory') = (firm_id IS NULL)`, assigned⇒assistant, partial unique one-assigned-per-firm, globally unique phone/provider ids) + voice_transfer_destinations; rollback refuses while any number is assigned/paused. Generated CLEAN against 0003's snapshot — the 0002 snapshot gap is healed. |
+| New files | `lib/voiceNumbers/{numberService,numberService.test}.ts`, `lib/voicePublishing/callPolicyConfig.ts`, `routes/receptionistNumbers.ts`, migration + rollback, `docs/backend-program/P6_SPEC.md` |
+| Modified | parser + eventKey (+`transfer-destination-request`, `transfer-update`), webhook route (assistant-request answered from inventory BEFORE assistant attribution; transfer branch; emergency scan), vapi `types`/`mapper` (callPolicy → four first-class fields), publish/sync (pre-claim callPolicy load), voiceIssueService (+`emergency_language_detected`), voiceSmsWebhook (inventory To→firm mapping, env pin demoted to fallback), voice barrel, inventory pins (18 domain / 45 app / 8 migrations) |
+| New env contract (inert) | `VOICE_CALL_POLICY_JSON` (fail-closed, closed keys, bounded; null default keeps payloads byte-identical) |
+| Deferred live gate | Number acquisition/import/porting/release (production `PhoneNumberProvider` throws — hard stop), wiring provider number webhooks, any transfer of a real call |
+| Residual risks | Transfer picks the single best destination (no cascade retry until real telephony evidence); business-hours guard reuses the scheduling weekly config (single range per day); emergency scan is a conservative keyword flag, deliberately not NLP |

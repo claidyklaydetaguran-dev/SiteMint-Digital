@@ -30,6 +30,7 @@ import {
 import { isVoiceSyncEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
 import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
+import { loadVoiceCallPolicyFromEnv, type VoiceCallPolicy } from "./callPolicyConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
@@ -92,6 +93,8 @@ export interface SyncServiceDependencies {
   loadServerConfig?: () => VoiceServerConfig | null;
   /** P3: optional tools attachment loader; null (feature off) sends no `tools`. Defaults to the env loader when omitted. */
   loadToolsConfig?: (serverConfig: VoiceServerConfig | null) => JsonObject[] | null;
+  /** P6: optional call-behavior policy; null (default) sends nothing. */
+  loadCallPolicy?: () => VoiceCallPolicy | null;
   createProvider: () => VoiceProvider;
   repository: SyncRepositoryDependency;
   clock: Clock;
@@ -106,6 +109,7 @@ export const defaultSyncServiceDependencies: SyncServiceDependencies = {
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
   loadServerConfig: loadVoiceServerConfigFromEnv,
   loadToolsConfig: loadVoiceToolsConfigFromEnv,
+  loadCallPolicy: loadVoiceCallPolicyFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -168,6 +172,7 @@ export function buildSyncProviderInput(
   catalog: RuntimeCatalog,
   serverConfig: VoiceServerConfig | null = null,
   toolsConfig: JsonObject[] | null = null,
+  callPolicy: VoiceCallPolicy | null = null,
 ): VoiceAssistantInput {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
   const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
@@ -199,6 +204,7 @@ export function buildSyncProviderInput(
       systemInstructions: extracted.systemInstructions,
       ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
       ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
+      ...(callPolicy !== null ? { callPolicy: callPolicy as unknown as JsonObject } : {}),
     },
   };
 }
@@ -345,6 +351,13 @@ export async function synchronizePublishedAssistant(
     return failure("sync_disabled");
   }
 
+  let callPolicy: VoiceCallPolicy | null;
+  try {
+    callPolicy = (deps.loadCallPolicy ?? loadVoiceCallPolicyFromEnv)();
+  } catch {
+    return failure("sync_disabled");
+  }
+
   let provider: VoiceProvider;
   try {
     provider = deps.createProvider();
@@ -363,7 +376,7 @@ export async function synchronizePublishedAssistant(
   // STEP 3 — build the payload from the claimed row and digest it.
   let providerInput: VoiceAssistantInput;
   try {
-    providerInput = buildSyncProviderInput(assistant, catalog, serverConfig, toolsConfig);
+    providerInput = buildSyncProviderInput(assistant, catalog, serverConfig, toolsConfig, callPolicy);
   } catch (err) {
     const code: PersistableSyncFailureCode =
       err instanceof PublishFoundationError && err.code === "UNSUPPORTED_PRESET"

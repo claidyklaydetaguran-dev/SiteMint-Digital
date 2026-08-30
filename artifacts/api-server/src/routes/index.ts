@@ -24,6 +24,7 @@ import receptionistVoiceCallsRouter from "./receptionistVoiceCalls";
 import receptionistAvailabilityRouter from "./receptionistAvailability";
 import receptionistCalendarRouter from "./receptionistCalendar";
 import voiceSmsWebhookRouter from "./voiceSmsWebhook";
+import receptionistNumbersRouter from "./receptionistNumbers";
 import publicSchedulingRouter from "./publicScheduling";
 import helpdeskRouter from "./helpdesk";
 
@@ -54,6 +55,7 @@ router.use(receptionistVoiceCallsRouter);
 router.use(receptionistAvailabilityRouter);
 router.use(receptionistCalendarRouter);
 router.use(voiceSmsWebhookRouter);
+router.use(receptionistNumbersRouter);
 router.use(publicSchedulingRouter);
 router.use(helpdeskRouter);
 
