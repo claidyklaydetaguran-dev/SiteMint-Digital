@@ -70,6 +70,14 @@ function journalWhens(domain: string): number[] {
   return (journal.entries as Array<{ when: number }>).map((e) => e.when);
 }
 
+function journalEntries(domain: string): Array<{ tag: string; when: number }> {
+  const journal = readJson("drizzle", domain, "meta", "_journal.json");
+  return (journal.entries as Array<{ tag: string; when: number }>).map((e) => ({
+    tag: e.tag,
+    when: e.when,
+  }));
+}
+
 console.log("--- migrationOrderContract.test.ts ---");
 
 // ── 1. The runner's canonical order ──────────────────────────────────────────
@@ -113,21 +121,71 @@ check("voice has at least one committed migration", voiceWhens.length > 0);
 check("discovery has at least one committed migration", discoveryWhens.length > 0);
 check("scheduling has at least one committed migration", schedulingWhens.length > 0);
 
-const maxVoice = Math.max(...voiceWhens);
-const minDiscovery = Math.min(...discoveryWhens);
-const maxDiscovery = Math.max(...discoveryWhens);
-const minScheduling = Math.min(...schedulingWhens);
+// All domains record into ONE shared journal table, and drizzle-kit decides
+// pending work from a single global watermark: the newest recorded created_at.
+// A migration whose journal `when` sits at or below that watermark is skipped
+// silently — no hash comparison, no error, no row.
+//
+// Domain-block ordering ("every voice migration precedes discovery") is
+// therefore NOT the invariant that matters, and enforcing it is what caused
+// AR-001X: voice 0002 was authored below the scheduling watermark, and
+// migrate:voice reported success while applying nothing. The invariant that
+// matters is that the shared journal describes ONE strictly increasing global
+// timeline, and that every committed migration appears on it exactly once, in
+// the order it is actually applied.
 
-check(
-  "voice migrations all precede discovery",
-  maxVoice < minDiscovery,
-  `max(voice)=${maxVoice} min(discovery)=${minDiscovery}`,
+/** Every migration sharing drizzle.__drizzle_migrations, in application order. */
+const SHARED_JOURNAL_TIMELINE: Array<{ domain: string; tag: string; when: number }> = [
+  { domain: "voice", tag: "0000_military_komodo", when: 1784372011129 },
+  { domain: "voice", tag: "0001_empty_sage", when: 1784444570582 },
+  { domain: "discovery", tag: "0000_discovery-domain-contract", when: 1784601043137 },
+  { domain: "scheduling", tag: "0000_superb_rhodey", when: 1785251267367 },
+  { domain: "voice", tag: "0002_provider_sync_state", when: 1785300000000 },
+];
+
+const committedMigrations = ["voice", "discovery", "scheduling"].flatMap((domain) =>
+  journalEntries(domain).map((e) => ({ domain, tag: e.tag, when: e.when })),
 );
 
 check(
-  "discovery migrations all precede scheduling — the watermark trap",
-  maxDiscovery < minScheduling,
-  `max(discovery)=${maxDiscovery} min(scheduling)=${minScheduling}`,
+  "the timeline enumerates every committed migration exactly once",
+  committedMigrations.length === SHARED_JOURNAL_TIMELINE.length &&
+    committedMigrations.every(
+      (e) =>
+        SHARED_JOURNAL_TIMELINE.filter((t) => t.domain === e.domain && t.tag === e.tag)
+          .length === 1,
+    ),
+  `committed=${committedMigrations.length} timeline=${SHARED_JOURNAL_TIMELINE.length}`,
+);
+
+check(
+  "each timeline entry matches the timestamp recorded in its journal",
+  SHARED_JOURNAL_TIMELINE.every((t) =>
+    committedMigrations.some(
+      (e) => e.domain === t.domain && e.tag === t.tag && e.when === t.when,
+    ),
+  ),
+  SHARED_JOURNAL_TIMELINE.map((t) => `${t.domain}/${t.tag}=${t.when}`).join(" "),
+);
+
+const timelineWhens = SHARED_JOURNAL_TIMELINE.map((t) => t.when);
+
+check(
+  "the global timeline is strictly increasing",
+  timelineWhens.every((when, i) => i === 0 || timelineWhens[i - 1] < when),
+  timelineWhens.join(" < "),
+);
+
+check(
+  "every committed timestamp is unique across the shared journal",
+  new Set(timelineWhens).size === timelineWhens.length,
+  timelineWhens.join(","),
+);
+
+check(
+  "the newest committed migration ends the timeline, clearing the watermark",
+  Math.max(...timelineWhens) === timelineWhens[timelineWhens.length - 1],
+  `max=${Math.max(...timelineWhens)} last=${timelineWhens[timelineWhens.length - 1]}`,
 );
 
 // The order the runner declares must match the order the timestamps demand.
@@ -493,22 +551,9 @@ check(
 // statement is idempotent, so even a forced replay would not fail. `push` is a
 // declarative diff against the live schema and converges by construction.
 
-const allWhens = [...voiceWhens, ...discoveryWhens, ...schedulingWhens];
-check(
-  "every committed migration timestamp is distinct",
-  new Set(allWhens).size === allWhens.length,
-  allWhens.join(","),
-);
-check(
-  "the canonical order applies timestamps in strictly ascending sequence",
-  allWhens.every((when, i) => i === 0 || allWhens[i - 1] < when),
-  allWhens.join(" < "),
-);
-check(
-  "discovery sits between voice and scheduling, so it cannot be skipped",
-  Math.max(...voiceWhens) < DISCOVERY_WHEN && DISCOVERY_WHEN < Math.min(...schedulingWhens),
-  `${Math.max(...voiceWhens)} < ${DISCOVERY_WHEN} < ${Math.min(...schedulingWhens)}`,
-);
+// Timestamp distinctness, strict ascent, and watermark clearance are asserted
+// once, against SHARED_JOURNAL_TIMELINE in section 2. Duplicating them here
+// against domain blocks is what encoded the obsolete ordering rule.
 check(
   "the runner applies discovery immediately before scheduling",
   scriptOrder.indexOf("migrate:scheduling") - scriptOrder.indexOf("migrate:discovery") === 1,
