@@ -25,7 +25,7 @@ Feature flag `VOICE_PLATFORM_ENABLED` stays OFF in production until owner approv
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M1 — Foundation + first working assistant** | Dark/light shell; versioned voice migrations; provider abstraction; assistant CRUD, templates, publish, duplicate, guarded delete; browser test call; automated unit tests | **CODE COMPLETE — staging configuration, migration, and real-call UAT pending** |
+| **M1 — Foundation + first working assistant** | Dark/light shell; versioned voice migrations; provider abstraction; assistant CRUD, templates, publish, duplicate, guarded delete; browser test call; automated unit tests | **COMPLETE — staging configured and migrated (journals voice 3 / discovery 1 / scheduling 1), one live browser test call and one controlled provider sync verified (AR-001T / AR-001AE)** |
 | M2 — Phone numbers + call ingestion | Voice-only number (never the intake SMS number), assignment, end-of-call ingestion → call logs, transcripts, recording proxy | Planned |
 | M3 — Analysis + shared lead scoring + contacts | Call analysis persistence, tier scoring via `intakeScoring` adapter, Resend voice notifications, contacts, trial voice-minute enforcement | Planned |
 | M4 — Tools + knowledge base + SMS unification | Tool CRUD, KB + docs, SMS agent surfaced as messaging assistant (pipeline untouched), inbox reply composer | Planned |
@@ -37,7 +37,9 @@ Feature flag `VOICE_PLATFORM_ENABLED` stays OFF in production until owner approv
 
 - Set `STRIPE_RECEPTIONIST_PRICE_ID` secret + connect Stripe (required before Phase 1B
   E2E tests (d)–(f) — these MUST run before onboarding any paying customer)
-- Set `ADMIN_PASSWORD` secret (removes hardcoded `"sitemint2024"` fallback)
+- Set `ADMIN_PASSWORD` secret where admin login is wanted (there is no code
+  fallback: unset means admin login answers 503 — see CLAUDE.md "Server
+  security configuration")
 - Set `RESEND_FROM_EMAIL` to a Resend-verified sending address
 - Set `INTAKE_TWILIO_ACCOUNT_SID` in production (required for outbound intake SMS —
   see corrected `.env.example`)
