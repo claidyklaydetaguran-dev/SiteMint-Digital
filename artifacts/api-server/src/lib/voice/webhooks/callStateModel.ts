@@ -128,6 +128,14 @@ export interface RealCallRecord {
    */
   analysisAvailability: StructuredOutcomeAvailability;
   structuredOutcome: StructuredOutcome | undefined;
+  /** True once an end-of-call-report event was observed for this call — reconciliation flags final calls that never got one. */
+  hasEndOfCallReport: boolean;
+  /**
+   * Duration as reported by the provider (end-of-call-report boundaries or
+   * an explicit durationSeconds), when available. `durationSec` remains the
+   * receipt-time approximation; metering must prefer this field.
+   */
+  providerDurationSec: number | undefined;
 }
 
 /**
@@ -157,6 +165,8 @@ export function foldEventsIntoCallRecord(
   let analysisAvailability: StructuredOutcomeAvailability = "unavailable";
   let structuredOutcome: StructuredOutcome | undefined;
   let endedAt: Date | undefined;
+  let hasEndOfCallReport = false;
+  let providerDurationSec: number | undefined;
 
   const firstEventAt = ordered[0]!.createdAt;
   let lastEventAt = firstEventAt;
@@ -185,6 +195,13 @@ export function foldEventsIntoCallRecord(
     if (message.type === "end-of-call-report") {
       // The authoritative terminal record. Always wins over a prior
       // provisional status-update guess, including endedReason.
+      hasEndOfCallReport = true;
+      if (message.durationSeconds !== undefined) {
+        providerDurationSec = Math.round(message.durationSeconds);
+      } else if (message.startedAtIso && message.endedAtIso) {
+        const span = (Date.parse(message.endedAtIso) - Date.parse(message.startedAtIso)) / 1000;
+        if (Number.isFinite(span) && span >= 0) providerDurationSec = Math.round(span);
+      }
       isFinal = true;
       endedAt = endedAt ?? event.createdAt;
       if (message.endedReason) endedReason = message.endedReason;
@@ -242,5 +259,7 @@ export function foldEventsIntoCallRecord(
     summary,
     analysisAvailability,
     structuredOutcome,
+    hasEndOfCallReport,
+    providerDurationSec,
   };
 }

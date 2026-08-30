@@ -22,3 +22,19 @@ this file alone.
 Doc drift corrected this phase: ROADMAP M1 status line (staging config,
 migration, browser-call UAT, and one controlled provider sync are done);
 stale `ADMIN_PASSWORD` fallback note (no fallback exists in code).
+
+P1 addendum: the docs/ledger PR (#6) merged as
+`33809b9b7e287c324a2e57d3851cfa686838dc22` — the first PR proven gated by the
+new protection.
+
+## P2 — Webhook and call-lifecycle completion (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p2-webhook-lifecycle (SHAs recorded on merge in the P3 entry's addendum or below) |
+| New files | `lib/voice/webhooks/webhookAuthPolicy.ts`, `lib/voice/webhooks/reconciliation.ts`, `lib/voiceIssues/voiceIssueService.ts`, `lib/voicePublishing/serverConfig.ts`, `lib/voice/webhooks/webhookLifecycle.test.ts`, `docs/backend-program/P2_SPEC.md` |
+| Modified | webhook route (policy auth, store-failure 500 + issue), `vapiServerMessage` (boundary extraction), `callStateModel` (`hasEndOfCallReport`, `providerDurationSec`), vapi `types`/`mapper` (`server` block), `publishService`/`syncService` (pre-claim server-config load, optional dep), `errors.ts` (+`SERVER_CONFIG_INVALID`), `index.ts` (gated sweep starter) |
+| Schema changes | none (voice_issues and provider_webhook_events already existed) |
+| New env contract (all inert by default) | `VAPI_WEBHOOK_SECRET_PREVIOUS` (rotation overlap), `VAPI_WEBHOOK_ALLOW_BEARER` ("true" = staging bridge; production is HMAC-only), `VOICE_RECONCILIATION_ENABLED`, `VOICE_WEBHOOK_ATTACH_ENABLED` + `VOICE_SERVER_URL` |
+| Deferred live gate | Configuring the Vapi server URL/credential and flipping `VOICE_WEBHOOK_ATTACH_ENABLED` — owner-gated activation (hard-stop boundary) |
+| Residual risks | Bearer bridge exists in code (flag-gated); reconciliation thresholds are constants pending real traffic; issue writers cover webhook/reconciliation only until P7 broadens them |

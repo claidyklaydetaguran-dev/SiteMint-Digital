@@ -66,6 +66,9 @@ export function buildVapiAssistantRequestBody(
     artifactPlan,
     firstMessageMode: config.firstMessageMode,
     ...(config.firstMessage !== undefined ? { firstMessage: config.firstMessage } : {}),
+    // P2: server-URL attachment rides through only when the validated config
+    // carries it (VOICE_WEBHOOK_ATTACH_ENABLED at the publish/sync layer).
+    ...(config.server !== undefined ? { server: { url: config.server.url, secret: config.server.secret } } : {}),
   };
 }
 

@@ -30,6 +30,16 @@ export interface VapiAssistantRuntimeConfig {
   firstMessageMode: VapiFirstMessageMode;
   firstMessage?: string;
   systemInstructions: string;
+  /**
+   * P2: optional server-URL attachment (Vapi `assistant.server`). Present
+   * only when the publish/sync layer loaded a validated VoiceServerConfig
+   * (VOICE_WEBHOOK_ATTACH_ENABLED) — never from a client, never persisted
+   * in an assistant row's config.
+   */
+  server?: {
+    url: string;
+    secret: string;
+  };
 }
 
 /** Vapi's documented assistant name limit. */
@@ -42,7 +52,9 @@ const TOP_LEVEL_KEYS = new Set([
   "firstMessageMode",
   "firstMessage",
   "systemInstructions",
+  "server",
 ]);
+const SERVER_KEYS = new Set(["url", "secret"]);
 const MODEL_KEYS = new Set(["provider", "model"]);
 const VOICE_KEYS = new Set(["provider", "voiceId", "version"]);
 const TRANSCRIBER_KEYS = new Set(["provider", "model", "language"]);
@@ -142,6 +154,26 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
   const firstMessage = optionalNonEmptyString(value.firstMessage, "firstMessage");
   const systemInstructions = requireNonEmptyString(value.systemInstructions, "systemInstructions");
 
+  let server: { url: string; secret: string } | undefined;
+  if (value.server !== undefined) {
+    if (!isPlainObject(value.server)) {
+      fail('Vapi runtime config "server" must be a plain object when present.');
+    }
+    requireNoUnknownKeys(value.server, SERVER_KEYS, 'Vapi runtime config "server"');
+    const url = requireNonEmptyString(value.server.url, "server.url");
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      fail("server.url must be a valid absolute URL.");
+    }
+    if (parsedUrl.protocol !== "https:") fail("server.url must use https.");
+    if (parsedUrl.username || parsedUrl.password) fail("server.url must not contain userinfo.");
+    const secret = requireNonEmptyString(value.server.secret, "server.secret");
+    if (secret.length < 16) fail("server.secret must be at least 16 characters.");
+    server = { url, secret };
+  }
+
   return {
     model,
     voice,
@@ -149,6 +181,7 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
     firstMessageMode,
     ...(firstMessage !== undefined ? { firstMessage } : {}),
     systemInstructions,
+    ...(server !== undefined ? { server } : {}),
   };
 }
 

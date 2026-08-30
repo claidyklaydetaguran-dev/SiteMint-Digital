@@ -1,4 +1,4 @@
-// Milestone 2 foundation: real inbound-call webhook receiver.
+// Milestone 2 foundation → P2: real inbound-call webhook receiver.
 //
 // Architecture (docs/ai-receptionist/ROADMAP.md, DECISION_LOG.md): Twilio
 // owns the phone number and, once it is imported into Vapi as a BYO number,
@@ -9,20 +9,27 @@
 // (see lib/voice/webhooks/realCallsRepository.ts) rather than by anything in
 // this route.
 //
+// P2 hardening:
+//   - Authentication goes through webhookAuthPolicy.ts: HMAC-only by
+//     default (±300 s timestamp bound), previous-secret rotation overlap,
+//     and the Bearer bridge only when VAPI_WEBHOOK_ALLOW_BEARER=true.
+//   - A store failure is caught: the route answers 500 (so Vapi retries),
+//     logs, and opens a firm-scoped voice_issue instead of leaking an
+//     unhandled rejection.
+//   - Malformed-but-authenticated payloads open a diagnostic issue when a
+//     firm can be attributed; auth failures and unknown assistants cannot
+//     be attributed to a firm and are log-only by design (voice_issues rows
+//     are always firm-scoped).
+//
 // Raw body capture for signature verification is registered in app.ts,
 // mirroring the existing Stripe / Resend / receptionist-billing webhooks —
 // BEFORE the global express.json() parser runs.
 
 import { Router, type Request, type Response } from "express";
-import {
-  verifyVapiWebhookSignature,
-  verifyVapiWebhookBearerSecret,
-  VAPI_SIGNATURE_HEADER,
-  VAPI_TIMESTAMP_HEADER,
-  VAPI_BEARER_HEADER,
-} from "../lib/voice/webhooks/vapiWebhookAuth.js";
+import { authenticateVapiWebhook } from "../lib/voice/webhooks/webhookAuthPolicy.js";
 import { parseVapiServerMessage } from "../lib/voice/webhooks/vapiServerMessage.js";
 import { findFirmIdForVapiAssistant, storeVapiWebhookEvent } from "../lib/voice/webhooks/realCallsRepository.js";
+import { openVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
 
 const router = Router();
 
@@ -42,27 +49,23 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
     return;
   }
 
-  // Try HMAC first (Custom Credential, preferred). If HMAC headers are absent
-  // fall back to Bearer secret (serverUrlSecret, DECISION_LOG.md 2026-07-17).
-  let auth = verifyVapiWebhookSignature({
+  const auth = authenticateVapiWebhook({
     rawBody,
-    signatureHeader: headerValue(req, VAPI_SIGNATURE_HEADER),
-    timestampHeader: headerValue(req, VAPI_TIMESTAMP_HEADER),
-    secret: process.env["VAPI_WEBHOOK_SECRET"],
+    header: (name) => headerValue(req, name),
+    env: process.env,
   });
-  if (!auth.ok && (auth.reason === "missing_signature" || auth.reason === "missing_timestamp")) {
-    auth = verifyVapiWebhookBearerSecret({
-      bearerHeader: headerValue(req, VAPI_BEARER_HEADER),
-      secret: process.env["VAPI_WEBHOOK_SECRET"],
-    });
-  }
   if (!auth.ok) {
     // Never echo the failure reason to the caller — an attacker probing
     // signature verification gets a uniform, uninformative rejection.
-    req.log.warn({ reason: auth.reason }, "[voice webhook] authentication failed");
+    req.log.warn({ reason: auth.reason, mechanism: auth.mechanism }, "[voice webhook] authentication failed");
     const status = auth.reason === "not_configured" ? 503 : 401;
     res.status(status).json({ error: "Unauthorized" });
     return;
+  }
+  if (auth.mode !== "hmac") {
+    // Rotation progress / staging-bridge visibility: which non-primary path
+    // authenticated this request. Value is one of our own enum labels.
+    req.log.info({ mode: auth.mode }, "[voice webhook] authenticated via non-primary mode");
   }
 
   let body: unknown;
@@ -101,13 +104,32 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
     return;
   }
 
-  const { inserted } = await storeVapiWebhookEvent(firmId, message);
-  req.log.info(
-    { firmId, callId: message.call.id, type: message.type, inserted },
-    "[voice webhook] event processed",
-  );
-
-  res.status(200).json({ received: true });
+  try {
+    const { inserted } = await storeVapiWebhookEvent(firmId, message);
+    req.log.info(
+      { firmId, callId: message.call.id, type: message.type, inserted, authMode: auth.mode },
+      "[voice webhook] event processed",
+    );
+    res.status(200).json({ received: true });
+  } catch (err) {
+    req.log.error(
+      { firmId, callId: message.call.id, type: message.type, errorClass: err instanceof Error ? err.name : "unknown" },
+      "[voice webhook] event store failed",
+    );
+    try {
+      await openVoiceIssue({
+        firmId,
+        level: "error",
+        code: "webhook_store_failed",
+        message: "A verified provider webhook event could not be stored; the provider will retry.",
+        dedupeKey: message.call.id,
+        context: { callId: message.call.id, type: message.type },
+      });
+    } catch {
+      // Issue creation is best-effort; the 500 below already forces a retry.
+    }
+    res.status(500).json({ error: "Internal error" });
+  }
 });
 
 export default router;
