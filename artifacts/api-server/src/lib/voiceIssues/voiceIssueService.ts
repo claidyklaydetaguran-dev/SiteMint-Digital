@@ -23,6 +23,8 @@ export const VOICE_ISSUE_CODES = [
   "webhook_store_failed",
   "call_stale_in_progress",
   "call_missing_report",
+  "tool_invalid_args",
+  "tool_execution_failed",
 ] as const;
 export type VoiceIssueCode = (typeof VOICE_ISSUE_CODES)[number];
 

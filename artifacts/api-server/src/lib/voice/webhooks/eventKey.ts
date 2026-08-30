@@ -39,6 +39,12 @@ export function buildVapiEventKey(message: ParsedVapiMessage): string {
       )}`;
     case "hang":
       return `${message.call.id}:hang`;
+    case "tool-calls":
+      // One delivery of a batch of tool calls is one logical event; Vapi
+      // retries redeliver the same ids. Distinct batches carry distinct ids.
+      return `${message.call.id}:tool-calls:${shortHash(
+        JSON.stringify((message.toolCallList ?? []).map((t) => t.id).sort()),
+      )}`;
     case "function-call":
       return `${message.call.id}:function-call:${shortHash(JSON.stringify(message.analysis ?? null))}`;
     case "assistant-request":

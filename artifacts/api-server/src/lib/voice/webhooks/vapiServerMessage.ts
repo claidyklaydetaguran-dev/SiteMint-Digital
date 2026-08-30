@@ -10,6 +10,7 @@
 export const VAPI_SERVER_MESSAGE_TYPES = [
   "assistant-request",
   "function-call",
+  "tool-calls",
   "status-update",
   "end-of-call-report",
   "hang",
@@ -47,6 +48,8 @@ export interface ParsedVapiMessage {
   startedAtIso?: string;
   endedAtIso?: string;
   durationSeconds?: number;
+  /** P3: extracted tool invocations for type "tool-calls". Arguments stay unknown — the dispatcher validates them. */
+  toolCallList?: Array<{ id: string; name: string; arguments: unknown }>;
 }
 
 export type ParseVapiServerMessageResult =
@@ -116,6 +119,31 @@ export function parseVapiServerMessage(body: unknown): ParseVapiServerMessageRes
   const duration = message.durationSeconds ?? (isPlainObject(call) ? call.durationSeconds : undefined);
   if (typeof duration === "number" && Number.isFinite(duration) && duration >= 0) {
     parsed.durationSeconds = duration;
+  }
+
+  if (parsed.type === "tool-calls") {
+    // Vapi nests each invocation as {id, function:{name, arguments}}
+    // (OpenAI-style) in `toolCallList`; some shapes flatten name/arguments,
+    // and arguments may arrive as an object or a JSON string. Anything that
+    // doesn't yield a non-empty id+name is dropped — the dispatcher answers
+    // only well-identified calls.
+    const rawList = Array.isArray(message.toolCallList)
+      ? message.toolCallList
+      : Array.isArray(message.toolCalls)
+        ? message.toolCalls
+        : [];
+    const extracted: Array<{ id: string; name: string; arguments: unknown }> = [];
+    for (const item of rawList) {
+      if (!isPlainObject(item) || !isNonEmptyString(item.id)) continue;
+      const fn = isPlainObject(item.function) ? item.function : item;
+      if (!isNonEmptyString(fn.name)) continue;
+      let args: unknown = fn.arguments;
+      if (typeof args === "string") {
+        try { args = JSON.parse(args); } catch { args = undefined; }
+      }
+      extracted.push({ id: item.id, name: fn.name, arguments: args });
+    }
+    parsed.toolCallList = extracted;
   }
 
   return { ok: true, message: parsed };

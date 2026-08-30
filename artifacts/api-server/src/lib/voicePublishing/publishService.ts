@@ -25,6 +25,7 @@ import {
 } from "../voiceAssistants/repository.js";
 import { isVoicePublishEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
+import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
@@ -85,6 +86,8 @@ export interface PublishServiceDependencies {
    * omitted, the environment loader is used.
    */
   loadServerConfig?: () => VoiceServerConfig | null;
+  /** P3: optional tools attachment loader; null (feature off) sends no `tools`. Defaults to the env loader when omitted. */
+  loadToolsConfig?: (serverConfig: VoiceServerConfig | null) => JsonObject[] | null;
   /** Explicit, lazy production-provider construction. No network request occurs during construction. */
   createProvider: () => VoiceProvider;
   repository: PublishRepositoryDependency;
@@ -104,6 +107,7 @@ export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   loadCatalog: loadRuntimeCatalogFromEnv,
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
   loadServerConfig: loadVoiceServerConfigFromEnv,
+  loadToolsConfig: loadVoiceToolsConfigFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -290,6 +294,7 @@ function buildProviderInput(
   assistant: VoiceAssistant,
   catalog: RuntimeCatalog,
   serverConfig: VoiceServerConfig | null,
+  toolsConfig: JsonObject[] | null,
 ): { input: VoiceAssistantInput; extracted: ExtractedAssistantPublishConfig } {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
   const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
@@ -315,6 +320,7 @@ function buildProviderInput(
     ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
     systemInstructions: extracted.systemInstructions,
     ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
+    ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
   };
 
   return { input: { name, config }, extracted };
@@ -369,6 +375,14 @@ export async function publishAssistant(
     return failure("publish_disabled");
   }
 
+  // P3: tools attachment, validated pre-claim; requires the server config.
+  let toolsConfig: JsonObject[] | null;
+  try {
+    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig);
+  } catch {
+    return failure("publish_disabled");
+  }
+
   let provider: VoiceProvider;
   try {
     provider = deps.createProvider();
@@ -386,7 +400,7 @@ export async function publishAssistant(
   // STEP 3/4 — claimed row as source of truth; build provider input.
   let providerInput: VoiceAssistantInput;
   try {
-    ({ input: providerInput } = buildProviderInput(assistant, catalog, serverConfig));
+    ({ input: providerInput } = buildProviderInput(assistant, catalog, serverConfig, toolsConfig));
   } catch (err) {
     const code: PersistableFailureCode =
       err instanceof PublishFoundationError && err.code === "UNSUPPORTED_PRESET" ? "unsupported_preset" : "assistant_config_invalid";
