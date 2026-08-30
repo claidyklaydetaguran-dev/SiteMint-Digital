@@ -38,3 +38,20 @@ new protection.
 | New env contract (all inert by default) | `VAPI_WEBHOOK_SECRET_PREVIOUS` (rotation overlap), `VAPI_WEBHOOK_ALLOW_BEARER` ("true" = staging bridge; production is HMAC-only), `VOICE_RECONCILIATION_ENABLED`, `VOICE_WEBHOOK_ATTACH_ENABLED` + `VOICE_SERVER_URL` |
 | Deferred live gate | Configuring the Vapi server URL/credential and flipping `VOICE_WEBHOOK_ATTACH_ENABLED` — owner-gated activation (hard-stop boundary) |
 | Residual risks | Bearer bridge exists in code (flag-gated); reconciliation thresholds are constants pending real traffic; issue writers cover webhook/reconciliation only until P7 broadens them |
+
+P2 addendum: PR #7 merged as `c973aa58406c2ad271f784d83cc1b48e68eded1c`;
+CI evidence run 33308414394 — vitest 22 files / 616 tests, both jobs green.
+In-phase fix `4156e38`: hoisted `vi.mock("@workspace/db")` (the db package
+throws at import without DATABASE_URL) + lazy sweep collaborators.
+
+## P3 — Tools and scheduling action loop (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p3-tools-scheduling (merge SHA recorded in the P4 addendum) |
+| New files | `lib/voice/tools/toolCatalog.ts`, `lib/voice/tools/toolDispatcher.ts`, `lib/voice/tools/toolDispatcher.test.ts`, `lib/voicePublishing/toolsConfig.ts`, `docs/backend-program/P3_SPEC.md` |
+| Modified | parser + eventKey (`tool-calls`), webhook route (tool branch w/ ledger replay), `realCallsRepository` (stored-results read/write), vapi `types`/`mapper` (validated `tools` emission), publish/sync (pre-claim tools load), errors (+`TOOLS_CONFIG_INVALID`), issue codes (+2), api-server `package.json` (+`zod: catalog:` — same ^3.25.76 the workspace already resolves; lockfile +3 lines importer entry) |
+| Schema changes | none (`source='ai_receptionist'` was already in the scheduling CHECK) |
+| New env contract (inert) | `VOICE_TOOLS_ATTACH_ENABLED` (requires the P2 server attachment when true) |
+| Deferred live gate | Creating/attaching live Vapi tools (owner-gated activation) |
+| Residual risks | Reschedule uses list-then-find for the old request (bounded at 200 rows) pending a direct lookup; tool result replay stores results inside the event payload (documented key `siteMintToolResults`) |

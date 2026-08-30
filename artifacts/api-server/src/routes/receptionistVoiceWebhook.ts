@@ -28,7 +28,14 @@
 import { Router, type Request, type Response } from "express";
 import { authenticateVapiWebhook } from "../lib/voice/webhooks/webhookAuthPolicy.js";
 import { parseVapiServerMessage } from "../lib/voice/webhooks/vapiServerMessage.js";
-import { findFirmIdForVapiAssistant, storeVapiWebhookEvent } from "../lib/voice/webhooks/realCallsRepository.js";
+import {
+  findFirmIdForVapiAssistant,
+  storeVapiWebhookEvent,
+  readStoredToolCallResults,
+  storeToolCallResults,
+} from "../lib/voice/webhooks/realCallsRepository.js";
+import { buildVapiEventKey } from "../lib/voice/webhooks/eventKey.js";
+import { dispatchToolCalls } from "../lib/voice/tools/toolDispatcher.js";
 import { openVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
 
 const router = Router();
@@ -101,6 +108,45 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
       "[voice webhook] event for an assistant not known to this application",
     );
     res.status(200).json({ received: true });
+    return;
+  }
+
+  // P3: tool-calls are request/response — the model is waiting on the answer.
+  // The ledger still provides idempotency: a redelivered batch is answered
+  // from the stored results, so a mutating tool never executes twice for the
+  // same toolCallId.
+  if (message.type === "tool-calls") {
+    try {
+      const eventKey = buildVapiEventKey(message);
+      const { inserted } = await storeVapiWebhookEvent(firmId, message);
+      if (!inserted) {
+        const replay = await readStoredToolCallResults(eventKey);
+        if (replay) {
+          req.log.info(
+            { firmId, callId: message.call.id, count: replay.results.length, authMode: auth.mode },
+            "[voice webhook] tool-calls replayed from stored results",
+          );
+          res.status(200).json({ results: replay.results });
+          return;
+        }
+        // Stored event without results: the first attempt crashed between
+        // store and respond — executing now is the correct completion.
+      }
+      const calls = (message.toolCallList ?? []).map((t) => ({ toolCallId: t.id, name: t.name, args: t.arguments }));
+      const results = await dispatchToolCalls(firmId, calls);
+      await storeToolCallResults(firmId, eventKey, results);
+      req.log.info(
+        { firmId, callId: message.call.id, count: results.length, authMode: auth.mode },
+        "[voice webhook] tool-calls executed",
+      );
+      res.status(200).json({ results });
+    } catch (err) {
+      req.log.error(
+        { firmId, callId: message.call.id, errorClass: err instanceof Error ? err.name : "unknown" },
+        "[voice webhook] tool-calls handling failed",
+      );
+      res.status(500).json({ error: "Internal error" });
+    }
     return;
   }
 

@@ -13,7 +13,7 @@
 // shapes and can be reviewed against each other.
 
 import type { VoiceAssistant } from "@workspace/db/schema/voice";
-import type { Clock, VoiceAssistantInput } from "../voice/types.js";
+import type { Clock, JsonObject, VoiceAssistantInput } from "../voice/types.js";
 import { systemClock } from "../voice/types.js";
 import { VoiceProviderError, type VoiceProviderErrorCode } from "../voice/errors.js";
 import type { VoiceProvider } from "../voice/VoiceProvider.js";
@@ -29,6 +29,7 @@ import {
 } from "../voiceAssistants/repository.js";
 import { isVoiceSyncEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
+import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
@@ -89,6 +90,8 @@ export interface SyncServiceDependencies {
   loadArtifactPolicy: () => VoiceArtifactPolicy;
   /** P2: optional server-URL attachment loader; null (feature off) sends no `server` object. Defaults to the env loader when omitted. */
   loadServerConfig?: () => VoiceServerConfig | null;
+  /** P3: optional tools attachment loader; null (feature off) sends no `tools`. Defaults to the env loader when omitted. */
+  loadToolsConfig?: (serverConfig: VoiceServerConfig | null) => JsonObject[] | null;
   createProvider: () => VoiceProvider;
   repository: SyncRepositoryDependency;
   clock: Clock;
@@ -102,6 +105,7 @@ export const defaultSyncServiceDependencies: SyncServiceDependencies = {
   loadCatalog: loadRuntimeCatalogFromEnv,
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
   loadServerConfig: loadVoiceServerConfigFromEnv,
+  loadToolsConfig: loadVoiceToolsConfigFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -163,6 +167,7 @@ export function buildSyncProviderInput(
   assistant: VoiceAssistant,
   catalog: RuntimeCatalog,
   serverConfig: VoiceServerConfig | null = null,
+  toolsConfig: JsonObject[] | null = null,
 ): VoiceAssistantInput {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
   const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
@@ -193,6 +198,7 @@ export function buildSyncProviderInput(
       ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
       systemInstructions: extracted.systemInstructions,
       ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
+      ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
     },
   };
 }
@@ -331,6 +337,14 @@ export async function synchronizePublishedAssistant(
     return failure("sync_disabled");
   }
 
+  // P3: tools attachment, validated pre-claim; requires the server config.
+  let toolsConfig: JsonObject[] | null;
+  try {
+    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig);
+  } catch {
+    return failure("sync_disabled");
+  }
+
   let provider: VoiceProvider;
   try {
     provider = deps.createProvider();
@@ -349,7 +363,7 @@ export async function synchronizePublishedAssistant(
   // STEP 3 — build the payload from the claimed row and digest it.
   let providerInput: VoiceAssistantInput;
   try {
-    providerInput = buildSyncProviderInput(assistant, catalog, serverConfig);
+    providerInput = buildSyncProviderInput(assistant, catalog, serverConfig, toolsConfig);
   } catch (err) {
     const code: PersistableSyncFailureCode =
       err instanceof PublishFoundationError && err.code === "UNSUPPORTED_PRESET"

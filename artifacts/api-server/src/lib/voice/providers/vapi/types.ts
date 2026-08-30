@@ -7,7 +7,11 @@
 // omitting them.
 
 import { VoiceProviderError } from "../../errors";
+import type { JsonObject } from "../../types";
+import { TOOL_NAMES } from "../../tools/toolCatalog.js";
 import { VAPI_PROVIDER_KEY } from "./config";
+
+const VAPI_ALLOWED_TOOL_NAMES: ReadonlySet<string> = new Set(TOOL_NAMES);
 
 /** Matches Vapi's documented firstMessageMode enum values. */
 export type VapiFirstMessageMode = "assistant-speaks-first" | "assistant-waits-for-user";
@@ -40,6 +44,8 @@ export interface VapiAssistantRuntimeConfig {
     url: string;
     secret: string;
   };
+  /** P3: closed-catalog tool definitions, validated structurally below. */
+  tools?: JsonObject[];
 }
 
 /** Vapi's documented assistant name limit. */
@@ -53,8 +59,12 @@ const TOP_LEVEL_KEYS = new Set([
   "firstMessage",
   "systemInstructions",
   "server",
+  "tools",
 ]);
 const SERVER_KEYS = new Set(["url", "secret"]);
+const TOOL_KEYS = new Set(["type", "function", "server"]);
+const TOOL_FUNCTION_KEYS = new Set(["name", "description", "parameters"]);
+const MAX_TOOLS = 8;
 const MODEL_KEYS = new Set(["provider", "model"]);
 const VOICE_KEYS = new Set(["provider", "voiceId", "version"]);
 const TRANSCRIBER_KEYS = new Set(["provider", "model", "language"]);
@@ -174,6 +184,35 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
     server = { url, secret };
   }
 
+  let tools: JsonObject[] | undefined;
+  if (value.tools !== undefined) {
+    if (!Array.isArray(value.tools)) fail('Vapi runtime config "tools" must be an array when present.');
+    if (value.tools.length === 0 || value.tools.length > MAX_TOOLS) {
+      fail(`Vapi runtime config "tools" must contain 1..${MAX_TOOLS} entries.`);
+    }
+    if (server === undefined) fail('Vapi runtime config "tools" requires "server" to be present.');
+    tools = value.tools.map((tool, index) => {
+      if (!isPlainObject(tool)) fail(`tools[${index}] must be a plain object.`);
+      requireNoUnknownKeys(tool, TOOL_KEYS, `tools[${index}]`);
+      if (tool.type !== "function") fail(`tools[${index}].type must be "function".`);
+      if (!isPlainObject(tool.function)) fail(`tools[${index}].function must be a plain object.`);
+      requireNoUnknownKeys(tool.function, TOOL_FUNCTION_KEYS, `tools[${index}].function`);
+      const name = requireNonEmptyString(tool.function.name, `tools[${index}].function.name`);
+      if (!VAPI_ALLOWED_TOOL_NAMES.has(name)) fail(`tools[${index}].function.name is not in the closed tool catalog.`);
+      requireNonEmptyString(tool.function.description, `tools[${index}].function.description`);
+      if (!isPlainObject(tool.function.parameters)) fail(`tools[${index}].function.parameters must be a plain object.`);
+      if (!isPlainObject(tool.server)) fail(`tools[${index}].server must be a plain object.`);
+      requireNoUnknownKeys(tool.server, SERVER_KEYS, `tools[${index}].server`);
+      const toolUrl = requireNonEmptyString(tool.server.url, `tools[${index}].server.url`);
+      let parsedToolUrl: URL;
+      try { parsedToolUrl = new URL(toolUrl); } catch { fail(`tools[${index}].server.url must be a valid absolute URL.`); }
+      if (parsedToolUrl.protocol !== "https:") fail(`tools[${index}].server.url must use https.`);
+      const toolSecret = requireNonEmptyString(tool.server.secret, `tools[${index}].server.secret`);
+      if (toolSecret.length < 16) fail(`tools[${index}].server.secret must be at least 16 characters.`);
+      return tool as JsonObject;
+    });
+  }
+
   return {
     model,
     voice,
@@ -182,6 +221,7 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
     ...(firstMessage !== undefined ? { firstMessage } : {}),
     systemInstructions,
     ...(server !== undefined ? { server } : {}),
+    ...(tools !== undefined ? { tools } : {}),
   };
 }
 

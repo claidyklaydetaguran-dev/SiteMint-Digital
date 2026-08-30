@@ -69,6 +69,7 @@ export function buildVapiAssistantRequestBody(
     // P2: server-URL attachment rides through only when the validated config
     // carries it (VOICE_WEBHOOK_ATTACH_ENABLED at the publish/sync layer).
     ...(config.server !== undefined ? { server: { url: config.server.url, secret: config.server.secret } } : {}),
+    ...(config.tools !== undefined ? { tools: config.tools } : {}),
   };
 }
 

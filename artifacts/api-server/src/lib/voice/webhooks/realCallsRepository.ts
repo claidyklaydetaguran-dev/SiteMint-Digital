@@ -100,3 +100,61 @@ export async function getRealCallForFirm(firmId: number, callId: string): Promis
   const calls = await listRealCallsForFirm(firmId);
   return calls.find((c) => c.callId === callId);
 }
+
+// ── P3: idempotent tool-call result replay ───────────────────────────────────
+// A tool-calls delivery is stored in the same ledger as every other event.
+// After execution, the produced results are written back onto that row so a
+// provider REDELIVERY of the same batch is answered from storage — the
+// mutating tools never run twice for one toolCallId.
+
+export interface StoredToolCallResults {
+  results: Array<{ toolCallId: string; result: string }>;
+}
+
+function isStoredResults(value: unknown): value is StoredToolCallResults {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as StoredToolCallResults).results)
+  );
+}
+
+/** Reads previously stored results for one (provider, eventKey), if any. */
+export async function readStoredToolCallResults(eventKey: string): Promise<StoredToolCallResults | undefined> {
+  const [row] = await db
+    .select({ payload: providerWebhookEvents.payload })
+    .from(providerWebhookEvents)
+    .where(and(eq(providerWebhookEvents.provider, VAPI_PROVIDER_NAME), eq(providerWebhookEvents.eventKey, eventKey)))
+    .limit(1);
+  if (!row) return undefined;
+  const stored = (row.payload as Record<string, unknown>)["siteMintToolResults"];
+  return isStoredResults(stored) ? stored : undefined;
+}
+
+/** Writes execution results onto the stored event row (merge, never replace the event payload). */
+export async function storeToolCallResults(
+  firmId: number,
+  eventKey: string,
+  results: StoredToolCallResults["results"],
+): Promise<void> {
+  const [row] = await db
+    .select({ id: providerWebhookEvents.id, payload: providerWebhookEvents.payload })
+    .from(providerWebhookEvents)
+    .where(
+      and(
+        eq(providerWebhookEvents.firmId, firmId),
+        eq(providerWebhookEvents.provider, VAPI_PROVIDER_NAME),
+        eq(providerWebhookEvents.eventKey, eventKey),
+      ),
+    )
+    .limit(1);
+  if (!row) return;
+  await db
+    .update(providerWebhookEvents)
+    .set({
+      payload: { ...(row.payload as Record<string, unknown>), siteMintToolResults: { results } },
+      processedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(providerWebhookEvents.id, row.id));
+}
