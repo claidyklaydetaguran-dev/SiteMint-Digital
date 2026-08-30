@@ -27,6 +27,9 @@ import voiceSmsWebhookRouter from "./voiceSmsWebhook";
 import receptionistNumbersRouter from "./receptionistNumbers";
 import receptionistMonitoringRouter from "./receptionistMonitoring";
 import monitoringRouter from "./monitoring";
+import receptionistAccountRouter from "./receptionistAccount";
+import adminVoiceDiagnosticsRouter from "./adminVoiceDiagnostics";
+import voiceBillingWebhookRouter from "./voiceBillingWebhook";
 import publicSchedulingRouter from "./publicScheduling";
 import helpdeskRouter from "./helpdesk";
 
@@ -60,6 +63,9 @@ router.use(voiceSmsWebhookRouter);
 router.use(receptionistNumbersRouter);
 router.use(receptionistMonitoringRouter);
 router.use(monitoringRouter);
+router.use(receptionistAccountRouter);
+router.use(adminVoiceDiagnosticsRouter);
+router.use(voiceBillingWebhookRouter);
 router.use(publicSchedulingRouter);
 router.use(helpdeskRouter);
 

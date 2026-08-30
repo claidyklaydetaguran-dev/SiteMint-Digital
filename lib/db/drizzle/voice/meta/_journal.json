@@ -43,6 +43,13 @@
       "when": 1788099834462,
       "tag": "0005_shiny_supernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788100856392,
+      "tag": "0006_dizzy_komodo",
+      "breakpoints": true
     }
   ]
 }
