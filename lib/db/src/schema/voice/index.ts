@@ -20,3 +20,4 @@ export * from "../voiceIssues";
 export * from "../voiceContactsSms";
 export * from "../voiceNumbers";
 export * from "../voiceMonitoring";
+export * from "../voiceAccounts";

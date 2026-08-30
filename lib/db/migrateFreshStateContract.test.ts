@@ -132,10 +132,10 @@ const INITIALIZED_DATABASE = {
 // ── 0. The derived inventory is the one staging is expected to hold ──────────
 
 check("the shared barrel derives 27 base tables", BARREL.length === 27, `${BARREL.length}`);
-check("the committed migrations derive 21 domain tables", DOMAIN.length === 21, `${DOMAIN.length}`); // P7: +3 monitoring tables
+check("the committed migrations derive 26 domain tables", DOMAIN.length === 26, `${DOMAIN.length}`); // P8: +5 account/billing tables
 check(
-  "the application owns exactly 48 public tables", // P7: +3 monitoring tables
-  APPLICATION.length === 48,
+  "the application owns exactly 53 public tables", // P8: +5 account/billing tables
+  APPLICATION.length === 53,
   `${APPLICATION.length}`,
 );
 check(

@@ -5,6 +5,7 @@ import { startScheduler } from "./lib/campaignScheduler.js";
 import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
 import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
 import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
+import { startGraceExpirySweep } from "./lib/voiceBilling/subscriptionState.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
 
@@ -71,6 +72,10 @@ app.listen(port, (err) => {
   startVoiceDigestSchedule(24 * 60 * 60_000, {
     logger: (event, meta) => logger.info(meta, event),
   } as Parameters<typeof startVoiceDigestSchedule>[1]);
+  // P8: dunning-window expiry (hourly tick), same reconciliation flag.
+  startGraceExpirySweep(60 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  } as Parameters<typeof startGraceExpirySweep>[1]);
 
   // Run slow Stripe webhook registration/backfill in the background so it
   // doesn't delay the HTTP port opening (and failing deploy health checks).

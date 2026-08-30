@@ -130,3 +130,20 @@ failing case constructed explicitly.
 | New env contract (all inert) | `VOICE_USAGE_INCLUDED_MINUTES` (unset = metering-only; malformed throws), `VOICE_ALERTS_ENABLED` + `RESEND_API_KEY`/`VOICE_ALERTS_FROM`/`VOICE_ALERTS_TO` (pinned api.resend.com, no SDK), `VOICE_DIGEST_ENABLED`, `VOICE_METRICS_TOKEN` (unset = /metricz does not exist) |
 | Deferred live gate | Sending any alert/digest (flags off, no key), acting on any pause_requested state (owner decision via the P6 pause route) |
 | Residual risks | Metering periods use report arrival time; digest manual re-runs are not idempotent (gated off); alert failures are logged/locally-refused, not persisted as issues (deliberate — avoids DB writes from the fire-and-forget path) |
+
+P7 addendum: PR #12 merged as `d9accb43032ef2d93aa1ded3d38d4b19b72c32c8`.
+First phase green on the first CI run (the P6 defect-family lesson —
+construct failing fixture cases explicitly — was applied while writing
+the tests, not after CI caught it).
+
+## P8 — Billing, entitlements, and accounts (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p8-billing-accounts (merge SHA recorded in the P9 addendum) |
+| Migration | voice `0006_dizzy_komodo` — voice_subscriptions (unique firm + unique stripe customer; grace⇒deadline CHECK), voice_account_tokens (hash-only, purpose+shape CHECKs), voice_account_states, voice_firm_members (lowercase-email CHECK), voice_audit_log (append-only, actor/action-shape CHECKs); rollback refuses on live subscriptions or audit evidence. |
+| New files | `lib/voiceBilling/{entitlements,subscriptionState,stripeWebhookAuth,voiceAccountsBilling.test}.ts`, `lib/accountSecurity/accountTokens.ts`, `lib/voiceAccounts/{auditLog,membership}.ts`, `routes/{receptionistAccount,adminVoiceDiagnostics,voiceBillingWebhook}.ts`, migration + rollback, `docs/backend-program/P8_SPEC.md` |
+| Modified | app.ts (raw-body mount for the billing webhook), routes/index.ts (+3 routers), server index.ts (hourly grace-expiry sweep on the reconciliation flag), voiceIssueService (+`billing_suspended`), alertTransport (per-message `to` for account emails), inventory pins (10 migrations / 26 domain / 53 public) |
+| New env contract (all inert) | `VOICE_PLAN_CATALOG_JSON` + `VOICE_DEFAULT_PLAN_CODE` (fail-closed catalog), `VOICE_BILLING_GRACE_DAYS` (default 7, bounded), `VOICE_BILLING_WEBHOOK_SECRET` (unset = webhook 503s) |
+| Deferred live gate | Any Stripe resource/webhook/price change; entitlement enforcement; multi-user login sessions (roster + invitations are the prepared surface); acting on `suspended` |
+| Residual risks | In-route limiter is per-process memory (defense-in-depth over token unguessability); subscription mapping rows are admin-set pending an owner-approved checkout metadata change; account emails require the alert transport to be enabled (503 otherwise, documented) |

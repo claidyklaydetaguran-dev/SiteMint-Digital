@@ -29,6 +29,7 @@ export const VOICE_ISSUE_CODES = [
   "emergency_language_detected",
   "tool_execution_failed",
   "usage_pause_requested",
+  "billing_suspended",
 ] as const;
 export type VoiceIssueCode = (typeof VOICE_ISSUE_CODES)[number];
 

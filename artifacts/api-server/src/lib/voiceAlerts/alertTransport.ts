@@ -53,6 +53,8 @@ export function loadVoiceAlertConfigFromEnv(
 export interface AlertMessage {
   subject: string;
   text: string;
+  /** Overrides the configured operator inbox (e.g. account emails to the firm's own address). */
+  to?: string;
 }
 
 export type AlertSendResult = { ok: true } | { ok: false; reason: string };
@@ -85,7 +87,7 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
           },
           body: JSON.stringify({
             from: config.from,
-            to: [config.to],
+            to: [message.to ?? config.to],
             subject: message.subject,
             text: message.text,
           }),

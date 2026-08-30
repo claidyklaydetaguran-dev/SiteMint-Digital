@@ -70,6 +70,9 @@ app.use("/api/receptionist/billing/webhook", express.raw({ type: "application/js
 // Capture raw body for the Vapi voice webhook BEFORE json() runs — signature
 // verification (lib/voice/webhooks/vapiWebhookAuth.ts) needs the exact bytes.
 app.use("/api/voice/webhooks/vapi", express.raw({ type: "application/json" }));
+// P8: the voice-subscription Stripe webhook verifies a signature over the
+// exact bytes, so it needs the raw body too.
+app.use("/api/voice/billing/webhook", express.raw({ type: "application/json" }));
 
 // P5: Twilio posts form-encoded to the voice-number SMS webhooks; the
 // signature covers the decoded parameters, so urlencoded (not raw) parsing
