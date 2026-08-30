@@ -96,6 +96,7 @@ function request(overrides: Partial<SchedulingAppointmentRequest> = {}): Schedul
     createdAt: NOW,
     updatedAt: NOW,
     cancelledAt: null,
+    ...overrides,
   } as SchedulingAppointmentRequest;
 }
 
