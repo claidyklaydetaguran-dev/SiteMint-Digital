@@ -18,7 +18,8 @@
     "migrate:voice": "drizzle-kit migrate --config ./drizzle.voice.config.ts",
     "generate:scheduling": "drizzle-kit generate --config ./drizzle.scheduling.config.ts",
     "migrate:scheduling": "drizzle-kit migrate --config ./drizzle.scheduling.config.ts",
-    "migrate:discovery": "drizzle-kit migrate --config ./drizzle.discovery.config.ts"
+    "migrate:discovery": "drizzle-kit migrate --config ./drizzle.discovery.config.ts",
+    "baseline:journals": "node ./src/baseline-journals.mjs"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

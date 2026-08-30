@@ -432,3 +432,50 @@ Stop and escalate, changing nothing further, if any of these hold:
   empty one and otherwise only applies committed migrations.
 - No migration execution without separate owner authorization naming the
   environment.
+
+## 11. `baseline:journals` — preparing for per-domain journals
+
+AR-001Z Commit A. This command does not change how migrations run today. It
+prepares a database that already applied migrations under the single shared
+journal for the per-domain journals introduced in Commit B.
+
+Without it, the first `migrate:*` after the switch would see an empty
+per-domain journal, conclude nothing had been applied, and replay every
+migration. No committed voice SQL uses `IF NOT EXISTS`, so that replay aborts
+on the first `CREATE TABLE` — loud, but still a failed run.
+
+```bash
+pnpm --filter @workspace/db run baseline:journals
+```
+
+What it does, all inside ONE transaction holding a transaction-scoped advisory
+lock (so it can never interleave with a guarded `migrate:*`):
+
+1. Derives the expected `(hash, created_at)` pairs from the committed migration
+   folders — `hash` is sha256 of the raw `.sql` text, exactly what drizzle
+   computes in `readMigrationFiles`. Row counts are never used as evidence.
+2. Verifies `drizzle.__drizzle_migrations` holds precisely that set. Missing,
+   duplicated, unknown, or hash-mismatched rows are refused.
+3. Creates `drizzle.__drizzle_migrations_{voice,discovery,scheduling}` with
+   drizzle's own DDL (`id SERIAL PRIMARY KEY, hash text NOT NULL, created_at
+   bigint`).
+4. Inserts only `hash` and `created_at`, letting each table's SERIAL default
+   issue the id, so the sequence stays correct for the next real migration.
+   Legacy ids are deliberately not copied.
+5. Re-reads each destination and requires exact `(hash, created_at)` equality.
+
+It is idempotent only when every destination already matches exactly. A
+partial or mismatched destination rolls the whole transaction back and fails.
+
+**It never modifies or drops `drizzle.__drizzle_migrations`.** That table stays
+as the recovery point: reverting Commit B restores the previous behaviour with
+no replay in either direction.
+
+### Proving it without touching staging
+
+```bash
+TEST_DATABASE_URL=postgresql://…/scratch pnpm --filter @workspace/scripts run test:journals
+```
+
+The suite refuses to start unless `TEST_DATABASE_URL` is set and differs from
+`DATABASE_URL`, and it creates and drops a database per case.
