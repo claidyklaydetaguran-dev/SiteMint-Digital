@@ -30,7 +30,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 export default defineConfig({
-  schema: path.join(__dirname, "./src/schema/scheduling/index.ts"),
+  // Forward slashes: drizzle-kit's schema glob rejects Windows backslash
+  // paths ("No schema files found"), so the joined path is normalized. On
+  // POSIX this is a no-op.
+  schema: path.join(__dirname, "./src/schema/scheduling/index.ts").split(path.sep).join("/"),
   out: "./drizzle/scheduling",
   dialect: "postgresql",
   // AR-001Z. Its own journal, so this domain's watermark is its own. Sharing

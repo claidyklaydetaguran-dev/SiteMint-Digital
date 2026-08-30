@@ -1,6 +1,7 @@
 import { NullFreeBusyProvider } from "./NullFreeBusyProvider.js";
 import { GoogleFreeBusyProvider } from "./GoogleFreeBusyProvider.js";
 import { ConnectorGoogleFreeBusyProvider } from "./ConnectorGoogleFreeBusyProvider.js";
+import { PerFirmGoogleFreeBusyProvider } from "./PerFirmGoogleFreeBusyProvider.js";
 import type { FreeBusyProvider } from "./FreeBusyProvider.js";
 
 export type { FreeBusyProvider, BusyRange } from "./FreeBusyProvider.js";
@@ -32,13 +33,19 @@ export function getFreeBusyProvider(): FreeBusyProvider {
     const hasCalendarId = Boolean(process.env["GOOGLE_CALENDAR_DEV_CALENDAR_ID"]);
     const legacyFlag = process.env["CALENDAR_PROVIDER"] === "google";
 
+    let workspaceLevel: FreeBusyProvider;
     if (hasAccessToken || legacyFlag) {
-      cached = new GoogleFreeBusyProvider();
+      workspaceLevel = new GoogleFreeBusyProvider();
     } else if (hasCalendarId) {
-      cached = new ConnectorGoogleFreeBusyProvider();
+      workspaceLevel = new ConnectorGoogleFreeBusyProvider();
     } else {
-      cached = new NullFreeBusyProvider();
+      workspaceLevel = new NullFreeBusyProvider();
     }
+    // P4: per-firm stored connections take precedence for any firm that has
+    // one; every other firm falls through to the workspace-level selection
+    // above. The wrapper is inert (always falls through) until a connection
+    // row exists, so this changes nothing for current environments.
+    cached = new PerFirmGoogleFreeBusyProvider(workspaceLevel);
   }
   return cached;
 }
