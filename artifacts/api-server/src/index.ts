@@ -6,6 +6,7 @@ import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliati
 import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
 import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
 import { startGraceExpirySweep } from "./lib/voiceBilling/subscriptionState.js";
+import { logEnvContractFindings } from "./lib/envContract.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
 
@@ -76,6 +77,13 @@ app.listen(port, (err) => {
   startGraceExpirySweep(60 * 60_000, {
     logger: (event, meta) => logger.info(meta, event),
   } as Parameters<typeof startGraceExpirySweep>[1]);
+
+  // P9: environment-contract validation — surfaces flags that do not
+  // enable anything and fail-closed configs that would refuse at use
+  // time. Logging only; behavior is unchanged.
+  void logEnvContractFindings((level, message) =>
+    level === "error" ? logger.error(message) : logger.warn(message),
+  );
 
   // Run slow Stripe webhook registration/backfill in the background so it
   // doesn't delay the HTTP port opening (and failing deploy health checks).

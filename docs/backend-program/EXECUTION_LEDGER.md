@@ -147,3 +147,18 @@ the tests, not after CI caught it).
 | New env contract (all inert) | `VOICE_PLAN_CATALOG_JSON` + `VOICE_DEFAULT_PLAN_CODE` (fail-closed catalog), `VOICE_BILLING_GRACE_DAYS` (default 7, bounded), `VOICE_BILLING_WEBHOOK_SECRET` (unset = webhook 503s) |
 | Deferred live gate | Any Stripe resource/webhook/price change; entitlement enforcement; multi-user login sessions (roster + invitations are the prepared surface); acting on `suspended` |
 | Residual risks | In-route limiter is per-process memory (defense-in-depth over token unguessability); subscription mapping rows are admin-set pending an owner-approved checkout metadata change; account emails require the alert transport to be enabled (503 otherwise, documented) |
+
+P8 addendum: PR #13 merged as `6cfd3dddd00feee6b34a73b14c5b78292469406a`.
+Green on the first CI run.
+
+## P9 — Deployment, recovery, and operations (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p9-deployment-recovery (merge SHA recorded in the final report) |
+| Migration | none — tooling and procedure only |
+| New files | `lib/db/src/{migrate-preflight,restore-guards,db-backup,db-restore-drill}.mjs`, `lib/db/deployRecoveryContract.test.ts`, `api-server src/lib/{envContract,envContract.test}.ts`, `docs/backend-program/deploy/{STAGING_MANIFEST,PRODUCTION_MANIFEST,STARTUP_CONTRACT}.md`, `docs/backend-program/runbooks/{ROLLBACK,SECRET_ROTATION,NUMBER_PAUSE,INCIDENT}.md`, `docs/backend-program/{RELEASE_CHECKLIST,PILOT_ACTIVATION,P9_SPEC}.md` |
+| Modified | lib/db package.json (+preflight/backup/restore:drill scripts), migrate-guard.mjs (readState exported), scripts package.json (test chain +deployRecoveryContract), server index.ts (boot env-contract logging — behavior unchanged) |
+| New env contract | none — P9 registers and validates the existing 40-variable contract instead (completeness-tested source scan) |
+| Deferred live gate | Executing any deploy/migration/backup/drill against a real environment; every activation step in PILOT_ACTIVATION.md marked [OWNER] |
+| Residual risks | Graceful-drain contract absent (documented); CALENDAR_TOKEN_KEY rotation requires firm reconnects (documented); drill assumes pg client binaries at the operator's machine (guards are what CI tests) |
