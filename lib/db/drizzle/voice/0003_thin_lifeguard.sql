@@ -64,11 +64,4 @@ CREATE INDEX "ix_voice_contacts_firm_last_seen" ON "voice_contacts" USING btree 
 CREATE UNIQUE INDEX "uq_voice_sms_consents_firm_phone" ON "voice_sms_consents" USING btree ("firm_id","phone_e164");--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_voice_sms_outbox_dedupe" ON "voice_sms_outbox" USING btree ("dedupe_key");--> statement-breakpoint
 CREATE INDEX "ix_voice_sms_outbox_firm_status" ON "voice_sms_outbox" USING btree ("firm_id","status");--> statement-breakpoint
-CREATE INDEX "ix_voice_sms_outbox_provider_sid" ON "voice_sms_outbox" USING btree ("provider_message_sid");--> statement-breakpoint
-CREATE INDEX "ix_voice_assistants_provider_sync_started_at" ON "voice_assistants" USING btree ("provider_sync_started_at");--> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD CONSTRAINT "ck_voice_assistants_provider_sync_error_length" CHECK ("voice_assistants"."provider_sync_error" IS NULL OR char_length("voice_assistants"."provider_sync_error") <= 100);--> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD CONSTRAINT "ck_voice_assistants_provider_config_hash_shape" CHECK ("voice_assistants"."provider_config_hash" IS NULL OR "voice_assistants"."provider_config_hash" ~ '^[0-9a-f]{64}$');--> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD CONSTRAINT "ck_voice_assistants_provider_sync_attempt" CHECK (
-      ("voice_assistants"."provider_sync_attempt_id" IS NULL AND "voice_assistants"."provider_sync_started_at" IS NULL)
-      OR ("voice_assistants"."provider_sync_attempt_id" IS NOT NULL AND "voice_assistants"."provider_sync_started_at" IS NOT NULL)
-    );
+CREATE INDEX "ix_voice_sms_outbox_provider_sid" ON "voice_sms_outbox" USING btree ("provider_message_sid");
