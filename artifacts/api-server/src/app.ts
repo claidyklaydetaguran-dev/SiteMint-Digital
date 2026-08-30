@@ -71,6 +71,11 @@ app.use("/api/receptionist/billing/webhook", express.raw({ type: "application/js
 // verification (lib/voice/webhooks/vapiWebhookAuth.ts) needs the exact bytes.
 app.use("/api/voice/webhooks/vapi", express.raw({ type: "application/json" }));
 
+// P5: Twilio posts form-encoded to the voice-number SMS webhooks; the
+// signature covers the decoded parameters, so urlencoded (not raw) parsing
+// is registered for exactly these paths.
+app.use("/api/voice/sms", express.urlencoded({ extended: false }));
+
 // Discovery v1 (structured submissions): explicit 64KB body-size cap,
 // tighter than the global default below and enforced by the parser itself
 // (actual bytes streamed, not a trusted Content-Length header — also

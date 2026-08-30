@@ -61,6 +61,14 @@ export interface ToolSchedulingDeps {
     now: Date,
   ) => Promise<SlotMutation>;
   cancelAppointmentRequestByPublicId: (firmId: number, publicId: string) => Promise<boolean>;
+  /** P5: best-effort confirmation enqueue after a successful booking; consent-gated inside the outbox service. */
+  enqueueBookingConfirmation?: (input: {
+    firmId: number;
+    rawPhone: string | null | undefined;
+    requestPublicId: string;
+    spokenSummary: string;
+    callerConsented: boolean;
+  }) => Promise<unknown>;
   /** Firm-scoped issue sink for diagnostics; injected so tests stay DB-free. */
   openIssue?: (input: {
     firmId: number;
@@ -92,6 +100,10 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
     submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now) =>
       repo.submitAppointmentRequest(firmId, typeId, startUtc, contact, consent, "ai_receptionist", now),
     cancelAppointmentRequestByPublicId: (firmId, publicId) => repo.cancelAppointmentRequestByPublicId(firmId, publicId),
+    enqueueBookingConfirmation: async (input) => {
+      const outbox = await import("../../voiceSms/outboxService.js");
+      return outbox.enqueueBookingConfirmation(input);
+    },
     openIssue: (input) => issues.openVoiceIssue(input),
   };
 }
@@ -174,6 +186,19 @@ async function runBookAppointment(
     return result.reason === "slot_no_longer_available"
       ? "That time was just taken. Check availability again and offer another slot."
       : "That appointment type isn't valid. Check availability first and use its appointment type id.";
+  }
+  // P5: consent-gated confirmation text (best-effort; the outbox enforces
+  // consent and the send-time flag — a failure here never fails the booking).
+  try {
+    await deps.enqueueBookingConfirmation?.({
+      firmId,
+      rawPhone: args.customerPhone ?? null,
+      requestPublicId: result.request.publicId,
+      spokenSummary: `Your appointment request is in — reference ${result.request.publicId}. The office will confirm shortly. Reply STOP to opt out.`,
+      callerConsented: args.smsConsent === true,
+    });
+  } catch {
+    // outbox unavailability must not undo a successful booking
   }
   return `Booked, pending the office's confirmation. Reference id ${result.request.publicId}. Tell the caller the office will confirm shortly.`;
 }
