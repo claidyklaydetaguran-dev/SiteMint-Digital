@@ -51,6 +51,7 @@ function requestRow(overrides: Partial<SchedulingAppointmentRequest> = {}): Sche
     holdExpiresAt: null,
     createdAt: NOW,
     updatedAt: NOW,
+    ...overrides,
   } as SchedulingAppointmentRequest;
 }
 
