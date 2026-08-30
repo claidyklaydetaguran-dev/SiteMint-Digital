@@ -162,3 +162,17 @@ Green on the first CI run.
 | New env contract | none — P9 registers and validates the existing 40-variable contract instead (completeness-tested source scan) |
 | Deferred live gate | Executing any deploy/migration/backup/drill against a real environment; every activation step in PILOT_ACTIVATION.md marked [OWNER] |
 | Residual risks | Graceful-drain contract absent (documented); CALENDAR_TOKEN_KEY rotation requires firm reconnects (documented); drill assumes pg client binaries at the operator's machine (guards are what CI tests) |
+
+P9 addendum: PR #14 merged as `54ae1c87660b0d43207e562be5d582657dd9d4b3`.
+Two in-phase CI catches: the tools-config probe validated process.env
+instead of the env under test (default-parameter family again — fixed
+`f68a02f`), and the P9 guard fixtures tripped the postgres-url secret
+rule because the local pre-commit scan sees only TRACKED files (fixture
+allowlisted `e4d7942`; lesson: `git add -A` before the local scan).
+
+## Program complete (2026-08-30)
+
+All nine phases merged through protected main with real green CI.
+The full accounting is `FINAL_REPORT.md`; activation path is
+`PILOT_ACTIVATION.md`. Nothing was deployed, migrated, or activated —
+every live capability awaits its [OWNER] step.
