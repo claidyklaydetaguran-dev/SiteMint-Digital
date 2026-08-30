@@ -20,6 +20,13 @@ import {
   readExpectedMigrations,
 } from "./src/baseline-journals.mjs";
 
+import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const dbPackageRoot = dirname(fileURLToPath(import.meta.url));
+
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -248,6 +255,228 @@ await withDisposableDb("partial-destination", async (url) => {
     others.every((rows) => rows === null || rows.length === 0),
     JSON.stringify(others.map((r) => r?.length ?? null)),
   );
+});
+
+// ── AR-001Z Commit B proofs — the switched, per-domain world ────────────────
+//
+// These drive the real package commands against disposable databases, so they
+// exercise the shipped configs, the guard, and drizzle-kit itself.
+
+
+
+function run(script: string, url: string): Promise<{ code: number; output: string }> {
+  return new Promise((resolve) => {
+    const child = spawn("pnpm", ["run", script], {
+      cwd: dbPackageRoot,
+      env: { ...process.env, DATABASE_URL: url },
+      shell: process.platform === "win32",
+    });
+    let output = "";
+    child.stdout.on("data", (d) => (output += d.toString()));
+    child.stderr.on("data", (d) => (output += d.toString()));
+    child.on("close", (code) => resolve({ code: code ?? 1, output }));
+    child.on("error", (e) => resolve({ code: 1, output: String(e) }));
+  });
+}
+
+/** A stable fingerprint of the application schema, for "nothing changed" proofs. */
+async function schemaFingerprint(url: string) {
+  const cols = await query(
+    url,
+    `SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema='public' ORDER BY table_name, column_name`,
+  );
+  const cons = await query(
+    url,
+    `SELECT conrelid::regclass::text AS t, conname FROM pg_constraint
+      WHERE connamespace='public'::regnamespace ORDER BY 1,2`,
+  );
+  const idx = await query(
+    url,
+    `SELECT tablename, indexname FROM pg_indexes WHERE schemaname='public' ORDER BY 1,2`,
+  );
+  return JSON.stringify({
+    cols: cols.rows.map((r: any) => `${r.table_name}.${r.column_name}`),
+    cons: cons.rows.map((r: any) => `${r.t}:${r.conname}`),
+    idx: idx.rows.map((r: any) => `${r.tablename}:${r.indexname}`),
+  });
+}
+
+async function journalCounts(url: string) {
+  const out: Record<string, number | null> = {};
+  for (const domain of BASELINE_DOMAINS) {
+    const rows = await domainRows(url, domain);
+    out[domain] = rows === null ? null : rows.length;
+  }
+  return out;
+}
+
+/** Rebuild the pre-Commit-B world: real schema, migrations recorded ONLY in the legacy journal. */
+async function seedLegacyStagingWorld(url: string) {
+  const push = await run("push", url);
+  if (push.code !== 0) throw new Error(`push failed: ${push.output.slice(-400)}`);
+
+  for (const domain of BASELINE_DOMAINS) {
+    for (const entry of readExpectedMigrations(domain)) {
+      const sql = readFileSync(join(dbPackageRoot, "drizzle", domain, `${entry.tag}.sql`)).toString();
+      for (const statement of sql.split("--> statement-breakpoint")) {
+        if (statement.trim()) await query(url, statement);
+      }
+    }
+  }
+  await seedLegacy(
+    url,
+    readAllExpectedMigrations().map((e) => ({ hash: e.hash, createdAt: e.createdAt })),
+  );
+}
+
+// ── Proof 1: an empty database applies every migration exactly once ─────────
+
+await withDisposableDb("empty-exact-once", async (url) => {
+  const push = await run("push", url);
+  check("base push succeeds on an empty database", push.code === 0, push.output.slice(-200));
+
+  for (const domain of BASELINE_DOMAINS) {
+    const res = await run(`migrate:${domain}`, url);
+    check(`migrate:${domain} succeeds on an empty database`, res.code === 0, res.output.slice(-200));
+  }
+
+  for (const domain of BASELINE_DOMAINS) {
+    const expected = readExpectedMigrations(domain);
+    const rows = await domainRows(url, domain);
+    const exact =
+      rows !== null &&
+      rows.length === expected.length &&
+      rows.every((r, i) => r.createdAt === expected[i].createdAt && r.hash === expected[i].hash);
+    check(`${domain} applied each migration exactly once`, exact, JSON.stringify(rows?.length));
+  }
+
+  const legacy = await query(url, `SELECT to_regclass('"drizzle"."__drizzle_migrations"') IS NOT NULL AS p`);
+  const legacyRows = legacy.rows[0].p
+    ? (await query(url, `SELECT count(*)::int n FROM "drizzle"."__drizzle_migrations"`)).rows[0].n
+    : 0;
+  check("the legacy shared journal is never written to after the switch", legacyRows === 0, String(legacyRows));
+
+  const tables = await query(
+    url,
+    `SELECT count(*)::int n FROM information_schema.tables
+      WHERE table_schema='public' AND table_name IN
+      ('voice_assistants','provider_webhook_events','voice_issues','discovery_delivery_jobs','discovery_ai_briefs')`,
+  );
+  check("every domain-owned table exists", tables.rows[0].n === 5, String(tables.rows[0].n));
+});
+
+// ── Proof 2: domain migrations after base push are order-independent ────────
+
+await withDisposableDb("order-independent", async (url) => {
+  const push = await run("push", url);
+  check("base push succeeds (reverse-order case)", push.code === 0, push.output.slice(-200));
+
+  for (const domain of [...BASELINE_DOMAINS].reverse()) {
+    const res = await run(`migrate:${domain}`, url);
+    check(`migrate:${domain} succeeds when run in reverse order`, res.code === 0, res.output.slice(-200));
+  }
+
+  for (const domain of BASELINE_DOMAINS) {
+    const expected = readExpectedMigrations(domain);
+    const rows = await domainRows(url, domain);
+    check(
+      `${domain} still applied exactly its own migrations in reverse order`,
+      rows !== null && rows.length === expected.length,
+      JSON.stringify(rows?.length),
+    );
+  }
+
+  const tables = await query(
+    url,
+    `SELECT count(*)::int n FROM information_schema.tables
+      WHERE table_schema='public' AND table_name IN
+      ('voice_assistants','provider_webhook_events','voice_issues','discovery_delivery_jobs','discovery_ai_briefs')`,
+  );
+  check("reverse order still creates every domain-owned table", tables.rows[0].n === 5, String(tables.rows[0].n));
+});
+
+// ── Proof 6: migration double-run is a verified no-op ───────────────────────
+
+await withDisposableDb("migrate-double-run", async (url) => {
+  await run("push", url);
+  for (const domain of BASELINE_DOMAINS) await run(`migrate:${domain}`, url);
+
+  const before = await schemaFingerprint(url);
+  const countsBefore = await journalCounts(url);
+
+  for (const domain of BASELINE_DOMAINS) {
+    const res = await run(`migrate:${domain}`, url);
+    check(`second migrate:${domain} exits cleanly`, res.code === 0, res.output.slice(-200));
+  }
+
+  const after = await schemaFingerprint(url);
+  const countsAfter = await journalCounts(url);
+
+  check("a second migration pass changes no schema", before === after);
+  check(
+    "a second migration pass records no new journal rows",
+    JSON.stringify(countsBefore) === JSON.stringify(countsAfter),
+    JSON.stringify(countsAfter),
+  );
+});
+
+// ── Proof 10: legacy-unbaselined direct migrate is blocked ──────────────────
+
+await withDisposableDb("guard-blocks-unbaselined", async (url) => {
+  await seedLegacyStagingWorld(url);
+
+  const before = await schemaFingerprint(url);
+
+  for (const domain of BASELINE_DOMAINS) {
+    const res = await run(`migrate:${domain}`, url);
+    check(`migrate:${domain} is refused before baseline`, res.code !== 0, `exit=${res.code}`);
+    check(
+      `migrate:${domain} names baseline:journals in its refusal`,
+      /baseline:journals/.test(res.output),
+      res.output.slice(-160),
+    );
+  }
+
+  const after = await schemaFingerprint(url);
+  check("a refused migration changes nothing", before === after);
+
+  const counts = await journalCounts(url);
+  check(
+    "a refused migration creates no per-domain journal rows",
+    Object.values(counts).every((n) => n === null || n === 0),
+    JSON.stringify(counts),
+  );
+});
+
+// ── Proof 4: after baseline, every migrate:* executes zero old SQL ──────────
+
+await withDisposableDb("zero-replay-after-baseline", async (url) => {
+  await seedLegacyStagingWorld(url);
+
+  const baseline = await run("baseline:journals", url);
+  check("baseline succeeds on the legacy staging world", baseline.code === 0, baseline.output.slice(-200));
+
+  const before = await schemaFingerprint(url);
+  const countsBefore = await journalCounts(url);
+
+  for (const domain of BASELINE_DOMAINS) {
+    const res = await run(`migrate:${domain}`, url);
+    check(`migrate:${domain} is allowed after baseline`, res.code === 0, res.output.slice(-200));
+  }
+
+  const after = await schemaFingerprint(url);
+  const countsAfter = await journalCounts(url);
+
+  check("no migration replayed any SQL — the schema is byte-identical", before === after);
+  check(
+    "no migration recorded a new journal row",
+    JSON.stringify(countsBefore) === JSON.stringify(countsAfter),
+    JSON.stringify(countsAfter),
+  );
+
+  const legacyAfter = await query(url, `SELECT count(*)::int n FROM "drizzle"."__drizzle_migrations"`);
+  check("the legacy journal still holds its five rows", legacyAfter.rows[0].n === 5, String(legacyAfter.rows[0].n));
 });
 
 console.log(`\n${passed} passed, ${failed} failed.`);

@@ -121,71 +121,75 @@ check("voice has at least one committed migration", voiceWhens.length > 0);
 check("discovery has at least one committed migration", discoveryWhens.length > 0);
 check("scheduling has at least one committed migration", schedulingWhens.length > 0);
 
-// All domains record into ONE shared journal table, and drizzle-kit decides
-// pending work from a single global watermark: the newest recorded created_at.
-// A migration whose journal `when` sits at or below that watermark is skipped
-// silently — no hash comparison, no error, no row.
-//
-// Domain-block ordering ("every voice migration precedes discovery") is
-// therefore NOT the invariant that matters, and enforcing it is what caused
-// AR-001X: voice 0002 was authored below the scheduling watermark, and
-// migrate:voice reported success while applying nothing. The invariant that
-// matters is that the shared journal describes ONE strictly increasing global
-// timeline, and that every committed migration appears on it exactly once, in
-// the order it is actually applied.
+/**
+ * AR-001Z. Each domain now records into its OWN journal table, so drizzle
+ * computes that domain's watermark from that domain's rows alone. Cross-domain
+ * ordering is no longer an invariant — and must not be re-encoded as one, or it
+ * would forbid exactly the migration AR-001X needed. What still matters is that
+ * each domain is internally ordered and that no two domains share a table.
+ */
+const DOMAIN_JOURNAL_TABLES: Record<string, string> = {
+  voice: "__drizzle_migrations_voice",
+  discovery: "__drizzle_migrations_discovery",
+  scheduling: "__drizzle_migrations_scheduling",
+};
 
-/** Every migration sharing drizzle.__drizzle_migrations, in application order. */
-const SHARED_JOURNAL_TIMELINE: Array<{ domain: string; tag: string; when: number }> = [
-  { domain: "voice", tag: "0000_military_komodo", when: 1784372011129 },
-  { domain: "voice", tag: "0001_empty_sage", when: 1784444570582 },
-  { domain: "discovery", tag: "0000_discovery-domain-contract", when: 1784601043137 },
-  { domain: "scheduling", tag: "0000_superb_rhodey", when: 1785251267367 },
-  { domain: "voice", tag: "0002_provider_sync_state", when: 1785300000000 },
-];
+for (const [domain, table] of Object.entries(DOMAIN_JOURNAL_TABLES)) {
+  const whens = journalWhens(domain);
+  check(
+    `${domain} migrations are strictly ascending within their own journal`,
+    whens.every((when, i) => i === 0 || whens[i - 1] < when),
+    whens.join(" < "),
+  );
+  check(
+    `${domain} migration timestamps are unique`,
+    new Set(whens).size === whens.length,
+    whens.join(","),
+  );
 
-const committedMigrations = ["voice", "discovery", "scheduling"].flatMap((domain) =>
-  journalEntries(domain).map((e) => ({ domain, tag: e.tag, when: e.when })),
+  const config = readFileSync(join(here, `drizzle.${domain}.config.ts`), "utf8");
+  check(
+    `${domain} declares its own migrations table`,
+    new RegExp(`table:\\s*"${table}"`).test(config),
+  );
+  check(`${domain} keeps its journal in the drizzle schema`, /schema:\s*"drizzle"/.test(config));
+}
+
+const journalTables = Object.values(DOMAIN_JOURNAL_TABLES);
+check(
+  "no two domains share a journal table",
+  new Set(journalTables).size === journalTables.length,
+  journalTables.join(","),
+);
+check(
+  "no domain reuses the legacy shared journal table",
+  !journalTables.includes("__drizzle_migrations"),
 );
 
+// The guard is what stops an un-baselined legacy database replaying SQL.
+const guardSource = readFileSync(join(here, "src", "migrate-guard.mjs"), "utf8");
+check("the migrate guard exists", guardSource.length > 0);
 check(
-  "the timeline enumerates every committed migration exactly once",
-  committedMigrations.length === SHARED_JOURNAL_TIMELINE.length &&
-    committedMigrations.every(
-      (e) =>
-        SHARED_JOURNAL_TIMELINE.filter((t) => t.domain === e.domain && t.tag === e.tag)
-          .length === 1,
-    ),
-  `committed=${committedMigrations.length} timeline=${SHARED_JOURNAL_TIMELINE.length}`,
+  "the guard holds a session advisory lock across drizzle-kit",
+  /pg_advisory_lock/.test(guardSource) && /pg_advisory_unlock/.test(guardSource),
+);
+check(
+  "the guard points an un-baselined database at baseline:journals",
+  /baseline:journals/.test(guardSource),
 );
 
+const dbPackage = JSON.parse(readFileSync(join(here, "package.json"), "utf8"));
+for (const domain of Object.keys(DOMAIN_JOURNAL_TABLES)) {
+  check(
+    `migrate:${domain} runs through the guard, not drizzle-kit directly`,
+    dbPackage.scripts[`migrate:${domain}`] === `node ./src/migrate-guard.mjs ${domain}`,
+    dbPackage.scripts[`migrate:${domain}`],
+  );
+}
 check(
-  "each timeline entry matches the timestamp recorded in its journal",
-  SHARED_JOURNAL_TIMELINE.every((t) =>
-    committedMigrations.some(
-      (e) => e.domain === t.domain && e.tag === t.tag && e.when === t.when,
-    ),
-  ),
-  SHARED_JOURNAL_TIMELINE.map((t) => `${t.domain}/${t.tag}=${t.when}`).join(" "),
-);
-
-const timelineWhens = SHARED_JOURNAL_TIMELINE.map((t) => t.when);
-
-check(
-  "the global timeline is strictly increasing",
-  timelineWhens.every((when, i) => i === 0 || timelineWhens[i - 1] < when),
-  timelineWhens.join(" < "),
-);
-
-check(
-  "every committed timestamp is unique across the shared journal",
-  new Set(timelineWhens).size === timelineWhens.length,
-  timelineWhens.join(","),
-);
-
-check(
-  "the newest committed migration ends the timeline, clearing the watermark",
-  Math.max(...timelineWhens) === timelineWhens[timelineWhens.length - 1],
-  `max=${Math.max(...timelineWhens)} last=${timelineWhens[timelineWhens.length - 1]}`,
+  "every domain can be regenerated as well as migrated",
+  Object.keys(DOMAIN_JOURNAL_TABLES).every((d) => typeof dbPackage.scripts[`generate:${d}`] === "string"),
+  Object.keys(dbPackage.scripts).filter((k) => k.startsWith("generate:")).join(","),
 );
 
 // The order the runner declares must match the order the timestamps demand.

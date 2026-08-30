@@ -479,3 +479,41 @@ TEST_DATABASE_URL=postgresql://…/scratch pnpm --filter @workspace/scripts run 
 
 The suite refuses to start unless `TEST_DATABASE_URL` is set and differs from
 `DATABASE_URL`, and it creates and drops a database per case.
+
+## 12. Per-domain journals (AR-001Z Commit B)
+
+Each domain now records into its own table in the `drizzle` schema:
+
+| domain | journal table |
+| --- | --- |
+| voice | `__drizzle_migrations_voice` |
+| discovery | `__drizzle_migrations_discovery` |
+| scheduling | `__drizzle_migrations_scheduling` |
+
+drizzle computes each domain's watermark from that domain's rows alone, so the
+cross-domain ordering rule is gone. §3 no longer applies: domain migrations may
+be applied in any order after `push`, and a new migration in any domain needs no
+coordination with the others.
+
+`push` is unchanged and still records nothing.
+
+### The guard
+
+All three `migrate:*` scripts now run through `src/migrate-guard.mjs`, which
+classifies the journals before handing over to drizzle-kit, holding a
+session-scoped advisory lock across the child so a baseline cannot interleave:
+
+| state | behaviour |
+| --- | --- |
+| truly empty database | migrate normally |
+| legacy journal populated, per-domain journals absent | **refuse**, name `baseline:journals` |
+| correctly baselined | migrate normally (a no-op when nothing is pending) |
+| partial, gapped, or hash-mismatched journals | **refuse**, change nothing |
+
+`migrate:fresh` refuses the same un-baselined state, for the same reason.
+
+### Rollback
+
+Revert this commit. The legacy `drizzle.__drizzle_migrations` was never modified,
+so the domains fall straight back to the shared watermark with no replay in
+either direction; the per-domain tables can then be dropped at leisure.

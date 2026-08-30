@@ -15,10 +15,11 @@
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "generate:voice": "drizzle-kit generate --config ./drizzle.voice.config.ts",
-    "migrate:voice": "drizzle-kit migrate --config ./drizzle.voice.config.ts",
+    "migrate:voice": "node ./src/migrate-guard.mjs voice",
     "generate:scheduling": "drizzle-kit generate --config ./drizzle.scheduling.config.ts",
-    "migrate:scheduling": "drizzle-kit migrate --config ./drizzle.scheduling.config.ts",
-    "migrate:discovery": "drizzle-kit migrate --config ./drizzle.discovery.config.ts",
+    "migrate:scheduling": "node ./src/migrate-guard.mjs scheduling",
+    "generate:discovery": "drizzle-kit generate --config ./drizzle.discovery.config.ts",
+    "migrate:discovery": "node ./src/migrate-guard.mjs discovery",
     "baseline:journals": "node ./src/baseline-journals.mjs"
   },
   "dependencies": {

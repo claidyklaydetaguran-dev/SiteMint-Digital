@@ -33,6 +33,13 @@ export default defineConfig({
   schema: path.join(__dirname, "./src/schema/scheduling/index.ts"),
   out: "./drizzle/scheduling",
   dialect: "postgresql",
+  // AR-001Z. Its own journal, so this domain's watermark is its own. Sharing
+  // drizzle's default table let one domain's newest migration mask every other
+  // domain's older ones, silently, with exit 0.
+  migrations: {
+    table: "__drizzle_migrations_scheduling",
+    schema: "drizzle",
+  },
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },

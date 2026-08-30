@@ -802,6 +802,42 @@ const SECRET_PARTS = [
 
 // ── Result ───────────────────────────────────────────────────────────────────
 
+// ── AR-001Z: an un-baselined legacy database is unsafe ──────────────────────
+
+const unbaselined = classifyDatabaseState(
+  {
+    journalExists: true,
+    journalRowCount: 5,
+    domainsReady: false,
+    publicBaseTables: [...expectedBarrelTables(), ...expectedDomainTables()],
+  },
+  undefined,
+);
+check(
+  "a legacy database whose per-domain journals are not baselined is unsafe",
+  unbaselined.state === "unsafe" && unbaselined.reason === "legacy-journal-not-baselined",
+  `${unbaselined.state}/${unbaselined.reason}`,
+);
+check(
+  "the refusal names the baseline command",
+  /baseline:journals/.test(unbaselined.detail),
+);
+
+const baselined = classifyDatabaseState(
+  {
+    journalExists: true,
+    journalRowCount: 5,
+    domainsReady: true,
+    publicBaseTables: [...expectedBarrelTables(), ...expectedDomainTables()],
+  },
+  undefined,
+);
+check(
+  "a baselined database is still initialized",
+  baselined.state === "initialized",
+  baselined.state,
+);
+
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {
   console.error("migrate:fresh state contract violated:");
