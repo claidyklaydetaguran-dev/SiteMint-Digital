@@ -71,3 +71,21 @@ caught by CI against real dispatcher output.
 | New env contract (all inert) | `CALENDAR_CONNECT_ENABLED`, `CALENDAR_WRITE_ENABLED`, `CALENDAR_TOKEN_KEY` (32-byte base64), `GOOGLE_OAUTH_CLIENT_ID`/`_CLIENT_SECRET`/`_REDIRECT_URI` |
 | Deferred live gate | Creating Google OAuth credentials, any consent, any real token/freebusy/event request; flipping either calendar flag (owner-gated) |
 | Residual risks | Approve→booked is exposed as a service primitive only (no route yet — P8 admin/approve flow); reconcile sweep is invocable but not yet on an interval; access-token refresh in the event writer reads env config directly (documented) |
+
+P4 addendum: PR #9 merged as `c9f290d8b8b9514402ddb19354b2f7e534f48176`.
+In-phase CI catches: three inventory-pin updates (domain 10→12, app 37→39,
+migrations 5→6 — the journal proof's legacy-row count is now DERIVED from
+the committed folders), plus the same missing-fixture-spread defect class
+as P3 (fixed in `99b594e`).
+
+## P5 — Contacts, conversations, and voice-side SMS (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p5-contacts-sms (merge SHA recorded in the P6 addendum) |
+| Migration | voice `0003_thin_lifeguard` — voice_contacts, voice_call_links, voice_sms_consents, voice_sms_outbox; rollback refuses mid-flight sends. Vertical-neutrality decision: NOT built on intake_cases (SMS-thread-anchored, legal-flavored); intake association is a read-only annotation by number. |
+| New files | `lib/voiceContacts/contactLinker.ts`, `lib/voiceSms/{smsCore,outboxService,voiceSmsContacts.test}.ts`, `routes/voiceSmsWebhook.ts`, migration + rollback, `docs/backend-program/P5_SPEC.md` |
+| Modified | app.ts (urlencoded for /api/voice/sms), routes/index.ts, webhook route (end-of-call → best-effort contact link), toolDispatcher (consent-gated confirmation enqueue), voice barrel, drizzle.voice.config.ts (path.sep fix), inventory pins (16 domain / 43 app / 7 migrations) |
+| New env contract (all inert) | `VOICE_SMS_ENABLED`, `VOICE_TWILIO_ACCOUNT_SID`/`_AUTH_TOKEN`/`_FROM_NUMBER` (loader structurally refuses any value equal to its INTAKE_TWILIO_* counterpart), `VOICE_SMS_OWNER_FIRM_ID` (interim single-number tenant mapping until P6) |
+| Deferred live gate | Creating any Twilio resource, sending any SMS, and the missed-call text-back policy (rows default `blocked_no_consent` — enabling is an owner policy decision) |
+| Residual risks | Inbound consent tenant-mapping is env-pinned until P6's number inventory; outbox send-loop logic is DB-bound and exercised at unit level via transport/consent fakes only until an integration harness (P9) |

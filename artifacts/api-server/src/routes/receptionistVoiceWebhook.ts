@@ -152,6 +152,20 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
 
   try {
     const { inserted } = await storeVapiWebhookEvent(firmId, message);
+    // P5: an end-of-call report also links the caller to a firm-scoped
+    // voice contact (idempotent; conflict-driven). Best-effort: identity
+    // must never turn a stored event into a retry loop.
+    if (message.type === "end-of-call-report" && message.call.customerNumber) {
+      try {
+        const { linkCallToContact } = await import("../lib/voiceContacts/contactLinker.js");
+        await linkCallToContact(firmId, message.call.id, message.call.customerNumber, undefined);
+      } catch (linkErr) {
+        req.log.warn(
+          { firmId, callId: message.call.id, errorClass: linkErr instanceof Error ? linkErr.name : "unknown" },
+          "[voice webhook] contact linking failed",
+        );
+      }
+    }
     req.log.info(
       { firmId, callId: message.call.id, type: message.type, inserted, authMode: auth.mode },
       "[voice webhook] event processed",

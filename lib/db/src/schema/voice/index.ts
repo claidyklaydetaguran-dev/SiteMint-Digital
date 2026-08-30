@@ -17,3 +17,4 @@
 export * from "../voiceAssistants";
 export * from "../providerWebhookEvents";
 export * from "../voiceIssues";
+export * from "../voiceContactsSms";
