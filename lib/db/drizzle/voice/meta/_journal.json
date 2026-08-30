@@ -36,6 +36,13 @@
       "when": 1788092914060,
       "tag": "0004_lying_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788099834462,
+      "tag": "0005_shiny_supernaut",
+      "breakpoints": true
     }
   ]
 }
