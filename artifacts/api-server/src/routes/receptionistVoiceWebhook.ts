@@ -239,6 +239,28 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
         } catch { /* flagging is best-effort */ }
       }
     }
+    // P7: meter the call (idempotent — a redelivered report is one row)
+    // and evaluate the usage cap. Best-effort: metering must never turn a
+    // stored event into a provider retry loop.
+    if (message.type === "end-of-call-report" && typeof message.durationSeconds === "number") {
+      try {
+        const usage = await import("../lib/voiceUsage/usageService.js");
+        await usage.recordCallUsage({
+          firmId,
+          provider: "vapi",
+          callId: message.call.id,
+          durationSec: message.durationSeconds,
+          source: "end_of_call_report",
+          endedAt: new Date(),
+        });
+        await usage.checkAndRecordUsageCap(firmId);
+      } catch (usageErr) {
+        req.log.warn(
+          { firmId, callId: message.call.id, errorClass: usageErr instanceof Error ? usageErr.name : "unknown" },
+          "[voice webhook] usage metering failed",
+        );
+      }
+    }
     if (message.type === "end-of-call-report" && message.call.customerNumber) {
       try {
         const { linkCallToContact } = await import("../lib/voiceContacts/contactLinker.js");

@@ -110,3 +110,23 @@ snapshot heals the chain. Two more proofs converted from pins to DERIVED
 | New env contract (inert) | `VOICE_CALL_POLICY_JSON` (fail-closed, closed keys, bounded; null default keeps payloads byte-identical) |
 | Deferred live gate | Number acquisition/import/porting/release (production `PhoneNumberProvider` throws — hard stop), wiring provider number webhooks, any transfer of a real call |
 | Residual risks | Transfer picks the single best destination (no cascade retry until real telephony evidence); business-hours guard reuses the scheduling weekly config (single range per day); emergency scan is a conservative keyword flag, deliberately not NLP |
+
+P6 addendum: PR #11 merged as `1cfc4b4084b942b9fcf2cfdc95eac573abb7aa13`.
+In-phase CI catch: the routing test passed `undefined` through a helper
+whose default parameter re-supplied a provider id (the JS explicit-
+undefined-still-defaults trap) — fixed by building that case's deps
+inline (`e010892`). Third member of the test-fixture defect family
+(P3/P4 spreads, P6 default params): fixtures with defaults need the
+failing case constructed explicitly.
+
+## P7 — Outcomes, metering, and alerts (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p7-outcomes-metering (merge SHA recorded in the P8 addendum) |
+| Migration | voice `0005_shiny_supernaut` — voice_call_reviews (no row = pending), voice_usage_ledger (IMMUTABLE, unique (provider, call_id)), voice_usage_cap_states (unique (firm, period), pause_requested/cleared); rollback refuses on non-empty ledger (billing evidence) or undecided cap states. Generated clean against 0004's snapshot. |
+| New files | `lib/voiceUsage/{usageService,voiceMonitoring.test}.ts`, `lib/voiceAlerts/{alertTransport,dailyDigest}.ts`, `lib/voiceReviews/reviewService.ts`, `routes/{monitoring,receptionistMonitoring}.ts`, migration + rollback, `docs/backend-program/P7_SPEC.md` |
+| Modified | webhook route (end-of-call metering + cap evaluation, best-effort), voiceIssueService (+`usage_pause_requested`, fire-and-forget critical alert hook), routes/index.ts (+2 routers), server index.ts (backfill sweep on the reconciliation flag, digest scheduler on its own flag), inventory pins (9 migrations / 21 domain / 48 public) |
+| New env contract (all inert) | `VOICE_USAGE_INCLUDED_MINUTES` (unset = metering-only; malformed throws), `VOICE_ALERTS_ENABLED` + `RESEND_API_KEY`/`VOICE_ALERTS_FROM`/`VOICE_ALERTS_TO` (pinned api.resend.com, no SDK), `VOICE_DIGEST_ENABLED`, `VOICE_METRICS_TOKEN` (unset = /metricz does not exist) |
+| Deferred live gate | Sending any alert/digest (flags off, no key), acting on any pause_requested state (owner decision via the P6 pause route) |
+| Residual risks | Metering periods use report arrival time; digest manual re-runs are not idempotent (gated off); alert failures are logged/locally-refused, not persisted as issues (deliberate — avoids DB writes from the fire-and-forget path) |

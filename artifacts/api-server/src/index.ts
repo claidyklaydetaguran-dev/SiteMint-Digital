@@ -3,6 +3,8 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
 import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
+import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
+import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
 
@@ -59,6 +61,16 @@ app.listen(port, (err) => {
   startVoiceReconciliationSweep(5 * 60_000, {
     logger: (event, meta) => logger.info(meta, event),
   });
+
+  // P7: metering backfill (15-minute tick) rides the same reconciliation
+  // flag; the daily digest has its own flag. Both starters register nothing
+  // while their flag is off.
+  startUsageBackfillSweep(15 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  } as Parameters<typeof startUsageBackfillSweep>[1]);
+  startVoiceDigestSchedule(24 * 60 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  } as Parameters<typeof startVoiceDigestSchedule>[1]);
 
   // Run slow Stripe webhook registration/backfill in the background so it
   // doesn't delay the HTTP port opening (and failing deploy health checks).

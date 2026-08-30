@@ -28,6 +28,7 @@ export const VOICE_ISSUE_CODES = [
   "calendar_sync_failed",
   "emergency_language_detected",
   "tool_execution_failed",
+  "usage_pause_requested",
 ] as const;
 export type VoiceIssueCode = (typeof VOICE_ISSUE_CODES)[number];
 
@@ -113,6 +114,16 @@ export async function openVoiceIssue(
     .returning();
   if (!created) {
     throw new Error("voice issue insert returned no row");
+  }
+  // P7: a critical issue also notifies the operator — fire-and-forget so
+  // provider latency never blocks the caller's response path, and inert
+  // while VOICE_ALERTS_ENABLED is off (the transport refuses locally).
+  if (created.level === "critical") {
+    void import("../voiceAlerts/alertTransport.js")
+      .then(({ notifyCriticalIssue }) =>
+        notifyCriticalIssue({ firmId: created.firmId, code: created.code, message: created.message }),
+      )
+      .catch(() => {});
   }
   return { issue: created, created: true };
 }
