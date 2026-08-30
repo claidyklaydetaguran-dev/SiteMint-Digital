@@ -160,9 +160,13 @@ await withDisposableDb("sequence-health", async (url) => {
   await baselineJournals({ databaseUrl: url, logger: { log() {} } });
 
   const identifier = `"${LEGACY_JOURNAL_SCHEMA}"."${domainJournalTable("voice")}"`;
+  // created_at strictly after every committed migration, DERIVED so new
+  // reviewed migrations can't reorder this proof (created_at ordering is the
+  // fold/journal ordering contract).
+  const afterAllCommitted = Math.max(...readAllExpectedMigrations().map((e) => e.createdAt)) + 60_000;
   await query(url, `INSERT INTO ${identifier} ("hash","created_at") VALUES ($1,$2)`, [
     "c".repeat(64),
-    1785400000000,
+    afterAllCommitted,
   ]);
   const rows = await domainRows(url, "voice");
   const ids = (rows ?? []).map((r) => r.id);

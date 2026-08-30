@@ -52,10 +52,6 @@ CREATE TABLE "voice_sms_outbox" (
 	CONSTRAINT "ck_voice_sms_outbox_body_length" CHECK (char_length("voice_sms_outbox"."body") <= 640)
 );
 --> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD COLUMN "provider_config_hash" text;--> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD COLUMN "provider_sync_attempt_id" uuid;--> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD COLUMN "provider_sync_started_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "voice_assistants" ADD COLUMN "provider_sync_error" text;--> statement-breakpoint
 ALTER TABLE "voice_call_links" ADD CONSTRAINT "voice_call_links_firm_id_intake_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "public"."intake_firms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "voice_call_links" ADD CONSTRAINT "voice_call_links_contact_id_voice_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."voice_contacts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "voice_contacts" ADD CONSTRAINT "voice_contacts_firm_id_intake_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "public"."intake_firms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
