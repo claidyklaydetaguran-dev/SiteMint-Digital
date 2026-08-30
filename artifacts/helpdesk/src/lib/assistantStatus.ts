@@ -32,9 +32,9 @@ export const STATUS_TONE: Record<AssistantStatus, StatusTone> = {
  * since it is never equal to "draft".
  */
 export function isEligibleForDelete(
-  assistant: Pick<AssistantDto, "status" | "provider" | "providerAssistantId">,
+  assistant: Pick<AssistantDto, "status" | "provider" | "providerLinked">,
 ): boolean {
-  return assistant.status === "draft" && !assistant.provider && !assistant.providerAssistantId;
+  return assistant.status === "draft" && !assistant.provider && !assistant.providerLinked;
 }
 
 /**

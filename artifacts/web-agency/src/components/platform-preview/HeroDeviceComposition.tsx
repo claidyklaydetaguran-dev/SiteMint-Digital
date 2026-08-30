@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Globe2, TrendingUp, UserPlus } from "lucide-react";
+import { withBase } from "@/lib/routes";
 
 /**
  * Owner-approved transparent hero device photo (laptop/tablet/phone),
@@ -15,7 +16,14 @@ import { Bot, Globe2, TrendingUp, UserPlus } from "lucide-react";
  * not live SiteMint data.
  */
 
-const HERO_IMAGE_SRC = "/hero-devices-remove-bg-io.png";
+/**
+ * Frontend V2 Phase 1: this file is served verbatim from `public/`, so Vite
+ * does not rewrite it. The previous root-relative
+ * `"/hero-devices-remove-bg-io.png"` 404'd under a deployment prefix (observed
+ * live in Gate 3); `withBase()` makes it resolve at both `/` and a prefixed
+ * base.
+ */
+const HERO_IMAGE_SRC = withBase("/hero-devices-remove-bg-io.png");
 const HERO_IMAGE_WIDTH = 1536;
 const HERO_IMAGE_HEIGHT = 1024;
 

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { AssistantTemplate } from "@/lib/assistantTemplates";
-import type { VoicePresetId } from "@/lib/assistantEstimates";
+import type { StoredVoicePresetId } from "@/pages/assistants/assistantsContract";
 
 export type FirstMessageMode = "assistant-speaks-first" | "wait-for-caller";
 
@@ -27,7 +27,12 @@ export interface AssistantPromptState {
 }
 
 export interface AssistantVoiceModelState {
-  preset: VoicePresetId;
+  /**
+   * May hold a retired preset that an older config still stores. The builder
+   * reports that truthfully and asks for a supported one; it never rewrites
+   * the value on the customer's behalf.
+   */
+  preset: StoredVoicePresetId;
 }
 
 export interface AssistantAnalysisState {

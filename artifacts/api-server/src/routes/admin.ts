@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { db, discoverySubmissions, formSubmissions } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { getSessionToken, validateToken } from "../lib/admin-session.js";
+import { verifyAdminPassword } from "../lib/adminPassword.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
@@ -24,16 +25,28 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
+// AR-001G: fail-closed. There is no literal fallback password any more, in any
+// environment. Without an explicitly configured ADMIN_PASSWORD this route
+// reports that admin authentication is unavailable — a distinct outcome from a
+// wrong password, so an operator can tell a misconfigured deployment apart from
+// a failed sign-in, and a client is not invited to keep retrying against a
+// server that can never accept any password. The submitted password is never
+// logged and never echoed back.
 router.post("/admin/login", (req: Request, res: Response) => {
-  const { password } = req.body as { password?: string };
-  const adminPassword = process.env.ADMIN_PASSWORD || "sitemint2024";
+  const { password } = req.body as { password?: unknown };
 
-  if (!password || password !== adminPassword) {
-    res.status(401).json({ error: "Invalid password" });
-    return;
+  switch (verifyAdminPassword(password, process.env)) {
+    case "unconfigured":
+      req.log.error("Admin login attempted but ADMIN_PASSWORD is not configured");
+      res.status(503).json({ error: "Admin authentication is not configured" });
+      return;
+    case "mismatch":
+      res.status(401).json({ error: "Invalid password" });
+      return;
+    case "match":
+      res.json({ token: getSessionToken() });
+      return;
   }
-
-  res.json({ token: getSessionToken() });
 });
 
 // ── Submissions list ──────────────────────────────────────────────────────────

@@ -1,441 +1,299 @@
+/**
+ * Frontend V2 Phase 14 — one stored call record.
+ *
+ * Mounted at `ROUTES.logDetail` (`/logs/:id`, base-relative) and registered
+ * only when `VITE_VOICE_PLATFORM_ENABLED` is true, exactly as before.
+ *
+ * ── Product classification ────────────────────────────────────────────────
+ * A read-only view of one record from
+ * `GET /api/receptionist/voice/calls/:callId`. It has no control that acts on
+ * a call: no playback, no recording, no retry of the call itself, no
+ * transfer, no assignment, no note, no delete, no CRM or appointment action,
+ * no message. The single button on the page re-reads the same GET.
+ *
+ * The fabricated demo record this page used to render (a made-up caller,
+ * phone number, transcript and booked-looking outcome, resolved from
+ * `lib/demoCallLog.ts` *before* the API was consulted) is removed along with
+ * the fixture module.
+ *
+ * ── The four outcomes of one read ─────────────────────────────────────────
+ * `fetchRealCallDetail` resolves to `undefined` on 404 and rejects on anything
+ * else, so the states stay distinct and a failure can never be mistaken for a
+ * missing record:
+ *   loading      → an accessible loading line
+ *   data.call    → the record
+ *   undefined    → not found
+ *   isError      → read failure, with an explicit Try again
+ */
+
 import { Link, useParams } from "wouter";
-import { ArrowLeft, User, CalendarClock, MessageSquareText, PhoneCall } from "lucide-react";
-import { StatusBadge, type StatusTone } from "@/components/common/StatusBadge";
-import { DemoModeBanner } from "@/components/common/DemoModeBanner";
-import { EmptyState } from "@/components/common/EmptyState";
-import {
-  findDemoCall,
-  demoOutcomeTone,
-  formatDemoDuration,
-  formatDemoOutcome,
-} from "@/lib/demoCallLog";
+import { useCallback, useState, type ReactNode } from "react";
+import { useSession } from "@/hooks/useSession";
 import { useRealCallDetail } from "@/hooks/useVoiceCalls";
-import type { RealCallDetail, InternalCallState } from "@/lib/voiceCallsApi";
+import type { RealCallDetail, StructuredOutcome } from "@/lib/voiceCallsApi";
+import {
+  ANALYSIS_UNAVAILABLE,
+  DETAIL,
+  LIST_PATH,
+  NOT_PROVIDED,
+  PAGE,
+  analysisIsAvailable,
+  consent,
+  dispositionLabel,
+  formatDuration,
+  formatFullTime,
+  isRecordMissing,
+  listOrMissing,
+  machineTime,
+  requestStatusLabel,
+  stateAccessibleName,
+  stateLabel,
+  stateTone,
+  textOrMissing,
+  urgencyLabel,
+  yesNo,
+} from "@/pages/call-logs/callLogsContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-call-logs.css";
 
-interface TranscriptTurn {
-  speaker: string;
-  text: string;
+function BackLink() {
+  return (
+    <Link href={LIST_PATH} className="sc-back">
+      <span aria-hidden="true">&larr;</span> {DETAIL.back}
+    </Link>
+  );
 }
-
-const TRANSCRIPT_LINE_PATTERN = /^([A-Za-z][A-Za-z ]{0,19}):\s*(.+)$/;
 
 /**
- * Splits a raw Vapi transcript string into speaker turns when every non-empty
- * line matches a `Speaker: text` shape. Falls back to `undefined` (render as
- * one block) for anything else — never guesses at a shape the transcript
- * doesn't actually have.
+ * `wide` marks a field whose value is prose rather than a token. It spans the
+ * grid and keeps a reading measure, so a long reason or summary is not forced
+ * down a column built for "Yes" and "High".
  */
-function parseTranscriptTurns(transcript: string): TranscriptTurn[] | undefined {
-  const lines = transcript.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-  if (lines.length < 2) return undefined;
-  const turns: TranscriptTurn[] = [];
-  for (const line of lines) {
-    const match = TRANSCRIPT_LINE_PATTERN.exec(line);
-    if (!match) return undefined;
-    turns.push({ speaker: match[1]!.trim(), text: match[2]!.trim() });
-  }
-  return turns;
-}
-
-function isAssistantSpeaker(speaker: string): boolean {
-  const s = speaker.toLowerCase();
-  return s === "ai" || s.includes("assistant") || s.includes("receptionist");
-}
-
-function NotFound() {
+function Fact({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
   return (
-    <div className="flex h-full flex-col bg-background">
-      <EmptyState
-        icon={MessageSquareText}
-        title="Call not found"
-        description="This call record doesn't exist. Go back to Call Logs."
-        action={
-          <Link href="/logs" className="text-sm font-medium text-primary hover:underline">
-            Back to Call Logs
-          </Link>
-        }
-        className="flex-1"
-      />
+    <div className={wide === true ? "sc-fact sc-fact--wide" : "sc-fact"}>
+      <dt className="sc-fact__label">{label}</dt>
+      <dd className="sc-fact__value">{children}</dd>
     </div>
   );
 }
 
-function realStateTone(state: InternalCallState): StatusTone {
-  switch (state) {
-    case "completed": return "success";
-    case "in_progress": case "ringing": case "connecting": case "queued": return "info";
-    case "no_answer": case "busy": case "canceled": return "warning";
-    case "failed": case "provider_error": return "destructive";
-  }
+function Group({ heading, children }: { heading: string; children: ReactNode }) {
+  return (
+    <div className="sc-group">
+      <h3 className="sc-group__heading">{heading}</h3>
+      <dl className="sc-facts">{children}</dl>
+    </div>
+  );
 }
 
-function formatRealDuration(sec: number | null): string {
-  if (sec === null) return "—";
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function RealCallDetailView({ call }: { call: RealCallDetail }) {
-  const startedAt = new Date(call.startedAt);
-  const outcome = call.analysisAvailability === "available" ? call.structuredOutcome : null;
-  const transcriptTurns = call.transcript ? parseTranscriptTurns(call.transcript) : undefined;
+function Analysis({ outcome }: { outcome: StructuredOutcome }) {
+  const appointment = outcome.appointmentRequest;
+  const followUp = outcome.followUp;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
-      <div className="flex-shrink-0 border-b border-border bg-card px-6 py-4">
-        <Link
-          href="/logs"
-          className="inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Call Logs
-        </Link>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">{call.callerNumberDisplay}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {startedAt.toLocaleString(undefined, {
-                month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
-              })}{" "}
-              &middot; {formatRealDuration(call.durationSec)}
-            </p>
-          </div>
-          <StatusBadge label={call.stateLabel} tone={realStateTone(call.state)} />
-        </div>
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-statusbadge-info-bg bg-statusbadge-info-bg/40 px-3 py-2 text-xs font-medium text-statusbadge-info-text">
-          <PhoneCall className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-          <span>Vapi + Twilio (Development) — a real webhook-verified call, not a simulation.</span>
-        </div>
+    <div className="sc-analysis">
+      <Group heading={DETAIL.callerHeading}>
+        <Fact label={DETAIL.callerName}>{textOrMissing(outcome.caller.name)}</Fact>
+        <Fact label={DETAIL.callerEmail}>{textOrMissing(outcome.caller.email)}</Fact>
+        <Fact label={DETAIL.callerCompany} wide>{textOrMissing(outcome.caller.companyOrBusiness)}</Fact>
+      </Group>
+
+      <Group heading={DETAIL.inquiryHeading}>
+        <Fact label={DETAIL.inquiryReason} wide>{textOrMissing(outcome.inquiry.reason)}</Fact>
+        <Fact label={DETAIL.inquiryServices} wide>{listOrMissing(outcome.inquiry.serviceInterest)}</Fact>
+        <Fact label={DETAIL.inquiryBusinessType}>{textOrMissing(outcome.inquiry.businessType)}</Fact>
+        <Fact label={DETAIL.inquiryPricing}>{yesNo(outcome.inquiry.pricingQuestion)}</Fact>
+        <Fact label={DETAIL.inquiryUrgency}>{urgencyLabel(outcome.inquiry.urgency)}</Fact>
+      </Group>
+
+      <Group heading={DETAIL.appointmentHeading}>
+        <Fact label={DETAIL.appointmentRequested}>{yesNo(appointment.requested)}</Fact>
+        <Fact label={DETAIL.appointmentDate}>{textOrMissing(appointment.preferredDateText)}</Fact>
+        <Fact label={DETAIL.appointmentTime}>{textOrMissing(appointment.preferredTimeText)}</Fact>
+        <Fact label={DETAIL.appointmentTimezone}>{textOrMissing(appointment.timezone)}</Fact>
+        <Fact label={DETAIL.appointmentStatus}>{requestStatusLabel(appointment.status)}</Fact>
+      </Group>
+
+      <Group heading={DETAIL.followUpHeading}>
+        <Fact label={DETAIL.followUpRequested}>{yesNo(followUp.requested)}</Fact>
+        <Fact label={DETAIL.followUpPhone}>{consent(followUp.phoneConsent)}</Fact>
+        <Fact label={DETAIL.followUpSms}>{consent(followUp.smsConsent)}</Fact>
+        <Fact label={DETAIL.followUpEmail}>{consent(followUp.emailConsent)}</Fact>
+        <Fact label={DETAIL.followUpStatus}>{requestStatusLabel(followUp.status)}</Fact>
+      </Group>
+
+      <Group heading={DETAIL.dispositionHeading}>
+        <Fact label={DETAIL.dispositionCategory}>{dispositionLabel(outcome.disposition.outcome)}</Fact>
+        <Fact label={DETAIL.dispositionSummary} wide>{textOrMissing(outcome.disposition.summary)}</Fact>
+      </Group>
+
+      <p className="sc-note">{DETAIL.note}</p>
+    </div>
+  );
+}
+
+function Record({ call }: { call: RealCallDetail }) {
+  const label = stateLabel(call);
+  const outcome = analysisIsAvailable(call.analysisAvailability) ? call.structuredOutcome : null;
+
+  return (
+    <div className="sd-page sc-page--doc sd-enter">
+      <div className="sc-nav">
+        <BackLink />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-            <h2 className="mb-4 text-sm font-semibold text-foreground">Transcript</h2>
-            {call.transcript ? (
-              transcriptTurns ? (
-                <ol className="space-y-3">
-                  {transcriptTurns.map((turn, i) => (
-                    <li key={i} className="flex gap-3">
-                      <span
-                        className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold uppercase ${
-                          isAssistantSpeaker(turn.speaker)
-                            ? "bg-surface-muted text-primary"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                        aria-hidden="true"
-                      >
-                        {isAssistantSpeaker(turn.speaker) ? "AI" : "C"}
-                      </span>
-                      <div>
-                        <div className="text-xs font-medium text-muted-foreground">{turn.speaker}</div>
-                        <p className="mt-0.5 text-sm text-foreground">{turn.text}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="whitespace-pre-wrap text-sm text-foreground">{call.transcript}</p>
-              )
+      {/* The record's left rule carries the state's tone, matching the row the
+          reader came from. The state is also spelled out beside the title. */}
+      <header className="sc-record" data-tone={stateTone(call.state)}>
+        <div className="sc-record__head">
+          <div className="sc-record__id">
+            <span className="sd-eyebrow">{DETAIL.factsHeading}</span>
+            <h1 className="sc-record__title">{call.callerNumberDisplay}</h1>
+          </div>
+          <span className="sc-state sc-state--lg">
+            <span className="sc-state__text">{label}</span>
+            <span className="sd-sr">{stateAccessibleName(label)}</span>
+          </span>
+        </div>
+
+        <dl className="sc-facts sc-facts--record">
+          <Fact label={DETAIL.started}>
+            <time className="sc-fig" dateTime={machineTime(call.startedAt)}>
+              {formatFullTime(call.startedAt)}
+            </time>
+          </Fact>
+          <Fact label={DETAIL.ended}>
+            {call.endedAt ? (
+              <time className="sc-fig" dateTime={machineTime(call.endedAt)}>
+                {formatFullTime(call.endedAt)}
+              </time>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {call.isFinal
-                  ? "No transcript was provided for this call."
-                  : "This call is still in progress — a transcript will appear once it ends."}
-              </p>
+              <span className="sc-absent-inline">{formatFullTime(null)}</span>
             )}
-            {call.summary && (
-              <>
-                <h3 className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Summary
-                </h3>
-                <p className="text-sm text-foreground">{call.summary}</p>
-              </>
+          </Fact>
+          <Fact label={DETAIL.duration}>
+            {typeof call.durationSec === "number" ? (
+              <span className="sc-fig">{formatDuration(call.durationSec)}</span>
+            ) : (
+              <span className="sc-absent-inline">{formatDuration(null)}</span>
             )}
-          </section>
+          </Fact>
+        </dl>
+      </header>
 
-          <div className="space-y-4">
-            <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                <User className="h-4 w-4 text-primary" aria-hidden="true" />
-                Extracted information
-              </h2>
-              {outcome ? (
-                <div className="space-y-2.5 text-sm">
-                  <dl className="space-y-2.5">
-                  {outcome.caller.name && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Caller name</dt>
-                      <dd className="text-foreground">{outcome.caller.name}</dd>
-                    </div>
-                  )}
-                  {outcome.caller.companyOrBusiness && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Company / business</dt>
-                      <dd className="text-foreground">{outcome.caller.companyOrBusiness}</dd>
-                    </div>
-                  )}
-                  {outcome.inquiry.businessType && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Business type</dt>
-                      <dd className="text-foreground">{outcome.inquiry.businessType}</dd>
-                    </div>
-                  )}
-                  {outcome.inquiry.reason && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Reason for calling</dt>
-                      <dd className="text-foreground">{outcome.inquiry.reason}</dd>
-                    </div>
-                  )}
-                  {outcome.inquiry.serviceInterest.length > 0 && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Services of interest</dt>
-                      <dd className="text-foreground">{outcome.inquiry.serviceInterest.join(", ")}</dd>
-                    </div>
-                  )}
-                  {outcome.inquiry.pricingQuestion && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Pricing question</dt>
-                      <dd className="text-foreground">Yes</dd>
-                    </div>
-                  )}
-                  {outcome.inquiry.urgency && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Urgency</dt>
-                      <dd className="text-foreground capitalize">{outcome.inquiry.urgency}</dd>
-                    </div>
-                  )}
-                  {outcome.disposition.summary && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Call summary</dt>
-                      <dd className="text-foreground">{outcome.disposition.summary}</dd>
-                    </div>
-                  )}
-                  </dl>
-                  <p className="text-xs text-muted-foreground">
-                    Extracted by the assistant during the call — caller-stated details, not
-                    independently confirmed facts.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Structured analysis unavailable for this call.
-                </p>
-              )}
-            </section>
+      <section className="sc-doc" aria-labelledby="sc-transcript">
+        <h2 className="sc-doc__heading" id="sc-transcript">
+          {DETAIL.transcriptHeading}
+        </h2>
+        {call.transcript && call.transcript.trim() !== "" ? (
+          <p className="sc-prose">{call.transcript}</p>
+        ) : (
+          <p className="sc-absent">{NOT_PROVIDED}</p>
+        )}
+      </section>
 
-            <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                <CalendarClock className="h-4 w-4 text-primary" aria-hidden="true" />
-                Appointment / follow-up
-              </h2>
-              {outcome ? (
-                <div className="space-y-3 text-sm">
-                  {outcome.appointmentRequest.requested ? (
-                    <div className="space-y-2.5">
-                      <dl className="space-y-2.5">
-                        {outcome.appointmentRequest.preferredDateText && (
-                          <div>
-                            <dt className="text-xs text-muted-foreground">Preferred date</dt>
-                            <dd className="text-foreground">{outcome.appointmentRequest.preferredDateText}</dd>
-                          </div>
-                        )}
-                        {outcome.appointmentRequest.preferredTimeText && (
-                          <div>
-                            <dt className="text-xs text-muted-foreground">Preferred time</dt>
-                            <dd className="text-foreground">{outcome.appointmentRequest.preferredTimeText}</dd>
-                          </div>
-                        )}
-                        {outcome.appointmentRequest.timezone && (
-                          <div>
-                            <dt className="text-xs text-muted-foreground">Timezone</dt>
-                            <dd className="text-foreground">{outcome.appointmentRequest.timezone}</dd>
-                          </div>
-                        )}
-                      </dl>
-                      <div className="flex flex-wrap gap-1.5">
-                        <StatusBadge label="Pending review" tone="warning" />
-                        <StatusBadge label="Not booked" tone="neutral" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        A calendar isn't connected — this is the request as the assistant captured
-                        it, not a confirmed booking.
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No appointment was requested on this call.</p>
-                  )}
+      <section className="sc-doc" aria-labelledby="sc-summary">
+        <h2 className="sc-doc__heading" id="sc-summary">
+          {DETAIL.summaryHeading}
+        </h2>
+        {call.summary && call.summary.trim() !== "" ? (
+          <p className="sc-prose">{call.summary}</p>
+        ) : (
+          <p className="sc-absent">{NOT_PROVIDED}</p>
+        )}
+      </section>
 
-                  <div className="border-t border-border pt-3">
-                    <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Consent
-                    </h3>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li>Phone follow-up: {outcome.followUp.phoneConsent ? "Permitted" : "Not given"}</li>
-                      <li>SMS: {outcome.followUp.smsConsent ? "Consented" : "Not given"}</li>
-                      <li>Email: {outcome.followUp.emailConsent ? "Consented" : "Not given"}</li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Structured analysis unavailable for this call.
-                </p>
-              )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                Delivery state: No message sent.
-              </p>
-            </section>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DemoCallDetailView({ call }: { call: NonNullable<ReturnType<typeof findDemoCall>> }) {
-  const startedAt = new Date(call.startedAt);
-  return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
-      <div className="flex-shrink-0 border-b border-border bg-card px-6 py-4">
-        <Link
-          href="/logs"
-          className="inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Call Logs
-        </Link>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">{call.callerName}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {call.callerPhone} &middot;{" "}
-              {startedAt.toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}{" "}
-              &middot; {formatDemoDuration(call.durationSec)}
-            </p>
-          </div>
-          <StatusBadge label={formatDemoOutcome(call.outcome)} tone={demoOutcomeTone(call.outcome)} />
-        </div>
-        <div className="mt-3">
-          <DemoModeBanner text="this is a sample transcript, not a recording of a real call." />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          {/* Transcript */}
-          <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-            <h2 className="mb-4 text-sm font-semibold text-foreground">Transcript</h2>
-            <ol className="space-y-3">
-              {call.transcript.map((line, i) => (
-                <li key={i} className="flex gap-3">
-                  <span
-                    className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold uppercase ${
-                      line.speaker === "assistant"
-                        ? "bg-surface-muted text-primary"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {line.speaker === "assistant" ? "AI" : "C"}
-                  </span>
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground">
-                      {line.speaker === "assistant" ? call.assistantName : call.callerName}
-                    </div>
-                    <p className="mt-0.5 text-sm text-foreground">{line.text}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          {/* Extracted info + outcome */}
-          <div className="space-y-4">
-            <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                <User className="h-4 w-4 text-primary" aria-hidden="true" />
-                Extracted information
-              </h2>
-              <dl className="space-y-2.5 text-sm">
-                <div>
-                  <dt className="text-xs text-muted-foreground">Name</dt>
-                  <dd className="text-foreground">{call.extracted.name}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-muted-foreground">Phone</dt>
-                  <dd className="text-foreground">{call.extracted.phone}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-muted-foreground">Reason for calling</dt>
-                  <dd className="text-foreground">{call.extracted.reason}</dd>
-                </div>
-              </dl>
-            </section>
-
-            <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                <CalendarClock className="h-4 w-4 text-primary" aria-hidden="true" />
-                Appointment / follow-up
-              </h2>
-              {call.appointment ? (
-                <div className="space-y-2.5 text-sm">
-                  <dl className="space-y-2.5">
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Service</dt>
-                      <dd className="text-foreground">{call.appointment.service}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Requested time</dt>
-                      <dd className="text-foreground">{call.appointment.requestedTime}</dd>
-                    </div>
-                  </dl>
-                  <StatusBadge label="Requested — not yet booked" tone="warning" />
-                  <p className="text-xs text-muted-foreground">
-                    Appointment booking isn't connected to a calendar yet. This shows the
-                    request the assistant would hand off to your front desk.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No appointment or follow-up was requested on this call.
-                </p>
-              )}
-            </section>
-          </div>
-        </div>
-      </div>
+      <section className="sc-doc" aria-labelledby="sc-analysis">
+        <h2 className="sc-doc__heading" id="sc-analysis">
+          {DETAIL.analysisHeading}
+        </h2>
+        {outcome ? <Analysis outcome={outcome} /> : <p className="sc-absent">{ANALYSIS_UNAVAILABLE}</p>}
+      </section>
     </div>
   );
 }
 
 export default function CallLogDetail() {
   const params = useParams<{ id: string }>();
-  const demoCall = params.id ? findDemoCall(params.id) : undefined;
+  const { data: me, isLoading: sessionLoading } = useSession();
+  const detail = useRealCallDetail(params.id);
+  const [announcement, setAnnouncement] = useState("");
 
-  // Only look up a real call when no demo fixture matched — demo ids
-  // (`demo-1`, etc.) never collide with a real Vapi call id, but this order
-  // guarantees a demo record is never shadowed by a slow/failed API call.
-  const realCallQuery = useRealCallDetail(demoCall ? undefined : params.id);
+  const retry = useCallback(() => {
+    setAnnouncement(DETAIL.announceRetrying);
+    void detail
+      .refetch()
+      .then((result) => {
+        setAnnouncement(result.isError ? DETAIL.announceFailed : DETAIL.announceLoaded);
+      })
+      .catch(() => setAnnouncement(DETAIL.announceFailed));
+  }, [detail]);
 
-  if (demoCall) {
-    return <DemoCallDetailView call={demoCall} />;
+  if (sessionLoading) {
+    return (
+      <div className="sd-page sc-page--doc">
+        <p className="sc-loading" role="status" aria-live="polite">
+          {PAGE.sessionLoading}
+        </p>
+      </div>
+    );
   }
 
-  if (realCallQuery.isLoading) {
-    return <div className="flex h-full flex-col bg-background" aria-hidden="true" />;
+  if (!me) return null;
+
+  if (detail.isLoading) {
+    return (
+      <div className="sd-page sc-page--doc">
+        <div className="sc-nav">
+          <BackLink />
+        </div>
+        <p className="sc-loading" role="status" aria-live="polite">
+          {DETAIL.loading}
+        </p>
+      </div>
+    );
   }
 
-  if (realCallQuery.data?.call) {
-    return <RealCallDetailView call={realCallQuery.data.call} />;
+  // A 404 arrives as a settled query with no data (see `isRecordMissing`), so
+  // it is separated out before the read-failure branch: a record that is not
+  // there is not a failure, and must not offer a Try again that cannot help.
+  const missing = detail.isError && isRecordMissing(detail.error);
+
+  if (detail.isError && !missing) {
+    return (
+      <div className="sd-page sc-page--doc sd-enter">
+        <div className="sc-nav">
+          <BackLink />
+        </div>
+        <p className="sd-sr" role="status" aria-live="polite">
+          {announcement}
+        </p>
+        <div className="sc-error" role="alert">
+          <h1 className="sc-error__title sc-error__title--h1">{DETAIL.errorTitle}</h1>
+          <p className="sc-error__detail">{DETAIL.errorDetail}</p>
+          <button type="button" className="sc-retry" onClick={retry} disabled={detail.isRefetching}>
+            {detail.isRefetching ? DETAIL.retryPendingLabel : DETAIL.retryLabel}
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  return <NotFound />;
+  const call = detail.data?.call;
+  if (!call) {
+    return (
+      <div className="sd-page sc-page--doc sd-enter">
+        <div className="sc-nav">
+          <BackLink />
+        </div>
+        <div className="sc-empty sc-empty--notfound">
+          <h1 className="sc-empty__title sc-empty__title--h1">{DETAIL.notFoundTitle}</h1>
+          <p className="sc-empty__detail">{DETAIL.notFoundDetail}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Record call={call} />;
 }

@@ -24,7 +24,14 @@ interface PublishButtonProps {
  * `eligible` is true. Forwards its ref to the underlying <button> so a
  * caller can restore focus here after the confirmation dialog closes.
  */
-export const PublishButton = forwardRef<HTMLButtonElement, PublishButtonProps>(function PublishButton(
+/**
+ * AR-001J final refinement: `forwardRef(...)` is a call expression at module
+ * top level, so a bundler must assume it has side effects and keep it even
+ * when nothing references the result. A build that renders no Publish control
+ * would still have shipped this component and its copy. The annotation states
+ * what is already true of `forwardRef` and changes nothing at runtime.
+ */
+export const PublishButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, PublishButtonProps>(function PublishButton(
   { eligible, pending, disabledReason, onClick },
   ref,
 ) {

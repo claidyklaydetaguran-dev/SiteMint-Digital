@@ -15,6 +15,10 @@ import { VoiceProviderError, type VoiceProviderErrorCode } from "../voice/errors
 import type { VoiceProvider } from "../voice/VoiceProvider.js";
 import { validateVapiAssistantName } from "../voice/providers/vapi/types.js";
 import {
+  loadVoiceArtifactPolicyFromEnv,
+  type VoiceArtifactPolicy,
+} from "../voice/providers/vapi/artifactPolicy.js";
+import {
   voiceAssistantRepository,
   STALE_PUBLISHING_THRESHOLD_MS,
   type ClaimForPublishResult,
@@ -35,7 +39,15 @@ export interface PublishedAssistantDto {
   id: number;
   status: string;
   provider: string;
-  providerAssistantId: string;
+  /**
+   * AR-001V.2: the provider assistant id is NOT returned here. A successful
+   * publish only needs to tell the browser that the assistant is now published
+   * and linked; the id itself is issued exclusively by the authenticated,
+   * feature-gated browser-test session endpoint, after an explicit owner
+   * confirmation. Publishing still records the id server-side — this changes
+   * what is disclosed, never what is stored or sent to the provider.
+   */
+  providerLinked: true;
   lastSyncedAt: string;
 }
 
@@ -58,6 +70,13 @@ export interface PublishServiceDependencies {
   isEnabled: () => boolean;
   /** Explicit runtime-catalog load + validation. Never read at module import time. */
   loadCatalog: () => RuntimeCatalog;
+  /**
+   * Explicit artifact-policy load + validation. Never read at module import
+   * time. Server-owned: the value comes from the process environment, never
+   * from the request body, the persisted assistant config, or any other
+   * caller-influenced source.
+   */
+  loadArtifactPolicy: () => VoiceArtifactPolicy;
   /** Explicit, lazy production-provider construction. No network request occurs during construction. */
   createProvider: () => VoiceProvider;
   repository: PublishRepositoryDependency;
@@ -75,6 +94,7 @@ export interface PublishServiceDependencies {
 export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   isEnabled: isVoicePublishEnabled,
   loadCatalog: loadRuntimeCatalogFromEnv,
+  loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -116,7 +136,10 @@ function success(row: VoiceAssistant): PublishServiceResult {
       id: row.id,
       status: row.status,
       provider: row.provider as string,
-      providerAssistantId: row.providerAssistantId as string,
+      // Only ever reached from finalizePublished, whose predicate guarantees a
+      // nonblank provider assistant id — so this is a fact about the row, not
+      // a constant, and it is deliberately the only thing said about the id.
+      providerLinked: true,
       lastSyncedAt: (row.lastSyncedAt as Date).toISOString(),
     },
   };
@@ -307,6 +330,20 @@ export async function publishAssistant(
   let catalog: RuntimeCatalog;
   try {
     catalog = deps.loadCatalog();
+  } catch {
+    return failure("publish_disabled");
+  }
+
+  // AR-001G: the artifact policy is server configuration, exactly like the
+  // runtime catalog, and is validated in the same pre-claim step. A missing or
+  // invalid policy therefore stops the publish here — before the atomic claim,
+  // before any database write, and before any provider request — rather than
+  // letting the request reach Vapi and inherit its permissive recording and
+  // transcript defaults. The resolved value is not carried forward: the
+  // provider adapter re-reads it for the actual request body, so there is no
+  // way for a policy validated here to differ from the one that is sent.
+  try {
+    deps.loadArtifactPolicy();
   } catch {
     return failure("publish_disabled");
   }

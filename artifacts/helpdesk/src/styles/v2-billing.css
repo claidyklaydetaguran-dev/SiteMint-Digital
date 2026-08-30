@@ -1,0 +1,429 @@
+/**
+ * Frontend V2 Phase 12 — the Billing workspace layer.
+ *
+ * Companion to `v2-dashboard.css` (Phase 7) and the Phase 8–11 route layers,
+ * and subject to the same rules. This file **defines no colour of its own**:
+ * every value below is an `--sd-*` token from the shell, so the route inherits
+ * the palette, the dark counterpart, the focus ring, the 8-point spacing, the
+ * 44px minimum target and the motion system without restating any of them. No
+ * new colour family, no remote request, no font, no image, no gradient, no
+ * glow, no decorative loop.
+ *
+ * Namespaced `sb-*` (SiteMint billing) so it cannot collide with `sd-*`,
+ * `sg-*`, `si-*`, `sc-*`, `sr-*`, `sk-*`, the `--v2-*` public tokens or the
+ * app's shadcn variables. It is imported *alongside* the shell stylesheet,
+ * never instead of it.
+ *
+ * ── Composition ───────────────────────────────────────────────────────────
+ * One editorial column on the warm-white canvas, at the same capped measure as
+ * the Settings record it sits beside in the rail. This is an account statement,
+ * not a pricing page: it is built from hairline rows and one ruled measure, and
+ * there is not a single card, panel, badge, pill, tile or bordered box on the
+ * plan record. The old page was four bordered boxes, a two-column benefit grid
+ * and three coloured notices for six facts.
+ *
+ * ── The measure ───────────────────────────────────────────────────────────
+ * The one element this route is meant to be remembered by is the usage meter,
+ * and it is deliberately not a rounded progress pill. It is a 4px ruled track
+ * with squared ends and a hairline tick at the trial limit — a gauge off a
+ * printed statement rather than a download bar. It carries real information
+ * (position against a real threshold that a real backend enforces), it is the
+ * only saturated mark in the reading column, and it is drawn only where a
+ * genuine denominator exists. Where the limit is missing, zero or inapplicable
+ * there is no track at all, because an empty gauge implies a scale that is not
+ * there.
+ *
+ * ── Colour discipline ─────────────────────────────────────────────────────
+ * Mint fills exactly two things: the measure below the attention threshold, and
+ * the Upgrade button — the page's single genuine action. Amber marks the two
+ * states that genuinely want attention (approaching the trial limit, and having
+ * reached it) and the deployment that cannot start Checkout. Red appears once,
+ * for the one genuine error this route has: a Checkout request that failed.
+ * Reaching a trial limit is not an error and is never drawn as one. Every state
+ * that carries colour also carries a word, so colour is never the only signal.
+ *
+ * ── Motion ────────────────────────────────────────────────────────────────
+ * Inherited, not extended. The shell's single 8px entrance runs once on the
+ * page container via `sd-enter`. This layer adds no keyframes. The meter's fill
+ * and the view indicator transition on transform/width and colour only, nothing
+ * loops, nothing staggers, no figure counts up, and no animation here can
+ * trigger a request. `prefers-reduced-motion` is honoured globally by
+ * `index.css`, and the block at the foot of this file removes the two local
+ * transitions as well, so every value is legible the instant it is rendered.
+ */
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
+
+/* Same measure as the Settings record: both are account documents read in one
+   pass, and they should not present two different column widths one nav click
+   apart. */
+.sb-page {
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--sd-space-6) var(--sd-space-6) var(--sd-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+.sb-lede {
+  margin: var(--sd-space-2) 0 0;
+  max-width: 40rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.6;
+  color: var(--sd-text-muted);
+}
+
+/* The authentication-loading branch. Text, not a spinner: the shell already
+   owns the boot animation, and a second one competing with it reads as two
+   things loading instead of one. */
+.sb-loading {
+  margin: 0;
+  padding: var(--sd-space-8) 0;
+  font-size: var(--sd-text-body);
+  color: var(--sd-text-muted);
+}
+
+/* ── Views ─────────────────────────────────────────────────────────────── */
+
+/* Text tabs on a hairline, not a segmented control on a filled track: these
+   switch what is displayed, they do not choose a setting, and a pill group
+   would read as the latter. */
+.sb-views {
+  display: flex;
+  gap: var(--sd-space-6);
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.sb-view {
+  position: relative;
+  min-height: 44px;
+  padding: 0 var(--sd-space-1);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text-muted);
+  cursor: pointer;
+  transition: color var(--sd-dur-control) var(--sd-ease);
+}
+
+/* The indicator is a child pseudo-element rather than a border on the button,
+   so selecting a view cannot shift the row by a pixel. */
+.sb-view::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--sd-accent);
+  transform: scaleX(0);
+  transition: transform var(--sd-dur-control) var(--sd-ease);
+}
+
+.sb-view[aria-selected="true"] {
+  color: var(--sd-text);
+}
+
+.sb-view[aria-selected="true"]::after {
+  transform: scaleX(1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sb-view:hover {
+    color: var(--sd-text);
+  }
+}
+
+.sb-view:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: calc(var(--sd-focus-offset) * -1);
+  border-radius: var(--sd-radius-control);
+}
+
+/* The panel is focusable so a keyboard user can reach its content directly
+   from the tab list; it must not draw a permanent box while doing so. */
+.sb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+.sb-panel:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+  border-radius: var(--sd-radius-card);
+}
+
+/* ── Plan record ───────────────────────────────────────────────────────── */
+
+/* The same hairline rhythm as the Settings account record, deliberately: an
+   operator moving between the two routes is reading one document in two
+   places. */
+.sb-fields {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--sd-border);
+}
+
+.sb-fields__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 13rem) 1fr;
+  gap: var(--sd-space-2) var(--sd-space-4);
+  align-items: baseline;
+  padding: var(--sd-space-3) 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.sb-fields__label {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A very large count wraps rather than truncating: a half-shown number is
+   worse than a wrapped one, and it is not obviously half-shown. */
+.sb-fields__value {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  line-height: 1.55;
+  color: var(--sd-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The paid plan's one truthful statement about the trial limit. Stated once,
+   under the record, without a notice band: it is settled information, not
+   something that wants attention. */
+.sb-note {
+  margin: var(--sd-space-3) 0 0;
+  max-width: 46rem;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text-muted);
+}
+
+/* ── Usage ─────────────────────────────────────────────────────────────── */
+
+.sb-usage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sd-space-3);
+  padding-top: var(--sd-space-2);
+}
+
+/* The figure carries the page's only large type. Tabular figures so the number
+   does not shuffle horizontally between two adjacent counts. */
+.sb-usage__figure {
+  margin: 0;
+  font-size: var(--sd-text-figure);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--sd-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* The state, in words, immediately under the measure. Present only when there
+   is a state worth naming. */
+.sb-usage__status {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-warn);
+}
+
+.sb-usage__detail {
+  margin: 0;
+  max-width: 44rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.6;
+  color: var(--sd-text-muted);
+}
+
+/* ── The measure ───────────────────────────────────────────────────────── */
+
+/* Squared, not rounded: a ruled measure off a statement, not a download bar.
+   Full width of the reading column so the eye can judge the proportion. */
+.sb-meter {
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  height: 4px;
+  background: var(--sd-muted-surface);
+  border: 1px solid var(--sd-border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.sb-meter__fill {
+  display: block;
+  height: 100%;
+  background: var(--sd-accent);
+  transition: width var(--sd-dur-enter) var(--sd-ease),
+    background-color var(--sd-dur-control) var(--sd-ease);
+}
+
+/* Both attention states take amber. They are distinguished from each other by
+   their words and by the fill reaching the end of the track — reaching a trial
+   limit is a thing to notice, not a fault, so red is not used for either. */
+.sb-usage[data-level="approaching"] .sb-meter__fill,
+.sb-usage[data-level="reached"] .sb-meter__fill {
+  background: var(--sd-warn);
+}
+
+/* ── Upgrade ───────────────────────────────────────────────────────────── */
+
+.sb-upgrade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-3) var(--sd-space-6);
+  padding-top: var(--sd-space-4);
+  border-top: 1px solid var(--sd-border);
+}
+
+.sb-upgrade__detail {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+
+/* The page's one genuine action, and so the page's one saturated fill. Sized to
+   its label rather than stretched across the column: this route is not selling
+   anything, and a full-width mint bar would be a sales device. */
+.sb-upgrade__action {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--sd-space-5);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-accent);
+  color: var(--sd-accent-ink);
+  font: inherit;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--sd-dur-control) var(--sd-ease),
+    color var(--sd-dur-control) var(--sd-ease),
+    border-color var(--sd-dur-control) var(--sd-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sb-upgrade__action:hover:not(:disabled) {
+    background: var(--sd-accent-soft);
+    border-color: var(--sd-border-strong);
+    color: var(--sd-text);
+  }
+}
+
+.sb-upgrade__action:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+
+/* Pending: the control keeps its place and its box so the row does not reflow
+   under the pointer while the request is in flight. The label changes, so the
+   state is never carried by the dimming alone. */
+.sb-upgrade__action:disabled {
+  cursor: progress;
+  background: var(--sd-surface);
+  border-color: var(--sd-border);
+  color: var(--sd-text-muted);
+}
+
+/* ── Checkout result ───────────────────────────────────────────────────── */
+
+/* The only bordered boxes on the route, and they appear only when something has
+   genuinely happened. */
+.sb-result {
+  margin-top: var(--sd-space-4);
+  padding: var(--sd-space-4);
+  border: 1px solid;
+  border-radius: var(--sd-radius-card);
+}
+
+.sb-result[data-state="attention"] {
+  border-color: var(--sd-warn-border);
+  background: var(--sd-warn-surface);
+}
+
+.sb-result[data-state="error"] {
+  border-color: var(--sd-danger-border);
+  background: var(--sd-danger-surface);
+}
+
+.sb-result__title {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+}
+
+.sb-result[data-state="attention"] .sb-result__title {
+  color: var(--sd-warn);
+}
+
+.sb-result[data-state="error"] .sb-result__title {
+  color: var(--sd-danger);
+}
+
+.sb-result__detail {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text);
+}
+
+/* ── Narrow viewports ──────────────────────────────────────────────────── */
+
+/* A two-column grid at 360px leaves the value column too tight to read, and a
+   right-aligned action on the same line as its description forces both to
+   truncate. Both stack.
+
+   The button stays sized to its label rather than stretching to the full
+   column. A full-width saturated bar is the shape of a sales call-to-action,
+   and it would be exactly as much of one at 360px as at 1440px; it also has no
+   usability argument here, because at this width the control is already the
+   only thing on its row and comfortably past the 44px target. */
+@media (max-width: 40rem) {
+  .sb-page {
+    padding: var(--sd-space-6) var(--sd-space-4) var(--sd-space-8);
+  }
+  .sb-fields__row {
+    grid-template-columns: 1fr;
+    gap: var(--sd-space-1);
+  }
+  .sb-upgrade {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sb-views {
+    gap: var(--sd-space-5);
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+
+/* The shell already disables its entrance. These are this layer's only two
+   transitions, and both are removed rather than shortened: a usage figure and
+   a selected view are information, and information should not arrive late. */
+@media (prefers-reduced-motion: reduce) {
+  .sb-view,
+  .sb-view::after,
+  .sb-meter__fill,
+  .sb-upgrade__action {
+    transition: none;
+  }
+}

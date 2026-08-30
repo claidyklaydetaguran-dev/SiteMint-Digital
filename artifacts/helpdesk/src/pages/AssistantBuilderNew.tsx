@@ -11,7 +11,16 @@ import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, findTemplateByKey, isValidTemplateKey } from "@/lib/assistantConfig";
 import { useLocalAssistantDraft } from "@/hooks/useAssistantDrafts";
 import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
-import { voicePublishEnabled } from "@/lib/featureFlags";
+import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
+
+/**
+ * AR-001J final refinement, owner decision B: a build that cannot publish
+ * renders no Publish control here either -- not a disabled one explaining a
+ * capability this build does not have. Foldable, so the control and its copy
+ * leave the build with it. When publishing is on, the control is exactly the
+ * one AR-001I shipped: never eligible on an unsaved assistant, and saying so.
+ */
+const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 
 function ExpiredPreview() {
   return (
@@ -97,16 +106,14 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
       announcement={announcement}
       headerBanner={<BuilderNotice />}
       publishControl={
-        <PublishButton
-          eligible={false}
-          pending={false}
-          disabledReason={
-            voicePublishEnabled
-              ? "Save this assistant as a draft before publishing."
-              : "Publishing is not enabled in this environment."
-          }
-          onClick={() => {}}
-        />
+        publishInBuild ? (
+          <PublishButton
+            eligible={false}
+            pending={false}
+            disabledReason="Save this assistant as a draft before publishing."
+            onClick={() => {}}
+          />
+        ) : undefined
       }
       footerRight={
         <div className="flex flex-col items-end gap-1.5">

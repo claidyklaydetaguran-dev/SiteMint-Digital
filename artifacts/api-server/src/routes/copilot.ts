@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { validateToken } from "../lib/admin-session.js";
+import { isOpenAiUnavailableError } from "../lib/openAiUnavailable.js";
 
 const router: IRouter = Router();
 
@@ -208,7 +209,12 @@ REMINDER: This is a strategy draft. All copy must be reviewed and personalised b
     res.end();
   } catch (err) {
     req.log.error({ err }, "Copilot generation error");
-    res.write(`data: ${JSON.stringify({ type: "error", message: "AI generation failed — please try again." })}\n\n`);
+    // AR-001O: SSE headers are already flushed, so the status line cannot change
+    // — but the message must still say which failure this is.
+    const message = isOpenAiUnavailableError(err)
+      ? "AI features are not configured on this server."
+      : "AI generation failed — please try again.";
+    res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
     res.end();
   }
 });

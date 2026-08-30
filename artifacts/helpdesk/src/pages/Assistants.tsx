@@ -8,9 +8,7 @@ import {
   MoreVertical,
   Copy,
   Trash2,
-  Pencil,
-  PlayCircle,
-  Rocket,
+  ArrowRight,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,11 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/common/EmptyState";
 import { InlineError } from "@/components/common/InlineError";
 import { SearchInput } from "@/components/common/SearchInput";
@@ -73,12 +66,21 @@ import {
   STATUS_TONE,
   isEligibleForDelete,
 } from "@/lib/assistantStatus";
+import {
+  LIST,
+  NEW_PATH,
+  assistantHref,
+  deleteDialogTitle,
+  moreActionsAccessibleName,
+  openAccessibleName,
+  providerLinkLabel,
+} from "@/pages/assistants/assistantsContract";
 
 type ViewMode = "cards" | "table";
 type StatusFilter = "all" | AssistantStatus;
 
 const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All statuses" },
+  { value: "all", label: LIST.allStatuses },
   { value: "draft", label: "Draft" },
   { value: "publishing", label: "Publishing" },
   { value: "published", label: "Published" },
@@ -100,12 +102,6 @@ function formatUpdatedAt(iso: string): string {
     day: "numeric",
     year: "numeric",
   });
-}
-
-function providerLabel(assistant: AssistantDto): string {
-  return assistant.provider && assistant.providerAssistantId
-    ? "Connected"
-    : "Not connected";
 }
 
 function AssistantsListSkeleton({ view }: { view: ViewMode }) {
@@ -133,20 +129,30 @@ function AssistantsListSkeleton({ view }: { view: ViewMode }) {
   );
 }
 
+/**
+ * AR-001I: a row carries exactly one control that leaves the list, and it is
+ * named for what it does.
+ *
+ * It used to carry two more: a play icon labelled "Test {name}" and a rocket
+ * icon labelled "Publish {name}". Neither started a test or published
+ * anything — both called `navigate()` to this same builder tab, which is
+ * also where the row's name and the menu's Edit item already went. Four
+ * controls, one destination, two of them named after actions that only
+ * happen inside the builder behind an explicit confirmation.
+ *
+ * So: one Open control, and the menu keeps only the two items that genuinely
+ * act on the row. Nothing here issues a provider request.
+ */
 function RowActions({
   assistant,
-  onEdit,
-  onOpenTest,
-  onOpenPublish,
+  onOpen,
   onDuplicate,
   onDelete,
   duplicatePending,
   menuTriggerRef,
 }: {
   assistant: AssistantDto;
-  onEdit: () => void;
-  onOpenTest: () => void;
-  onOpenPublish: () => void;
+  onOpen: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   duplicatePending: boolean;
@@ -156,64 +162,40 @@ function RowActions({
 
   return (
     <div className="flex flex-shrink-0 items-center gap-1.5">
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={onOpenTest}
-            className="inline-flex h-11 min-h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover-elevate md:h-8 md:min-h-0 md:w-8"
-            aria-label={`Test ${assistant.name}`}
-          >
-            <PlayCircle className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          Open assistant to test
-        </TooltipContent>
-      </Tooltip>
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={onOpenPublish}
-            className="inline-flex h-11 min-h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover-elevate md:h-8 md:min-h-0 md:w-8"
-            aria-label={`Publish ${assistant.name}`}
-          >
-            <Rocket className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          Open assistant to publish
-        </TooltipContent>
-      </Tooltip>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={openAccessibleName(assistant.name)}
+        className="inline-flex h-11 min-h-11 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover-elevate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8 md:min-h-0"
+      >
+        {LIST.open}
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             ref={menuTriggerRef}
             type="button"
-            className="inline-flex h-11 min-h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover-elevate md:h-8 md:min-h-0 md:w-8"
-            aria-label={`More actions for ${assistant.name}`}
+            className="inline-flex h-11 min-h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover-elevate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8 md:min-h-0 md:w-8"
+            aria-label={moreActionsAccessibleName(assistant.name)}
           >
             <MoreVertical className="h-4 w-4" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={onEdit} className="gap-2">
-            <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit
-          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={onDuplicate}
             disabled={duplicatePending}
             className="gap-2"
           >
-            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Duplicate
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> {LIST.duplicate}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={onDelete}
             disabled={!deletable}
             className="gap-2 text-destructive focus:text-destructive"
           >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {LIST.delete}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -253,6 +235,10 @@ export default function Assistants() {
       );
     });
   }, [assistants, search, status]);
+
+  const openAssistant = (assistant: AssistantDto) => {
+    navigate(assistantHref(assistant.id));
+  };
 
   const handleDuplicate = (assistant: AssistantDto) => {
     if (duplicateMutation.isPending) return;
@@ -320,19 +306,18 @@ export default function Assistants() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="font-display text-xl font-semibold text-foreground">
-              Assistants
+              {LIST.title}
             </h1>
             <p className="mt-0.5 max-w-lg text-sm text-muted-foreground">
-              Build and manage the AI voice assistants that answer, qualify, and
-              book for your business.
+              {LIST.detail}
             </p>
           </div>
           <Button
-            onClick={() => navigate("/assistants/new")}
+            onClick={() => navigate(NEW_PATH)}
             className="h-9 gap-1.5 text-sm"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            New Assistant
+            {LIST.newAssistant}
           </Button>
         </div>
 
@@ -340,8 +325,8 @@ export default function Assistants() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Search assistants…"
-            aria-label="Search assistants"
+            placeholder={LIST.searchPlaceholder}
+            aria-label={LIST.searchLabel}
             className="w-full sm:max-w-xs"
           />
           <Select
@@ -350,9 +335,9 @@ export default function Assistants() {
           >
             <SelectTrigger
               className="h-9 w-full text-sm sm:w-40"
-              aria-label="Filter by status"
+              aria-label={LIST.statusFilterLabel}
             >
-              <SelectValue placeholder="All statuses" />
+              <SelectValue placeholder={LIST.allStatuses} />
             </SelectTrigger>
             <SelectContent>
               {STATUS_FILTER_OPTIONS.map((option) => (
@@ -365,20 +350,20 @@ export default function Assistants() {
           <SegmentedControl<ViewMode>
             value={view}
             onChange={setView}
-            aria-label="Assistants view"
+            aria-label={LIST.viewLabel}
             className="sm:ml-auto"
             options={[
               {
                 value: "cards",
-                label: "Cards",
+                label: LIST.cards,
                 icon: LayoutGrid,
-                "aria-label": "Card view",
+                "aria-label": LIST.cardsView,
               },
               {
                 value: "table",
-                label: "Table",
+                label: LIST.table,
                 icon: ListIcon,
-                "aria-label": "Table view",
+                "aria-label": LIST.tableView,
               },
             ]}
           />
@@ -391,7 +376,7 @@ export default function Assistants() {
         ) : isError ? (
           <div className="rounded-xl border border-border bg-card shadow-xs">
             <InlineError
-              title="Couldn't load assistants"
+              title={LIST.errorTitle}
               description={
                 error instanceof AssistantApiRequestError
                   ? error.message
@@ -405,15 +390,15 @@ export default function Assistants() {
           <div className="rounded-xl border border-border bg-card shadow-xs">
             <EmptyState
               icon={Bot}
-              title="Create your first assistant"
-              description="Pick a template to get started. Nothing is saved until you select Save Draft in the builder."
+              title={LIST.emptyTitle}
+              description={LIST.emptyDetail}
               action={
                 <Button
-                  onClick={() => navigate("/assistants/new")}
+                  onClick={() => navigate(NEW_PATH)}
                   className="h-9 gap-1.5 text-sm"
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
-                  New Assistant
+                  {LIST.newAssistant}
                 </Button>
               }
               className="py-16"
@@ -423,23 +408,22 @@ export default function Assistants() {
           <div className="rounded-xl border border-border bg-card shadow-xs">
             <EmptyState
               icon={Bot}
-              title="No assistants match your search"
-              description="Try a different name, template, or status filter."
+              title={LIST.noMatchTitle}
+              description={LIST.noMatchDetail}
               className="py-16"
             />
           </div>
         ) : view === "table" ? (
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Template</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Phone number</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{LIST.colName}</TableHead>
+                  <TableHead>{LIST.colTemplate}</TableHead>
+                  <TableHead>{LIST.colStatus}</TableHead>
+                  <TableHead>{LIST.colProviderLink}</TableHead>
+                  <TableHead>{LIST.colUpdated}</TableHead>
+                  <TableHead className="text-right">{LIST.colActions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -448,10 +432,9 @@ export default function Assistants() {
                     <TableCell className="max-w-[220px]">
                       <button
                         type="button"
-                        onClick={() =>
-                          navigate(`/assistants/${assistant.id}/setup`)
-                        }
-                        className="truncate text-left text-sm font-medium text-foreground hover:text-primary"
+                        onClick={() => openAssistant(assistant)}
+                        aria-label={openAccessibleName(assistant.name)}
+                        className="truncate rounded-sm text-left text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {assistant.name}
                       </button>
@@ -466,34 +449,25 @@ export default function Assistants() {
                       />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {providerLabel(assistant)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      Available after Phone Numbers setup
+                      {providerLinkLabel(assistant)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {formatUpdatedAt(assistant.updatedAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <RowActions
-                        assistant={assistant}
-                        onEdit={() =>
-                          navigate(`/assistants/${assistant.id}/setup`)
-                        }
-                        onOpenTest={() =>
-                          navigate(`/assistants/${assistant.id}/setup`)
-                        }
-                        onOpenPublish={() =>
-                          navigate(`/assistants/${assistant.id}/setup`)
-                        }
-                        onDuplicate={() => handleDuplicate(assistant)}
-                        onDelete={() => setDeleteTarget(assistant)}
-                        duplicatePending={duplicateMutation.isPending}
-                        menuTriggerRef={(el) => {
-                          if (el) rowMenuRefs.current.set(assistant.id, el);
-                          else rowMenuRefs.current.delete(assistant.id);
-                        }}
-                      />
+                      <div className="flex justify-end">
+                        <RowActions
+                          assistant={assistant}
+                          onOpen={() => openAssistant(assistant)}
+                          onDuplicate={() => handleDuplicate(assistant)}
+                          onDelete={() => setDeleteTarget(assistant)}
+                          duplicatePending={duplicateMutation.isPending}
+                          menuTriggerRef={(el) => {
+                            if (el) rowMenuRefs.current.set(assistant.id, el);
+                            else rowMenuRefs.current.delete(assistant.id);
+                          }}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -510,10 +484,9 @@ export default function Assistants() {
                 <div className="flex items-start justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      navigate(`/assistants/${assistant.id}/setup`)
-                    }
-                    className="min-w-0 flex-1 truncate text-left font-display text-sm font-semibold text-foreground hover:text-primary"
+                    onClick={() => openAssistant(assistant)}
+                    aria-label={openAccessibleName(assistant.name)}
+                    className="min-w-0 flex-1 truncate rounded-sm text-left font-display text-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {assistant.name}
                   </button>
@@ -526,23 +499,18 @@ export default function Assistants() {
                   {templateDisplayName(assistant.templateKey)}
                 </p>
                 <div className="mt-3 space-y-1 text-[11px] text-muted-foreground">
-                  <p>Provider: {providerLabel(assistant)}</p>
-                  <p>Phone number: Available after Phone Numbers setup</p>
+                  <p>
+                    {LIST.colProviderLink}: {providerLinkLabel(assistant)}
+                  </p>
                   <p>Updated {formatUpdatedAt(assistant.updatedAt)}</p>
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
                   <span className="text-[11px] text-muted-foreground">
-                    {isEligibleForDelete(assistant) ? "Draft" : "Locked"}
+                    {isEligibleForDelete(assistant) ? LIST.draft : LIST.locked}
                   </span>
                   <RowActions
                     assistant={assistant}
-                    onEdit={() => navigate(`/assistants/${assistant.id}/setup`)}
-                    onOpenTest={() =>
-                      navigate(`/assistants/${assistant.id}/setup`)
-                    }
-                    onOpenPublish={() =>
-                      navigate(`/assistants/${assistant.id}/setup`)
-                    }
+                    onOpen={() => openAssistant(assistant)}
                     onDuplicate={() => handleDuplicate(assistant)}
                     onDelete={() => setDeleteTarget(assistant)}
                     duplicatePending={duplicateMutation.isPending}
@@ -566,15 +534,14 @@ export default function Assistants() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes this assistant draft. This action cannot
-              be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>
+              {deleteDialogTitle(deleteTarget?.name ?? "")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{LIST.deleteDetail}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {LIST.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
@@ -590,7 +557,7 @@ export default function Assistants() {
                   aria-hidden="true"
                 />
               )}
-              Delete
+              {LIST.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -9,6 +9,13 @@ import { AssistantApiError } from "../lib/voiceAssistants/errors.js";
 import { validateRouteId } from "../lib/voiceAssistants/validation.js";
 import { publishAssistant } from "../lib/voicePublishing/publishService.js";
 import { buildPublishRouteError, type PublishRouteError } from "../lib/voicePublishing/publishHttpErrors.js";
+import { synchronizePublishedAssistant } from "../lib/voicePublishing/syncService.js";
+import { buildSyncRouteError, type SyncRouteError } from "../lib/voicePublishing/syncErrors.js";
+import {
+  getBrowserTestSession,
+  buildBrowserTestSessionError,
+  type BrowserTestSessionError,
+} from "../lib/voiceAssistants/browserTestSession.js";
 
 const router = Router();
 
@@ -219,6 +226,109 @@ router.post(
         "[receptionist] voice assistant publish request failed",
       );
       sendPublishError(res, buildPublishRouteError("internal_error"));
+    }
+  },
+);
+
+// ── POST /api/receptionist/voice/assistants/:id/sync ──────────────────────────
+// AR-001V. Same contract as publish: firmId comes only from the authenticated
+// session, and the body must be absent or `{}` — the browser may not supply a
+// provider, a providerAssistantId, an attempt id, a config, or a digest. The
+// response carries no provider assistant id and no provider response.
+
+function sendSyncError(res: Response, error: SyncRouteError): void {
+  res.status(error.status).json({
+    error: { code: error.code, message: error.message, retryable: error.retryable },
+  });
+}
+
+router.post(
+  "/receptionist/voice/assistants/:id/sync",
+  requireReceptionistAuth,
+  async (req: Request, res: Response) => {
+    let assistantId: number;
+    try {
+      assertEmptyPublishBody(req.body);
+      assistantId = validateRouteId(req.params.id as string);
+    } catch (err) {
+      if (err instanceof AssistantApiError) {
+        sendSyncError(res, buildSyncRouteError("invalid_request"));
+        return;
+      }
+      req.log.error(
+        { operation: "sync", firmId: req.firmId, category: "unexpected_internal_error", errorClass: safeErrorClassName(err) },
+        "[receptionist] voice assistant sync request failed",
+      );
+      sendSyncError(res, buildSyncRouteError("internal_error"));
+      return;
+    }
+
+    try {
+      const result = await synchronizePublishedAssistant(req.firmId!, assistantId);
+      if (result.ok) {
+        res.status(200).json({ assistant: result.assistant });
+        return;
+      }
+      sendSyncError(res, result.error);
+    } catch (err) {
+      req.log.error(
+        {
+          operation: "sync",
+          firmId: req.firmId,
+          assistantId,
+          category: "unexpected_internal_error",
+          errorClass: safeErrorClassName(err),
+        },
+        "[receptionist] voice assistant sync request failed",
+      );
+      sendSyncError(res, buildSyncRouteError("internal_error"));
+    }
+  },
+);
+
+// ── GET /api/receptionist/voice/assistants/:id/browser-test-session ───────────
+// AR-001V.1. The only endpoint that ever returns a provider assistant id, and
+// it returns nothing else. The client calls it exactly once, after the owner
+// confirms Start Browser Test — never on page load. It performs no provider
+// request and constructs no provider client.
+
+function sendBrowserTestSessionError(res: Response, error: BrowserTestSessionError): void {
+  res.status(error.status).json({ error: { code: error.code, message: error.message } });
+}
+
+router.get(
+  "/receptionist/voice/assistants/:id/browser-test-session",
+  requireReceptionistAuth,
+  async (req: Request, res: Response) => {
+    let assistantId: number;
+    try {
+      assistantId = validateRouteId(req.params.id as string);
+    } catch {
+      sendBrowserTestSessionError(res, buildBrowserTestSessionError("invalid_request"));
+      return;
+    }
+
+    try {
+      const result = await getBrowserTestSession(req.firmId!, assistantId);
+      if (result.ok) {
+        res.status(200).json({ session: result.session });
+        return;
+      }
+      sendBrowserTestSessionError(res, result.error);
+    } catch (err) {
+      // Only the error class name is logged — never the row, the provider id,
+      // the assistant config, or the raw error.
+      req.log.error(
+        {
+          operation: "browser_test_session",
+          firmId: req.firmId,
+          assistantId,
+          category: "unexpected_internal_error",
+          errorClass: safeErrorClassName(err),
+        },
+        "[receptionist] voice assistant browser-test session request failed",
+      );
+      sendBrowserTestSessionError(res, buildBrowserTestSessionError("internal_error"));
     }
   },
 );

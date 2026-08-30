@@ -11,8 +11,16 @@ import {
 } from "lucide-react";
 
 /**
- * Eight starting points for a new assistant (Checkpoint B3 — template picker).
- * Selecting one only prefills local builder state; nothing is created or saved.
+ * Eight starting points for a new assistant. Selecting one only prefills
+ * local builder state; nothing is created or saved.
+ *
+ * AR-001I rewrote every `outcome` line. They were written as promises of a
+ * working answering service — "Answers every call…", "Books and confirms
+ * appointments so your calendar fills itself.", "Keeps the phone answered
+ * after your team clocks out." — and one `useCase` promised "never missing a
+ * call again". Nothing behind this journey answers a call: there is no phone
+ * number, no PSTN path and no inbound route. Each line now says what
+ * selecting the template actually does, which is prefill the builder.
  */
 export interface AssistantTemplate {
   id: string;
@@ -37,7 +45,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "ai-receptionist",
     name: "AI Receptionist",
     icon: Bot,
-    outcome: "Answers every call, greets callers, and routes them to the right outcome.",
+    outcome: "Prefills a front-desk assistant that greets callers and routes them to the right outcome.",
     responsibilities: [
       "Greet callers and confirm who they've reached",
       "Answer common questions about hours, location, and services",
@@ -59,7 +67,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "appointment-setter",
     name: "Appointment Setter",
     icon: CalendarClock,
-    outcome: "Books and confirms appointments so your calendar fills itself.",
+    outcome: "Prefills an assistant that offers available times and confirms the booking on the call.",
     responsibilities: [
       "Offer available times and confirm bookings",
       "Collect the details needed to prepare for the visit",
@@ -81,7 +89,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "lead-qualification",
     name: "Lead Qualification",
     icon: Target,
-    outcome: "Separates real buyers from window shoppers before they reach your team.",
+    outcome: "Prefills an assistant that asks qualifying questions and flags high-intent callers.",
     responsibilities: [
       "Ask qualifying questions in a natural conversation",
       "Score interest and readiness to buy",
@@ -103,7 +111,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "customer-support",
     name: "Customer Support",
     icon: Headset,
-    outcome: "Resolves common issues on the spot and escalates the rest cleanly.",
+    outcome: "Prefills an assistant that handles common issues and escalates the rest with context.",
     responsibilities: [
       "Answer frequently asked support questions",
       "Walk callers through simple troubleshooting",
@@ -125,13 +133,13 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "after-hours-receptionist",
     name: "After-Hours Receptionist",
     icon: MoonStar,
-    outcome: "Keeps the phone answered after your team clocks out.",
+    outcome: "Prefills an assistant that explains you're closed and captures details for follow-up.",
     responsibilities: [
       "Let callers know they've reached you outside business hours",
       "Capture the details for a next-business-day follow-up",
       "Flag anything urgent for immediate escalation",
     ],
-    useCase: "Best for never missing a call again, even at 9pm on a Saturday.",
+    useCase: "Best for capturing what comes in outside business hours.",
     defaults: {
       role: "After-hours receptionist",
       primaryGoal: "Capture every after-hours call so nothing is missed",
@@ -147,7 +155,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "real-estate-inquiry",
     name: "Real Estate Inquiry Assistant",
     icon: Home,
-    outcome: "Fields property inquiries and connects serious buyers to an agent.",
+    outcome: "Prefills an assistant that fields listing questions and routes serious inquiries to an agent.",
     responsibilities: [
       "Answer common questions about listings",
       "Gather buyer or renter requirements",
@@ -169,7 +177,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "law-firm-intake",
     name: "Law Firm Intake Assistant",
     icon: Scale,
-    outcome: "Handles first-contact intake so attorneys only see qualified matters.",
+    outcome: "Prefills an assistant that gathers first-contact intake details for attorney review.",
     responsibilities: [
       "Gather the basics of a prospective client's matter",
       "Screen for conflicts and practice-area fit",
@@ -191,7 +199,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     id: "blank",
     name: "Blank Assistant",
     icon: FileQuestion,
-    outcome: "Start with a clean slate and build the assistant your way.",
+    outcome: "Starts with a clean slate so you can build the assistant your way.",
     responsibilities: [
       "No defaults applied",
       "Every field starts empty",

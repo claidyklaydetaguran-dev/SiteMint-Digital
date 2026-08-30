@@ -1,7 +1,13 @@
 import { Input } from "@/components/ui/input";
-import { DisabledFeatureCard } from "@/components/common/DisabledFeatureCard";
-import { Phone } from "lucide-react";
 import type { BuilderTabProps } from "@/pages/AssistantBuilder";
+
+/**
+ * AR-001I removed an "Assigned phone number" block from the foot of this
+ * tab. It rendered a fixed string promising a number "after Phone Numbers
+ * setup" — no response supplied it, no endpoint assigns a number, and no
+ * such setup exists. Nothing replaces it: a number the product cannot give
+ * is better left unmentioned than mocked up.
+ */
 
 function Field({
   id,
@@ -71,16 +77,6 @@ export default function SetupTab({ draft, update }: BuilderTabProps) {
         placeholder="What should this assistant accomplish on most calls?"
         helpText="A short sentence describing the main outcome this assistant should drive toward."
       />
-
-      <div>
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">Assigned phone number</p>
-        <DisabledFeatureCard
-          icon={Phone}
-          title="No number assigned"
-          description="Connect or provision a number to route calls to this assistant."
-          availability="Available after Phone Numbers setup"
-        />
-      </div>
     </div>
   );
 }

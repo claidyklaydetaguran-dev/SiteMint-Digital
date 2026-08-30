@@ -9,7 +9,10 @@ import {
   type AssistantAdvancedState,
   type FirstMessageMode,
 } from "@/hooks/useAssistantDrafts";
-import type { VoicePresetId } from "@/lib/assistantEstimates";
+import {
+  isStoredVoicePreset,
+  type StoredVoicePresetId,
+} from "@/pages/assistants/assistantsContract";
 
 /**
  * Milestone 1 / Checkpoint E2: deterministic, provider-neutral mapping
@@ -57,18 +60,15 @@ function firstMessageMode(value: unknown, fallback: FirstMessageMode): FirstMess
     : fallback;
 }
 
-const VOICE_PRESET_IDS: VoicePresetId[] = [
-  "natural-balanced",
-  "fast-response",
-  "highest-intelligence",
-  "budget-friendly",
-  "custom",
-];
-
-function voicePresetId(value: unknown, fallback: VoicePresetId): VoicePresetId {
-  return typeof value === "string" && (VOICE_PRESET_IDS as string[]).includes(value)
-    ? (value as VoicePresetId)
-    : fallback;
+/**
+ * AR-001I: a stored preset is preserved exactly as saved, including a
+ * retired one such as `custom`. Collapsing it to the template default here
+ * would silently re-label the customer's configuration as a preset they
+ * never chose — and then persist that on the next save. The builder shows a
+ * recovery state for it instead, and only an explicit choice changes it.
+ */
+function voicePresetId(value: unknown, fallback: StoredVoicePresetId): StoredVoicePresetId {
+  return isStoredVoicePreset(value) ? value : fallback;
 }
 
 function sanitizeSetup(value: unknown, fallback: AssistantSetupState): AssistantSetupState {

@@ -1,27 +1,31 @@
 import { Link } from "wouter";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
-import { signInHref, workHref, pricingHref } from "./navConfig";
+import { signInHref, workHref } from "./navConfig";
+import { ROUTES } from "@/lib/routes";
 
+// Frontend V2 Phase 1, owner decision 4: the "Pricing" entry was removed from
+// the Services group. `/pricing` is deferred out of the approved public
+// navigation and IA until real package scope and prices are approved; the
+// route and its source are retained only as a rollback reference.
 const footerGroups = [
   {
     heading: "Products",
     links: [
-      { label: "AI Receptionist", href: "/ai-receptionist" },
+      { label: "AI Receptionist", href: ROUTES.aiReceptionist },
     ],
   },
   {
     heading: "Services",
     links: [
-      { label: "All Services", href: "/services" },
-      { label: "Pricing", href: pricingHref },
+      { label: "All Services", href: ROUTES.services },
     ],
   },
   {
     heading: "Company",
     links: [
-      { label: "About", href: "/about" },
+      { label: "About", href: ROUTES.about },
       { label: "Work", href: workHref },
-      { label: "Contact", href: "/contact" },
+      { label: "Contact", href: ROUTES.contact },
     ],
   },
 ];
@@ -113,14 +117,16 @@ export function PlatformPreviewFooter({ variant = "light" }: { variant?: "light"
           </h2>
           <ul className="flex flex-col gap-3">
             <li>
-              <Link
+              {/* Cross-application document navigation — <a>, never <Link>.
+                  See navConfig.ts's signInHref note. */}
+              <a
                 href={signInHref}
                 aria-label="Sign in to AI Receptionist"
                 className={`${linkClassName} ${linkHoverClassName}`}
                 style={linkStyle}
               >
                 Sign In
-              </Link>
+              </a>
             </li>
             <li>
               <a href="mailto:info.sitemint@gmail.com" className={`${linkClassName} ${linkHoverClassName}`} style={linkStyle}>

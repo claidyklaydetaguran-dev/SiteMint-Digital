@@ -1,465 +1,774 @@
-import { useState, useEffect } from "react";
+/**
+ * Frontend V2 Phase 9 — the Current SMS Receptionist workspace.
+ *
+ * Mounted at `ROUTES.receptionist` (`/receptionist`, base-relative) inside the
+ * Phase 7 `DashboardShell`. It inherits that shell's navigation rail, its
+ * `<main>` landmark, its skip link, its palette and its motion system; it adds
+ * no second design system and no chrome of its own.
+ *
+ * ── Requests, unchanged ───────────────────────────────────────────────────
+ * One authenticated GET and one authenticated PATCH, exactly as before:
+ *   • `GET   /api/receptionist/agent-config`
+ *   • `PATCH /api/receptionist/agent-config`  `{greetingMessage,
+ *      businessDescription, qualifyingQuestions}`
+ * Same paths, same methods, same payload keys, same response shapes, same
+ * `["agent-config"]` query key, same cookie session, same default caching and
+ * retry. No polling was added — this route has no refetch interval, exactly as
+ * it had none before. Firm scoping stays server-side; nothing here sends a firm
+ * identifier.
+ *
+ * Every claim, limit, validation rule and piece of copy lives in
+ * `receptionistContract.ts`, which documents the evidence for each. The three
+ * things this page will not say — that the receptionist is "Active", what the
+ * SMS number is, and that it can be tested — are argued there in full.
+ *
+ * ── Defects in the previous workspace that this fixes ─────────────────────
+ *  1. **Every field rendered blank.** The server wraps the configuration in a
+ *     `firm` object; the page read the fields off the top level, so a fully
+ *     configured firm saw an empty form — and a first save PATCHed those empty
+ *     values over its real settings. `readAgentConfig` reads the documented
+ *     shape.
+ *  2. **A hardcoded "Active" badge.** No status field exists anywhere in the
+ *     product. Replaced by what can actually be read: whether the three
+ *     settings this route owns are saved.
+ *  3. **A fake SMS preview** rendering an invented customer message and an
+ *     invented AI reply. Removed; nothing on this page simulates a
+ *     conversation.
+ *  4. **A background refetch could silently wipe an in-progress edit**, because
+ *     the form re-seeded from the query on every change. It now re-seeds only
+ *     when the form is clean, or when the account itself changes.
+ *  5. **Blank question rows vanished on save** — they were filtered out of the
+ *     payload without a word. A blank row is a validation error now, and the
+ *     owner's text stays put.
+ *  6. **Over-long text was silently truncated** by `.slice()` before sending.
+ *     It is a validation error now, so nothing is discarded without saying so.
+ *  7. **A save failure said only "Save failed — please try again."** with no
+ *     distinction between a rejection, an expired session and a server error.
+ */
+
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { AlertTriangle, ArrowRight, Check, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AGENT_TEMPLATES } from "@/lib/agentTemplates";
 import {
-  Plus,
-  Trash2,
-  CheckCircle2,
-  RefreshCw,
-  Save,
-  ChevronUp,
-  ChevronDown,
-  Smartphone,
-} from "lucide-react";
+  AGENT_CONFIG_PATH,
+  AGENT_CONFIG_QUERY_KEY,
+  LIMITS,
+  buildPayload,
+  deriveStatus,
+  diffDraft,
+  draftFrom,
+  hasErrors,
+  overwriteWarning,
+  readAgentConfig,
+  readFailure,
+  readOnlyFields,
+  saveAnnouncement,
+  saveFailure,
+  saveGate,
+  validateDraft,
+  type AgentConfigFields,
+  type Draft,
+  type SaveStatus,
+} from "@/pages/receptionist/receptionistContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-receptionist.css";
 
-interface AgentConfigData {
-  name: string;
-  industry: string | null;
-  greetingMessage: string | null;
-  businessDescription: string | null;
-  qualifyingQuestions: string[];
+function statusOf(error: unknown): number | undefined {
+  return typeof error === "object" && error !== null && "status" in error
+    ? (error as { status?: number }).status
+    : undefined;
 }
-
-// ─── Character counter ──────────────────────────────────────────────────────
-
-function CharCount({ value, max }: { value: string; max: number }) {
-  const len = value.length;
-  const over = len > max;
-  const nearLimit = len >= Math.floor(max * 0.85);
-  return (
-    <span
-      className={`text-[11px] tabular-nums ${
-        over
-          ? "text-rose-600 font-semibold"
-          : nearLimit
-          ? "text-amber-600"
-          : "text-muted-foreground"
-      }`}
-      aria-live="polite"
-    >
-      {len}/{max}
-    </span>
-  );
-}
-
-// ─── Phone preview card ─────────────────────────────────────────────────────
-
-function PhonePreview({
-  greeting,
-  questions,
-}: {
-  greeting: string;
-  questions: string[];
-}) {
-  const previewGreeting = greeting.trim() || "Your greeting will appear here…";
-  const previewQ = questions.find((q) => q.trim());
-
-  return (
-    <div className="w-52 flex-shrink-0 hidden lg:flex flex-col pt-1">
-      <div className="flex items-center gap-1.5 mb-3">
-        <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          SMS Preview
-        </p>
-      </div>
-      {/* Phone frame */}
-      <div className="bg-[#111a15] rounded-[28px] p-2 shadow-lg">
-        <div className="bg-card rounded-[20px] overflow-hidden">
-          {/* Notch */}
-          <div className="bg-[#111a15] h-5 flex items-center justify-center">
-            <div className="w-12 h-1 bg-[#2a352f] rounded-full" />
-          </div>
-          {/* Header bar */}
-          <div className="bg-muted px-3 py-2 border-b border-border">
-            <p className="text-[10px] text-center text-muted-foreground font-medium">
-              AI Receptionist · SMS
-            </p>
-          </div>
-          {/* Messages */}
-          <div className="p-3 space-y-2.5 min-h-[260px] bg-surface-muted">
-            {/* Greeting bubble */}
-            <div className="flex justify-start">
-              <div className="bg-card rounded-2xl rounded-tl-sm px-3 py-2 max-w-[90%] border border-border shadow-sm">
-                <p className="text-[10px] text-foreground leading-relaxed">
-                  {previewGreeting.length > 120
-                    ? previewGreeting.slice(0, 117) + "…"
-                    : previewGreeting}
-                </p>
-              </div>
-            </div>
-            {/* Caller reply placeholder */}
-            <div className="flex justify-end">
-              <div className="bg-primary rounded-2xl rounded-tr-sm px-3 py-2 max-w-[75%]">
-                <p className="text-[10px] text-primary-foreground/80">Hi, I need help with…</p>
-              </div>
-            </div>
-            {/* First question */}
-            {previewQ && (
-              <div className="flex justify-start">
-                <div className="bg-card rounded-2xl rounded-tl-sm px-3 py-2 max-w-[90%] border border-border shadow-sm">
-                  <p className="text-[10px] text-foreground leading-relaxed">
-                    {previewQ.length > 100 ? previewQ.slice(0, 97) + "…" : previewQ}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Bottom bar */}
-          <div className="bg-card border-t border-border px-3 py-2 flex items-center gap-1.5">
-            <div className="flex-1 h-6 bg-muted rounded-full" />
-            <div className="w-6 h-6 bg-primary rounded-full" />
-          </div>
-        </div>
-      </div>
-      <p className="text-[10px] text-muted-foreground text-center mt-3 leading-snug">
-        Approximate preview — exact formatting depends on carrier.
-      </p>
-    </div>
-  );
-}
-
-// ─── Main page ──────────────────────────────────────────────────────────────
 
 export default function AgentConfig() {
-  const qc = useQueryClient();
-  const [saved, setSaved] = useState(false);
-  const [appliedId, setAppliedId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const headingId = useId();
 
-  const { data: config, isLoading } = useQuery<AgentConfigData>({
-    queryKey: ["agent-config"],
-    queryFn: () => apiFetch<AgentConfigData>("/receptionist/agent-config"),
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: [AGENT_CONFIG_QUERY_KEY],
+    queryFn: () => apiFetch<unknown>(AGENT_CONFIG_PATH),
   });
 
-  const [greeting, setGreeting]       = useState("");
-  const [description, setDescription] = useState("");
-  const [questions, setQuestions]     = useState<string[]>([]);
+  const config: AgentConfigFields | null = useMemo(
+    () => (data === undefined ? null : readAgentConfig(data)),
+    [data],
+  );
+
+  // ── The draft ────────────────────────────────────────────────────────────
+  // Seeded from saved configuration, and re-seeded only when it is safe to:
+  // when the form has no unsaved work, or when the account itself changed.
+  // A background refetch must never take an owner's half-written text away.
+
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const seededFor = useRef<string | null>(null);
+  const draftRef = useRef<Draft | null>(null);
+  draftRef.current = draft;
 
   useEffect(() => {
     if (!config) return;
-    setGreeting(config.greetingMessage ?? "");
-    setDescription(config.businessDescription ?? "");
-    setQuestions(config.qualifyingQuestions ?? []);
+    const identity = config.name ?? "";
+    const current = draftRef.current;
+    const accountChanged = seededFor.current !== null && seededFor.current !== identity;
+    const clean = current === null || !diffDraft(current, config).dirty;
+    if (current === null || accountChanged || clean) {
+      setDraft(draftFrom(config));
+      seededFor.current = identity;
+    }
   }, [config]);
 
-  const isDirty = config
-    ? greeting !== (config.greetingMessage ?? "") ||
-      description !== (config.businessDescription ?? "") ||
-      JSON.stringify(questions) !== JSON.stringify(config.qualifyingQuestions ?? [])
-    : false;
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [showTemplateWarning, setShowTemplateWarning] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const saveRegionRef = useRef<HTMLDivElement | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
+
+  const diff = config && draft ? diffDraft(draft, config) : null;
+  const errors = useMemo(
+    () => (draft ? validateDraft(draft) : { questions: {} }),
+    [draft],
+  );
+
+  // A synchronous in-flight latch. `mutation.isPending` and the button's
+  // `disabled` attribute both settle on a later render, so three clicks
+  // dispatched in one tick all read the stale value and all send — verified
+  // against a real build before this ref existed. A ref updates immediately, so
+  // the second and third clicks are refused by the same turn of the event loop.
+  const inFlight = useRef(false);
 
   const mutation = useMutation({
-    mutationFn: (payload: Partial<AgentConfigData>) =>
-      apiFetch<AgentConfigData>("/receptionist/agent-config", {
+    mutationFn: (payload: Draft) =>
+      apiFetch<unknown>(AGENT_CONFIG_PATH, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
     onSuccess: (updated) => {
-      qc.setQueryData(["agent-config"], updated);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      // The server's own response is the new truth. The draft is not treated as
+      // saved until this arrives — there is no optimistic update anywhere here.
+      const next = readAgentConfig(updated);
+      if (next) {
+        queryClient.setQueryData([AGENT_CONFIG_QUERY_KEY], updated);
+        setDraft(draftFrom(next));
+        seededFor.current = next.name ?? "";
+      }
+      setSaveStatus("saved");
+      setSubmitAttempted(false);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSaveStatus("idle"), 6000);
+    },
+    onError: () => setSaveStatus("error"),
+    onSettled: () => {
+      inFlight.current = false;
     },
   });
 
-  const handleSave = () => {
-    mutation.mutate({
-      greetingMessage:     greeting.slice(0, 500),
-      businessDescription: description.slice(0, 1000),
-      qualifyingQuestions: questions.map((q) => q.slice(0, 200)).filter(Boolean),
-    });
-  };
+  const gate = saveGate({
+    dirty: Boolean(diff?.dirty),
+    saving: mutation.isPending,
+    configLoaded: Boolean(config && draft),
+  });
 
-  const handleReset = () => {
-    if (!config) return;
-    setGreeting(config.greetingMessage ?? "");
-    setDescription(config.businessDescription ?? "");
-    setQuestions(config.qualifyingQuestions ?? []);
-    setAppliedId(null);
-  };
+  const handleSave = useCallback(() => {
+    if (!draft) return;
+    setSubmitAttempted(true);
+    // Three guards against a duplicate save, in order of how quickly they act:
+    // the synchronous latch, the pending flag, and the button's disabled state.
+    if (inFlight.current || mutation.isPending) return;
+    if (hasErrors(validateDraft(draft))) {
+      // The button stays live when the form is invalid precisely so this can
+      // happen: the errors appear and focus moves to the first one, rather than
+      // the owner pressing a dead control and being told nothing.
+      requestAnimationFrame(() => {
+        const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+        firstInvalid?.focus();
+      });
+      return;
+    }
+    if (!diff?.dirty) return;
+    inFlight.current = true;
+    setSaveStatus("saving");
+    mutation.mutate(buildPayload(draft));
+  }, [draft, diff, mutation]);
 
-  const applyTemplate = (id: string) => {
-    const tpl = AGENT_TEMPLATES.find((t) => t.id === id);
-    if (!tpl) return;
-    setAppliedId(id);
-    setGreeting(tpl.greetingMessage);
-    setDescription(tpl.businessDescription);
-    setQuestions(tpl.qualifyingQuestions);
-  };
+  const update = useCallback((patch: Partial<Draft>) => {
+    setDraft((d) => (d ? { ...d, ...patch } : d));
+    setSaveStatus((s) => (s === "saved" ? "idle" : s));
+  }, []);
 
-  const addQuestion = () => setQuestions((q) => [...q, ""]);
-  const removeQuestion = (i: number) => setQuestions((q) => q.filter((_, idx) => idx !== i));
-  const updateQuestion = (i: number, val: string) =>
-    setQuestions((q) => q.map((v, idx) => (idx === i ? val : v)));
-  const moveQuestion = (i: number, dir: "up" | "down") => {
-    setQuestions((q) => {
-      const next = [...q];
-      const j = dir === "up" ? i - 1 : i + 1;
-      if (j < 0 || j >= next.length) return next;
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
-  };
+  const setQuestion = useCallback((index: number, value: string) => {
+    setDraft((d) =>
+      d
+        ? { ...d, qualifyingQuestions: d.qualifyingQuestions.map((q, i) => (i === index ? value : q)) }
+        : d,
+    );
+    setSaveStatus((s) => (s === "saved" ? "idle" : s));
+  }, []);
 
-  if (isLoading || !config) {
+  // ── Loading ──────────────────────────────────────────────────────────────
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full bg-card">
-        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="sr-page" aria-busy="true">
+        <div className="sd-page__head">
+          <h1 className="sd-page__title">SMS receptionist</h1>
+        </div>
+        <p className="sr-loading" role="status">
+          Loading your receptionist&rsquo;s settings…
+        </p>
+        <div className="sr-skeleton sr-skeleton--band" aria-hidden="true" />
+        <div className="sr-skeleton sr-skeleton--group" aria-hidden="true" />
+        <div className="sr-skeleton sr-skeleton--group" aria-hidden="true" />
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col h-full bg-card">
-      {/* Page header */}
-      <div className="px-6 py-4 border-b border-border flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-foreground">Current SMS Receptionist</h1>
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium">
-            Live on SMS
-          </Badge>
+  // ── The configuration could not be read ──────────────────────────────────
+
+  if (isError || !config) {
+    const failure = readFailure(isError ? statusOf(error) : undefined);
+    return (
+      <div className="sr-page sd-enter">
+        <div className="sd-page__head">
+          <h1 className="sd-page__title">SMS receptionist</h1>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          This controls your current SMS receptionist.
-        </p>
-      </div>
-
-      {/* Tab bar */}
-      <div className="border-b border-border px-6 flex gap-6 flex-shrink-0">
-        <button className="py-3 text-sm font-semibold text-primary border-b-2 border-primary -mb-px">
-          Configure
-        </button>
-        <Tooltip delayDuration={200}>
-          <TooltipTrigger asChild>
-            <span className="py-3 text-sm font-medium text-muted-foreground cursor-not-allowed select-none">
-              Test
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">
-            Coming soon
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* Scrollable form area */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Template picker */}
-        <div className="px-6 pt-5 pb-4 border-b border-border">
-          <p className="text-xs font-semibold text-muted-foreground mb-2.5">
-            Start from a template
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {AGENT_TEMPLATES.map((tpl) => (
-              <button
-                key={tpl.id}
-                onClick={() => applyTemplate(tpl.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                  appliedId === tpl.id
-                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
-                    : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-surface-muted"
-                }`}
-              >
-                <span role="img" aria-label={tpl.label}>{tpl.emoji}</span>
-                {tpl.label}
-              </button>
-            ))}
+        <section className="sd-error" role="alert">
+          <AlertTriangle className="sd-error__icon" aria-hidden="true" />
+          <div className="sd-error__body">
+            <span className="sd-error__title">{failure.title}</span>
+            <p className="sd-error__detail">{failure.detail}</p>
           </div>
-          {appliedId && (
-            <p className="text-[11px] text-primary mt-2">
-              Template applied — edit the fields below and save.
+          {failure.sessionExpired ? (
+            <Link href="/login" className="sd-error__action">
+              Sign in
+            </Link>
+          ) : (
+            <button type="button" className="sd-error__action" onClick={() => refetch()}>
+              Try again
+            </button>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  const status = deriveStatus(config);
+  const identity = readOnlyFields(config);
+  // `apiFetch` does not surface the server's message body, so the 400 branch
+  // falls back to its own wording rather than inventing the server's.
+  const saveFailureCopy = mutation.isError ? saveFailure(statusOf(mutation.error)) : null;
+
+  return (
+    <div className="sr-page sd-enter">
+      <div className="sd-page__head">
+        <h1 className="sd-page__title" id={headingId}>
+          SMS receptionist
+        </h1>
+        <span className="sd-page__meta">
+          What it says when someone texts your business
+        </span>
+      </div>
+
+      {/* ── A. Configuration status ────────────────────────────────────── */}
+
+      <section className="sd-status sr-status" data-state={status.state} aria-labelledby={`${headingId}-status`}>
+        <div className="sd-status__head">
+          <span className="sd-status__dot" aria-hidden="true" />
+          <div className="sd-status__body">
+            <h2 className="sd-status__title" id={`${headingId}-status`}>
+              {status.title}
+            </h2>
+            <p className="sd-status__detail">{status.detail}</p>
+          </div>
+        </div>
+        {status.groups.length > 0 && (
+          <ul className="sr-ledger">
+            {status.groups.map((group) => (
+              <li className="sr-ledger__item" key={group.key} data-set={group.set ? "true" : "false"}>
+                <span className="sr-ledger__mark" aria-hidden="true">
+                  {group.set ? <Check className="sr-ledger__icon" /> : null}
+                </span>
+                <span className="sr-ledger__label">{group.label}</span>
+                <span className="sr-ledger__state">{group.set ? "Saved" : "Not set"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {status.next && (
+          <p className="sr-status__next">
+            <a className="sd-link sr-status__link" href={`#${headingId}-${status.next.key}`}>
+              Next: {status.next.label.toLowerCase()}
+              <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
+            </a>
+          </p>
+        )}
+      </section>
+
+      {/* ── B. Receptionist behaviour ──────────────────────────────────── */}
+
+      <form
+        className="sr-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSave();
+        }}
+      >
+        {identity.length > 0 && (
+          <section className="sr-group" aria-labelledby={`${headingId}-identity`}>
+            <div className="sr-group__head">
+              <h2 className="sd-h2" id={`${headingId}-identity`}>
+                Business identity
+              </h2>
+              <span className="sr-group__badge">Read-only here</span>
+            </div>
+            <dl className="sr-facts">
+              {identity.map((field) => (
+                <div className="sr-facts__row" key={field.key}>
+                  <dt className="sr-facts__label">{field.label}</dt>
+                  <dd className="sr-facts__value">
+                    {field.value}
+                    <span className="sr-facts__note">{field.note}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+
+        <TemplateControl
+          onApply={(id) => {
+            const template = AGENT_TEMPLATES.find((t) => t.id === id);
+            if (!template) return;
+            setDraft({
+              greetingMessage: template.greetingMessage,
+              businessDescription: template.businessDescription,
+              qualifyingQuestions: [...template.qualifyingQuestions],
+            });
+            setSaveStatus("idle");
+            setShowTemplateWarning(null);
+          }}
+          warning={overwriteWarning(config)}
+          pendingWarning={showTemplateWarning}
+          setPendingWarning={setShowTemplateWarning}
+          headingId={headingId}
+        />
+
+        {/* Opening message */}
+        <section className="sr-group" aria-labelledby={`${headingId}-greeting`}>
+          <div className="sr-group__head">
+            <h2 className="sd-h2" id={`${headingId}-greeting`} tabIndex={-1}>
+              Opening message
+            </h2>
+            {diff?.greeting && <span className="sr-group__changed">Unsaved change</span>}
+          </div>
+          <TextAreaField
+            id={`${headingId}-greeting-input`}
+            label="The first text someone receives when they message your number"
+            value={draft?.greetingMessage ?? ""}
+            onChange={(v) => update({ greetingMessage: v })}
+            max={LIMITS.greeting}
+            rows={4}
+            error={submitAttempted ? errors.greetingMessage : undefined}
+            help="Say who is replying and invite them to describe what they need."
+          />
+        </section>
+
+        {/* Business context */}
+        <section className="sr-group" aria-labelledby={`${headingId}-description`}>
+          <div className="sr-group__head">
+            <h2 className="sd-h2" id={`${headingId}-description`} tabIndex={-1}>
+              What your business does
+            </h2>
+            {diff?.description && <span className="sr-group__changed">Unsaved change</span>}
+          </div>
+          <TextAreaField
+            id={`${headingId}-description-input`}
+            label="The context your receptionist uses to answer questions"
+            value={draft?.businessDescription ?? ""}
+            onChange={(v) => update({ businessDescription: v })}
+            max={LIMITS.description}
+            rows={6}
+            error={submitAttempted ? errors.businessDescription : undefined}
+            help="Services, prices, areas you cover, how long things take. Specific detail produces better answers."
+          />
+        </section>
+
+        {/* Qualifying questions */}
+        <section className="sr-group" aria-labelledby={`${headingId}-questions`} id={`${headingId}-questions`}>
+          <div className="sr-group__head">
+            <h2 className="sd-h2" id={`${headingId}-questions`} tabIndex={-1}>
+              Questions it asks
+            </h2>
+            {diff?.questions && <span className="sr-group__changed">Unsaved change</span>}
+          </div>
+          <p className="sr-group__help">
+            Asked after the opening message, in this order, to work out what each person needs.
+            Up to {LIMITS.questions}.
+          </p>
+
+          {errors.questionsList && submitAttempted && (
+            <p className="sr-fielderror" role="alert">
+              {errors.questionsList}
             </p>
           )}
-        </div>
 
-        {/* Two-column form */}
-        <div className="flex gap-8 px-6 py-6">
-          {/* Left: form fields */}
-          <div className="flex-1 min-w-0 max-w-xl space-y-5">
-            {/* Business name (read-only) */}
-            <div>
-              <label className="text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5 block">
-                Business Name
-              </label>
-              <Input
-                value={config.name}
-                disabled
-                className="h-9 bg-surface-muted text-muted-foreground border-border text-sm"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Update your business name in account settings.
-              </p>
-            </div>
+          {(draft?.qualifyingQuestions.length ?? 0) === 0 ? (
+            <p className="sr-empty">No questions yet. Your receptionist will reply, but it won&rsquo;t ask anything back.</p>
+          ) : (
+            <ol className="sr-questions">
+              {draft?.qualifyingQuestions.map((question, index) => (
+                <QuestionRow
+                  key={index}
+                  index={index}
+                  total={draft.qualifyingQuestions.length}
+                  value={question}
+                  error={submitAttempted ? errors.questions[index] : undefined}
+                  idBase={`${headingId}-q`}
+                  onChange={(v) => setQuestion(index, v)}
+                  onRemove={() =>
+                    update({
+                      qualifyingQuestions: draft.qualifyingQuestions.filter((_, i) => i !== index),
+                    })
+                  }
+                  onMove={(direction) => {
+                    const next = [...draft.qualifyingQuestions];
+                    const target = direction === "up" ? index - 1 : index + 1;
+                    if (target < 0 || target >= next.length) return;
+                    [next[index], next[target]] = [next[target], next[index]];
+                    update({ qualifyingQuestions: next });
+                  }}
+                />
+              ))}
+            </ol>
+          )}
 
-            {/* Greeting message */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                  Greeting Message
-                </label>
-                <CharCount value={greeting} max={500} />
-              </div>
-              <Textarea
-                placeholder="Hi! This is the virtual receptionist for [Business]. How can I help you today?"
-                className="text-sm resize-none min-h-[80px] border-border focus-visible:ring-ring"
-                maxLength={500}
-                value={greeting}
-                onChange={(e) => setGreeting(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                The first SMS message sent to callers.
-              </p>
-            </div>
+          <button
+            type="button"
+            className="sr-addbtn"
+            onClick={() =>
+              update({ qualifyingQuestions: [...(draft?.qualifyingQuestions ?? []), ""] })
+            }
+            disabled={(draft?.qualifyingQuestions.length ?? 0) >= LIMITS.questions}
+          >
+            <Plus className="sr-addbtn__icon" aria-hidden="true" />
+            Add a question
+          </button>
+          {(draft?.qualifyingQuestions.length ?? 0) >= LIMITS.questions && (
+            <p className="sr-group__help">
+              That&rsquo;s the maximum of {LIMITS.questions}. Remove one to add another.
+            </p>
+          )}
+        </section>
 
-            {/* Business description */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                  Business Description
-                </label>
-                <CharCount value={description} max={1000} />
-              </div>
-              <Textarea
-                placeholder="We are a [type] company that helps customers with…"
-                className="text-sm resize-none min-h-[100px] border-border focus-visible:ring-ring"
-                maxLength={1000}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Context the AI uses to answer questions and qualify leads.
-              </p>
-            </div>
+        {/* ── C. Save and feedback ────────────────────────────────────── */}
 
-            {/* Qualifying questions */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                  Qualifying Questions
-                </label>
-                <button
-                  className="text-xs text-primary hover:text-primary font-medium flex items-center gap-1 disabled:opacity-40 transition-colors"
-                  onClick={addQuestion}
-                  disabled={questions.length >= 6}
-                  aria-label="Add qualifying question"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add
-                </button>
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-3">
-                Questions the AI asks to qualify each lead (up to 6, max 200 chars each).
+        <div
+          className="sr-savebar"
+          data-dirty={diff?.dirty ? "true" : "false"}
+          data-actions={
+            diff?.dirty || mutation.isPending || saveStatus === "saved" || mutation.isError
+              ? "true"
+              : "false"
+          }
+        >
+          <div className="sr-savebar__inner">
+            <div className="sr-savebar__state" ref={saveRegionRef}>
+              <p className="sd-sr" role="status" aria-live="polite">
+                {saveAnnouncement(saveStatus, saveFailureCopy ?? undefined)}
               </p>
-              {questions.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-border rounded-lg text-sm text-muted-foreground">
-                  No questions yet — click Add to create one
-                </div>
+              {mutation.isPending ? (
+                <span className="sr-savebar__text">
+                  <RefreshCw className="sr-spin" aria-hidden="true" /> Saving…
+                </span>
+              ) : saveStatus === "saved" ? (
+                <span className="sr-savebar__text" data-tone="ok">
+                  <Check className="sr-savebar__icon" aria-hidden="true" /> Changes saved
+                </span>
+              ) : diff?.dirty ? (
+                <span className="sr-savebar__text">
+                  {diff.count} unsaved change{diff.count === 1 ? "" : "s"}
+                </span>
               ) : (
-                <div className="space-y-2">
-                  {questions.map((q, i) => (
-                    <div key={i} className="flex flex-col gap-1">
-                      <div className="flex gap-2 items-center">
-                        {/* Reorder buttons */}
-                        <div className="flex flex-col gap-0.5 flex-shrink-0">
-                          <button
-                            onClick={() => moveQuestion(i, "up")}
-                            disabled={i === 0}
-                            className="p-0.5 text-muted-foreground hover:text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            aria-label="Move question up"
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => moveQuestion(i, "down")}
-                            disabled={i === questions.length - 1}
-                            className="p-0.5 text-muted-foreground hover:text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            aria-label="Move question down"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <Input
-                          value={q}
-                          onChange={(e) => updateQuestion(i, e.target.value)}
-                          placeholder={`Question ${i + 1}…`}
-                          maxLength={200}
-                          className="h-9 text-sm border-border focus-visible:ring-ring flex-1"
-                          aria-label={`Qualifying question ${i + 1}`}
-                        />
-                        <button
-                          className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-50 transition-colors flex-shrink-0"
-                          onClick={() => removeQuestion(i)}
-                          aria-label={`Remove question ${i + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <div className="flex justify-end pr-9">
-                        <CharCount value={q} max={200} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <span className="sr-savebar__text" data-tone="quiet">
+                  {isFetching ? "Checking for changes…" : "No unsaved changes"}
+                </span>
               )}
             </div>
-
-            {/* Inline save button (always visible in scroll area) */}
-            <div className="flex items-center gap-3 pt-1">
-              <Button
-                className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold h-9 gap-1.5"
-                onClick={handleSave}
-                disabled={mutation.isPending || (!isDirty && !saved)}
+            <div className="sr-savebar__actions">
+              {diff?.dirty && !mutation.isPending && (
+                <button
+                  type="button"
+                  className="sr-btn sr-btn--quiet"
+                  onClick={() => {
+                    setDraft(draftFrom(config));
+                    setSubmitAttempted(false);
+                    setSaveStatus("idle");
+                    mutation.reset();
+                  }}
+                >
+                  Discard changes
+                </button>
+              )}
+              <button
+                type="submit"
+                className="sr-btn sr-btn--primary"
+                disabled={!gate.enabled}
+                aria-describedby={gate.reason ? `${headingId}-gate` : undefined}
               >
-                {mutation.isPending ? (
-                  <><RefreshCw className="h-4 w-4 animate-spin" /> Saving…</>
-                ) : saved ? (
-                  <><CheckCircle2 className="h-4 w-4" /> Saved</>
-                ) : (
-                  <><Save className="h-4 w-4" /> Save Changes</>
-                )}
-              </Button>
-              {mutation.isError && (
-                <p className="text-xs text-rose-600">Save failed — please try again.</p>
+                Save changes
+              </button>
+              {gate.reason && (
+                <span className="sd-sr" id={`${headingId}-gate`}>
+                  {gate.reason}
+                </span>
               )}
             </div>
           </div>
 
-          {/* Right: phone preview */}
-          <PhonePreview greeting={greeting} questions={questions} />
+          {saveFailureCopy && !mutation.isPending && (
+            <div className="sr-savefail" role="alert">
+              <AlertTriangle className="sr-savefail__icon" aria-hidden="true" />
+              <div>
+                <span className="sr-savefail__title">{saveFailureCopy.title}</span>
+                <p className="sr-savefail__detail">{saveFailureCopy.detail}</p>
+              </div>
+              {saveFailureCopy.sessionExpired ? (
+                <Link href="/login" className="sr-btn sr-btn--quiet">
+                  Sign in
+                </Link>
+              ) : saveFailureCopy.retryable ? (
+                <button type="button" className="sr-btn sr-btn--quiet" onClick={handleSave}>
+                  Retry
+                </button>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ─── Fields ────────────────────────────────────────────────────────────────
+
+function TextAreaField({
+  id,
+  label,
+  value,
+  onChange,
+  max,
+  rows,
+  error,
+  help,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  max: number;
+  rows: number;
+  error?: string;
+  help: string;
+}) {
+  const helpId = `${id}-help`;
+  const errorId = `${id}-error`;
+  const over = value.length > max;
+  return (
+    <div className="sr-field">
+      <label className="sr-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <p className="sr-field__help" id={helpId}>
+        {help}
+      </p>
+      <textarea
+        id={id}
+        className="sr-input sr-input--area"
+        rows={rows}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby={error ? `${errorId} ${helpId} ${id}-count` : `${helpId} ${id}-count`}
+        aria-invalid={error ? "true" : undefined}
+      />
+      <div className="sr-field__foot">
+        {error ? (
+          <p className="sr-fielderror" id={errorId} role="alert">
+            {error}
+          </p>
+        ) : (
+          <span />
+        )}
+        <span className="sr-count" id={`${id}-count`} data-over={over ? "true" : "false"}>
+          {value.length} of {max}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function QuestionRow({
+  index,
+  total,
+  value,
+  error,
+  idBase,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  index: number;
+  total: number;
+  value: string;
+  error?: string;
+  idBase: string;
+  onChange: (value: string) => void;
+  onRemove: () => void;
+  onMove: (direction: "up" | "down") => void;
+}) {
+  const id = `${idBase}-${index}`;
+  const errorId = `${id}-error`;
+  return (
+    <li className="sr-question">
+      <label className="sr-question__label" htmlFor={id}>
+        Question {index + 1}
+      </label>
+      <div className="sr-question__row">
+        <input
+          id={id}
+          className="sr-input"
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error ? "true" : undefined}
+        />
+        <div className="sr-question__tools">
+          <button
+            type="button"
+            className="sr-iconbtn"
+            onClick={() => onMove("up")}
+            disabled={index === 0}
+            aria-label={`Move question ${index + 1} earlier`}
+          >
+            <span aria-hidden="true">↑</span>
+          </button>
+          <button
+            type="button"
+            className="sr-iconbtn"
+            onClick={() => onMove("down")}
+            disabled={index === total - 1}
+            aria-label={`Move question ${index + 1} later`}
+          >
+            <span aria-hidden="true">↓</span>
+          </button>
+          <button
+            type="button"
+            className="sr-iconbtn sr-iconbtn--danger"
+            onClick={onRemove}
+            aria-label={`Remove question ${index + 1}`}
+          >
+            <Trash2 className="sr-iconbtn__icon" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <div className="sr-field__foot">
+        {error ? (
+          <p className="sr-fielderror" id={errorId} role="alert">
+            {error}
+          </p>
+        ) : (
+          <span />
+        )}
+        <span className="sr-count" data-over={value.length > LIMITS.questionLength ? "true" : "false"}>
+          {value.length} of {LIMITS.questionLength}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+// ─── Starting drafts ───────────────────────────────────────────────────────
+//
+// Local example copy, not a server capability. Applying one fills the form and
+// saves nothing; when there is existing configuration to lose, it says so and
+// asks first.
+
+function TemplateControl({
+  onApply,
+  warning,
+  pendingWarning,
+  setPendingWarning,
+  headingId,
+}: {
+  onApply: (id: string) => void;
+  warning: string | null;
+  pendingWarning: string | null;
+  setPendingWarning: (id: string | null) => void;
+  headingId: string;
+}) {
+  const [selected, setSelected] = useState(AGENT_TEMPLATES[0]?.id ?? "");
+  const selectId = `${headingId}-template`;
+
+  return (
+    <section className="sr-group sr-group--quiet" aria-labelledby={`${headingId}-template-title`}>
+      <div className="sr-group__head">
+        <h2 className="sd-h2" id={`${headingId}-template-title`}>
+          Start from an example
+        </h2>
+      </div>
+      <p className="sr-group__help">
+        Fills the three settings below with example wording for a type of business, for you to edit.
+        Nothing is saved until you choose Save changes.
+      </p>
+      <div className="sr-template">
+        <label className="sr-field__label" htmlFor={selectId}>
+          Type of business
+        </label>
+        <div className="sr-template__row">
+          <select
+            id={selectId}
+            className="sr-input sr-select"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            {AGENT_TEMPLATES.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="sr-btn sr-btn--quiet"
+            onClick={() => (warning ? setPendingWarning(selected) : onApply(selected))}
+          >
+            Use this example
+          </button>
         </div>
       </div>
 
-      {/* Sticky save bar — appears when form is dirty */}
-      {isDirty && (
-        <div className="border-t border-primary/20 bg-surface-muted px-6 py-3 flex-shrink-0 flex items-center justify-between gap-4 shadow-md">
-          <p className="text-sm text-primary font-medium">You have unsaved changes</p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              disabled={mutation.isPending}
-              className="h-8 text-sm border-primary/30 text-primary hover:bg-surface-muted"
-            >
-              Discard
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 text-sm bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5"
-              onClick={handleSave}
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? (
-                <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Saving…</>
-              ) : (
-                <><Save className="h-3.5 w-3.5" /> Save Changes</>
-              )}
-            </Button>
+      {pendingWarning && warning && (
+        <div className="sr-confirm" role="alert">
+          <p className="sr-confirm__text">{warning}</p>
+          <div className="sr-confirm__actions">
+            <button type="button" className="sr-btn sr-btn--quiet" onClick={() => setPendingWarning(null)}>
+              Keep what I have
+            </button>
+            <button type="button" className="sr-btn sr-btn--primary" onClick={() => onApply(pendingWarning)}>
+              Replace the form
+            </button>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

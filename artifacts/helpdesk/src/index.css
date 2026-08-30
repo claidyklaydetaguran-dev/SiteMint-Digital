@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap');
+/* Frontend V2 Phase 1: the render-blocking Google Fonts @import (Plus Jakarta
+   Sans + Playfair Display) was removed here, and the matching <link> was
+   removed from index.html. The font stack now comes from the shared
+   @workspace/design-tokens primitives, which Phase 1 moved to a system stack —
+   no remote font request, and no new dependency. */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@workspace/design-tokens/css";
@@ -163,32 +167,33 @@
      the 3:1 non-text minimum). See SHARED_DESIGN_TOKENS_SPEC.md §16. */
   --ring: var(--sm-color-border-focus);
 
+  /* Ocean navy sidebar — matches SiteMint Digital production design system */
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 160 25% 10%;
-  --sidebar-border: 152 16% 88%;
-  --sidebar-primary: 160 76% 22%;
-  --sidebar-primary-foreground: 150 30% 98%;
-  --sidebar-accent: 152 38% 96%;
-  --sidebar-accent-foreground: 160 76% 22%;
-  --sidebar-ring: 160 64% 50%;
+  --sidebar-foreground: 203 76% 8%;
+  --sidebar-border: 207 12% 85%;
+  --sidebar-primary: 204 42% 15%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 169 53% 94%;
+  --sidebar-accent-foreground: 204 42% 15%;
+  --sidebar-ring: 164 82% 53%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 160 25% 10%;
-  --popover-border: 152 16% 88%;
+  --popover-foreground: 203 76% 8%;
+  --popover-border: 207 12% 85%;
 
-  /* Deep evergreen = primary action color */
-  --primary: 160 76% 22%;
-  --primary-foreground: 150 30% 98%;
+  /* Ocean navy = primary action color (#162936) */
+  --primary: 204 42% 15%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 152 30% 94%;
-  --secondary-foreground: 160 25% 12%;
+  --secondary: 169 53% 94%;
+  --secondary-foreground: 203 76% 8%;
 
-  --muted: 152 20% 95%;
-  --muted-foreground: 155 10% 40%;
+  --muted: 169 40% 96%;
+  --muted-foreground: 207 26% 31%;
 
-  /* Bright mint = accent / highlight / focus / data — never body text on white */
-  --accent: 160 64% 50%;
-  --accent-foreground: 160 30% 12%;
+  /* Cyan-mint accent (#27E9B5) — small elements, highlights, charts, icons */
+  --accent: 164 82% 53%;
+  --accent-foreground: 203 76% 8%;
 
   /* Transitional alias onto the shared semantic layer (value unchanged —
      light danger already passes AA, 4.68:1). See SHARED_DESIGN_TOKENS_SPEC.md
@@ -204,12 +209,12 @@
   --info: 199 80% 44%;
   --info-foreground: 0 0% 100%;
 
-  --chart-1: 160 64% 50%;
-  --chart-2: 160 76% 22%;
-  --chart-3: 190 55% 40%;
+  --chart-1: 164 82% 53%;
+  --chart-2: 204 42% 15%;
+  --chart-3: 207 55% 42%;
   --chart-4: 42 85% 55%;
   --chart-5: 6 75% 60%;
-  --chart-6: 210 12% 45%;
+  --chart-6: 207 26% 55%;
 
   /* Typography/radius: transitional aliases onto the shared primitive layer
      (values unchanged — see SHARED_DESIGN_TOKENS_SPEC.md §9, §13). */
@@ -218,17 +223,14 @@
   --app-font-mono: var(--sm-font-mono);
   --radius: var(--sm-radius-md);
 
-  /* Green-tinted, low-opacity layered shadows. shadow-sm/md/lg/2xl/mint-glow
-     alias onto the shared shadow ramp (SHARED_DESIGN_TOKENS_SPEC.md §15) —
-     values unchanged; shadow-2xs/xs/xl are helpdesk-local, not in the shared
-     spec's 5-step ramp, and are left as-is. */
-  --shadow-2xs: 0 1px 0 0 rgb(14 40 30 / 0.04);
-  --shadow-xs: 0 1px 1px 0 rgb(14 40 30 / 0.05);
+  /* Navy-tinted, low-opacity layered shadows — updated from green-tint. */
+  --shadow-2xs: 0 1px 0 0 rgb(5 24 36 / 0.04);
+  --shadow-xs: 0 1px 1px 0 rgb(5 24 36 / 0.05);
   --shadow-sm: var(--sm-shadow-sm);
-  --shadow: 0 1px 3px 0 rgb(14 40 30 / 0.08), 0 1px 2px -1px rgb(14 40 30 / 0.07);
+  --shadow: 0 1px 3px 0 rgb(5 24 36 / 0.08), 0 1px 2px -1px rgb(5 24 36 / 0.07);
   --shadow-md: var(--sm-shadow-md);
   --shadow-lg: var(--sm-shadow-lg);
-  --shadow-xl: 0 20px 25px -5px rgb(14 40 30 / 0.08), 0 8px 10px -6px rgb(14 40 30 / 0.04);
+  --shadow-xl: 0 20px 25px -5px rgb(5 24 36 / 0.08), 0 8px 10px -6px rgb(5 24 36 / 0.04);
   --shadow-2xl: var(--sm-shadow-overlay);
   --shadow-mint-glow: var(--sm-shadow-glow-subtle);
 
@@ -266,13 +268,13 @@
 
 /* ─── DARK MODE ──────────────────────────────────────────────────────────── */
 .dark {
-  --button-outline: rgba(220, 245, 235, .10);
-  --badge-outline: rgba(220, 245, 235, .05);
+  --button-outline: rgba(200, 230, 255, .10);
+  --badge-outline: rgba(200, 230, 255, .05);
 
   --opaque-button-border-intensity: 9;
 
-  --elevate-1: rgba(220, 245, 235, .04);
-  --elevate-2: rgba(220, 245, 235, .09);
+  --elevate-1: rgba(200, 230, 255, .04);
+  --elevate-2: rgba(200, 230, 255, .09);
 
   /* Deep green-charcoal — never pure black. Transitional aliases onto the
      shared semantic layer (values unchanged — dark theme needed no
@@ -289,32 +291,33 @@
   --input: var(--sm-color-border-default);
   --ring: var(--sm-color-border-focus);
 
-  --sidebar: 160 22% 8%;
-  --sidebar-foreground: 150 20% 92%;
-  --sidebar-border: 158 14% 20%;
-  --sidebar-primary: 160 55% 45%;
-  --sidebar-primary-foreground: 160 30% 8%;
-  --sidebar-accent: 158 16% 15%;
-  --sidebar-accent-foreground: 160 64% 70%;
-  --sidebar-ring: 160 64% 55%;
+  /* Ocean navy sidebar — dark mode */
+  --sidebar: 203 42% 10%;
+  --sidebar-foreground: 207 20% 92%;
+  --sidebar-border: 207 25% 20%;
+  --sidebar-primary: 164 70% 60%;
+  --sidebar-primary-foreground: 203 76% 8%;
+  --sidebar-accent: 203 35% 18%;
+  --sidebar-accent-foreground: 164 70% 70%;
+  --sidebar-ring: 164 70% 60%;
 
-  --popover: 158 18% 10%;
-  --popover-foreground: 150 20% 92%;
-  --popover-border: 158 14% 20%;
+  --popover: 203 42% 10%;
+  --popover-foreground: 207 20% 92%;
+  --popover-border: 207 25% 20%;
 
-  /* Brighter evergreen for contrast on dark */
-  --primary: 160 55% 45%;
-  --primary-foreground: 160 30% 8%;
+  /* Bright cyan-mint for contrast on dark navy */
+  --primary: 164 70% 60%;
+  --primary-foreground: 203 76% 8%;
 
-  --secondary: 158 16% 15%;
-  --secondary-foreground: 150 20% 92%;
+  --secondary: 203 35% 18%;
+  --secondary-foreground: 207 20% 92%;
 
-  --muted: 158 16% 13%;
-  --muted-foreground: 150 8% 62%;
+  --muted: 203 35% 12%;
+  --muted-foreground: 207 20% 62%;
 
-  /* Mint does more visual lifting on dark: rails, accents, glows */
-  --accent: 160 64% 55%;
-  --accent-foreground: 160 30% 10%;
+  /* Mint accent glows and highlights on dark */
+  --accent: 164 70% 62%;
+  --accent-foreground: 203 76% 8%;
 
   /* Corrected (Phase 1B.1): was 356 65% 55% (4.40:1 with white text,
      marginal AA fail); now aliased to the shared corrected value, 4.79:1.
@@ -328,12 +331,12 @@
   --info: 199 75% 55%;
   --info-foreground: 199 40% 8%;
 
-  --chart-1: 160 64% 55%;
-  --chart-2: 160 55% 45%;
-  --chart-3: 190 55% 50%;
+  --chart-1: 164 70% 60%;
+  --chart-2: 164 82% 53%;
+  --chart-3: 207 55% 50%;
   --chart-4: 42 85% 60%;
   --chart-5: 6 70% 65%;
-  --chart-6: 210 12% 65%;
+  --chart-6: 207 20% 65%;
 
   --shadow-2xs: 0 1px 0 0 rgb(0 0 0 / 0.25);
   --shadow-xs: 0 1px 1px 0 rgb(0 0 0 / 0.25);

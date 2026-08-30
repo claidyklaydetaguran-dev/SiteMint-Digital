@@ -1,33 +1,56 @@
-import { useEffect } from "react";
+import { useEffect, lazy } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComingSoon } from "@/components/common/ComingSoon";
 import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAssistantSessionGuard } from "@/hooks/useAssistants";
+import { ROUTER_BASE, ROUTES } from "@/lib/routes";
+import { voiceRoutePages } from "@/routes/voiceRoutes";
+import { DashboardShell } from "@/shells/DashboardShell";
+import { AuthShell } from "@/shells/AuthShell";
+import { PublicShell } from "@/shells/PublicShell";
 
-import Login from "@/pages/Login";
-import Overview from "@/pages/Overview";
-import Inbox from "@/pages/Inbox";
-import AgentConfig from "@/pages/AgentConfig";
-import Contacts from "@/pages/Contacts";
-import ContactDetail from "@/pages/ContactDetail";
-import Settings from "@/pages/Settings";
-import Billing from "@/pages/Billing";
-import Assistants from "@/pages/Assistants";
-import AssistantCreate from "@/pages/AssistantCreate";
-import AssistantBuilderNew from "@/pages/AssistantBuilderNew";
-import AssistantBuilder from "@/pages/AssistantBuilder";
-import CallLogs from "@/pages/CallLogs";
-import CallLogDetail from "@/pages/CallLogDetail";
-import Appointments from "@/pages/Appointments";
-import PublicSchedule from "@/pages/PublicSchedule";
+/**
+ * Frontend V2 Phase 1 — route-level code splitting.
+ *
+ * The dashboard previously shipped as a single chunk: 17 direct page imports,
+ * zero lazy boundaries. Every page is now `lazy()`, imported inline at its own
+ * call site (never through a barrel, which would defeat the split) — except the
+ * voice-platform pages, whose imports live behind the AR-001J build boundary so
+ * that a default-gated build does not emit them at all.
+ *
+ * Route paths, ordering, auth behaviour, and the voice-platform gating are
+ * unchanged from the protected baseline.
+ */
+
+const Login = lazy(() => import("@/pages/Login"));
+const PublicSchedule = lazy(() => import("@/pages/PublicSchedule"));
+const Overview = lazy(() => import("@/pages/Overview"));
+const Inbox = lazy(() => import("@/pages/Inbox"));
+const AgentConfig = lazy(() => import("@/pages/AgentConfig"));
+const Contacts = lazy(() => import("@/pages/Contacts"));
+const ContactDetail = lazy(() => import("@/pages/ContactDetail"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Billing = lazy(() => import("@/pages/Billing"));
+// The seven voice-platform pages are the one exception, and AR-001J is why:
+// an `import()` written here is emitted by every build, so a default-gated
+// build shipped chunks it could never load. They come from the build boundary
+// instead, which removes their imports from the graph — see routes/voiceRoutes.
+const {
+  Assistants,
+  AssistantCreate,
+  AssistantBuilderNew,
+  AssistantBuilder,
+  CallLogs,
+  CallLogDetail,
+  Appointments,
+} = voiceRoutePages;
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient();
 
@@ -57,31 +80,44 @@ const comingSoonRoutes = voicePlatformEnabled
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={Login} />
+      <Route path={ROUTES.login}>
+        {() => (
+          <AuthShell>
+            <Login />
+          </AuthShell>
+        )}
+      </Route>
       {/* Public, unauthenticated scheduling page — no dashboard chrome, no session cookie required. */}
-      <Route path="/schedule/:slug" component={PublicSchedule} />
+      <Route path={ROUTES.publicSchedule}>
+        {() => (
+          <PublicShell routeLabel="This booking page">
+            {/* PublicSchedule reads `:slug` itself via useRoute — it takes no props. */}
+            <PublicSchedule />
+          </PublicShell>
+        )}
+      </Route>
       <Route>
-        <AppShell>
+        <DashboardShell>
           <Switch>
-            <Route path="/" component={Overview} />
-            <Route path="/conversations" component={Inbox} />
-            <Route path="/receptionist" component={AgentConfig} />
-            <Route path="/contacts" component={Contacts} />
-            <Route path="/contacts/:id" component={ContactDetail} />
-            <Route path="/deploy">
-              {() => <InSpaRedirect to="/receptionist" />}
+            <Route path={ROUTES.overview} component={Overview} />
+            <Route path={ROUTES.conversations} component={Inbox} />
+            <Route path={ROUTES.receptionist} component={AgentConfig} />
+            <Route path={ROUTES.contacts} component={Contacts} />
+            <Route path={ROUTES.contactDetail} component={ContactDetail} />
+            <Route path={ROUTES.deploy}>
+              {() => <InSpaRedirect to={ROUTES.receptionist} />}
             </Route>
-            <Route path="/settings" component={Settings} />
-            <Route path="/billing" component={Billing} />
+            <Route path={ROUTES.settings} component={Settings} />
+            <Route path={ROUTES.billing} component={Billing} />
             {voicePlatformEnabled && (
               <>
-                <Route path="/assistants" component={Assistants} />
-                <Route path="/assistants/new" component={AssistantCreate} />
-                <Route path="/assistants/new/:tab" component={AssistantBuilderNew} />
-                <Route path="/assistants/:id/:tab?" component={AssistantBuilder} />
-                <Route path="/logs" component={CallLogs} />
-                <Route path="/logs/:id" component={CallLogDetail} />
-                <Route path="/appointments" component={Appointments} />
+                <Route path={ROUTES.assistants} component={Assistants} />
+                <Route path={ROUTES.assistantNew} component={AssistantCreate} />
+                <Route path={ROUTES.assistantNewTab} component={AssistantBuilderNew} />
+                <Route path={ROUTES.assistantDetail} component={AssistantBuilder} />
+                <Route path={ROUTES.logs} component={CallLogs} />
+                <Route path={ROUTES.logDetail} component={CallLogDetail} />
+                <Route path={ROUTES.appointments} component={Appointments} />
               </>
             )}
             {comingSoonRoutes.map((item) => (
@@ -96,7 +132,7 @@ function Router() {
             ))}
             <Route component={NotFound} />
           </Switch>
-        </AppShell>
+        </DashboardShell>
       </Route>
     </Switch>
   );
@@ -109,7 +145,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             {voicePlatformEnabled && <AssistantSessionGuard />}
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <WouterRouter base={ROUTER_BASE}>
               <Router />
             </WouterRouter>
             <Toaster />

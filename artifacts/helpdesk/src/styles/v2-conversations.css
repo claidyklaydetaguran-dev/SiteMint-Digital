@@ -1,0 +1,804 @@
+/**
+ * Frontend V2 Phase 8 — the SMS Conversations workspace layer.
+ *
+ * A companion to `v2-dashboard.css`, not a replacement for it. Every colour,
+ * space, radius, duration, easing and focus value here is a `--sd-*` token
+ * that file already defines, so this adds no palette, no second scale and no
+ * second design system. Light and dark both come free for the same reason.
+ *
+ * Namespaced `sc-*` (SiteMint conversations) so it cannot collide with `sd-*`
+ * shell classes, the `--v2-*` public tokens, or the app's shadcn variables.
+ * The two `sd-*` classes used from the markup — `sd-sr` and `sd-enter` — are
+ * the shell's, used as-is.
+ *
+ * ── Composition ───────────────────────────────────────────────────────────
+ * Two panes, not three. The previous workspace put a category rail, a list, a
+ * thread and a details panel side by side: four vertical borders before any
+ * message, and the details panel held only four real fields. Those fields now
+ * live in the thread header where they are read, which buys the message
+ * column roughly a third more width at 1440.
+ *
+ * Depth is carried by one hairline border and one surface change. There is no
+ * card inside a card, no shadow stack, no gradient, no glass. The selected row
+ * is the only place mint appears in the list, which is what makes it findable.
+ *
+ * ── Motion ────────────────────────────────────────────────────────────────
+ * Inherits the shell's rules exactly: only `transform`, `opacity`,
+ * `background-color`, `border-color` and `color` are ever animated; nothing
+ * loops; nothing exceeds 240ms; hover transforms are gated behind a fine
+ * pointer; `prefers-reduced-motion: reduce` is honoured by the shell's blanket
+ * rule (this markup is inside `.sd-app`) and reinforced at the end of this
+ * file. The message list is never staggered and never animated on load — only
+ * the pane it lives in fades once when the selection changes.
+ */
+
+/* ── Frame ─────────────────────────────────────────────────────────────────
+   The shell's `<main>` is a bounded flex column; this fills it and then hands
+   its own bounded height to the two panes, so each scrolls independently and
+   the page itself never scrolls. */
+
+.sc-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  background: var(--sd-canvas);
+}
+
+/* ── List pane ─────────────────────────────────────────────────────────────*/
+
+.sc-list {
+  flex: 0 0 23rem;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--sd-border);
+  background: var(--sd-surface);
+}
+
+.sc-list__head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-5) var(--sd-space-4) var(--sd-space-4);
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.sc-list__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+}
+
+.sc-h1 {
+  margin: 0;
+  font-size: var(--sd-text-h1);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--sd-text);
+}
+
+.sc-count {
+  font-size: var(--sd-text-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text-muted);
+}
+
+/* Search ------------------------------------------------------------------*/
+
+.sc-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sc-search__icon {
+  position: absolute;
+  left: var(--sd-space-3);
+  width: 1rem;
+  height: 1rem;
+  color: var(--sd-text-muted);
+  pointer-events: none;
+}
+
+.sc-search__input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--sd-space-2) var(--sd-space-3) var(--sd-space-2) 2.25rem;
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-canvas);
+  color: var(--sd-text);
+  font: inherit;
+  font-size: var(--sd-text-body);
+  transition: border-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-search__input::placeholder {
+  color: var(--sd-text-muted);
+}
+.sc-search__input:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+  border-color: var(--sd-accent);
+}
+
+/* Status filters ----------------------------------------------------------*/
+
+.sc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-1);
+}
+
+.sc-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-height: 2.75rem;
+  /* Tight horizontal padding is deliberate: all four status views must sit on
+     one line inside the list column, because a single filter wrapping alone
+     reads as a layout fault rather than as a choice. The 44px target is kept
+     by the min-height, not by the padding. */
+  padding: 0 var(--sd-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-control);
+  background: transparent;
+  color: var(--sd-text-muted);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--sd-dur-fast) var(--sd-ease),
+    border-color var(--sd-dur-fast) var(--sd-ease),
+    color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-filter__count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--sd-text-micro);
+  color: var(--sd-text-muted);
+}
+.sc-filter[data-active="true"] {
+  background: var(--sd-surface-accent);
+  border-color: var(--sd-border);
+  color: var(--sd-text);
+  font-weight: 600;
+}
+.sc-filter[data-active="true"] .sc-filter__count {
+  color: var(--sd-text);
+}
+.sc-filter:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-filter:hover {
+    color: var(--sd-text);
+    background: var(--sd-surface-alt);
+  }
+}
+
+/* List body ---------------------------------------------------------------*/
+
+.sc-list__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sd-space-2);
+}
+
+.sc-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sc-options:focus {
+  outline: none;
+}
+
+/* A row is a flat band, not a card: one hairline separator, no border box, no
+   shadow. The selected row is the single mint moment in this column. */
+.sc-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+  min-height: 2.75rem;
+  padding: var(--sd-space-3) var(--sd-space-3) var(--sd-space-3) var(--sd-space-4);
+  border-radius: var(--sd-radius-control);
+  cursor: pointer;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-option + .sc-option {
+  box-shadow: 0 -1px 0 var(--sd-border);
+}
+.sc-option::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--sd-space-2);
+  bottom: var(--sd-space-2);
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-option[data-selected="true"] {
+  background: var(--sd-surface-accent);
+}
+.sc-option[data-selected="true"]::before {
+  background: var(--sd-accent);
+}
+.sc-option[data-selected="true"] .sc-option__phone {
+  font-weight: 600;
+}
+.sc-option:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: calc(var(--sd-focus-offset) * -1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-option:hover {
+    background: var(--sd-surface-alt);
+  }
+  .sc-option[data-selected="true"]:hover {
+    background: var(--sd-surface-accent);
+  }
+}
+
+.sc-option__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+}
+.sc-option__phone {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sd-text-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text);
+}
+.sc-option__when {
+  flex: 0 0 auto;
+  font-size: var(--sd-text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text-muted);
+}
+.sc-option__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-1);
+}
+
+/* ── Chips ─────────────────────────────────────────────────────────────────
+   Text always carries the meaning; tone only reinforces it. Amber appears
+   for a real warning and nowhere else, and there is no red chip because no
+   conversation state in this product is a failure. */
+
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-1);
+  padding: 0.125rem var(--sd-space-2);
+  border: 1px solid var(--sd-border);
+  border-radius: 999px;
+  background: var(--sd-surface-alt);
+  color: var(--sd-text-muted);
+  font-size: var(--sd-text-micro);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.sc-chip__icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.sc-chip[data-tone="active"] {
+  background: var(--sd-accent-soft);
+  border-color: var(--sd-border-strong);
+  color: var(--sd-text);
+  font-weight: 600;
+}
+.sc-chip[data-tone="stopped"] {
+  background: var(--sd-muted-surface);
+  color: var(--sd-muted-text);
+}
+.sc-chip[data-tone="warn"] {
+  background: var(--sd-warn-surface);
+  border-color: var(--sd-warn-border);
+  color: var(--sd-warn);
+  font-weight: 600;
+}
+
+/* ── Thread pane ───────────────────────────────────────────────────────────*/
+
+.sc-thread {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sd-canvas);
+}
+.sc-thread--blank {
+  align-items: center;
+  justify-content: center;
+}
+
+/* The back control is a mobile affordance; on desktop both panes are present
+   so there is nothing to go back from. */
+.sc-thread__bar {
+  display: none;
+  flex: 0 0 auto;
+  padding: var(--sd-space-2) var(--sd-space-3);
+  border-bottom: 1px solid var(--sd-border);
+  background: var(--sd-surface);
+}
+
+.sc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-height: 2.75rem;
+  padding: 0 var(--sd-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-control);
+  background: transparent;
+  color: var(--sd-text);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-back:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-back:hover {
+    background: var(--sd-surface-alt);
+  }
+}
+
+.sc-thread__head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+  padding: var(--sd-space-5) var(--sd-space-6) var(--sd-space-4);
+  border-bottom: 1px solid var(--sd-border);
+  background: var(--sd-surface);
+}
+
+.sc-thread__phone {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text);
+  overflow-wrap: anywhere;
+}
+
+.sc-thread__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-2);
+}
+
+.sc-thread__timeline {
+  margin: 0;
+  font-size: var(--sd-text-micro);
+  color: var(--sd-text-muted);
+}
+
+.sc-thread__reason {
+  margin: var(--sd-space-1) 0 0;
+  padding-left: var(--sd-space-3);
+  border-left: 2px solid var(--sd-border-strong);
+  font-size: var(--sd-text-small);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+.sc-thread__reasonlabel {
+  display: block;
+  font-size: var(--sd-text-micro);
+  font-weight: 700;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-text-muted);
+}
+
+/* Non-message pane states (loading, error, empty history) share one box so
+   the thread never collapses when a field is missing. */
+.sc-thread__state {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+  justify-content: center;
+  padding: var(--sd-space-6);
+}
+
+/* ── Message history ───────────────────────────────────────────────────────*/
+
+.sc-history {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sd-space-5) var(--sd-space-6) var(--sd-space-6);
+}
+.sc-history:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: calc(var(--sd-focus-offset) * -1);
+}
+
+.sc-day + .sc-day {
+  margin-top: var(--sd-space-5);
+}
+
+/* A quiet rule with the date sitting on it — a separator, not a heading
+   people have to read past. */
+.sc-day__label {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  margin: 0 0 var(--sd-space-4);
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-text-muted);
+}
+.sc-day__label::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--sd-border);
+}
+
+.sc-day__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-4);
+}
+
+/* Flat blocks with a disciplined radius — a business transcript, not a chat
+   toy. No tails, no pointers, no bubble gradient. Direction is carried by
+   alignment, surface and the named sender, never by colour alone. */
+.sc-message {
+  max-width: min(44rem, 82%);
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+}
+.sc-message[data-direction="outbound"] {
+  margin-left: auto;
+  background: var(--sd-surface-accent);
+  border-color: var(--sd-border-strong);
+}
+
+.sc-message__from {
+  margin: 0 0 var(--sd-space-1);
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  color: var(--sd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-message__body {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  line-height: 1.6;
+  color: var(--sd-text);
+  /* A pasted URL or an unbroken 300-character string must wrap, not push the
+     pane sideways. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* ── Messaging status (the composer region) ────────────────────────────────
+   Information, not a control. There is no send endpoint in this product, so
+   there is deliberately no input and no button here — a disabled text box
+   would promise a state that never arrives. */
+
+.sc-messaging {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-4) var(--sd-space-6);
+  padding-bottom: calc(var(--sd-space-4) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--sd-border);
+  background: var(--sd-surface);
+}
+.sc-messaging__icon {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  color: var(--sd-text-muted);
+}
+.sc-messaging__body {
+  min-width: 0;
+}
+.sc-messaging__title {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sc-messaging__detail {
+  margin: 0.125rem 0 0;
+  font-size: var(--sd-text-micro);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+.sc-messaging[data-tone="stopped"] {
+  background: var(--sd-muted-surface);
+}
+.sc-messaging[data-tone="stopped"] .sc-messaging__title {
+  color: var(--sd-muted-text);
+}
+
+/* ── Notices, empty states, skeletons, buttons ─────────────────────────────*/
+
+.sc-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-4);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+}
+.sc-notice__icon {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+}
+.sc-notice__body {
+  min-width: 0;
+}
+.sc-notice__title {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+}
+.sc-notice__detail {
+  margin: 0.25rem 0 0;
+  font-size: var(--sd-text-micro);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+.sc-notice--danger {
+  border-color: var(--sd-danger-border);
+  background: var(--sd-danger-surface);
+}
+.sc-notice--danger .sc-notice__icon,
+.sc-notice--danger .sc-notice__title {
+  color: var(--sd-danger);
+}
+.sc-notice--warn {
+  border-color: var(--sd-warn-border);
+  background: var(--sd-warn-surface);
+}
+.sc-notice--warn .sc-notice__icon,
+.sc-notice--warn .sc-notice__title {
+  color: var(--sd-warn);
+}
+
+.sc-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-height: 2.75rem;
+  margin-top: var(--sd-space-3);
+  padding: 0 var(--sd-space-4);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface);
+  color: var(--sd-text);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--sd-dur-fast) var(--sd-ease),
+    border-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-button__icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.sc-button:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-button:hover {
+    background: var(--sd-surface-alt);
+    border-color: var(--sd-accent);
+  }
+}
+
+.sc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--sd-space-1);
+  padding: var(--sd-space-10) var(--sd-space-5);
+  max-width: 26rem;
+  margin: 0 auto;
+}
+.sc-empty__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-bottom: var(--sd-space-2);
+  color: var(--sd-text-muted);
+}
+.sc-empty__title {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sc-empty__detail {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+
+@keyframes sc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.sc-skel {
+  height: 3.5rem;
+  margin: var(--sd-space-2);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface-alt);
+  animation: sc-pulse 1.4s var(--sd-ease) infinite;
+}
+.sc-skel--title {
+  height: 1.5rem;
+  width: 12rem;
+  margin: 0;
+}
+.sc-skel--line {
+  height: 3rem;
+  margin: 0;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────
+   Below 64rem the shell's rail is already a drawer, so the two panes get the
+   whole width and the list narrows rather than disappearing. Below 48rem they
+   cannot both be understood at once, so the workspace becomes master/detail:
+   exactly one pane is in the document flow, and the back control appears. */
+
+@media (max-width: 75rem) {
+  .sc-list {
+    flex-basis: 20rem;
+  }
+  .sc-thread__head,
+  .sc-history,
+  .sc-messaging {
+    padding-left: var(--sd-space-5);
+    padding-right: var(--sd-space-5);
+  }
+}
+
+/* Tablet keeps both panes. The list gives up width rather than the thread
+   disappearing, because at 768 the two together are still comfortably
+   readable and a tablet user should not have to navigate to see context. */
+@media (min-width: 48rem) and (max-width: 64rem) {
+  .sc-list {
+    flex-basis: 17rem;
+  }
+  .sc-thread__head,
+  .sc-history,
+  .sc-messaging {
+    padding-left: var(--sd-space-4);
+    padding-right: var(--sd-space-4);
+  }
+}
+
+/* Strictly *below* 768px. The bound is exclusive on purpose: a 768-wide tablet
+   must not land in the single-pane layout by rounding. */
+@media (max-width: 47.99rem) {
+  .sc-list {
+    flex: 1 1 auto;
+    border-right: 0;
+  }
+  .sc-thread__bar {
+    display: block;
+  }
+  .sc-workspace[data-view="list"] .sc-thread {
+    display: none;
+  }
+  .sc-workspace[data-view="thread"] .sc-list {
+    display: none;
+  }
+  .sc-message {
+    max-width: 100%;
+  }
+  .sc-thread__head,
+  .sc-history,
+  .sc-messaging,
+  .sc-thread__state {
+    padding-left: var(--sd-space-4);
+    padding-right: var(--sd-space-4);
+  }
+  .sc-history {
+    padding-top: var(--sd-space-4);
+  }
+  .sc-list__head {
+    padding: var(--sd-space-4);
+  }
+}
+
+/* A short viewport — a phone in landscape, or 200% zoom — must not leave the
+   message column too small to read a message in. The list header stops being
+   sticky weight and the panes keep scrolling. */
+@media (max-height: 34rem) {
+  .sc-list__head {
+    padding-top: var(--sd-space-3);
+    padding-bottom: var(--sd-space-3);
+  }
+  .sc-empty {
+    padding-top: var(--sd-space-5);
+    padding-bottom: var(--sd-space-5);
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+   The shell's blanket rule already neutralises transitions inside `.sd-app`;
+   these remove the two things that are not transitions — the entrance on the
+   message pane and the skeleton pulse — so nothing here moves at all, and no
+   content depends on an animation having run. */
+@media (prefers-reduced-motion: reduce) {
+  .sc-history.sd-enter {
+    animation: none;
+  }
+  .sc-skel {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
+/* ── Forced colours ────────────────────────────────────────────────────────*/
+@media (forced-colors: active) {
+  .sc-chip,
+  .sc-message,
+  .sc-notice {
+    border: 1px solid CanvasText;
+  }
+  .sc-option[data-selected="true"] {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .sc-option[data-selected="true"]::before {
+    background: HighlightText;
+  }
+}

@@ -7,6 +7,12 @@ import {
 
 describe("Vapi assistant mapper", () => {
   it("builds the bounded provider request from validated runtime fields", () => {
+    const artifactPlan = {
+      recordingEnabled: false,
+      videoRecordingEnabled: false,
+      pcapEnabled: false,
+      transcriptPlan: { enabled: false },
+    };
     const request = buildVapiAssistantRequestBody("Front Desk", {
       model: { provider: "test-model-provider", model: "test-model" },
       voice: { provider: "test-voice-provider", voiceId: "test-voice" },
@@ -18,7 +24,7 @@ describe("Vapi assistant mapper", () => {
       firstMessageMode: "assistant-speaks-first",
       firstMessage: "Thank you for calling. How can I help?",
       systemInstructions: "Act as a concise receptionist.",
-    });
+    }, artifactPlan);
 
     expect(request).toEqual({
       name: "Front Desk",
@@ -34,6 +40,12 @@ describe("Vapi assistant mapper", () => {
         provider: "test-transcriber-provider",
         model: "test-transcriber",
         language: "en",
+      },
+      artifactPlan: {
+        recordingEnabled: false,
+        videoRecordingEnabled: false,
+        pcapEnabled: false,
+        transcriptPlan: { enabled: false },
       },
       firstMessageMode: "assistant-speaks-first",
       firstMessage: "Thank you for calling. How can I help?",

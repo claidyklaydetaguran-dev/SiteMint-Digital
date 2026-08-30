@@ -1,0 +1,595 @@
+/**
+ * Frontend V2 Phase 14 — the Call Logs workspace.
+ *
+ * Namespaced `sc-*` (SiteMint calls). Every colour, space, radius, duration
+ * and focus value is a `--sd-*` token declared by `v2-dashboard.css`; this
+ * file adds no palette, no font request, no image, no gradient and no
+ * dark-theme block — the dark counterpart is inherited from the shell, so the
+ * two can never drift.
+ *
+ * ── Direction ─────────────────────────────────────────────────────────────
+ * A call record is a filed document, not a dashboard tile. So the list is a
+ * call sheet: a state mark in a left gutter, monospaced tabular figures for
+ * the times and durations that are read down a column, and the caller in the
+ * proportional face. The detail keeps the same vocabulary at a larger size —
+ * the same mark, the same figures — so a record is recognisably the same
+ * object in both places, and then drops the card entirely: hairline rules and
+ * vertical rhythm, because a transcript is prose and prose wants a measure,
+ * not a box.
+ *
+ * Colour carries state and nothing else. Mint is only ever focus. Amber marks
+ * a call that did not connect, red marks one that failed; every mark is
+ * accompanied by the state in words, so no meaning is carried by colour alone.
+ *
+ * ── Motion ────────────────────────────────────────────────────────────────
+ * One entrance (`sd-enter`, from the shell) and two 120ms colour transitions
+ * on interactive rows. Nothing loops, nothing animates layout, nothing delays
+ * access to information, and no transition can cause a request.
+ * `prefers-reduced-motion: reduce` removes all of it.
+ */
+
+/* ── Type roles ────────────────────────────────────────────────────────────
+   The figure face is a second role, not decoration: a call sheet's times and
+   durations are compared down a column, and tabular monospace is what makes
+   that scan honest. Local stack only — no font is fetched. */
+
+.sc-fig {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--sd-text-small);
+  letter-spacing: -0.01em;
+  color: var(--sd-text);
+  white-space: nowrap;
+}
+
+.sc-lede {
+  margin: var(--sd-space-2) 0 0;
+  max-width: 46rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+
+/* ── State ─────────────────────────────────────────────────────────────────
+   The tone is carried by a 3px rule on the left edge of the row and of the
+   record — a ledger's margin mark, not a pill. Four tones, one per semantic
+   outcome group. The state is always spelled out in words as well, so nothing
+   is legible by colour alone. */
+
+.sc-state {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.sc-state__text {
+  font-size: var(--sd-text-small);
+  color: var(--sd-text);
+  overflow-wrap: anywhere;
+}
+.sc-state--lg .sc-state__text {
+  font-size: var(--sd-text-h2);
+  font-weight: 600;
+}
+
+/* A value the record does not carry is a phrase, not a figure: set in the
+   muted proportional face so a column of real numbers still scans. */
+.sc-absent-inline {
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+
+/* ── The call sheet ────────────────────────────────────────────────────── */
+
+.sc-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+}
+
+.sc-count {
+  margin: 0;
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  color: var(--sd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Four short columns do not need the page's full measure; the sheet keeps the
+   width its content actually reads at. */
+.sc-tablewrap {
+  max-width: 48rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+  box-shadow: var(--sd-shadow-1);
+  overflow-x: auto;
+}
+
+.sc-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.sc-table__head th {
+  padding: var(--sd-space-3) var(--sd-space-4);
+  text-align: left;
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  color: var(--sd-text-muted);
+  border-bottom: 1px solid var(--sd-border);
+  white-space: nowrap;
+}
+/* Widths are declared once, on the header, so the columns cannot drift as
+   content changes. The caller column takes whatever is left. */
+.sc-col--caller {
+  width: auto;
+}
+.sc-col--time {
+  width: 12rem;
+}
+.sc-col--duration {
+  width: 7rem;
+  text-align: right;
+}
+.sc-col--state {
+  width: 10rem;
+}
+
+.sc-row {
+  position: relative;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sc-row + .sc-row .sc-cell {
+  border-top: 1px solid var(--sd-border);
+}
+
+.sc-cell {
+  padding: var(--sd-space-2) var(--sd-space-4);
+  vertical-align: middle;
+  font-size: var(--sd-text-body);
+  color: var(--sd-text);
+}
+
+/* The state's tone, as a rule in the sheet's left margin. */
+.sc-cell--caller {
+  min-width: 0;
+  border-left: 3px solid transparent;
+}
+.sc-row[data-tone="settled"] .sc-cell--caller {
+  border-left-color: var(--sd-text);
+}
+.sc-row[data-tone="open"] .sc-cell--caller {
+  border-left-color: var(--sd-text-muted);
+}
+.sc-row[data-tone="attention"] .sc-cell--caller {
+  border-left-color: var(--sd-warn);
+}
+.sc-row[data-tone="failed"] .sc-cell--caller {
+  border-left-color: var(--sd-danger);
+}
+
+.sc-cell--time,
+.sc-cell--duration {
+  white-space: nowrap;
+  color: var(--sd-text-muted);
+}
+.sc-cell--duration {
+  text-align: right;
+}
+.sc-cell--state {
+  white-space: nowrap;
+}
+
+/* Column labels live inside the cell so a narrow layout keeps every field
+   self-describing. On wide layouts the column header already says it, so the
+   in-cell copy is removed from the page and from the accessibility tree —
+   exactly one label source at every width. */
+.sc-cell__label {
+  display: none;
+}
+
+/* The row link. The anchor is real and focusable; its stretched ::after makes
+   the whole row a target without a clickable div. */
+.sc-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  color: var(--sd-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+/* A caller number is a figure, like the times and durations beside it — the
+   masked form reads as deliberate in the figure face rather than accidental. */
+.sc-link__text {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.sc-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.sc-link:focus-visible {
+  outline: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sc-row:hover {
+    background: var(--sd-surface-accent);
+  }
+  .sc-row:hover .sc-link__text {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* Focus is drawn on the row, because the row is what activates. */
+.sc-row:focus-within {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: calc(var(--sd-focus-offset) * -1);
+  background: var(--sd-surface-accent);
+}
+
+/* ── Loading, empty, failure ───────────────────────────────────────────────
+   Three visibly different blocks. An empty result and a failed read never
+   share a shape, a colour or a heading. */
+
+.sc-loading {
+  margin: 0;
+  padding: var(--sd-space-6) var(--sd-space-4);
+  font-size: var(--sd-text-body);
+  color: var(--sd-text-muted);
+}
+
+.sc-empty {
+  max-width: 42rem;
+  padding: var(--sd-space-10) var(--sd-space-6);
+  border: 1px dashed var(--sd-border-strong);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface-alt);
+}
+.sc-empty__title {
+  margin: 0;
+  font-size: var(--sd-text-h2);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sc-empty__title--h1 {
+  font-size: var(--sd-text-h1);
+  letter-spacing: -0.02em;
+}
+.sc-empty__detail {
+  margin: var(--sd-space-2) 0 0;
+  max-width: 40rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+.sc-empty--notfound {
+  border-style: solid;
+}
+
+.sc-error {
+  max-width: 42rem;
+  padding: var(--sd-space-5) var(--sd-space-6);
+  border: 1px solid var(--sd-danger-border);
+  border-left: 3px solid var(--sd-danger);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-danger-surface);
+}
+.sc-error__title {
+  margin: 0;
+  font-size: var(--sd-text-h2);
+  font-weight: 600;
+  color: var(--sd-danger);
+}
+.sc-error__title--h1 {
+  font-size: var(--sd-text-h1);
+  letter-spacing: -0.02em;
+}
+.sc-error__detail {
+  margin: var(--sd-space-2) 0 var(--sd-space-4);
+  max-width: 40rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.5;
+  color: var(--sd-text);
+}
+
+.sc-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--sd-space-5);
+  border: 1px solid var(--sd-text);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface);
+  font-family: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+  cursor: pointer;
+  transition: background-color var(--sd-dur-fast) var(--sd-ease),
+    color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-retry:hover:not(:disabled) {
+    background: var(--sd-text);
+    color: var(--sd-surface);
+  }
+}
+.sc-retry:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+/* ── Record: the detail header ─────────────────────────────────────────── */
+
+/* A record is a document, and a document reads at a narrower measure than a
+   sheet of columns does. */
+.sd-page.sc-page--doc {
+  max-width: 54rem;
+}
+
+.sc-nav {
+  display: flex;
+}
+
+.sc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-height: 44px;
+  padding-right: var(--sd-space-2);
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text-muted);
+  text-decoration: none;
+  transition: color var(--sd-dur-fast) var(--sd-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-back:hover {
+    color: var(--sd-text);
+  }
+}
+
+.sc-record {
+  padding: var(--sd-space-5) var(--sd-space-6);
+  border: 1px solid var(--sd-border);
+  border-left: 3px solid var(--sd-text-muted);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface);
+  box-shadow: var(--sd-shadow-1);
+}
+.sc-record[data-tone="settled"] {
+  border-left-color: var(--sd-text);
+}
+.sc-record[data-tone="attention"] {
+  border-left-color: var(--sd-warn);
+}
+.sc-record[data-tone="failed"] {
+  border-left-color: var(--sd-danger);
+}
+
+.sc-record__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+  padding-bottom: var(--sd-space-4);
+  border-bottom: 1px solid var(--sd-border);
+}
+.sc-record__id {
+  min-width: 0;
+}
+/* The same figure face the list uses for a caller, one size up. */
+.sc-record__title {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: var(--sd-text-h1);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--sd-text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Fact lists ────────────────────────────────────────────────────────── */
+
+.sc-facts {
+  margin: 0;
+  display: grid;
+  gap: var(--sd-space-3) var(--sd-space-6);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.sc-facts--record {
+  padding-top: var(--sd-space-4);
+}
+.sc-fact {
+  min-width: 0;
+}
+/* A prose value spans the grid and keeps a reading measure. */
+.sc-fact--wide {
+  grid-column: 1 / -1;
+  max-width: 62ch;
+}
+.sc-fact__label {
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  color: var(--sd-text-muted);
+}
+.sc-fact__value {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-body);
+  line-height: 1.5;
+  color: var(--sd-text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Document sections ─────────────────────────────────────────────────────
+   No card. A hairline rule and vertical rhythm carry the structure, and the
+   prose keeps a measure so a long transcript stays readable. */
+
+.sc-doc {
+  padding-top: var(--sd-space-5);
+  border-top: 1px solid var(--sd-border);
+}
+.sc-doc__heading {
+  margin: 0 0 var(--sd-space-3);
+  font-size: var(--sd-text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--sd-tracking-eyebrow);
+  color: var(--sd-text-muted);
+}
+
+.sc-prose {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--sd-text-body);
+  line-height: 1.65;
+  color: var(--sd-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sc-absent {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  color: var(--sd-text-muted);
+}
+
+/* ── Analysis ──────────────────────────────────────────────────────────── */
+
+.sc-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-5);
+}
+.sc-group {
+  min-width: 0;
+}
+.sc-group__heading {
+  margin: 0 0 var(--sd-space-3);
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sc-note {
+  margin: 0;
+  padding-top: var(--sd-space-4);
+  border-top: 1px solid var(--sd-border);
+  max-width: 62ch;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text-muted);
+}
+
+/* ── Narrow layout ─────────────────────────────────────────────────────────
+   The table becomes a stack of records. The column headers are removed from
+   the page and from the accessibility tree, and each cell's own label appears
+   in their place, so a record stays self-describing without them. */
+
+@media (max-width: 47.99rem) {
+  .sc-table,
+  .sc-table__head,
+  .sc-row,
+  .sc-cell,
+  .sc-table tbody {
+    display: block;
+    width: auto;
+  }
+  .sc-table__head {
+    display: none;
+  }
+  /* The tone rule moves from the first cell to the whole card. */
+  .sc-row {
+    padding: var(--sd-space-4);
+    border-left: 3px solid transparent;
+  }
+  .sc-row[data-tone="settled"] {
+    border-left-color: var(--sd-text);
+  }
+  .sc-row[data-tone="open"] {
+    border-left-color: var(--sd-text-muted);
+  }
+  .sc-row[data-tone="attention"] {
+    border-left-color: var(--sd-warn);
+  }
+  .sc-row[data-tone="failed"] {
+    border-left-color: var(--sd-danger);
+  }
+  .sc-row + .sc-row {
+    border-top: 1px solid var(--sd-border);
+  }
+  .sc-row + .sc-row .sc-cell {
+    border-top: 0;
+  }
+  .sc-cell {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--sd-space-3);
+    padding: var(--sd-space-1) 0;
+    text-align: left;
+  }
+  .sc-cell--caller {
+    border-left: 0;
+  }
+  .sc-cell--duration {
+    text-align: left;
+  }
+  .sc-cell--state {
+    width: auto;
+    white-space: normal;
+  }
+  .sc-cell__label {
+    display: block;
+    font-size: var(--sd-text-micro);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--sd-tracking-eyebrow);
+    color: var(--sd-text-muted);
+  }
+  .sc-link {
+    min-height: 0;
+    padding: var(--sd-space-2) 0;
+  }
+  .sc-record,
+  .sc-error,
+  .sc-empty {
+    padding-left: var(--sd-space-4);
+    padding-right: var(--sd-space-4);
+  }
+  .sc-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+   Every value is legible immediately with all animation off; no content
+   depends on a transition or an entrance having run. */
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-row,
+  .sc-retry,
+  .sc-back {
+    transition: none;
+  }
+}

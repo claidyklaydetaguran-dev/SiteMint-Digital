@@ -21,7 +21,14 @@ interface BrowserTestButtonProps {
  * attribute so keyboard/screen-reader users can always discover the reason,
  * becoming a real actionable button only when `eligible` is true.
  */
-export const BrowserTestButton = forwardRef<HTMLButtonElement, BrowserTestButtonProps>(function BrowserTestButton(
+/**
+ * AR-001J final refinement: `forwardRef(...)` is a call expression at module
+ * top level, so a bundler must assume it has side effects and keep it even
+ * when nothing references the result. A build that renders no Test control
+ * would still have shipped this component and its copy. The annotation states
+ * what is already true of `forwardRef` and changes nothing at runtime.
+ */
+export const BrowserTestButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, BrowserTestButtonProps>(function BrowserTestButton(
   { eligible, active, disabledReason, onClick },
   ref,
 ) {

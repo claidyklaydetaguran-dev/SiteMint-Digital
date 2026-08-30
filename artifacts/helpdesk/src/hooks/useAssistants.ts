@@ -8,10 +8,12 @@ import {
   duplicateAssistant,
   deleteAssistant,
   publishAssistant,
+  syncAssistant,
   type AssistantDto,
   type CreateAssistantInput,
   type UpdateAssistantInput,
   type PublishedAssistantResult,
+  type SynchronizedAssistantResult,
 } from "@/lib/assistantsApi";
 import { useAuthenticatedFirmId, SESSION_KEY } from "@/hooks/useSession";
 import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
@@ -140,6 +142,40 @@ export function usePublishAssistant(id: number | undefined) {
         throw new Error("Publishing is not available right now.");
       }
       return publishAssistant(id);
+    },
+    retry: false,
+    onSettled: (_result, error) => {
+      if (firmId !== undefined && id !== undefined) {
+        qc.invalidateQueries({ queryKey: assistantDetailKey(firmId, id) });
+        qc.invalidateQueries({ queryKey: assistantsListKey(firmId) });
+      }
+      const status = (error as { status?: number } | undefined)?.status;
+      if (status === 401) {
+        qc.invalidateQueries({ queryKey: SESSION_KEY });
+      }
+    },
+  });
+}
+
+/**
+ * AR-001V: sends the saved configuration of an already-published assistant to
+ * the voice provider. Gated in the client on the platform flag only — the
+ * server independently refuses to contact the provider unless publishing is
+ * enabled there, so this hook can never make a provider request on its own.
+ * `retry: false` is essential: a provider update must never be re-issued
+ * automatically.
+ */
+export function useSyncAssistant(id: number | undefined) {
+  const qc = useQueryClient();
+  const firmId = useAuthenticatedFirmId();
+  const usable = voicePlatformEnabled && firmId !== undefined && id !== undefined && id > 0;
+
+  return useMutation<SynchronizedAssistantResult, unknown, void>({
+    mutationFn: async () => {
+      if (!usable || id === undefined) {
+        throw new Error("Updating the published assistant is not available right now.");
+      }
+      return syncAssistant(id);
     },
     retry: false,
     onSettled: (_result, error) => {

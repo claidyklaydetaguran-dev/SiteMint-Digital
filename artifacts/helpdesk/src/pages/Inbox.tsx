@@ -1,114 +1,87 @@
-import { useState, useRef, useEffect } from "react";
+/**
+ * Frontend V2 Phase 8 — the SMS Conversations workspace.
+ *
+ * Mounted at `ROUTES.conversations` (`/conversations`, base-relative) inside
+ * the Phase 7 `DashboardShell`. It inherits that shell's navigation rail, its
+ * `<main>` landmark, its skip link, its palette and its motion system; it adds
+ * no second design system and no chrome of its own.
+ *
+ * ── Requests, unchanged ───────────────────────────────────────────────────
+ * Two authenticated GETs, exactly as before this file was rewritten:
+ *   • `GET /api/receptionist/conversations`      — 30s refetch, via `useConversations`
+ *   • `GET /api/receptionist/conversations/:id`  — 15s refetch, enabled by selection
+ * Same paths, same methods, same (absent) payloads, same response shapes, same
+ * query keys, same intervals, same cookie-based session. Nothing is posted,
+ * patched or deleted; firm scoping stays entirely server-side, and a
+ * conversation belonging to another firm 404s at the API exactly as before.
+ *
+ * ── What this workspace deliberately does not have ────────────────────────
+ * A reply composer. There is no send endpoint in this product — see the header
+ * of `conversationsContract.ts` for the full evidence — so instead of a
+ * disabled text box (which implies a capability that would enable under some
+ * condition), the composer region states plainly who is answering and why the
+ * operator cannot type. `messagingState().canSend` is typed `false`, so an
+ * enabled send control cannot be added here by accident.
+ *
+ * ── Defects in the previous workspace that this fixes ─────────────────────
+ *  1. **A failed request rendered as an empty inbox.** `isError` was never
+ *     read, so a 500 told an owner "No conversations found" — that their
+ *     business had no leads. List and detail failures are now distinct,
+ *     announced, and retryable.
+ *  2. **The list was not keyboard operable as a selector.** Rows were
+ *     `<div role="button">` with `aria-selected`, which is not valid on
+ *     `button` and gave no arrow-key navigation. It is now a real listbox
+ *     with roving tabindex.
+ *  3. **Messages could render under the wrong contact.** Nothing checked that
+ *     the loaded detail matched the current selection. It is checked now.
+ *  4. **Mobile had no way back to the list from an error or empty thread** —
+ *     the back control lived inside the loaded thread only.
+ *  5. **Random per-phone avatar colours** carried no meaning and included
+ *     indigo and violet, outside the approved palette. They are gone.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
-import { Conversation, useConversations } from "@/hooks/useConversations";
-import { relativeTime, TIER_STYLES, phoneInitials, phoneColor } from "@/lib/conversationUi";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
-  Search,
-  MessageSquare,
-  MessageCircle,
-  RefreshCw,
   AlertTriangle,
-  Clock,
-  HelpCircle,
   ArrowLeft,
-  ChevronDown,
+  Ban,
+  Bot,
+  MessageSquare,
+  RefreshCw,
+  Search,
 } from "lucide-react";
-
-// ─── types ─────────────────────────────────────────────────────────────────
-
-interface Message {
-  id: number;
-  createdAt: string;
-  conversationId: number;
-  direction: "inbound" | "outbound";
-  body: string;
-}
+import { apiFetch } from "@/lib/api";
+import { useConversations } from "@/hooks/useConversations";
+import { relativeTime } from "@/lib/conversationUi";
+import {
+  attentionOf,
+  detailFailure,
+  emptyCopy,
+  filterConversations,
+  formatAbsolute,
+  formatTimeOfDay,
+  groupMessagesByDay,
+  isoAttribute,
+  listFailure,
+  messagingState,
+  senderLabel,
+  statusCounts,
+  statusPresentation,
+  tierLabel,
+  type ContractConversation,
+  type ContractMessage,
+  type StatusFilter,
+} from "@/pages/conversations/conversationsContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-conversations.css";
 
 interface ConversationDetail {
-  conversation: Conversation;
-  messages: Message[];
+  conversation: ContractConversation;
+  messages: ContractMessage[];
 }
 
-type CategoryView = "all" | "active" | "completed" | "opted_out";
-
-// ─── tier chip styling ──────────────────────────────────────────────────────
-
-const TIER_CHIP_ACTIVE: Record<string, string> = {
-  Hot:           "bg-rose-100 text-rose-700 border-rose-300",
-  Warm:          "bg-amber-100 text-amber-700 border-amber-300",
-  Cold:          "bg-blue-100 text-blue-700 border-blue-300",
-  Disqualified:  "bg-muted text-foreground border-border",
-  "Needs Review":"bg-yellow-100 text-yellow-700 border-yellow-300",
-};
-
-const TIER_CHIP_INACTIVE =
-  "bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-primary";
-
-// ─── "Why this tier" card colors ────────────────────────────────────────────
-
-const WHY_TIER_STYLES: Record<string, string> = {
-  Hot:           "bg-rose-50 border-rose-200",
-  Warm:          "bg-amber-50 border-amber-200",
-  Cold:          "bg-blue-50 border-blue-200",
-  Disqualified:  "bg-background border-border",
-  "Needs Review":"bg-yellow-50 border-yellow-200",
-};
-
-const WHY_TIER_TEXT: Record<string, string> = {
-  Hot:           "text-rose-700",
-  Warm:          "text-amber-700",
-  Cold:          "text-blue-700",
-  Disqualified:  "text-muted-foreground",
-  "Needs Review":"text-yellow-700",
-};
-
-// ─── helpers ───────────────────────────────────────────────────────────────
-
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function dateSeparatorLabel(dateStr: string): string {
-  const d = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function groupMessagesByDate(
-  messages: Message[],
-): Array<{ dateLabel: string; messages: Message[] }> {
-  const map = new Map<string, Message[]>();
-  for (const msg of messages) {
-    const key = new Date(msg.createdAt).toDateString();
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(msg);
-  }
-  return Array.from(map.entries()).map(([, msgs]) => ({
-    dateLabel: dateSeparatorLabel(msgs[0].createdAt),
-    messages: msgs,
-  }));
-}
-
-// ─── hooks ─────────────────────────────────────────────────────────────────
-
+/** Unchanged request: same path, method, key and 15s interval as the baseline. */
 function useConversationDetail(id: number | null) {
   return useQuery<ConversationDetail>({
     queryKey: ["conversation", id],
@@ -118,926 +91,600 @@ function useConversationDetail(id: number | null) {
   });
 }
 
-// ─── TIER_ORDER ─────────────────────────────────────────────────────────────
-
-const TIER_ORDER = ["Hot", "Warm", "Cold", "Needs Review", "Disqualified"] as const;
-
-// ─── main ──────────────────────────────────────────────────────────────────
-
-export default function Inbox() {
-  const [activeCategory, setActiveCategory] = useState<CategoryView>("all");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const [tierFilter, setTierFilter] = useState<string | null>(null);
-  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
-  const [showMobileDetails, setShowMobileDetails] = useState(false);
-
-  const { data: conversations, isLoading } = useConversations();
-  const { data: detail, isLoading: isLoadingDetail } = useConversationDetail(selectedId);
-
-  const activeCount    = conversations?.filter((c) => c.status === "in_progress").length ?? 0;
-  const completedCount = conversations?.filter((c) => c.status === "completed").length ?? 0;
-  const optedOutCount  = conversations?.filter((c) => c.status === "opted_out").length ?? 0;
-
-  const categoryFiltered = conversations
-    ?.filter((c) => {
-      if (activeCategory === "active")    return c.status === "in_progress";
-      if (activeCategory === "completed") return c.status === "completed";
-      if (activeCategory === "opted_out") return c.status === "opted_out";
-      return true;
-    })
-    .filter((c) => !search || c.callerPhone.includes(search));
-
-  const tierCounts = (categoryFiltered ?? []).reduce<Record<string, number>>((acc, c) => {
-    if (c.tier) acc[c.tier] = (acc[c.tier] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const filtered = categoryFiltered?.filter((c) => !tierFilter || c.tier === tierFilter);
-
-  const availableTiers = TIER_ORDER.filter((t) => (tierCounts[t] ?? 0) > 0);
-
-  const handleCategorySelect = (v: CategoryView) => {
-    setActiveCategory(v);
-    setTierFilter(null);
-  };
-
-  const handleMobileSelect = (id: number) => {
-    setSelectedId(id);
-    setShowMobileDetails(false);
-    setMobileView("thread");
-  };
-
-  return (
-    <>
-      {/* ── Mobile layout (<768 px) ──────────────────────────── */}
-      <div className="flex md:hidden h-full w-full flex-col overflow-hidden bg-background font-sans text-foreground">
-        {mobileView === "list" ? (
-          <>
-            <MobileFilterBar
-              activeCategory={activeCategory}
-              onCatChange={handleCategorySelect}
-              totalCount={conversations?.length ?? 0}
-              activeCount={activeCount}
-              completedCount={completedCount}
-              optedOutCount={optedOutCount}
-              tierFilter={tierFilter}
-              onTierFilter={setTierFilter}
-              availableTiers={availableTiers}
-              tierCounts={tierCounts}
-              search={search}
-              onSearch={setSearch}
-            />
-            <ConversationList
-              conversations={filtered}
-              isLoading={isLoading}
-              selectedId={selectedId}
-              onSelect={handleMobileSelect}
-              activeCategory={activeCategory}
-              tierFilter={tierFilter}
-              onTierFilter={setTierFilter}
-              tierCounts={tierCounts}
-              hideTierChips
-              fullWidth
-            />
-          </>
-        ) : (
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            {isLoadingDetail && !detail ? (
-              <>
-                <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0">
-                  <button
-                    onClick={() => setMobileView("list")}
-                    className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                    aria-label="Back to conversations list"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Conversations
-                  </button>
-                </div>
-                <div className="flex-1 flex items-center justify-center bg-card">
-                  <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              </>
-            ) : detail ? (
-              <ThreadPanel
-                detail={detail}
-                onBack={() => setMobileView("list")}
-                showDetails={showMobileDetails}
-                onToggleDetails={() => setShowMobileDetails((p) => !p)}
-              />
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {/* ── Desktop layout (≥768 px) ─────────────────────────── */}
-      <div className="hidden md:flex h-full w-full overflow-hidden bg-background font-sans text-foreground">
-        <CategoryRail
-          active={activeCategory}
-          onSelect={handleCategorySelect}
-          totalCount={conversations?.length ?? 0}
-          activeCount={activeCount}
-          completedCount={completedCount}
-          optedOutCount={optedOutCount}
-          search={search}
-          onSearch={setSearch}
-        />
-        <ConversationList
-          conversations={filtered}
-          isLoading={isLoading}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          activeCategory={activeCategory}
-          tierFilter={tierFilter}
-          onTierFilter={setTierFilter}
-          tierCounts={tierCounts}
-        />
-        {selectedId ? (
-          isLoadingDetail && !detail ? (
-            <div className="flex-1 flex items-center justify-center bg-card">
-              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : detail ? (
-            <>
-              <ThreadPanel detail={detail} />
-              <DetailsPanel detail={detail} />
-            </>
-          ) : null
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-card">
-            <div className="text-center">
-              <MessageSquare className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-sm font-medium text-muted-foreground">Select a conversation to view</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
-// ─── MobileFilterBar ────────────────────────────────────────────────────────
-
-const MOBILE_CATS: { key: CategoryView; label: string }[] = [
-  { key: "all",       label: "All" },
-  { key: "active",    label: "Active" },
+const FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
   { key: "completed", label: "Completed" },
-  { key: "opted_out", label: "Opted Out" },
+  { key: "opted_out", label: "Opted out" },
 ];
 
-function MobileFilterBar({
-  activeCategory,
-  onCatChange,
-  totalCount,
-  activeCount,
-  completedCount,
-  optedOutCount,
-  tierFilter,
-  onTierFilter,
-  availableTiers,
-  tierCounts,
-  search,
-  onSearch,
-}: {
-  activeCategory: CategoryView;
-  onCatChange: (v: CategoryView) => void;
-  totalCount: number;
-  activeCount: number;
-  completedCount: number;
-  optedOutCount: number;
-  tierFilter: string | null;
-  onTierFilter: (t: string | null) => void;
-  availableTiers: readonly string[];
-  tierCounts: Record<string, number>;
-  search: string;
-  onSearch: (s: string) => void;
-}) {
-  const counts: Record<CategoryView, number> = {
-    all: totalCount,
-    active: activeCount,
-    completed: completedCount,
-    opted_out: optedOutCount,
-  };
-
+function prefersReducedMotion(): boolean {
   return (
-    <div className="flex-shrink-0 bg-card border-b border-border px-3 pt-2 pb-2 space-y-2">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          placeholder="Search by phone…"
-          className="h-8 pl-8 bg-background border-border text-xs focus-visible:ring-ring"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          aria-label="Search conversations"
-        />
-      </div>
-
-      {/* Category pills */}
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5" role="group" aria-label="Filter by status">
-        {MOBILE_CATS.map((cat) => {
-          const isActive = activeCategory === cat.key;
-          return (
-            <button
-              key={cat.key}
-              onClick={() => onCatChange(cat.key)}
-              aria-pressed={isActive}
-              className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                isActive
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-primary"
-              }`}
-            >
-              {cat.label}
-              <span className="ml-1 opacity-70">{counts[cat.key]}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tier chips (only when any tier has data) */}
-      {availableTiers.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5" role="group" aria-label="Filter by tier">
-          {tierFilter !== null && (
-            <button
-              onClick={() => onTierFilter(null)}
-              className="flex-shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-card text-muted-foreground border-border hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Clear tier filter"
-            >
-              All ×
-            </button>
-          )}
-          {availableTiers.map((tier) => {
-            const isActive = tierFilter === tier;
-            return (
-              <button
-                key={tier}
-                onClick={() => onTierFilter(isActive ? null : tier)}
-                aria-pressed={isActive}
-                className={`flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  isActive ? TIER_CHIP_ACTIVE[tier] : TIER_CHIP_INACTIVE
-                }`}
-              >
-                {tier}
-                <span className="ml-1 opacity-70">{tierCounts[tier]}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
 
-// ─── CategoryRail ───────────────────────────────────────────────────────────
+// ─── Page ──────────────────────────────────────────────────────────────────
 
-function CategoryRail({
-  active,
-  onSelect,
-  totalCount,
-  activeCount,
-  completedCount,
-  optedOutCount,
-  search,
-  onSearch,
-}: {
-  active: CategoryView;
-  onSelect: (v: CategoryView) => void;
-  totalCount: number;
-  activeCount: number;
-  completedCount: number;
-  optedOutCount: number;
-  search: string;
-  onSearch: (s: string) => void;
-}) {
-  return (
-    <div className="w-[210px] flex-shrink-0 border-r border-border bg-card flex flex-col">
-      <div className="p-3 border-b border-border">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search by phone…"
-            className="h-8 pl-8 bg-background border-border text-xs focus-visible:ring-ring"
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            aria-label="Search conversations"
-          />
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-5">
-        <div>
-          <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 px-2">
-            Conversations
-          </h3>
-          <div className="space-y-0.5" role="group" aria-label="Filter conversations by status">
-            <NavItem
-              label="All"
-              count={totalCount}
-              active={active === "all"}
-              onClick={() => onSelect("all")}
-            />
-            <NavItem
-              label="Active"
-              count={activeCount}
-              active={active === "active"}
-              countHighlight={activeCount > 0}
-              onClick={() => onSelect("active")}
-            />
-            <NavItem
-              label="Completed"
-              count={completedCount}
-              active={active === "completed"}
-              onClick={() => onSelect("completed")}
-            />
-            <NavItem
-              label="Opted Out"
-              count={optedOutCount}
-              active={active === "opted_out"}
-              onClick={() => onSelect("opted_out")}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+export default function Inbox() {
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
+
+  const list = useConversations();
+  const detail = useConversationDetail(selectedId);
+
+  const conversations = list.data;
+  const counts = useMemo(() => statusCounts(conversations ?? []), [conversations]);
+  const visible = useMemo(
+    () => filterConversations(conversations ?? [], { status: statusFilter, query }),
+    [conversations, statusFilter, query],
   );
-}
 
-function NavItem({
-  label,
-  count,
-  active,
-  onClick,
-  countHighlight,
-  disabled,
-}: {
-  label: string;
-  count?: number;
-  active?: boolean;
-  onClick?: () => void;
-  countHighlight?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-pressed={active}
-      className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        disabled
-          ? "text-muted-foreground cursor-not-allowed"
-          : active
-          ? "bg-surface-muted text-primary font-semibold cursor-pointer"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
-      }`}
-      onClick={disabled ? undefined : onClick}
-      onKeyDown={(e) => {
-        if (!disabled && (e.key === "Enter" || e.key === " ")) onClick?.();
-      }}
-    >
-      <span className={active ? "font-semibold" : "font-medium"}>{label}</span>
-      {count !== undefined && (
-        <span
-          className={`text-xs rounded-full px-1.5 ${
-            countHighlight
-              ? "bg-rose-500 text-white font-semibold px-2"
-              : active
-              ? "text-primary font-medium"
-              : "text-muted-foreground"
-          }`}
-        >
-          {count}
-        </span>
-      )}
-    </div>
+  // The selected row's own summary, taken from the list rather than the detail
+  // response, so the header identity is correct the instant a row is clicked
+  // and never waits on a request.
+  const selectedSummary = useMemo(
+    () => conversations?.find((c) => c.id === selectedId) ?? null,
+    [conversations, selectedId],
   );
-}
 
-// ─── ConversationList ───────────────────────────────────────────────────────
+  const backRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef<number | null>(null);
 
-function ConversationList({
-  conversations,
-  isLoading,
-  selectedId,
-  onSelect,
-  activeCategory,
-  tierFilter,
-  onTierFilter,
-  tierCounts,
-  hideTierChips,
-  fullWidth,
-}: {
-  conversations: Conversation[] | undefined;
-  isLoading: boolean;
-  selectedId: number | null;
-  onSelect: (id: number) => void;
-  activeCategory: CategoryView;
-  tierFilter: string | null;
-  onTierFilter: (t: string | null) => void;
-  tierCounts: Record<string, number>;
-  hideTierChips?: boolean;
-  fullWidth?: boolean;
-}) {
-  const label =
-    activeCategory === "active"    ? "Active"      :
-    activeCategory === "completed" ? "Completed"   :
-    activeCategory === "opted_out" ? "Opted Out"   :
-    "All Conversations";
+  const selectConversation = useCallback((id: number) => {
+    setSelectedId(id);
+    returnFocusRef.current = id;
+    setMobileView("thread");
+  }, []);
 
-  const availableTiers = TIER_ORDER.filter((t) => (tierCounts[t] ?? 0) > 0);
+  const backToList = useCallback(() => {
+    setMobileView("list");
+  }, []);
 
-  const emptyMessage =
-    tierFilter
-      ? `No ${tierFilter} conversations`
-      : activeCategory === "active"
-      ? "No active conversations"
-      : activeCategory === "completed"
-      ? "No completed conversations"
-      : activeCategory === "opted_out"
-      ? "No opted-out conversations"
-      : "No conversations found";
-
-  const emptyHelper =
-    tierFilter
-      ? "Try a different tier filter or clear the filter."
-      : activeCategory === "opted_out"
-      ? "Callers who text STOP will appear here."
-      : "Conversations will appear here as calls come in.";
-
-  return (
-    <div
-      className={`${
-        fullWidth ? "flex-1 min-w-0" : "w-[300px] flex-shrink-0"
-      } border-r border-border bg-background flex flex-col`}
-    >
-      {/* List header */}
-      <div className="border-b border-border bg-card px-4 py-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-foreground text-sm">{label}</h2>
-            {conversations !== undefined && (
-              <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-medium">
-                {conversations.length}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Tier filter chips (desktop; hidden on mobile via hideTierChips prop) */}
-        {!hideTierChips && availableTiers.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2.5" role="group" aria-label="Filter by tier">
-            {tierFilter !== null && (
-              <button
-                onClick={() => onTierFilter(null)}
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-card text-muted-foreground border-border hover:border-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Clear tier filter"
-              >
-                All ×
-              </button>
-            )}
-            {availableTiers.map((tier) => {
-              const isActive = tierFilter === tier;
-              return (
-                <button
-                  key={tier}
-                  onClick={() => onTierFilter(isActive ? null : tier)}
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    isActive ? TIER_CHIP_ACTIVE[tier] : TIER_CHIP_INACTIVE
-                  }`}
-                  aria-pressed={isActive}
-                >
-                  {tier}
-                  <span className="ml-1 opacity-70">{tierCounts[tier]}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* List content */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {isLoading ? (
-          <div className="space-y-2 pt-1">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-lg border border-border bg-card p-3 h-20 animate-pulse" />
-            ))}
-          </div>
-        ) : !conversations?.length ? (
-          <div className="text-center py-12 px-4">
-            <div className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center mx-auto mb-3">
-              <MessageSquare className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">{emptyMessage}</p>
-            <p className="text-xs text-muted-foreground mt-1">{emptyHelper}</p>
-          </div>
-        ) : (
-          conversations.map((c) => (
-            <ConversationCard
-              key={c.id}
-              conversation={c}
-              selected={selectedId === c.id}
-              onClick={() => onSelect(c.id)}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ConversationCard({
-  conversation: c,
-  selected,
-  onClick,
-}: {
-  conversation: Conversation;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const initials = phoneInitials(c.callerPhone);
-  const color = phoneColor(c.callerPhone);
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-selected={selected}
-      className={`p-3 rounded-lg border cursor-pointer transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        selected
-          ? "border-primary/50 bg-surface-muted/60 shadow-sm"
-          : "border-border bg-card hover:border-primary/30 hover:shadow-sm"
-      }`}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
-    >
-      {selected && (
-        <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-surface-muted0 rounded-r-sm" />
-      )}
-
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <Avatar className="h-6 w-6 flex-shrink-0">
-            <AvatarFallback
-              style={{ backgroundColor: color }}
-              className="text-white text-[10px] font-bold"
-            >
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <span
-            className={`text-sm truncate ${
-              selected ? "font-semibold text-foreground" : "font-medium text-foreground"
-            }`}
-          >
-            {c.callerPhone}
-          </span>
-        </div>
-        <span
-          className={`text-xs flex-shrink-0 ml-2 tabular-nums ${
-            selected ? "text-primary font-medium" : "text-muted-foreground"
-          }`}
-        >
-          {relativeTime(c.lastMessageAt)}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <Badge
-          className={`border-transparent rounded-full px-2 py-0 text-xs h-4 ${
-            c.status === "in_progress"
-              ? "bg-emerald-100 text-emerald-700"
-              : c.status === "opted_out"
-              ? "bg-muted text-muted-foreground"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {c.status === "in_progress"
-            ? "Active"
-            : c.status === "opted_out"
-            ? "Opted out"
-            : "Completed"}
-        </Badge>
-        {c.tier && (
-          <Badge
-            className={`border-transparent rounded-full px-2 py-0 text-xs h-4 ${
-              TIER_STYLES[c.tier] ?? "bg-muted text-muted-foreground"
-            }`}
-          >
-            {c.tier}
-          </Badge>
-        )}
-        {c.isOverCap && (
-          <span title="Trial conversation cap reached">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── ThreadPanel ────────────────────────────────────────────────────────────
-
-function ThreadPanel({
-  detail,
-  onBack,
-  showDetails,
-  onToggleDetails,
-}: {
-  detail: ConversationDetail;
-  onBack?: () => void;
-  showDetails?: boolean;
-  onToggleDetails?: () => void;
-}) {
-  const { conversation: c, messages } = detail;
-  const threadRef = useRef<HTMLDivElement>(null);
+  // Mobile master/detail focus contract: entering the thread lands on the way
+  // back out; returning to the list lands on the row that was open. Neither
+  // transition drops focus to `<body>`.
+  useEffect(() => {
+    if (mobileView !== "thread") return;
+    backRef.current?.focus();
+  }, [mobileView, selectedId]);
 
   useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight;
-    }
-  }, [messages.length]);
-
-  const groups = groupMessagesByDate(messages);
+    if (mobileView !== "list") return;
+    const id = returnFocusRef.current;
+    if (id === null) return;
+    const option = document.getElementById(`sc-option-${id}`);
+    option?.focus();
+  }, [mobileView]);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-card">
-      {/* Thread header */}
-      <div className="border-b border-border px-4 md:px-5 py-3 md:py-4 flex-shrink-0">
-        {/* Back button (mobile only) */}
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary mb-2.5 -ml-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-            aria-label="Back to conversations list"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Conversations
-          </button>
-        )}
-        <div className="flex items-start justify-between gap-2">
-          <h1 className="text-base font-semibold text-foreground truncate mb-2">
-            {c.callerPhone}
-          </h1>
-          {/* Details toggle (mobile only) */}
-          {onToggleDetails && (
+    <div className="sc-workspace" data-view={mobileView}>
+      <ConversationListPane
+        query={query}
+        onQuery={setQuery}
+        statusFilter={statusFilter}
+        onStatusFilter={setStatusFilter}
+        counts={counts}
+        conversations={visible}
+        totalCount={conversations?.length ?? 0}
+        isLoading={list.isLoading}
+        isError={list.isError}
+        error={list.error}
+        onRetry={() => void list.refetch()}
+        selectedId={selectedId}
+        onSelect={selectConversation}
+      />
+
+      <ThreadPane
+        selectedId={selectedId}
+        summary={selectedSummary}
+        detail={detail.data}
+        isLoading={detail.isLoading}
+        isError={detail.isError}
+        error={detail.error}
+        onRetry={() => void detail.refetch()}
+        onBack={backToList}
+        backRef={backRef}
+      />
+    </div>
+  );
+}
+
+// ─── List pane ─────────────────────────────────────────────────────────────
+
+function ConversationListPane({
+  query,
+  onQuery,
+  statusFilter,
+  onStatusFilter,
+  counts,
+  conversations,
+  totalCount,
+  isLoading,
+  isError,
+  error,
+  onRetry,
+  selectedId,
+  onSelect,
+}: {
+  query: string;
+  onQuery: (value: string) => void;
+  statusFilter: StatusFilter;
+  onStatusFilter: (value: StatusFilter) => void;
+  counts: Record<StatusFilter, number>;
+  conversations: ContractConversation[];
+  totalCount: number;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  onRetry: () => void;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}) {
+  // Roving tabindex: the list is a single tab stop, and arrow keys move
+  // *focus* only. Selection stays explicit (Enter/Space/click) because
+  // selecting issues a request — selection-following-focus would fire one per
+  // keystroke.
+  const [focusedId, setFocusedId] = useState<number | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+
+  const activeId =
+    conversations.some((c) => c.id === focusedId)
+      ? focusedId
+      : conversations.some((c) => c.id === selectedId)
+        ? selectedId
+        : (conversations[0]?.id ?? null);
+
+  const moveFocus = (delta: number | "first" | "last") => {
+    if (conversations.length === 0) return;
+    const current = conversations.findIndex((c) => c.id === activeId);
+    let next: number;
+    if (delta === "first") next = 0;
+    else if (delta === "last") next = conversations.length - 1;
+    else next = Math.min(conversations.length - 1, Math.max(0, (current < 0 ? 0 : current) + delta));
+    const target = conversations[next];
+    if (!target) return;
+    setFocusedId(target.id);
+    listRef.current
+      ?.querySelector<HTMLElement>(`#sc-option-${target.id}`)
+      ?.focus();
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        moveFocus(1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        moveFocus(-1);
+        break;
+      case "Home":
+        event.preventDefault();
+        moveFocus("first");
+        break;
+      case "End":
+        event.preventDefault();
+        moveFocus("last");
+        break;
+      default:
+        break;
+    }
+  };
+
+  const empty = emptyCopy({ status: statusFilter, query, totalCount });
+  const failure = isError ? listFailure(error) : null;
+
+  return (
+    <section className="sc-list" aria-label="Conversations">
+      <div className="sc-list__head">
+        <div className="sc-list__title">
+          <h1 className="sc-h1">Conversations</h1>
+          {!isLoading && !isError && (
+            <span className="sc-count">
+              {conversations.length}
+              <span className="sd-sr"> conversations shown</span>
+            </span>
+          )}
+        </div>
+
+        <div className="sc-search">
+          <Search className="sc-search__icon" aria-hidden="true" />
+          <input
+            id="sc-search"
+            type="search"
+            className="sc-search__input"
+            placeholder="Search by number"
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            aria-label="Search conversations by phone number"
+          />
+        </div>
+
+        <div className="sc-filters" role="group" aria-label="Filter conversations by status">
+          {FILTERS.map((filter) => (
             <button
-              onClick={onToggleDetails}
-              aria-expanded={showDetails}
-              aria-label={showDetails ? "Hide details" : "Show details"}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground flex-shrink-0 mt-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
+              key={filter.key}
+              type="button"
+              className="sc-filter"
+              data-active={statusFilter === filter.key}
+              aria-pressed={statusFilter === filter.key}
+              onClick={() => onStatusFilter(filter.key)}
             >
-              Details
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                  showDetails ? "rotate-180" : ""
-                }`}
-              />
+              {filter.label}
+              <span className="sc-filter__count">{counts[filter.key]}</span>
             </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge
-            className={`border-transparent rounded-full px-2 py-0 text-xs ${
-              c.status === "in_progress"
-                ? "bg-emerald-100 text-emerald-700"
-                : c.status === "opted_out"
-                ? "bg-muted text-muted-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {c.status === "in_progress"
-              ? "Active"
-              : c.status === "opted_out"
-              ? "Opted out"
-              : "Completed"}
-          </Badge>
-          {c.tier && (
-            <Badge
-              className={`border-transparent rounded-full px-2 py-0 text-xs ${
-                TIER_STYLES[c.tier] ?? "bg-muted text-muted-foreground"
-              }`}
-            >
-              {c.tier}
-            </Badge>
-          )}
-          {c.isOverCap && (
-            <Badge className="border-transparent rounded-full px-2 py-0 text-xs bg-amber-100 text-amber-700">
-              <AlertTriangle className="h-3 w-3 mr-1" /> Trial cap reached
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <MessageCircle className="h-3 w-3" /> SMS
-          </span>
+          ))}
         </div>
       </div>
 
-      {/* Message thread */}
-      <div ref={threadRef} className="flex-1 overflow-y-auto px-4 md:px-5 py-4 space-y-1 bg-surface-muted/40">
-        {messages.length === 0 ? (
-          <div className="text-center text-sm text-muted-foreground py-8">No messages yet</div>
-        ) : (
-          groups.map((group, gi) => (
-            <div key={gi}>
-              <div className="flex items-center gap-3 py-3">
-                <div className="flex-1 h-px bg-muted" />
-                <span className="text-[11px] text-muted-foreground font-medium flex-shrink-0">
-                  {group.dateLabel}
-                </span>
-                <div className="flex-1 h-px bg-muted" />
-              </div>
-              <div className="space-y-3">
-                {group.messages.map((msg) => (
-                  <MessageBubble key={msg.id} msg={msg} />
-                ))}
-              </div>
+      <div className="sc-list__body">
+        {isLoading ? (
+          <div aria-busy="true">
+            <p className="sd-sr" role="status">
+              Loading conversations
+            </p>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="sc-skel" />
+            ))}
+          </div>
+        ) : failure ? (
+          <div className="sc-notice sc-notice--danger" role="alert">
+            <AlertTriangle className="sc-notice__icon" aria-hidden="true" />
+            <div className="sc-notice__body">
+              <p className="sc-notice__title">{failure.title}</p>
+              <p className="sc-notice__detail">{failure.detail}</p>
+              {!failure.isSession && (
+                <button type="button" className="sc-button" onClick={onRetry}>
+                  <RefreshCw className="sc-button__icon" aria-hidden="true" />
+                  Retry
+                </button>
+              )}
             </div>
-          ))
+          </div>
+        ) : conversations.length === 0 ? (
+          <div className="sc-empty">
+            <MessageSquare className="sc-empty__icon" aria-hidden="true" />
+            <p className="sc-empty__title">{empty.title}</p>
+            <p className="sc-empty__detail">{empty.detail}</p>
+          </div>
+        ) : (
+          <ul
+            ref={listRef}
+            className="sc-options"
+            role="listbox"
+            aria-label="Conversations"
+            onKeyDown={onKeyDown}
+          >
+            {conversations.map((conversation) => (
+              <ConversationOption
+                key={conversation.id}
+                conversation={conversation}
+                selected={selectedId === conversation.id}
+                tabbable={activeId === conversation.id}
+                onSelect={() => onSelect(conversation.id)}
+                onFocus={() => setFocusedId(conversation.id)}
+              />
+            ))}
+          </ul>
         )}
       </div>
+    </section>
+  );
+}
 
-      {/* Composer — coming soon notice */}
-      <div className="border-t border-border bg-card flex-shrink-0 px-4 md:px-5 py-3.5">
-        <div className="flex items-start gap-2.5">
-          <Clock className="h-4 w-4 flex-shrink-0 text-amber-400 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Manual replies</span> are coming soon.
-            Your AI Receptionist handles all responses automatically right now.
+function ConversationOption({
+  conversation,
+  selected,
+  tabbable,
+  onSelect,
+  onFocus,
+}: {
+  conversation: ContractConversation;
+  selected: boolean;
+  tabbable: boolean;
+  onSelect: () => void;
+  onFocus: () => void;
+}) {
+  const status = statusPresentation(conversation.status);
+  const attention = attentionOf(conversation);
+
+  return (
+    <li
+      id={`sc-option-${conversation.id}`}
+      role="option"
+      aria-selected={selected}
+      tabIndex={tabbable ? 0 : -1}
+      className="sc-option"
+      data-selected={selected}
+      onClick={onSelect}
+      onFocus={onFocus}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <span className="sc-option__top">
+        <span className="sc-option__phone">{conversation.callerPhone}</span>
+        <time className="sc-option__when" dateTime={isoAttribute(conversation.lastMessageAt)}>
+          <span aria-hidden="true">{relativeTime(conversation.lastMessageAt)}</span>
+          <span className="sd-sr">
+            Last message {formatAbsolute(conversation.lastMessageAt)}
+          </span>
+        </time>
+      </span>
+
+      <span className="sc-option__meta">
+        <span className="sc-chip" data-tone={status.tone}>
+          {status.label}
+        </span>
+        <span className="sc-chip" data-tone="quiet">
+          {tierLabel(conversation.tier)}
+        </span>
+        {conversation.isOverCap && (
+          <span className="sc-chip" data-tone="warn">
+            <AlertTriangle className="sc-chip__icon" aria-hidden="true" />
+            Over trial limit
+          </span>
+        )}
+      </span>
+
+      {attention.summary && <span className="sd-sr">{attention.summary}</span>}
+    </li>
+  );
+}
+
+// ─── Thread pane ───────────────────────────────────────────────────────────
+
+function ThreadPane({
+  selectedId,
+  summary,
+  detail,
+  isLoading,
+  isError,
+  error,
+  onRetry,
+  onBack,
+  backRef,
+}: {
+  selectedId: number | null;
+  summary: ContractConversation | null;
+  detail: ConversationDetail | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  onRetry: () => void;
+  onBack: () => void;
+  backRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  // The detail response is only trusted when it is the response for the
+  // current selection. Without this a slow reply for a previous conversation
+  // could paint its messages under the newly selected contact.
+  const loaded = detail && detail.conversation.id === selectedId ? detail : undefined;
+  const conversation = loaded?.conversation ?? summary ?? null;
+  const failure = isError ? detailFailure(error) : null;
+
+  if (selectedId === null) {
+    return (
+      <section className="sc-thread sc-thread--blank" aria-label="Selected conversation">
+        <div className="sc-empty">
+          <MessageSquare className="sc-empty__icon" aria-hidden="true" />
+          <p className="sc-empty__title">No conversation selected</p>
+          <p className="sc-empty__detail">
+            Choose a conversation to read its messages.
           </p>
         </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="sc-thread" aria-label="Selected conversation">
+      <div className="sc-thread__bar">
+        <button ref={backRef} type="button" className="sc-back" onClick={onBack}>
+          <ArrowLeft className="sc-button__icon" aria-hidden="true" />
+          Back to conversations
+        </button>
       </div>
 
-      {/* Inline details panel (mobile: shown when Details is toggled open) */}
-      {showDetails && onToggleDetails && (
-        <div className="border-t border-border overflow-y-auto max-h-[45vh] flex-shrink-0 md:hidden">
-          <DetailsPanel detail={detail} embedded />
+      {conversation ? (
+        <ThreadHeader conversation={conversation} />
+      ) : (
+        <div className="sc-thread__head">
+          <div className="sc-skel sc-skel--title" />
         </div>
       )}
-    </div>
+
+      {failure ? (
+        <div className="sc-thread__state">
+          <div className="sc-notice sc-notice--danger" role="alert">
+            <AlertTriangle className="sc-notice__icon" aria-hidden="true" />
+            <div className="sc-notice__body">
+              <p className="sc-notice__title">{failure.title}</p>
+              <p className="sc-notice__detail">{failure.detail}</p>
+              {!failure.isSession && (
+                <button type="button" className="sc-button" onClick={onRetry}>
+                  <RefreshCw className="sc-button__icon" aria-hidden="true" />
+                  Retry
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : !loaded ? (
+        <div className="sc-thread__state" aria-busy="true">
+          <p className="sd-sr" role="status">
+            Loading conversation
+          </p>
+          <div className="sc-skel sc-skel--line" />
+          <div className="sc-skel sc-skel--line" />
+          <div className="sc-skel sc-skel--line" />
+        </div>
+      ) : (
+        <MessageHistory
+          key={selectedId}
+          conversation={loaded.conversation}
+          messages={loaded.messages}
+        />
+      )}
+
+      {conversation && <MessagingStatus conversation={conversation} />}
+    </section>
   );
 }
 
-function MessageBubble({ msg }: { msg: Message }) {
-  const isOutbound = msg.direction === "outbound";
+function ThreadHeader({ conversation }: { conversation: ContractConversation }) {
+  const status = statusPresentation(conversation.status);
+  const attention = attentionOf(conversation);
+
   return (
-    <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[72%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-          isOutbound
-            ? "bg-primary text-primary-foreground rounded-tr-sm"
-            : "bg-card text-foreground rounded-tl-sm border border-border"
-        }`}
-      >
-        <p className="leading-relaxed">{msg.body}</p>
-        <p
-          className={`text-[10px] mt-1.5 ${
-            isOutbound ? "text-primary-foreground/70" : "text-muted-foreground"
-          }`}
-        >
-          {formatDateTime(msg.createdAt)} · {isOutbound ? "AI Receptionist" : "Caller"}
+    <header className="sc-thread__head">
+      <h2 className="sc-thread__phone">{conversation.callerPhone}</h2>
+
+      <div className="sc-thread__chips">
+        <span className="sc-chip" data-tone={status.tone}>
+          {status.label}
+        </span>
+        <span className="sc-chip" data-tone="quiet">
+          {tierLabel(conversation.tier)}
+        </span>
+        <span className="sc-chip" data-tone="quiet">
+          SMS
+        </span>
+      </div>
+
+      <p className="sc-thread__timeline">
+        Started{" "}
+        <time dateTime={isoAttribute(conversation.createdAt)}>
+          {formatAbsolute(conversation.createdAt)}
+        </time>
+        <span aria-hidden="true"> · </span>
+        Last message{" "}
+        <time dateTime={isoAttribute(conversation.lastMessageAt)}>
+          {formatAbsolute(conversation.lastMessageAt)}
+        </time>
+      </p>
+
+      {conversation.disqualifyReason && (
+        <p className="sc-thread__reason">
+          <span className="sc-thread__reasonlabel">Why this tier</span>
+          {conversation.disqualifyReason}
         </p>
+      )}
+
+      {attention.warnings.map((warning) => (
+        <div key={warning} className="sc-notice sc-notice--warn">
+          <AlertTriangle className="sc-notice__icon" aria-hidden="true" />
+          <div className="sc-notice__body">
+            <p className="sc-notice__title">{warning}</p>
+            <p className="sc-notice__detail">
+              Conversations past the trial limit still arrive, but upgrading keeps them
+              from counting against you.
+            </p>
+          </div>
+        </div>
+      ))}
+    </header>
+  );
+}
+
+function MessageHistory({
+  conversation,
+  messages,
+}: {
+  conversation: ContractConversation;
+  messages: ContractMessage[];
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const seen = useRef<{ conversationId: number; lastMessageId: number | null } | null>(null);
+  const lastMessageId = messages.length > 0 ? messages[messages.length - 1]!.id : null;
+
+  // Scroll intent, stated explicitly: opening a conversation jumps to the
+  // newest message with no animation; a genuinely new message arriving in the
+  // conversation already open eases down to it. The whole historical list is
+  // never animated, and nothing here triggers a request.
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const previous = seen.current;
+    const changedConversation = previous?.conversationId !== conversation.id;
+    seen.current = { conversationId: conversation.id, lastMessageId };
+    if (!changedConversation && previous?.lastMessageId === lastMessageId) return;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior: changedConversation || prefersReducedMotion() ? "auto" : "smooth",
+    });
+  }, [conversation.id, lastMessageId]);
+
+  if (messages.length === 0) {
+    return (
+      <div className="sc-thread__state">
+        <div className="sc-empty">
+          <MessageSquare className="sc-empty__icon" aria-hidden="true" />
+          <p className="sc-empty__title">No messages in this conversation</p>
+          <p className="sc-empty__detail">
+            Nothing has been exchanged with this number yet.
+          </p>
+        </div>
       </div>
+    );
+  }
+
+  const groups = groupMessagesByDay(messages);
+
+  return (
+    <div ref={scrollRef} className="sc-history sc-enter" tabIndex={0} aria-label="Message history">
+      {groups.map((group) => (
+        <section key={group.key} className="sc-day" aria-label={group.label}>
+          <h3 className="sc-day__label">{group.label}</h3>
+          <ol className="sc-day__list">
+            {group.messages.map((message) => (
+              <li
+                key={message.id}
+                className="sc-message"
+                data-direction={message.direction}
+              >
+                <p className="sc-message__from">
+                  {senderLabel(message, conversation)}
+                  <span aria-hidden="true"> · </span>
+                  <time dateTime={isoAttribute(message.createdAt)}>
+                    <span aria-hidden="true">{formatTimeOfDay(message.createdAt)}</span>
+                    <span className="sd-sr">{formatAbsolute(message.createdAt)}</span>
+                  </time>
+                </p>
+                <p className="sc-message__body">{message.body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
     </div>
   );
 }
 
-// ─── DetailsPanel ────────────────────────────────────────────────────────────
-
-function DetailsPanel({
-  detail,
-  embedded = false,
-}: {
-  detail: ConversationDetail;
-  embedded?: boolean;
-}) {
-  const { conversation: c } = detail;
+/**
+ * The composer region. It carries information, not a control, because the
+ * product has no dashboard send path — see this file's header. Rendering a
+ * disabled input here would promise a text box that becomes usable under some
+ * condition; none exists.
+ */
+function MessagingStatus({ conversation }: { conversation: ContractConversation }) {
+  const state = messagingState(conversation);
+  const Icon = state.key === "opted-out" ? Ban : Bot;
 
   return (
-    <div
-      className={
-        embedded
-          ? "bg-card flex flex-col"
-          : "w-[260px] flex-shrink-0 border-l border-border bg-card flex flex-col overflow-y-auto"
-      }
-    >
-      <div className="px-4 py-4 border-b border-border flex-shrink-0">
-        <h2 className="text-sm font-semibold text-foreground">Details</h2>
+    <footer className="sc-messaging" data-tone={state.tone}>
+      <Icon className="sc-messaging__icon" aria-hidden="true" />
+      <div className="sc-messaging__body">
+        <p className="sc-messaging__title">{state.title}</p>
+        <p className="sc-messaging__detail">{state.detail}</p>
       </div>
-      <div className="p-4 space-y-5">
-
-        {/* Caller */}
-        <section aria-label="Caller info">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
-            Caller
-          </p>
-          <div className="flex items-center gap-2.5">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback
-                style={{ backgroundColor: phoneColor(c.callerPhone) }}
-                className="text-white text-xs font-bold"
-              >
-                {phoneInitials(c.callerPhone)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="text-sm font-medium text-foreground">{c.callerPhone}</div>
-              <div className="text-xs text-muted-foreground">Via SMS</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Lead tier + Why this tier */}
-        {c.tier && (
-          <section aria-label="Lead tier">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
-              Lead Tier
-            </p>
-            <Badge
-              className={`${TIER_STYLES[c.tier] ?? "bg-muted text-muted-foreground"} border-transparent`}
-            >
-              {c.tier}
-            </Badge>
-
-            {c.disqualifyReason ? (
-              <div
-                className={`mt-2.5 rounded-lg border p-3 ${
-                  WHY_TIER_STYLES[c.tier] ?? "bg-background border-border"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <HelpCircle
-                    className={`h-3.5 w-3.5 flex-shrink-0 ${
-                      WHY_TIER_TEXT[c.tier] ?? "text-muted-foreground"
-                    }`}
-                  />
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-wide ${
-                      WHY_TIER_TEXT[c.tier] ?? "text-muted-foreground"
-                    }`}
-                  >
-                    Why this tier
-                  </span>
-                </div>
-                <p
-                  className={`text-xs leading-relaxed ${
-                    WHY_TIER_TEXT[c.tier] ?? "text-muted-foreground"
-                  }`}
-                >
-                  {c.disqualifyReason}
-                </p>
-              </div>
-            ) : null}
-          </section>
-        )}
-
-        {/* Opted-out notice */}
-        {c.status === "opted_out" && (
-          <section>
-            <div className="bg-background border border-border rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                <MessageCircle className="h-3.5 w-3.5" />
-                <span className="text-xs font-semibold">Caller Unsubscribed</span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                This caller unsubscribed via SMS. The AI will not reply unless they text START.
-              </p>
-            </div>
-          </section>
-        )}
-
-        {/* Trial cap warning */}
-        {c.isOverCap && (
-          <section>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-amber-700 mb-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <span className="text-xs font-semibold">Trial Cap Reached</span>
-              </div>
-              <p className="text-xs text-amber-600 leading-relaxed">
-                This conversation hit your trial limit. Upgrade to keep receiving leads.
-              </p>
-            </div>
-          </section>
-        )}
-
-        {/* Timeline */}
-        <section aria-label="Timeline">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
-            Timeline
-          </p>
-          <div className="space-y-2 text-xs text-muted-foreground">
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-muted-foreground flex-shrink-0">Started</span>
-              <span className="text-right">{formatDateTime(c.createdAt)}</span>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-muted-foreground flex-shrink-0">Last msg</span>
-              <span className="text-right">{formatDateTime(c.lastMessageAt)}</span>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
+    </footer>
   );
 }

@@ -22,8 +22,24 @@ function asFiniteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-/** Builds the Vapi create/update request body from a validated runtime config. Sends no undefined fields. */
-export function buildVapiAssistantRequestBody(name: string, config: VapiAssistantRuntimeConfig): JsonObject {
+/**
+ * Builds the Vapi create/update request body from a validated runtime config
+ * and a server-resolved artifact plan. Sends no undefined fields.
+ *
+ * `artifactPlan` is a required parameter, not an optional one, and that is the
+ * point: omitting it would hand Vapi's own permissive defaults
+ * (`recordingEnabled: true`, `transcriptPlan.enabled: true`) to a real call.
+ * Because it is required, no caller can reach the provider without having
+ * resolved a policy first — the compiler enforces what a runtime check alone
+ * would only hope for. It is built by `artifactPolicy.ts` from a server
+ * environment variable and never from `config`, so nothing a firm or a browser
+ * can set influences it.
+ */
+export function buildVapiAssistantRequestBody(
+  name: string,
+  config: VapiAssistantRuntimeConfig,
+  artifactPlan: JsonObject,
+): JsonObject {
   const model: JsonObject = {
     provider: config.model.provider,
     model: config.model.model,
@@ -47,6 +63,7 @@ export function buildVapiAssistantRequestBody(name: string, config: VapiAssistan
     model,
     voice,
     transcriber,
+    artifactPlan,
     firstMessageMode: config.firstMessageMode,
     ...(config.firstMessage !== undefined ? { firstMessage: config.firstMessage } : {}),
   };

@@ -36,6 +36,25 @@ export const voiceAssistants = pgTable("voice_assistants", {
   // by the browser) and is not a provider credential or provider identifier.
   publishAttemptId:     uuid("publish_attempt_id"),
   publishStartedAt:     timestamp("publish_started_at", { withTimezone: true }),
+  // AR-001V: provider-synchronization bookkeeping for an ALREADY-published
+  // assistant. Deliberately separate from the publish columns above, which
+  // describe the one-time create lifecycle and are constrained by
+  // ck_voice_assistants_publish_invariants — a published row must keep
+  // sync_error NULL, so a failed *update* can never be recorded there.
+  //
+  // providerConfigHash is a SHA-256 over the exact provider-relevant payload
+  // that was last successfully sent to the provider (see
+  // lib/voicePublishing/providerPayloadHash.ts). It is a digest of our own
+  // request body — never a credential, never a provider identifier, and it
+  // deliberately covers only provider-relevant fields, so editing a purely
+  // local field (Setup, Analysis, Advanced) changes updated_at but not this
+  // value. NULL means "never proven synchronized", which the UI must render
+  // as unsynchronized rather than as synchronized.
+  providerConfigHash:     text("provider_config_hash"),
+  providerSyncAttemptId:  uuid("provider_sync_attempt_id"),
+  providerSyncStartedAt:  timestamp("provider_sync_started_at", { withTimezone: true }),
+  /** Short static code from PROVIDER_SYNC_ERROR_CODES. Never provider text, payloads, ids, prompts, or caller data. */
+  providerSyncError:      text("provider_sync_error"),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
@@ -113,6 +132,29 @@ export const voiceAssistants = pgTable("voice_assistants", {
         ))
     `,
   ),
+  // AR-001V. Additive only: these three constraints/indexes reference solely
+  // the new provider-sync columns, so ck_voice_assistants_publish_invariants
+  // and ck_voice_assistants_status are untouched and every existing row stays
+  // valid without backfill.
+  check(
+    "ck_voice_assistants_provider_sync_error_length",
+    sql`${table.providerSyncError} IS NULL OR char_length(${table.providerSyncError}) <= 100`,
+  ),
+  check(
+    "ck_voice_assistants_provider_config_hash_shape",
+    sql`${table.providerConfigHash} IS NULL OR ${table.providerConfigHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+  // Attempt ownership is all-or-nothing: a half-populated claim would let a
+  // concurrent writer's predicate match when it must not.
+  check(
+    "ck_voice_assistants_provider_sync_attempt",
+    sql`
+      (${table.providerSyncAttemptId} IS NULL AND ${table.providerSyncStartedAt} IS NULL)
+      OR (${table.providerSyncAttemptId} IS NOT NULL AND ${table.providerSyncStartedAt} IS NOT NULL)
+    `,
+  ),
+  // Supports the stale-sync-attempt sweep without a full-table scan.
+  index("ix_voice_assistants_provider_sync_started_at").on(table.providerSyncStartedAt),
 ]);
 
 export const insertVoiceAssistantSchema = createInsertSchema(voiceAssistants).omit({

@@ -7,12 +7,45 @@ import { Badge } from "@/components/ui/badge";
 import { UnavailableActionButton } from "@/components/common/UnavailableActionButton";
 import { CostBreakdown } from "@/components/common/CostBreakdown";
 import { LatencyMeter } from "@/components/common/LatencyMeter";
-import { getVoicePreset } from "@/lib/assistantEstimates";
+import { findVoicePreset } from "@/lib/assistantEstimates";
+import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
+import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 
 import SetupTab from "@/pages/assistant-builder/SetupTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
 import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
+
+/**
+ * ── AR-001J final refinement, owner decision B ───────────────────────────
+ *
+ * A build that cannot publish, or cannot run a browser test, shows no control
+ * for it — not a disabled one, not a tooltip explaining a future capability,
+ * and not an empty slot where one used to be. The customer sees the
+ * functionality this build actually offers.
+ *
+ * Both constants are compositions of the foldable flag constants in
+ * `lib/featureFlags.ts`, so each is a literal by the time Rollup sees it. The
+ * whole action row, the standing placeholders, their icons and the browser-test
+ * panel slot therefore leave the build entirely when their flag is off, rather
+ * than being rendered and hidden. When a flag is on, nothing about the control
+ * changes — the same component, the same props, the same placement.
+ *
+ * The row itself is conditional, not just its children: an empty flex
+ * container would still consume the header's `justify-between` slot and leave
+ * a visible gap where the actions were.
+ */
+const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
+const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+/**
+ * AR-001V: the provider-synchronization control is gated by the platform flag
+ * alone. It is neither a publish nor a browser test — it updates a resource
+ * that already exists — and the server independently refuses to contact the
+ * provider unless VOICE_PUBLISH_ENABLED is true, so nothing here can reach a
+ * provider on its own.
+ */
+const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;
+const anyBuilderActionInBuild = publishInBuild || browserTestInBuild || syncInBuild;
 
 export const BUILDER_TABS = [
   { key: "setup", label: "Setup" },
@@ -74,6 +107,12 @@ interface BuilderShellProps extends BuilderTabProps {
    * default, since testing is never eligible for an unpersisted assistant.
    */
   testControl?: ReactNode;
+  /**
+   * AR-001V: the provider-synchronization control for this builder instance.
+   * Omitted entirely by the new/unsaved builder, where no published provider
+   * resource exists to update.
+   */
+  syncControl?: ReactNode;
   /** Milestone 1 / Checkpoint F1: the active browser-test panel, rendered below the header banner when a test is in progress or has just ended. */
   testPanel?: ReactNode;
   /**
@@ -104,10 +143,14 @@ export function BuilderShell({
   announcement,
   publishControl,
   testControl,
+  syncControl,
   testPanel,
   contentDisabled = false,
 }: BuilderShellProps) {
-  const preset = getVoicePreset(draft.voiceModel.preset);
+  // Undefined when the saved config carries a retired preset. The footer
+  // then says the estimates are unavailable rather than showing figures
+  // belonging to a preset the customer never chose.
+  const preset = findVoicePreset(draft.voiceModel.preset);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -150,25 +193,30 @@ export function BuilderShell({
               {statusBadge}
             </Badge>
           </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
-            {testControl ?? (
-              <UnavailableActionButton
-                icon={PlayCircle}
-                label="Test"
-                availability="Save and publish this assistant before testing."
-              />
-            )}
-            {publishControl ?? (
-              <UnavailableActionButton
-                icon={Rocket}
-                label="Publish"
-                availability="Save this assistant as a draft before publishing."
-              />
-            )}
-          </div>
+          {anyBuilderActionInBuild && (
+            <div className="flex flex-shrink-0 items-center gap-2">
+              {browserTestInBuild &&
+                (testControl ?? (
+                  <UnavailableActionButton
+                    icon={PlayCircle}
+                    label="Test"
+                    availability="Save and publish this assistant before testing."
+                  />
+                ))}
+              {publishInBuild &&
+                (publishControl ?? (
+                  <UnavailableActionButton
+                    icon={Rocket}
+                    label="Publish"
+                    availability="Save this assistant as a draft before publishing."
+                  />
+                ))}
+              {syncInBuild && syncControl}
+            </div>
+          )}
         </div>
         {headerBanner && <div className="mt-3">{headerBanner}</div>}
-        {testPanel && <div className="mt-3">{testPanel}</div>}
+        {browserTestInBuild && testPanel && <div className="mt-3">{testPanel}</div>}
       </div>
 
       {/* Tabs + content */}
@@ -209,8 +257,16 @@ export function BuilderShell({
       <div className="flex-shrink-0 border-t border-border bg-card px-6 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="grid flex-1 grid-cols-2 gap-4 sm:flex sm:gap-8">
-            <CostBreakdown preset={preset} compact />
-            <LatencyMeter latencyMs={preset.latencyMs} compact />
+            {preset === undefined ? (
+              <p className="col-span-2 self-center text-[11px] text-muted-foreground">
+                {PRESET_RECOVERY.estimatesUnavailable}
+              </p>
+            ) : (
+              <>
+                <CostBreakdown preset={preset} compact />
+                <LatencyMeter latencyMs={preset.latencyMs} compact />
+              </>
+            )}
           </div>
           {footerRight}
         </div>
