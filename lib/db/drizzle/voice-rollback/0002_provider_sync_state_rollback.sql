@@ -5,7 +5,10 @@
 -- Rolls back migration: lib/db/drizzle/voice/0002_provider_sync_state.sql
 -- (AR-001V: provider-synchronization state for already-published assistants).
 --
--- NOT APPLIED. Authored under AR-001V, which forbids running any migration.
+-- Run only by an operator, deliberately, and only after confirming the target
+-- database. Nothing invokes it automatically. It does not remove this
+-- migration's row from `drizzle.__drizzle_migrations_voice`, so that row must
+-- be cleared separately before the forward migration can be applied again.
 --
 -- VERIFY BACKUPS FIRST. Confirm the target database is safe to modify before
 -- running this file, and confirm it is the intended (non-production, unless

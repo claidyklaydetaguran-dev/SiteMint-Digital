@@ -517,3 +517,38 @@ session-scoped advisory lock across the child so a baseline cannot interleave:
 Revert this commit. The legacy `drizzle.__drizzle_migrations` was never modified,
 so the domains fall straight back to the shared watermark with no replay in
 either direction; the per-domain tables can then be dropped at leisure.
+
+## 13. Applied migration immutability
+
+A journal row's `hash` is `sha256` over the **entire raw `.sql` file**, comments
+included — `src/baseline-journals.mjs` computes
+`createHash("sha256").update(readFileSync(<tag>.sql))`, which is exactly what
+drizzle's own `readMigrationFiles` does. Nothing strips comments first.
+
+**So once a migration has been recorded in any database, every byte of that
+committed file is frozen.** Editing so much as a typo in a header comment
+changes the hash, and `src/migrate-guard.mjs` then reports
+`<tag> records a different hash than the committed SQL` and refuses. The
+refusal is not scoped to the edited domain: the guard builds the expected set
+for all of `voice`, `discovery`, and `scheduling` on every invocation, so one
+altered comment makes **all three** `migrate:*` commands refuse against any
+database holding the old hash. Recovering means hand-updating the journal row
+on every affected database.
+
+Corrections about *where* a migration has been deployed therefore belong here,
+in the rollback file, or in a commit message — never inside the hashed `.sql`.
+
+### Deployment note for `0002_provider_sync_state`
+
+Migration `0002_provider_sync_state` was applied successfully to the
+`SiteMint-Voice-Staging` database on 2026-08-30.
+
+That file still opens with a `NOT APPLIED` header, which was accurate when it
+was authored and is now false. It is retained **only** because rewriting it
+would invalidate the recorded hash and block guarded migrations, per the rule
+above. Read the header as a historical authoring note, not as current state.
+
+This statement describes `SiteMint-Voice-Staging` at that date and nothing
+else. It is not a claim about production or any other environment, and it is
+not a claim about staging's state today. The authoritative answer for any
+database is always its own `drizzle.__drizzle_migrations_voice` table.
