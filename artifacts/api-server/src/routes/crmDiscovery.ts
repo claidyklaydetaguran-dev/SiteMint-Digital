@@ -51,7 +51,19 @@ const DEFAULT_LAUNCH_CHECKLIST = [
 
 // ── Deterministic classification ──────────────────────────────────────────────
 
-function buildDeterministicSummary(sub: DiscoverySubmission): {
+// Narrowed to exactly the fields this function reads, so it stays valid
+// regardless of future additive columns on discoverySubmissions — see
+// docs/sitemint-platform/DISCOVERY_DOMAIN_CONTRACT.md, "crmDiscovery.ts
+// compatibility exception." Compile-time only: the `partial` object below
+// keeps its full original runtime construction and is passed here
+// structurally (TypeScript accepts a wider-shaped variable wherever a
+// narrower Pick<> is expected).
+type DeterministicSummaryInput = Pick<
+  DiscoverySubmission,
+  "formData" | "budget" | "timeline" | "companyName" | "contactName" | "leadScore"
+>;
+
+function buildDeterministicSummary(sub: DeterministicSummaryInput): {
   aiSummary: string;
   estimatedComplexity: string;
   estimatedBudgetTier: string;
@@ -161,7 +173,7 @@ router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res
 
   const formData = (body.formData as Record<string, unknown>) || {};
 
-  const partial: DiscoverySubmission = {
+  const partial = {
     id: 0, createdAt: new Date(), updatedAt: new Date(),
     contactName, companyName, email,
     phone: String(body.phone || "") || null,

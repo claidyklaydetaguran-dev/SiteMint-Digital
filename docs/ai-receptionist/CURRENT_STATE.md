@@ -22,8 +22,27 @@
 
 ## Stub / Coming Soon Pages
 
-- **Contacts**: Full "Coming Soon" overlay — no data shown.
-- **Deploy**: Channel status display — SMS shown as Active, Email and Web Chat shown as Coming Soon.
+- **Contacts** (`/contacts`): page header + honest empty state (icon card, copy, CTA to
+  `/conversations`). `/contacts/:id` is a bare stub. No data shown.
+- **Settings** (`/settings`): Members panel is "Coming Soon"; Language panel is
+  non-functional decorative UI.
+- **Deploy**: page deleted in Phase 2B — `/deploy` is an in-SPA redirect to `/receptionist`.
+- **Inbox reply composer**: explicit "coming soon" notice; conversations are read-only
+  from the dashboard.
+- **AgentConfig "Test" tab**: disabled placeholder.
+
+## Voice Platform Launch Candidate
+
+Milestone 1 code is complete on `claude/milestone-1-f2b-readiness-kvbe27` and is
+being verified on `feature/ai-receptionist-today-mvp`. It includes the new
+dashboard shell, versioned voice migrations, firm-scoped assistant CRUD, the
+provider-neutral voice layer, Vapi publishing, and real browser microphone calls.
+
+The launch candidate is not yet accepted until staging has the required Vapi
+configuration, the voice migration is applied, and the real browser-call UAT in
+`LAUNCH_CHECKLIST.md` passes. Inbound phone calls, appointment booking, call
+ingestion, transcripts, recordings, CRM handoff, contacts, analytics, and voice
+billing are not implemented in this release.
 
 ## Dead Code — RETIRED (Phase 2A)
 

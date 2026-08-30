@@ -1,0 +1,276 @@
+import type { ReactNode } from "react";
+import { Link } from "wouter";
+import { ArrowLeft, PlayCircle, Rocket } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { UnavailableActionButton } from "@/components/common/UnavailableActionButton";
+import { CostBreakdown } from "@/components/common/CostBreakdown";
+import { LatencyMeter } from "@/components/common/LatencyMeter";
+import { findVoicePreset } from "@/lib/assistantEstimates";
+import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
+import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
+import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
+
+import SetupTab from "@/pages/assistant-builder/SetupTab";
+import PromptTab from "@/pages/assistant-builder/PromptTab";
+import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
+
+/**
+ * ── AR-001J final refinement, owner decision B ───────────────────────────
+ *
+ * A build that cannot publish, or cannot run a browser test, shows no control
+ * for it — not a disabled one, not a tooltip explaining a future capability,
+ * and not an empty slot where one used to be. The customer sees the
+ * functionality this build actually offers.
+ *
+ * Both constants are compositions of the foldable flag constants in
+ * `lib/featureFlags.ts`, so each is a literal by the time Rollup sees it. The
+ * whole action row, the standing placeholders, their icons and the browser-test
+ * panel slot therefore leave the build entirely when their flag is off, rather
+ * than being rendered and hidden. When a flag is on, nothing about the control
+ * changes — the same component, the same props, the same placement.
+ *
+ * The row itself is conditional, not just its children: an empty flex
+ * container would still consume the header's `justify-between` slot and leave
+ * a visible gap where the actions were.
+ */
+const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
+const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
+/**
+ * AR-001V: the provider-synchronization control is gated by the platform flag
+ * alone. It is neither a publish nor a browser test — it updates a resource
+ * that already exists — and the server independently refuses to contact the
+ * provider unless VOICE_PUBLISH_ENABLED is true, so nothing here can reach a
+ * provider on its own.
+ */
+const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;
+const anyBuilderActionInBuild = publishInBuild || browserTestInBuild || syncInBuild;
+
+export const BUILDER_TABS = [
+  { key: "setup", label: "Setup" },
+  { key: "prompt", label: "Prompt" },
+  { key: "voice-model", label: "Voice & Model" },
+] as const;
+
+export type BuilderTabKey = (typeof BUILDER_TABS)[number]["key"];
+
+export function isBuilderTabKey(
+  value: string | undefined,
+): value is BuilderTabKey {
+  return BUILDER_TABS.some((t) => t.key === value);
+}
+
+export interface BuilderTabProps {
+  draft: AssistantDraft;
+  update: (updater: (draft: AssistantDraft) => AssistantDraft) => void;
+}
+
+function TabPanel({
+  tab,
+  draft,
+  update,
+}: { tab: BuilderTabKey } & BuilderTabProps) {
+  switch (tab) {
+    case "setup":
+      return <SetupTab draft={draft} update={update} />;
+    case "prompt":
+      return <PromptTab draft={draft} update={update} />;
+    case "voice-model":
+      return <VoiceModelTab draft={draft} update={update} />;
+    default:
+      return null;
+  }
+}
+
+interface BuilderShellProps extends BuilderTabProps {
+  tab: BuilderTabKey;
+  onTabChange: (tab: BuilderTabKey) => void;
+  backHref: string;
+  statusBadge: ReactNode;
+  headerBanner?: ReactNode;
+  footerRight: ReactNode;
+  /** Screen-reader-only save-status announcement (aria-live). */
+  announcement: string;
+  /**
+   * Milestone 1 / Checkpoint E3C: the Publish control for this builder
+   * instance. Defaults to the standing "unavailable" placeholder (matching
+   * pre-E3C behavior) when the caller doesn't supply one — the new/unsaved
+   * builder always uses the default, since publishing is never eligible for
+   * an unpersisted assistant.
+   */
+  publishControl?: ReactNode;
+  /**
+   * Milestone 1 / Checkpoint F1: the Test control for this builder
+   * instance. Defaults to the standing "unavailable" placeholder when the
+   * caller doesn't supply one — the new/unsaved builder always uses the
+   * default, since testing is never eligible for an unpersisted assistant.
+   */
+  testControl?: ReactNode;
+  /**
+   * AR-001V: the provider-synchronization control for this builder instance.
+   * Omitted entirely by the new/unsaved builder, where no published provider
+   * resource exists to update.
+   */
+  syncControl?: ReactNode;
+  /** Milestone 1 / Checkpoint F1: the active browser-test panel, rendered below the header banner when a test is in progress or has just ended. */
+  testPanel?: ReactNode;
+  /**
+   * True while a publish request is in flight for this assistant. Disables
+   * the name field and every tab's editable controls (via a fieldset) so a
+   * publish attempt can't race a concurrent edit — mirrors the existing
+   * disabled Save Draft behavior during that same window.
+   */
+  contentDisabled?: boolean;
+}
+
+/**
+ * Shared chrome for both the new-unsaved and persisted assistant builder
+ * routes: header (name field, status badge, disabled Test/Publish), the
+ * launch-candidate builder tabs, and the sticky estimate/save footer. Only the parts
+ * that differ between "new" and "persisted" (status badge, save control,
+ * banner) are passed in by the caller.
+ */
+export function BuilderShell({
+  draft,
+  update,
+  tab,
+  onTabChange,
+  backHref,
+  statusBadge,
+  headerBanner,
+  footerRight,
+  announcement,
+  publishControl,
+  testControl,
+  syncControl,
+  testPanel,
+  contentDisabled = false,
+}: BuilderShellProps) {
+  // Undefined when the saved config carries a retired preset. The footer
+  // then says the estimates are unavailable rather than showing figures
+  // belonging to a preset the customer never chose.
+  const preset = findVoicePreset(draft.voiceModel.preset);
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-background">
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+
+      {/* Header */}
+      <div className="flex-shrink-0 border-b border-border px-6 py-4">
+        <Link
+          href="/assistants"
+          className="inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-0 md:py-0"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          Assistants
+        </Link>
+        <h1 className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Assistant Builder
+        </h1>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Input
+              aria-label="Assistant name"
+              value={draft.setup.assistantName}
+              onChange={(e) =>
+                update((d) => ({
+                  ...d,
+                  setup: { ...d.setup, assistantName: e.target.value },
+                }))
+              }
+              placeholder="Untitled assistant"
+              maxLength={100}
+              disabled={contentDisabled}
+              className="h-9 max-w-xs text-sm font-semibold"
+            />
+            <Badge
+              variant="secondary"
+              className="flex-shrink-0 text-xs font-medium"
+            >
+              {statusBadge}
+            </Badge>
+          </div>
+          {anyBuilderActionInBuild && (
+            <div className="flex flex-shrink-0 items-center gap-2">
+              {browserTestInBuild &&
+                (testControl ?? (
+                  <UnavailableActionButton
+                    icon={PlayCircle}
+                    label="Test"
+                    availability="Save and publish this assistant before testing."
+                  />
+                ))}
+              {publishInBuild &&
+                (publishControl ?? (
+                  <UnavailableActionButton
+                    icon={Rocket}
+                    label="Publish"
+                    availability="Save this assistant as a draft before publishing."
+                  />
+                ))}
+              {syncInBuild && syncControl}
+            </div>
+          )}
+        </div>
+        {headerBanner && <div className="mt-3">{headerBanner}</div>}
+        {browserTestInBuild && testPanel && <div className="mt-3">{testPanel}</div>}
+      </div>
+
+      {/* Tabs + content */}
+      <Tabs
+        value={tab}
+        onValueChange={(v) => isBuilderTabKey(v) && onTabChange(v)}
+        className="flex min-h-0 flex-1 flex-col md:flex-row"
+      >
+        <div className="relative flex-shrink-0 md:w-48">
+          <TabsList
+            aria-label="Assistant builder sections"
+            className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-2 md:w-48 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-3"
+          >
+            {BUILDER_TABS.map((t) => (
+              <TabsTrigger
+                key={t.key}
+                value={t.key}
+                className="w-auto min-h-11 shrink-0 justify-start whitespace-nowrap rounded-lg px-3 py-2 text-sm data-[state=active]:bg-surface-muted data-[state=active]:text-primary data-[state=active]:shadow-none md:w-full"
+              >
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent md:hidden"
+          />
+        </div>
+
+        <div className="min-w-0 flex-1 overflow-y-auto p-6">
+          <fieldset disabled={contentDisabled} className="min-w-0">
+            <TabPanel tab={tab} draft={draft} update={update} />
+          </fieldset>
+        </div>
+      </Tabs>
+
+      {/* Sticky estimate summary + save */}
+      <div className="flex-shrink-0 border-t border-border bg-card px-6 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="grid flex-1 grid-cols-2 gap-4 sm:flex sm:gap-8">
+            {preset === undefined ? (
+              <p className="col-span-2 self-center text-[11px] text-muted-foreground">
+                {PRESET_RECOVERY.estimatesUnavailable}
+              </p>
+            ) : (
+              <>
+                <CostBreakdown preset={preset} compact />
+                <LatencyMeter latencyMs={preset.latencyMs} compact />
+              </>
+            )}
+          </div>
+          {footerRight}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,299 +1,458 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
-import { ReceptionistNav } from "@/components/layout/ReceptionistNav";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertCircle,
-  Loader2,
-  ArrowLeft,
-  Zap,
-  MessageSquare,
-  Users,
-  ShieldCheck,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+/**
+ * Frontend V2 Phase 5 — the AI Receptionist account-creation page.
+ *
+ * The filename is unchanged on purpose: `App.tsx` still lazy-loads this module
+ * at `ROUTES.aiReceptionistSignup`, so the route, its registration order ahead
+ * of `/ai-receptionist`, and the base-path handling are preserved by
+ * construction rather than by re-derivation.
+ *
+ * **Frozen contract.** Every field, its required/optional status, the submitted
+ * payload keys, the endpoint and method, `credentials: "include"`, the
+ * fire-and-forget lead capture, and the post-signup redirect into the dashboard
+ * SPA are exactly what shipped before. The payload and the two validation rules
+ * now live in `signup/signupContract.ts` so they can be asserted by a committed
+ * test; extracting them changed no value.
+ *
+ * **Product truth.** This page creates an account for the capability that is
+ * available today: the SMS receptionist. The Phase 4 page opposite the form
+ * claimed "running 24/7", "Answers in seconds", "Qualifies every caller" and
+ * "24 hours a day" — none of which is supported, and all of which are removed.
+ * The three readiness tiers are stated above the form, from the same shared
+ * source the landing page uses, so signup can never describe the product
+ * differently from the page the user just read.
+ *
+ * **What happens next** is limited to verified behaviour: the server sets a
+ * session cookie and this page navigates to the dashboard; the firm is created
+ * on `planTier: "trial"` with `trialConversationsLimit: 20`, which
+ * `intakeAgent.ts` enforces; and no number is provisioned at signup, so the
+ * page says plainly that creating the account does not finish setup.
+ *
+ * Accessibility. Persistent visible labels, explicit Required/Optional text
+ * (never colour alone), `autocomplete` on every field so password managers
+ * work, an accessible password-visibility toggle (the previous one was
+ * `tabIndex={-1}` and unreachable by keyboard), inline errors tied to inputs by
+ * `aria-describedby`, a form-level alert that takes focus on failure, and 44px
+ * minimum control heights (the previous inputs were 36px).
+ */
 
-const FEATURES = [
-  { icon: Zap,           title: "Answers in seconds",      body: "The moment a customer texts or chats, they get a reply — not a voicemail, not silence." },
-  { icon: MessageSquare, title: "Qualifies every caller",   body: "Asks the right questions for your business before your team ever picks up the phone." },
-  { icon: Users,         title: "Keeps your team in sync", body: "Every conversation is logged. Nothing falls through the cracks, even on your busiest days." },
-  { icon: ShieldCheck,   title: "Always on-brand",         body: "Consistent tone, your service list, your process — 24 hours a day, no off days." },
+import { useRef, useState } from "react";
+import { Link } from "wouter";
+import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
+import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
+import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  EMPTY_SIGNUP_FORM,
+  INDUSTRY_OPTIONS,
+  INDUSTRY_VALUES,
+  SIGNUP_ENDPOINT,
+  SIGNUP_METHOD,
+  SIGNUP_NETWORK_ERROR,
+  buildSignupPayload,
+  mapSignupError,
+  validateSignup,
+  type SignupFormValues,
+} from "./signup/signupContract";
+
+/** Verified consequences of creating an account. Nothing speculative. */
+const NEXT_STEPS = [
+  {
+    title: "You're signed in straight away",
+    body: "Creating the account signs you in and opens your receptionist dashboard.",
+  },
+  {
+    title: "You start on a trial plan",
+    body: "New accounts begin on a trial with 20 conversations included.",
+  },
+  {
+    title: "Setup is not finished at signup",
+    body: "Connecting the number your receptionist answers on, and choosing the questions it asks, are steps that still have to happen after the account exists.",
+  },
 ];
 
-interface SignupState {
-  name: string;
-  businessName: string;
-  email: string;
-  phone: string;
-  businessType: string;
-  password: string;
-}
-const empty: SignupState = { name: "", businessName: "", email: "", phone: "", businessType: "", password: "" };
-
 export default function LandingReceptionistSignup() {
-  const [, navigate]    = useLocation();
-  const [form, setForm] = useState<SignupState>(empty);
+  const [form, setForm] = useState<SignupFormValues>(EMPTY_SIGNUP_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState("");
-  const [googleNote, setGoogleNote] = useState(false);
-  const [showPw,     setShowPw]     = useState(false);
+  const [error, setError] = useState("");
+  const [offerSignIn, setOfferSignIn] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+  }>({});
+  const [showPw, setShowPw] = useState(false);
 
-  const set = (k: keyof SignupState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const alertRef = useRef<HTMLDivElement | null>(null);
+  const fieldRefs = {
+    name: useRef<HTMLInputElement | null>(null),
+    email: useRef<HTMLInputElement | null>(null),
+    password: useRef<HTMLInputElement | null>(null),
+  };
+
+  const set =
+    (k: keyof SignupFormValues) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!form.name.trim() || !form.email.trim()) {
-      setError("Name and email are required.");
+    setOfferSignIn(false);
+    setFieldErrors({});
+
+    // Identical rules, identical order, identical messages.
+    const result = validateSignup(form);
+    if (!result.ok) {
+      setError(result.formError);
+      setFieldErrors(result.fieldErrors);
+      // Send focus to the first field the rule implicates so a keyboard or
+      // screen-reader user is put where the problem is.
+      const target = result.focusField;
+      if (target === "name" || target === "email" || target === "password") {
+        fieldRefs[target].current?.focus();
+      }
       return;
     }
-    if (!form.password.trim() || form.password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
+
     setSubmitting(true);
     try {
-      // ── Real account creation ──────────────────────────────────────────────
-      const r = await fetch("/api/receptionist/auth/signup", {
-        method: "POST",
+      // ── Real account creation — endpoint, method, credentials, and body
+      //    unchanged. ────────────────────────────────────────────────────────
+      const r = await fetch(SIGNUP_ENDPOINT, {
+        method: SIGNUP_METHOD,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          fullName:     form.name,
-          businessName: form.businessName,
-          email:        form.email,
-          phone:        form.phone,
-          industry:     form.businessType,
-          password:     form.password,
-        }),
+        body: JSON.stringify(buildSignupPayload(form)),
       });
-      const d = await r.json() as { error?: string };
-      if (!r.ok) { setError(d.error ?? "Signup failed — please try again."); return; }
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) {
+        const mapped = mapSignupError(r.status, d.error);
+        setError(mapped.message);
+        setOfferSignIn(mapped.offerSignIn);
+        // The alert is focusable and receives focus so the failure is
+        // announced rather than silently rendered above the fold.
+        window.requestAnimationFrame(() => alertRef.current?.focus());
+        return;
+      }
 
-      // ── Fire-and-forget lead capture (non-blocking) ─────────────────────
+      // ── Fire-and-forget lead capture (non-blocking) — unchanged. ─────────
       void fetch("/api/landing-test/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          vertical:     "receptionist",
-          name:         form.name,
+          vertical: "receptionist",
+          name: form.name,
           businessName: form.businessName,
-          email:        form.email,
-          phone:        form.phone,
-          extra:        { source: "get-early-access", businessType: form.businessType },
-          utmSource:    new URLSearchParams(window.location.search).get("utm_source") ?? "direct",
-          utmMedium:    new URLSearchParams(window.location.search).get("utm_medium") ?? "direct",
-          utmCampaign:  new URLSearchParams(window.location.search).get("utm_campaign") ?? null,
+          email: form.email,
+          phone: form.phone,
+          extra: { source: "get-early-access", businessType: form.businessType },
+          utmSource: new URLSearchParams(window.location.search).get("utm_source") ?? "direct",
+          utmMedium: new URLSearchParams(window.location.search).get("utm_medium") ?? "direct",
+          utmCampaign: new URLSearchParams(window.location.search).get("utm_campaign") ?? null,
         }),
       }).catch(() => {});
 
-      window.location.href = "/ai-receptionist/dashboard/";
+      // Cross-application navigation into the dashboard SPA, resolved through
+      // the centralised path layer. Redirect target unchanged.
+      window.location.href = DASHBOARD_URLS.root;
     } catch {
-      setError("Network error — please try again.");
+      setError(SIGNUP_NETWORK_ERROR);
+      window.requestAnimationFrame(() => alertRef.current?.focus());
     } finally {
       setSubmitting(false);
     }
   };
 
+  const describedBy = (field: "name" | "email" | "password", ...extra: string[]) => {
+    const ids = [...extra];
+    if (fieldErrors[field]) ids.unshift(`${field}-error`);
+    return ids.length ? ids.join(" ") : undefined;
+  };
+
   return (
-    <div className="min-h-screen bg-background font-sans overflow-x-hidden">
-      <ReceptionistNav />
-      {/* spacer for fixed nav */}
-      <div className="h-[82px]" />
+    <div className="sg-page">
+      {/* Minimal auth chrome. The previous page rendered the marketing
+          `ReceptionistNav`, whose links still point at homepage anchors
+          (`/#features`, `/#pricing`) that the approved information
+          architecture removed. A wordmark that returns to the landing page and
+          a sign-in link are what this surface actually needs. */}
+      <header className="sg-bar">
+        <div className="sg-bar__inner">
+          <Link href={ROUTES.aiReceptionist} className="sg-bar__brand">
+            SiteMint <span className="sg-bar__brand-accent">Digital</span>
+          </Link>
+          <a href={DASHBOARD_URLS.login} className="sg-bar__signin">
+            Sign in
+          </a>
+        </div>
+      </header>
 
-      <div className="min-h-[calc(100vh-82px)] flex flex-col md:flex-row">
-
-        {/* ── Left — form ────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col px-6 py-10 md:px-12 md:py-16 max-w-xl w-full mx-auto md:mx-0 md:max-w-none md:basis-[480px] md:shrink-0">
-          {/* Back link */}
-          <div className="flex items-center mb-10">
-            <Link href="/ai-receptionist" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back
+      <main className="sg-main" id="signup-main">
+        <div className="sg-grid">
+          {/* ── Context. First in the DOM, so mobile reads it before the
+                 fields — and it is kept short so it never becomes a marketing
+                 section standing between the user and the form. ──────────── */}
+          <div className="sg-intro">
+            <Link href={ROUTES.aiReceptionist} className="sg-back">
+              <ArrowLeft aria-hidden="true" className="sg-back__icon" />
+              Back to AI Receptionist
             </Link>
+
+            <p className="v2-eyebrow">AI Receptionist</p>
+            <h1 className="sg-title">Create your SMS Receptionist</h1>
+            <p className="sg-lede">
+              This account is for the SMS receptionist — the part of the product
+              that is available today. It replies to inbound texts, asks the
+              questions you choose, and hands the conversation to a person.
+            </p>
+
+            {/* Readiness, above the form and never below it. Same three tiers,
+                same wording, from the same shared source as the landing page. */}
+            <ul className="sg-readiness">
+              {CAPABILITY_STATUS.map((item) => (
+                <li key={item.capability} className={`sg-readiness__item sg-readiness__item--${item.tier}`}>
+                  {/* Capability first, then its tier, so the row reads as the
+                      sentence a person would say: "SMS Receptionist —
+                      available now". */}
+                  <span className="sg-readiness__name">{item.capability}</span>
+                  <span className={`v2-tier v2-tier--${item.tier}`}>
+                    {READINESS[item.tier].label}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* ── Form ── */}
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="mb-8 space-y-1.5">
-              <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground leading-tight">
-                Get early access
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Create your account — your AI receptionist will be configured personally by our team.
-              </p>
-            </div>
+          {/* ── The form. One surface, not a stack of cards. ──────────────── */}
+          <div className="sg-form-col">
+            <form className="sg-form" onSubmit={submit} noValidate={false}>
+              <h2 className="sg-form__title">Your account</h2>
 
-            {/* Google sign-in — honest "coming soon" */}
-            <div className="mb-6">
-              <button
-                type="button"
-                onClick={() => setGoogleNote(true)}
-                className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-2.5 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M17.64 9.2045C17.64 8.5663 17.5827 7.9527 17.4764 7.3636H9V10.845H13.8436C13.635 11.97 13.0009 12.9231 12.0477 13.5613V15.8195H14.9564C16.6582 14.2527 17.64 11.9454 17.64 9.2045Z" fill="#4285F4"/>
-                  <path d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="#34A853"/>
-                  <path d="M3.96409 10.71C3.78409 10.17 3.68182 9.5931 3.68182 9C3.68182 8.4068 3.78409 7.8299 3.96409 7.2899V4.9581H0.957275C0.347727 6.1731 0 7.5477 0 9C0 10.4522 0.347727 11.8268 0.957275 13.0418L3.96409 10.71Z" fill="#FBBC05"/>
-                  <path d="M9 3.5795C10.3214 3.5795 11.5077 4.0336 12.4405 4.9254L15.0218 2.344C13.4632 0.891772 11.4259 0 9 0C5.48182 0 2.43818 2.01681 0.957275 4.9581L3.96409 7.2899C4.67182 5.1627 6.65591 3.5795 9 3.5795Z" fill="#EA4335"/>
-                </svg>
-                Continue with Google
-              </button>
-              {googleNote && (
-                <motion.p
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="text-xs text-muted-foreground mt-2 text-center px-2"
+              {error && (
+                <div
+                  ref={alertRef}
+                  className="sg-alert"
+                  role="alert"
+                  tabIndex={-1}
+                  aria-live="assertive"
                 >
-                  Google sign-in is coming soon — please use the form below for now.
-                </motion.p>
+                  {/* The word "Error" carries the state, so it never depends on
+                      colour or on the icon alone. */}
+                  <span className="sg-alert__label">Error</span>
+                  <span className="sg-alert__text">
+                    {error}
+                    {offerSignIn && (
+                      <>
+                        {" "}
+                        <a href={DASHBOARD_URLS.login} className="sg-alert__link">
+                          Sign in instead
+                        </a>
+                        .
+                      </>
+                    )}
+                  </span>
+                </div>
               )}
-            </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">or create your account</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            <form onSubmit={submit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="s-name" className="text-sm font-semibold">Full name *</Label>
-                  <Input id="s-name" value={form.name} onChange={set("name")} placeholder="Chris Rivera" className="mt-1.5" required />
+              <div className="sg-row">
+                <div className="sg-field">
+                  <label htmlFor="s-name" className="sg-label">
+                    Full name <span className="sg-req">Required</span>
+                  </label>
+                  <input
+                    id="s-name"
+                    ref={fieldRefs.name}
+                    className={`sg-input${fieldErrors.name ? " sg-input--invalid" : ""}`}
+                    type="text"
+                    value={form.name}
+                    onChange={set("name")}
+                    autoComplete="name"
+                    required
+                    aria-required="true"
+                    aria-invalid={fieldErrors.name ? true : undefined}
+                    aria-describedby={describedBy("name")}
+                  />
+                  {fieldErrors.name && (
+                    <p className="sg-error" id="name-error">
+                      {fieldErrors.name}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <Label htmlFor="s-biz" className="text-sm font-semibold">Business name</Label>
-                  <Input id="s-biz" value={form.businessName} onChange={set("businessName")} placeholder="Rivera Plumbing" className="mt-1.5" />
+
+                <div className="sg-field">
+                  <label htmlFor="s-biz" className="sg-label">
+                    Business name <span className="sg-opt">Optional</span>
+                  </label>
+                  <input
+                    id="s-biz"
+                    className="sg-input"
+                    type="text"
+                    value={form.businessName}
+                    onChange={set("businessName")}
+                    autoComplete="organization"
+                    aria-describedby="biz-help"
+                  />
+                  <p className="sg-help" id="biz-help">
+                    Used as your account name. Your own name is used if you leave
+                    this empty.
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="s-email" className="text-sm font-semibold">Email *</Label>
-                <Input id="s-email" type="email" value={form.email} onChange={set("email")} placeholder="chris@riveraplumbing.com" className="mt-1.5" autoComplete="email" required />
+              <div className="sg-field">
+                <label htmlFor="s-email" className="sg-label">
+                  Email <span className="sg-req">Required</span>
+                </label>
+                <input
+                  id="s-email"
+                  ref={fieldRefs.email}
+                  className={`sg-input${fieldErrors.email ? " sg-input--invalid" : ""}`}
+                  type="email"
+                  value={form.email}
+                  onChange={set("email")}
+                  autoComplete="email"
+                  inputMode="email"
+                  required
+                  aria-required="true"
+                  aria-invalid={fieldErrors.email ? true : undefined}
+                  aria-describedby={describedBy("email", "email-help")}
+                />
+                {fieldErrors.email && (
+                  <p className="sg-error" id="email-error">
+                    {fieldErrors.email}
+                  </p>
+                )}
+                <p className="sg-help" id="email-help">
+                  You sign in with this address, and conversation summaries are
+                  sent to it.
+                </p>
               </div>
 
-              <div>
-                <Label htmlFor="s-phone" className="text-sm font-semibold">Phone</Label>
-                <Input id="s-phone" type="tel" value={form.phone} onChange={set("phone")} placeholder="(555) 000-0000" className="mt-1.5" />
+              <div className="sg-row">
+                <div className="sg-field">
+                  <label htmlFor="s-phone" className="sg-label">
+                    Phone <span className="sg-opt">Optional</span>
+                  </label>
+                  <input
+                    id="s-phone"
+                    className="sg-input"
+                    type="tel"
+                    value={form.phone}
+                    onChange={set("phone")}
+                    autoComplete="tel"
+                    inputMode="tel"
+                  />
+                </div>
+
+                <div className="sg-field">
+                  <label htmlFor="s-industry" className="sg-label">
+                    Industry <span className="sg-opt">Optional</span>
+                  </label>
+                  {/* A native select: it is keyboard- and screen-reader-native,
+                      works with autofill, and needs no JavaScript to open. The
+                      stored values are unchanged. */}
+                  <select
+                    id="s-industry"
+                    className="sg-input sg-select"
+                    value={form.businessType}
+                    onChange={set("businessType")}
+                  >
+                    <option value="">Select your industry</option>
+                    {INDUSTRY_OPTIONS.map((label) => (
+                      <option key={label} value={INDUSTRY_VALUES[label]}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="s-industry" className="text-sm font-semibold">Industry</Label>
-                <Select value={form.businessType} onValueChange={(v) => setForm((f) => ({ ...f, businessType: v }))}>
-                  <SelectTrigger id="s-industry" className="mt-1.5 w-full">
-                    <SelectValue placeholder="Select your industry…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Real Estate">Real Estate</SelectItem>
-                    <SelectItem value="Law Firm">Law Firm</SelectItem>
-                    <SelectItem value="Home Services">Home Services (HVAC, Plumbing, Electrical…)</SelectItem>
-                    <SelectItem value="Med Spa">Med Spa / Aesthetics</SelectItem>
-                    <SelectItem value="Restaurant">Restaurant</SelectItem>
-                    <SelectItem value="Retail">Retail</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="s-password" className="text-sm font-semibold">Password *</Label>
-                <div className="relative mt-1.5">
-                  <Input
+              <div className="sg-field">
+                <label htmlFor="s-password" className="sg-label">
+                  Password <span className="sg-req">Required</span>
+                </label>
+                <div className="sg-password">
+                  <input
                     id="s-password"
+                    ref={fieldRefs.password}
+                    className={`sg-input sg-input--password${
+                      fieldErrors.password ? " sg-input--invalid" : ""
+                    }`}
                     type={showPw ? "text" : "password"}
                     value={form.password}
                     onChange={set("password")}
-                    placeholder="Min. 8 characters"
                     autoComplete="new-password"
                     required
+                    aria-required="true"
+                    aria-invalid={fieldErrors.password ? true : undefined}
+                    aria-describedby={describedBy("password", "password-help")}
                   />
+                  {/* Reachable by keyboard, and its state is announced. The
+                      previous control was tabIndex={-1} with no label. */}
                   <button
                     type="button"
-                    tabIndex={-1}
+                    className="sg-password__toggle"
                     onClick={() => setShowPw((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-pressed={showPw}
+                    aria-controls="s-password"
                   >
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPw ? (
+                      <EyeOff aria-hidden="true" className="sg-password__icon" />
+                    ) : (
+                      <Eye aria-hidden="true" className="sg-password__icon" />
+                    )}
+                    <span className="v2-visually-hidden">
+                      {showPw ? "Hide password" : "Show password"}
+                    </span>
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="sg-error" id="password-error">
+                    {fieldErrors.password}
+                  </p>
+                )}
+                <p className="sg-help" id="password-help">
+                  At least 8 characters.
+                </p>
               </div>
 
-              {error && (
-                <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-                </div>
-              )}
+              <button type="submit" className="sg-submit" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 aria-hidden="true" className="sg-submit__spinner" />
+                    Creating your account…
+                  </>
+                ) : (
+                  "Create account"
+                )}
+              </button>
 
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11 rounded-xl"
-              >
-                {submitting
-                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Creating account…</>
-                  : "Create account & get access"}
-              </Button>
-
-              <p className="text-[11px] text-muted-foreground text-center">
+              <p className="sg-alt">
                 Already have an account?{" "}
-                <a href="/ai-receptionist/dashboard/login" className="text-primary hover:underline">Sign in</a>
+                <a href={DASHBOARD_URLS.login} className="sg-alt__link">
+                  Sign in
+                </a>
               </p>
             </form>
           </div>
-        </div>
 
-        {/* ── Right — navy brand panel ────────────────────────────────────── */}
-        <div className="hidden md:flex flex-1 bg-primary text-primary-foreground flex-col justify-center px-12 py-16 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-[0.06]"
-            style={{ backgroundImage: "radial-gradient(circle at 30% 20%, white 1px, transparent 1px), radial-gradient(circle at 70% 80%, white 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-
-          <div className="relative space-y-10 max-w-md">
-            <div className="space-y-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary-foreground/50">AI Receptionist</p>
-              <h2 className="font-serif text-3xl md:text-4xl font-bold leading-tight">
-                Never miss a<br />customer moment.
-              </h2>
-              <p className="text-primary-foreground/65 text-sm leading-relaxed">
-                An AI receptionist that works exactly the way your business does —
-                configured by us, reviewed by you, running 24/7.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {FEATURES.map((f) => (
-                <div key={f.title} className="flex items-start gap-4 bg-white/8 rounded-xl p-4 border border-white/10">
-                  <div className="w-8 h-8 rounded-lg bg-white/12 flex items-center justify-center shrink-0 mt-0.5">
-                    <f.icon className="w-4 h-4 text-emerald-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold mb-0.5">{f.title}</p>
-                    <p className="text-xs text-primary-foreground/60 leading-relaxed">{f.body}</p>
-                  </div>
-                </div>
+          {/* ── What happens next. After the form in the DOM, so mobile users
+                 reach the fields first; placed under the context column on
+                 desktop. ─────────────────────────────────────────────────── */}
+          <aside className="sg-next" aria-labelledby="sg-next-heading">
+            <h2 className="sg-next__title" id="sg-next-heading">
+              What happens after you create it
+            </h2>
+            <ul className="sg-next__list">
+              {NEXT_STEPS.map((step) => (
+                <li key={step.title} className="sg-next__item">
+                  <h3 className="sg-next__name">{step.title}</h3>
+                  <p className="sg-next__body">{step.body}</p>
+                </li>
               ))}
-            </div>
-
-            <p className="text-xs text-primary-foreground/35">
-              SiteMint Digital · info.sitemint@gmail.com
-            </p>
-          </div>
+            </ul>
+          </aside>
         </div>
-
-      </div>
+      </main>
     </div>
   );
 }

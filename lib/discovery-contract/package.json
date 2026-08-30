@@ -1,0 +1,19 @@
+{
+  "name": "@workspace/discovery-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx test/schemas.test.ts && tsx test/canonicalization.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "tsx": "catalog:"
+  }
+}

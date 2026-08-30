@@ -1,0 +1,73 @@
+Continue the authorized SiteMint scheduling verification from inside this actual Replit Development workspace.
+
+Repository:
+claidyklaydetaguran-dev/SiteMint-Digital
+
+Authorized branch:
+feature/ai-receptionist-visible-progress
+
+Required starting commit:
+08d67df
+
+First, verify:
+
+1. This is the actual SiteMint Replit Development runtime.
+2. The current branch is feature/ai-receptionist-visible-progress.
+3. HEAD is exactly 08d67df.
+4. The working tree has no unexplained changes.
+5. The configured database is the authorized Replit Development database—not Production.
+6. No Production resources or credentials will be accessed.
+
+Never print database URLs, credentials, tokens, calendar IDs, account email addresses, or private provider data.
+
+Authorized work:
+
+1. Apply the existing scheduling migration to the Replit Development database.
+2. Verify availability settings and appointment requests persist after a safe Development server restart or repository reinitialization.
+3. Verify firm ownership and cross-account isolation using sanitized fictional records.
+4. Connect only the authorized Development Google Calendar using the least-privileged read-only scope that supports free/busy availability.
+5. Perform one genuine free/busy query.
+6. Confirm an existing busy period removes the conflicting public scheduling slot while nearby slots remain available.
+7. Confirm no event titles, descriptions, attendees, locations, meeting links, calendar IDs, provider IDs, or raw Google responses reach the client, logs, screenshots, or public API.
+8. Improve the public result page to show:
+   - business name;
+   - appointment type;
+   - requested date;
+   - requested time;
+   - business timezone;
+   - Status: Pending review;
+   - Booking state: Not booked.
+9. Improve the desktop Availability Settings width.
+10. Improve mobile weekly hours with visible Start and End labels and a clean stacked or responsive layout.
+11. Run the relevant tests, typechecks, builds, lint, and browser verification.
+12. Create one focused commit and push only the authorized feature branch after verification succeeds.
+
+Restrictions:
+
+- Do not add or change a migration without stopping for approval.
+- Do not request calendar write permission.
+- Do not create, edit, reschedule, or delete a calendar event.
+- Do not mark any request Booked.
+- Do not send email, SMS, or scheduling links.
+- Do not access Production.
+- Do not merge, deploy, or modify main.
+- Do not discard unexplained work.
+
+Every public submission must remain:
+
+- status: pending_review;
+- booking state: not_booked;
+- providerEventId: null.
+
+If Google cannot be genuinely connected from this Replit workspace, stop and report the exact blocker. Mocked Google tests do not count as genuine verification.
+
+If verification requires creating a Development test calendar event, stop and request explicit approval. Do not create one automatically.
+
+Before committing, inspect every changed file and exclude secrets, environment files, tokens, calendar responses, customer data, logs, screenshots, caches, build output, and unrelated changes.
+
+End with exactly one verdict:
+
+- READ-ONLY CALENDAR VERIFIED — BOOKING AUTHORIZATION REQUIRED
+- DEVELOPMENT PERSISTENCE VERIFIED — GOOGLE CONNECTION REQUIRED
+- PARTIAL SCHEDULING VERIFICATION — TECHNICAL ISSUES REMAIN
+- BLOCKED

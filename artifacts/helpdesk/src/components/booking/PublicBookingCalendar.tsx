@@ -1,0 +1,543 @@
+import { useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Clock, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { usePublicConfig, usePublicDays, usePublicSlots, useSubmitPublicRequest } from "@/hooks/usePublicScheduling";
+import type { DayReason } from "@/lib/publicSchedulingApi";
+
+type Step = "browse" | "contact" | "review" | "result";
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function dateKeyFor(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function firstWeekdayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+}
+
+function todayDateKey(): string {
+  const now = new Date();
+  return dateKeyFor(now.getFullYear(), now.getMonth() + 1, now.getDate());
+}
+
+const DAY_LABELS: Record<DayReason, string> = {
+  open: "Available",
+  blocked: "Unavailable",
+  outside_hours: "Outside business hours",
+  fully_booked: "Fully booked",
+  past_booking_window: "Too soon to book",
+  beyond_advance_window: "Not yet open for booking",
+};
+
+const DAY_CELL_CLASSES: Record<DayReason, string> = {
+  open: "border-primary/40 bg-surface-muted text-foreground hover:border-primary hover:bg-surface-muted/80 cursor-pointer",
+  blocked: "border-border bg-muted text-muted-foreground cursor-not-allowed opacity-60",
+  outside_hours: "border-border bg-background text-muted-foreground/60 cursor-not-allowed",
+  fully_booked: "border-statusbadge-warning-bg bg-statusbadge-warning-bg/40 text-statusbadge-warning-text cursor-not-allowed",
+  past_booking_window: "border-border bg-muted text-muted-foreground cursor-not-allowed opacity-50",
+  beyond_advance_window: "border-border bg-background text-muted-foreground/40 cursor-not-allowed",
+};
+
+function formatSlotTime(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone });
+}
+
+function formatTimezoneLabel(timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" }).formatToParts(new Date());
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
+  } catch {
+    return timeZone;
+  }
+}
+
+/**
+ * The public, unauthenticated customer-facing scheduling page (Checkpoint
+ * B). Sourced from the same server-side availability engine as the admin
+ * Booking preview and (in a later checkpoint) the voice assistant. A
+ * submission here is always honestly reported as "pending review" — never
+ * "confirmed," "scheduled," or "booked" — because no calendar provider has
+ * confirmed anything yet.
+ */
+export function PublicBookingCalendar({ slug }: { slug: string }) {
+  const configQuery = usePublicConfig(slug);
+  const config = configQuery.data;
+
+  const [typeId, setTypeId] = useState<string | undefined>(undefined);
+  const activeTypeId = typeId ?? config?.appointmentTypes[0]?.id;
+
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
+
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [selectedSlot, setSelectedSlot] = useState<string | undefined>(undefined);
+  const [step, setStep] = useState<Step>("browse");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [emailConsent, setEmailConsent] = useState(false);
+  const [resultError, setResultError] = useState<string | null>(null);
+  const [resultData, setResultData] = useState<{
+    firmName: string;
+    appointmentType: string;
+    startUtc: string;
+    timezone: string;
+    message: string;
+  } | null>(null);
+  // Captured once, at first render — a bot-speed check on the server side.
+  const formStartedAt = useRef(new Date().toISOString());
+
+  const monthStart = dateKeyFor(viewYear, viewMonth, 1);
+  const monthEnd = dateKeyFor(viewYear, viewMonth, daysInMonth(viewYear, viewMonth));
+  const daysQuery = usePublicDays(slug, monthStart, monthEnd, activeTypeId);
+  const slotsQuery = usePublicSlots(slug, selectedDate, activeTypeId);
+  const submitMutation = useSubmitPublicRequest(slug);
+
+  const dayByKey = useMemo(() => {
+    const map = new Map<string, { reason: DayReason; slotCount: number }>();
+    for (const d of daysQuery.data?.days ?? []) map.set(d.dateKey, { reason: d.reason, slotCount: d.slotCount });
+    return map;
+  }, [daysQuery.data]);
+
+  const today = todayDateKey();
+  const monthLabel = new Date(Date.UTC(viewYear, viewMonth - 1, 1)).toLocaleDateString(undefined, {
+    month: "long", year: "numeric", timeZone: "UTC",
+  });
+
+  function goToMonth(delta: number) {
+    const total = viewYear * 12 + (viewMonth - 1) + delta;
+    setViewYear(Math.floor(total / 12));
+    setViewMonth((total % 12) + 1);
+    setSelectedDate(undefined);
+    setSelectedSlot(undefined);
+  }
+
+  function selectDay(dateKey: string, reason: DayReason) {
+    if (reason !== "open") return;
+    setSelectedDate(dateKey);
+    setSelectedSlot(undefined);
+  }
+
+  function selectSlot(startUtc: string) {
+    setSelectedSlot(startUtc);
+    setStep("contact");
+  }
+
+  async function handleSubmit() {
+    if (!activeTypeId || !selectedSlot) return;
+    setResultError(null);
+    try {
+      const result = await submitMutation.mutateAsync({
+        appointmentTypeId: activeTypeId,
+        startUtc: selectedSlot,
+        contact: {
+          name: contactName.trim(),
+          phone: contactPhone.trim() || null,
+          email: contactEmail.trim() || null,
+          phoneConsent: false,
+          smsConsent,
+          emailConsent,
+        },
+        formStartedAt: formStartedAt.current,
+      });
+      setResultData({
+        firmName: config?.firmName ?? "",
+        appointmentType: result.appointmentType,
+        startUtc: result.startUtc,
+        timezone: result.timezone,
+        message: result.message,
+      });
+      setStep("result");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "That time is no longer available.";
+      setResultError(message);
+      setStep("browse");
+      setSelectedSlot(undefined);
+      const d = selectedDate;
+      setSelectedDate(undefined);
+      requestAnimationFrame(() => setSelectedDate(d));
+    }
+  }
+
+  if (configQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center rounded-xl border border-border bg-card p-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading availability…</span>
+      </div>
+    );
+  }
+
+  if (configQuery.isError || !config) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-statusbadge-danger-bg bg-statusbadge-danger-bg/30 p-6 text-sm text-statusbadge-danger-text">
+        <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+        {configQuery.error instanceof Error ? configQuery.error.message : "This scheduling page could not be found."}
+      </div>
+    );
+  }
+
+  if (config.appointmentTypes.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+        No appointment types are available for online booking right now.
+      </div>
+    );
+  }
+
+  if (step === "result" && resultData) {
+    const slotDate = new Date(resultData.startUtc);
+    const requestedDate = slotDate.toLocaleDateString(undefined, {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+      timeZone: resultData.timezone,
+    });
+    const requestedTime = slotDate.toLocaleTimeString(undefined, {
+      hour: "numeric", minute: "2-digit", timeZone: resultData.timezone,
+    });
+    return (
+      <div className="rounded-xl border border-border bg-card p-8">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-primary">
+            <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground">Request received</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {resultData.firmName ? `Your request has been sent to ${resultData.firmName}.` : resultData.message}
+          </p>
+        </div>
+
+        <dl className="mt-6 divide-y divide-border rounded-lg border border-border text-sm">
+          {resultData.firmName && (
+            <div className="flex justify-between px-4 py-2.5">
+              <dt className="text-muted-foreground">Business</dt>
+              <dd className="font-medium text-foreground">{resultData.firmName}</dd>
+            </div>
+          )}
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Appointment type</dt>
+            <dd className="font-medium text-foreground">{resultData.appointmentType}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Requested date</dt>
+            <dd className="font-medium text-foreground">{requestedDate}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Requested time</dt>
+            <dd className="font-medium text-foreground">{requestedTime}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Timezone</dt>
+            <dd className="font-medium text-foreground">{formatTimezoneLabel(resultData.timezone)}</dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Status</dt>
+            <dd><StatusBadge label="Pending review" tone="warning" /></dd>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <dt className="text-muted-foreground">Booking state</dt>
+            <dd><StatusBadge label="Not booked" tone="neutral" /></dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          This is a request, not a confirmed booking. The business will contact you to confirm.
+        </p>
+        <div className="mt-5 flex justify-center">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setStep("browse");
+              setResultData(null);
+              setSelectedDate(undefined);
+              setSelectedSlot(undefined);
+              setContactName("");
+              setContactPhone("");
+              setContactEmail("");
+              setSmsConsent(false);
+              setEmailConsent(false);
+            }}
+          >
+            Request another time
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {config.appointmentTypes.length > 1 ? (
+          <div className="flex items-center gap-2">
+            <Label htmlFor="appointment-type" className="text-xs text-muted-foreground">Appointment type</Label>
+            <Select value={activeTypeId} onValueChange={(v) => { setTypeId(v); setSelectedDate(undefined); setSelectedSlot(undefined); }}>
+              <SelectTrigger id="appointment-type" className="h-9 w-56 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {config.appointmentTypes.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name} ({t.durationMin} min)</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <span className="text-sm font-medium text-foreground">{config.appointmentTypes[0]?.name}</span>
+        )}
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          Times shown in {formatTimezoneLabel(config.timezone)}
+        </span>
+      </div>
+
+      {resultError && (
+        <div className="flex items-center gap-2 rounded-lg border border-statusbadge-warning-bg bg-statusbadge-warning-bg/40 px-3 py-2 text-xs font-medium text-statusbadge-warning-text">
+          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+          {resultError}
+        </div>
+      )}
+
+      {step === "contact" || step === "review" ? (
+        <PublicContactAndReviewSteps
+          step={step}
+          setStep={setStep}
+          typeName={config.appointmentTypes.find((t) => t.id === activeTypeId)?.name ?? ""}
+          timezoneLabel={formatTimezoneLabel(config.timezone)}
+          selectedSlot={selectedSlot}
+          contactName={contactName}
+          setContactName={setContactName}
+          contactPhone={contactPhone}
+          setContactPhone={setContactPhone}
+          contactEmail={contactEmail}
+          setContactEmail={setContactEmail}
+          smsConsent={smsConsent}
+          setSmsConsent={setSmsConsent}
+          emailConsent={emailConsent}
+          setEmailConsent={setEmailConsent}
+          onSubmit={handleSubmit}
+          submitting={submitMutation.isPending}
+          onBack={() => { setStep("browse"); setSelectedSlot(undefined); }}
+        />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          {/* Month calendar */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => goToMonth(-1)} aria-label="Previous month">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-semibold text-foreground">{monthLabel}</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => goToMonth(1)} aria-label="Next month">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase text-muted-foreground">
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {Array.from({ length: firstWeekdayOfMonth(viewYear, viewMonth) }).map((_, i) => <div key={`pad-${i}`} />)}
+              {Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) => i + 1).map((day) => {
+                const dateKey = dateKeyFor(viewYear, viewMonth, day);
+                const info = dayByKey.get(dateKey);
+                const isPast = dateKey < today;
+                const reason: DayReason = isPast ? "past_booking_window" : info?.reason ?? "outside_hours";
+                const isSelected = dateKey === selectedDate;
+                const isLoadingDay = daysQuery.isLoading;
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    disabled={reason !== "open" || isLoadingDay}
+                    onClick={() => selectDay(dateKey, reason)}
+                    title={DAY_LABELS[reason]}
+                    aria-label={`${dateKey}: ${DAY_LABELS[reason]}`}
+                    aria-pressed={isSelected}
+                    className={`flex aspect-square min-h-11 items-center justify-center rounded-lg border text-sm transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : isLoadingDay
+                          ? "border-border bg-muted text-muted-foreground/40 animate-pulse"
+                          : DAY_CELL_CLASSES[reason]
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              <LegendDot className="bg-surface-muted border-primary/40" label="Available" />
+              <LegendDot className="bg-statusbadge-warning-bg/40 border-statusbadge-warning-bg" label="Fully booked" />
+              <LegendDot className="bg-muted border-border" label="Unavailable" />
+            </div>
+          </div>
+
+          {/* Time slots */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 text-sm font-semibold text-foreground">
+              {selectedDate
+                ? new Date(`${selectedDate}T12:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })
+                : "Select a date"}
+            </h3>
+            {!selectedDate ? (
+              <p className="text-sm text-muted-foreground">Pick an available day on the calendar to see times.</p>
+            ) : slotsQuery.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading times…
+              </div>
+            ) : slotsQuery.isError ? (
+              <div className="flex items-center gap-2 text-sm text-statusbadge-danger-text">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" /> Temporarily unavailable.
+              </div>
+            ) : (slotsQuery.data?.slots.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground">No availability for this day.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+                {slotsQuery.data!.slots.map((slot) => (
+                  <button
+                    key={slot.startUtc}
+                    type="button"
+                    onClick={() => selectSlot(slot.startUtc)}
+                    className="min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-surface-muted"
+                  >
+                    {formatSlotTime(slot.startUtc, config.timezone)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`h-2.5 w-2.5 rounded-full border ${className}`} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+function PublicContactAndReviewSteps({
+  step,
+  setStep,
+  typeName,
+  timezoneLabel,
+  selectedSlot,
+  contactName,
+  setContactName,
+  contactPhone,
+  setContactPhone,
+  contactEmail,
+  setContactEmail,
+  smsConsent,
+  setSmsConsent,
+  emailConsent,
+  setEmailConsent,
+  onSubmit,
+  submitting,
+  onBack,
+}: {
+  step: "contact" | "review";
+  setStep: (s: Step) => void;
+  typeName: string;
+  timezoneLabel: string;
+  selectedSlot: string | undefined;
+  contactName: string;
+  setContactName: (v: string) => void;
+  contactPhone: string;
+  setContactPhone: (v: string) => void;
+  contactEmail: string;
+  setContactEmail: (v: string) => void;
+  smsConsent: boolean;
+  setSmsConsent: (v: boolean) => void;
+  emailConsent: boolean;
+  setEmailConsent: (v: boolean) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+  onBack: () => void;
+}) {
+  const slotLabel = selectedSlot
+    ? new Date(selectedSlot).toLocaleString(undefined, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    : "";
+  const canContinue = contactName.trim().length > 0;
+
+  return (
+    <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-5">
+      <button type="button" onClick={onBack} className="mb-3 text-xs font-medium text-muted-foreground hover:text-foreground">
+        ← Back to calendar
+      </button>
+      <div className="mb-4 rounded-lg bg-surface-muted p-3 text-sm">
+        <div className="font-medium text-foreground">{typeName}</div>
+        <div className="text-muted-foreground">{slotLabel} ({timezoneLabel})</div>
+      </div>
+
+      {step === "contact" ? (
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="public-contact-name" className="text-xs">Name</Label>
+            <Input id="public-contact-name" value={contactName} onChange={(e) => setContactName(e.target.value)} maxLength={200} className="mt-1 h-10" />
+          </div>
+          <div>
+            <Label htmlFor="public-contact-phone" className="text-xs">Phone (optional)</Label>
+            <Input id="public-contact-phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} maxLength={40} className="mt-1 h-10" />
+          </div>
+          <div>
+            <Label htmlFor="public-contact-email" className="text-xs">Email (optional)</Label>
+            <Input id="public-contact-email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} maxLength={200} className="mt-1 h-10" />
+          </div>
+          {/* Consent is always opt-in and never inferred from providing a phone/email value. */}
+          {contactPhone.trim() && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              I agree to receive text messages about this appointment request at the number above.
+            </label>
+          )}
+          {contactEmail.trim() && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={emailConsent} onChange={(e) => setEmailConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              I agree to receive email updates about this appointment request at the address above.
+            </label>
+          )}
+          <Button className="mt-2 w-full" disabled={!canContinue} onClick={() => setStep("review")}>
+            Review
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between"><dt className="text-muted-foreground">Name</dt><dd className="text-foreground">{contactName}</dd></div>
+            {contactPhone && <div className="flex justify-between"><dt className="text-muted-foreground">Phone</dt><dd className="text-foreground">{contactPhone}</dd></div>}
+            {contactEmail && <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="text-foreground">{contactEmail}</dd></div>}
+          </dl>
+          <p className="text-xs text-muted-foreground">
+            Submitting sends a request for this time. Your appointment request will be pending
+            review — it is not booked yet.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setStep("contact")}>Edit</Button>
+            <Button className="flex-1" onClick={onSubmit} disabled={submitting}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit request"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

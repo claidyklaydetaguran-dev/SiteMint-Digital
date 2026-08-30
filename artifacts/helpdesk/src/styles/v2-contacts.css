@@ -1,0 +1,151 @@
+/**
+ * Frontend V2 Phase 10 — the Contacts workspace layer.
+ *
+ * Companion to `v2-dashboard.css` (Phase 7), `v2-conversations.css` (Phase 8)
+ * and `v2-receptionist.css` (Phase 9), and subject to the same rules. This file
+ * **defines no colour of its own**: every value below is an `--sd-*` token from
+ * the shell, so the route inherits the palette, the dark counterpart, the focus
+ * ring, the 8-point spacing, the 44px minimum target and the motion system
+ * without restating any of them. No new colour family, no remote request, no
+ * font, no image, no gradient, no glow, no decorative loop.
+ *
+ * Namespaced `sk-*` (SiteMint contacts) so it cannot collide with `sd-*`,
+ * `si-*`, `sc-*`, `sr-*`, the `--v2-*` public tokens or the app's shadcn
+ * variables. It is imported *alongside* the shell stylesheet, never instead
+ * of it.
+ *
+ * ── Composition ───────────────────────────────────────────────────────────
+ * One editorial column on the warm-white canvas, capped at the same measure the
+ * receptionist console uses. This route is read once and understood, not
+ * scanned or worked — so it is short, left-aligned, and built from a status
+ * band, a description list and a link. There is no card grid, because there is
+ * nothing to compare; there are no pills, because there is no status to carry.
+ *
+ * ── Motion ────────────────────────────────────────────────────────────────
+ * Inherited, not extended. The shell's single 8px entrance runs once on the
+ * page container via `sd-enter`. This layer adds no keyframes at all — it
+ * transitions only `border-color` on the one link, and `prefers-reduced-motion`
+ * is already honoured globally by `index.css`. Nothing loops, nothing staggers,
+ * nothing animates on scroll, and nothing here can trigger a request, because
+ * the route makes none.
+ */
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
+
+/* Narrower than the shell default: this is prose to be read, not a workspace
+   to be scanned, so the measure is capped for line length rather than
+   stretched to the viewport. Above ~52rem the extra width becomes margin. */
+.sk-page {
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--sd-space-8) var(--sd-space-6) var(--sd-space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-8);
+}
+
+/* ── Status band ───────────────────────────────────────────────────────── */
+
+/* Phase 7's band is built for readiness states that call for action. Here the
+   message is settled information, so the dot keeps the neutral treatment and
+   the band sits on the muted surface rather than the accent one — mint is
+   reserved in this system for something being right, and "no records exist" is
+   neither right nor wrong. */
+.sk-status[data-state="neutral"] {
+  background: var(--sd-muted-surface);
+  border-color: var(--sd-border);
+}
+.sk-status[data-state="neutral"] .sd-status__dot {
+  background: var(--sd-muted-text);
+}
+/* The band stretches to the column, but its sentence should not: past ~60
+   characters-per-line the eye loses the return sweep. */
+.sk-status .sd-status__detail {
+  max-width: 46rem;
+}
+
+/* ── Recorded fields ───────────────────────────────────────────────────── */
+
+/* A description list, styled as rows separated by hairlines rather than as
+   boxes. Four short facts do not need four cards. */
+.sk-fields {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--sd-border);
+}
+.sk-fields__row {
+  display: grid;
+  /* Tight enough that the label reads as attached to its value. A wider label
+     column leaves a gutter the eye has to jump, which is what a description
+     list is specifically meant to avoid. */
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  gap: var(--sd-space-2) var(--sd-space-4);
+  align-items: baseline;
+  padding: var(--sd-space-4) 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+.sk-fields__label {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  margin: 0;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+  /* Long field labels wrap instead of forcing the grid wider. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sk-fields__detail {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.6;
+  color: var(--sd-text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The mark is a redundant cue, never the message: every row also states
+   "recorded" or "not recorded" in a visually hidden span, and the detail text
+   says it in full. A filled mark is a stored column; a hollow one is an absent
+   field. */
+.sk-fields__mark {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sd-border-strong);
+  background: transparent;
+}
+.sk-fields__row[data-recorded="true"] .sk-fields__mark {
+  background: var(--sd-accent);
+  border-color: transparent;
+}
+
+/* Stacked on narrow viewports: a two-column grid at 360px would leave the
+   detail column too tight to read. */
+@media (max-width: 40rem) {
+  .sk-fields__row {
+    grid-template-columns: 1fr;
+    gap: var(--sd-space-1);
+  }
+}
+
+/* ── Prose and link ────────────────────────────────────────────────────── */
+
+.sk-prose {
+  margin: 0;
+  max-width: 42rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.65;
+  color: var(--sd-text-muted);
+}
+
+/* Inherits `.sd-link`'s 44px minimum target and underline treatment; this only
+   places the icon. */
+.sk-link__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}

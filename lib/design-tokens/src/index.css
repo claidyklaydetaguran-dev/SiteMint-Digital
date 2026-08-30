@@ -1,0 +1,13 @@
+/**
+ * SiteMint Platform — Shared Design Tokens
+ *
+ * Canonical runtime entry point. Import as `@import "@workspace/design-tokens/css";`
+ * from a consuming app's global CSS, before that app's own `:root`/`.dark`
+ * declarations so app-local aliases can reference these `--sm-*` variables.
+ *
+ * See README.md for usage and docs/sitemint-platform/SHARED_DESIGN_TOKENS_SPEC.md
+ * for the full token specification these files implement.
+ */
+@import "./primitives.css";
+@import "./semantic.css";
+@import "./components.css";

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import discoveryRouter from "./discovery";
+import discoveryV1Router from "./discoveryV1";
 import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
@@ -17,12 +18,18 @@ import receptionistConversationsRouter from "./receptionistConversations";
 import receptionistAdminRouter from "./receptionistAdmin";
 import receptionistBillingRouter from "./receptionistBilling";
 import receptionistAgentConfigRouter from "./receptionistAgentConfig";
+import receptionistVoiceAssistantsRouter from "./receptionistVoiceAssistants";
+import receptionistVoiceWebhookRouter from "./receptionistVoiceWebhook";
+import receptionistVoiceCallsRouter from "./receptionistVoiceCalls";
+import receptionistAvailabilityRouter from "./receptionistAvailability";
+import publicSchedulingRouter from "./publicScheduling";
 import helpdeskRouter from "./helpdesk";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(discoveryRouter);
+router.use(discoveryV1Router);
 router.use(adminRouter);
 router.use(contactRouter);
 router.use(crmRouter);
@@ -39,6 +46,11 @@ router.use(receptionistConversationsRouter);
 router.use(receptionistAdminRouter);
 router.use(receptionistBillingRouter);
 router.use(receptionistAgentConfigRouter);
+router.use(receptionistVoiceAssistantsRouter);
+router.use(receptionistVoiceWebhookRouter);
+router.use(receptionistVoiceCallsRouter);
+router.use(receptionistAvailabilityRouter);
+router.use(publicSchedulingRouter);
 router.use(helpdeskRouter);
 
 export default router;

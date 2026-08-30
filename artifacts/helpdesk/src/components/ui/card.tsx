@@ -9,7 +9,10 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
+      // Phase 1C: border-card-border makes the card-border component token
+      // explicit (same resolved value as the generic `border` utility it
+      // replaces — both alias to --sm-color-border-default).
+      "rounded-xl border border-card-border bg-card text-card-foreground shadow",
       className
     )}
     {...props}

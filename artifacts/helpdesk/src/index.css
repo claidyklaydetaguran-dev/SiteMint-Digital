@@ -1,6 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Frontend V2 Phase 1: the render-blocking Google Fonts @import (Plus Jakarta
+   Sans + Playfair Display) was removed here, and the matching <link> was
+   removed from index.html. The font stack now comes from the shared
+   @workspace/design-tokens primitives, which Phase 1 moved to a system stack —
+   no remote font request, and no new dependency. */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@workspace/design-tokens/css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
@@ -15,6 +20,9 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
   --color-card-border: hsl(var(--card-border));
+
+  --color-surface: hsl(var(--surface));
+  --color-surface-muted: hsl(var(--surface-muted));
 
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
@@ -40,11 +48,47 @@
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-destructive-border: var(--destructive-border);
 
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  /* Phase 1C: expose @workspace/design-tokens' component-layer disabled
+     roles as Tailwind utilities (`disabled:bg-button-disabled-bg`, etc.) so
+     Button/Input/Textarea can consume the approved disabled tokens directly
+     instead of a generic opacity dim. Values are the component tokens
+     themselves (already hsl()-wrapped in components.css), not re-derived. */
+  --color-button-disabled-bg: var(--sm-button-disabled-background);
+  --color-button-disabled-fg: var(--sm-button-disabled-text);
+  --color-button-disabled-border: var(--sm-button-disabled-border);
+  --color-input-disabled-bg: var(--sm-input-disabled-background);
+  --color-input-disabled-fg: var(--sm-input-disabled-text);
+  --color-input-disabled-border: var(--sm-input-disabled-border);
+
+  /* Phase 1C.1: expose the corrected StatusBadge soft-tint component tokens
+     (bg-statusbadge-*-bg / text-statusbadge-*-text) so StatusBadge.tsx can
+     consume them directly instead of raw success/warning/info/destructive
+     opacity tints, which measured below 4.5:1 for warning (light), info
+     (light), and destructive (dark). */
+  --color-statusbadge-success-bg: var(--sm-statusbadge-success-background);
+  --color-statusbadge-success-text: var(--sm-statusbadge-success-text);
+  --color-statusbadge-warning-bg: var(--sm-statusbadge-warning-background);
+  --color-statusbadge-warning-text: var(--sm-statusbadge-warning-text);
+  --color-statusbadge-info-bg: var(--sm-statusbadge-info-background);
+  --color-statusbadge-info-text: var(--sm-statusbadge-info-text);
+  --color-statusbadge-neutral-bg: var(--sm-statusbadge-neutral-background);
+  --color-statusbadge-neutral-text: var(--sm-statusbadge-neutral-text);
+  --color-statusbadge-danger-bg: var(--sm-statusbadge-danger-background);
+  --color-statusbadge-danger-text: var(--sm-statusbadge-danger-text);
+
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
+  --color-chart-6: hsl(var(--chart-6));
 
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
@@ -58,7 +102,8 @@
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
   --font-sans: var(--app-font-sans);
-  --font-serif: var(--app-font-serif);
+  --font-display: var(--app-font-display);
+  --font-serif: var(--app-font-display);
   --font-mono: var(--app-font-mono);
 
   --text-xs: 0.75rem;
@@ -94,68 +139,110 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* LIGHT MODE */
+/* ─── LIGHT MODE ─────────────────────────────────────────────────────────── */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(15, 40, 30, .10);
+  --badge-outline: rgba(15, 40, 30, .05);
 
   --opaque-button-border-intensity: -8;
 
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(15, 40, 30, .03);
+  --elevate-2: rgba(15, 40, 30, .08);
 
-  --background: 220 33% 98%;
-  --foreground: 222 47% 11%;
-  --border: 214 32% 91%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
+  /* Core surfaces — warm white app bg, white cards, pale-mint muted surfaces.
+     Transitional aliases onto @workspace/design-tokens' shared semantic
+     layer (SHARED_DESIGN_TOKENS_SPEC.md §5, Migration Strategy stage 2) —
+     same resolved values as before, sourced from the shared package now. */
+  --background: var(--sm-color-bg-canvas);
+  --foreground: var(--sm-color-text-primary);
+  --card: var(--sm-color-surface-default);
+  --card-foreground: var(--sm-color-text-primary);
+  --card-border: var(--sm-color-border-default);
+  --surface: var(--sm-color-surface-default);
+  --surface-muted: var(--sm-color-surface-muted);
+
+  --border: var(--sm-color-border-default);
+  --input: var(--sm-color-border-default);
+  /* Corrected: darkened evergreen focus ring (was raw mint, 1.96:1, failing
+     the 3:1 non-text minimum). See SHARED_DESIGN_TOKENS_SPEC.md §16. */
+  --ring: var(--sm-color-border-focus);
+
+  /* Ocean navy sidebar — matches SiteMint Digital production design system */
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 222 47% 11%;
-  --sidebar-border: 214 32% 91%;
-  --sidebar-primary: 236 85% 58%;
+  --sidebar-foreground: 203 76% 8%;
+  --sidebar-border: 207 12% 85%;
+  --sidebar-primary: 204 42% 15%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 214 32% 91%;
-  --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 236 85% 58%;
+  --sidebar-accent: 169 53% 94%;
+  --sidebar-accent-foreground: 204 42% 15%;
+  --sidebar-ring: 164 82% 53%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 214 32% 91%;
-  --primary: 236 85% 58%;
+  --popover-foreground: 203 76% 8%;
+  --popover-border: 207 12% 85%;
+
+  /* Ocean navy = primary action color (#162936) */
+  --primary: 204 42% 15%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 236 85% 58%;
-  --chart-1: 12 76% 61%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 197 37% 24%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
 
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: Georgia, serif;
-  --app-font-mono: Menlo, monospace;
-  --radius: .5rem;
+  --secondary: 169 53% 94%;
+  --secondary-foreground: 203 76% 8%;
 
-  /* Real, visible shadows for premium SaaS aesthetic */
-  --shadow-2xs: 0 1px 0 0 rgb(15 23 42 / 0.04);
-  --shadow-xs: 0 1px 1px 0 rgb(15 23 42 / 0.05);
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
-  --shadow: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.07);
-  --shadow-md: 0 4px 8px -1px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.07), 0 4px 6px -4px rgb(15 23 42 / 0.05);
-  --shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 0.08), 0 8px 10px -6px rgb(15 23 42 / 0.04);
-  --shadow-2xl: 0 25px 50px -12px rgb(15 23 42 / 0.14);
+  --muted: 169 40% 96%;
+  --muted-foreground: 207 26% 31%;
 
-  --tracking-normal: 0em;
+  /* Cyan-mint accent (#27E9B5) — small elements, highlights, charts, icons */
+  --accent: 164 82% 53%;
+  --accent-foreground: 203 76% 8%;
+
+  /* Transitional alias onto the shared semantic layer (value unchanged —
+     light danger already passes AA, 4.68:1). See SHARED_DESIGN_TOKENS_SPEC.md
+     §5 Action/Status. */
+  --destructive: var(--sm-color-action-danger);
+  --destructive-foreground: 0 0% 100%;
+  /* Corrected: darkened success fill (was raw success-500, 2.92:1 with white
+     text, failing AA). See SHARED_DESIGN_TOKENS_SPEC.md §5 Status, §24. */
+  --success: var(--sm-color-status-success);
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 32 40% 12%;
+  --info: 199 80% 44%;
+  --info-foreground: 0 0% 100%;
+
+  --chart-1: 164 82% 53%;
+  --chart-2: 204 42% 15%;
+  --chart-3: 207 55% 42%;
+  --chart-4: 42 85% 55%;
+  --chart-5: 6 75% 60%;
+  --chart-6: 207 26% 55%;
+
+  /* Typography/radius: transitional aliases onto the shared primitive layer
+     (values unchanged — see SHARED_DESIGN_TOKENS_SPEC.md §9, §13). */
+  --app-font-sans: var(--sm-font-body);
+  --app-font-display: var(--sm-font-display);
+  --app-font-mono: var(--sm-font-mono);
+  --radius: var(--sm-radius-md);
+
+  /* Navy-tinted, low-opacity layered shadows — updated from green-tint. */
+  --shadow-2xs: 0 1px 0 0 rgb(5 24 36 / 0.04);
+  --shadow-xs: 0 1px 1px 0 rgb(5 24 36 / 0.05);
+  --shadow-sm: var(--sm-shadow-sm);
+  --shadow: 0 1px 3px 0 rgb(5 24 36 / 0.08), 0 1px 2px -1px rgb(5 24 36 / 0.07);
+  --shadow-md: var(--sm-shadow-md);
+  --shadow-lg: var(--sm-shadow-lg);
+  --shadow-xl: 0 20px 25px -5px rgb(5 24 36 / 0.08), 0 8px 10px -6px rgb(5 24 36 / 0.04);
+  --shadow-2xl: var(--sm-shadow-overlay);
+  --shadow-mint-glow: var(--sm-shadow-glow-subtle);
+
+  --tracking-normal: var(--sm-tracking-normal);
   --spacing: 0.25rem;
+
+  /* Motion: aliases onto the shared motion primitives (values unchanged). */
+  --ease-standard: var(--sm-easing-standard);
+  --ease-emphasized: var(--sm-easing-enter);
+  --dur-fast: var(--sm-duration-fast);
+  --dur: var(--sm-duration-normal);
+  --dur-slow: var(--sm-duration-slow);
 
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
@@ -179,58 +266,87 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/* ─── DARK MODE ──────────────────────────────────────────────────────────── */
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(200, 230, 255, .10);
+  --badge-outline: rgba(200, 230, 255, .05);
 
   --opaque-button-border-intensity: 9;
 
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(200, 230, 255, .04);
+  --elevate-2: rgba(200, 230, 255, .09);
 
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --border: 217 32% 17%;
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 217 32% 17%;
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 217 32% 17%;
-  --sidebar-primary: 236 85% 58%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 217 32% 17%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 236 85% 58%;
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217 32% 17%;
-  --primary: 236 85% 58%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --input: 217 32% 17%;
-  --ring: 236 85% 58%;
-  --chart-1: 220 70% 50%;
-  --chart-2: 160 60% 45%;
-  --chart-3: 30 80% 55%;
-  --chart-4: 280 65% 60%;
-  --chart-5: 340 75% 55%;
+  /* Deep green-charcoal — never pure black. Transitional aliases onto the
+     shared semantic layer (values unchanged — dark theme needed no
+     correction; see SHARED_DESIGN_TOKENS_SPEC.md §8, §16). */
+  --background: var(--sm-color-bg-canvas);
+  --foreground: var(--sm-color-text-primary);
+  --card: var(--sm-color-surface-default);
+  --card-foreground: var(--sm-color-text-primary);
+  --card-border: var(--sm-color-border-default);
+  --surface: var(--sm-color-surface-default);
+  --surface-muted: var(--sm-color-surface-muted);
+
+  --border: var(--sm-color-border-default);
+  --input: var(--sm-color-border-default);
+  --ring: var(--sm-color-border-focus);
+
+  /* Ocean navy sidebar — dark mode */
+  --sidebar: 203 42% 10%;
+  --sidebar-foreground: 207 20% 92%;
+  --sidebar-border: 207 25% 20%;
+  --sidebar-primary: 164 70% 60%;
+  --sidebar-primary-foreground: 203 76% 8%;
+  --sidebar-accent: 203 35% 18%;
+  --sidebar-accent-foreground: 164 70% 70%;
+  --sidebar-ring: 164 70% 60%;
+
+  --popover: 203 42% 10%;
+  --popover-foreground: 207 20% 92%;
+  --popover-border: 207 25% 20%;
+
+  /* Bright cyan-mint for contrast on dark navy */
+  --primary: 164 70% 60%;
+  --primary-foreground: 203 76% 8%;
+
+  --secondary: 203 35% 18%;
+  --secondary-foreground: 207 20% 92%;
+
+  --muted: 203 35% 12%;
+  --muted-foreground: 207 20% 62%;
+
+  /* Mint accent glows and highlights on dark */
+  --accent: 164 70% 62%;
+  --accent-foreground: 203 76% 8%;
+
+  /* Corrected (Phase 1B.1): was 356 65% 55% (4.40:1 with white text,
+     marginal AA fail); now aliased to the shared corrected value, 4.79:1.
+     See SHARED_DESIGN_TOKENS_SPEC.md §5 Action/Status. */
+  --destructive: var(--sm-color-action-danger);
+  --destructive-foreground: 0 0% 100%;
+  --success: var(--sm-color-status-success);
+  --success-foreground: 152 40% 8%;
+  --warning: 38 90% 55%;
+  --warning-foreground: 32 40% 10%;
+  --info: 199 75% 55%;
+  --info-foreground: 199 40% 8%;
+
+  --chart-1: 164 70% 60%;
+  --chart-2: 164 82% 53%;
+  --chart-3: 207 55% 50%;
+  --chart-4: 42 85% 60%;
+  --chart-5: 6 70% 65%;
+  --chart-6: 207 20% 65%;
 
   --shadow-2xs: 0 1px 0 0 rgb(0 0 0 / 0.25);
   --shadow-xs: 0 1px 1px 0 rgb(0 0 0 / 0.25);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: var(--sm-shadow-sm);
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+  --shadow-md: var(--sm-shadow-md);
+  --shadow-lg: var(--sm-shadow-lg);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  --shadow-2xl: var(--sm-shadow-overlay);
+  --shadow-mint-glow: var(--sm-shadow-glow-subtle);
 }
 
 @layer base {
@@ -240,11 +356,12 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-variant-numeric: tabular-nums;
   }
 }
 
 /**
- * Focus ring — global accessible focus style
+ * Focus ring — global accessible focus style (mint)
  */
 @layer utilities {
   :focus-visible {
@@ -331,3 +448,15 @@
 /* Hide scrollbar for horizontal filter rows while keeping scroll behaviour */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Reduced motion: disable transforms/long transitions, keep opacity fades */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,537 @@
+/**
+ * Frontend V2 Phase 5 — AI Receptionist signup presentation.
+ *
+ * Same rules as the rest of V2: every value is a `--v2-*` token, no new colour,
+ * no new font, no remote request, no gradient, no glass, no radius above 16px,
+ * no decorative shadow, and no motion beyond the token-defined control
+ * transitions. Namespaced `sg-*`.
+ *
+ * Composition. Context on the left, one form surface on the right, with
+ * "what happens next" tucked under the context column so neither half of a
+ * 1440 viewport is left empty. The form is the only element on the page that
+ * gets a surface and a border — everything else is set with type and rules —
+ * which is what keeps the eye on the task instead of on a grid of cards.
+ *
+ * DOM order is context → form → next steps, so a phone reads a short
+ * explanation, then the fields, and never has to scroll past a marketing block
+ * to start typing. Desktop restores the intended two-column arrangement with
+ * explicit grid placement rather than by reordering the markup.
+ */
+
+.sg-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-color-canvas);
+  color: var(--v2-color-text);
+  font-family: var(--v2-font-sans);
+}
+
+/* ── Auth chrome ─────────────────────────────────────────────────────────── */
+
+.sg-bar {
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+  background: var(--v2-color-canvas);
+}
+
+.sg-bar__inner {
+  max-width: var(--v2-container);
+  margin: 0 auto;
+  padding: var(--v2-space-3) var(--v2-gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-4);
+}
+
+.sg-bar__brand,
+.sg-bar__signin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text);
+  text-decoration: none;
+}
+
+.sg-bar__brand-accent {
+  color: var(--v2-color-text-muted);
+  margin-left: 0.25em;
+}
+
+.sg-bar__signin {
+  padding-inline: var(--v2-space-3);
+  margin-right: calc(var(--v2-space-3) * -1);
+}
+
+.sg-bar__signin:hover,
+.sg-bar__brand:hover {
+  text-decoration: underline;
+}
+
+.sg-bar__brand:focus-visible,
+.sg-bar__signin:focus-visible,
+.sg-back:focus-visible,
+.sg-alt__link:focus-visible,
+.sg-alert__link:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.sg-main {
+  flex: 1;
+  padding-block: var(--v2-space-12);
+}
+
+.sg-grid {
+  max-width: var(--v2-container);
+  margin: 0 auto;
+  padding-inline: var(--v2-gutter);
+  display: grid;
+  gap: var(--v2-space-12);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .sg-main {
+    padding-block: var(--v2-space-16);
+  }
+
+  .sg-grid {
+    /* The form takes the larger column: it is the task, and the context is
+       there to qualify it. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    column-gap: var(--v2-space-16);
+    row-gap: var(--v2-space-12);
+  }
+
+  .sg-intro {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  /* Spans both rows so the form column stays one continuous surface beside
+     the context and the next-steps list. */
+  .sg-form-col {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .sg-next {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
+}
+
+/* ── Context ─────────────────────────────────────────────────────────────── */
+
+.sg-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-2);
+  min-height: 44px;
+  margin-bottom: var(--v2-space-4);
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text-muted);
+  text-decoration: none;
+}
+
+.sg-back:hover {
+  color: var(--v2-color-text);
+}
+
+.sg-back__icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sg-title {
+  margin: 0 0 var(--v2-space-4);
+  max-width: 16ch;
+  font-size: var(--v2-text-h1);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.sg-lede {
+  margin: 0 0 var(--v2-space-8);
+  max-width: 46ch;
+  font-size: var(--v2-text-body-lg);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+/* Readiness: one row per tier, the available one carrying the mint spine so
+   the shipped capability is the one with weight. The tier word is always
+   present, so nothing depends on the colour. */
+.sg-readiness {
+  display: grid;
+  gap: var(--v2-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sg-readiness__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-2) 0 var(--v2-space-2) var(--v2-space-4);
+  border-left: 2px solid var(--v2-color-border);
+}
+
+.sg-readiness__item--available {
+  border-left-color: var(--v2-color-action);
+}
+
+.sg-readiness__name {
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text);
+}
+
+.sg-readiness__item--in-development .sg-readiness__name,
+.sg-readiness__item--planned .sg-readiness__name {
+  font-weight: var(--v2-weight-regular);
+  color: var(--v2-color-text-muted);
+}
+
+/* ── The form surface ────────────────────────────────────────────────────── */
+
+.sg-form {
+  display: grid;
+  gap: var(--v2-space-6);
+  padding: var(--v2-space-8) var(--v2-space-6);
+  border: var(--v2-border-width) solid var(--v2-color-border-strong);
+  border-radius: var(--v2-radius-card);
+  background: var(--v2-color-surface);
+}
+
+@media (min-width: 768px) {
+  .sg-form {
+    padding: var(--v2-space-8);
+  }
+}
+
+.sg-form__title {
+  margin: 0;
+  font-size: var(--v2-text-h3);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+}
+
+.sg-row {
+  display: grid;
+  gap: var(--v2-space-6);
+}
+
+@media (min-width: 560px) {
+  .sg-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sg-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sg-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--v2-space-2);
+  margin-bottom: var(--v2-space-2);
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-semibold);
+  color: var(--v2-color-text);
+}
+
+/* Required and optional are spelled out. An asterisk alone is not a label, and
+   colour alone is not a state. */
+.sg-req,
+.sg-opt {
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.sg-input {
+  width: 100%;
+  /* 44px minimum target; the previous inputs were 36px. */
+  min-height: 44px;
+  padding: var(--v2-space-2) var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border-strong);
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-color-surface);
+  color: var(--v2-color-text);
+  font-family: inherit;
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-leading-body);
+  transition: border-color var(--v2-duration-control) var(--v2-ease-standard);
+}
+
+.sg-input:hover {
+  border-color: var(--v2-color-text-muted);
+}
+
+.sg-input:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+  border-color: var(--v2-color-text);
+}
+
+/* The invalid state is carried by the error text and `aria-invalid`; the
+   thicker rule is a reinforcement, not the signal. */
+.sg-input--invalid {
+  border-color: var(--v2-navy-700);
+  border-width: 2px;
+}
+
+.sg-select {
+  appearance: none;
+  /* Room for the native chevron on platforms that draw one inside the box. */
+  padding-right: var(--v2-space-8);
+  background-image: linear-gradient(45deg, transparent 50%, var(--v2-color-text-muted) 50%),
+    linear-gradient(135deg, var(--v2-color-text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 1.125rem) 50%, calc(100% - 0.75rem) 50%;
+  background-size: 0.375rem 0.375rem, 0.375rem 0.375rem;
+  background-repeat: no-repeat;
+}
+
+.sg-password {
+  position: relative;
+  display: flex;
+}
+
+.sg-input--password {
+  padding-right: 3.25rem;
+}
+
+.sg-password__toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  /* A real 44px target rather than an icon hit-area. */
+  width: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--v2-color-text-muted);
+  cursor: pointer;
+  border-radius: var(--v2-radius-control);
+}
+
+.sg-password__toggle:hover {
+  color: var(--v2-color-text);
+}
+
+.sg-password__toggle:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: calc(var(--v2-focus-ring-offset) * -1);
+}
+
+.sg-password__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.sg-help {
+  margin: var(--v2-space-2) 0 0;
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+.sg-error {
+  margin: var(--v2-space-2) 0 0;
+  font-size: var(--v2-text-small);
+  font-weight: var(--v2-weight-medium);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-navy-900);
+}
+
+/* The error is prefixed with a word, so the state survives without colour. */
+.sg-error::before {
+  content: "Error: ";
+  font-weight: var(--v2-weight-semibold);
+}
+
+/* ── Form-level alert ────────────────────────────────────────────────────── */
+
+.sg-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-3) var(--v2-space-4);
+  /* The left rule and the tint delineate the alert; an outer border on top of
+     both was one border too many inside an already-bordered surface. */
+  border-left: 3px solid var(--v2-navy-900);
+  border-radius: 0 var(--v2-radius-control) var(--v2-radius-control) 0;
+  background: var(--v2-color-surface-alt);
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text);
+}
+
+.sg-alert:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+.sg-alert__label {
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+}
+
+.sg-alert__text {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.sg-alert__link {
+  color: var(--v2-color-text);
+  font-weight: var(--v2-weight-semibold);
+}
+
+/* ── Submit ──────────────────────────────────────────────────────────────── */
+
+.sg-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v2-space-2);
+  width: 100%;
+  min-height: 48px;
+  padding-inline: var(--v2-space-6);
+  border: var(--v2-border-width) solid transparent;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-color-action);
+  color: var(--v2-color-text-on-action);
+  font-family: inherit;
+  font-size: var(--v2-text-body);
+  font-weight: var(--v2-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--v2-duration-control) var(--v2-ease-standard);
+}
+
+.sg-submit:focus-visible {
+  outline: var(--v2-focus-ring-width) solid var(--v2-focus-ring-color);
+  outline-offset: var(--v2-focus-ring-offset);
+}
+
+/* Disabled is legible rather than ghosted: navy text on a bordered surface
+   keeps contrast well above the minimum while clearly reading as inactive. */
+.sg-submit:disabled {
+  background: var(--v2-color-surface-alt);
+  border-color: var(--v2-color-border-strong);
+  color: var(--v2-color-text-muted);
+  cursor: default;
+}
+
+.sg-submit__spinner {
+  width: 1rem;
+  height: 1rem;
+  animation: sg-spin 900ms linear infinite;
+}
+
+@keyframes sg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Laid out as a row rather than a sentence with an inline link, so the
+   sign-in target meets the 44px minimum without stretching body copy. */
+.sg-alt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-2);
+  margin: 0;
+  padding-top: var(--v2-space-4);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+  font-size: var(--v2-text-small);
+  color: var(--v2-color-text-muted);
+}
+
+.sg-alt__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding-inline: var(--v2-space-3);
+  margin-inline: calc(var(--v2-space-3) * -1);
+  color: var(--v2-color-text);
+  font-weight: var(--v2-weight-semibold);
+}
+
+/* ── What happens next ───────────────────────────────────────────────────── */
+
+.sg-next__title {
+  margin: 0 0 var(--v2-space-4);
+  font-size: var(--v2-text-micro);
+  font-weight: var(--v2-weight-semibold);
+  letter-spacing: var(--v2-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v2-color-text-muted);
+}
+
+.sg-next__list {
+  display: grid;
+  gap: var(--v2-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sg-next__item {
+  padding-top: var(--v2-space-3);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.sg-next__name {
+  margin: 0 0 var(--v2-space-1);
+  font-size: var(--v2-text-body);
+  font-weight: var(--v2-weight-semibold);
+  line-height: var(--v2-leading-heading);
+  color: var(--v2-color-text);
+}
+
+.sg-next__body {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+  color: var(--v2-color-text-muted);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-input,
+  .sg-submit {
+    transition: none;
+  }
+
+  .sg-submit__spinner {
+    animation: none;
+  }
+}

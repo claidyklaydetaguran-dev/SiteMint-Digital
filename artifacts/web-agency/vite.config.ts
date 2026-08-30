@@ -50,6 +50,16 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      // @workspace/discovery-contract is not a compiled package — point Vite
+      // directly at its TypeScript source so the dev server and production
+      // build can resolve it without a separate build step. The package's own
+      // zod/v4 imports resolve fine via esbuild at runtime (zod 3.25.x
+      // exposes ./v4 in its exports map). TypeScript uses tsconfig paths
+      // for type-checking; this alias is for Vite/esbuild only.
+      "@workspace/discovery-contract": path.resolve(
+        import.meta.dirname,
+        "../../lib/discovery-contract/src/index.ts",
+      ),
     },
     dedupe: ["react", "react-dom"],
   },

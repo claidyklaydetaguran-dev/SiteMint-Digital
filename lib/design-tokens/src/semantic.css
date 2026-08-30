@@ -1,0 +1,194 @@
+/**
+ * SiteMint Platform — Semantic Tokens
+ *
+ * Source of truth: docs/sitemint-platform/SHARED_DESIGN_TOKENS_SPEC.md §5,
+ * §15, §16. Resolves primitive tokens (primitives.css) into role-based tokens
+ * consumers should prefer over primitives. Requires primitives.css to be
+ * imported first.
+ *
+ * Three values below are corrected from helpdesk's raw historical values per
+ * the Phase 1A audit (DESIGN_TOKEN_AUDIT.md, Accessibility Review) and the
+ * Phase 1B-V rendered verification, and are NOT the same as a literal
+ * primitive:
+ *   - --sm-color-border-focus (light): darkened evergreen, not raw mint
+ *     (mint measured 1.96:1, failing the 3:1 non-text minimum).
+ *   - --sm-color-status-success (light): darkened success hue, not raw
+ *     success-500 (raw value measured 2.92:1 with white text, failing AA).
+ *   - --sm-color-action-danger / --sm-color-status-danger (dark, Phase 1B.1):
+ *     darkened from `356 65% 55%` to `356 65% 52%` — the raw value measured
+ *     4.40:1 with white text, marginally failing the 4.5:1 AA text minimum;
+ *     the corrected value measures 4.79:1. Same hue/saturation, only
+ *     lightness moved, so it stays a clearly recognizable destructive red.
+ *
+ * Phase 1B.1 also adds explicit disabled and inverse semantic roles
+ * (surface-disabled, border-disabled, text-inverse-secondary) that did not
+ * exist in Phase 1B. text-disabled (light) is additionally corrected from
+ * `155 8% 55%` to `155 8% 49%` so it clears 3:1 against both the canvas and
+ * the new disabled surface — see the Accessibility Review in
+ * DESIGN_TOKEN_AUDIT.md for why disabled labels are held to a readable-text
+ * standard here even though WCAG itself exempts truly inactive controls.
+ *
+ * Phase 1C.1 adds dedicated statusbadge-* text/background pairs for the
+ * "soft tint" status-pill pattern (StatusBadge.tsx: a pale/dark tinted fill
+ * with a colored text label, distinct from the solid-fill white-text badge
+ * pattern in components.css's badge-success/-warning tokens). Phase 1C-V
+ * measured the raw hue-as-text approach failing 4.5:1 in three cases: light
+ * warning (2.09:1), light info (3.47:1), dark destructive (3.83:1). Rather
+ * than changing the shared success/warning/info/danger primitives (used
+ * correctly elsewhere as solid fills or icons), this adds darker
+ * (light-theme) or brighter (dark-theme destructive) text variants plus
+ * solid (not alpha-blended) pale/dark tint backgrounds so the pairing is
+ * deterministic regardless of what surface the badge sits on. Success,
+ * dark-warning, dark-info, and neutral already passed and are reused
+ * unchanged via var() references — only the three failing pairs get new
+ * dedicated values.
+ */
+
+:root {
+  /* Background (§5 Background) */
+  --sm-color-bg-canvas: var(--sm-neutral-50);
+  --sm-color-bg-subtle: var(--sm-neutral-100);
+  --sm-color-bg-elevated: var(--sm-neutral-0);
+  --sm-color-bg-inverse: var(--sm-charcoal-950);
+
+  /* Surface (§5 Surface) */
+  --sm-color-surface-default: var(--sm-neutral-0);
+  --sm-color-surface-muted: var(--sm-neutral-100);
+  --sm-color-surface-interactive: var(--sm-neutral-100);
+  --sm-color-surface-disabled: var(--sm-neutral-100);
+
+  /* Text (§5 Text) */
+  --sm-color-text-primary: var(--sm-neutral-900);
+  --sm-color-text-secondary: 155 10% 30%;
+  --sm-color-text-muted: var(--sm-neutral-600);
+  /* Inverse text — for content placed on --sm-color-bg-inverse. Primary
+     pairs at 18.02:1 both themes; secondary pairs at 11.28:1 (light) /
+     7.83:1 (dark), both well above the 4.5:1 text minimum. */
+  --sm-color-text-inverse: var(--sm-neutral-50);
+  --sm-color-text-inverse-secondary: 150 12% 78%;
+  --sm-color-text-link: var(--sm-evergreen-900);
+  /* Corrected (Phase 1B.1) — see file header. 3.74:1 vs canvas, 3.57:1 vs
+     --sm-color-surface-disabled. */
+  --sm-color-text-disabled: 155 8% 49%;
+
+  /* Border (§5 Border) */
+  --sm-color-border-default: var(--sm-neutral-200);
+  --sm-color-border-subtle: 152 20% 93%;
+  --sm-color-border-strong: 152 10% 70%;
+  --sm-color-border-focus: 160 76% 30%; /* corrected — see file header */
+  /* Decorative divider around a disabled control — like other borders
+     (§10/§Accessibility Review), not held to a text contrast minimum. */
+  --sm-color-border-disabled: 152 10% 80%;
+
+  /* Action (§5 Action) */
+  --sm-color-action-primary: var(--sm-evergreen-900);
+  --sm-color-action-primary-hover: 160 76% 18%;
+  --sm-color-action-primary-active: 160 76% 15%;
+  --sm-color-action-secondary-bg: var(--sm-neutral-100);
+  --sm-color-action-secondary-text: var(--sm-evergreen-900);
+  --sm-color-action-danger: var(--sm-danger-500);
+
+  /* Status (§5 Status) */
+  --sm-color-status-success: 152 50% 32%; /* corrected — see file header */
+  --sm-color-status-warning: var(--sm-warning-500);
+  --sm-color-status-danger: var(--sm-danger-500);
+  --sm-color-status-info: var(--sm-info-500);
+  --sm-color-status-neutral: var(--sm-neutral-600);
+
+  /* StatusBadge soft-tint pairs (Phase 1C.1 — see file header).
+     success/neutral reuse already-passing existing tokens; warning/info/
+     danger get dedicated darker text (raw hues fail as text-on-tint). */
+  --sm-color-statusbadge-success-bg: 148 30% 96%;
+  --sm-color-statusbadge-success-text: var(--sm-color-status-success); /* 4.87:1 */
+  --sm-color-statusbadge-warning-bg: 40 55% 95%;
+  --sm-color-statusbadge-warning-text: 32 80% 26%; /* 7.23:1 — was 2.09:1 raw warning-500 */
+  --sm-color-statusbadge-info-bg: 202 55% 95%;
+  --sm-color-statusbadge-info-text: 202 80% 28%; /* 6.98:1 — was 3.47:1 raw info-500 */
+  --sm-color-statusbadge-neutral-bg: var(--sm-color-surface-muted);
+  --sm-color-statusbadge-neutral-text: var(--sm-color-text-muted);
+  --sm-color-statusbadge-danger-bg: 356 55% 95%;
+  --sm-color-statusbadge-danger-text: 356 75% 40%; /* 5.88:1 — was 4.58:1 raw danger-500, thin margin */
+
+  /* Shadow/Elevation (§15) */
+  --sm-shadow-none: none;
+  --sm-shadow-sm: 0 1px 2px 0 rgb(14 40 30 / 0.06);
+  --sm-shadow-md: 0 4px 8px -1px rgb(14 40 30 / 0.08), 0 2px 4px -2px rgb(14 40 30 / 0.05);
+  --sm-shadow-lg: 0 10px 15px -3px rgb(14 40 30 / 0.07), 0 4px 6px -4px rgb(14 40 30 / 0.05);
+  --sm-shadow-overlay: 0 25px 50px -12px rgb(14 40 30 / 0.14);
+  --sm-shadow-glow-subtle: 0 0 0 1px rgb(52 211 153 / 0.35), 0 8px 24px -6px rgb(52 211 153 / 0.35);
+}
+
+.dark {
+  /* Background */
+  --sm-color-bg-canvas: var(--sm-charcoal-950);
+  --sm-color-bg-subtle: var(--sm-charcoal-800);
+  --sm-color-bg-elevated: var(--sm-charcoal-900);
+  --sm-color-bg-inverse: var(--sm-neutral-50);
+
+  /* Surface */
+  --sm-color-surface-default: var(--sm-charcoal-900);
+  --sm-color-surface-muted: var(--sm-charcoal-800);
+  --sm-color-surface-interactive: var(--sm-charcoal-800);
+  --sm-color-surface-disabled: var(--sm-charcoal-800);
+
+  /* Text */
+  --sm-color-text-primary: 150 20% 92%;
+  --sm-color-text-secondary: 150 12% 78%;
+  --sm-color-text-muted: 150 8% 62%;
+  /* Inverse text — for content placed on --sm-color-bg-inverse. Primary
+     pairs at 18.02:1; secondary pairs at 7.83:1. */
+  --sm-color-text-inverse: var(--sm-charcoal-950);
+  --sm-color-text-inverse-secondary: 155 10% 30%;
+  --sm-color-text-link: var(--sm-evergreen-700);
+  /* Already passes 3:1 against both canvas (4.09:1) and the new
+     --sm-color-surface-disabled (3.46:1) — no correction needed. */
+  --sm-color-text-disabled: 150 6% 45%;
+
+  /* Border */
+  --sm-color-border-default: var(--sm-charcoal-700);
+  --sm-color-border-subtle: 158 14% 16%;
+  --sm-color-border-strong: 158 10% 32%;
+  --sm-color-border-focus: 160 64% 55%; /* dark ring already passes (9.96:1), unchanged */
+  --sm-color-border-disabled: 158 10% 26%;
+
+  /* Action */
+  --sm-color-action-primary: var(--sm-evergreen-700);
+  --sm-color-action-primary-hover: 160 55% 50%;
+  --sm-color-action-primary-active: 160 55% 40%;
+  --sm-color-action-secondary-bg: var(--sm-charcoal-800);
+  --sm-color-action-secondary-text: 150 20% 92%;
+  /* Corrected (Phase 1B.1) — see file header. Was 356 65% 55% (4.40:1 with
+     white text, marginal AA fail); now 4.79:1. */
+  --sm-color-action-danger: 356 65% 52%;
+
+  /* Status */
+  --sm-color-status-success: 152 55% 48%;
+  --sm-color-status-warning: 38 90% 55%;
+  /* Corrected (Phase 1B.1) — kept in sync with --sm-color-action-danger
+     above, same underlying destructive red concept. */
+  --sm-color-status-danger: 356 65% 52%;
+  --sm-color-status-info: 199 75% 55%;
+  --sm-color-status-neutral: 150 8% 62%;
+
+  /* StatusBadge soft-tint pairs (Phase 1C.1 — see file header).
+     success/warning/info/neutral already passed at healthy margins
+     (5.46:1–7.73:1) and are reused unchanged via var(); only destructive
+     (3.83:1 raw) needed a dedicated brighter-text/darker-tint pair. */
+  --sm-color-statusbadge-success-bg: 152 30% 16%;
+  --sm-color-statusbadge-success-text: var(--sm-color-status-success); /* 5.54:1 */
+  --sm-color-statusbadge-warning-bg: 38 35% 16%;
+  --sm-color-statusbadge-warning-text: var(--sm-color-status-warning); /* 6.74:1 */
+  --sm-color-statusbadge-info-bg: 199 35% 16%;
+  --sm-color-statusbadge-info-text: var(--sm-color-status-info); /* 5.46:1 */
+  --sm-color-statusbadge-neutral-bg: var(--sm-color-surface-muted);
+  --sm-color-statusbadge-neutral-text: var(--sm-color-text-muted); /* 6.10:1 */
+  --sm-color-statusbadge-danger-bg: 356 35% 14%;
+  --sm-color-statusbadge-danger-text: 356 85% 72%; /* 6.34:1 — was 3.83:1 raw dark danger */
+
+  /* Shadow/Elevation */
+  --sm-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --sm-shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+  --sm-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+  --sm-shadow-overlay: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  --sm-shadow-glow-subtle: 0 0 0 1px rgb(52 211 153 / 0.4), 0 8px 28px -4px rgb(52 211 153 / 0.4);
+}

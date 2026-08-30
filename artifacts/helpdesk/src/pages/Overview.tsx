@@ -1,40 +1,59 @@
-import { useState } from "react";
-import { Link } from "wouter";
+/**
+ * Frontend V2 Phase 7 — the default authenticated dashboard overview.
+ *
+ * The page answers one question: *is my SMS receptionist set up, and is
+ * anything waiting on me?* Everything on it is derived from the three
+ * authenticated endpoints the dashboard already called — no request, method,
+ * payload, query key, or caching behaviour is changed by this file.
+ *
+ * ── What changed, and why ─────────────────────────────────────────────────
+ *
+ *  1. **The "Receptionist active" badge is gone.** No endpoint reports whether
+ *     a number is live, so that badge was an assertion with nothing behind it.
+ *     The page now shows evidence instead: configuration state (real, from
+ *     agent-config) and the timestamp of the most recent real conversation.
+ *
+ *  2. **The setup checklist reports the truth.** The server sends agent-config
+ *     wrapped in `{ firm: … }`; the previous page read the fields off the top
+ *     level, so every field was `undefined` and a fully configured firm was
+ *     told "0 of 3 steps completed". `readAgentConfig` reads the documented
+ *     shape. Frontend misread only — see `overviewContract.ts`.
+ *
+ *  3. **The recharts bar chart is gone.** A seven-bar count of conversations
+ *     cost 380 kB on the dashboard's own route chunk and told an owner less
+ *     than the conversation list directly beneath it. The real counts remain,
+ *     as figures.
+ *
+ *  4. **The three voice metric tiles are gone.** "Calls answered — Voice add-on
+ *     required" implied a purchasable add-on that does not exist. Voice
+ *     readiness is stated once, honestly, in the capability ladder.
+ *
+ * ── States ────────────────────────────────────────────────────────────────
+ * Authentication loading is handled by `AppShell` before this renders.
+ * This component covers: authenticated loading, empty account, populated,
+ * partial data (agent-config failed but conversations loaded, and the
+ * reverse), and request failure. A session expiry surfaces as a session error
+ * and `AppShell` redirects — this page never renders authenticated content
+ * without a resolved session.
+ */
+
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { AlertTriangle, ArrowRight, Check, CircleDashed } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { Conversation, useConversations } from "@/hooks/useConversations";
+import { useConversations } from "@/hooks/useConversations";
 import { useSession } from "@/hooks/useSession";
-import { relativeTime, TIER_STYLES } from "@/lib/conversationUi";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { relativeTime } from "@/lib/conversationUi";
+import { CAPABILITY_STATUS, READINESS } from "@/pages/login/readiness";
 import {
-  MessageSquare,
-  Flame,
-  Activity,
-  BarChart2,
-  ChevronRight,
-  RefreshCw,
-  AlertTriangle,
-  X,
-  CheckCircle2,
-} from "lucide-react";
-
-// ─── Agent config type ─────────────────────────────────────────────────────
-
-interface AgentConfig {
-  greetingMessage: string | null;
-  businessDescription: string | null;
-  qualifyingQuestions: string[];
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
+  buildActivityFigures,
+  buildAttention,
+  deriveReadiness,
+  readAgentConfig,
+  recentConversations,
+  type Readiness,
+} from "@/pages/overview/overviewContract";
+import "@/styles/v2-dashboard.css";
 
 function todayLabel(): string {
   return new Date().toLocaleDateString("en-US", {
@@ -44,349 +63,276 @@ function todayLabel(): string {
   });
 }
 
-function countThisWeek(conversations: Conversation[]): number {
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  return conversations.filter((c) => new Date(c.createdAt).getTime() >= cutoff).length;
-}
+// ─── Loading ───────────────────────────────────────────────────────────────
 
-function countHot(conversations: Conversation[]): number {
-  return conversations.filter((c) => c.tier === "Hot").length;
-}
-
-function countActive(conversations: Conversation[]): number {
-  return conversations.filter((c) => c.status === "in_progress").length;
-}
-
-// ─── Skeleton ──────────────────────────────────────────────────────────────
-
-function SkeletonState() {
+function OverviewSkeleton() {
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-y-auto p-6 gap-6">
-      <div className="h-7 w-56 bg-slate-200 rounded-lg animate-pulse" />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl border border-slate-200 bg-white p-5 h-28 animate-pulse" />
-        ))}
-      </div>
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <div className="h-12 border-b border-slate-100 px-4 flex items-center gap-2">
-          <div className="h-4 w-40 bg-slate-100 rounded animate-pulse" />
-        </div>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 last:border-0">
-            <div className="flex-1 h-4 bg-slate-100 rounded animate-pulse" />
-            <div className="h-5 w-14 bg-slate-100 rounded-full animate-pulse" />
-            <div className="h-4 w-10 bg-slate-100 rounded animate-pulse" />
-          </div>
-        ))}
-      </div>
+    <div className="sd-page" aria-busy="true">
+      <p className="sd-sr" role="status">
+        Loading your overview
+      </p>
+      <div className="sd-skel sd-skel--title" />
+      <div className="sd-skel sd-skel--status" />
+      <div className="sd-skel sd-skel--figures" />
+      <div className="sd-skel sd-skel--list" />
     </div>
   );
 }
 
-// ─── Error state ───────────────────────────────────────────────────────────
+// ─── Status rail ───────────────────────────────────────────────────────────
 
-function ErrorState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-8">
-      <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center">
-        <AlertTriangle className="h-6 w-6 text-rose-500" />
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-slate-900">Failed to load overview</p>
-        <p className="text-xs text-slate-500 mt-1">Check your connection and try again.</p>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="gap-1.5 border-slate-200 text-sm"
-        onClick={onRetry}
-      >
-        <RefreshCw className="h-3.5 w-3.5" /> Retry
-      </Button>
-    </div>
-  );
-}
-
-// ─── KPI card ──────────────────────────────────────────────────────────────
-
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  iconBg,
-  iconColor,
-  href,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
-  href?: string;
-}) {
-  const inner = (
-    <div
-      className={`rounded-xl border border-slate-200 bg-white p-5 flex flex-col gap-3 shadow-sm transition-all duration-150 ${
-        href ? "hover:shadow-md hover:border-slate-300 cursor-pointer" : ""
-      }`}
-    >
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconBg}`}>
-        <Icon className={`h-4 w-4 ${iconColor}`} />
-      </div>
-      <div>
-        <div className="text-[30px] font-bold text-slate-900 leading-none tabular-nums">
-          {value}
-        </div>
-        <div className="text-xs text-slate-500 mt-2 leading-snug">{label}</div>
-      </div>
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{inner}</Link>;
+function statusCopy(readiness: Readiness): { title: string; detail: string } {
+  switch (readiness.state) {
+    case "answering":
+      return {
+        title: "SMS receptionist configured",
+        detail: `Most recent conversation activity ${relativeTime(readiness.lastActivityAt!)} ago.`,
+      };
+    case "configured":
+      return {
+        title: "SMS receptionist configured",
+        detail: readiness.activityKnown
+          ? "No conversations yet. The first one appears here once someone texts your business number."
+          : "Setup is complete. Conversation activity could not be loaded just now.",
+      };
+    case "incomplete":
+      // The count lives in the chip beside this copy, so it is not repeated
+      // here — the sentence says what finishing the steps buys instead.
+      return {
+        title: "Finish setting up your receptionist",
+        detail: "The receptionist answers with your own details once these are set.",
+      };
+    case "unknown":
+    default:
+      return {
+        title: "Setup status unavailable",
+        detail: "Your receptionist settings could not be loaded. Everything else on this page is current.",
+      };
   }
-  return inner;
 }
 
-// ─── Getting-started checklist ─────────────────────────────────────────────
-
-function GettingStartedChecklist({
-  agentConfig,
-  dismissed,
-  onDismiss,
-}: {
-  agentConfig: AgentConfig;
-  dismissed: boolean;
-  onDismiss: () => void;
-}) {
-  const steps = [
-    {
-      label: "Add a business description",
-      done: Boolean(agentConfig.businessDescription?.trim()),
-    },
-    {
-      label: "Write a greeting message",
-      done: Boolean(agentConfig.greetingMessage?.trim()),
-    },
-    {
-      label: "Add qualifying questions",
-      done: (agentConfig.qualifyingQuestions ?? []).length > 0,
-    },
-  ];
-
-  const allDone = steps.every((s) => s.done);
-  if (allDone || dismissed) return null;
-
-  const doneCount = steps.filter((s) => s.done).length;
+function StatusRail({ readiness }: { readiness: Readiness }) {
+  const { title, detail } = statusCopy(readiness);
+  const showSteps = readiness.state === "incomplete";
 
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-sm font-semibold text-indigo-900">
-            Set up your AI Receptionist
-          </p>
-          <p className="text-xs text-indigo-600 mt-0.5">
-            {doneCount} of {steps.length} steps completed
-          </p>
+    <section className="sd-status" data-state={readiness.state} aria-labelledby="sd-status-title">
+      <div className="sd-status__head">
+        <span className="sd-status__dot" aria-hidden="true" />
+        <div className="sd-status__body">
+          <h2 className="sd-status__title" id="sd-status-title">
+            {title}
+          </h2>
+          <p className="sd-status__detail">{detail}</p>
         </div>
-        <button
-          onClick={onDismiss}
-          className="text-indigo-300 hover:text-indigo-500 transition-colors mt-0.5 flex-shrink-0"
-          aria-label="Dismiss setup checklist"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {showSteps ? (
+          <span className="sd-status__count">
+            {readiness.completed}/{readiness.total} done
+          </span>
+        ) : (
+          /* The capability whose status this card reports, stated in the same
+             three-tier vocabulary the rest of the product uses. */
+          <span className="sd-tier" data-tier="available">
+            {READINESS.available.label}
+          </span>
+        )}
       </div>
-      <div className="space-y-1">
-        {steps.map((step) => (
-          <Link key={step.label} href="/receptionist">
-            <div
-              className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg cursor-pointer hover:bg-indigo-100/60 transition-colors ${
-                step.done ? "opacity-55" : ""
-              }`}
-            >
-              <div
-                className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center border ${
-                  step.done
-                    ? "bg-emerald-500 border-emerald-500"
-                    : "border-indigo-300 bg-white"
-                }`}
-              >
-                {step.done && <CheckCircle2 className="h-3 w-3 text-white" />}
-              </div>
-              <span
-                className={`text-xs leading-snug ${
-                  step.done
-                    ? "text-indigo-400 line-through"
-                    : "text-indigo-800 font-medium"
-                }`}
-              >
-                {step.label}
-              </span>
-              {!step.done && (
-                <ChevronRight className="h-3.5 w-3.5 text-indigo-400 ml-auto flex-shrink-0" />
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
+
+      {showSteps && (
+        <>
+          <ul className="sd-steps">
+            {readiness.steps.map((step) => (
+              <li className="sd-step" key={step.key} data-done={step.done ? "true" : "false"}>
+                {step.done ? (
+                  <Check className="sd-step__mark" aria-hidden="true" />
+                ) : (
+                  <CircleDashed className="sd-step__mark" aria-hidden="true" />
+                )}
+                <div className="sd-step__body">
+                  <span className="sd-step__label">
+                    {step.label}
+                    <span className="sd-sr">{step.done ? " — done" : " — not done yet"}</span>
+                  </span>
+                  <p className="sd-step__detail">{step.detail}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {/* All three steps are edited on the same page, so there is one
+              action rather than a repeated button on every row. */}
+          <div className="sd-status__foot">
+            <Link href={readiness.steps[0]!.href} className="sd-step__action">
+              Open receptionist settings
+            </Link>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
 export default function Overview() {
-  const [dismissed, setDismissed] = useState(false);
-
   const {
     data: conversations,
-    isLoading: isLoadingConvs,
-    isError: isErrorConvs,
-    refetch,
+    isLoading: convsLoading,
+    isError: convsError,
+    refetch: refetchConversations,
   } = useConversations();
 
-  const { data: me, isLoading: isLoadingMe } = useSession();
+  const { data: session, isLoading: sessionLoading } = useSession();
 
-  const { data: agentConfig } = useQuery<AgentConfig>({
+  // agent-config is partial data: its failure never blanks the page, and it is
+  // never substituted with "nothing is configured".
+  const { data: agentConfigBody, isLoading: configLoading, isError: configError } = useQuery({
     queryKey: ["agent-config"],
-    queryFn: () => apiFetch<AgentConfig>("/receptionist/agent-config"),
+    queryFn: () => apiFetch<unknown>("/receptionist/agent-config"),
   });
 
-  if (isLoadingConvs || isLoadingMe) return <SkeletonState />;
-  if (isErrorConvs) return <ErrorState onRetry={refetch} />;
+  if (sessionLoading || convsLoading || configLoading) return <OverviewSkeleton />;
+  if (!session) return null;
 
-  const convs   = conversations ?? [];
-  const firm    = me?.firm;
-  const isPaid  = firm?.planTier === "paid";
-
-  const thisWeek  = countThisWeek(convs);
-  const hotLeads  = countHot(convs);
-  const activeNow = countActive(convs);
-  const usedCount = me?.conversationCount ?? 0;
-  const capCount  = firm?.trialConversationsLimit ?? 20;
-  const trialLabel = isPaid ? "Pro" : `${usedCount} / ${capCount}`;
-
-  const recent5 = [...convs]
-    .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
-    .slice(0, 5);
-
-  const needsSetup =
-    !dismissed &&
-    agentConfig !== undefined &&
-    !(
-      Boolean(agentConfig.greetingMessage?.trim()) &&
-      Boolean(agentConfig.businessDescription?.trim()) &&
-      (agentConfig.qualifyingQuestions ?? []).length > 0
-    );
+  const convs = conversations ?? [];
+  const config = configError ? null : readAgentConfig(agentConfigBody);
+  const readiness = deriveReadiness(config, convs, !convsError);
+  const isPaid = session.firm.planTier === "paid";
+  const attention = convsError ? [] : buildAttention(convs, isPaid);
+  const figures = buildActivityFigures(convs);
+  const recent = recentConversations(convs);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-y-auto">
-      {/* Page header */}
-      <div className="px-6 pt-6 pb-5 flex-shrink-0">
-        <h1 className="text-lg font-semibold text-slate-900">
-          {greeting()}{firm?.name ? `, ${firm.name}` : ""}
-        </h1>
-        <p className="text-sm text-slate-500 mt-0.5">{todayLabel()}</p>
+    <div className="sd-page sd-enter">
+      <div className="sd-page__head">
+        <h1 className="sd-page__title">Overview</h1>
+        <span className="sd-page__meta">{todayLabel()}</span>
       </div>
 
-      <div className="px-6 pb-6 flex flex-col gap-5">
-        {/* Getting-started checklist */}
-        {needsSetup && agentConfig && (
-          <GettingStartedChecklist
-            agentConfig={agentConfig}
-            dismissed={dismissed}
-            onDismiss={() => setDismissed(true)}
-          />
-        )}
+      <StatusRail readiness={readiness} />
 
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <KpiCard
-            label="Conversations this week"
-            value={thisWeek}
-            icon={MessageSquare}
-            iconBg="bg-indigo-50"
-            iconColor="text-indigo-600"
-            href="/conversations"
-          />
-          <KpiCard
-            label="Hot leads"
-            value={hotLeads}
-            icon={Flame}
-            iconBg="bg-rose-50"
-            iconColor="text-rose-500"
-            href="/conversations"
-          />
-          <KpiCard
-            label="Active now"
-            value={activeNow}
-            icon={Activity}
-            iconBg="bg-emerald-50"
-            iconColor="text-emerald-600"
-            href="/conversations"
-          />
-          <KpiCard
-            label={isPaid ? "Plan" : "Trial usage"}
-            value={trialLabel}
-            icon={BarChart2}
-            iconBg="bg-amber-50"
-            iconColor="text-amber-600"
-            href="/billing"
-          />
-        </div>
+      {attention.length > 0 && (
+        <section className="sd-section" aria-labelledby="sd-attention-title">
+          <h2 className="sd-h2" id="sd-attention-title">
+            Needs your attention
+          </h2>
+          <ul className="sd-attention">
+            {attention.map((item) => (
+              <li className="sd-attention__item" key={item.key}>
+                <AlertTriangle className="sd-attention__icon" aria-hidden="true" />
+                <div className="sd-attention__body">
+                  <span className="sd-attention__title">{item.title}</span>
+                  <p className="sd-attention__detail">{item.detail}</p>
+                </div>
+                <Link href={item.href} className="sd-attention__action">
+                  {item.action}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-        {/* Recent conversations */}
-        {convs.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-10 flex flex-col items-center justify-center gap-3 text-center shadow-sm">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
-              <MessageSquare className="h-6 w-6 text-indigo-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">No conversations yet</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Once callers reach your AI Receptionist, they'll appear here.
-              </p>
-            </div>
+      {convsError ? (
+        <section className="sd-error" role="alert" aria-labelledby="sd-error-title">
+          <AlertTriangle className="sd-error__icon" aria-hidden="true" />
+          <div className="sd-error__body">
+            <span className="sd-error__title" id="sd-error-title">
+              Conversations didn&rsquo;t load
+            </span>
+            <p className="sd-error__detail">
+              The request failed. Nothing was lost — your conversations are still on the server.
+            </p>
           </div>
-        ) : (
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
-              <span className="text-sm font-semibold text-slate-900">Recent conversations</span>
-              <Link href="/conversations">
-                <button className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
-                  View all <ChevronRight className="h-3 w-3" />
-                </button>
-              </Link>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {recent5.map((c) => (
-                <Link key={c.id} href="/conversations">
-                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-slate-900 truncate block">
-                        {c.callerPhone}
-                      </span>
-                    </div>
-                    {c.tier && (
-                      <Badge
-                        className={`${TIER_STYLES[c.tier] ?? ""} border-transparent text-xs flex-shrink-0 rounded-full`}
-                      >
-                        {c.tier}
-                      </Badge>
-                    )}
-                    <span className="text-xs text-slate-400 flex-shrink-0 tabular-nums">
-                      {relativeTime(c.lastMessageAt)}
-                    </span>
-                  </div>
+          <button type="button" className="sd-error__action" onClick={() => refetchConversations()}>
+            Try again
+          </button>
+        </section>
+      ) : (
+        <>
+          <section className="sd-section" aria-labelledby="sd-activity-title">
+            <h2 className="sd-h2 sd-sr" id="sd-activity-title">
+              Conversation activity
+            </h2>
+            <div className="sd-figures">
+              {figures.map((figure) => (
+                <Link
+                  key={figure.key}
+                  href={figure.href}
+                  className="sd-figure"
+                  data-emphasis={figure.emphasis ? "true" : "false"}
+                  data-nonzero={figure.value ? "true" : "false"}
+                >
+                  <span className="sd-figure__value" data-empty={figure.value === null ? "true" : "false"}>
+                    {figure.value === null ? "None yet" : figure.value}
+                  </span>
+                  <span className="sd-figure__label">{figure.label}</span>
                 </Link>
               ))}
             </div>
-          </div>
-        )}
-      </div>
+          </section>
+
+          <section className="sd-section" aria-labelledby="sd-recent-title">
+            <div className="sd-section__head">
+              <h2 className="sd-h2" id="sd-recent-title">
+                Recent conversations
+              </h2>
+              {recent.length > 0 && (
+                <Link href="/conversations" className="sd-link">
+                  View all
+                  <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+
+            {recent.length === 0 ? (
+              <div className="sd-empty">
+                <h3 className="sd-empty__title">No conversations yet</h3>
+                <p className="sd-empty__detail">
+                  When someone texts your business number, the receptionist replies and the
+                  conversation appears here. You can change what it says under Current SMS
+                  Receptionist.
+                </p>
+              </div>
+            ) : (
+              <ul className="sd-list">
+                {recent.map((conversation) => (
+                  <li className="sd-list__item" key={conversation.id}>
+                    <Link href="/conversations" className="sd-row">
+                      <span className="sd-row__who">{conversation.callerPhone}</span>
+                      {conversation.tier && (
+                        <span className="sd-chip" data-tier={conversation.tier}>
+                          {conversation.tier}
+                        </span>
+                      )}
+                      <span className="sd-row__when">
+                        {relativeTime(conversation.lastMessageAt)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
+
+      {/* Product readiness, stated once. The wording is the public site's,
+          character-for-character — see pages/login/readiness.ts. */}
+      <section className="sd-section" aria-labelledby="sd-ladder-title">
+        <h2 className="sd-h2" id="sd-ladder-title">
+          What&rsquo;s available
+        </h2>
+        <ul className="sd-ladder">
+          {CAPABILITY_STATUS.map(({ capability, tier }) => (
+            <li className="sd-ladder__item" key={capability} data-tier={tier}>
+              <span className="sd-ladder__name">{capability}</span>
+              <span className="sd-tier" data-tier={tier}>
+                {READINESS[tier].label}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

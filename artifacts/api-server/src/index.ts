@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
 import { getStripeSync } from "./lib/stripeClient.js";
+import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
 
 async function runStripeMigrations(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];
@@ -53,7 +54,16 @@ app.listen(port, (err) => {
 
   // Run slow Stripe webhook registration/backfill in the background so it
   // doesn't delay the HTTP port opening (and failing deploy health checks).
-  initStripeWebhookAndSync().catch((err) => {
-    logger.error({ err }, "Error initializing Stripe webhook/sync");
+  //
+  // AR-001G: this is now opt-in. Registering a managed webhook and starting a
+  // backfill are external mutations of a Stripe account, and they must not
+  // happen merely because a connector happens to be attached to whatever
+  // environment the server booted in. `runStripeMigrations()` above is a
+  // different thing entirely — an internal database migration that startup
+  // requires — and is deliberately left outside this flag.
+  startStripeBootSync({
+    isEnabled: () => isStripeBootSyncEnabled(process.env),
+    runBootSync: initStripeWebhookAndSync,
+    logger,
   });
 });

@@ -1,363 +1,373 @@
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
+/**
+ * Frontend V2 Phase 12 — the Billing workspace.
+ *
+ * Mounted at `ROUTES.billing` (`/billing`, base-relative) inside the Phase 7
+ * `DashboardShell`, whose navigation rail, `<main>` landmark, skip link,
+ * palette, focus ring and motion system it inherits without adding a second
+ * design system or any chrome of its own.
+ *
+ * ── Product classification ────────────────────────────────────────────────
+ * A read-only plan-and-usage record with **one** genuine, conditional,
+ * financially significant action. Everything on the page except the Upgrade
+ * button is display; the button issues a real `POST` to a real endpoint that,
+ * in a configured deployment, creates a live Stripe Checkout session and
+ * navigates the browser to it. It is not accurate to call this route read-only.
+ *
+ * ── Requests: the shell's session, and nothing else ───────────────────────
+ * `useSession()` reads the **same** React Query entry the shell has already
+ * fetched (`SESSION_KEY`, `GET /api/receptionist/auth/me`, `staleTime: 60_000`).
+ * Mounting a second observer on a resolved, fresh entry issues no request — the
+ * pattern Overview and Settings already use. This page adds no billing GET, no
+ * billing-status read, no price lookup, no portal call, no query of its own, no
+ * refetch interval, no prefetch and no polling. Switching between the Plan and
+ * Usage views is local state and causes no request. Nothing here prefetches
+ * Stripe or any other provider. The only request this route can cause is the
+ * Checkout `POST`, and only after the operator activates the button.
+ *
+ * Authentication, the loading gate and the redirect on an expired session are
+ * the shell's, unchanged: `AppShell` renders its own boot state while the
+ * session is in flight and navigates to `/login` on error, so no authenticated
+ * content can paint before authorisation resolves. The local loading branch
+ * below is a second belt on the same trousers, not a replacement.
+ *
+ * ── One deliberate change to prior behaviour ──────────────────────────────
+ * The previous page installed a `setInterval` that invalidated the session five
+ * times at two-second spacing whenever it was loaded with `?upgraded=1`, to
+ * paper over Stripe webhook latency on the return trip. That is a poll, and a
+ * poll is the one thing this route may not do. It is also unnecessary: the
+ * return from Stripe is a full document load, so the session is fetched fresh
+ * by the shell on arrival regardless. The interval and its `history.replaceState`
+ * cleanup are both gone; no timer of any kind remains on this route.
+ *
+ * ── What this replaces ────────────────────────────────────────────────────
+ * A page built largely from claims with nothing behind them: a product named
+ * "Pro", a four-item benefit grid ("Unlimited conversations", "No trial cap",
+ * "Full conversation history", "Priority support"), a "priority AI response"
+ * promise, a "Secured by Stripe" badge, a support address that appears nowhere
+ * else in this repository, and — past 80% usage — the assertion that the
+ * operator should upgrade "to keep receiving leads", which inverts what the
+ * backend actually does. Every claim on this route now comes from
+ * `billing/billingContract.ts`, which owns each string and each rule and
+ * documents the evidence for both.
+ */
 
-import { useSession, SESSION_KEY } from "@/hooks/useSession";
-import type { SessionFirm } from "@/hooks/useSession";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "@/hooks/useSession";
 import {
-  CreditCard,
-  CheckCircle2,
-  ArrowRight,
-  Sparkles,
-  Clock,
-  Star,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
+  CHECKOUT_PATH,
+  CHECKOUT_TIMEOUT_MS,
+  canUpgrade,
+  checkoutCopy,
+  checkoutLabel,
+  checkoutUrl,
+  isNotConfigured,
+  LOADING_MESSAGE,
+  METER_LABEL,
+  nextView,
+  pageCopy,
+  planFields,
+  planLabel,
+  usageCopy,
+  usageModel,
+  views,
+  type CheckoutState,
+  type UsageModel,
+  type ViewId,
+} from "@/pages/billing/billingContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-billing.css";
 
 export default function Billing() {
   const { data: me, isLoading } = useSession();
-  const [upgrading, setUpgrading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState("");
-  const [notConfigured, setNotConfigured] = useState(false);
-  const qc = useQueryClient();
 
+  const [view, setView] = useState<ViewId>("plan");
+  const [checkout, setCheckout] = useState<CheckoutState>("idle");
+
+  const upgradeRef = useRef<HTMLButtonElement | null>(null);
+  const tabRefs = useRef(new Map<ViewId, HTMLButtonElement | null>());
+  // Survives unmount: a successful Checkout navigates away, and a state update
+  // on a page that is already gone is a warning nobody can act on.
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+
+  // The way out after a failure is the control that failed, so focus returns to
+  // it — a keyboard user must never have to hunt for the retry. Focus moves
+  // only on a transition into a failed state, never on an unrelated re-render,
+  // so it cannot be taken from somewhere the operator has since moved to.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("upgraded") !== "1") return;
-    window.history.replaceState({}, "", window.location.pathname);
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
-      await qc.invalidateQueries({ queryKey: SESSION_KEY });
-      if (attempts >= 5) clearInterval(poll);
-    }, 2000);
-    return () => clearInterval(poll);
-  }, [qc]);
-
-  const handleUpgrade = async () => {
-    setUpgrading(true);
-    setUpgradeError("");
-    setNotConfigured(false);
-    try {
-      const res = await fetch("/api/receptionist/billing/create-checkout-session", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json() as { url?: string; error?: string };
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error?.toLowerCase().includes("not configured")) {
-        setNotConfigured(true);
-      } else {
-        setUpgradeError(data.error ?? "Failed to start checkout");
-      }
-    } catch {
-      setUpgradeError("Failed to start checkout. Please try again.");
-    } finally {
-      setUpgrading(false);
+    if (checkout === "failed" || checkout === "unavailable") {
+      upgradeRef.current?.focus();
     }
+  }, [checkout]);
+
+  /**
+   * The single Checkout mutation. Method, path, credentials and response
+   * handling are the protected contract, unchanged.
+   *
+   * Exactly one POST leaves the browser per activation: the pending guard
+   * returns early on a second click, and the button is disabled for the
+   * duration as well, so neither a double click nor a repeated keyboard
+   * activation can start a second session. The wait is bounded, so a request
+   * that never answers ends in a stated failure rather than a permanent
+   * spinner. Nothing calls this on mount, on focus, on animation or on a view
+   * change — it is reachable only from the button's own activation.
+   */
+  const handleUpgrade = useCallback(async () => {
+    if (checkout === "pending") return;
+    setCheckout("pending");
+
+    try {
+      const res = await Promise.race([
+        fetch(CHECKOUT_PATH, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), CHECKOUT_TIMEOUT_MS),
+        ),
+      ]);
+
+      const data = (await res.json()) as { url?: unknown; error?: unknown };
+      const url = checkoutUrl(data.url);
+
+      if (url !== null) {
+        // The established contract: the server returns Stripe's session URL and
+        // the browser goes there. No iframe, no modal, no popup, no interstitial
+        // screen of our own invention. Pending is deliberately left in place —
+        // the document is navigating away, and clearing it would offer a second
+        // activation during the hand-off.
+        window.location.href = url;
+        return;
+      }
+
+      if (!alive.current) return;
+      const error = typeof data.error === "string" ? data.error : null;
+      setCheckout(isNotConfigured(error) ? "unavailable" : "failed");
+    } catch {
+      // A transport failure, a timeout, or a response that was not JSON. The
+      // browser cannot tell these apart, so the page does not pretend to.
+      if (!alive.current) return;
+      setCheckout("failed");
+    }
+  }, [checkout]);
+
+  const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const all = views();
+    let target: ViewId | null = null;
+    if (event.key === "ArrowRight") target = nextView(view, 1);
+    else if (event.key === "ArrowLeft") target = nextView(view, -1);
+    else if (event.key === "Home") target = all[0]!.id;
+    else if (event.key === "End") target = all[all.length - 1]!.id;
+    if (target === null) return;
+    event.preventDefault();
+    setView(target);
+    tabRefs.current.get(target)?.focus();
   };
 
-  if (isLoading || !me) {
+  const page = pageCopy();
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <RefreshCw className="h-5 w-5 animate-spin text-slate-400" />
+      <div className="sb-page">
+        <p className="sb-loading" role="status" aria-live="polite">
+          {LOADING_MESSAGE}
+        </p>
       </div>
     );
   }
 
-  const { firm, conversationCount } = me;
-  const isPaid = firm.planTier === "paid";
-  const trialLimit = firm.trialConversationsLimit;
-  const usagePct = Math.min(100, Math.round((conversationCount / trialLimit) * 100));
+  // The shell has already redirected on a session error. Rendering nothing here
+  // guarantees no authenticated shape appears in the frame before it does.
+  if (!me) return null;
 
-  return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200">
-        <h1 className="text-lg font-semibold text-slate-900">Billing</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Manage your plan and usage</p>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="plan" className="h-full flex flex-col">
-          <div className="px-6 border-b border-slate-200 bg-white">
-            <TabsList className="h-10 bg-transparent border-0 p-0 gap-6">
-              <TabsTrigger
-                value="plan"
-                className="h-10 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 data-[state=active]:bg-transparent text-slate-500 text-sm font-medium"
-              >
-                Plan
-              </TabsTrigger>
-              <TabsTrigger
-                value="usage"
-                className="h-10 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 data-[state=active]:bg-transparent text-slate-500 text-sm font-medium"
-              >
-                Usage
-              </TabsTrigger>
-            </TabsList>
-          </div>
-          <div className="flex-1 overflow-auto">
-            <TabsContent value="plan" className="mt-0">
-              <PlanTab
-                firm={firm}
-                isPaid={isPaid}
-                upgrading={upgrading}
-                upgradeError={upgradeError}
-                notConfigured={notConfigured}
-                onUpgrade={handleUpgrade}
-              />
-            </TabsContent>
-            <TabsContent value="usage" className="mt-0">
-              <UsageTab
-                conversationCount={conversationCount}
-                trialLimit={trialLimit}
-                usagePct={usagePct}
-                isPaid={isPaid}
-                onUpgrade={handleUpgrade}
-                upgrading={upgrading}
-              />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
-    </div>
+  const model = usageModel(
+    me.firm.planTier,
+    me.conversationCount,
+    me.firm.trialConversationsLimit,
   );
-}
+  const label = planLabel(me.firm.planTier);
+  const eligible = canUpgrade(me.firm.planTier);
 
-function PlanTab({
-  firm,
-  isPaid,
-  upgrading,
-  upgradeError,
-  notConfigured,
-  onUpgrade,
-}: {
-  firm: SessionFirm;
-  isPaid: boolean;
-  upgrading: boolean;
-  upgradeError: string;
-  notConfigured: boolean;
-  onUpgrade: () => void;
-}) {
   return (
-    <div className="p-6 max-w-2xl space-y-5">
-      {isPaid ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-emerald-900">Active Subscription</div>
-            <p className="text-xs text-emerald-700 mt-0.5">
-              Your AI Receptionist is fully active with no conversation limits.
-            </p>
-          </div>
+    <div className="sb-page sd-enter">
+      <div className="sd-page__head">
+        <div>
+          <span className="sd-eyebrow">{page.eyebrow}</span>
+          <h1 className="sd-page__title">{page.title}</h1>
+          <p className="sb-lede">{page.detail}</p>
         </div>
-      ) : (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-            <Clock className="h-5 w-5 text-amber-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-sm font-semibold text-amber-900">Free Trial</span>
-              <Badge className="bg-amber-200 text-amber-800 border-transparent text-xs">
-                Active
-              </Badge>
-            </div>
-            <p className="text-xs text-amber-700">
-              You're on the free trial — upgrade to remove the conversation limit.
-            </p>
-          </div>
-        </div>
-      )}
+      </div>
 
-      {!isPaid && (
-        <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="h-5 w-5 text-indigo-600" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-indigo-900">Upgrade to Pro</h3>
-              <p className="text-xs text-indigo-700 mt-0.5">
-                Unlimited conversations, priority AI response, full history
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {[
-              "Unlimited conversations",
-              "No trial cap",
-              "Full conversation history",
-              "Priority support",
-            ].map((feat) => (
-              <div key={feat} className="flex items-center gap-1.5 text-xs text-indigo-700">
-                <CheckCircle2 className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />
-                {feat}
-              </div>
-            ))}
-          </div>
-          {notConfigured && (
-            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 flex items-start gap-2.5">
-              <Clock className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-semibold text-amber-900">Billing isn&apos;t live yet</p>
-                <p className="text-xs text-amber-700 mt-0.5">
-                  Contact us at{" "}
-                  <a
-                    href="mailto:hello@sitemint.com"
-                    className="underline hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded"
-                  >
-                    hello@sitemint.com
-                  </a>{" "}
-                  to upgrade your account.
-                </p>
-              </div>
-            </div>
-          )}
-          {upgradeError && !notConfigured && (
-            <p className="text-xs text-rose-600 mb-3 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-              {upgradeError}
-            </p>
-          )}
-          <Button
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold h-10 gap-1.5"
-            onClick={onUpgrade}
-            disabled={upgrading}
+      {/* Two local views over the same session values. No route change, no
+          request, no content that is reachable only in one of them. */}
+      <div className="sb-views" role="tablist" aria-label="Billing views">
+        {views().map((item) => (
+          <button
+            key={item.id}
+            ref={(node) => { tabRefs.current.set(item.id, node); }}
+            type="button"
+            role="tab"
+            id={`sb-tab-${item.id}`}
+            aria-selected={view === item.id}
+            aria-controls={`sb-panel-${item.id}`}
+            tabIndex={view === item.id ? 0 : -1}
+            className="sb-view"
+            onClick={() => setView(item.id)}
+            onKeyDown={onTabKeyDown}
           >
-            {upgrading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Redirecting to Stripe…
-              </>
-            ) : (
-              <>
-                Upgrade Now <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </Button>
-          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 mt-3">
-            <CreditCard className="h-3 w-3" /> Secured by Stripe
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Account Details</h3>
-        <div className="space-y-3">
-          <DetailRow label="Business" value={firm.name} />
-          <DetailRow label="Email" value={firm.email ?? "—"} />
-          <DetailRow label="Plan" value={isPaid ? "Pro (Paid)" : "Free Trial"} />
-          <DetailRow
-            label="Trial limit"
-            value={`${firm.trialConversationsLimit} conversations`}
-          />
-          <DetailRow
-            label="Member since"
-            value={new Date(firm.createdAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
-    </div>
-  );
-}
-
-function UsageTab({
-  conversationCount,
-  trialLimit,
-  usagePct,
-  isPaid,
-  onUpgrade,
-  upgrading,
-}: {
-  conversationCount: number;
-  trialLimit: number;
-  usagePct: number;
-  isPaid: boolean;
-  onUpgrade: () => void;
-  upgrading: boolean;
-}) {
-  const isHigh = usagePct >= 80;
-
-  return (
-    <div className="p-6 max-w-xl">
-      <div className="mb-5">
-        <h2 className="text-sm font-semibold text-slate-900">Conversation Usage</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {isPaid
-            ? "Unlimited — you are on a paid plan"
-            : `Free trial: ${trialLimit} conversations included`}
-        </p>
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-slate-900">Conversations Used</span>
-          <span
-            className={`text-xs font-medium ${
-              isPaid ? "text-emerald-600" : isHigh ? "text-rose-600" : "text-slate-500"
-            }`}
-          >
-            {isPaid
-              ? `${conversationCount} (unlimited)`
-              : `${conversationCount} / ${trialLimit}`}
-          </span>
-        </div>
-        <Progress
-          value={isPaid ? 100 : usagePct}
-          className={`h-2 ${
-            isPaid
-              ? "bg-emerald-100 [&>div]:bg-emerald-500"
-              : isHigh
-              ? "bg-rose-100 [&>div]:bg-rose-500"
-              : "bg-slate-100 [&>div]:bg-indigo-500"
-          }`}
-        />
-        {isHigh && !isPaid && (
-          <p className="text-[10px] text-rose-500 mt-1 font-medium">
-            Approaching trial limit — upgrade to keep receiving leads
-          </p>
+      <div
+        role="tabpanel"
+        id={`sb-panel-${view}`}
+        aria-labelledby={`sb-tab-${view}`}
+        tabIndex={0}
+        className="sb-panel"
+      >
+        {view === "plan" ? (
+          <PlanView
+            model={model}
+            label={label}
+            eligible={eligible}
+            checkout={checkout}
+            onUpgrade={handleUpgrade}
+            upgradeRef={upgradeRef}
+          />
+        ) : (
+          <UsageView model={model} />
         )}
       </div>
-
-      {!isPaid && (
-        <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50 flex items-center gap-4">
-          <Star className="h-5 w-5 text-indigo-500 flex-shrink-0" />
-          <div className="flex-1 text-xs">
-            <div className="font-semibold text-indigo-900 mb-0.5">Remove the limit</div>
-            <div className="text-indigo-700">Upgrade to Pro for unlimited conversations.</div>
-          </div>
-          <Button
-            size="sm"
-            className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white flex-shrink-0"
-            onClick={onUpgrade}
-            disabled={upgrading}
-          >
-            {upgrading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              "Upgrade"
-            )}
-          </Button>
-        </div>
-      )}
     </div>
+  );
+}
+
+/* ── Plan ─────────────────────────────────────────────────────────────────
+   The verified record, then the one action — and the action only where the
+   session verifies the account is on a trial. A paid plan has no portal to be
+   sent to, and an unrecognised tier is not assumed to be upgradeable. */
+
+function PlanView({
+  model,
+  label,
+  eligible,
+  checkout,
+  onUpgrade,
+  upgradeRef,
+}: {
+  model: UsageModel;
+  label: string | null;
+  eligible: boolean;
+  checkout: CheckoutState;
+  onUpgrade: () => void;
+  upgradeRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const copy = checkoutCopy();
+  const fields = planFields(label, model);
+
+  return (
+    <>
+      {/* A description list, not a form: there is nothing to submit here, and a
+          disabled input would imply there was.
+
+          Labelled by the tab rather than by a heading of its own: the selected
+          tab already reads "Plan" directly above these rows, and repeating the
+          word as an h2 one line below it was chrome that named nothing new. */}
+      <section className="sd-section" aria-label="Plan">
+        <dl className="sb-fields">
+          {fields.map((field) => (
+            <div className="sb-fields__row" key={field.label}>
+              <dt className="sb-fields__label">{field.label}</dt>
+              <dd className="sb-fields__value">{field.value}</dd>
+            </div>
+          ))}
+        </dl>
+        {model.kind === "paid" && (
+          <p className="sb-note">{usageCopy(model).detail}</p>
+        )}
+      </section>
+
+      {eligible && (
+        <section className="sd-section" aria-labelledby="sb-upgrade-title">
+          <div className="sd-section__head">
+            <h2 className="sd-h2" id="sb-upgrade-title">{copy.heading}</h2>
+          </div>
+          <div className="sb-upgrade">
+            <p className="sb-upgrade__detail">{copy.detail}</p>
+            <button
+              ref={upgradeRef}
+              type="button"
+              className="sb-upgrade__action"
+              onClick={onUpgrade}
+              disabled={checkout === "pending"}
+              aria-busy={checkout === "pending"}
+            >
+              {checkoutLabel(checkout)}
+            </button>
+          </div>
+
+          {/* Announced once, on the transition into the state. Distinct
+              headings, because "not configured here" and "the request failed"
+              are different facts and lead to different expectations. */}
+          {checkout === "unavailable" && (
+            <div className="sb-result" data-state="attention" role="alert">
+              <p className="sb-result__title">{copy.unavailableTitle}</p>
+              <p className="sb-result__detail">{copy.unavailableDetail}</p>
+            </div>
+          )}
+          {checkout === "failed" && (
+            <div className="sb-result" data-state="error" role="alert">
+              <p className="sb-result__title">{copy.errorTitle}</p>
+              <p className="sb-result__detail">{copy.errorDetail}</p>
+            </div>
+          )}
+        </section>
+      )}
+    </>
+  );
+}
+
+/* ── Usage ────────────────────────────────────────────────────────────────
+   One figure, one measure, one sentence. The measure appears only where there
+   is a real denominator to measure against; where there is not, the count is
+   shown alone rather than beside an invented percentage. */
+
+function UsageView({ model }: { model: UsageModel }) {
+  const copy = usageCopy(model);
+
+  return (
+    <section className="sd-section" aria-labelledby="sb-usage-title">
+      <div className="sd-section__head">
+        <h2 className="sd-h2" id="sb-usage-title">Conversation usage</h2>
+      </div>
+
+      <div className="sb-usage" data-level={model.kind === "measured" ? model.level : "none"}>
+        <p className="sb-usage__figure">{copy.figure}</p>
+
+        {model.kind === "measured" && (
+          <div
+            className="sb-meter"
+            role="progressbar"
+            aria-label={METER_LABEL}
+            aria-valuemin={0}
+            aria-valuemax={model.limit}
+            /* Clamped so the value stays inside its own range; the exact
+               counts travel in `aria-valuetext` and in the figure above, so
+               an over-limit account is never under-reported. */
+            aria-valuenow={Math.min(model.used, model.limit)}
+            aria-valuetext={`${copy.figure} conversations`}
+          >
+            <span className="sb-meter__fill" style={{ width: `${model.fill}%` }} />
+          </div>
+        )}
+
+        {/* The state in words. Colour is never the only carrier. */}
+        {copy.status !== null && <p className="sb-usage__status">{copy.status}</p>}
+        <p className="sb-usage__detail">{copy.detail}</p>
+      </div>
+    </section>
   );
 }
