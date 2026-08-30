@@ -55,3 +55,19 @@ throws at import without DATABASE_URL) + lazy sweep collaborators.
 | New env contract (inert) | `VOICE_TOOLS_ATTACH_ENABLED` (requires the P2 server attachment when true) |
 | Deferred live gate | Creating/attaching live Vapi tools (owner-gated activation) |
 | Residual risks | Reschedule uses list-then-find for the old request (bounded at 200 rows) pending a direct lookup; tool result replay stores results inside the event payload (documented key `siteMintToolResults`) |
+
+P3 addendum: PR #8 merged as `16ed1ac2f5d1fdb0d369fb22e9518d1a7ac19924`.
+In-phase fix `2ee3017`: the test fixture's missing `...overrides` spread —
+caught by CI against real dispatcher output.
+
+## P4 — Per-firm calendar truth (2026-08-30)
+
+| Item | Value |
+| --- | --- |
+| PR | phase/p4-calendar (merge SHA recorded in the P5 addendum) |
+| Migration | scheduling `0001_black_reavers` — `scheduling_calendar_connections` + `scheduling_calendar_oauth_states`; rollback at `drizzle/scheduling-rollback/0001_black_reavers_rollback.sql`. Design correction mid-phase: an initially added `calendar_event_id` column duplicated the existing `providerEventId`/`providerCalendarId` + booked-CHECK invariant and was reverted before commit — the sync layer builds on the schema's own invariant instead. |
+| New files | `lib/calendar/{tokenCrypto,googleOAuth,calendarConnectionsRepository,PerFirmGoogleFreeBusyProvider,eventWriter,calendarEventSync,calendarIntegration.test}.ts`, `routes/receptionistCalendar.ts`, `docs/backend-program/P4_SPEC.md` |
+| Modified | calendar factory (per-firm wrapper over the workspace-level selection — inert fall-through), routes/index.ts, voiceIssueService (+`calendar_revoked`, `calendar_sync_failed`), drizzle.scheduling.config.ts (`path.sep` normalization so generate works on Windows; POSIX no-op) |
+| New env contract (all inert) | `CALENDAR_CONNECT_ENABLED`, `CALENDAR_WRITE_ENABLED`, `CALENDAR_TOKEN_KEY` (32-byte base64), `GOOGLE_OAUTH_CLIENT_ID`/`_CLIENT_SECRET`/`_REDIRECT_URI` |
+| Deferred live gate | Creating Google OAuth credentials, any consent, any real token/freebusy/event request; flipping either calendar flag (owner-gated) |
+| Residual risks | Approve→booked is exposed as a service primitive only (no route yet — P8 admin/approve flow); reconcile sweep is invocable but not yet on an interval; access-token refresh in the event writer reads env config directly (documented) |

@@ -16,3 +16,4 @@
 // remove it.
 
 export * from "../scheduling";
+export * from "../schedulingCalendar";

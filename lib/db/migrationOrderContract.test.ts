@@ -634,13 +634,23 @@ const schedulingTables = tablesCreatedBy("scheduling");
 const domainTables = [...voiceTables, ...discoveryTables, ...schedulingTables];
 
 check(
-  "the committed migrations create exactly ten domain tables",
-  domainTables.length === 10,
+  // P4 raised this from ten: scheduling 0001 adds calendar_connections
+  // and calendar_oauth_states. Update this pin ONLY alongside a reviewed
+  // migration that changes the inventory.
+  "the committed migrations create exactly twelve domain tables",
+  domainTables.length === 12,
   domainTables.join(","),
 );
 check(
-  "the scheduling migration creates exactly five scheduling_* tables",
-  schedulingTables.length === 5 && schedulingTables.every((t) => t.startsWith("scheduling_")),
+  "the scheduling migrations create exactly seven scheduling_* tables",
+  schedulingTables.length === 7 && schedulingTables.every((t) => t.startsWith("scheduling_")),
+  schedulingTables.join(","),
+);
+check(
+  "the scheduling calendar tables from P4 are present",
+  ["scheduling_calendar_connections", "scheduling_calendar_oauth_states"].every((t) =>
+    schedulingTables.includes(t),
+  ),
   schedulingTables.join(","),
 );
 check(

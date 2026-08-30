@@ -476,7 +476,11 @@ await withDisposableDb("zero-replay-after-baseline", async (url) => {
   );
 
   const legacyAfter = await query(url, `SELECT count(*)::int n FROM "drizzle"."__drizzle_migrations"`);
-  check("the legacy journal still holds its five rows", legacyAfter.rows[0].n === 5, String(legacyAfter.rows[0].n));
+  check(
+    "the legacy journal still holds one row per committed migration",
+    legacyAfter.rows[0].n === readAllExpectedMigrations().length,
+    String(legacyAfter.rows[0].n),
+  ); // derived, so a reviewed new migration cannot silently break this proof
 });
 
 console.log(`\n${passed} passed, ${failed} failed.`);
