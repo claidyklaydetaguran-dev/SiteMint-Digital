@@ -165,7 +165,8 @@ export async function validateEnvContract(
     await probe(findings, "VOICE_TOOLS_ATTACH_ENABLED", async () => {
       const { loadVoiceServerConfigFromEnv } = await import("./voicePublishing/serverConfig.js");
       const { loadVoiceToolsConfigFromEnv } = await import("./voicePublishing/toolsConfig.js");
-      loadVoiceToolsConfigFromEnv(loadVoiceServerConfigFromEnv(env));
+      // Both loaders read the PROVIDED env — the flag default is process.env.
+      loadVoiceToolsConfigFromEnv(loadVoiceServerConfigFromEnv(env), env);
     });
   }
 
