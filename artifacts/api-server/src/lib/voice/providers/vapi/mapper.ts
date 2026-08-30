@@ -70,6 +70,16 @@ export function buildVapiAssistantRequestBody(
     // carries it (VOICE_WEBHOOK_ATTACH_ENABLED at the publish/sync layer).
     ...(config.server !== undefined ? { server: { url: config.server.url, secret: config.server.secret } } : {}),
     ...(config.tools !== undefined ? { tools: config.tools } : {}),
+    ...(config.callPolicy?.silenceTimeoutSeconds !== undefined
+      ? { silenceTimeoutSeconds: config.callPolicy.silenceTimeoutSeconds }
+      : {}),
+    ...(config.callPolicy?.maxDurationSeconds !== undefined
+      ? { maxDurationSeconds: config.callPolicy.maxDurationSeconds }
+      : {}),
+    ...(config.callPolicy?.endCallMessage !== undefined ? { endCallMessage: config.callPolicy.endCallMessage } : {}),
+    ...(config.callPolicy?.voicemailMessage !== undefined
+      ? { voicemailMessage: config.callPolicy.voicemailMessage }
+      : {}),
   };
 }
 

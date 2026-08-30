@@ -26,6 +26,7 @@ import {
 import { isVoicePublishEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
 import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
+import { loadVoiceCallPolicyFromEnv, type VoiceCallPolicy } from "./callPolicyConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
@@ -88,6 +89,8 @@ export interface PublishServiceDependencies {
   loadServerConfig?: () => VoiceServerConfig | null;
   /** P3: optional tools attachment loader; null (feature off) sends no `tools`. Defaults to the env loader when omitted. */
   loadToolsConfig?: (serverConfig: VoiceServerConfig | null) => JsonObject[] | null;
+  /** P6: optional call-behavior policy; null (default) sends nothing. */
+  loadCallPolicy?: () => VoiceCallPolicy | null;
   /** Explicit, lazy production-provider construction. No network request occurs during construction. */
   createProvider: () => VoiceProvider;
   repository: PublishRepositoryDependency;
@@ -108,6 +111,7 @@ export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
   loadServerConfig: loadVoiceServerConfigFromEnv,
   loadToolsConfig: loadVoiceToolsConfigFromEnv,
+  loadCallPolicy: loadVoiceCallPolicyFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -295,6 +299,7 @@ function buildProviderInput(
   catalog: RuntimeCatalog,
   serverConfig: VoiceServerConfig | null,
   toolsConfig: JsonObject[] | null,
+  callPolicy: VoiceCallPolicy | null,
 ): { input: VoiceAssistantInput; extracted: ExtractedAssistantPublishConfig } {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
   const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
@@ -321,6 +326,7 @@ function buildProviderInput(
     systemInstructions: extracted.systemInstructions,
     ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
     ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
+    ...(callPolicy !== null ? { callPolicy: callPolicy as unknown as JsonObject } : {}),
   };
 
   return { input: { name, config }, extracted };
@@ -383,6 +389,13 @@ export async function publishAssistant(
     return failure("publish_disabled");
   }
 
+  let callPolicy: VoiceCallPolicy | null;
+  try {
+    callPolicy = (deps.loadCallPolicy ?? loadVoiceCallPolicyFromEnv)();
+  } catch {
+    return failure("publish_disabled");
+  }
+
   let provider: VoiceProvider;
   try {
     provider = deps.createProvider();
@@ -400,7 +413,7 @@ export async function publishAssistant(
   // STEP 3/4 — claimed row as source of truth; build provider input.
   let providerInput: VoiceAssistantInput;
   try {
-    ({ input: providerInput } = buildProviderInput(assistant, catalog, serverConfig, toolsConfig));
+    ({ input: providerInput } = buildProviderInput(assistant, catalog, serverConfig, toolsConfig, callPolicy));
   } catch (err) {
     const code: PersistableFailureCode =
       err instanceof PublishFoundationError && err.code === "UNSUPPORTED_PRESET" ? "unsupported_preset" : "assistant_config_invalid";

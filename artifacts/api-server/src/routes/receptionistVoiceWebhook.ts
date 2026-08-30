@@ -37,6 +37,7 @@ import {
 import { buildVapiEventKey } from "../lib/voice/webhooks/eventKey.js";
 import { dispatchToolCalls } from "../lib/voice/tools/toolDispatcher.js";
 import { openVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
+import { resolveAssistantForNumber, resolveTransferDestination, scanEmergencyLanguage } from "../lib/voiceNumbers/numberService.js";
 
 const router = Router();
 
@@ -91,6 +92,38 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
   }
   const { message } = parsed;
 
+  // P6: assistant-request precedes assistant attribution by definition —
+  // the whole point is telling the provider WHICH assistant answers this
+  // number. Tenant identity comes from our own number inventory row.
+  if (message.type === "assistant-request") {
+    const providerNumberId = message.call.phoneNumberId;
+    if (!providerNumberId) {
+      res.status(200).json({ error: "This number is not in service." });
+      return;
+    }
+    try {
+      const resolution = await resolveAssistantForNumber(providerNumberId);
+      if (resolution.ok) {
+        await storeVapiWebhookEvent(resolution.firmId, message);
+        req.log.info({ firmId: resolution.firmId, callId: message.call.id }, "[voice webhook] assistant-request routed");
+        // The provider assistant id goes back to the PROVIDER itself here —
+        // never to a client. This is the inbound-routing answer.
+        res.status(200).json({ assistantId: resolution.providerAssistantId });
+      } else {
+        req.log.warn({ reason: resolution.reason, callId: message.call.id }, "[voice webhook] assistant-request unroutable");
+        const spoken =
+          resolution.reason === "paused"
+            ? "This number is temporarily unavailable. Please try again later."
+            : "This number is not in service.";
+        res.status(200).json({ error: spoken });
+      }
+    } catch (err) {
+      req.log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[voice webhook] assistant-request failed");
+      res.status(200).json({ error: "This number is temporarily unavailable. Please try again later." });
+    }
+    return;
+  }
+
   if (!message.call.assistantId) {
     // We can't safely associate this event with a firm. Acknowledge so Vapi
     // doesn't retry indefinitely, but do not persist anything.
@@ -108,6 +141,38 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
       "[voice webhook] event for an assistant not known to this application",
     );
     res.status(200).json({ received: true });
+    return;
+  }
+
+  // P6: transfer-destination-request — in-call escalation routing against
+  // the firm's approved destination list with the business-hours guard.
+  // Failure is a spoken outcome, never a dropped call.
+  if (message.type === "transfer-destination-request") {
+    try {
+      await storeVapiWebhookEvent(firmId, message);
+      const resolution = await resolveTransferDestination(firmId);
+      if (resolution.ok) {
+        req.log.info({ firmId, callId: message.call.id }, "[voice webhook] transfer destination resolved");
+        res.status(200).json({
+          destination: {
+            type: "number",
+            number: resolution.destinationE164,
+            message: `Connecting you to ${resolution.label}.`,
+          },
+        });
+      } else {
+        req.log.info({ firmId, reason: resolution.reason }, "[voice webhook] transfer unavailable");
+        res.status(200).json({
+          error:
+            resolution.reason === "after_hours"
+              ? "The office is closed right now, but I can take a detailed message."
+              : "No one is available for a transfer right now, but I can take a detailed message.",
+        });
+      }
+    } catch (err) {
+      req.log.error({ firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[voice webhook] transfer resolution failed");
+      res.status(200).json({ error: "I could not reach anyone to transfer you, but I can take a detailed message." });
+    }
     return;
   }
 
@@ -155,6 +220,25 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
     // P5: an end-of-call report also links the caller to a firm-scoped
     // voice contact (idempotent; conflict-driven). Best-effort: identity
     // must never turn a stored event into a retry loop.
+    // P6: flag emergency language for immediate operator attention. A
+    // conservative keyword scan — the assistant's own prompt handles the
+    // in-call "hang up and dial 911" instruction; this guarantees a human
+    // sees that it happened.
+    if (message.type === "end-of-call-report") {
+      const scan = scanEmergencyLanguage(message.transcript);
+      if (scan.flagged) {
+        try {
+          await openVoiceIssue({
+            firmId,
+            level: "critical",
+            code: "emergency_language_detected",
+            message: "A call transcript matched emergency language; review immediately.",
+            dedupeKey: message.call.id,
+            context: { callId: message.call.id },
+          });
+        } catch { /* flagging is best-effort */ }
+      }
+    }
     if (message.type === "end-of-call-report" && message.call.customerNumber) {
       try {
         const { linkCallToContact } = await import("../lib/voiceContacts/contactLinker.js");

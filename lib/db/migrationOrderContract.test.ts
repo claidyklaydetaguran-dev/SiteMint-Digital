@@ -637,8 +637,8 @@ check(
   // P4 raised this from ten: scheduling 0001 adds calendar_connections
   // and calendar_oauth_states. Update this pin ONLY alongside a reviewed
   // migration that changes the inventory.
-  "the committed migrations create exactly sixteen domain tables",
-  domainTables.length === 16,
+  "the committed migrations create exactly eighteen domain tables",
+  domainTables.length === 18,
   domainTables.join(","),
 );
 check(

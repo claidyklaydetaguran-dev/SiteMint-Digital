@@ -46,6 +46,13 @@ export interface VapiAssistantRuntimeConfig {
   };
   /** P3: closed-catalog tool definitions, validated structurally below. */
   tools?: JsonObject[];
+  /** P6: server-owned call behavior (silence/max-duration/end/voicemail lines). */
+  callPolicy?: {
+    silenceTimeoutSeconds?: number;
+    maxDurationSeconds?: number;
+    endCallMessage?: string;
+    voicemailMessage?: string;
+  };
 }
 
 /** Vapi's documented assistant name limit. */
@@ -60,7 +67,9 @@ const TOP_LEVEL_KEYS = new Set([
   "systemInstructions",
   "server",
   "tools",
+  "callPolicy",
 ]);
+const CALL_POLICY_KEYS = new Set(["silenceTimeoutSeconds", "maxDurationSeconds", "endCallMessage", "voicemailMessage"]);
 const SERVER_KEYS = new Set(["url", "secret"]);
 const TOOL_KEYS = new Set(["type", "function", "server"]);
 const TOOL_FUNCTION_KEYS = new Set(["name", "description", "parameters"]);
@@ -213,6 +222,22 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
     });
   }
 
+  let callPolicy: VapiAssistantRuntimeConfig["callPolicy"];
+  if (value.callPolicy !== undefined) {
+    if (!isPlainObject(value.callPolicy)) fail('Vapi runtime config "callPolicy" must be a plain object.');
+    requireNoUnknownKeys(value.callPolicy, CALL_POLICY_KEYS, 'Vapi runtime config "callPolicy"');
+    callPolicy = {};
+    const silence = optionalNonNegativeInteger(value.callPolicy.silenceTimeoutSeconds, "callPolicy.silenceTimeoutSeconds");
+    if (silence !== undefined) callPolicy.silenceTimeoutSeconds = silence;
+    const maxDuration = optionalNonNegativeInteger(value.callPolicy.maxDurationSeconds, "callPolicy.maxDurationSeconds");
+    if (maxDuration !== undefined) callPolicy.maxDurationSeconds = maxDuration;
+    const endLine = optionalNonEmptyString(value.callPolicy.endCallMessage, "callPolicy.endCallMessage");
+    if (endLine !== undefined) callPolicy.endCallMessage = endLine;
+    const vmLine = optionalNonEmptyString(value.callPolicy.voicemailMessage, "callPolicy.voicemailMessage");
+    if (vmLine !== undefined) callPolicy.voicemailMessage = vmLine;
+    if (Object.keys(callPolicy).length === 0) fail('Vapi runtime config "callPolicy" must set at least one field.');
+  }
+
   return {
     model,
     voice,
@@ -222,6 +247,7 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
     systemInstructions,
     ...(server !== undefined ? { server } : {}),
     ...(tools !== undefined ? { tools } : {}),
+    ...(callPolicy !== undefined ? { callPolicy } : {}),
   };
 }
 

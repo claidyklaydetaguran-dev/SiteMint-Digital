@@ -17,6 +17,7 @@ import {
 } from "../lib/voiceSms/smsCore.js";
 import { recordConsent, recordDeliveryStatus } from "../lib/voiceSms/outboxService.js";
 import { normalizePhoneE164 } from "../lib/voiceContacts/contactLinker.js";
+import { resolveFirmIdForInboundSmsNumber } from "../lib/voiceNumbers/numberService.js";
 
 const router = Router();
 
@@ -63,16 +64,30 @@ router.post("/voice/sms/inbound", async (req: Request, res: Response) => {
   const firmIdRaw = Number(params["firmId"] ?? NaN); // never trusted — see below
   void firmIdRaw;
 
-  // Tenant resolution: exactly one voice number exists per deployment stage
-  // in the pilot architecture (VOICE_TWILIO_FROM_NUMBER), owned by exactly
-  // one firm. Until the P6 number inventory maps To→firm, consent updates
-  // apply to the firm that owns the configured number, provided by env.
-  const ownerFirmId = Number(process.env["VOICE_SMS_OWNER_FIRM_ID"] ?? NaN);
-  if (!from || !Number.isInteger(ownerFirmId)) {
+  // Tenant resolution (P6): the number inventory maps To→firm — phone_e164
+  // is globally unique, and only an assigned/paused number maps to its firm
+  // (a released number must never update its former firm's consent).
+  // VOICE_SMS_OWNER_FIRM_ID remains the documented fallback for
+  // pre-inventory deployments where no voice_numbers rows exist yet.
+  const to = normalizePhoneE164(params["To"]);
+  let firmId: number | undefined;
+  if (to) {
+    try {
+      firmId = await resolveFirmIdForInboundSmsNumber(to.e164);
+    } catch {
+      firmId = undefined; // resolution failure falls through to the env pin
+    }
+  }
+  if (firmId === undefined) {
+    const pinned = Number(process.env["VOICE_SMS_OWNER_FIRM_ID"] ?? NaN);
+    firmId = Number.isInteger(pinned) ? pinned : undefined;
+  }
+  if (!from || firmId === undefined) {
     // Acknowledge so Twilio doesn't retry, but change nothing.
     res.type("text/xml").send(EMPTY_TWIML);
     return;
   }
+  const ownerFirmId = firmId;
 
   const keyword = classifyInboundKeyword(params["Body"]);
   if (keyword === "stop") {

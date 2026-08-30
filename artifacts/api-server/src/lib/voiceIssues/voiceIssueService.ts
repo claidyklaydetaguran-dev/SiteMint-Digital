@@ -26,6 +26,7 @@ export const VOICE_ISSUE_CODES = [
   "tool_invalid_args",
   "calendar_revoked",
   "calendar_sync_failed",
+  "emergency_language_detected",
   "tool_execution_failed",
 ] as const;
 export type VoiceIssueCode = (typeof VOICE_ISSUE_CODES)[number];

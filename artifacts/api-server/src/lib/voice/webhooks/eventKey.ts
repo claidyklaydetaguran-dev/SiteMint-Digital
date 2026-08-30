@@ -37,6 +37,11 @@ export function buildVapiEventKey(message: ParsedVapiMessage): string {
       return `${message.call.id}:end-of-call-report:${shortHash(
         JSON.stringify({ transcript: message.transcript, summary: message.summary, analysis: message.analysis }),
       )}`;
+    case "transfer-destination-request":
+      // One logical lookup per call attempt; retries collapse.
+      return `${message.call.id}:transfer-destination-request`;
+    case "transfer-update":
+      return `${message.call.id}:transfer-update:${shortHash(JSON.stringify(message.status ?? null))}`;
     case "hang":
       return `${message.call.id}:hang`;
     case "tool-calls":

@@ -11,6 +11,8 @@ export const VAPI_SERVER_MESSAGE_TYPES = [
   "assistant-request",
   "function-call",
   "tool-calls",
+  "transfer-destination-request",
+  "transfer-update",
   "status-update",
   "end-of-call-report",
   "hang",
