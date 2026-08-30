@@ -28,6 +28,7 @@ import {
   type ClaimForProviderSyncResult,
 } from "../voiceAssistants/repository.js";
 import { isVoiceSyncEnabled } from "./featureFlags.js";
+import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
@@ -86,6 +87,8 @@ export interface SyncServiceDependencies {
   isEnabled: () => boolean;
   loadCatalog: () => RuntimeCatalog;
   loadArtifactPolicy: () => VoiceArtifactPolicy;
+  /** P2: optional server-URL attachment loader; null (feature off) sends no `server` object. Defaults to the env loader when omitted. */
+  loadServerConfig?: () => VoiceServerConfig | null;
   createProvider: () => VoiceProvider;
   repository: SyncRepositoryDependency;
   clock: Clock;
@@ -98,6 +101,7 @@ export const defaultSyncServiceDependencies: SyncServiceDependencies = {
   isEnabled: isVoiceSyncEnabled,
   loadCatalog: loadRuntimeCatalogFromEnv,
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
+  loadServerConfig: loadVoiceServerConfigFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -155,7 +159,11 @@ function success(row: VoiceAssistant, providerRequestSent: boolean): SyncService
  * Identical construction to publishService.buildProviderInput, so the digest
  * of a create and the digest of an equivalent update agree by construction.
  */
-export function buildSyncProviderInput(assistant: VoiceAssistant, catalog: RuntimeCatalog): VoiceAssistantInput {
+export function buildSyncProviderInput(
+  assistant: VoiceAssistant,
+  catalog: RuntimeCatalog,
+  serverConfig: VoiceServerConfig | null = null,
+): VoiceAssistantInput {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
   const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
   if (!preset) {
@@ -184,6 +192,7 @@ export function buildSyncProviderInput(assistant: VoiceAssistant, catalog: Runti
       firstMessageMode: mapFirstMessageMode(extracted.firstMessageMode),
       ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
       systemInstructions: extracted.systemInstructions,
+      ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
     },
   };
 }
@@ -314,6 +323,14 @@ export async function synchronizePublishedAssistant(
     return failure("sync_disabled");
   }
 
+  // P2: server-URL attachment, validated pre-claim like catalog and policy.
+  let serverConfig: VoiceServerConfig | null;
+  try {
+    serverConfig = (deps.loadServerConfig ?? loadVoiceServerConfigFromEnv)();
+  } catch {
+    return failure("sync_disabled");
+  }
+
   let provider: VoiceProvider;
   try {
     provider = deps.createProvider();
@@ -332,7 +349,7 @@ export async function synchronizePublishedAssistant(
   // STEP 3 — build the payload from the claimed row and digest it.
   let providerInput: VoiceAssistantInput;
   try {
-    providerInput = buildSyncProviderInput(assistant, catalog);
+    providerInput = buildSyncProviderInput(assistant, catalog, serverConfig);
   } catch (err) {
     const code: PersistableSyncFailureCode =
       err instanceof PublishFoundationError && err.code === "UNSUPPORTED_PRESET"

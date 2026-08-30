@@ -24,6 +24,7 @@ import {
   type ClaimForPublishResult,
 } from "../voiceAssistants/repository.js";
 import { isVoicePublishEnabled } from "./featureFlags.js";
+import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
@@ -77,6 +78,13 @@ export interface PublishServiceDependencies {
    * caller-influenced source.
    */
   loadArtifactPolicy: () => VoiceArtifactPolicy;
+  /**
+   * P2: server-URL attachment for the provider payload. Null (the default
+   * when VOICE_WEBHOOK_ATTACH_ENABLED is off) means no `server` object is
+   * sent. Optional so existing test dependency objects stay valid; when
+   * omitted, the environment loader is used.
+   */
+  loadServerConfig?: () => VoiceServerConfig | null;
   /** Explicit, lazy production-provider construction. No network request occurs during construction. */
   createProvider: () => VoiceProvider;
   repository: PublishRepositoryDependency;
@@ -95,6 +103,7 @@ export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   isEnabled: isVoicePublishEnabled,
   loadCatalog: loadRuntimeCatalogFromEnv,
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
+  loadServerConfig: loadVoiceServerConfigFromEnv,
   createProvider: createProductionVoiceProvider,
   repository: voiceAssistantRepository,
   clock: systemClock,
@@ -280,6 +289,7 @@ async function classifyClaimConflict(
 function buildProviderInput(
   assistant: VoiceAssistant,
   catalog: RuntimeCatalog,
+  serverConfig: VoiceServerConfig | null,
 ): { input: VoiceAssistantInput; extracted: ExtractedAssistantPublishConfig } {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
   const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
@@ -304,6 +314,7 @@ function buildProviderInput(
     firstMessageMode: mapFirstMessageMode(extracted.firstMessageMode),
     ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
     systemInstructions: extracted.systemInstructions,
+    ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
   };
 
   return { input: { name, config }, extracted };
@@ -348,6 +359,16 @@ export async function publishAssistant(
     return failure("publish_disabled");
   }
 
+  // P2: server-URL attachment is validated in the same pre-claim step. Null
+  // means the feature is off and no `server` object is sent; enabled-but-
+  // invalid fails here, before any claim or provider request.
+  let serverConfig: VoiceServerConfig | null;
+  try {
+    serverConfig = (deps.loadServerConfig ?? loadVoiceServerConfigFromEnv)();
+  } catch {
+    return failure("publish_disabled");
+  }
+
   let provider: VoiceProvider;
   try {
     provider = deps.createProvider();
@@ -365,7 +386,7 @@ export async function publishAssistant(
   // STEP 3/4 — claimed row as source of truth; build provider input.
   let providerInput: VoiceAssistantInput;
   try {
-    ({ input: providerInput } = buildProviderInput(assistant, catalog));
+    ({ input: providerInput } = buildProviderInput(assistant, catalog, serverConfig));
   } catch (err) {
     const code: PersistableFailureCode =
       err instanceof PublishFoundationError && err.code === "UNSUPPORTED_PRESET" ? "unsupported_preset" : "assistant_config_invalid";

@@ -2,6 +2,7 @@ import { runMigrations } from "stripe-replit-sync";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
+import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
 
@@ -51,6 +52,13 @@ app.listen(port, (err) => {
 
   // Start campaign auto-send scheduler (60-second tick)
   startScheduler(60_000);
+
+  // P2: voice call-state reconciliation sweep (5-minute tick). Inert unless
+  // VOICE_RECONCILIATION_ENABLED="true" — the starter itself checks the flag
+  // and registers nothing when it is off, per the disabled-by-default rule.
+  startVoiceReconciliationSweep(5 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  });
 
   // Run slow Stripe webhook registration/backfill in the background so it
   // doesn't delay the HTTP port opening (and failing deploy health checks).

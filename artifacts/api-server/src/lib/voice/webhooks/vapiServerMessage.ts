@@ -38,6 +38,15 @@ export interface ParsedVapiMessage {
   /** Vapi structured-output / analysis payload, if the assistant produced one. Untyped — validated field-by-field by the caller before display. */
   analysis?: unknown;
   timestamp?: number;
+  /**
+   * Provider-reported call boundaries, when present (end-of-call-report
+   * carries call.startedAt/endedAt as ISO strings, and some payloads a
+   * durationSeconds). Extracted opportunistically for reconciliation and
+   * future metering — receipt-time createdAt remains the ordering truth.
+   */
+  startedAtIso?: string;
+  endedAtIso?: string;
+  durationSeconds?: number;
 }
 
 export type ParseVapiServerMessageResult =
@@ -92,6 +101,22 @@ export function parseVapiServerMessage(body: unknown): ParseVapiServerMessageRes
   if (isNonEmptyString(message.summary)) parsed.summary = message.summary;
   if ("analysis" in message) parsed.analysis = message.analysis;
   if (typeof message.timestamp === "number") parsed.timestamp = message.timestamp;
+
+  // Provider-reported boundaries: accepted only as parseable ISO datetimes /
+  // finite non-negative numbers; anything else is silently ignored rather
+  // than poisoning downstream duration math.
+  const startedAt = call.startedAt ?? message.startedAt;
+  if (isNonEmptyString(startedAt) && Number.isFinite(Date.parse(startedAt))) {
+    parsed.startedAtIso = startedAt;
+  }
+  const endedAt = call.endedAt ?? message.endedAt;
+  if (isNonEmptyString(endedAt) && Number.isFinite(Date.parse(endedAt))) {
+    parsed.endedAtIso = endedAt;
+  }
+  const duration = message.durationSeconds ?? (isPlainObject(call) ? call.durationSeconds : undefined);
+  if (typeof duration === "number" && Number.isFinite(duration) && duration >= 0) {
+    parsed.durationSeconds = duration;
+  }
 
   return { ok: true, message: parsed };
 }
