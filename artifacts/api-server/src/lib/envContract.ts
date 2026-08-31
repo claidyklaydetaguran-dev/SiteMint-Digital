@@ -46,6 +46,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["PUBLIC_REGISTRATION_ENABLED", "R4", "Unauthenticated self-registration (POST /receptionist/auth/signup)"],
   ["PUBLIC_FORM_SUBMISSIONS_ENABLED", "R4", "Unauthenticated public lead forms (contact / discovery / landing-test submit)"],
   ["PUBLIC_ANALYTICS_WRITES_ENABLED", "R5", "Unauthenticated analytics/telemetry writes (POST /landing-test/view)"],
+  ["AI_TOOLKIT_CHECKOUT_ENABLED", "R6", "Unauthenticated Stripe Checkout Session creation (POST /ai-toolkit/checkout)"],
 ];
 
 const SECRETS: Array<[string, string, string]> = [

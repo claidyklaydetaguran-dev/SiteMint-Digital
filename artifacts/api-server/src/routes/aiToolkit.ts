@@ -9,6 +9,10 @@ import {
 import { getUncachableStripeClient } from "../lib/stripeClient.js";
 import { sendAiToolkitDeliveryEmail } from "../lib/aiToolkitEmail.js";
 import { AI_TOOLKIT_FILENAME, AI_TOOLKIT_MARKDOWN } from "../assets/smb-ai-toolkit-content.js";
+import {
+  AI_TOOLKIT_CHECKOUT_DISABLED_MESSAGE,
+  isAiToolkitCheckoutEnabled,
+} from "../lib/publicWriteFlags.js";
 
 const router: IRouter = Router();
 
@@ -41,6 +45,13 @@ async function findActivePriceIdForProduct(): Promise<string> {
 }
 
 router.post("/ai-toolkit/checkout", async (req: Request, res: Response) => {
+  // R6: fail-closed commerce gate. First statement in the handler — ahead of
+  // the price lookup's database query, Stripe client construction, and any
+  // outbound Stripe request. A blocked request makes zero external calls.
+  if (!isAiToolkitCheckoutEnabled()) {
+    res.status(503).json({ error: AI_TOOLKIT_CHECKOUT_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const priceId = await findActivePriceIdForProduct();
     const stripe = await getUncachableStripeClient();
