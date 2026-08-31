@@ -85,6 +85,30 @@ describe("guard placement (blocked requests reach nothing)", () => {
       flag: "isPublicAnalyticsWritesEnabled",
       forbidden: [/insert\(landingPageViews\)/, /VERTICALS\.includes/, /req\.body/],
     },
+    // R6: the checkout gate must precede the price lookup (a database query),
+    // Stripe client construction, and the outbound session create.
+    {
+      file: "routes/aiToolkit.ts",
+      handler: 'router.post("/ai-toolkit/checkout"',
+      flag: "isAiToolkitCheckoutEnabled",
+      forbidden: [/findActivePriceIdForProduct\(/, /getUncachableStripeClient\(/, /checkout\.sessions\.create/],
+    },
+    // R6: the discovery-v1 gate must precede dependency resolution, fingerprint
+    // config, rate limiting, honeypot/timing checks, validation and the insert.
+    // Its guard lives in the delegated handler, which is where the work is.
+    {
+      file: "routes/discoveryV1.ts",
+      handler: "export async function handleDiscoverySubmission",
+      flag: "isPublicFormSubmissionsEnabled",
+      forbidden: [
+        /getDefaultDeps\(/,
+        /loadFingerprintConfig\(/,
+        /discoveryV1IpLimiter/,
+        /isHoneypotTripped/,
+        /safeParse/,
+        /insertDiscoverySubmission\(/,
+      ],
+    },
   ];
 
   for (const c of CASES) {

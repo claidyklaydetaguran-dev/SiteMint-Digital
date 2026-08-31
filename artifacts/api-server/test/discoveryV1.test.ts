@@ -14,6 +14,13 @@ import { handleDiscoverySubmission, type DiscoveryV1Deps } from "../src/routes/d
 import type { DiscoveryFingerprintConfigResult } from "../src/lib/discoveryFingerprintConfig";
 import { discoveryV1IpLimiter } from "../src/lib/discoveryV1Protection";
 
+// R6: POST /v1/discovery-submissions is fail-closed behind
+// PUBLIC_FORM_SUBMISSIONS_ENABLED. This suite asserts the ENABLED contract
+// (validation, honeypot/timing, idempotency, persistence, delivery jobs), so
+// it opts in explicitly. The disabled path is covered by
+// src/publicWriteRuntime.test.ts and src/lib/publicWriteGuards.test.ts.
+process.env.PUBLIC_FORM_SUBMISSIONS_ENABLED = "true";
+
 let failures = 0;
 function check(label: string, condition: boolean): void {
   if (condition) {

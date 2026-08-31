@@ -8,6 +8,10 @@ import { computeDuplicateFingerprint, computeIdempotencyPayloadHash } from "../l
 import { loadDiscoveryFingerprintConfig, type DiscoveryFingerprintConfigResult } from "../lib/discoveryFingerprintConfig.js";
 import { discoveryV1IpLimiter, getClientIp, isHoneypotTripped, isImplausiblyFast } from "../lib/discoveryV1Protection.js";
 import { insertDiscoverySubmission, type DiscoveryDb } from "../lib/discoveryV1Persistence.js";
+import {
+  isPublicFormSubmissionsEnabled,
+  PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 
 const router: IRouter = Router();
 
@@ -69,6 +73,14 @@ export async function handleDiscoverySubmission(
   res: Response,
   deps?: DiscoveryV1Deps,
 ): Promise<void> {
+  // R6: fail-closed public-write gate. First statement in the handler — ahead
+  // of dependency resolution, fingerprint/config evaluation, rate limiting,
+  // honeypot and timing checks, validation, every database access, the
+  // submission insert, and pending-job creation.
+  if (!isPublicFormSubmissionsEnabled()) {
+    res.status(503).json({ error: PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const resolvedDeps = deps ?? (await getDefaultDeps());
     const fingerprintConfigResult = resolvedDeps.loadFingerprintConfig();

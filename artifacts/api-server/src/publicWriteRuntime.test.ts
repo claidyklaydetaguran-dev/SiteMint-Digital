@@ -39,6 +39,27 @@ vi.mock("@workspace/db", async (importOriginal) => {
 });
 (globalThis as { __dbHits?: string[] }).__dbHits = dbHits;
 
+// R6: count every Stripe client acquisition and Checkout Session creation, so
+// "a blocked checkout makes zero Stripe calls" is measured, not assumed.
+const stripeCalls: string[] = [];
+(globalThis as { __stripeCalls?: string[] }).__stripeCalls = stripeCalls;
+vi.mock("./lib/stripeClient.js", () => ({
+  getUncachableStripeClient: async () => {
+    (globalThis as { __stripeCalls?: string[] }).__stripeCalls?.push("getClient");
+    return {
+      checkout: {
+        sessions: {
+          create: async () => {
+            (globalThis as { __stripeCalls?: string[] }).__stripeCalls?.push("sessions.create");
+            return { url: "https://checkout.example.test/session" };
+          },
+        },
+      },
+    };
+  },
+  getStripeSync: async () => ({}),
+}));
+
 const { default: app } = await import("./app.js");
 
 let server: http.Server;
@@ -58,11 +79,13 @@ const FLAGS = [
   "PUBLIC_REGISTRATION_ENABLED",
   "PUBLIC_FORM_SUBMISSIONS_ENABLED",
   "PUBLIC_ANALYTICS_WRITES_ENABLED",
+  "AI_TOOLKIT_CHECKOUT_ENABLED",
 ] as const;
 
 afterEach(() => {
   for (const f of FLAGS) delete process.env[f];
   dbHits.length = 0;
+  stripeCalls.length = 0;
 });
 
 function post(path: string, body: unknown): Promise<{ status: number; body: string }> {
@@ -82,6 +105,24 @@ function post(path: string, body: unknown): Promise<{ status: number; body: stri
   });
 }
 
+// A structurally valid v1 discovery submission — enough to get past the
+// schema if the gate ever let it through, so the test proves the GATE is
+// what stops it and not a validation error.
+const DISCOVERY_V1_BODY = {
+  meta: { formStartedAt: new Date(Date.now() - 60_000).toISOString(), honeypot: "" },
+  answers: { contact: { name: "A", email: "a@b.test" } },
+};
+
+// Several gated routes have OTHER legitimate 503s (discovery-v1 answers 503
+// when its fingerprint config is unavailable), so "did the gate fire?" is
+// decided by the gate's own message, never by the status code alone.
+const DISABLED_MESSAGE: Record<string, string> = {
+  PUBLIC_REGISTRATION_ENABLED: "Account creation is not currently available.",
+  PUBLIC_FORM_SUBMISSIONS_ENABLED: "Form submission is not currently available.",
+  PUBLIC_ANALYTICS_WRITES_ENABLED: "Analytics recording is not currently available.",
+  AI_TOOLKIT_CHECKOUT_ENABLED: "Checkout is not currently available.",
+};
+
 // path → [flag that gates it, a body that WOULD be valid if it got through]
 const GATED: Array<[string, string, unknown]> = [
   ["/api/receptionist/auth/signup", "PUBLIC_REGISTRATION_ENABLED", { email: "a@b.test", password: "Str0ngPassw0rd!", firmName: "X" }],
@@ -89,6 +130,9 @@ const GATED: Array<[string, string, unknown]> = [
   ["/api/discovery/submit", "PUBLIC_FORM_SUBMISSIONS_ENABLED", { name: "A", email: "a@b.test" }],
   ["/api/landing-test/submit", "PUBLIC_FORM_SUBMISSIONS_ENABLED", { vertical: "lawyers", name: "A", email: "a@b.test" }],
   ["/api/landing-test/view", "PUBLIC_ANALYTICS_WRITES_ENABLED", { page: "lawyers" }],
+  // R6: the two writers closed in this PR.
+  ["/api/v1/discovery-submissions", "PUBLIC_FORM_SUBMISSIONS_ENABLED", DISCOVERY_V1_BODY],
+  ["/api/ai-toolkit/checkout", "AI_TOOLKIT_CHECKOUT_ENABLED", {}],
 ];
 
 describe("public write gates — runtime behaviour", () => {
@@ -96,6 +140,7 @@ describe("public write gates — runtime behaviour", () => {
     it(`${path} is refused with 503 and touches no database when ${flag} is absent`, async () => {
       const res = await post(path, body);
       expect(res.status).toBe(503);
+      expect(res.body).toContain(DISABLED_MESSAGE[flag] as string);
       expect(dbHits, "a blocked request must not reach the database").toEqual([]);
     });
 
@@ -111,6 +156,7 @@ describe("public write gates — runtime behaviour", () => {
         process.env[flag] = bad;
         const res = await post(path, body);
         expect(res.status).toBe(503);
+        expect(res.body).toContain(DISABLED_MESSAGE[flag] as string);
         expect(dbHits).toEqual([]);
       });
     }
@@ -118,10 +164,10 @@ describe("public write gates — runtime behaviour", () => {
     it(`${path} passes the gate when ${flag} is exactly "true"`, async () => {
       process.env[flag] = "true";
       const res = await post(path, body);
-      // Past the gate the request meets the trapped database (or this route's
-      // own validation) — either way it is no longer the gate's 503. The
-      // status changing on the exact string is the proof the gate opened.
-      expect(res.status).not.toBe(503);
+      // Past the gate the request meets the trapped database, this route's own
+      // validation, or its own unrelated 503 — what must no longer appear is
+      // the GATE's reply. That is what the exact string "true" changes.
+      expect(res.body).not.toContain(DISABLED_MESSAGE[flag] as string);
     });
   }
 
@@ -129,6 +175,7 @@ describe("public write gates — runtime behaviour", () => {
     process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
     const res = await post("/api/landing-test/view", { page: "lawyers" });
     expect(res.status, "enabling forms must not enable analytics").toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_ANALYTICS_WRITES_ENABLED"] as string);
     expect(dbHits).toEqual([]);
   });
 
@@ -145,6 +192,48 @@ describe("public write gates — runtime behaviour", () => {
     const res = await post("/api/receptionist/auth/signup", { email: "a@b.test", password: "Str0ngPassw0rd!", firmName: "X" });
     expect(res.status).toBe(503);
     expect(dbHits).toEqual([]);
+  });
+
+  it("a blocked checkout makes zero Stripe calls", async () => {
+    const res = await post("/api/ai-toolkit/checkout", {});
+    expect(res.status).toBe(503);
+    expect(stripeCalls, "no Stripe client may be built and no session created").toEqual([]);
+    expect(dbHits, "not even the price lookup may run").toEqual([]);
+  });
+
+  it("an enabled checkout reaches Stripe and returns the session url", async () => {
+    process.env["AI_TOOLKIT_CHECKOUT_ENABLED"] = "true";
+    const res = await post("/api/ai-toolkit/checkout", {});
+    // The price lookup hits the trapped database first, which is itself proof
+    // the gate opened; Stripe is reached only once that lookup succeeds.
+    expect(res.status).not.toBe(503);
+    expect(dbHits.length, "enabled checkout performs the price lookup").toBeGreaterThan(0);
+  });
+
+  it("checkout is not gated by the boot-sync flag", async () => {
+    process.env["STRIPE_BOOT_SYNC_ENABLED"] = "true";
+    const res = await post("/api/ai-toolkit/checkout", {});
+    expect(res.status, "boot sync must not enable customer checkout").toBe(503);
+    expect(stripeCalls).toEqual([]);
+    delete process.env["STRIPE_BOOT_SYNC_ENABLED"];
+  });
+
+  it("a blocked discovery submission creates no submission, job or external action", async () => {
+    const res = await post("/api/v1/discovery-submissions", DISCOVERY_V1_BODY);
+    expect(res.status).toBe(503);
+    expect(dbHits, "no submission row and no pending job").toEqual([]);
+    expect(stripeCalls).toEqual([]);
+  });
+
+  it("discovery and checkout gates are independent of each other", async () => {
+    process.env["AI_TOOLKIT_CHECKOUT_ENABLED"] = "true";
+    expect((await post("/api/v1/discovery-submissions", DISCOVERY_V1_BODY)).body)
+      .toContain(DISABLED_MESSAGE["PUBLIC_FORM_SUBMISSIONS_ENABLED"] as string);
+    delete process.env["AI_TOOLKIT_CHECKOUT_ENABLED"];
+    process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
+    const res = await post("/api/ai-toolkit/checkout", {});
+    expect(res.status).toBe(503);
+    expect(stripeCalls).toEqual([]);
   });
 
   it("login is not gated by any public-write flag", async () => {

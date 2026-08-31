@@ -47,11 +47,12 @@ Set these as staging secrets or build variables. Never paste their values into a
 | `VITE_VOICE_SYNC_ENABLED` | Dashboard build | `false` — see AR-001V.1 below |
 | `VOICE_BROWSER_TEST_ENABLED` | API runtime | `false` — see AR-001V.1 below |
 | `VITE_VAPI_PUBLIC_KEY` | Dashboard build | Vapi public browser key (staging organization) |
-| `PUBLIC_REGISTRATION_ENABLED` | API runtime | `false` — see AR-002B-R4/R5 below |
-| `PUBLIC_FORM_SUBMISSIONS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5 below |
-| `PUBLIC_ANALYTICS_WRITES_ENABLED` | API runtime | `false` — see AR-002B-R4/R5 below |
+| `PUBLIC_REGISTRATION_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
+| `PUBLIC_FORM_SUBMISSIONS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
+| `PUBLIC_ANALYTICS_WRITES_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
+| `AI_TOOLKIT_CHECKOUT_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 
-### AR-002B-R4/R5 — three independent public-write capabilities
+### AR-002B-R4/R5/R6 — four independent public-write capabilities
 
 Every write the API accepts from an unauthenticated caller sits behind one of
 these, each with the same exact-string contract as the voice flags: only the
@@ -65,17 +66,40 @@ capture on while self-registration stays off — and must never be combined.
 | `PUBLIC_REGISTRATION_ENABLED` | `POST /api/receptionist/auth/signup` (creates a firm, a session, and availability defaults) |
 | `PUBLIC_FORM_SUBMISSIONS_ENABLED` | `POST /api/contact/submit`, `/api/discovery/submit`, `/api/landing-test/submit` (insert `form_submissions`, send notification email) |
 | `PUBLIC_ANALYTICS_WRITES_ENABLED` | `POST /api/landing-test/view` (inserts `landing_page_views`) |
+| `AI_TOOLKIT_CHECKOUT_ENABLED` | `POST /api/ai-toolkit/checkout` (creates a Stripe Checkout Session) |
+
+`AI_TOOLKIT_CHECKOUT_ENABLED` is deliberately **not** `STRIPE_BOOT_SYNC_ENABLED`:
+boot-time webhook registration and customer checkout are different capabilities
+with different blast radii, and one flag for both would make enabling either
+enable both. `POST /api/v1/discovery-submissions` is covered by
+`PUBLIC_FORM_SUBMISSIONS_ENABLED` alongside the other lead forms.
 
 While disabled each returns `503` with a short generic sentence that names no
 flag, environment or internal state. Sign-in, sign-out, and every
 authenticated, signature-verified or token-proven route are unaffected.
 
-Two unauthenticated mutating endpoints are **not** covered by these flags and
-remain open when the deployment is live — see AR-002B-R5 §4:
-`POST /api/v1/discovery-submissions` (inserts `discovery_submissions` plus
-pending job rows) and `POST /api/ai-toolkit/checkout` (creates a Stripe
-Checkout Session). Both are rate-limited but neither is authenticated,
-signature-verified, nor default-off. Closing them needs its own authorization.
+### The route-security contract
+
+`lib/routeSecurity.ts` re-derives the full mutating-route inventory from source
+on every CI run and compares it against the committed manifest in
+`lib/routeSecurity.manifest.ts` (127 routes). CI fails when a new `POST`/`PUT`/
+`PATCH`/`DELETE` route appears unclassified, when a route loses its recorded
+protection, or when a new route reachable without authentication, signature,
+credential or default-off flag appears.
+
+Rate limiting and honeypots are explicitly **not** counted as protection. They
+bound abuse; they do not control access. Treating them as guards is what caused
+the AR-002B-R5 inventory to miss the writer below.
+
+**One open writer remains and needs an owner decision:**
+`POST /api/public/schedule/:slug/requests` accepts an appointment request from
+any caller who knows a firm's public booking slug and persists it. It has an IP
+limiter and honeypot/timing checks but no authentication, signature, credential
+or flag. AR-002B-R6 authorized closing only the discovery-submissions and
+ai-toolkit-checkout writers, so this one is recorded in `KNOWN_OPEN_ROUTES`
+rather than gated unilaterally. Closing it needs its own capability flag — a
+booking flow is not a lead form, so `PUBLIC_FORM_SUBMISSIONS_ENABLED` must not
+be stretched to cover it.
 
 ### API root liveness (AR-002B-R5)
 

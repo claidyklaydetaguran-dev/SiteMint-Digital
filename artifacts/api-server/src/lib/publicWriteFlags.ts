@@ -19,6 +19,7 @@
 export const PUBLIC_REGISTRATION_ENABLED_ENV_VAR = "PUBLIC_REGISTRATION_ENABLED";
 export const PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR = "PUBLIC_FORM_SUBMISSIONS_ENABLED";
 export const PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR = "PUBLIC_ANALYTICS_WRITES_ENABLED";
+export const AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR = "AI_TOOLKIT_CHECKOUT_ENABLED";
 
 /** True only for the exact string "true". */
 export function isPublicRegistrationEnabled(
@@ -51,6 +52,22 @@ export function isPublicAnalyticsWritesEnabled(
 }
 
 /**
+ * True only for the exact string "true".
+ *
+ * R6: `POST /ai-toolkit/checkout` is unauthenticated and creates a real
+ * Stripe Checkout Session, so it is a commerce capability rather than a lead
+ * form and gets its own switch. Deliberately NOT
+ * `STRIPE_BOOT_SYNC_ENABLED` — that governs webhook registration and
+ * backfill at boot, which is a different capability with a different blast
+ * radius; sharing one flag would make enabling either one enable both.
+ */
+export function isAiToolkitCheckoutEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR] === "true";
+}
+
+/**
  * The repository's established feature-disabled reply (see
  * receptionistCalendar.ts and voiceSmsWebhook.ts): HTTP 503 with a short,
  * generic sentence. It names no flag, environment, or internal state, so a
@@ -59,3 +76,4 @@ export function isPublicAnalyticsWritesEnabled(
 export const PUBLIC_REGISTRATION_DISABLED_MESSAGE = "Account creation is not currently available.";
 export const PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE = "Form submission is not currently available.";
 export const PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE = "Analytics recording is not currently available.";
+export const AI_TOOLKIT_CHECKOUT_DISABLED_MESSAGE = "Checkout is not currently available.";
