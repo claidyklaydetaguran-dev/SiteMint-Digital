@@ -1,3 +1,4 @@
+import type { Server } from "node:http";
 import { runMigrations } from "stripe-replit-sync";
 import app from "./app";
 import { logger } from "./lib/logger";
@@ -9,6 +10,7 @@ import { startGraceExpirySweep } from "./lib/voiceBilling/subscriptionState.js";
 import { logEnvContractFindings } from "./lib/envContract.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
+import { runBootSequence } from "./lib/bootSequence.js";
 
 async function runStripeMigrations(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];
@@ -44,17 +46,14 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-await runStripeMigrations();
-
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
-  logger.info({ port }, "Server listening");
-
-  // Start campaign auto-send scheduler (60-second tick)
+/**
+ * Everything that must NOT run until migrations have succeeded.
+ *
+ * Each starter already checks its own capability flag and registers nothing
+ * while that flag is off; this only decides *when* they are allowed to start.
+ */
+function startBackgroundWorkers(): void {
+  // Campaign auto-send scheduler (60-second tick)
   startScheduler(60_000);
 
   // P2: voice call-state reconciliation sweep (5-minute tick). Inert unless
@@ -85,18 +84,35 @@ app.listen(port, (err) => {
     level === "error" ? logger.error(message) : logger.warn(message),
   );
 
-  // Run slow Stripe webhook registration/backfill in the background so it
-  // doesn't delay the HTTP port opening (and failing deploy health checks).
+  // Stripe webhook registration/backfill.
   //
-  // AR-001G: this is now opt-in. Registering a managed webhook and starting a
+  // AR-001G: this is opt-in. Registering a managed webhook and starting a
   // backfill are external mutations of a Stripe account, and they must not
   // happen merely because a connector happens to be attached to whatever
-  // environment the server booted in. `runStripeMigrations()` above is a
-  // different thing entirely — an internal database migration that startup
-  // requires — and is deliberately left outside this flag.
+  // environment the server booted in. `runStripeMigrations()` is a different
+  // thing entirely — an internal database migration that startup requires —
+  // and is deliberately left outside this flag.
   startStripeBootSync({
     isEnabled: () => isStripeBootSyncEnabled(process.env),
     runBootSync: initStripeWebhookAndSync,
     logger,
   });
+}
+
+// R6: bind the port BEFORE migrations so the platform's health probe has an
+// upstream while they run, with `bootGate` refusing application traffic until
+// they succeed. See lib/bootSequence.ts.
+await runBootSequence({
+  listen: () =>
+    new Promise<Server>((resolve, reject) => {
+      const server = app.listen(port, () => {
+        logger.info({ port }, "Server listening");
+        resolve(server);
+      });
+      server.on("error", reject);
+    }),
+  runMigrations: runStripeMigrations,
+  startWorkers: startBackgroundWorkers,
+  logger,
+  exit: (code) => process.exit(code),
 });
