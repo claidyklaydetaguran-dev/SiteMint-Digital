@@ -45,6 +45,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["STRIPE_BOOT_SYNC_ENABLED", "core", "Stripe webhook registration/backfill at boot"],
   ["PUBLIC_REGISTRATION_ENABLED", "R4", "Unauthenticated self-registration (POST /receptionist/auth/signup)"],
   ["PUBLIC_FORM_SUBMISSIONS_ENABLED", "R4", "Unauthenticated public lead forms (contact / discovery / landing-test submit)"],
+  ["PUBLIC_ANALYTICS_WRITES_ENABLED", "R5", "Unauthenticated analytics/telemetry writes (POST /landing-test/view)"],
 ];
 
 const SECRETS: Array<[string, string, string]> = [

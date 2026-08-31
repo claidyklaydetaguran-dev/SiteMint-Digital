@@ -4,7 +4,9 @@ import { eq, sql, ilike } from "drizzle-orm";
 import { sendFormEmails } from "../lib/email.js";
 import { validateToken } from "../lib/admin-session.js";
 import {
+  isPublicAnalyticsWritesEnabled,
   isPublicFormSubmissionsEnabled,
+  PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE,
   PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE,
 } from "../lib/publicWriteFlags.js";
 
@@ -113,6 +115,12 @@ router.post("/landing-test/submit", async (req: Request, res: Response) => {
 // ── POST /landing-test/view  (public, no auth) ────────────────────────────────
 
 router.post("/landing-test/view", async (req: Request, res: Response) => {
+  // R5: fail-closed analytics-write gate — before validation and before any
+  // database access or insertion. Independent of the form-submission flag.
+  if (!isPublicAnalyticsWritesEnabled()) {
+    res.status(503).json({ error: PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const { page, utmSource, utmMedium, utmCampaign } = req.body as Record<string, unknown>;
 
