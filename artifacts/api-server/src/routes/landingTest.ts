@@ -3,6 +3,10 @@ import { db, formSubmissions, landingPageViews } from "@workspace/db";
 import { eq, sql, ilike } from "drizzle-orm";
 import { sendFormEmails } from "../lib/email.js";
 import { validateToken } from "../lib/admin-session.js";
+import {
+  isPublicFormSubmissionsEnabled,
+  PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 
 const router: IRouter = Router();
 
@@ -25,6 +29,12 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 // ── POST /landing-test/submit ──────────────────────────────────────────────────
 
 router.post("/landing-test/submit", async (req: Request, res: Response) => {
+  // Fail-closed public-write gate — before validation, database access,
+  // insertion, and notification email.
+  if (!isPublicFormSubmissionsEnabled()) {
+    res.status(503).json({ error: PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const data = req.body as Record<string, unknown>;
 
