@@ -4,6 +4,7 @@
 // endpoint. It re-derives the mutating-route inventory from source on every
 // run and compares it against the committed manifest.
 
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -112,6 +113,38 @@ describe("route-security inventory", () => {
     expect(offenders, "unreviewed route reachable with no authentication, signature, credential or flag").toEqual([]);
   });
 
+  it("R8: both exception lists are empty — every mutating route is protected", () => {
+    // The closure claim, asserted directly rather than inferred from the
+    // absence of offenders above.
+    expect(Object.keys(KNOWN_OPEN_ROUTES), "no route may be exempt as proven-safe").toEqual([]);
+    expect(Object.keys(OPEN_WRITERS_PENDING_AUTHORIZATION), "no open writer may remain").toEqual([]);
+    const open = routes.filter((r) => detectProtection(r).length === 0).map((r) => r.key);
+    expect(open, "a route with no protection signal at all").toEqual([]);
+  });
+
+  it("the exception mechanism still exists — emptiness is a fact, not a deletion", () => {
+    // Deleting the lists would make the assertion above vacuous. Both must
+    // remain real, importable, empty objects that a future route could be
+    // added to (and would then have to justify itself).
+    expect(typeof KNOWN_OPEN_ROUTES, "KNOWN_OPEN_ROUTES was removed").toBe("object");
+    expect(typeof OPEN_WRITERS_PENDING_AUTHORIZATION, "OPEN_WRITERS_PENDING_AUTHORIZATION was removed").toBe("object");
+    expect(KNOWN_OPEN_ROUTES).not.toBeNull();
+    expect(OPEN_WRITERS_PENDING_AUTHORIZATION).not.toBeNull();
+    const manifestSource = readFileSync(join(SRC, "lib", "routeSecurity.manifest.ts"), "utf8");
+    expect(manifestSource).toMatch(/export const KNOWN_OPEN_ROUTES/);
+    expect(manifestSource).toMatch(/export const OPEN_WRITERS_PENDING_AUTHORIZATION/);
+  });
+
+  it("no public database writer or external-action route lacks protection", () => {
+    // Restates the goal in terms of side effects rather than route names: a
+    // route that can write or reach outside must carry a real guard.
+    const unguarded = routes
+      .filter((r) => detectSideEffects(r).length > 0 || callsImportedFunction(r))
+      .filter((r) => detectProtection(r).length === 0)
+      .map((r) => r.key);
+    expect(unguarded, "a route that can persist data or act externally is unprotected").toEqual([]);
+  });
+
   it("every allowlisted open route carries a substantive reason", () => {
     for (const [key, reason] of Object.entries(KNOWN_OPEN_ROUTES)) {
       expect(reason.length, `${key} needs a real justification`).toBeGreaterThan(80);
@@ -128,6 +161,7 @@ describe("route-security inventory", () => {
       "POST /api/receptionist/auth/signup",
       "POST /api/landing-test/view",
       "POST /api/public/schedule/:slug/requests",
+      "POST /api/receptionist/account/password-reset/request",
     ]) {
       expect(ROUTE_SECURITY_MANIFEST[key], key).toBe("feature-flag");
     }
@@ -157,9 +191,46 @@ describe("parser correctness (the false-positive traps)", () => {
     // but a helper's source must stop at the next route registration. Without
     // that bound, password-reset/request picked up a later route's
     // requireReceptionistAuth and was misreported as session-protected.
+    //
+    // R8 gave this route its own flag, so the assertion is now "exactly its own
+    // gate, and specifically NOT session" — the leak this guards against would
+    // show up as an extra `session` signal, which is still the thing being
+    // excluded. Stripping the flag must leave it with nothing at all.
     const req = byKey.get("POST /api/receptionist/account/password-reset/request");
     expect(req, "route missing").toBeDefined();
-    expect(detectProtection(req as MutatingRoute)).toEqual([]);
+    expect(detectProtection(req as MutatingRoute)).toEqual(["feature-flag"]);
+    expect(detectProtection(req as MutatingRoute), "absorbed a neighbour's session guard").not.toContain("session");
+    const withoutFlag = {
+      ...(req as MutatingRoute),
+      body: (req as MutatingRoute).body.replace(/isPasswordResetRequestsEnabled/g, "x"),
+    };
+    expect(detectProtection(withoutFlag), "a helper leaked a guard into this route").toEqual([]);
+  });
+
+  it("R8: the password-reset guard precedes its imported delegation", () => {
+    // The guard has to be visible in the ROUTE body, not only somewhere in the
+    // file, and it must sit before the call into requestPasswordReset — which
+    // is where the token row, the audit row and the email actually happen.
+    const route = byKey.get("POST /api/receptionist/account/password-reset/request");
+    expect(route, "route missing").toBeDefined();
+    const body = (route as MutatingRoute).body;
+    const guardAt = body.indexOf("isPasswordResetRequestsEnabled");
+    const delegateAt = body.indexOf("requestPasswordReset(");
+    expect(guardAt, "guard not in the route body").toBeGreaterThan(-1);
+    expect(delegateAt, "delegation not found").toBeGreaterThan(-1);
+    expect(guardAt, "the gate must run before the imported delegation").toBeLessThan(delegateAt);
+    // ...and before the rate limiter, so a blocked request consumes no budget.
+    const limiterAt = body.indexOf('limited(req, res, "pw-reset")');
+    expect(limiterAt).toBeGreaterThan(-1);
+    expect(guardAt).toBeLessThan(limiterAt);
+    // The token-proven siblings must NOT have been gated.
+    for (const sibling of [
+      "POST /api/receptionist/account/password-reset/complete",
+      "POST /api/receptionist/account/verify-email/confirm",
+      "POST /api/receptionist/account/members/accept",
+    ]) {
+      expect(ROUTE_SECURITY_MANIFEST[sibling], sibling).toBe("token-proven");
+    }
   });
 
   it("still resolves genuine delegation to a same-file handler", () => {

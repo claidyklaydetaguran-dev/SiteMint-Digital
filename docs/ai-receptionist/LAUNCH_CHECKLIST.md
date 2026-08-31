@@ -52,8 +52,9 @@ Set these as staging secrets or build variables. Never paste their values into a
 | `PUBLIC_ANALYTICS_WRITES_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 | `AI_TOOLKIT_CHECKOUT_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 | `PUBLIC_SCHEDULING_REQUESTS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
+| `PASSWORD_RESET_REQUESTS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 
-### AR-002B-R4 through R7 — five independent public-write capabilities
+### AR-002B-R4 through R8 — six independent public-write capabilities
 
 Every write the API accepts from an unauthenticated caller sits behind one of
 these, each with the same exact-string contract as the voice flags: only the
@@ -69,6 +70,7 @@ capture on while self-registration stays off — and must never be combined.
 | `PUBLIC_ANALYTICS_WRITES_ENABLED` | `POST /api/landing-test/view` (inserts `landing_page_views`) |
 | `AI_TOOLKIT_CHECKOUT_ENABLED` | `POST /api/ai-toolkit/checkout` (creates a Stripe Checkout Session) |
 | `PUBLIC_SCHEDULING_REQUESTS_ENABLED` | `POST /api/public/schedule/:slug/requests` (persists a booking request) |
+| `PASSWORD_RESET_REQUESTS_ENABLED` | `POST /api/receptionist/account/password-reset/request` (mints a reset token, writes an audit row, sends mail) |
 
 `AI_TOOLKIT_CHECKOUT_ENABLED` is deliberately **not** `STRIPE_BOOT_SYNC_ENABLED`:
 boot-time webhook registration and customer checkout are different capabilities
@@ -80,6 +82,26 @@ enable both. `POST /api/v1/discovery-submissions` is covered by
 read-only availability endpoints — `GET /public/schedule/:slug/config`,
 `/days` and `/slots` — stay available, because they persist nothing and a
 booking page that cannot render its availability is not safer.
+
+`PASSWORD_RESET_REQUESTS_ENABLED` gates **only** reset *initiation*. The
+token-proven routes — `password-reset/complete`, `verify-email/confirm` and
+`members/accept` — are untouched, so anyone already holding a valid token can
+still use it. It is independent of `RESEND_API_KEY`: having a mail provider
+configured is not consent to expose password recovery.
+
+> **Turning this flag off disables password recovery for real customers.** It
+> is the one flag in this set whose "off" position has a direct product cost,
+> which is why it is explicit rather than folded into another capability. Set
+> it to `true` in any environment where real customers sign in.
+
+When enabled, the reset flow keeps the properties audited in AR-002B-R8 and
+pinned by `lib/accountSecurity/passwordResetSecurity.test.ts`: one identical
+generic response for known and unknown addresses, no account-existence
+disclosure, the existing fixed-window IP limiter (10/hour, keyed
+`pw-reset:<ip>`), single-use tokens that expire in 30 minutes, only a SHA-256
+hash of a 256-bit random token stored at rest, no token value ever logged, the
+audit row preserved, and at most one email per accepted request — always to
+the address on file rather than the one supplied by the caller.
 
 While disabled each returns `503` with a short generic sentence that names no
 flag, environment or internal state. Sign-in, sign-out, and every
@@ -101,21 +123,18 @@ the AR-002B-R5 inventory to miss the writer below.
 The manifest keeps two separate lists. `KNOWN_OPEN_ROUTES` is for routes proven
 incapable of persisting data or acting externally — the bar is a clean
 side-effect scan **and** no delegation to an imported function, because a
-source scan cannot see across a module boundary. It is currently empty.
+source scan cannot see across a module boundary.
 `OPEN_WRITERS_PENDING_AUTHORIZATION` holds open routes that do write or act
 externally and have not yet been authorized to close; each entry states exactly
 what it does. Both lists are asserted exactly, so nothing can join or leave
 either one silently.
 
-**One open writer remains and needs an owner decision:**
-`POST /api/receptionist/account/password-reset/request` is unauthenticated by
-design — the caller is proving nothing yet — but it is not side-effect free: for
-a known address it persists a `password_reset` token row, sends an email, and
-writes an audit row. It is rate limited and answers identically for known and
-unknown addresses, and the token only ever reaches the account owner. AR-002B-R7
-authorized closing only the scheduling writer, so this is recorded rather than
-gated. Note that gating it disables password recovery for real customers, which
-makes it a product decision as much as a security one.
+**As of AR-002B-R8 both lists are empty.** Every one of the 127 mutating
+routes is reachable only behind authentication, a verified signature, a
+credential, a single-use token, or a default-off capability flag. The lists
+are kept rather than deleted on purpose: emptiness is asserted as a fact, and
+removing the mechanism would make the count zero by construction and prove
+nothing.
 
 ### API root liveness (AR-002B-R5)
 

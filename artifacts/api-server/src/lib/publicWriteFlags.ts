@@ -21,6 +21,7 @@ export const PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR = "PUBLIC_FORM_SUBMISSIONS_
 export const PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR = "PUBLIC_ANALYTICS_WRITES_ENABLED";
 export const AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR = "AI_TOOLKIT_CHECKOUT_ENABLED";
 export const PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR = "PUBLIC_SCHEDULING_REQUESTS_ENABLED";
+export const PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR = "PASSWORD_RESET_REQUESTS_ENABLED";
 
 /** True only for the exact string "true". */
 export function isPublicRegistrationEnabled(
@@ -85,6 +86,27 @@ export function isPublicSchedulingRequestsEnabled(
 }
 
 /**
+ * True only for the exact string "true".
+ *
+ * R8: `POST /receptionist/account/password-reset/request` is unauthenticated by
+ * design — the caller is proving nothing yet — but it is not side-effect free.
+ * For a known address it persists a `password_reset` token row, sends an email,
+ * and writes an audit row, so an unauthenticated caller can cause writes and
+ * outbound mail. It gets its own switch, independent of the public-write flags
+ * and of generic email configuration (`RESEND_API_KEY`): having a mail provider
+ * configured is not consent to expose password recovery.
+ *
+ * Turning this off disables password recovery for real customers. That is a
+ * product decision as much as a security one, which is exactly why it is an
+ * explicit switch rather than something folded into another flag.
+ */
+export function isPasswordResetRequestsEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR] === "true";
+}
+
+/**
  * The repository's established feature-disabled reply (see
  * receptionistCalendar.ts and voiceSmsWebhook.ts): HTTP 503 with a short,
  * generic sentence. It names no flag, environment, or internal state, so a
@@ -95,3 +117,4 @@ export const PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE = "Form submission is not 
 export const PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE = "Analytics recording is not currently available.";
 export const AI_TOOLKIT_CHECKOUT_DISABLED_MESSAGE = "Checkout is not currently available.";
 export const PUBLIC_SCHEDULING_REQUESTS_DISABLED_MESSAGE = "Online booking is not currently available.";
+export const PASSWORD_RESET_REQUESTS_DISABLED_MESSAGE = "Password reset is not currently available.";

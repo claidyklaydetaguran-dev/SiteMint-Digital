@@ -48,6 +48,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["PUBLIC_ANALYTICS_WRITES_ENABLED", "R5", "Unauthenticated analytics/telemetry writes (POST /landing-test/view)"],
   ["AI_TOOLKIT_CHECKOUT_ENABLED", "R6", "Unauthenticated Stripe Checkout Session creation (POST /ai-toolkit/checkout)"],
   ["PUBLIC_SCHEDULING_REQUESTS_ENABLED", "R7", "Unauthenticated public booking requests (POST /public/schedule/:slug/requests)"],
+  ["PASSWORD_RESET_REQUESTS_ENABLED", "R8", "Unauthenticated password-reset initiation (POST /receptionist/account/password-reset/request)"],
 ];
 
 const SECRETS: Array<[string, string, string]> = [

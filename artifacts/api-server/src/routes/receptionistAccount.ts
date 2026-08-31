@@ -14,6 +14,10 @@ import {
 } from "../lib/accountSecurity/accountTokens.js";
 import { acceptInvitation, inviteMember, listFirmMembers, revokeMemberById } from "../lib/voiceAccounts/membership.js";
 import { resolveEntitlementsForFirm } from "../lib/voiceBilling/entitlements.js";
+import {
+  isPasswordResetRequestsEnabled,
+  PASSWORD_RESET_REQUESTS_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 
 const router: IRouter = Router();
 
@@ -47,6 +51,16 @@ function limited(req: Request, res: Response, bucket: string): boolean {
 // ── password reset ───────────────────────────────────────────────────────────
 
 router.post("/receptionist/account/password-reset/request", async (req: Request, res: Response) => {
+  // R8: fail-closed password-reset gate. First statement in the handler — ahead
+  // of the rate limiter, request validation, the account/email lookup, the
+  // imported requestPasswordReset delegation, token creation, the audit row,
+  // and any email construction or send. The token-proven routes below
+  // (password-reset/complete, verify-email/confirm, members/accept) are
+  // deliberately unaffected: they already require a token this endpoint issued.
+  if (!isPasswordResetRequestsEnabled()) {
+    res.status(503).json({ error: PASSWORD_RESET_REQUESTS_DISABLED_MESSAGE });
+    return;
+  }
   if (limited(req, res, "pw-reset")) return;
   try {
     const result = await requestPasswordReset((req.body as Record<string, unknown> | undefined)?.email);

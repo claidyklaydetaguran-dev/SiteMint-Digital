@@ -60,6 +60,16 @@ vi.mock("./lib/stripeClient.js", () => ({
   getStripeSync: async () => ({}),
 }));
 
+// R8: a fetch tripwire is the honest test for "sends zero emails". The reset
+// mail leaves as a POST to the Resend API through the alert transport, so
+// counting outbound fetches catches it wherever the sender happens to live —
+// and catches any other external call a blocked request might attempt.
+const outboundFetches: string[] = [];
+globalThis.fetch = ((input: unknown) => {
+  outboundFetches.push(String(input));
+  throw new Error("outbound request attempted during a blocked request");
+}) as unknown as typeof globalThis.fetch;
+
 const { default: app } = await import("./app.js");
 
 // R6: the boot gate refuses application traffic until the boot sequence
@@ -87,12 +97,14 @@ const FLAGS = [
   "PUBLIC_ANALYTICS_WRITES_ENABLED",
   "AI_TOOLKIT_CHECKOUT_ENABLED",
   "PUBLIC_SCHEDULING_REQUESTS_ENABLED",
+  "PASSWORD_RESET_REQUESTS_ENABLED",
 ] as const;
 
 afterEach(() => {
   for (const f of FLAGS) delete process.env[f];
   dbHits.length = 0;
   stripeCalls.length = 0;
+  outboundFetches.length = 0;
 });
 
 function post(path: string, body: unknown): Promise<{ status: number; body: string }> {
@@ -129,6 +141,7 @@ const DISABLED_MESSAGE: Record<string, string> = {
   PUBLIC_ANALYTICS_WRITES_ENABLED: "Analytics recording is not currently available.",
   AI_TOOLKIT_CHECKOUT_ENABLED: "Checkout is not currently available.",
   PUBLIC_SCHEDULING_REQUESTS_ENABLED: "Online booking is not currently available.",
+  PASSWORD_RESET_REQUESTS_ENABLED: "Password reset is not currently available.",
 };
 
 // A structurally valid booking request. The slug is a well-formed 32-hex value
@@ -153,6 +166,8 @@ const GATED: Array<[string, string, unknown]> = [
   ["/api/ai-toolkit/checkout", "AI_TOOLKIT_CHECKOUT_ENABLED", {}],
   // R7: the public booking writer.
   ["/api/public/schedule/00000000000000000000000000000000/requests", "PUBLIC_SCHEDULING_REQUESTS_ENABLED", SCHEDULING_BODY],
+  // R8: the last public writer.
+  ["/api/receptionist/account/password-reset/request", "PASSWORD_RESET_REQUESTS_ENABLED", { email: "nobody@example.test" }],
 ];
 
 function get(path: string): Promise<{ status: number; body: string }> {
@@ -315,6 +330,56 @@ describe("public write gates — runtime behaviour", () => {
     expect(res.status, "no other flag may enable booking").toBe(503);
     expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
     expect(dbHits).toEqual([]);
+  });
+
+  it("a blocked password-reset request writes no token, no audit row, and sends no email", async () => {
+    const res = await post("/api/receptionist/account/password-reset/request", { email: "nobody@example.test" });
+    expect(res.status).toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PASSWORD_RESET_REQUESTS_ENABLED"] as string);
+    // The token row, the audit row and the email all live behind the imported
+    // requestPasswordReset, which reaches the database first. No database hit
+    // means none of the three happened.
+    expect(dbHits, "no token row and no audit row").toEqual([]);
+    expect(outboundFetches, "no outbound request while reset is disabled").toEqual([]);
+  });
+
+  it("a blocked reset request stays blocked across repeated attempts", async () => {
+    // Also proves the gate precedes the rate limiter: 12 attempts against a
+    // 10-per-hour bucket never turn into 429, and never consume budget.
+    for (let i = 0; i < 12; i++) {
+      const res = await post("/api/receptionist/account/password-reset/request", { email: `a${i}@example.test` });
+      expect(res.status, `attempt ${i}`).toBe(503);
+    }
+    expect(dbHits).toEqual([]);
+    expect(outboundFetches).toEqual([]);
+  });
+
+  it("the reset gate is independent of the other five flags", async () => {
+    for (const f of FLAGS) if (f !== "PASSWORD_RESET_REQUESTS_ENABLED") process.env[f] = "true";
+    const res = await post("/api/receptionist/account/password-reset/request", { email: "nobody@example.test" });
+    expect(res.status, "no other flag may enable password reset").toBe(503);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("having an email provider configured does not enable password reset", async () => {
+    // Generic mail configuration is not consent to expose password recovery.
+    process.env["RESEND_API_KEY"] = "re_test_not_a_real_key";
+    const res = await post("/api/receptionist/account/password-reset/request", { email: "nobody@example.test" });
+    expect(res.status).toBe(503);
+    expect(outboundFetches).toEqual([]);
+    delete process.env["RESEND_API_KEY"];
+  });
+
+  it("the token-proven sibling routes are not gated by the reset flag", async () => {
+    // Gating these would strand anyone holding a valid token.
+    for (const path of [
+      "/api/receptionist/account/password-reset/complete",
+      "/api/receptionist/account/verify-email/confirm",
+      "/api/receptionist/account/members/accept",
+    ]) {
+      const res = await post(path, { token: "x".repeat(40), newPassword: "Str0ngPassw0rd!" });
+      expect(res.body, path).not.toContain(DISABLED_MESSAGE["PASSWORD_RESET_REQUESTS_ENABLED"] as string);
+    }
   });
 
   it("login is not gated by any public-write flag", async () => {
