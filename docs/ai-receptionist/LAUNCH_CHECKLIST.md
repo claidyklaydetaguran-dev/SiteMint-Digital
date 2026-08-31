@@ -47,6 +47,46 @@ Set these as staging secrets or build variables. Never paste their values into a
 | `VITE_VOICE_SYNC_ENABLED` | Dashboard build | `false` — see AR-001V.1 below |
 | `VOICE_BROWSER_TEST_ENABLED` | API runtime | `false` — see AR-001V.1 below |
 | `VITE_VAPI_PUBLIC_KEY` | Dashboard build | Vapi public browser key (staging organization) |
+| `PUBLIC_REGISTRATION_ENABLED` | API runtime | `false` — see AR-002B-R4/R5 below |
+| `PUBLIC_FORM_SUBMISSIONS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5 below |
+| `PUBLIC_ANALYTICS_WRITES_ENABLED` | API runtime | `false` — see AR-002B-R4/R5 below |
+
+### AR-002B-R4/R5 — three independent public-write capabilities
+
+Every write the API accepts from an unauthenticated caller sits behind one of
+these, each with the same exact-string contract as the voice flags: only the
+literal lowercase `true` enables. Absent, empty, `TRUE`, `1` or anything else
+means disabled, so a typo fails closed instead of quietly opening a public
+write path. They are deliberately separate — a deployment may want lead
+capture on while self-registration stays off — and must never be combined.
+
+| Flag | Opens |
+|---|---|
+| `PUBLIC_REGISTRATION_ENABLED` | `POST /api/receptionist/auth/signup` (creates a firm, a session, and availability defaults) |
+| `PUBLIC_FORM_SUBMISSIONS_ENABLED` | `POST /api/contact/submit`, `/api/discovery/submit`, `/api/landing-test/submit` (insert `form_submissions`, send notification email) |
+| `PUBLIC_ANALYTICS_WRITES_ENABLED` | `POST /api/landing-test/view` (inserts `landing_page_views`) |
+
+While disabled each returns `503` with a short generic sentence that names no
+flag, environment or internal state. Sign-in, sign-out, and every
+authenticated, signature-verified or token-proven route are unaffected.
+
+Two unauthenticated mutating endpoints are **not** covered by these flags and
+remain open when the deployment is live — see AR-002B-R5 §4:
+`POST /api/v1/discovery-submissions` (inserts `discovery_submissions` plus
+pending job rows) and `POST /api/ai-toolkit/checkout` (creates a Stripe
+Checkout Session). Both are rate-limited but neither is authenticated,
+signature-verified, nor default-off. Closing them needs its own authorization.
+
+### API root liveness (AR-002B-R5)
+
+`GET /api` returns `200 {"status":"ok"}` and `HEAD /api` returns `200` with no
+body. This exists for the platform health probe: before R5 the API root had no
+handler, so it fell through to Express's default `404`, which the probe read as
+an unhealthy deployment. It performs no database query, creates no session,
+makes no outbound request, and discloses no environment, version or build
+detail. It is liveness only — readiness (`GET /api/readyz`, which does ping the
+database) and `GET /api/healthz` are unchanged, and unknown paths under `/api`
+still `404`.
 
 ### AR-001V.1 — three independent voice capabilities
 

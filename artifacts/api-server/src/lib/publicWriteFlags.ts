@@ -18,6 +18,7 @@
 
 export const PUBLIC_REGISTRATION_ENABLED_ENV_VAR = "PUBLIC_REGISTRATION_ENABLED";
 export const PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR = "PUBLIC_FORM_SUBMISSIONS_ENABLED";
+export const PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR = "PUBLIC_ANALYTICS_WRITES_ENABLED";
 
 /** True only for the exact string "true". */
 export function isPublicRegistrationEnabled(
@@ -34,6 +35,22 @@ export function isPublicFormSubmissionsEnabled(
 }
 
 /**
+ * True only for the exact string "true".
+ *
+ * R5: anonymous analytics/telemetry writes (`POST /landing-test/view`, which
+ * inserts `landing_page_views`) are a third, independent public write surface.
+ * A deployment may legitimately want lead capture on while page-view telemetry
+ * stays off — or the reverse — so this never shares a flag with the other two.
+ * Read-only analytics (the admin-authenticated `GET /landing-test/stats`) is
+ * unaffected.
+ */
+export function isPublicAnalyticsWritesEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR] === "true";
+}
+
+/**
  * The repository's established feature-disabled reply (see
  * receptionistCalendar.ts and voiceSmsWebhook.ts): HTTP 503 with a short,
  * generic sentence. It names no flag, environment, or internal state, so a
@@ -41,3 +58,4 @@ export function isPublicFormSubmissionsEnabled(
  */
 export const PUBLIC_REGISTRATION_DISABLED_MESSAGE = "Account creation is not currently available.";
 export const PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE = "Form submission is not currently available.";
+export const PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE = "Analytics recording is not currently available.";
