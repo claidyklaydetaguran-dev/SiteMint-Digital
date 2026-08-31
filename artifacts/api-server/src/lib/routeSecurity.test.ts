@@ -9,12 +9,18 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  callsImportedFunction,
   detectProtection,
+  detectSideEffects,
   discoverMutatingRoutes,
   type MutatingRoute,
   type Protection,
 } from "./routeSecurity.js";
-import { KNOWN_OPEN_ROUTES, ROUTE_SECURITY_MANIFEST } from "./routeSecurity.manifest.js";
+import {
+  KNOWN_OPEN_ROUTES,
+  OPEN_WRITERS_PENDING_AUTHORIZATION,
+  ROUTE_SECURITY_MANIFEST,
+} from "./routeSecurity.manifest.js";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
 const routes = discoverMutatingRoutes(join(SRC, "routes"), join(SRC, "app.ts"));
@@ -59,13 +65,51 @@ describe("route-security inventory", () => {
     ).toEqual([]);
   });
 
-  it("the set of unauthenticated routes is exactly the reviewed allowlist", () => {
+  it("the set of unauthenticated routes is exactly the reviewed allowlists", () => {
     const open = routes.filter((r) => detectProtection(r).length === 0).map((r) => r.key).sort();
-    const allowed = Object.keys(KNOWN_OPEN_ROUTES).sort();
+    const allowed = [...Object.keys(KNOWN_OPEN_ROUTES), ...Object.keys(OPEN_WRITERS_PENDING_AUTHORIZATION)].sort();
     expect(
       open,
-      "an uncontrolled public writer appeared (or an allowlisted one was closed). Gate it behind a default-off flag, or record it in KNOWN_OPEN_ROUTES with a reason.",
+      "an uncontrolled route appeared (or an allowlisted one was closed). Gate it behind a default-off flag, or record it in the manifest with evidence.",
     ).toEqual(allowed);
+  });
+
+  it("the two allowlists never overlap", () => {
+    const both = Object.keys(KNOWN_OPEN_ROUTES).filter((k) => k in OPEN_WRITERS_PENDING_AUTHORIZATION);
+    expect(both, "a route cannot be both proven-safe and a pending writer").toEqual([]);
+  });
+
+  it("no allowlisted open route can persist data or act externally", () => {
+    // R7: KNOWN_OPEN_ROUTES is for routes PROVEN incapable of a side effect.
+    // Both conditions matter — a clean detector result means nothing if the
+    // handler delegates across a module boundary the scan cannot follow.
+    for (const key of Object.keys(KNOWN_OPEN_ROUTES)) {
+      const route = byKey.get(key);
+      expect(route, `${key} is allowlisted but does not exist`).toBeDefined();
+      const fx = detectSideEffects(route as MutatingRoute);
+      expect(fx, `${key} persists data or acts externally — it belongs in OPEN_WRITERS_PENDING_AUTHORIZATION or behind a flag`).toEqual([]);
+      expect(
+        callsImportedFunction(route as MutatingRoute),
+        `${key} delegates to an imported function, so it cannot be PROVEN side-effect free from source`,
+      ).toBe(false);
+    }
+  });
+
+  it("every pending open writer is documented with what it actually does", () => {
+    for (const [key, evidence] of Object.entries(OPEN_WRITERS_PENDING_AUTHORIZATION)) {
+      expect(byKey.has(key), `${key} is listed but no longer exists`).toBe(true);
+      expect(evidence.length, `${key} needs real evidence, not a label`).toBeGreaterThan(120);
+      // The entry must name a concrete effect, not merely assert safety.
+      expect(/persist|token|row|email|sms|calendar|stripe|external/i.test(evidence), key).toBe(true);
+    }
+  });
+
+  it("zero uncontrolled public writers outside the reviewed lists", () => {
+    const offenders = routes
+      .filter((r) => detectProtection(r).length === 0)
+      .filter((r) => !(r.key in KNOWN_OPEN_ROUTES) && !(r.key in OPEN_WRITERS_PENDING_AUTHORIZATION))
+      .map((r) => `${r.key} effects=[${detectSideEffects(r).join(",")}]`);
+    expect(offenders, "unreviewed route reachable with no authentication, signature, credential or flag").toEqual([]);
   });
 
   it("every allowlisted open route carries a substantive reason", () => {
@@ -83,6 +127,7 @@ describe("route-security inventory", () => {
       "POST /api/ai-toolkit/checkout",
       "POST /api/receptionist/auth/signup",
       "POST /api/landing-test/view",
+      "POST /api/public/schedule/:slug/requests",
     ]) {
       expect(ROUTE_SECURITY_MANIFEST[key], key).toBe("feature-flag");
     }
@@ -126,9 +171,28 @@ describe("parser correctness (the false-positive traps)", () => {
   });
 
   it("treats rate limiting and honeypots as non-protection", () => {
-    // The scheduling writer has both and must still classify as open.
+    // The scheduling route keeps both, but they are not what protects it:
+    // strip the flag guard and it classifies as open again. Before R7 closed
+    // it, that limiter is exactly what made the R5 audit call it safe.
     const sched = byKey.get("POST /api/public/schedule/:slug/requests");
-    expect(sched?.body).toMatch(/publicSchedulingIpLimiter|isHoneypotTripped/);
-    expect(detectProtection(sched as MutatingRoute)).toEqual([]);
+    expect(sched?.body).toMatch(/publicSchedulingIpLimiter/);
+    expect(sched?.body).toMatch(/isHoneypotTripped/);
+    expect(detectProtection(sched as MutatingRoute)).toEqual(["feature-flag"]);
+    const withoutFlag = {
+      ...(sched as MutatingRoute),
+      body: (sched as MutatingRoute).body.replace(/isPublicSchedulingRequestsEnabled/g, "x"),
+    };
+    expect(
+      detectProtection(withoutFlag),
+      "the limiter and honeypot must not count as protection on their own",
+    ).toEqual([]);
+  });
+
+  it("detects the side effects that make a route a writer", () => {
+    // Sanity-check the detector against a route known to write and one known
+    // to reach an external service, so an over-broad edit that silences it
+    // shows up here instead of quietly emptying the writer classification.
+    expect(detectSideEffects(byKey.get("POST /api/landing-test/view") as MutatingRoute)).toContain("db-write");
+    expect(detectSideEffects(byKey.get("POST /api/ai-toolkit/checkout") as MutatingRoute)).toContain("external");
   });
 });

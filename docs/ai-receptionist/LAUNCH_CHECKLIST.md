@@ -51,8 +51,9 @@ Set these as staging secrets or build variables. Never paste their values into a
 | `PUBLIC_FORM_SUBMISSIONS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 | `PUBLIC_ANALYTICS_WRITES_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 | `AI_TOOLKIT_CHECKOUT_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
+| `PUBLIC_SCHEDULING_REQUESTS_ENABLED` | API runtime | `false` — see AR-002B-R4/R5/R6 below |
 
-### AR-002B-R4/R5/R6 — four independent public-write capabilities
+### AR-002B-R4 through R7 — five independent public-write capabilities
 
 Every write the API accepts from an unauthenticated caller sits behind one of
 these, each with the same exact-string contract as the voice flags: only the
@@ -67,12 +68,18 @@ capture on while self-registration stays off — and must never be combined.
 | `PUBLIC_FORM_SUBMISSIONS_ENABLED` | `POST /api/contact/submit`, `/api/discovery/submit`, `/api/landing-test/submit` (insert `form_submissions`, send notification email) |
 | `PUBLIC_ANALYTICS_WRITES_ENABLED` | `POST /api/landing-test/view` (inserts `landing_page_views`) |
 | `AI_TOOLKIT_CHECKOUT_ENABLED` | `POST /api/ai-toolkit/checkout` (creates a Stripe Checkout Session) |
+| `PUBLIC_SCHEDULING_REQUESTS_ENABLED` | `POST /api/public/schedule/:slug/requests` (persists a booking request) |
 
 `AI_TOOLKIT_CHECKOUT_ENABLED` is deliberately **not** `STRIPE_BOOT_SYNC_ENABLED`:
 boot-time webhook registration and customer checkout are different capabilities
 with different blast radii, and one flag for both would make enabling either
 enable both. `POST /api/v1/discovery-submissions` is covered by
 `PUBLIC_FORM_SUBMISSIONS_ENABLED` alongside the other lead forms.
+
+`PUBLIC_SCHEDULING_REQUESTS_ENABLED` gates **only** the booking write. The
+read-only availability endpoints — `GET /public/schedule/:slug/config`,
+`/days` and `/slots` — stay available, because they persist nothing and a
+booking page that cannot render its availability is not safer.
 
 While disabled each returns `503` with a short generic sentence that names no
 flag, environment or internal state. Sign-in, sign-out, and every
@@ -91,15 +98,24 @@ Rate limiting and honeypots are explicitly **not** counted as protection. They
 bound abuse; they do not control access. Treating them as guards is what caused
 the AR-002B-R5 inventory to miss the writer below.
 
+The manifest keeps two separate lists. `KNOWN_OPEN_ROUTES` is for routes proven
+incapable of persisting data or acting externally — the bar is a clean
+side-effect scan **and** no delegation to an imported function, because a
+source scan cannot see across a module boundary. It is currently empty.
+`OPEN_WRITERS_PENDING_AUTHORIZATION` holds open routes that do write or act
+externally and have not yet been authorized to close; each entry states exactly
+what it does. Both lists are asserted exactly, so nothing can join or leave
+either one silently.
+
 **One open writer remains and needs an owner decision:**
-`POST /api/public/schedule/:slug/requests` accepts an appointment request from
-any caller who knows a firm's public booking slug and persists it. It has an IP
-limiter and honeypot/timing checks but no authentication, signature, credential
-or flag. AR-002B-R6 authorized closing only the discovery-submissions and
-ai-toolkit-checkout writers, so this one is recorded in `KNOWN_OPEN_ROUTES`
-rather than gated unilaterally. Closing it needs its own capability flag — a
-booking flow is not a lead form, so `PUBLIC_FORM_SUBMISSIONS_ENABLED` must not
-be stretched to cover it.
+`POST /api/receptionist/account/password-reset/request` is unauthenticated by
+design — the caller is proving nothing yet — but it is not side-effect free: for
+a known address it persists a `password_reset` token row, sends an email, and
+writes an audit row. It is rate limited and answers identically for known and
+unknown addresses, and the token only ever reaches the account owner. AR-002B-R7
+authorized closing only the scheduling writer, so this is recorded rather than
+gated. Note that gating it disables password recovery for real customers, which
+makes it a product decision as much as a security one.
 
 ### API root liveness (AR-002B-R5)
 

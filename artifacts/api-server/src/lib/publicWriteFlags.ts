@@ -20,6 +20,7 @@ export const PUBLIC_REGISTRATION_ENABLED_ENV_VAR = "PUBLIC_REGISTRATION_ENABLED"
 export const PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR = "PUBLIC_FORM_SUBMISSIONS_ENABLED";
 export const PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR = "PUBLIC_ANALYTICS_WRITES_ENABLED";
 export const AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR = "AI_TOOLKIT_CHECKOUT_ENABLED";
+export const PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR = "PUBLIC_SCHEDULING_REQUESTS_ENABLED";
 
 /** True only for the exact string "true". */
 export function isPublicRegistrationEnabled(
@@ -68,6 +69,22 @@ export function isAiToolkitCheckoutEnabled(
 }
 
 /**
+ * True only for the exact string "true".
+ *
+ * R7: `POST /public/schedule/:slug/requests` lets anyone who knows a firm's
+ * booking slug persist an appointment request. Booking is its own capability —
+ * not lead capture — so it gets its own switch rather than being folded into
+ * `PUBLIC_FORM_SUBMISSIONS_ENABLED`. The read-only availability endpoints
+ * (`/config`, `/days`, `/slots`) are deliberately NOT gated by this: they
+ * persist nothing, and a booking page that cannot render is not safer.
+ */
+export function isPublicSchedulingRequestsEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR] === "true";
+}
+
+/**
  * The repository's established feature-disabled reply (see
  * receptionistCalendar.ts and voiceSmsWebhook.ts): HTTP 503 with a short,
  * generic sentence. It names no flag, environment, or internal state, so a
@@ -77,3 +94,4 @@ export const PUBLIC_REGISTRATION_DISABLED_MESSAGE = "Account creation is not cur
 export const PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE = "Form submission is not currently available.";
 export const PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE = "Analytics recording is not currently available.";
 export const AI_TOOLKIT_CHECKOUT_DISABLED_MESSAGE = "Checkout is not currently available.";
+export const PUBLIC_SCHEDULING_REQUESTS_DISABLED_MESSAGE = "Online booking is not currently available.";

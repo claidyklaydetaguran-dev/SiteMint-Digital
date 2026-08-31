@@ -31,6 +31,8 @@ export type Protection =
   | "unauthenticated"; // deliberately open — must be allowlisted with a reason
 
 export interface MutatingRoute {
+  /** Full source of the file the route was declared in. */
+  fileSource: string;
   /** Repo-relative source file. */
   file: string;
   method: "POST" | "PUT" | "PATCH" | "DELETE";
@@ -71,7 +73,7 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\bvalidateToken\s*\(/, "credential"],
   [/\bverifyPassword\b|\bbcrypt\.compare\b/, "credential"],
   [/\bcompletePasswordReset\b|\bacceptInvitation\b|\bconfirmEmailVerification\b|\bconsumeAccountToken\b/, "token-proven"],
-  [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites)Enabled\b/, "feature-flag"],
+  [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites|SchedulingRequests)Enabled\b/, "feature-flag"],
   [/\bisAiToolkitCheckoutEnabled\b/, "feature-flag"],
 ];
 
@@ -158,6 +160,7 @@ export function discoverMutatingRoutes(routesDir: string, appFile?: string): Mut
       const body = src.slice(after, next ?? src.length);
       const handlerAt = body.search(/async\s*\(|\(\s*_?req\b/);
       routes.push({
+        fileSource: src,
         file,
         method: m[1].toUpperCase() as MutatingRoute["method"],
         path: m[3],
@@ -168,6 +171,61 @@ export function discoverMutatingRoutes(routesDir: string, appFile?: string): Mut
     }
   }
   return routes;
+}
+
+/**
+ * What a route can do if it executes.
+ *
+ * Used to enforce R7's rule that an allowlisted open route must be incapable of
+ * persisting data or initiating an external action. It is a SOURCE scan, so it
+ * sees the route body plus same-file callees — it cannot follow a call into
+ * another module. That limit is deliberate and load-bearing: an allowlist entry
+ * whose work happens in an imported function cannot be proven safe here, so the
+ * manifest requires such a route to declare its effects explicitly and the test
+ * refuses to treat "detector found nothing" as proof on its own.
+ */
+export type SideEffect = "db-write" | "external";
+
+const SIDE_EFFECT_SIGNALS: Array<[RegExp, SideEffect]> = [
+  [/\.insert\s*\(/, "db-write"],
+  [/\.update\s*\(/, "db-write"],
+  [/\.delete\s*\(/, "db-write"],
+  [/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b/i, "db-write"],
+  [/\bissueAccountToken\b|\brecordAudit\b/, "db-write"],
+  [/\bsubmitAppointmentRequest\b|\bcreateAppointmentRequest\b/, "db-write"],
+  [/\bfetch\s*\(/, "external"],
+  [/\bsendEmail\b|\bsendFormEmails\b|\bsendAiToolkitDeliveryEmail\b/, "external"],
+  [/\bstripe\.|checkout\.sessions\.create/, "external"],
+  [/\btwilio\b|\bsendSms\b/i, "external"],
+];
+
+/** Side effects detectable in the route body and its same-file callees. */
+export function detectSideEffects(route: MutatingRoute): SideEffect[] {
+  const found = new Set<SideEffect>();
+  for (const [re, e] of SIDE_EFFECT_SIGNALS) if (re.test(route.body)) found.add(e);
+  return [...found].sort();
+}
+
+/**
+ * True when the handler delegates to a function imported from another module.
+ *
+ * Such a route cannot be proven side-effect-free by this source scan, so the
+ * test refuses to accept "the detector found nothing" as proof for it.
+ */
+export function callsImportedFunction(route: MutatingRoute): boolean {
+  const imported = new Set<string>();
+  const importRe = /import\s*{([^}]*)}\s*from/g;
+  for (let m = importRe.exec(route.fileSource); m; m = importRe.exec(route.fileSource)) {
+    for (const part of (m[1] as string).split(",")) {
+      const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0];
+      if (name) imported.add(name.trim());
+    }
+  }
+  const called = new Set(
+    (route.body.match(/\b([A-Za-z_$][\w$]*)\s*\(/g) ?? []).map((c) => c.slice(0, c.indexOf("(")).trim()),
+  );
+  for (const name of called) if (imported.has(name)) return true;
+  return false;
 }
 
 /** Every protection signal the route carries, deduplicated and sorted. */
