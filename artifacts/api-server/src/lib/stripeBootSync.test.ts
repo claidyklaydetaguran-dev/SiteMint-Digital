@@ -217,13 +217,37 @@ describe("startup wiring is guarded and migrations are untouched", () => {
   it("leaves the required startup migration outside the flag", () => {
     // `runStripeMigrations()` is an internal database migration that startup
     // genuinely requires; it must not have been moved behind the flag.
-    expect(indexSource).toMatch(/await runStripeMigrations\(\)/);
-    const migrationIndex = indexSource.indexOf("await runStripeMigrations()");
-    // The call site, not the import, so the ordering assertion is meaningful.
-    const guardIndex = indexSource.indexOf("startStripeBootSync({");
-    expect(migrationIndex).toBeGreaterThan(-1);
-    expect(guardIndex).toBeGreaterThan(-1);
-    expect(migrationIndex).toBeLessThan(guardIndex);
+    //
+    // R6 moved the call site: the migration is now the boot sequence's
+    // `runMigrations` dependency rather than a bare `await` in this file, so
+    // the invariant is checked structurally instead of by textual order — the
+    // worker function that calls startStripeBootSync is now DECLARED above the
+    // boot-sequence call even though it RUNS strictly after migrations succeed.
+    expect(indexSource).toMatch(/runMigrations:\s*runStripeMigrations/);
+    // The boot sync must not be able to gate, wrap or skip the migration.
+    // Bound to the call itself — slicing to end-of-file would sweep in the
+    // boot-sequence wiring below and defeat the assertion.
+    const guardAt = indexSource.indexOf("startStripeBootSync({");
+    const guardCall = indexSource.slice(guardAt, indexSource.indexOf("});", guardAt) + 3);
+    expect(guardCall).not.toContain("runStripeMigrations");
+    // And the migration must not become conditional on the flag: the boot
+    // sequence that owns it must not consult isStripeBootSyncEnabled at all.
+    const seqAt = indexSource.indexOf("runBootSequence({");
+    expect(seqAt).toBeGreaterThan(-1);
+    const seqCall = indexSource.slice(seqAt);
+    expect(seqCall).toMatch(/runMigrations:\s*runStripeMigrations/);
+    expect(seqCall).not.toContain("isStripeBootSyncEnabled");
+  });
+
+  it("starts the boot sync only from the post-migration worker path", () => {
+    // startStripeBootSync must live inside startBackgroundWorkers, which the
+    // boot sequence invokes only after migrations resolve. At module scope it
+    // would run during — or despite — a failed migration.
+    const workersAt = indexSource.indexOf("function startBackgroundWorkers()");
+    const guardAt = indexSource.indexOf("startStripeBootSync({");
+    expect(workersAt).toBeGreaterThan(-1);
+    expect(guardAt).toBeGreaterThan(workersAt);
+    expect(indexSource).toMatch(/startWorkers:\s*startBackgroundWorkers/);
   });
 
   it("leaves the checkout and webhook request paths out of this module", () => {

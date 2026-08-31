@@ -43,6 +43,12 @@ vi.mock("@workspace/db", async (importOriginal) => {
 
 const { default: app } = await import("./app.js");
 
+// R6: the boot gate refuses application traffic until the boot sequence
+// marks the process ready. These suites exercise the READY app, so they
+// declare that explicitly — the fail-closed default stays "starting".
+const { setBootState } = await import("./lib/bootState.js");
+setBootState("ready");
+
 let server: http.Server;
 let base: string;
 

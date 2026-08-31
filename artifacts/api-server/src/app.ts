@@ -7,6 +7,7 @@ import { createCorsMiddleware, resolveCorsPolicy } from "./lib/corsPolicy.js";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { DISCOVERY_V1_BODY_LIMIT, DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler } from "./lib/discoveryV1BodyLimit.js";
 import { openAiUnavailableErrorHandler } from "./lib/openAiUnavailable.js";
+import { bootGate } from "./lib/bootGate.js";
 
 const app: Express = express();
 
@@ -38,6 +39,13 @@ app.use(
 // starting with a policy that trusts everyone.
 app.use(createCorsMiddleware(resolveCorsPolicy(process.env)));
 app.use(cookieParser());
+
+// R6: the boot gate is the first thing every /api request meets — ahead of the
+// Stripe webhook below, ahead of the raw-body parsers, ahead of the router.
+// Until `runBootSequence` marks the process ready, only the liveness root and
+// /healthz are served; everything else is refused with a generic 503 before
+// authentication, body parsing, database access or any outbound call.
+app.use("/api", bootGate);
 
 // Register Stripe webhook route BEFORE express.json() -- it needs the raw Buffer body
 app.post(
