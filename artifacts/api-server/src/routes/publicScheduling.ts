@@ -20,6 +20,10 @@ import {
   isImplausiblyFast,
   HONEYPOT_FIELD,
 } from "../lib/scheduling/publicSchedulingProtection.js";
+import {
+  isPublicSchedulingRequestsEnabled,
+  PUBLIC_SCHEDULING_REQUESTS_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 
 const router = Router();
 
@@ -176,6 +180,15 @@ const MAX_EMAIL_LEN = 200;
 const MAX_NOTES_LEN = 1000;
 
 router.post("/public/schedule/:slug/requests", async (req: Request, res: Response) => {
+  // R7: fail-closed booking gate. First statement in the handler — ahead of the
+  // slug/firm lookup, rate limiting, honeypot and timing checks, validation,
+  // every database read and write, the appointment-request insert, and any
+  // calendar, email or SMS action. The read-only availability routes above are
+  // deliberately unaffected.
+  if (!isPublicSchedulingRequestsEnabled()) {
+    res.status(503).json({ error: PUBLIC_SCHEDULING_REQUESTS_DISABLED_MESSAGE });
+    return;
+  }
   if (rateLimited(req, res)) return;
 
   const body = (req.body ?? {}) as Record<string, unknown>;

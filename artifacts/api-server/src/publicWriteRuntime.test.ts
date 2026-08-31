@@ -86,6 +86,7 @@ const FLAGS = [
   "PUBLIC_FORM_SUBMISSIONS_ENABLED",
   "PUBLIC_ANALYTICS_WRITES_ENABLED",
   "AI_TOOLKIT_CHECKOUT_ENABLED",
+  "PUBLIC_SCHEDULING_REQUESTS_ENABLED",
 ] as const;
 
 afterEach(() => {
@@ -127,6 +128,17 @@ const DISABLED_MESSAGE: Record<string, string> = {
   PUBLIC_FORM_SUBMISSIONS_ENABLED: "Form submission is not currently available.",
   PUBLIC_ANALYTICS_WRITES_ENABLED: "Analytics recording is not currently available.",
   AI_TOOLKIT_CHECKOUT_ENABLED: "Checkout is not currently available.",
+  PUBLIC_SCHEDULING_REQUESTS_ENABLED: "Online booking is not currently available.",
+};
+
+// A structurally valid booking request. The slug is a well-formed 32-hex value
+// that matches no firm, so even if the gate opened this could not create a real
+// appointment — the test proves the GATE stops it, not a bad slug.
+const SCHEDULING_BODY = {
+  appointmentTypeId: "00000000-0000-0000-0000-000000000000",
+  startUtc: new Date(Date.now() + 86_400_000).toISOString(),
+  contact: { name: "A", email: "a@b.test" },
+  formStartedAt: new Date(Date.now() - 60_000).toISOString(),
 };
 
 // path → [flag that gates it, a body that WOULD be valid if it got through]
@@ -139,7 +151,21 @@ const GATED: Array<[string, string, unknown]> = [
   // R6: the two writers closed in this PR.
   ["/api/v1/discovery-submissions", "PUBLIC_FORM_SUBMISSIONS_ENABLED", DISCOVERY_V1_BODY],
   ["/api/ai-toolkit/checkout", "AI_TOOLKIT_CHECKOUT_ENABLED", {}],
+  // R7: the public booking writer.
+  ["/api/public/schedule/00000000000000000000000000000000/requests", "PUBLIC_SCHEDULING_REQUESTS_ENABLED", SCHEDULING_BODY],
 ];
+
+function get(path: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(`${base}${path}`, { method: "GET" }, (res) => {
+      let out = "";
+      res.on("data", (c) => (out += c));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body: out }));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
 
 describe("public write gates — runtime behaviour", () => {
   for (const [path, flag, body] of GATED) {
@@ -240,6 +266,55 @@ describe("public write gates — runtime behaviour", () => {
     const res = await post("/api/ai-toolkit/checkout", {});
     expect(res.status).toBe(503);
     expect(stripeCalls).toEqual([]);
+  });
+
+  it("a blocked booking request is refused before the slug lookup", async () => {
+    // The slug is syntactically valid but matches no firm. A request that got
+    // past the gate would resolve the firm (a database read) and answer 404;
+    // 503 with no database hit proves the gate ran first.
+    const res = await post("/api/public/schedule/00000000000000000000000000000000/requests", SCHEDULING_BODY);
+    expect(res.status).toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    expect(dbHits, "no slug/firm lookup, no appointment row, no dependent row").toEqual([]);
+    expect(stripeCalls, "no external action").toEqual([]);
+  });
+
+  it("a blocked booking request is refused before rate limiting or honeypot", async () => {
+    // A tripped honeypot answers 400. Sending one and still getting 503 proves
+    // the gate precedes the bot checks — and that the limiter budget is never
+    // consumed while booking is off.
+    const trapped = { ...SCHEDULING_BODY, website: "http://spam.example" };
+    for (let i = 0; i < 12; i++) {
+      const res = await post("/api/public/schedule/00000000000000000000000000000000/requests", trapped);
+      expect(res.status, `attempt ${i}`).toBe(503);
+      expect(res.body, `attempt ${i}`).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    }
+    expect(dbHits).toEqual([]);
+  });
+
+  it("public read-only scheduling stays available while booking is off", async () => {
+    // Gating the writer must not take the booking page down. These are reads,
+    // so they reach the trapped database — which is the point: they were not
+    // short-circuited by the booking gate.
+    for (const path of [
+      "/api/public/schedule/00000000000000000000000000000000/config",
+      "/api/public/schedule/00000000000000000000000000000000/days",
+      "/api/public/schedule/00000000000000000000000000000000/slots",
+    ]) {
+      const res = await get(path);
+      expect(res.body, path).not.toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    }
+  });
+
+  it("the booking gate is independent of the other four flags", async () => {
+    process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
+    process.env["PUBLIC_REGISTRATION_ENABLED"] = "true";
+    process.env["PUBLIC_ANALYTICS_WRITES_ENABLED"] = "true";
+    process.env["AI_TOOLKIT_CHECKOUT_ENABLED"] = "true";
+    const res = await post("/api/public/schedule/00000000000000000000000000000000/requests", SCHEDULING_BODY);
+    expect(res.status, "no other flag may enable booking").toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    expect(dbHits).toEqual([]);
   });
 
   it("login is not gated by any public-write flag", async () => {

@@ -1,8 +1,8 @@
-// R6 — the committed route-security manifest.
+// R6/R7 — the committed route-security manifest.
 //
-// Every mutating route (POST/PUT/PATCH/DELETE) the api-server exposes, with
-// the protection class it is expected to keep. routeSecurity.test.ts re-derives
-// this from source on every CI run and fails when the two disagree, so:
+// Every mutating route (POST/PUT/PATCH/DELETE) the api-server exposes, with the
+// protection class it is expected to keep. routeSecurity.test.ts re-derives this
+// from source on every CI run and fails when the two disagree, so:
 //   - a new mutating route cannot ship unclassified;
 //   - an existing route cannot silently lose its guard;
 //   - a new uncontrolled public writer cannot appear unnoticed.
@@ -105,7 +105,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/intake/sms-webhook": "signature",
   "POST /api/landing-test/submit": "feature-flag",
   "POST /api/landing-test/view": "feature-flag",
-  "POST /api/public/schedule/:slug/requests": "unauthenticated",
+  "POST /api/public/schedule/:slug/requests": "feature-flag",
   "POST /api/receptionist/account/members": "session",
   "POST /api/receptionist/account/members/accept": "token-proven",
   "POST /api/receptionist/account/password-reset/complete": "token-proven",
@@ -144,28 +144,41 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
 };
 
 /**
- * Routes that are deliberately reachable without authentication, signature,
- * credential or feature flag. This list is asserted EXACTLY: adding an open
- * route without adding it here fails CI, and removing one from the code
- * without removing it here fails too.
+ * Routes that are deliberately reachable without authentication AND are proven
+ * incapable of persisting data or initiating an external action.
  *
- * Each entry must carry a reason. "It has a rate limiter" is not a reason —
- * rate limiting and honeypots bound abuse, they do not control access. That
- * distinction is why the AR-002B-R5 audit missed the scheduling writer below:
- * its inventory counted rate limiting as a guard.
+ * The bar is deliberately high: an entry here must have no detectable
+ * side effect in its own source *and* must not delegate to an imported
+ * function, because a source scan cannot see across a module boundary. A route
+ * that fails either check cannot be called safe and does not belong here.
+ *
+ * It is currently empty. That is the intended steady state — every open route
+ * either gets a default-off flag or is listed below awaiting one.
  */
-export const KNOWN_OPEN_ROUTES: Record<string, string> = {
+export const KNOWN_OPEN_ROUTES: Record<string, string> = {};
+
+/**
+ * Unauthenticated mutating routes that DO persist data or take an external
+ * action, and are still open because closing them has not been authorized.
+ *
+ * This list is asserted exactly. A new open writer cannot appear without
+ * failing CI, and one cannot be quietly removed from the code either. Each
+ * entry states precisely what it does, so the decision to gate it can be made
+ * on evidence rather than on a route name.
+ *
+ * Rate limiting is not a reason to be on this list rather than gated — limiters
+ * and honeypots bound abuse, they do not control access. Treating them as
+ * guards is what let the AR-002B-R5 inventory miss the scheduling writer that
+ * R7 has now closed.
+ */
+export const OPEN_WRITERS_PENDING_AUTHORIZATION: Record<string, string> = {
   "POST /api/receptionist/account/password-reset/request":
-    "Password-reset initiation is unauthenticated by design — the caller is proving nothing yet. " +
-    "It is fixed-window rate limited, and the single-use token it issues is delivered to the " +
-    "account owner's address, so the privileged half of the flow (password-reset/complete) is " +
-    "token-proven.",
-  "POST /api/public/schedule/:slug/requests":
-    "AR-002B-R6 FINDING, awaiting an owner decision: the public booking page accepts an " +
-    "appointment request from any caller who knows a firm's slug and writes it via " +
-    "submitAppointmentRequest. It has an IP limiter and honeypot/timing checks but no " +
-    "authentication, signature, credential or default-off flag. R6 authorized closing only the " +
-    "discovery-submissions and ai-toolkit-checkout writers, so this one is recorded here rather " +
-    "than gated unilaterally. It needs its own flag (a booking capability is not a lead form, so " +
-    "PUBLIC_FORM_SUBMISSIONS_ENABLED must not be stretched to cover it).",
+    "AR-002B-R7 FINDING, awaiting an owner decision. Unauthenticated by design — the caller is " +
+    "proving nothing yet — but it is NOT side-effect free: for a known address it calls " +
+    "issueAccountToken (persists a password_reset token row), sends an email through the " +
+    "configured provider, and writes a best-effort audit row. It is fixed-window rate limited and " +
+    "answers identically for known and unknown addresses, and the token it issues only ever " +
+    "reaches the account owner's inbox. R7 authorized closing only the scheduling writer, so this " +
+    "is recorded rather than gated. Closing it needs its own flag; note that gating it disables " +
+    "password recovery for real customers, which is a product decision, not just a security one.",
 };
