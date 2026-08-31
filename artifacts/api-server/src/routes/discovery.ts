@@ -3,10 +3,20 @@ import { db, discoverySubmissions, formSubmissions } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { calculateLeadScore, calculateTags, recommendPackage } from "../lib/generators.js";
 import { sendFormEmails } from "../lib/email.js";
+import {
+  isPublicFormSubmissionsEnabled,
+  PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 
 const router: IRouter = Router();
 
 router.post("/discovery/submit", async (req: Request, res: Response) => {
+  // Fail-closed public-write gate — before validation, database access,
+  // insertion, and notification email.
+  if (!isPublicFormSubmissionsEnabled()) {
+    res.status(503).json({ error: PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const data = req.body as Record<string, unknown>;
 

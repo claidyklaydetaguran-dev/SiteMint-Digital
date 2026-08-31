@@ -18,12 +18,24 @@ import {
   getClientIp,
   maskEmail,
 } from "../lib/authRateLimit.js";
+import {
+  isPublicRegistrationEnabled,
+  PUBLIC_REGISTRATION_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 
 const router = Router();
 
 // ── POST /api/receptionist/auth/signup ────────────────────────────────────────
 
 router.post("/receptionist/auth/signup", async (req: Request, res: Response) => {
+  // Fail-closed public-write gate. FIRST statement in the handler: no
+  // validation, no rate-limit budget, no database read, no bcrypt work, no
+  // firm insert, no session creation, no availability provisioning, and no
+  // email can happen while self-registration is disabled.
+  if (!isPublicRegistrationEnabled()) {
+    res.status(503).json({ error: PUBLIC_REGISTRATION_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const { fullName, businessName, email, phone, industry, password } = req.body as {
       fullName?: string;

@@ -42,6 +42,12 @@ if (!process.env.DATABASE_URL || !process.env.RESEND_API_KEY) {
   process.exit(1);
 }
 
+// R4: POST /discovery/submit is fail-closed behind PUBLIC_FORM_SUBMISSIONS_ENABLED.
+// This suite asserts the ENABLED contract (400 validation, 201 success, inserts,
+// intercepted email), so it opts in explicitly. The disabled path is covered by
+// src/lib/publicWriteGuards.test.ts.
+process.env.PUBLIC_FORM_SUBMISSIONS_ENABLED = "true";
+
 // ── Monkey-patch db methods (same singleton routes/discovery.ts imports) ──
 
 type FakeRow = Record<string, unknown>;
