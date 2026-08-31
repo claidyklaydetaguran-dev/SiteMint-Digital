@@ -21,10 +21,12 @@ import {
   isPublicAnalyticsWritesEnabled,
   isPublicFormSubmissionsEnabled,
   isPublicRegistrationEnabled,
+  isPasswordResetRequestsEnabled,
   isPublicSchedulingRequestsEnabled,
   PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR,
   PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR,
   PUBLIC_REGISTRATION_ENABLED_ENV_VAR,
+  PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR,
   PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR,
 } from "./publicWriteFlags.js";
 import { describeEnvContract, validateEnvContract } from "./envContract.js";
@@ -47,15 +49,18 @@ describe("public-write flag contract", () => {
       expect(isAiToolkitCheckoutEnabled(env4), `checkout:${String(v)}`).toBe(false);
       const env5 = v === undefined ? {} : { [PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR]: v };
       expect(isPublicSchedulingRequestsEnabled(env5), `scheduling:${String(v)}`).toBe(false);
+      const env6 = v === undefined ? {} : { [PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR]: v };
+      expect(isPasswordResetRequestsEnabled(env6), `reset:${String(v)}`).toBe(false);
     }
     expect(isPublicRegistrationEnabled({ [PUBLIC_REGISTRATION_ENABLED_ENV_VAR]: "true" })).toBe(true);
     expect(isPublicFormSubmissionsEnabled({ [PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR]: "true" })).toBe(true);
     expect(isPublicAnalyticsWritesEnabled({ [PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR]: "true" })).toBe(true);
     expect(isAiToolkitCheckoutEnabled({ [AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR]: "true" })).toBe(true);
     expect(isPublicSchedulingRequestsEnabled({ [PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR]: "true" })).toBe(true);
+    expect(isPasswordResetRequestsEnabled({ [PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR]: "true" })).toBe(true);
   });
 
-  it("defaults to disabled and all five flags are independent", () => {
+  it("defaults to disabled and all six flags are independent", () => {
     expect(isPublicRegistrationEnabled({})).toBe(false);
     expect(isPublicFormSubmissionsEnabled({})).toBe(false);
     const onlyForms = { [PUBLIC_FORM_SUBMISSIONS_ENABLED_ENV_VAR]: "true" };
@@ -79,6 +84,7 @@ describe("public-write flag contract", () => {
       [PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR, isPublicAnalyticsWritesEnabled],
       [AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR, isAiToolkitCheckoutEnabled],
       [PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR, isPublicSchedulingRequestsEnabled],
+      [PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR, isPasswordResetRequestsEnabled],
     ] as const;
     for (const [name, self] of ALL) {
       const env = { [name]: "true" };
@@ -90,6 +96,8 @@ describe("public-write flag contract", () => {
     }
     // Boot sync is a separate capability and must imply none of them.
     for (const [, fn] of ALL) expect(fn({ STRIPE_BOOT_SYNC_ENABLED: "true" })).toBe(false);
+    // Neither is having a mail provider configured.
+    for (const [, fn] of ALL) expect(fn({ RESEND_API_KEY: "re_test_not_a_real_key" })).toBe(false);
   });
 });
 
@@ -121,6 +129,14 @@ describe("guard placement (blocked requests reach nothing)", () => {
       handler: 'router.post("/ai-toolkit/checkout"',
       flag: "isAiToolkitCheckoutEnabled",
       forbidden: [/findActivePriceIdForProduct\(/, /getUncachableStripeClient\(/, /checkout\.sessions\.create/],
+    },
+    // R8: the reset gate must precede the limiter, validation, the account
+    // lookup, the imported delegation, token creation, the audit row and mail.
+    {
+      file: "routes/receptionistAccount.ts",
+      handler: 'router.post("/receptionist/account/password-reset/request"',
+      flag: "isPasswordResetRequestsEnabled",
+      forbidden: [/limited\(req, res, "pw-reset"\)/, /requestPasswordReset\(/, /req\.body/],
     },
     // R7: the booking gate must precede the slug/firm lookup, the IP limiter,
     // the honeypot and timing checks, validation, and the request insert.
@@ -244,7 +260,7 @@ describe("guard placement (blocked requests reach nothing)", () => {
 });
 
 describe("environment contract", () => {
-  it("registers all five public-write and checkout flags", () => {
+  it("registers all six public-write, checkout and reset flags", () => {
     const names = describeEnvContract().map((e) => e.name);
     for (const n of [
       PUBLIC_REGISTRATION_ENABLED_ENV_VAR,
@@ -252,6 +268,7 @@ describe("environment contract", () => {
       PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR,
       AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR,
       PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR,
+      PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR,
     ]) {
       expect(names, n).toContain(n);
       expect(describeEnvContract().find((e) => e.name === n)?.kind, n).toBe("flag");
@@ -265,6 +282,7 @@ describe("environment contract", () => {
       [PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR]: "yes",
       [AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR]: "on",
       [PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR]: "True",
+      [PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR]: "on",
     });
     const named = findings.map((f) => f.name);
     expect(named).toContain(PUBLIC_REGISTRATION_ENABLED_ENV_VAR);
@@ -272,6 +290,7 @@ describe("environment contract", () => {
     expect(named).toContain(PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR);
     expect(named).toContain(AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR);
     expect(named).toContain(PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR);
+    expect(named).toContain(PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR);
     expect(findings.every((f) => f.level === "warning" || f.level === "error")).toBe(true);
   });
 

@@ -75,6 +75,7 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\bcompletePasswordReset\b|\bacceptInvitation\b|\bconfirmEmailVerification\b|\bconsumeAccountToken\b/, "token-proven"],
   [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites|SchedulingRequests)Enabled\b/, "feature-flag"],
   [/\bisAiToolkitCheckoutEnabled\b/, "feature-flag"],
+  [/\bisPasswordResetRequestsEnabled\b/, "feature-flag"],
 ];
 
 /**

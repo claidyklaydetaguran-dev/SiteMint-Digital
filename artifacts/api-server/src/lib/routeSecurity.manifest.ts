@@ -1,4 +1,4 @@
-// R6/R7 — the committed route-security manifest.
+// R6/R7/R8 — the committed route-security manifest.
 //
 // Every mutating route (POST/PUT/PATCH/DELETE) the api-server exposes, with the
 // protection class it is expected to keep. routeSecurity.test.ts re-derives this
@@ -109,7 +109,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/receptionist/account/members": "session",
   "POST /api/receptionist/account/members/accept": "token-proven",
   "POST /api/receptionist/account/password-reset/complete": "token-proven",
-  "POST /api/receptionist/account/password-reset/request": "unauthenticated",
+  "POST /api/receptionist/account/password-reset/request": "feature-flag",
   "POST /api/receptionist/account/verify-email/confirm": "token-proven",
   "POST /api/receptionist/account/verify-email/request": "session",
   "POST /api/receptionist/auth/login": "credential",
@@ -144,41 +144,32 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
 };
 
 /**
- * Routes that are deliberately reachable without authentication AND are proven
- * incapable of persisting data or initiating an external action.
+ * Routes deliberately reachable without authentication AND proven incapable of
+ * persisting data or initiating an external action.
  *
- * The bar is deliberately high: an entry here must have no detectable
- * side effect in its own source *and* must not delegate to an imported
- * function, because a source scan cannot see across a module boundary. A route
- * that fails either check cannot be called safe and does not belong here.
+ * The bar is deliberately high: an entry must have no detectable side effect in
+ * its own source *and* must not delegate to an imported function, because a
+ * source scan cannot see across a module boundary. A route that fails either
+ * check cannot be called safe and does not belong here.
  *
- * It is currently empty. That is the intended steady state — every open route
- * either gets a default-off flag or is listed below awaiting one.
+ * EMPTY as of R8. The two exception lists are kept — not deleted — precisely so
+ * that emptiness is an asserted fact rather than an absent mechanism. Deleting
+ * them would make the count zero by construction and prove nothing.
  */
 export const KNOWN_OPEN_ROUTES: Record<string, string> = {};
 
 /**
  * Unauthenticated mutating routes that DO persist data or take an external
- * action, and are still open because closing them has not been authorized.
+ * action and remain open because closing them has not been authorized.
  *
- * This list is asserted exactly. A new open writer cannot appear without
- * failing CI, and one cannot be quietly removed from the code either. Each
- * entry states precisely what it does, so the decision to gate it can be made
- * on evidence rather than on a route name.
+ * EMPTY as of R8: every public writer is now behind a default-off capability
+ * flag. R7 closed the public booking writer; R8 closed password-reset
+ * initiation, which persisted a token row, wrote an audit row and sent mail.
  *
- * Rate limiting is not a reason to be on this list rather than gated — limiters
- * and honeypots bound abuse, they do not control access. Treating them as
- * guards is what let the AR-002B-R5 inventory miss the scheduling writer that
- * R7 has now closed.
+ * If an entry ever reappears here it must state precisely what the route does,
+ * so the decision to gate it can be made on evidence rather than a route name.
+ * Rate limiting is never a reason to sit here instead of behind a flag —
+ * limiters and honeypots bound abuse, they do not control access. Treating them
+ * as guards is what let the AR-002B-R5 inventory miss the scheduling writer.
  */
-export const OPEN_WRITERS_PENDING_AUTHORIZATION: Record<string, string> = {
-  "POST /api/receptionist/account/password-reset/request":
-    "AR-002B-R7 FINDING, awaiting an owner decision. Unauthenticated by design — the caller is " +
-    "proving nothing yet — but it is NOT side-effect free: for a known address it calls " +
-    "issueAccountToken (persists a password_reset token row), sends an email through the " +
-    "configured provider, and writes a best-effort audit row. It is fixed-window rate limited and " +
-    "answers identically for known and unknown addresses, and the token it issues only ever " +
-    "reaches the account owner's inbox. R7 authorized closing only the scheduling writer, so this " +
-    "is recorded rather than gated. Closing it needs its own flag; note that gating it disables " +
-    "password recovery for real customers, which is a product decision, not just a security one.",
-};
+export const OPEN_WRITERS_PENDING_AUTHORIZATION: Record<string, string> = {};
