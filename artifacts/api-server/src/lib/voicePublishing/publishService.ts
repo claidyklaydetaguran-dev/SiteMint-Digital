@@ -324,7 +324,7 @@ function buildProviderInput(
     firstMessageMode: mapFirstMessageMode(extracted.firstMessageMode),
     ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
     systemInstructions: extracted.systemInstructions,
-    ...(serverConfig !== null ? { server: { url: serverConfig.url, secret: serverConfig.secret } } : {}),
+    ...(serverConfig !== null ? { server: { url: serverConfig.url, credentialId: serverConfig.credentialId } } : {}),
     ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
     ...(callPolicy !== null ? { callPolicy: callPolicy as unknown as JsonObject } : {}),
   };

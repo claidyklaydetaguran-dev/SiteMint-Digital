@@ -37,7 +37,7 @@ export function buildVoiceToolDefinitions(serverConfig: VoiceServerConfig): Json
       description: TOOL_DESCRIPTIONS[name],
       parameters: TOOL_PARAMETER_SCHEMAS[name],
     },
-    server: { url: serverConfig.url, secret: serverConfig.secret },
+    server: { url: serverConfig.url, credentialId: serverConfig.credentialId },
   }));
 }
 
