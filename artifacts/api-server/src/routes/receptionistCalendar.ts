@@ -28,6 +28,12 @@ import {
   markConnectionRevoked,
   getActiveConnection,
 } from "../lib/calendar/calendarConnectionsRepository.js";
+import {
+  approveRequestToBooked,
+  reconcileCalendarForFirm,
+  isCalendarWriteEnabled,
+} from "../lib/calendar/calendarEventSync.js";
+import { calendarSyncDeps } from "../lib/calendar/calendarSyncDeps.js";
 
 const router = Router();
 
@@ -125,6 +131,78 @@ router.delete("/receptionist/calendar/connection", requireReceptionistAuth, asyn
     res.json({ disconnected: true });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] disconnect failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /api/receptionist/calendar/requests/:publicId/approve ───────────────
+//
+// The approval action — the only reachable path that writes a calendar event.
+// It lives on the CALENDAR router rather than the availability router on
+// purpose: appointmentsContract.test.ts pins that router to exactly the ten
+// endpoints the appointments page calls and explicitly forbids an approve
+// endpoint there, and this is calendar-domain work regardless.
+//
+// Authenticated and firm-scoped like every sibling: the firm comes from the
+// session, never from the request. All the hard parts — the
+// CALENDAR_WRITE_ENABLED gate, the single event write, the status-guarded
+// atomic stamp, and the delete-on-lost-race compensation — already live in
+// approveRequestToBooked; this only maps an outcome to a status code.
+//
+// The response body is deliberately coarse: an operator learns what to do
+// next without it ever carrying a provider event id, calendar id, token, or
+// caller detail.
+
+const APPROVE_STATUS: Record<string, number> = {
+  booked: 200,
+  disabled: 503,
+  no_connection: 409,
+  not_found: 404,
+  not_approvable: 409,
+  event_write_failed: 502,
+  conflict_after_write: 409,
+};
+
+router.post("/receptionist/calendar/requests/:publicId/approve", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const firmId = req.firmId!;
+  try {
+    const outcome = await approveRequestToBooked(firmId, req.params.publicId as string, calendarSyncDeps());
+    req.log.info({ firmId, outcome }, "[calendar] appointment approval");
+    res
+      .status(APPROVE_STATUS[outcome] ?? 500)
+      .json(outcome === "booked" ? { ok: true, status: "booked" } : { ok: false, reason: outcome });
+  } catch (err) {
+    req.log.error(
+      { firmId, errorClass: err instanceof Error ? err.name : "unknown" },
+      "[calendar] appointment approval failed",
+    );
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /api/receptionist/calendar/reconcile ────────────────────────────────
+//
+// Recovery for the one gap the happy paths cannot close: a request that left
+// the calendar-worthy world without its event being removed — a voice-tool
+// reschedule or cancel that goes through the repository rather than a route,
+// or a delete that failed once. Deleting an event twice is safe (the writer
+// treats 404/410 as success), so this is repeatable by design.
+
+router.post("/receptionist/calendar/reconcile", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const firmId = req.firmId!;
+  try {
+    if (!isCalendarWriteEnabled()) {
+      res.status(503).json({ ok: false, reason: "disabled" });
+      return;
+    }
+    const summary = await reconcileCalendarForFirm(firmId, calendarSyncDeps());
+    req.log.info({ firmId, ...summary }, "[calendar] reconcile");
+    res.json({ ok: true, ...summary });
+  } catch (err) {
+    req.log.error(
+      { firmId, errorClass: err instanceof Error ? err.name : "unknown" },
+      "[calendar] reconcile failed",
+    );
     res.status(500).json({ error: "Internal error" });
   }
 });
