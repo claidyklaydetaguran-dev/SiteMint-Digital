@@ -304,7 +304,10 @@ describe("event body carries nothing it should not", () => {
     ]) {
       expect(body).not.toHaveProperty(forbidden);
     }
-    expect(Object.keys(body).sort()).toEqual(["end", "iCalUID", "source", "start", "summary"]);
+    // "source" was here until Google rejected every insert over it (400
+    // "Invalid source url: ."). See buildEventBody and the events.insert
+    // field test in calendarIntegration.test.ts.
+    expect(Object.keys(body).sort()).toEqual(["end", "iCalUID", "start", "summary"]);
   });
 
   it("derives iCalUID from the request public id, which is what prevents a duplicate event", () => {
