@@ -60,6 +60,20 @@ export const ROUTES = {
   aiReceptionistSignup: "/ai-receptionist/signup",
   aiReceptionist: "/ai-receptionist",
 
+  // ── Frontend V3 — Operational Editorial IA (additive) ───────────────────
+  // New public destinations from docs/frontend-v3/DESIGN-SPEC.md §4. Nothing
+  // existing is renamed; `/portfolio` stays routed while `/work` becomes the
+  // V3 canonical Work path.
+  websitesApps: "/websites-apps",
+  discoverySystems: "/discovery-systems",
+  automation: "/automation",
+  workV3: "/work",
+  process: "/process",
+  insights: "/insights",
+  start: "/start",
+  privacy: "/privacy",
+  terms: "/terms",
+
   // ── Deferred / deprecated (owner decision 4) ────────────────────────────
   // Still routed so existing inbound links do not break, but removed from all
   // navigation and from the approved information architecture. Source files

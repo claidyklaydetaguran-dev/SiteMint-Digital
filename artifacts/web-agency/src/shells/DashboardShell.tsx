@@ -38,6 +38,18 @@ export function DashboardShell({ children, routeLabel }: DashboardShellProps) {
 
   return (
     <div className="v2-dashboard-shell" data-shell="dashboard">
+      {/* V3 Phase 5: honest internal-environment labelling. Server-side
+          Bearer auth remains the actual access boundary. */}
+      <div className="v3o-bar">
+        <span className="v3o-bar__brand">
+          <span className="v3o-bar__brand-dot" aria-hidden="true" />
+          SiteMint Operations
+        </span>
+        <span className="v3o-bar__scope">
+          Internal operating environment — not a customer surface
+        </span>
+        <span className="v3o-bar__badge">Authorized personnel</span>
+      </div>
       <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
         <Suspense fallback={<RouteFallback label={routeLabel ?? "Loading workspace"} />}>
           {children}

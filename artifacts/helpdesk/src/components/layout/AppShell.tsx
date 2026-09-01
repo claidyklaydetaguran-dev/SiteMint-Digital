@@ -50,6 +50,7 @@ import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboard
 // have; see `pages/settings/settingsContract.ts` for the evidence.
 import { planLabel } from "@/pages/settings/settingsContract";
 import "@/styles/v2-dashboard.css";
+import "@/styles/v3-app.css";
 
 const DESKTOP_QUERY = "(min-width: 64rem)";
 

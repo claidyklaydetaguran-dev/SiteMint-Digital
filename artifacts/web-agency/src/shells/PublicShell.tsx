@@ -28,6 +28,8 @@ import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
 import { SiteHeader } from "@/components/v2/SiteHeader";
 import { SiteFooter } from "@/components/v2/SiteFooter";
+import { SiteHeaderV3 } from "@/components/v3/SiteHeaderV3";
+import { SiteFooterV3 } from "@/components/v3/SiteFooterV3";
 import { HOME_SECTIONS } from "@/lib/routes";
 
 interface PublicShellProps {
@@ -35,10 +37,20 @@ interface PublicShellProps {
   /** Human name of the surface, used by the recovery panel. */
   routeLabel?: string;
   /** Which chrome wraps the page. See the module comment. */
-  chrome?: "none" | "v2";
+  chrome?: "none" | "v2" | "v3";
+  /**
+   * V3 chrome only: pages that open on an ink hero let it run underneath the
+   * floating header ("ink"); light pages pad below it ("light").
+   */
+  heroTone?: "ink" | "light";
 }
 
-export function PublicShell({ children, routeLabel, chrome = "none" }: PublicShellProps) {
+export function PublicShell({
+  children,
+  routeLabel,
+  chrome = "none",
+  heroTone = "light",
+}: PublicShellProps) {
   const [location] = useLocation();
 
   const boundary = (
@@ -48,6 +60,27 @@ export function PublicShell({ children, routeLabel, chrome = "none" }: PublicShe
       </Suspense>
     </RouteErrorBoundary>
   );
+
+  if (chrome === "v3") {
+    return (
+      <div
+        className="v3-shell"
+        data-shell="public"
+        data-chrome="v3"
+        data-hero-tone={heroTone}
+        data-tone={heroTone === "ink" ? "ink" : "porcelain"}
+      >
+        <a className="v3-skip" href={`#${HOME_SECTIONS.main}`}>
+          Skip to main content
+        </a>
+        <SiteHeaderV3 tone={heroTone} />
+        <main id={HOME_SECTIONS.main} className="v3-shell__main" tabIndex={-1}>
+          {boundary}
+        </main>
+        <SiteFooterV3 />
+      </div>
+    );
+  }
 
   if (chrome !== "v2") {
     return (
