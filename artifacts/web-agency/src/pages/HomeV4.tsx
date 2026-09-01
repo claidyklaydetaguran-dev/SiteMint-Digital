@@ -22,7 +22,7 @@
 
 import { useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { ROUTES } from "@/lib/routes";
+import { HOME_SECTIONS, ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { SignalGlyphV4 } from "@/components/v4/SignalGlyphsV4";
 import { whatWeBuildV4, startHrefV4, startLabelV4 } from "@/components/v4/publicNavV4";
@@ -351,18 +351,32 @@ function SignalHeroV4() {
       return () => window.removeEventListener("resize", onResize);
     }
 
+    // The loop runs only while the hero is BOTH on-screen and the page is
+    // visible (R1 correction 7: explicit page-visibility pause — the app no
+    // longer relies solely on the browser suspending rAF in hidden tabs).
+    let intersecting = false;
+
+    function syncLoop() {
+      const shouldRun = intersecting && document.visibilityState === "visible";
+      if (shouldRun && !running) {
+        running = true;
+        raf = requestAnimationFrame(frame);
+      } else if (!shouldRun && running) {
+        running = false;
+        cancelAnimationFrame(raf);
+      }
+    }
+
     const vis = new IntersectionObserver((entries) => {
       for (const entry of entries) {
-        if (entry.isIntersecting && !running) {
-          running = true;
-          raf = requestAnimationFrame(frame);
-        } else if (!entry.isIntersecting && running) {
-          running = false;
-          cancelAnimationFrame(raf);
-        }
+        intersecting = entry.isIntersecting;
       }
+      syncLoop();
     });
     vis.observe(root);
+
+    const onVisibility = () => syncLoop();
+    document.addEventListener("visibilitychange", onVisibility);
 
     function onPointer(e: PointerEvent) {
       tgX = (e.clientX / window.innerWidth - 0.5) * 20;
@@ -377,6 +391,7 @@ function SignalHeroV4() {
       running = false;
       cancelAnimationFrame(raf);
       vis.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
       if (finePointer) root.removeEventListener("pointermove", onPointer);
     };
@@ -502,10 +517,17 @@ export default function HomeV4() {
     <div className="v4-home">
       <SignalHeroV4 />
 
+      {/* Legacy homepage-section aliases (R1 correction 4): inbound V2/V3-era
+          links to /#process, /#selected-work and /#faq land on the nearest
+          equivalent V4 chapter instead of the top of the page. Zero-height
+          anchors; scroll-margin-top places them below the fixed header. */}
+      <span id={HOME_SECTIONS.process} aria-hidden="true" />
       <SignalJourneyV4 reveal={reveal} />
 
+      <span id={HOME_SECTIONS.work} aria-hidden="true" />
       <PillarsV4 reveal={reveal} />
 
+      <span id={HOME_SECTIONS.faq} aria-hidden="true" />
       <section className="v4-section v4-cta-band" data-tone="ink">
         <div className="v4-container">
           <span className="v4-kicker">03 — Start</span>

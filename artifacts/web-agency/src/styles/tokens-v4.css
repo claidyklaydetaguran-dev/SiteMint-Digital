@@ -49,14 +49,18 @@
   --v4-red-deep: #c62a33;
   --v4-green-ok: #0b6e4f;
 
-  /* ── V4 type — four voices (self-hosted via @fontsource, display:swap) ── */
-  --v4-font-display: "Space Grotesk", "Geist", ui-sans-serif, system-ui,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --v4-font-body: "DM Sans", "Geist", ui-sans-serif, system-ui, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
-  --v4-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono",
-    SFMono-Regular, Menlo, Consolas, monospace;
-  --v4-font-editorial: "Newsreader", Didot, Georgia, ui-serif, serif;
+  /* ── V4 type — four voices (self-hosted via @fontsource, display:swap).
+     Each stack falls back through a metric-matched local face (defined
+     below) so the swap-in causes near-zero reflow — the R1 font-CLS fix. ── */
+  --v4-font-display: "Space Grotesk", "Space Grotesk Fallback", "Geist",
+    ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --v4-font-body: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --v4-font-mono: "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace,
+    "Cascadia Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --v4-font-editorial: "Newsreader", "Newsreader Fallback", Didot, Georgia,
+    ui-serif, serif;
 
   /* ── Signal gradient — the thread only, never fills or buttons ───────── */
   --v4-signal-gradient: linear-gradient(
@@ -65,6 +69,48 @@
     var(--v4-turquoise) 55%,
     var(--v4-mint)
   );
+}
+
+/* ── Metric-matched fallback faces (R1 font-CLS fix) ──
+   Overrides derived from @capsizecss/metrics 3.x font tables:
+   size-adjust = webfont xWidthAvg/upm ÷ fallback xWidthAvg/upm, and
+   ascent/descent/line-gap re-expressed against the adjusted size. With these,
+   text set in the local fallback occupies the same box the webfont will,
+   so `font-display: swap` no longer moves the page. */
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial");
+  size-adjust: 109.69%;
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "DM Sans Fallback";
+  src: local("Arial");
+  size-adjust: 104.53%;
+  ascent-override: 94.9%;
+  descent-override: 29.66%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  src: local("Courier New");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Newsreader Fallback";
+  src: local("Georgia");
+  size-adjust: 96.12%;
+  ascent-override: 76.47%;
+  descent-override: 27.57%;
+  line-gap-override: 0%;
 }
 
 /* ── The V4 remap: V3 vocabulary wears the Signal skin under V4 chrome ── */

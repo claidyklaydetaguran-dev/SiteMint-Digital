@@ -25,6 +25,26 @@
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
 
+/* Metric-matched fallback faces (R1 font-CLS fix) — values derived from
+   @capsizecss/metrics; same definitions as web-agency tokens-v4.css. */
+@font-face {
+  font-family: "DM Sans Fallback";
+  src: local("Arial");
+  size-adjust: 104.53%;
+  ascent-override: 94.9%;
+  descent-override: 29.66%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial");
+  size-adjust: 109.69%;
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+}
+
 .sd-app.sd-app {
   /* ── V4 palette through the V2 token names the roles read ────────────── */
   --v2-warm-white: #f4f8fb; /* cloud canvas */
@@ -57,8 +77,8 @@
   --sd-radius-card: 12px;
 
   /* V4 operational voice. */
-  --sd-font: "DM Sans", "Geist", ui-sans-serif, system-ui, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sd-font: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* Dark counterpart stays in the ink family, V4 hues. */
@@ -95,8 +115,8 @@
   --v2-slate-500: #46617a;
   --v2-radius-control: 8px;
   --v2-radius-card: 12px;
-  --v2-font-sans: "DM Sans", "Geist", ui-sans-serif, system-ui, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --v2-font-sans: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* Display voice for app headings — scoped, additive, no literal changes to
@@ -104,7 +124,7 @@
 .sd-app.sd-app h1,
 .sd-app.sd-app h2,
 .si-page.si-page h1 {
-  font-family: "Space Grotesk", "DM Sans", ui-sans-serif, system-ui,
-    sans-serif;
+  font-family: "Space Grotesk", "Space Grotesk Fallback", "DM Sans",
+    "DM Sans Fallback", ui-sans-serif, system-ui, sans-serif;
   letter-spacing: -0.02em;
 }

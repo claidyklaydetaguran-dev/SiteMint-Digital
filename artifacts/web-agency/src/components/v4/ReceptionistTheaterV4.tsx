@@ -215,11 +215,26 @@ function useVoiceObject(
       }
 
       const active = state === "listening" || state === "thinking" || state === "speaking";
-      if (!reduced && active) raf = requestAnimationFrame(draw);
+      if (!reduced && active && document.visibilityState === "visible") {
+        raf = requestAnimationFrame(draw);
+      }
     }
 
+    // Explicit page-visibility pause (R1 correction 7): the loop stops in
+    // hidden tabs and redraws the current state on return.
+    const onVisibility = () => {
+      cancelAnimationFrame(raf);
+      if (document.visibilityState === "visible") {
+        raf = requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [state, canvasRef]);
 }
 

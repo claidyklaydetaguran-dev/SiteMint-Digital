@@ -28,6 +28,29 @@
 .v4-shell__main {
   flex: 1;
   outline: none;
+  /* CLS root-cause fix (R1): while a lazy route loads, only the 60vh
+     RouteFallback occupied <main>, so the footer laid out inside the initial
+     viewport and then moved ~4500px when the page mounted — that jump was
+     the dominant layout-shift source (~0.35–0.43), not font swapping.
+     Reserving one viewport of main height keeps the footer below the fold
+     at first paint, so its later move has zero viewport impact. Every V4
+     route is taller than one viewport, so no permanent blank space is
+     introduced; short states simply pin the footer to the fold. */
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* The shared route fallback inherits the shell's ground inside V4 (no V2
+   canvas flash) and stretches to the reserved height. */
+.v4-shell .v2-route-fallback {
+  background: transparent;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Anchor targets settle below the fixed bar, for pointer and keyboard. */
+.v4-shell [id] {
+  scroll-margin-top: calc(var(--v4-hdr-h) + 12px);
 }
 
 /* Light-opening pages pad below the fixed bar; ink heroes run beneath it. */

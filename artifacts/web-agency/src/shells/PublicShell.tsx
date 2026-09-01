@@ -32,6 +32,7 @@ import { SiteHeaderV3 } from "@/components/v3/SiteHeaderV3";
 import { SiteFooterV3 } from "@/components/v3/SiteFooterV3";
 import { SiteHeaderV4 } from "@/components/v4/SiteHeaderV4";
 import { SiteFooterV4 } from "@/components/v4/SiteFooterV4";
+import { useHashScrollV4 } from "@/components/v4/useHashScrollV4";
 import { HOME_SECTIONS } from "@/lib/routes";
 
 interface PublicShellProps {
@@ -54,6 +55,9 @@ export function PublicShell({
   heroTone = "light",
 }: PublicShellProps) {
   const [location] = useLocation();
+  // Route-aware anchors (R1): resolves /#section navigations after lazy
+  // routes mount. No-op when the URL carries no hash.
+  useHashScrollV4();
 
   const boundary = (
     <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>

@@ -45,6 +45,9 @@ export function SiteFooterV4() {
           </div>
           <div className="v4-footer__col">
             <span className="v4-footer__col-title">Company</span>
+            {/* Route-aware section anchor: navigates to the homepage and then
+                scrolls to the journey chapter (useHashScrollV4). */}
+            <Link href="/#signal-journey">The Signal journey</Link>
             {primaryNavV4.map((item) => (
               <Link key={item.label} href={item.href}>
                 {item.label}
