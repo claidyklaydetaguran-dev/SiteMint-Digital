@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Frontend V3 information architecture (R1). Deliberately absent:
+     /insights (returns after the first verified article is approved),
+     /pricing and vertical landers (deferred, out of IA), /admin (internal). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://sitemintdigital.com/</loc>
@@ -11,14 +14,34 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://sitemintdigital.com/pricing</loc>
+    <loc>https://sitemintdigital.com/websites-apps</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/ai-receptionist</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://sitemintdigital.com/portfolio</loc>
+    <loc>https://sitemintdigital.com/discovery-systems</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/automation</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/work</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/process</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://sitemintdigital.com/about</loc>
@@ -26,13 +49,28 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://sitemintdigital.com/contact</loc>
+    <loc>https://sitemintdigital.com/start</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://sitemintdigital.com/discovery</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/contact</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://sitemintdigital.com/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

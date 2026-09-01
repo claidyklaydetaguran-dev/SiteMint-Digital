@@ -11,11 +11,13 @@ import { ROUTES } from "@/lib/routes";
 import { SiteMintMarkV3 } from "./SiteMintMarkV3";
 import { servicesNavItems, signInHrefV3, startHrefV3, startLabelV3 } from "./publicNavV3";
 
+// R1: Insights is deliberately absent until the first verified article is
+// approved (docs/frontend-v3/LAUNCH-CHECKLIST.md); the route stays for
+// internal preview by direct URL.
 const companyLinks = [
   { label: "Work", href: ROUTES.workV3 },
   { label: "Process", href: ROUTES.process },
   { label: "About", href: ROUTES.about },
-  { label: "Insights", href: ROUTES.insights },
 ];
 
 const beginLinks = [

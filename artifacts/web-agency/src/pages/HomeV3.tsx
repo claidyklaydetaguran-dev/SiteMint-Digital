@@ -28,9 +28,13 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { SignalWave } from "@/components/v3/SignalWave";
 import { useReveal } from "@/components/v3/useReveal";
-// Magnific "Signal Loop" poster (approved visual program, DESIGN-SPEC §10):
-// atmospheric media only — all content stays real DOM above it.
+// Magnific "Signal Loop" (approved visual program, DESIGN-SPEC §10 / R1):
+// atmospheric media only — all content stays real DOM above it. The poster
+// paints immediately; the silent loop upgrades in deferred, motion-safe
+// conditions only (see SignalLoopMedia).
 import signalPoster from "@/assets/v3/signal-loop-poster.jpg";
+import signalLoop from "@/assets/v3/signal-loop.mp4";
+import { SignalLoopMedia } from "@/components/v3/SignalLoopMedia";
 
 const heroSequence = [
   {
@@ -167,14 +171,7 @@ export default function HomeV3() {
           <div className="v3h-theater">
             <div className="v3m-theater">
               <div className="v3m-theater__stage">
-                <img
-                  className="v3m-theater__poster"
-                  src={signalPoster}
-                  alt=""
-                  aria-hidden="true"
-                  decoding="async"
-                  fetchPriority="low"
-                />
+                <SignalLoopMedia poster={signalPoster} src={signalLoop} />
                 <p className="v3m-theater__status">
                   <span className="v3-dot v3-dot--live" aria-hidden="true" />
                   SiteMint system · Live
@@ -721,23 +718,10 @@ export default function HomeV3() {
         </div>
       </section>
 
-      {/* ── 13 · Insights teaser ──────────────────────────────────────── */}
-      <section className="v3-section" data-tone="white">
-        <div className="v3-container v3-reveal" ref={reveal}>
-          <div className="v3m-sechead">
-            <span className="v3m-sechead__no">05</span>
-            <h2 className="v3-display">Thinking out loud.</h2>
-            <p className="v3-lede">
-              Notes on building business systems — practical, specific, and
-              free of hype.
-            </p>
-          </div>
-          <Link href={ROUTES.insights} className="v3-btn v3-btn--outline">
-            Visit Insights
-            <ArrowRight aria-hidden="true" size={16} />
-          </Link>
-        </div>
-      </section>
+      {/* ── 13 · Insights teaser — removed for launch (R1). Insights stays
+          routed for internal preview; the teaser and all public links return
+          once the first verified article is approved. See
+          docs/frontend-v3/LAUNCH-CHECKLIST.md. ─────────────────────────── */}
 
       {/* ── 14 · Final conversion ─────────────────────────────────────── */}
       <section className="v3-section v3m-cta" data-tone="ink">

@@ -55,7 +55,9 @@ export const primaryNavV3: V3NavItem[] = [
   { label: "Work", href: ROUTES.workV3 },
   { label: "Process", href: ROUTES.process },
   { label: "About", href: ROUTES.about },
-  { label: "Insights", href: ROUTES.insights },
+  // R1 owner decision: Insights stays routed for internal preview but leaves
+  // every public discoverability surface until the first verified article is
+  // approved — see docs/frontend-v3/LAUNCH-CHECKLIST.md.
 ];
 
 /** Cross-application destination — always a document navigation. */

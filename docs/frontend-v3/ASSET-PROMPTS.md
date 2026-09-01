@@ -1,6 +1,25 @@
 # Frontend V3 — Magnific visual program status
 
-## Generated and shipped (2 of the 3 allowed attempts used)
+## R1 update: the Corporate Signal Loop video is generated and shipped
+
+The third and final authorized attempt produced the Corporate Signal Loop
+(model auto-selected `wan-3-0`; requested 8s, ran at the model's 10s — within
+the 8–10s spec; **1,200 credits**; silent, no text/logos/people/interface).
+Post-processing (local ffmpeg, no credits): the loop seam was closed with an
+0.8s tail-into-head crossfade (9.2s final) and the file was encoded to a
+636 KB 1280×720 H.264 web deliverable, committed as
+`artifacts/web-agency/src/assets/v3/signal-loop.mp4`.
+
+Integration (`components/v3/SignalLoopMedia.tsx`, homepage hero theater only):
+the poster paints immediately; the silent loop upgrades only when reduced
+motion is off, the viewport is ≥768px, data-saver is off, and the browser has
+gone idle — and downgrades live if reduced motion is enabled mid-session. The
+AI Receptionist theater deliberately stays on poster + CSS signal for this
+release (owner R1 decision). **Total program spend: 1,350 credits, 3/3
+attempts used, no purchases.** The Voice Loop video prompt below remains
+available for a future, separately authorized generation.
+
+## Generated and shipped earlier (attempts 1–2)
 
 Both priority poster images were generated with the authorized Magnific
 connector (75 credits each, 150 total) and are committed as Vite-hashed
