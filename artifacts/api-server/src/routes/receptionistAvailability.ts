@@ -22,6 +22,8 @@ import {
 import type { DayHours } from "../lib/scheduling/availabilityEngine.js";
 import { parseDateKey } from "../lib/scheduling/zonedTime.js";
 import { getFreeBusyProvider } from "../lib/calendar/index.js";
+import { removeCalendarEventForRequest } from "../lib/calendar/calendarEventSync.js";
+import { calendarSyncDeps } from "../lib/calendar/calendarSyncDeps.js";
 import type { SchedulingAppointmentRequest } from "@workspace/db/schema/scheduling";
 
 /**
@@ -386,12 +388,36 @@ router.get("/receptionist/availability/requests", requireReceptionistAuth, async
 
 router.post("/receptionist/availability/requests/:publicId/cancel", requireReceptionistAuth, async (req: Request, res: Response) => {
   try {
-    const cancelled = await cancelAppointmentRequestByPublicId(req.firmId!, req.params.publicId as string);
+    const firmId = req.firmId!;
+    const publicId = req.params.publicId as string;
+    // Read the row BEFORE cancelling: the cancel clears the status we would
+    // otherwise use to find the event, and the provider ids live on this row.
+    // Firm-scoped, so a foreign publicId is simply absent.
+    const before = (await listAppointmentRequests(firmId)).find((r) => r.publicId === publicId);
+
+    const cancelled = await cancelAppointmentRequestByPublicId(firmId, publicId);
     if (!cancelled) {
       res.status(404).json({ error: "Request not found" });
       return;
     }
-    res.json({ ok: true });
+
+    // The cancel itself is already durable. Removing the calendar event is a
+    // best-effort follow-up: a provider failure opens a firm-scoped issue and
+    // leaves the id in place for reconciliation, and must never turn a
+    // successful cancellation into a 500.
+    let calendar: string = "skipped";
+    if (before?.providerEventId) {
+      try {
+        calendar = await removeCalendarEventForRequest(before, calendarSyncDeps());
+      } catch (syncErr) {
+        calendar = "failed";
+        req.log.warn(
+          { firmId, errorClass: syncErr instanceof Error ? syncErr.name : "unknown" },
+          "[receptionist] calendar event removal failed after cancel",
+        );
+      }
+    }
+    res.json({ ok: true, calendar });
   } catch (err) {
     req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to cancel appointment request");
     res.status(500).json({ error: "Internal server error" });
