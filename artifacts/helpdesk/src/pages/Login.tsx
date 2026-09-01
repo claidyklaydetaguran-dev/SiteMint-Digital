@@ -55,6 +55,7 @@ import {
 } from "./login/loginContract";
 import { CAPABILITY_STATUS, READINESS } from "./login/readiness";
 import "@/styles/v2-signin.css";
+import "@/styles/v3-app.css";
 
 /**
  * The public marketing surfaces this page links back out to. Both are in the
