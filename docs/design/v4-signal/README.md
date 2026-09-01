@@ -13,7 +13,8 @@ is the design record; the interactive prototype lives in `prototypes/v4-signal/`
 | [06-ROUTE-PLANS.md](06-ROUTE-PLANS.md) | Route-by-route design plan: public site, customer app, operations |
 | [07-PERFORMANCE-ACCESSIBILITY.md](07-PERFORMANCE-ACCESSIBILITY.md) | LCP/CLS/INP budgets, WCAG commitments |
 | [08-OWNER-DECISIONS.md](08-OWNER-DECISIONS.md) | Consolidated decision list D1–D10 |
-| [09-PROTOTYPE-REPORT.md](09-PROTOTYPE-REPORT.md) | Prototype QA: screenshots, measurements, known limits |
+| [09-PROTOTYPE-REPORT.md](09-PROTOTYPE-REPORT.md) | V4.0 prototype QA record (superseded by 10) |
+| [10-V4.1-REFINEMENT.md](10-V4.1-REFINEMENT.md) | Owner correction pass: before/after, exact copy changes, V4.1 QA, keyframe spend |
 
 Phase rules honored: no PR/merge/deploy; no backend, DB, Replit, Vapi, or flag changes; no paid
 video generation; no live voice demo; skill-generated catalogs not committed.

@@ -1,6 +1,15 @@
 # V4 Homepage Hero — Cinematic Storyboard & Production Plan
 
-**Status: storyboard for owner approval. No Magnific credits spent in this phase.**
+**V4.1 update (2026-09-01):** the storyboard now follows the five-phase arc **scatter → capture →
+organize → connect → resolve** (matching the recomposed prototype hero), the leading copy is
+"From first click to booked customer." / "SiteMint designs the connected digital system in
+between.", and four approval keyframes were generated with Seedream 5 Pro at 21:9 —
+`keyframes/k1-scatter.jpg`, `k2-capture.jpg`, `k3-connect.jpg`, `k4-resolve.jpg` (k4 doubles as
+the poster-frame candidate). **Keyframe spend: 400 credits (4 × 100, exact), within the
+owner-authorized <500 ceiling. The 8,400-credit video master remains NOT generated — blocked on
+owner review of these keyframes.**
+
+**Status: storyboard + keyframes for owner approval.**
 The existing Corporate Signal Loop remains the temporary fallback until the owner approves this
 board and the final video is generated.
 

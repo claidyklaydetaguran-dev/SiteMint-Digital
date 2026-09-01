@@ -1,21 +1,44 @@
-# AI Receptionist — Live Demo Theater (design + future activation contract)
+# AI Receptionist — Demo Theater (design + future activation contract)
 
 **This phase ships a typed state-machine simulation only. Vapi is NOT activated; no public
 calling exists.** The theater is designed so the simulated adapter and the future live adapter
 implement the same interface.
 
-## Interface: Receptionist Theater
+## V4.1 capability-honest copy rules (binding until certification)
 
-A premium conversational stage on the AI Receptionist landing hero: central voice object (the
-SiteMint diamond dissolving into a live waveform), state label, elapsed timer, End control, and a
-persistent disclosure line: **"This is an AI voice demonstration."**
+- Page lead: **"Meet the receptionist designed to help every caller reach the next right
+  step."** Language describes *design intent* ("designed to answer, qualify, and guide"), never
+  certified production behavior.
+- The theater is labeled prominently: **"Interactive staging preview — simulated conversation"**
+  (amber tag), and the action reads **"Preview the experience"** — no "live conversation"
+  wording anywhere until the real public demo is authorized.
+- No production-SMS claims, no completely-autonomous-booking claims: simulated scripts end with
+  "preferred time captured for the team to confirm", never "appointment booked".
+- Visible privacy/artifact line on the theater: "No recording · no transcripts retained ·
+  artifact policy: none", plus the simulation disclosure ("no microphone is requested, no audio
+  plays, nothing is live").
+- Contextual example-question chips (appointments / hours / callback) seed the simulated script.
 
-### State machine (typed adapter contract)
+## Interface: Receptionist Theater (V4.1)
+
+A distinctive SiteMint stage: the **Signal voice object** — the diamond inside a responsive ring
+field rendered on canvas (rings ripple inward while Listening, dots orbit while Thinking, rings
+emanate outward while Speaking, a mint ring when Ended) — with state label, elapsed timer, End
+control, example-question chips, and the disclosures above.
+
+### Prototype state machine (simulated adapter)
 
 ```
-ready → mic_explain → permission_request → connecting → listening ⇄ assistant_speaking
+ready → listening ⇄ thinking ⇄ speaking → ended → ready
+any active state → ended (End control, Escape, or 02:00 cap)
+```
+
+### Future live-adapter states (unchanged from V4.0, for the real integration)
+
+```
+ready → mic_explain → permission_request → connecting → listening ⇄ thinking ⇄ speaking
       ↘ unavailable                         ↘ error      ↘ reconnecting → listening
-listening/assistant_speaking → session_ending → ready
+listening/thinking/speaking → session_ending → ready
 any active state → time_limit_reached → ready
 ```
 

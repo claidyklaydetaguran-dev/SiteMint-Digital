@@ -6,25 +6,30 @@ product surface they are in** and **where inside it they are**.
 ## 1. Public marketing navigation
 
 Desktop header (sticky, 64px, translucent ink over dark sections / cloud over light, 12px
-backdrop blur, hairline bottom border):
+backdrop blur, hairline bottom border). **V4.1 resolved map:**
 
 ```
-[◆ SiteMint]   What We Build ▾   Work   How It Works   About   [AI Receptionist]   |   Sign In   [Start a Project]
+[◆ SiteMint]   What We Build ▾   Work   Process   Company   [AI Receptionist]   |   Client Sign In   [Start a Project]
 ```
 
 - Logo = Home control (no separate Home item).
 - **AI Receptionist** is a distinct product entry: pill-outlined item with a live signal dot —
-  visually separated from the four editorial links.
-- **Start a Project** is the single filled CTA.
+  visually separated from the editorial links.
+- **Start a Project** is the single filled CTA. **Client Sign In** is a quiet utility action
+  (muted text link, right of the separator) — deliberately not equal weight to the CTA.
+- V4.0 → V4.1 renames: "How It Works" → **Process**, "About" → **Company**, "Sign In" →
+  **Client Sign In**.
 - Active route: cyan underline bar (3px) + `aria-current="page"`; section-level scroll-spy
   highlights the current chapter in long pages via the progress rail (see Motion doc).
 
-### "What We Build" mega panel
-- **Click/tap-operated `<button aria-expanded aria-controls>`** — not hover-only. Hover may
-  pre-warm (visual affordance) but never opens/closes on its own.
-- Panel: 4 service pillars in a 4-col grid (2-col ≤1024px), each a large card: Lucide icon, pillar
-  name, one-line promise, 2–3 sub-links; footer row inside the panel links to the What We Build
-  overview ("See how the pillars connect →" — points at the Signal Map).
+### "What We Build" mega panel (V4.1)
+- **Click/tap-operated `<button aria-expanded aria-controls>`** — not hover-only, and pointer
+  movement never closes it (only click-outside, Escape, a selection, or focus leaving).
+- Panel: 4 service pillars in a 4-col grid (2-col ≤1024px), each a card with a **custom signal
+  glyph** (mini SVG whose stroke draws on hover/focus), an **outcome kicker** ("Never lose a
+  lead"), the pillar name, a one-line outcome description, and **one destination**; footer row
+  links to the What We Build overview ("See how the systems connect →" — points at the Signal
+  Map). Hover/focus/selected states: border + lift + glyph draw; arrow keys move between cards.
   1. **Websites & digital experiences**
   2. **Web apps & business systems**
   3. **CRM & workflow automation**
@@ -43,11 +48,13 @@ backdrop blur, hairline bottom border):
 - 404: signal-thread broken illustration, search-free, three exits (Home, What We Build, Start a
   Project).
 
-### Mobile (<768px)
-- Header: logo + Start a Project (compact) + menu button (44×44).
-- Full-screen sheet: the four pillars as an accordion under "What We Build", then Work / How It
-  Works / About / AI Receptionist / Sign In. Focus trapped inside sheet, Escape/close restores
-  focus to menu button, body scroll locked. Current page marked with cyan bar + `aria-current`.
+### Mobile (<768px) — V4.1 grouped model
+- Header: logo + menu button (44×44).
+- Full-screen sheet with **deliberate expandable groups** instead of a flat list:
+  **What We Build** (accordion: the four systems) · **Company** (accordion: Work / Process /
+  About SiteMint) · **AI Receptionist** (direct) · quiet **Client Sign In** row · **Start a
+  Project** button. Focus trapped inside the sheet, Escape/close restores focus to the menu
+  button, body scroll locked. Current page marked with cyan text + `aria-current`.
 
 ## 2. Customer application navigation (dashboard, `/ai-receptionist/dashboard`)
 

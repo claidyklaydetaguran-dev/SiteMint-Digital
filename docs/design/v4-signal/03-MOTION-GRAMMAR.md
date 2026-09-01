@@ -26,10 +26,13 @@ immediately (verified rule + scroll-storytelling pattern requirement).
    chapter. One reveal per chapter; paragraphs do not individually animate.
 3. **Progress rail** — fixed left rail (desktop) listing chapters 01–05; fill and active dot track
    scroll position. Meaning: orientation. Clickable; `scroll-margin-top` respected.
-4. **Hero scroll narrative** — scroll position drives the hero's 4 storyboard states (scattered →
-   organizing → connected → resolved) via a scrub value; no pinning beyond the hero itself, no
-   scroll hijacking, native wheel/touch untouched. Reduced motion / mobile data-saver: static
-   resolved-state poster with full copy.
+4. **Hero scroll narrative (V4.1)** — scroll drives five phases (**scatter → capture → organize →
+   connect → resolve**): stray amber fragments are captured onto the signal thread, which routes
+   through the four system nodes (websites / web apps / CRM / AI receptionist) and resolves at a
+   mint "booked customer" terminus. A phase HUD names the current stage; each system node lights
+   as the thread passes (state, not decoration). No pinning beyond the hero itself, no scroll
+   hijacking, native wheel/touch untouched. Reduced motion / data-saver: the resolved composition
+   renders immediately with full copy.
 5. **Cards assemble** — feature/service cards translate from 24px offsets into their grid (320ms,
    60ms stagger, from:start). Meaning: parts form a system. Never on data tables.
 6. **Magnetic CTA (restrained)** — primary CTA translates ≤6px toward pointer within a 80px
@@ -39,9 +42,17 @@ immediately (verified rule + scroll-storytelling pattern requirement).
    fade+rise. Meaning: state.
 8. **Route transitions** — outgoing content fades 120ms, incoming rises 8px/240ms; header and rail
    persist so orientation is preserved. No full-screen wipes.
-9. **Waveform / voice states** — demo theater bars animate only while "listening/speaking";
-   amplitude maps to state, color maps to speaker (cyan = caller, turquoise = assistant). Reduced
-   motion: static bars + text state label (state is never conveyed by motion alone).
+9. **Voice-object states (V4.1)** — the theater's Signal voice object animates by state:
+   Listening = rings ripple inward (cyan), Thinking = three orbiting dots, Speaking = rings
+   emanate outward (turquoise), Ended = static mint ring. Color+geometry map to state, and the
+   text state label always accompanies the motion. Reduced motion: static ring + label (state is
+   never conveyed by motion alone).
+9b. **Signal Map progression** — scrolling the journey chapter advances one inquiry dot through
+   the five stages; each transition swaps the stage panel's business-outcome text. Stage chips
+   override manually; leaving the viewport re-arms scroll control. Reduced motion: final stage
+   shown, chips still work.
+9c. **Pillar glyphs** — each pillar's glyph draws its stroke when the card enters the viewport
+   (staggered) and replays depth on hover/focus-within. Meaning: confirm interaction + identity.
 10. **Dashboard counters/status** — animate only on meaningful change (new conversation, publish
     state); a status pulse ring runs once, not looped. Tables never stagger.
 
