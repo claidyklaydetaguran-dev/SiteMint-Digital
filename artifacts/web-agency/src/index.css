@@ -15,6 +15,14 @@
 /* Frontend V2 Phase 5: AI Receptionist signup presentation. Namespaced `sg-*`,
    token-only, and carries no authentication logic of its own. */
 @import "./styles/v2-signup.css";
+/* Frontend V3 Phase 1: the Operational Editorial token layer + primitives,
+   namespaced `--v3-*` / `.v3-*`. Loaded after the V2 layer, changes no V2
+   pixel until a surface opts into the V3 classes. */
+@import "./styles/tokens-v3.css";
+/* Frontend V3 Phase 1: floating public chrome (header, sheet, footer). */
+@import "./styles/v3-chrome.css";
+/* Frontend V3 Phase 2: shared marketing sections + homepage presentation. */
+@import "./styles/v3-marketing.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";

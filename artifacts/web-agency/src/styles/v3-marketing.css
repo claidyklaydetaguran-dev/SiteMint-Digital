@@ -1,0 +1,699 @@
+/**
+ * Frontend V3 — shared marketing section vocabulary (`.v3m-*`).
+ *
+ * Every public V3 page composes these patterns; page CSS files add only what
+ * is unique to that page. Token-only: raw values appear solely inside rgba()
+ * line work derived from the palette.
+ *
+ * Patterns: ink hero + signal theater, sequence rail, editorial page hero,
+ * split sections, pillar grid, numbered process, system map, outcome receipt,
+ * FAQ, conversion band, prose, card links, honest example labelling.
+ */
+
+/* ── Ink hero ─────────────────────────────────────────────────────────── */
+.v3m-hero {
+  position: relative;
+  overflow: hidden;
+  padding-top: calc(88px + var(--v3-space-12));
+  padding-bottom: var(--v3-space-16);
+}
+
+/* Faint technical grid on ink surfaces — restraint: 3% lines, large cells. */
+.v3m-hero::before,
+.v3m-grid-ink::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(233, 252, 248, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(233, 252, 248, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 55%, transparent 100%);
+}
+
+.v3m-hero__inner {
+  position: relative;
+  display: grid;
+  gap: var(--v3-space-12);
+}
+
+.v3m-hero__copy {
+  display: grid;
+  gap: var(--v3-space-6);
+  justify-items: start;
+  align-content: start;
+}
+
+.v3m-hero__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-3);
+}
+
+.v3m-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v3-space-3);
+  margin-top: var(--v3-space-2);
+}
+
+.v3m-hero__trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v3-space-3) var(--v3-space-6);
+  margin: var(--v3-space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.v3m-hero__trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  font-size: var(--v3-text-small);
+  color: var(--v3-fg-muted);
+}
+.v3m-hero__trust svg {
+  width: 16px;
+  height: 16px;
+  color: var(--v3-accent-text);
+}
+
+@media (min-width: 1024px) {
+  .v3m-hero__inner--split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: center;
+  }
+}
+
+/* ── Signal theater ───────────────────────────────────────────────────── */
+.v3m-theater {
+  position: relative;
+  border-radius: var(--v3-radius-theater);
+  border: 1px solid rgba(79, 231, 245, 0.14);
+  background:
+    radial-gradient(90% 120% at 70% 10%, rgba(79, 231, 245, 0.1), transparent 55%),
+    radial-gradient(120% 140% at 20% 100%, rgba(32, 230, 195, 0.08), transparent 60%),
+    var(--v3-charcoal);
+  overflow: hidden;
+  min-height: 340px;
+  box-shadow: var(--v3-shadow-3);
+}
+
+.v3m-theater__stage {
+  position: relative;
+  padding: var(--v3-space-8);
+  min-height: 340px;
+}
+
+/* The CSS signal — layered luminous sine strokes. Pure decoration: real
+   content overlays it as DOM. Static under reduced motion. */
+.v3m-signal {
+  position: absolute;
+  inset-inline: -10%;
+  top: 50%;
+  height: 120px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  filter: drop-shadow(0 0 18px rgba(79, 231, 245, 0.35));
+}
+.v3m-signal path {
+  fill: none;
+  stroke-width: 2;
+}
+.v3m-signal .v3m-signal__a {
+  stroke: rgba(79, 231, 245, 0.85);
+}
+.v3m-signal .v3m-signal__b {
+  stroke: rgba(32, 230, 195, 0.55);
+  stroke-width: 1.5;
+}
+.v3m-signal .v3m-signal__c {
+  stroke: rgba(233, 252, 248, 0.18);
+  stroke-width: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .v3m-signal path {
+    stroke-dasharray: 6 10;
+    animation: v3m-signal-flow 14s linear infinite;
+  }
+  .v3m-signal .v3m-signal__b {
+    animation-duration: 20s;
+    animation-direction: reverse;
+  }
+  .v3m-signal .v3m-signal__c {
+    animation-duration: 30s;
+  }
+}
+@keyframes v3m-signal-flow {
+  to {
+    stroke-dashoffset: -320;
+  }
+}
+
+/* Floating interface containers — never more than three dominant at once. */
+.v3m-theater .v3-float {
+  position: absolute;
+  padding: var(--v3-space-4);
+  max-width: 260px;
+}
+.v3m-float__title {
+  display: flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  margin: 0;
+  font-size: var(--v3-text-small);
+  font-weight: 620;
+}
+.v3m-float__meta {
+  margin: var(--v3-space-1) 0 0;
+  font-size: var(--v3-text-micro);
+  color: var(--v3-slate-d);
+  line-height: 1.5;
+}
+.v3m-float__list {
+  margin: var(--v3-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--v3-space-1);
+}
+.v3m-float__list li {
+  display: flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  font-size: var(--v3-text-micro);
+  color: var(--v3-ice);
+}
+
+/* Theater status bar (top strip: live label). */
+.v3m-theater__status {
+  position: absolute;
+  top: var(--v3-space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  padding: var(--v3-space-2) var(--v3-space-4);
+  border-radius: var(--v3-radius-pill);
+  background: rgba(6, 21, 31, 0.72);
+  border: 1px solid rgba(233, 252, 248, 0.12);
+  font-size: var(--v3-text-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--v3-ice);
+  white-space: nowrap;
+}
+
+/* ── Sequence rail — numbered workflow beats over the theater or below it. */
+.v3m-seq {
+  display: grid;
+  gap: var(--v3-space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: v3m-seq;
+}
+.v3m-seq__item {
+  position: relative;
+  padding-top: var(--v3-space-3);
+  border-top: 1px solid var(--v3-line);
+}
+.v3m-seq__num {
+  font-family: var(--v3-font-mono);
+  font-size: var(--v3-text-small);
+  font-weight: 600;
+  color: var(--v3-accent-text);
+  letter-spacing: 0.08em;
+}
+.v3m-seq__label {
+  display: block;
+  margin-top: var(--v3-space-1);
+  font-size: var(--v3-text-body);
+  font-weight: 620;
+  color: var(--v3-fg);
+}
+.v3m-seq__desc {
+  display: block;
+  margin-top: var(--v3-space-1);
+  font-size: var(--v3-text-small);
+  line-height: 1.5;
+  color: var(--v3-fg-muted);
+}
+@media (min-width: 1024px) {
+  .v3m-seq {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ── Section headers ──────────────────────────────────────────────────── */
+.v3m-sechead {
+  display: grid;
+  gap: var(--v3-space-4);
+  max-width: 56rem;
+  margin-bottom: var(--v3-space-12);
+}
+.v3m-sechead--center {
+  margin-inline: auto;
+  text-align: center;
+  justify-items: center;
+}
+.v3m-sechead__no {
+  font-family: var(--v3-font-mono);
+  font-size: var(--v3-text-small);
+  font-weight: 600;
+  color: var(--v3-accent-text);
+  letter-spacing: 0.08em;
+}
+
+/* ── Editorial page hero (inner pages, porcelain) ─────────────────────── */
+.v3m-page-hero {
+  padding-top: var(--v3-space-12);
+  padding-bottom: var(--v3-space-8);
+  border-bottom: 1px solid var(--v3-line);
+}
+.v3m-page-hero__inner {
+  display: grid;
+  gap: var(--v3-space-6);
+  max-width: 60rem;
+}
+
+/* ── Split section — media beside editorial copy, alternating ─────────── */
+.v3m-split {
+  display: grid;
+  gap: var(--v3-space-8);
+  align-items: center;
+}
+.v3m-split__copy {
+  display: grid;
+  gap: var(--v3-space-4);
+  justify-items: start;
+}
+.v3m-split__media {
+  min-width: 0;
+}
+@media (min-width: 1024px) {
+  .v3m-split {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .v3m-split__copy {
+    grid-column: span 5;
+  }
+  .v3m-split__media {
+    grid-column: span 7;
+  }
+  .v3m-split--flip .v3m-split__copy {
+    order: 2;
+  }
+  .v3m-split--flip .v3m-split__media {
+    order: 1;
+  }
+}
+
+/* ── Pillar grid ──────────────────────────────────────────────────────── */
+.v3m-pillars {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3m-pillar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v3-space-3);
+  padding: var(--v3-space-6);
+  min-height: 220px;
+  text-decoration: none;
+  color: inherit;
+}
+.v3m-pillar__icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--v3-radius-control);
+  background: color-mix(in srgb, var(--v3-mint) 14%, transparent);
+  color: var(--v3-accent-text);
+}
+.v3m-pillar__icon svg {
+  width: 20px;
+  height: 20px;
+}
+.v3m-pillar__title {
+  margin: 0;
+  font-size: var(--v3-text-h3);
+  font-weight: 620;
+  color: var(--v3-fg);
+}
+.v3m-pillar__desc {
+  margin: 0;
+  font-size: var(--v3-text-small);
+  line-height: 1.55;
+  color: var(--v3-fg-muted);
+}
+.v3m-pillar__go {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  font-size: var(--v3-text-small);
+  font-weight: 600;
+  color: var(--v3-accent-text);
+}
+.v3m-pillar__go svg {
+  width: 16px;
+  height: 16px;
+  transition: transform var(--v3-duration-control) var(--v3-ease-standard);
+}
+.v3m-pillar:hover .v3m-pillar__go svg {
+  transform: translateX(3px);
+}
+@media (min-width: 768px) {
+  .v3m-pillars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .v3m-pillars--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .v3m-pillars--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── Numbered process ─────────────────────────────────────────────────── */
+.v3m-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+.v3m-step {
+  display: grid;
+  gap: var(--v3-space-3);
+  padding-block: var(--v3-space-8);
+  border-top: 1px solid var(--v3-line);
+}
+.v3m-step:last-child {
+  border-bottom: 1px solid var(--v3-line);
+}
+.v3m-step__no {
+  font-family: var(--v3-font-mono);
+  font-size: clamp(1.75rem, 1.4rem + 1.6vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--v3-accent-text);
+}
+.v3m-step__title {
+  margin: 0;
+  font-size: var(--v3-text-h2);
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+.v3m-step__body {
+  margin: 0;
+  max-width: var(--v3-measure);
+  line-height: var(--v3-leading-body);
+  color: var(--v3-fg-muted);
+}
+@media (min-width: 768px) {
+  .v3m-step {
+    grid-template-columns: 120px minmax(0, 1fr);
+    align-items: start;
+  }
+  .v3m-step__head {
+    grid-column: 2;
+  }
+  .v3m-step__no {
+    grid-row: 1 / span 2;
+  }
+}
+
+/* ── System map — Website → Discovery → Automation/AI → System → Human ── */
+.v3m-map {
+  display: grid;
+  gap: var(--v3-space-3);
+}
+.v3m-map__node {
+  position: relative;
+  padding: var(--v3-space-4) var(--v3-space-6);
+  display: grid;
+  gap: var(--v3-space-1);
+}
+.v3m-map__node-label {
+  font-size: var(--v3-text-body);
+  font-weight: 620;
+  color: var(--v3-fg);
+  display: flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+}
+.v3m-map__node-desc {
+  font-size: var(--v3-text-small);
+  color: var(--v3-fg-muted);
+  line-height: 1.5;
+}
+.v3m-map__link {
+  display: grid;
+  place-items: center;
+  color: var(--v3-accent-text);
+}
+.v3m-map__link svg {
+  width: 18px;
+  height: 18px;
+}
+@media (min-width: 1024px) {
+  .v3m-map {
+    grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr auto 1fr;
+    align-items: stretch;
+  }
+}
+
+/* ── Outcome receipt ──────────────────────────────────────────────────── */
+.v3m-receipt {
+  display: grid;
+  gap: 1px;
+  background: var(--v3-line);
+  border: 1px solid var(--v3-line);
+  border-radius: var(--v3-radius-card);
+  overflow: hidden;
+}
+.v3m-receipt__row {
+  display: grid;
+  gap: var(--v3-space-1);
+  padding: var(--v3-space-4) var(--v3-space-6);
+  background: var(--v3-bg-raised);
+}
+.v3m-receipt__k {
+  font-size: var(--v3-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--v3-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v3-accent-text);
+}
+.v3m-receipt__v {
+  font-size: var(--v3-text-body);
+  color: var(--v3-fg);
+  line-height: 1.5;
+}
+
+/* ── FAQ ──────────────────────────────────────────────────────────────── */
+.v3m-faq {
+  display: grid;
+  border-top: 1px solid var(--v3-line);
+}
+.v3m-faq__item {
+  border-bottom: 1px solid var(--v3-line);
+}
+.v3m-faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v3-space-4);
+  width: 100%;
+  padding: var(--v3-space-6) 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--v3-text-body-lg);
+  font-weight: 600;
+  color: var(--v3-fg);
+}
+.v3m-faq__q::-webkit-details-marker {
+  display: none;
+}
+.v3m-faq__q::after {
+  content: "+";
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--v3-accent-text);
+  flex: none;
+}
+.v3m-faq__item[open] .v3m-faq__q::after {
+  content: "−";
+}
+.v3m-faq__a {
+  padding: 0 0 var(--v3-space-6);
+  max-width: var(--v3-measure);
+  line-height: var(--v3-leading-body);
+  color: var(--v3-fg-muted);
+}
+
+/* ── Conversion band ──────────────────────────────────────────────────── */
+.v3m-cta {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+.v3m-cta__inner {
+  position: relative;
+  display: grid;
+  gap: var(--v3-space-6);
+  justify-items: center;
+  max-width: 52rem;
+  margin-inline: auto;
+}
+.v3m-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--v3-space-3);
+}
+
+/* ── Card links (work, insights) ──────────────────────────────────────── */
+.v3m-cards {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3m-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v3-space-3);
+  padding: var(--v3-space-6);
+  text-decoration: none;
+  color: inherit;
+}
+.v3m-card-link__kicker {
+  font-size: var(--v3-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--v3-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v3-accent-text);
+}
+.v3m-card-link__title {
+  margin: 0;
+  font-size: var(--v3-text-h3);
+  font-weight: 620;
+  line-height: 1.3;
+}
+.v3m-card-link__desc {
+  margin: 0;
+  font-size: var(--v3-text-small);
+  line-height: 1.55;
+  color: var(--v3-fg-muted);
+}
+@media (min-width: 768px) {
+  .v3m-cards--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .v3m-cards--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .v3m-cards--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── Honest example labelling ─────────────────────────────────────────── */
+.v3m-example-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  font-size: var(--v3-text-micro);
+  color: var(--v3-fg-muted);
+}
+
+/* ── Prose (legal, insights articles) ─────────────────────────────────── */
+.v3m-prose {
+  max-width: var(--v3-measure);
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3m-prose h2 {
+  margin: var(--v3-space-6) 0 0;
+  font-size: var(--v3-text-h3);
+  font-weight: 620;
+}
+.v3m-prose p,
+.v3m-prose li {
+  margin: 0;
+  line-height: var(--v3-leading-body);
+  color: var(--v3-fg-muted);
+}
+.v3m-prose ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: var(--v3-space-2);
+}
+
+/* ── Checklist rows ───────────────────────────────────────────────────── */
+.v3m-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--v3-space-3);
+}
+.v3m-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--v3-space-3);
+  font-size: var(--v3-text-body);
+  line-height: 1.55;
+  color: var(--v3-fg-muted);
+}
+.v3m-checks svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  flex: none;
+  color: var(--v3-accent-text);
+}
+.v3m-checks strong {
+  color: var(--v3-fg);
+  font-weight: 620;
+}
+
+/* ── Small-screen theater adjustments ─────────────────────────────────── */
+@media (max-width: 767px) {
+  .v3m-theater__stage {
+    padding: var(--v3-space-4);
+    min-height: 300px;
+  }
+  .v3m-theater .v3-float {
+    position: static;
+    max-width: none;
+    margin-top: var(--v3-space-3);
+  }
+  .v3m-theater__floats {
+    position: relative;
+    margin-top: 140px;
+    display: grid;
+    gap: var(--v3-space-3);
+  }
+  /* On phones only the first two floats show — three stacked cards push the
+     theater past a viewport. */
+  .v3m-theater .v3-float:nth-of-type(n + 3) {
+    display: none;
+  }
+}
+@media (min-width: 768px) {
+  .v3m-theater__floats {
+    position: static;
+  }
+}
