@@ -66,6 +66,7 @@ const Discovery = lazy(() => import("@/pages/Discovery"));
 // Frontend V3 Phase 3: the Voice Theater landing. The V2 page stays imported
 // as a rollback reference — ROLLBACK: swap AiReceptionistV3 back to
 // AiReceptionist (and chrome="v3" back to "v2") to revert instantly.
+const AiReceptionistV4 = lazy(() => import("@/pages/AiReceptionistV4"));
 const AiReceptionistV3 = lazy(() => import("@/pages/AiReceptionistV3"));
 const AiReceptionist = lazy(() => import("@/pages/AiReceptionist"));
 const LandingReceptionist = lazy(() => import("@/pages/LandingReceptionist"));
@@ -263,8 +264,8 @@ function Router() {
       </Route>
       <Route path={ROUTES.aiReceptionist}>
         {() => (
-          <PublicShell routeLabel="AI Receptionist" chrome="v3" heroTone="ink">
-            <AiReceptionistV3 />
+          <PublicShell routeLabel="AI Receptionist" chrome="v4" heroTone="ink">
+            <AiReceptionistV4 />
           </PublicShell>
         )}
       </Route>
