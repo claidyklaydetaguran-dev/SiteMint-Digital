@@ -1,0 +1,101 @@
+/**
+ * Frontend V3 — SiteMint Operations (internal CRM) chrome.
+ *
+ * Scope: `.v2-dashboard-shell` — the /admin* subtree only. Two things happen
+ * here and nothing else:
+ *
+ * 1. The shadcn semantic variables the CRM consumes are re-pointed from the
+ *    legacy blue system to the V3 palette (ink primaries, mint focus ring,
+ *    porcelain chrome). CRM page markup is untouched — this is an internal
+ *    tool and its 26 pages keep their own layout; the semantic layer is what
+ *    makes it visually part of the V3 family.
+ * 2. The internal-environment bar (`.v3o-bar`) marks every operations screen
+ *    as internal. Server-side Bearer auth remains the actual boundary; the
+ *    bar is honest labelling, not security.
+ *
+ * The `.dark` counterpart is deliberately left alone.
+ */
+
+.v2-dashboard-shell {
+  /* V3 palette as HSL triplets (shadcn format). */
+  --background: 45 20% 98%;
+  --foreground: 203 68% 7%;
+  --border: 203 20% 88%;
+  --card: 0 0% 100%;
+  --card-foreground: 203 68% 7%;
+  --card-border: 203 20% 90%;
+
+  --sidebar: 45 33% 96%;
+  --sidebar-foreground: 203 68% 7%;
+  --sidebar-border: 203 20% 88%;
+  --sidebar-primary: 203 68% 7%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 167 76% 93%;
+  --sidebar-accent-foreground: 203 68% 7%;
+  --sidebar-ring: 168 78% 41%;
+
+  --primary: 203 68% 7%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 168 78% 41%;
+
+  --accent: 167 76% 93%;
+  --accent-foreground: 203 68% 7%;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.v2-dashboard-shell > .v3o-bar + * {
+  flex: 1;
+}
+
+/* ── Internal-environment bar ── */
+.v3o-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 36px;
+  padding: 0.25rem 1.25rem;
+  background: #06151f;
+  color: #e9fcf8;
+  font-family: "Geist", "Geist Sans", ui-sans-serif, system-ui, "Segoe UI",
+    Roboto, sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+.v3o-bar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.v3o-bar__brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #20e6c3, #4fe7f5);
+  flex: none;
+}
+.v3o-bar__scope {
+  color: #8fb0be;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v3o-bar__badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid rgba(32, 230, 195, 0.35);
+  border-radius: 999px;
+  color: #20e6c3;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.625rem;
+  white-space: nowrap;
+}

@@ -28,6 +28,8 @@
 /* Frontend V3 Phase 2: inner marketing pages (services, work, process, about,
    insights, start, legal). */
 @import "./styles/v3-pages.css";
+/* Frontend V3 Phase 5: SiteMint Operations (internal /admin*) chrome. */
+@import "./styles/v3-ops.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
