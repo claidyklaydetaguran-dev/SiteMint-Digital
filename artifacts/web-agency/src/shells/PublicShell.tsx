@@ -30,6 +30,8 @@ import { SiteHeader } from "@/components/v2/SiteHeader";
 import { SiteFooter } from "@/components/v2/SiteFooter";
 import { SiteHeaderV3 } from "@/components/v3/SiteHeaderV3";
 import { SiteFooterV3 } from "@/components/v3/SiteFooterV3";
+import { SiteHeaderV4 } from "@/components/v4/SiteHeaderV4";
+import { SiteFooterV4 } from "@/components/v4/SiteFooterV4";
 import { HOME_SECTIONS } from "@/lib/routes";
 
 interface PublicShellProps {
@@ -37,9 +39,9 @@ interface PublicShellProps {
   /** Human name of the surface, used by the recovery panel. */
   routeLabel?: string;
   /** Which chrome wraps the page. See the module comment. */
-  chrome?: "none" | "v2" | "v3";
+  chrome?: "none" | "v2" | "v3" | "v4";
   /**
-   * V3 chrome only: pages that open on an ink hero let it run underneath the
+   * V3/V4 chrome: pages that open on an ink hero let it run underneath the
    * floating header ("ink"); light pages pad below it ("light").
    */
   heroTone?: "ink" | "light";
@@ -60,6 +62,31 @@ export function PublicShell({
       </Suspense>
     </RouteErrorBoundary>
   );
+
+  if (chrome === "v4") {
+    // Frontend V4 "Signal": the V4 chrome plus the `.v4-shell` token remap —
+    // inside it the V3 tone/role system resolves to the Signal palette, so
+    // `.v3m-*` page vocabulary inherits V4 without markup changes
+    // (tokens-v4.css). V3 remains the rollback chrome.
+    return (
+      <div
+        className="v4-shell"
+        data-shell="public"
+        data-chrome="v4"
+        data-hero-tone={heroTone}
+        data-tone={heroTone === "ink" ? "ink" : "porcelain"}
+      >
+        <a className="v4-skip" href={`#${HOME_SECTIONS.main}`}>
+          Skip to main content
+        </a>
+        <SiteHeaderV4 tone={heroTone} />
+        <main id={HOME_SECTIONS.main} className="v4-shell__main" tabIndex={-1}>
+          {boundary}
+        </main>
+        <SiteFooterV4 />
+      </div>
+    );
+  }
 
   if (chrome === "v3") {
     return (

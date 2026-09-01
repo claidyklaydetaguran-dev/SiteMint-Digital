@@ -1,0 +1,135 @@
+/**
+ * Frontend V4 — "SiteMint Signal" token foundation (Phase 1).
+ *
+ * Approved reference: design/sitemint-v4-signal-experience @ 086d52f
+ * (docs/design/v4-signal/01-DESIGN-SYSTEM.md). Every hex here was
+ * contrast-verified there (WCAG 2.2 AA); see that doc's table before changing
+ * any pairing.
+ *
+ * Two layers in one file:
+ *
+ * 1. `--v4-*` primitives on :root — the Signal palette and the four-voice
+ *    type system. New V4 components read these.
+ * 2. The `.v4-shell` remap — inside a V4-chromed surface, the `--v3-*`
+ *    primitives are re-pointed to their V4 equivalents. The V3 tone/role
+ *    system (`[data-tone]` → --v3-bg/--v3-fg/…) resolves at use-site, so
+ *    every `.v3m-*` marketing surface inherits the full V4 palette and type
+ *    the moment its route wraps in `chrome="v4"` — without touching the V3
+ *    files, which remain the rollback skin. This is the same
+ *    override-not-rewrite mechanism the committed helpdesk V3 retheme uses.
+ *
+ * Accent discipline (binding, from the approved system):
+ * - cyan #22D3EE is THE accent (dark surfaces); #0E7490 carries it on light
+ *   (5.36:1 on white).
+ * - turquoise #2DD4BF is mid-journey/secondary only.
+ * - mint #4AF2C8 marks journey completion ONLY — never buttons or headings.
+ * - amber is the single warm voice, for human-attention moments only.
+ */
+
+:root {
+  /* ── V4 Signal palette ───────────────────────────────────────────────── */
+  --v4-ink: #071324;
+  --v4-navy: #0d2440;
+  --v4-navy-2: #143354; /* raised dark surface / hover on dark */
+  --v4-navy-line: #1b3a5e;
+  --v4-cloud: #f4f8fb;
+  --v4-paper: #ffffff;
+  --v4-mist: #c9d9e6;
+  --v4-line-strong-l: #5a7186;
+  --v4-text: #0b1c2e;
+  --v4-mute: #46617a; /* 6.05:1 on cloud */
+  --v4-mute-dark: #93aec4; /* 8.06:1 on ink */
+  --v4-cyan: #22d3ee; /* 10.30:1 on ink */
+  --v4-cyan-deep: #0e7490; /* 5.36:1 on white */
+  --v4-turquoise: #2dd4bf;
+  --v4-mint: #4af2c8; /* completion only */
+  --v4-amber: #f5a524;
+  --v4-amber-deep: #b45309;
+  --v4-red: #ff6369;
+  --v4-red-deep: #c62a33;
+  --v4-green-ok: #0b6e4f;
+
+  /* ── V4 type — four voices (self-hosted via @fontsource, display:swap) ── */
+  --v4-font-display: "Space Grotesk", "Geist", ui-sans-serif, system-ui,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --v4-font-body: "DM Sans", "Geist", ui-sans-serif, system-ui, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --v4-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono",
+    SFMono-Regular, Menlo, Consolas, monospace;
+  --v4-font-editorial: "Newsreader", Didot, Georgia, ui-serif, serif;
+
+  /* ── Signal gradient — the thread only, never fills or buttons ───────── */
+  --v4-signal-gradient: linear-gradient(
+    90deg,
+    var(--v4-cyan),
+    var(--v4-turquoise) 55%,
+    var(--v4-mint)
+  );
+}
+
+/* ── The V4 remap: V3 vocabulary wears the Signal skin under V4 chrome ── */
+.v4-shell {
+  /* Palette primitives → V4 (the [data-tone] role scopes read these). */
+  --v3-ink: var(--v4-ink);
+  --v3-charcoal: var(--v4-navy);
+  --v3-charcoal-2: var(--v4-navy-2);
+  --v3-mint: var(--v4-cyan); /* the accent role — cyan carries it in V4 */
+  --v3-mint-deep: var(--v4-cyan-deep); /* accent-on-light / focus ring */
+  --v3-cyan: var(--v4-turquoise); /* secondary accent */
+  --v3-ice: #e7f4f8;
+  --v3-porcelain: var(--v4-cloud);
+  --v3-white: var(--v4-paper);
+  --v3-slate: var(--v4-mute);
+  --v3-slate-d: var(--v4-mute-dark);
+  --v3-amber: var(--v4-amber);
+  --v3-amber-deep: var(--v4-amber-deep);
+  --v3-red: var(--v4-red);
+  --v3-red-deep: var(--v4-red-deep);
+  --v3-green-ok: var(--v4-green-ok);
+
+  /* Type voices. */
+  --v3-font-sans: var(--v4-font-body);
+  --v3-font-serif: var(--v4-font-editorial);
+  --v3-font-mono: var(--v4-font-mono);
+
+  /* Geometry: V4 tightens control radii (4px controls, 10px cards). */
+  --v3-radius-control: 6px;
+  --v3-radius-card: 10px;
+
+  /* Elevation/glow follow the accent hue. */
+  --v3-glow-mint: 0 0 24px rgba(34, 211, 238, 0.28);
+  --v3-shadow-3: 0 24px 64px -32px rgba(7, 19, 36, 0.4);
+
+  font-family: var(--v4-font-body);
+}
+
+/* Display voice: headings across V4 surfaces use Space Grotesk. Scoped to
+   the shell so no V2/V3-chromed page changes. */
+.v4-shell h1,
+.v4-shell h2,
+.v4-shell h3,
+.v4-shell h4 {
+  font-family: var(--v4-font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Shared V4 micro-vocabulary used by chrome + pages. */
+.v4-kicker {
+  font-family: var(--v4-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v3-accent-text, var(--v4-cyan-deep));
+}
+
+.v4-signal-rule {
+  height: 2px;
+  background: var(--v4-signal-gradient);
+  border: 0;
+}
+
+/* Focus visibility on every V4 surface (2px, offset, accent-on-tone). */
+.v4-shell :focus-visible {
+  outline: 2px solid var(--v3-accent-text, var(--v4-cyan-deep));
+  outline-offset: 2px;
+}
