@@ -82,8 +82,13 @@
 
 @media (min-width: 1024px) {
   .v3m-hero__inner--split {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
     align-items: center;
+  }
+  /* In a split hero the title shares the row with the theater — the full
+     editorial scale wraps to six lines there, so it steps down one size. */
+  .v3m-hero__inner--split .v3-hero-title {
+    font-size: clamp(2.5rem, 1.8rem + 2.2vw, 4rem);
   }
 }
 
