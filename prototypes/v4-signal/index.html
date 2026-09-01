@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SiteMint Signal V4 Prototype</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<!-- ARTIFACT-START -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap">
+<style>
+/* ============ SiteMint Signal V4 tokens ============ */
+:root{
+  --ink:#071324; --navy:#0D2440; --navy-line:#1B3A5E;
+  --cloud:#F4F8FB; --paper:#FFFFFF; --mist:#C9D9E6; --line-strong:#5A7186;
+  --text:#0B1C2E; --mute:#46617A; --mute-dark:#93AEC4;
+  --cyan:#22D3EE; --cyan-deep:#0E7490; --turq:#2DD4BF; --mint:#4AF2C8;
+  --amber:#F5A524; --amber-deep:#B45309; --red:#FF6369; --red-deep:#C62A33;
+  --f-display:'Space Grotesk',system-ui,sans-serif;
+  --f-body:'DM Sans',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,monospace;
+  --f-edit:'Newsreader',Georgia,serif;
+  --m-fast:160ms ease-out;
+  --m-base:320ms cubic-bezier(.22,.9,.28,1);
+  --m-slow:600ms cubic-bezier(.22,.9,.28,1);
+  --shadow-float:0 24px 64px -32px rgb(7 19 36 / .4);
+  --hdr-h:64px;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--cloud);color:var(--text);font-family:var(--f-body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+img,svg,canvas,video{max-width:100%}
+button{font:inherit;cursor:pointer}
+a{color:var(--cyan-deep)}
+h1,h2,h3,h4{font-family:var(--f-display);line-height:1.08;margin:0 0 .5em;letter-spacing:-.02em}
+:focus-visible{outline:2px solid var(--cyan-deep);outline-offset:2px}
+.on-dark :focus-visible,.on-dark:focus-visible{outline-color:var(--cyan)}
+.skip{position:absolute;left:-9999px;top:0;background:var(--paper);color:var(--text);padding:.75rem 1.25rem;z-index:200;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+.mono-kicker{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan-deep)}
+.on-dark .mono-kicker{color:var(--cyan)}
+.badge-sim{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--f-mono);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border:1px solid var(--mist);border-radius:999px;padding:.2rem .6rem}
+.on-dark .badge-sim{color:var(--mute-dark);border-color:var(--navy-line)}
+.container{max-width:1280px;margin:0 auto;padding:0 clamp(1.25rem,4vw,3rem)}
+
+/* ============ Buttons ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:44px;padding:.65rem 1.4rem;border-radius:4px;border:1px solid transparent;font-weight:500;text-decoration:none;transition:transform var(--m-fast),background var(--m-fast),box-shadow var(--m-fast);position:relative;will-change:transform}
+.btn-primary{background:var(--cyan-deep);color:#fff}
+.btn-primary:hover{box-shadow:0 6px 24px -8px rgb(14 116 144/.55)}
+.on-dark .btn-primary{background:var(--cyan);color:var(--ink)}
+.btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
+.on-dark .btn-ghost{border-color:var(--navy-line);color:var(--cloud)}
+.btn-danger{background:transparent;border-color:var(--red);color:var(--red)}
+
+/* ============ Marketing header ============ */
+.mk-header{position:fixed;inset:0 0 auto 0;height:var(--hdr-h);z-index:100;display:flex;align-items:center;transition:background var(--m-base),border-color var(--m-base)}
+.mk-header .container{display:flex;align-items:center;gap:1.5rem;width:100%}
+.mk-header.over-dark{background:rgb(7 19 36/.72);backdrop-filter:blur(12px);border-bottom:1px solid rgb(27 58 94/.6)}
+.mk-header.over-light{background:rgb(244 248 251/.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--mist)}
+.brand{display:flex;align-items:center;gap:.6rem;font-family:var(--f-display);font-weight:700;font-size:1.15rem;text-decoration:none;color:var(--text);min-height:44px}
+.over-dark .brand{color:var(--cloud)}
+.brand .gem{width:20px;height:20px;flex:none}
+.mk-nav{display:flex;align-items:center;gap:.25rem;margin-left:auto}
+.mk-nav>li{list-style:none}
+.mk-nav{padding:0;margin-top:0;margin-bottom:0}
+.nav-link{position:relative;display:inline-flex;align-items:center;min-height:44px;padding:0 .8rem;text-decoration:none;color:var(--mute);font-weight:500;background:none;border:none;border-radius:4px}
+.over-dark .nav-link{color:var(--mute-dark)}
+.nav-link:hover{color:var(--text)}
+.over-dark .nav-link:hover{color:var(--cloud)}
+.nav-link[aria-current="page"],.nav-link.active{color:var(--text)}
+.over-dark .nav-link[aria-current="page"],.over-dark .nav-link.active{color:var(--cloud)}
+.nav-link[aria-current="page"]::after,.nav-link.active::after{content:"";position:absolute;left:.8rem;right:.8rem;bottom:6px;height:3px;border-radius:2px;background:var(--cyan);}
+.nav-prod{border:1px solid var(--cyan-deep);border-radius:999px;padding:0 1rem;gap:.5rem;display:inline-flex;align-items:center;color:var(--cyan-deep)!important}
+.over-dark .nav-prod{border-color:var(--cyan);color:var(--cyan)!important}
+.nav-prod .dot{width:7px;height:7px;border-radius:50%;background:var(--turq);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+.nav-sep{width:1px;height:22px;background:var(--mist);margin:0 .4rem}
+.over-dark .nav-sep{background:var(--navy-line)}
+.caret{transition:transform var(--m-fast)}
+[aria-expanded="true"] .caret{transform:rotate(180deg)}
+
+/* mega panel */
+.mega{position:fixed;top:var(--hdr-h);left:0;right:0;z-index:99;background:var(--paper);border-bottom:1px solid var(--mist);box-shadow:var(--shadow-float);transform:translateY(-8px);opacity:0;visibility:hidden;transition:transform 180ms ease-out,opacity 180ms ease-out,visibility 0s 180ms}
+.mega.open{transform:none;opacity:1;visibility:visible;transition:transform 180ms ease-out,opacity 180ms ease-out}
+.mega-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;padding:2rem 0 1.25rem}
+.pillar-card{display:block;text-decoration:none;border:1px solid var(--mist);border-radius:10px;padding:1.1rem;color:var(--text);transition:border-color var(--m-fast),transform var(--m-fast),box-shadow var(--m-fast)}
+.pillar-card:hover,.pillar-card:focus-visible{border-color:var(--cyan-deep);transform:translateY(-2px);box-shadow:var(--shadow-float)}
+.pillar-card .num{font-family:var(--f-mono);font-size:.7rem;color:var(--cyan-deep);letter-spacing:.12em}
+.pillar-card h3{font-size:1.02rem;margin:.5rem 0 .3rem}
+.pillar-card p{margin:0;font-size:.85rem;color:var(--mute);line-height:1.45}
+.mega-foot{border-top:1px solid var(--mist);padding:.85rem 0 1.4rem;font-size:.9rem;display:flex;justify-content:space-between;color:var(--mute)}
+
+/* mobile nav */
+.menu-btn{display:none;margin-left:auto;width:44px;height:44px;border:none;background:none;color:inherit;border-radius:6px}
+.over-dark .menu-btn{color:var(--cloud)}
+.sheet{position:fixed;inset:0;z-index:150;background:var(--ink);color:var(--cloud);padding:1.25rem;overflow:auto;display:none}
+.sheet.open{display:block}
+.sheet .close-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
+.sheet a,.sheet button.acc{display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem .25rem;color:var(--cloud);text-decoration:none;font-family:var(--f-display);font-size:1.3rem;background:none;border:none;border-bottom:1px solid var(--navy-line);text-align:left}
+.sheet .sub a{font-family:var(--f-body);font-size:1rem;color:var(--mute-dark);padding:.65rem 1rem;border-bottom:none}
+.sheet .brand{display:inline-flex;justify-content:flex-start;width:auto;border-bottom:none;font-size:1.15rem;padding:0;gap:.6rem}
+.sheet .sub{display:none}
+.sheet .sub.open{display:block}
+.sheet a.cur{color:var(--cyan)}
+
+/* ============ Hero ============ */
+.hero-scroll{position:relative;height:340vh;background:var(--ink)}
+.hero-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;align-items:flex-end}
+#heroCanvas{position:absolute;inset:0;width:100%;height:100%}
+.hero-veil{position:absolute;inset:0;background:radial-gradient(120% 90% at 28% 78%, rgb(7 19 36/.88) 0%, rgb(7 19 36/.45) 45%, rgb(7 19 36/.15) 100%)}
+.hero-copy{position:relative;z-index:2;padding-bottom:clamp(3rem,9vh,6rem);max-width:760px}
+.hero-copy .mono-kicker{display:block;margin-bottom:1.1rem}
+.hero-copy h1{color:var(--cloud);font-size:clamp(2.6rem,6vw,4.75rem);max-width:12em}
+.hero-copy .sub{color:var(--mute-dark);font-size:clamp(1.05rem,1.6vw,1.3rem);max-width:36em;margin:0 0 1.8rem}
+.hero-copy .sub b{color:var(--cloud);font-weight:500}
+.hero-ctas{display:flex;gap:.9rem;flex-wrap:wrap}
+.hero-nodes{position:absolute;z-index:2;right:clamp(1rem,6vw,6rem);top:18vh;display:grid;gap:1.1rem;text-align:right}
+.hero-node{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute-dark);opacity:0;transform:translateX(10px);transition:opacity var(--m-base),transform var(--m-base),color var(--m-base)}
+.hero-node.lit{opacity:1;transform:none;color:var(--turq)}
+.scroll-hint{position:absolute;z-index:2;left:50%;bottom:1.1rem;transform:translateX(-50%);color:var(--mute-dark);font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;opacity:.8;transition:opacity var(--m-base)}
+.hero-scroll.past .scroll-hint{opacity:0}
+
+/* ============ Progress rail ============ */
+.rail{position:fixed;left:1.1rem;top:50%;transform:translateY(-50%);z-index:60;display:grid;gap:1rem;opacity:0;visibility:hidden;transition:opacity var(--m-base),visibility 0s var(--m-base)}
+.rail.show{opacity:1;visibility:visible;transition:opacity var(--m-base)}
+.rail a{display:flex;align-items:center;gap:.55rem;text-decoration:none;font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;color:var(--mute)}
+.rail a .tick{width:18px;height:2px;background:var(--mist);transition:background var(--m-fast),width var(--m-fast)}
+.rail a.cur{color:var(--cyan-deep)}
+.rail a.cur .tick{background:var(--cyan-deep);width:28px}
+.rail .lbl{opacity:0;transition:opacity var(--m-fast)}
+.rail a.cur .lbl,.rail:hover .lbl{opacity:1}
+.rail.at-end{opacity:0;visibility:hidden}
+
+/* ============ Marketing chapters ============ */
+.chapter{padding:clamp(4rem,9vw,7.5rem) 0;position:relative}
+.chapter-head{display:flex;align-items:baseline;gap:1rem;margin-bottom:2.2rem}
+.chapter-head .rule{flex:1;height:1px;background:var(--mist)}
+.chapter h2{font-size:clamp(2rem,4vw,3.25rem);margin:0 0 1rem;max-width:16em}
+.reveal{opacity:0;transform:translateY(22px);transition:opacity var(--m-slow),transform var(--m-slow)}
+.reveal.in{opacity:1;transform:none}
+.reveal-clip h2{clip-path:inset(0 0 100% 0);transition:clip-path var(--m-slow)}
+.reveal-clip.in h2{clip-path:inset(0 0 -8% 0)}
+.lede{font-size:1.15rem;color:var(--mute);max-width:44em}
+.editorial-split{display:grid;grid-template-columns:5fr 7fr;gap:clamp(2rem,5vw,4.5rem);align-items:start}
+.pull-quote{font-family:var(--f-edit);font-style:italic;font-size:1.5rem;line-height:1.4;color:var(--text);border-left:3px solid var(--cyan);padding-left:1.2rem;margin:1.6rem 0}
+
+/* signal map */
+.sigmap{background:var(--ink);border-radius:14px;padding:clamp(1.5rem,4vw,3rem);color:var(--cloud)}
+.sigmap svg{width:100%;height:auto;display:block}
+.sigmap-stages{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1.4rem}
+.stage-chip{border:1px solid var(--navy-line);background:none;color:var(--mute-dark);border-radius:999px;padding:.5rem 1rem;min-height:44px;font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;transition:color var(--m-fast),border-color var(--m-fast)}
+.stage-chip[aria-pressed="true"]{color:var(--ink);background:var(--cyan);border-color:var(--cyan)}
+.sigmap .stage-desc{margin:1.1rem 0 0;color:var(--mute-dark);min-height:3.2em;font-size:.95rem}
+.sigmap .stage-desc b{color:var(--cloud);font-weight:500}
+.sig-node circle.core{fill:var(--navy);stroke:var(--navy-line);stroke-width:1.5;transition:stroke var(--m-base),fill var(--m-base)}
+.sig-node.lit circle.core{stroke:var(--cyan)}
+.sig-node.done circle.core{stroke:var(--turq)}
+.sig-node text{fill:var(--mute-dark);font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.sig-node.lit text{fill:var(--cloud)}
+#sigPath{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 1.1s cubic-bezier(.22,.9,.28,1)}
+.sigmap.drawn #sigPath{stroke-dashoffset:0}
+
+/* service pillars */
+.pillar-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem}
+.svc-card{background:var(--paper);border:1px solid var(--mist);border-radius:10px;padding:1.4rem;display:flex;flex-direction:column;gap:.5rem;transition:transform var(--m-base),box-shadow var(--m-base),border-color var(--m-base)}
+.svc-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-float);border-color:var(--cyan-deep)}
+.svc-card .num{font-family:var(--f-mono);color:var(--cyan-deep);font-size:.72rem;letter-spacing:.12em}
+.svc-card h3{font-size:1.15rem;margin:0}
+.svc-card p{margin:0;color:var(--mute);font-size:.92rem;flex:1}
+.svc-card .link{font-weight:500;text-decoration:none;font-size:.92rem}
+.svc-connector{height:52px;position:relative;margin:-.5rem 0}
+.svc-connector svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* CTA band + footer */
+.cta-band{background:var(--ink);color:var(--cloud);padding:clamp(3.5rem,8vw,6rem) 0;position:relative;overflow:hidden}
+.cta-band h2{font-size:clamp(1.9rem,3.6vw,3rem);max-width:18em}
+.cta-band .thread{position:absolute;inset:auto 0 0 0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--turq),var(--mint));opacity:.85}
+.mk-footer{background:var(--ink);color:var(--mute-dark);padding:2.5rem 0 3rem;border-top:1px solid var(--navy-line);font-size:.9rem}
+.mk-footer .cols{display:flex;justify-content:space-between;gap:2rem;flex-wrap:wrap}
+.mk-footer a{color:var(--mute-dark)}
+.next-band{border-top:1px solid var(--mist);padding:2rem 0;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+
+/* ============ Receptionist page ============ */
+.rx-hero{background:var(--ink);color:var(--cloud);padding:calc(var(--hdr-h) + clamp(2.5rem,7vw,5rem)) 0 clamp(3rem,7vw,5rem)}
+.rx-grid{display:grid;grid-template-columns:6fr 6fr;gap:clamp(2rem,5vw,4rem);align-items:center}
+.rx-hero h1{color:var(--cloud);font-size:clamp(2.2rem,4.4vw,3.6rem)}
+.rx-hero .sub{color:var(--mute-dark);font-size:1.12rem;max-width:32em}
+.theater{background:linear-gradient(180deg,var(--navy) 0%,#0A1C33 100%);border:1px solid var(--navy-line);border-radius:16px;padding:1.75rem;display:flex;flex-direction:column;align-items:center;gap:1.1rem;min-height:430px;position:relative}
+.theater .disclose{font-size:.78rem;color:var(--mute-dark);text-align:center}
+.stage-obj{width:150px;height:150px;position:relative;display:grid;place-items:center}
+.stage-obj .gem-big{width:64px;height:64px;transition:opacity var(--m-base),transform var(--m-base)}
+.stage-obj .ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--navy-line);transition:border-color var(--m-base)}
+.theater[data-state="ready"] .gem-big{animation:breathe 4s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.06);opacity:1}}
+.theater[data-state="connecting"] .ring{border-color:transparent;border-top-color:var(--cyan);animation:orbit 1s linear infinite}
+@keyframes orbit{to{transform:rotate(360deg)}}
+.theater[data-state="permission_request"] .ring,.theater[data-state="mic_explain"] .ring{border-color:var(--cyan)}
+.wave{display:flex;gap:4px;align-items:center;height:56px}
+.wave span{width:5px;border-radius:3px;background:var(--cyan);height:8px;transition:height 120ms ease,background var(--m-base)}
+.theater[data-state="assistant_speaking"] .wave span{background:var(--turq)}
+.theater .state-lbl{font-family:var(--f-mono);font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cloud);min-height:1.4em}
+.theater .timer{font-family:var(--f-mono);color:var(--mute-dark);font-size:.85rem}
+.theater .t-ctas{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center}
+.theater .convo{width:100%;max-height:120px;overflow:auto;font-size:.85rem;color:var(--mute-dark);display:grid;gap:.4rem}
+.theater .convo .line b{color:var(--cloud);font-weight:500}
+.rx-walk{padding:clamp(3.5rem,8vw,6rem) 0}
+
+/* ============ App shells (customer + ops) ============ */
+.app{min-height:100vh;display:grid;grid-template-columns:248px 1fr;background:var(--cloud)}
+.app-side{background:var(--paper);border-right:1px solid var(--mist);padding:1.1rem .9rem;display:flex;flex-direction:column;gap:1.1rem;position:sticky;top:0;height:100vh;overflow:auto}
+.app-side .brand{font-size:1rem}
+.side-group{display:grid;gap:2px}
+.side-group .g-lbl{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;color:var(--mute);text-transform:uppercase;padding:.4rem .6rem .2rem}
+.side-link{display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;min-height:38px;border-radius:6px;text-decoration:none;color:var(--mute);font-size:.92rem;font-weight:500;position:relative;background:none;border:none;width:100%;text-align:left}
+.side-link:hover{background:var(--cloud);color:var(--text)}
+.side-link[aria-current="page"]{background:#E7F4F8;color:var(--cyan-deep)}
+.side-link[aria-current="page"]::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:2px;background:var(--cyan-deep)}
+.app-main{padding:1.5rem clamp(1.25rem,3vw,2.5rem) 3rem;min-width:0}
+.app-topbar{display:flex;align-items:center;gap:1rem;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap}
+.app-topbar>div{flex-wrap:wrap}
+.status-chip{display:inline-flex;align-items:center;gap:.45rem;border-radius:999px;padding:.3rem .8rem;font-size:.8rem;font-weight:500;background:#E9FBF4;color:#0B6E4F;border:1px solid #BDEBD9}
+.status-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--turq)}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.4rem;flex-wrap:wrap}
+.page-head h1{font-size:1.375rem;margin:0}
+.page-head .pdesc{color:var(--mute);font-size:.92rem;margin:.2rem 0 0}
+.tile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.4rem}
+.tile{background:var(--paper);border:1px solid var(--mist);border-radius:10px;padding:1rem}
+.tile .t-lbl{font-size:.78rem;color:var(--mute);font-weight:500}
+.tile .t-val{font-family:var(--f-display);font-size:1.7rem;font-weight:700;margin-top:.15rem}
+.tile .t-sub{font-size:.75rem;color:var(--mute)}
+.tile.warn{border-color:#F3D9A4;background:#FFFBF2}
+.panel{background:var(--paper);border:1px solid var(--mist);border-radius:10px;margin-bottom:1.2rem;overflow:hidden}
+.panel .p-head{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.1rem;border-bottom:1px solid var(--mist);font-weight:500;font-size:.95rem}
+.plist{margin:0;padding:0;list-style:none}
+.plist li{display:flex;gap:.8rem;align-items:center;padding:.75rem 1.1rem;border-bottom:1px solid var(--cloud);font-size:.9rem}
+.plist li:last-child{border-bottom:none}
+.plist .who{font-weight:500;min-width:11em}
+.plist .meta{color:var(--mute);font-size:.82rem;margin-left:auto;font-family:var(--f-mono)}
+.attn{display:flex;gap:.6rem;align-items:flex-start;padding:.75rem 1.1rem;border-left:3px solid var(--amber);background:#FFFBF2;border-bottom:1px solid #F6EBD2;font-size:.9rem}
+.attn:last-child{border-bottom:none}
+.attn .a-act{margin-left:auto;white-space:nowrap}
+.empty-state{padding:2.6rem 1.5rem;text-align:center;color:var(--mute)}
+.empty-state .gem{opacity:.35;width:34px;height:34px}
+.empty-state p{max-width:30em;margin:.6rem auto 1rem}
+.view-toggle{display:inline-flex;border:1px solid var(--mist);border-radius:6px;overflow:hidden}
+.view-toggle button{border:none;background:var(--paper);padding:.35rem .8rem;font-size:.8rem;color:var(--mute)}
+.view-toggle button[aria-pressed="true"]{background:#E7F4F8;color:var(--cyan-deep);font-weight:500}
+.skel{background:linear-gradient(90deg,var(--cloud) 25%,#E9F1F7 50%,var(--cloud) 75%);background-size:200% 100%;animation:sk 1.4s infinite;border-radius:6px;color:transparent!important;pointer-events:none}
+@keyframes sk{to{background-position:-200% 0}}
+
+/* ops skin */
+.ops .app-side{background:var(--ink);border-right-color:var(--navy-line)}
+.ops .app-side .brand{color:var(--cloud)}
+.ops .side-group .g-lbl{color:#5E7C9B}
+.ops .side-link{color:var(--mute-dark);font-family:var(--f-mono);font-size:.8rem;letter-spacing:.04em}
+.ops .side-link:hover{background:var(--navy);color:var(--cloud)}
+.ops .side-link[aria-current="page"]{background:var(--navy);color:var(--cyan)}
+.ops .side-link[aria-current="page"]::before{background:var(--cyan)}
+.ops-mark{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;border:1px solid rgb(245 165 36/.4);padding:.2rem .6rem;border-radius:4px}
+.ops-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.ops-table th{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);text-align:left;padding:.55rem .9rem;border-bottom:1px solid var(--mist)}
+.ops-table td{padding:.6rem .9rem;border-bottom:1px solid var(--cloud)}
+.ops-table tr:hover td{background:#F0F6FA}
+.score{font-family:var(--f-mono);font-weight:500}
+.stage-tag{font-size:.72rem;font-weight:500;border-radius:4px;padding:.15rem .5rem}
+.st-new{background:#E7F4F8;color:var(--cyan-deep)}
+.st-qual{background:#E9FBF4;color:#0B6E4F}
+.st-prop{background:#FFF4E0;color:var(--amber-deep)}
+.st-won{background:#DFF7EE;color:#0B6E4F}
+.table-wrap{overflow-x:auto}
+
+/* ============ Routing & transitions ============ */
+[data-route]{display:none}
+[data-route].active{display:block}
+.route-anim{animation:routein 240ms cubic-bezier(.22,.9,.28,1)}
+@keyframes routein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+main:focus{outline:none}
+
+/* ============ Responsive ============ */
+@media (max-width:1023px){
+  .mk-nav{display:none}
+  .menu-btn{display:inline-flex;align-items:center;justify-content:center}
+  .rail{display:none}
+  .mega-grid{grid-template-columns:repeat(2,1fr)}
+  .pillar-grid{grid-template-columns:repeat(2,1fr)}
+  .tile-grid{grid-template-columns:repeat(2,1fr)}
+  .rx-grid{grid-template-columns:1fr}
+  .editorial-split{grid-template-columns:1fr}
+  .app{grid-template-columns:1fr}
+  .app-side{position:fixed;left:0;top:0;bottom:0;width:260px;transform:translateX(-100%);transition:transform var(--m-base);z-index:120;height:100vh}
+  .app.side-open .app-side{transform:none;box-shadow:var(--shadow-float)}
+  .app-menu-btn{display:inline-flex!important}
+}
+.app-menu-btn{display:none;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--mist);background:var(--paper);border-radius:6px}
+@media (max-width:640px){
+  .pillar-grid{grid-template-columns:1fr}
+  .tile-grid{grid-template-columns:1fr 1fr}
+  .hero-nodes{display:none}
+  .plist .who{min-width:0}
+}
+
+/* ============ Reduced motion ============ */
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .reveal,.hero-node{opacity:1!important;transform:none!important}
+  .reveal-clip h2{clip-path:none!important}
+  #sigPath{stroke-dashoffset:0!important}
+  .hero-scroll{height:100vh}
+}
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sigGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22D3EE"/><stop offset=".55" stop-color="#2DD4BF"/><stop offset="1" stop-color="#4AF2C8"/>
+    </linearGradient>
+    <symbol id="gem" viewBox="0 0 24 24">
+      <rect x="5.2" y="5.2" width="13.6" height="13.6" rx="2" transform="rotate(45 12 12)" fill="none" stroke="url(#sigGrad)" stroke-width="2"/>
+      <circle cx="12" cy="12" r="2.4" fill="#22D3EE"/>
+    </symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ================= Marketing header ================= -->
+<header class="mk-header over-dark" id="mkHeader">
+  <div class="container">
+    <a href="#/" class="brand" aria-label="SiteMint — home">
+      <svg class="gem" aria-hidden="true"><use href="#gem"/></svg> SiteMint
+    </a>
+    <ul class="mk-nav" role="list">
+      <li>
+        <button class="nav-link" id="megaBtn" aria-expanded="false" aria-controls="megaPanel">
+          What We Build
+          <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-left:.35rem"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </li>
+      <li><a class="nav-link" href="#/" data-nav="work">Work</a></li>
+      <li><a class="nav-link" href="#/" data-nav="how">How It Works</a></li>
+      <li><a class="nav-link" href="#/" data-nav="about">About</a></li>
+      <li><a class="nav-link nav-prod" href="#/ai-receptionist" data-nav="rx"><span class="dot" aria-hidden="true"></span>AI Receptionist</a></li>
+      <li class="nav-sep" role="presentation" aria-hidden="true"></li>
+      <li><a class="nav-link" href="#/dashboard" data-nav="signin">Sign In</a></li>
+      <li><a class="btn btn-primary magnetic" href="#/" data-nav="start" style="margin-left:.4rem">Start a Project</a></li>
+    </ul>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mobileSheet" aria-label="Open menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- mega panel -->
+<div class="mega" id="megaPanel" role="region" aria-label="What We Build">
+  <div class="container">
+    <div class="mega-grid">
+      <a class="pillar-card" href="#/"><span class="num">01</span><h3>Websites &amp; digital experiences</h3><p>Marketing sites engineered to capture attention and convert it.</p></a>
+      <a class="pillar-card" href="#/"><span class="num">02</span><h3>Web apps &amp; business systems</h3><p>Custom applications that run the work behind the website.</p></a>
+      <a class="pillar-card" href="#/"><span class="num">03</span><h3>CRM &amp; workflow automation</h3><p>Pipelines, follow-up, and scoring that never forget a lead.</p></a>
+      <a class="pillar-card" href="#/ai-receptionist"><span class="num">04</span><h3>AI Receptionist &amp; voice systems</h3><p>Every call answered, qualified, and booked — day and night.</p></a>
+    </div>
+    <div class="mega-foot">
+      <span>Four pillars, one connected system.</span>
+      <a href="#/">See how the pillars connect →</a>
+    </div>
+  </div>
+</div>
+
+<!-- mobile sheet -->
+<nav class="sheet" id="mobileSheet" aria-label="Mobile navigation">
+  <div class="close-row">
+    <a href="#/" class="brand" style="color:var(--cloud)"><svg class="gem" aria-hidden="true"><use href="#gem"/></svg> SiteMint</a>
+    <button class="menu-btn" id="sheetClose" aria-label="Close menu" style="display:inline-flex;color:var(--cloud)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <button class="acc" id="sheetAcc" aria-expanded="false" aria-controls="sheetSub">What We Build
+    <svg class="caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <div class="sub" id="sheetSub">
+    <a href="#/">Websites &amp; digital experiences</a>
+    <a href="#/">Web apps &amp; business systems</a>
+    <a href="#/">CRM &amp; workflow automation</a>
+    <a href="#/ai-receptionist">AI Receptionist &amp; voice systems</a>
+  </div>
+  <a href="#/" data-nav="work">Work</a>
+  <a href="#/" data-nav="how">How It Works</a>
+  <a href="#/" data-nav="about">About</a>
+  <a href="#/ai-receptionist" data-nav="rx">AI Receptionist</a>
+  <a href="#/dashboard">Sign In</a>
+  <div style="margin-top:1.5rem"><a class="btn btn-primary" href="#/" style="width:100%">Start a Project</a></div>
+</nav>
+
+<!-- progress rail (homepage) -->
+<nav class="rail" id="rail" aria-label="Page sections">
+  <a href="#ch-hero"><span class="tick" aria-hidden="true"></span><span class="lbl">00 — Signal</span></a>
+  <a href="#ch-map"><span class="tick" aria-hidden="true"></span><span class="lbl">01 — Attention</span></a>
+  <a href="#ch-build"><span class="tick" aria-hidden="true"></span><span class="lbl">02 — What We Build</span></a>
+  <a href="#ch-cta"><span class="tick" aria-hidden="true"></span><span class="lbl">03 — Start</span></a>
+</nav>
+
+<main id="main" tabindex="-1">
+
+<!-- ============================================================ HOME -->
+<section data-route="home" class="active">
+  <div class="hero-scroll" id="heroScroll">
+    <div class="hero-stage" id="ch-hero">
+      <canvas id="heroCanvas" aria-hidden="true"></canvas>
+      <div class="hero-veil" aria-hidden="true"></div>
+      <div class="container hero-copy on-dark">
+        <span class="mono-kicker">SiteMint Digital · Signal V4 Prototype</span>
+        <h1>Digital systems that turn attention into customers.</h1>
+        <p class="sub">We build <b>websites, web apps, CRM workflows, and AI reception systems</b> that work as one connected system — so no inquiry gets lost.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary magnetic" href="#/">Start a Project</a>
+          <a class="btn btn-ghost" href="#ch-map">See how it works</a>
+        </div>
+      </div>
+      <div class="hero-nodes" aria-hidden="true">
+        <span class="hero-node" data-at=".30">Website</span>
+        <span class="hero-node" data-at=".45">Conversation</span>
+        <span class="hero-node" data-at=".60">CRM</span>
+        <span class="hero-node" data-at=".75">Automation</span>
+        <span class="hero-node" data-at=".88">Customer</span>
+      </div>
+      <span class="scroll-hint" aria-hidden="true">Scroll — the signal organizes</span>
+    </div>
+  </div>
+
+  <!-- chapter 01: signal map (scroll-story section) -->
+  <div class="chapter" id="ch-map">
+    <div class="container">
+      <div class="chapter-head reveal"><span class="mono-kicker">01 — Attention</span><span class="rule" aria-hidden="true"></span></div>
+      <div class="editorial-split">
+        <div class="reveal reveal-clip">
+          <h2>Every inquiry takes a journey. Most businesses lose it halfway.</h2>
+          <p class="lede">A missed call, a form no one answers, a lead that never gets a follow-up. The SiteMint Signal is the path an inquiry should travel — and the system that keeps it moving.</p>
+          <p class="pull-quote">One thread, from first click to booked customer.</p>
+        </div>
+        <div class="sigmap reveal" id="sigmap">
+          <svg viewBox="0 0 640 240" role="img" aria-label="Diagram: an inquiry travels from attention through conversation, organization, and action to a customer">
+            <path id="sigPath" d="M40 190 C 140 60, 200 210, 320 120 S 520 40, 600 60" fill="none" stroke="url(#sigGrad)" stroke-width="2.5" pathLength="1"/>
+            <g class="sig-node" data-stage="0" transform="translate(40 190)"><circle class="core" r="17"/><text y="38" text-anchor="middle">Attention</text></g>
+            <g class="sig-node" data-stage="1" transform="translate(180 140)"><circle class="core" r="17"/><text y="38" text-anchor="middle">Conversation</text></g>
+            <g class="sig-node" data-stage="2" transform="translate(320 120)"><circle class="core" r="17"/><text y="38" text-anchor="middle">Organization</text></g>
+            <g class="sig-node" data-stage="3" transform="translate(462 92)"><circle class="core" r="17"/><text y="38" text-anchor="middle">Action</text></g>
+            <g class="sig-node" data-stage="4" transform="translate(600 60)"><circle class="core" r="17" style="stroke:var(--mint)"/><text y="38" text-anchor="middle">Customer</text></g>
+          </svg>
+          <div class="sigmap-stages" role="group" aria-label="Journey stages">
+            <button class="stage-chip" data-stage="0" aria-pressed="true">Attention</button>
+            <button class="stage-chip" data-stage="1" aria-pressed="false">Conversation</button>
+            <button class="stage-chip" data-stage="2" aria-pressed="false">Organization</button>
+            <button class="stage-chip" data-stage="3" aria-pressed="false">Action</button>
+            <button class="stage-chip" data-stage="4" aria-pressed="false">Customer</button>
+          </div>
+          <p class="stage-desc" id="stageDesc" aria-live="polite"><b>Attention.</b> Your website and channels capture the inquiry the moment it appears — no ring-out, no unread message.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- chapter 02: what we build (service section) -->
+  <div class="chapter" id="ch-build" style="background:var(--paper)">
+    <div class="container">
+      <div class="chapter-head reveal"><span class="mono-kicker">02 — What We Build</span><span class="rule" aria-hidden="true"></span></div>
+      <div class="reveal reveal-clip"><h2>Four pillars. One connected system.</h2></div>
+      <p class="lede reveal" style="margin-bottom:2.4rem">Each pillar stands on its own. Connected, they carry the signal end to end.</p>
+      <div class="pillar-grid" id="pillarGrid">
+        <article class="svc-card reveal"><span class="num">01</span><h3>Websites &amp; digital experiences</h3><p>Fast, distinctive marketing sites built to capture attention and convert it into real inquiries.</p><a class="link" href="#/">Explore websites →</a></article>
+        <article class="svc-card reveal"><span class="num">02</span><h3>Web apps &amp; business systems</h3><p>Custom applications that run the work behind the site — portals, tools, and operational software.</p><a class="link" href="#/">Explore web apps →</a></article>
+        <article class="svc-card reveal"><span class="num">03</span><h3>CRM &amp; workflow automation</h3><p>Pipelines, lead scoring, and follow-up automation so every conversation is organized and acted on.</p><a class="link" href="#/">Explore CRM →</a></article>
+        <article class="svc-card reveal"><span class="num">04</span><h3>AI Receptionist &amp; voice systems</h3><p>A receptionist that answers every call and text, qualifies the lead, and books the appointment.</p><a class="link" href="#/ai-receptionist">Explore AI Receptionist →</a></article>
+      </div>
+      <div class="next-band" style="margin-top:3rem">
+        <span class="mono-kicker" style="color:var(--mute)">Next</span>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap">
+          <a class="btn btn-ghost" href="#/ai-receptionist">Meet the AI Receptionist</a>
+          <a class="btn btn-primary" href="#/">Start a Project</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- final CTA band -->
+  <div class="cta-band on-dark" id="ch-cta">
+    <div class="container">
+      <span class="mono-kicker">03 — Start</span>
+      <h2>Tell us where attention leaks out of your business. We'll build the system that catches it.</h2>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1.6rem">
+        <a class="btn btn-primary magnetic" href="#/">Start a Project</a>
+        <a class="btn btn-ghost" href="#/">How It Works</a>
+      </div>
+    </div>
+    <div class="thread" aria-hidden="true"></div>
+  </div>
+
+  <footer class="mk-footer on-dark">
+    <div class="container cols">
+      <div>
+        <a href="#/" class="brand" style="color:var(--cloud)"><svg class="gem" aria-hidden="true"><use href="#gem"/></svg> SiteMint</a>
+        <p style="max-width:26em;margin:.8rem 0 0">Websites, web apps, CRM workflows, and AI reception systems — built as one signal.</p>
+      </div>
+      <div style="display:flex;gap:3rem;flex-wrap:wrap">
+        <div><strong style="color:var(--cloud)">Build</strong><br><a href="#/">Websites</a><br><a href="#/">Web apps</a><br><a href="#/">CRM &amp; automation</a><br><a href="#/ai-receptionist">AI Receptionist</a></div>
+        <div><strong style="color:var(--cloud)">Company</strong><br><a href="#/">Work</a><br><a href="#/">How It Works</a><br><a href="#/">About</a><br><a href="#/">Contact</a></div>
+        <div><strong style="color:var(--cloud)">Legal</strong><br><a href="#/">Privacy</a><br><a href="#/">Terms</a></div>
+      </div>
+    </div>
+  </footer>
+</section>
+
+<!-- ============================================================ AI RECEPTIONIST -->
+<section data-route="receptionist">
+  <div class="rx-hero on-dark">
+    <div class="container">
+      <p class="mono-kicker" style="margin-bottom:1rem"><a href="#/" style="color:inherit;text-decoration:none">Home</a> / AI Receptionist</p>
+      <div class="rx-grid">
+        <div>
+          <h1>Your calls, answered. Every one of them.</h1>
+          <p class="sub">The SiteMint AI Receptionist picks up 24/7, has a natural conversation, qualifies the caller, and books the appointment — then hands everything to your CRM.</p>
+          <div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-top:1.6rem">
+            <a class="btn btn-primary magnetic" href="#/dashboard">Sign In</a>
+            <a class="btn btn-ghost" href="#/">Talk to us</a>
+          </div>
+          <p style="color:var(--mute-dark);font-size:.85rem;margin-top:1.4rem">Also answers SMS. Plays fair with your existing number.</p>
+        </div>
+        <div class="theater" id="theater" data-state="ready">
+          <span class="badge-sim">Interface preview · simulated conversation</span>
+          <div class="stage-obj" aria-hidden="true">
+            <span class="ring"></span>
+            <svg class="gem-big"><use href="#gem"/></svg>
+            <div class="wave" id="wave" hidden>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <p class="state-lbl" id="stateLbl" aria-live="polite">Try a live conversation</p>
+          <p class="timer" id="timer" hidden>00:00 / 02:00</p>
+          <div class="convo" id="convo" aria-live="polite"></div>
+          <div class="t-ctas" id="tCtas">
+            <button class="btn btn-primary" id="tStart">Start the demo</button>
+          </div>
+          <p class="disclose">This is an AI voice demonstration. In this prototype the conversation is simulated — no microphone is requested and no audio plays.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="rx-walk">
+    <div class="container">
+      <div class="chapter-head reveal"><span class="mono-kicker">01 — How it answers</span><span class="rule" aria-hidden="true"></span></div>
+      <div class="reveal reveal-clip"><h2>Answer. Qualify. Book. Hand off.</h2></div>
+      <p class="lede reveal">Every conversation follows your rules: your greeting, your questions, your calendar. Anything it can't handle goes to a human — with context.</p>
+      <div class="next-band" style="margin-top:2.5rem">
+        <span class="mono-kicker" style="color:var(--mute)">Next</span>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap"><a class="btn btn-ghost" href="#/">See pricing</a><a class="btn btn-primary" href="#/">Start a Project</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CUSTOMER DASHBOARD -->
+<section data-route="dashboard">
+  <div class="app" id="custApp">
+    <aside class="app-side" aria-label="Dashboard navigation">
+      <a href="#/" class="brand"><svg class="gem" aria-hidden="true"><use href="#gem"/></svg> SiteMint</a>
+      <nav style="display:grid;gap:1.1rem">
+        <div class="side-group"><span class="g-lbl">Overview</span>
+          <a class="side-link" href="#/dashboard" aria-current="page">Overview</a>
+        </div>
+        <div class="side-group"><span class="g-lbl">Assistant</span>
+          <a class="side-link" href="#/dashboard">Assistants</a>
+          <a class="side-link" href="#/dashboard">Prompt</a>
+          <a class="side-link" href="#/dashboard">Voice &amp; Model</a>
+        </div>
+        <div class="side-group"><span class="g-lbl">Activity</span>
+          <a class="side-link" href="#/dashboard">Conversations</a>
+          <a class="side-link" href="#/dashboard">Appointments</a>
+          <a class="side-link" href="#/dashboard">Contacts</a>
+        </div>
+        <div class="side-group"><span class="g-lbl">Channels</span>
+          <a class="side-link" href="#/dashboard">Numbers &amp; Transfers</a>
+          <a class="side-link" href="#/dashboard">Integrations</a>
+        </div>
+        <div class="side-group"><span class="g-lbl">Account</span>
+          <a class="side-link" href="#/dashboard">Usage &amp; Billing</a>
+          <a class="side-link" href="#/dashboard">Issues</a>
+          <a class="side-link" href="#/dashboard">Settings</a>
+        </div>
+      </nav>
+    </aside>
+    <div class="app-main">
+      <div class="app-topbar">
+        <div style="display:flex;align-items:center;gap:.8rem">
+          <button class="app-menu-btn" data-appmenu="custApp" aria-label="Open dashboard navigation">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <span class="status-chip"><span class="dot" aria-hidden="true"></span>Assistant published</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:.8rem">
+          <span class="badge-sim">Simulated preview data</span>
+          <div class="view-toggle" role="group" aria-label="Preview mode">
+            <button aria-pressed="true" data-vmode="data">Sample data</button>
+            <button aria-pressed="false" data-vmode="empty">Empty states</button>
+            <button aria-pressed="false" data-vmode="loading">Loading</button>
+          </div>
+        </div>
+      </div>
+      <div class="page-head">
+        <div>
+          <h1>Overview</h1>
+          <p class="pdesc">Is your receptionist healthy, and what needs you today.</p>
+        </div>
+        <a class="btn btn-ghost" href="#/dashboard" style="min-height:40px">Review flagged items</a>
+      </div>
+      <div class="tile-grid" data-v="data">
+        <div class="tile"><span class="t-lbl">Calls answered today</span><div class="t-val" data-count="14">14</div><span class="t-sub">of 14 inbound — none missed</span></div>
+        <div class="tile"><span class="t-lbl">Conversations</span><div class="t-val" data-count="23">23</div><span class="t-sub">voice + SMS</span></div>
+        <div class="tile"><span class="t-lbl">Appointments booked</span><div class="t-val" data-count="6">6</div><span class="t-sub">synced to calendar</span></div>
+        <div class="tile warn"><span class="t-lbl">Needs attention</span><div class="t-val" data-count="2">2</div><span class="t-sub">items waiting on you</span></div>
+      </div>
+      <div class="panel" data-v="data">
+        <div class="p-head">Needs attention</div>
+        <div class="attn"><span aria-hidden="true" style="color:var(--amber-deep)">●</span><span><b>Caller asked for a human transfer</b> outside business hours — set an after-hours rule.</span><a class="a-act" href="#/dashboard">Set rule</a></div>
+        <div class="attn"><span aria-hidden="true" style="color:var(--amber-deep)">●</span><span><b>Calendar integration expires in 3 days</b> — reconnect to keep bookings flowing.</span><a class="a-act" href="#/dashboard">Reconnect</a></div>
+      </div>
+      <div class="panel" data-v="data">
+        <div class="p-head">Recent conversations <a href="#/dashboard" style="font-weight:400;font-size:.85rem">View all</a></div>
+        <ul class="plist">
+          <li><span class="who">Avery C.</span><span>Asked about pricing, booked a consult for Thursday</span><span class="meta">voice · 12:40</span></li>
+          <li><span class="who">(555) 0142</span><span>New caller, left a service inquiry — qualified as a lead</span><span class="meta">voice · 11:05</span></li>
+          <li><span class="who">Morgan R.</span><span>Rescheduled Tuesday's appointment via SMS</span><span class="meta">sms · 09:52</span></li>
+          <li><span class="who">Jamie T.</span><span>Hours question — answered, no follow-up needed</span><span class="meta">sms · 08:17</span></li>
+        </ul>
+      </div>
+      <div class="panel" data-v="empty" hidden>
+        <div class="p-head">Needs attention</div>
+        <div class="empty-state">
+          <svg class="gem" aria-hidden="true"><use href="#gem"/></svg>
+          <p><b>All clear.</b> Nothing needs you right now — your receptionist is answering on its own.</p>
+        </div>
+      </div>
+      <div class="panel" data-v="empty" hidden>
+        <div class="p-head">Recent conversations</div>
+        <div class="empty-state">
+          <svg class="gem" aria-hidden="true"><use href="#gem"/></svg>
+          <p><b>No conversations yet.</b> Once your number is live, every call and text your receptionist handles appears here.</p>
+          <a class="btn btn-primary" href="#/dashboard">Finish setup</a>
+        </div>
+      </div>
+      <div data-v="loading" hidden>
+        <div class="tile-grid">
+          <div class="tile"><span class="t-lbl skel">Loading</span><div class="t-val skel">00</div><span class="t-sub skel">loading state</span></div>
+          <div class="tile"><span class="t-lbl skel">Loading</span><div class="t-val skel">00</div><span class="t-sub skel">loading state</span></div>
+          <div class="tile"><span class="t-lbl skel">Loading</span><div class="t-val skel">00</div><span class="t-sub skel">loading state</span></div>
+          <div class="tile"><span class="t-lbl skel">Loading</span><div class="t-val skel">00</div><span class="t-sub skel">loading state</span></div>
+        </div>
+        <div class="panel"><div class="p-head"><span class="skel">Loading panel</span></div>
+          <ul class="plist"><li><span class="skel" style="width:100%">loading row loading row</span></li><li><span class="skel" style="width:100%">loading row loading row</span></li><li><span class="skel" style="width:100%">loading row loading row</span></li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ OPERATIONS / CRM -->
+<section data-route="ops">
+  <div class="app ops" id="opsApp">
+    <aside class="app-side" aria-label="Operations navigation">
+      <a href="#/" class="brand"><svg class="gem" aria-hidden="true"><use href="#gem"/></svg> SiteMint</a>
+      <span class="ops-mark">Operations</span>
+      <nav style="display:grid;gap:1.1rem">
+        <div class="side-group"><span class="g-lbl">Ops</span>
+          <a class="side-link" href="#/ops">CRM Overview</a>
+          <a class="side-link" href="#/ops" aria-current="page">Leads &amp; Firms</a>
+          <a class="side-link" href="#/ops">Projects</a>
+          <a class="side-link" href="#/ops">Forms &amp; Discovery</a>
+          <a class="side-link" href="#/ops">Voice Ops</a>
+          <a class="side-link" href="#/ops">Issues</a>
+          <a class="side-link" href="#/ops">Settings</a>
+        </div>
+      </nav>
+    </aside>
+    <div class="app-main">
+      <div class="app-topbar">
+        <div style="display:flex;align-items:center;gap:.8rem">
+          <button class="app-menu-btn" data-appmenu="opsApp" aria-label="Open operations navigation">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <span style="font-family:var(--f-mono);font-size:.75rem;color:var(--mute)">Internal · not customer-facing</span>
+        </div>
+        <span class="badge-sim">Simulated preview data</span>
+      </div>
+      <div class="page-head">
+        <div>
+          <h1>Leads &amp; Firms</h1>
+          <p class="pdesc">Pipeline view — scored by the locked lead-score engine, read-only here.</p>
+        </div>
+        <button class="btn btn-primary" style="min-height:40px">Add lead</button>
+      </div>
+      <div class="panel">
+        <div class="p-head">Pipeline <span style="font-weight:400;font-size:.8rem;color:var(--mute)">4 of 4 shown · filters deep-link</span></div>
+        <div class="table-wrap">
+          <table class="ops-table">
+            <thead><tr><th scope="col">Lead</th><th scope="col">Stage</th><th scope="col">Score</th><th scope="col">Source</th><th scope="col">Last touch</th><th scope="col">Next action</th></tr></thead>
+            <tbody>
+              <tr><td><b>Harbor Dental (sample)</b></td><td><span class="stage-tag st-qual">Qualified</span></td><td class="score">82</td><td>AI Receptionist call</td><td>2h ago</td><td>Send proposal draft</td></tr>
+              <tr><td><b>Reyes Plumbing (sample)</b></td><td><span class="stage-tag st-prop">Proposal</span></td><td class="score">74</td><td>Website intake</td><td>1d ago</td><td>Follow up on quote</td></tr>
+              <tr><td><b>Lakeside Law (sample)</b></td><td><span class="stage-tag st-new">New</span></td><td class="score">61</td><td>Referral</td><td>3h ago</td><td>Discovery call</td></tr>
+              <tr><td><b>Northway Fitness (sample)</b></td><td><span class="stage-tag st-won">Won</span></td><td class="score">88</td><td>SMS conversation</td><td>4d ago</td><td>Kickoff scheduled</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<script>
+(() => {
+'use strict';
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const finePointer = matchMedia('(pointer: fine)').matches;
+
+/* ================= Router ================= */
+const routes = { '': 'home', '/': 'home', '/ai-receptionist': 'receptionist', '/dashboard': 'dashboard', '/ops': 'ops' };
+const mkHeader = $('#mkHeader'), rail = $('#rail');
+let currentRoute = null;
+
+function applyRoute(first) {
+  const h = location.hash;
+  if (h && !h.startsWith('#/')) return;                 // in-page anchor, not a route
+  const name = routes[h.replace(/^#/, '')] ?? 'home';
+  if (name === currentRoute) return;
+  currentRoute = name;
+  closeMega(); closeSheet();
+  $$('#main > [data-route]').forEach(sec => {
+    const on = sec.dataset.route === name;
+    sec.classList.toggle('active', on);
+    if (on && !first && !reduced) { sec.classList.remove('route-anim'); void sec.offsetWidth; sec.classList.add('route-anim'); }
+  });
+  const marketing = name === 'home' || name === 'receptionist';
+  mkHeader.style.display = marketing ? '' : 'none';
+  document.body.style.paddingTop = '0';
+  // active nav marks
+  $$('.nav-link[data-nav], .sheet a[data-nav]').forEach(a => {
+    const cur = (name === 'receptionist' && a.dataset.nav === 'rx');
+    if (cur) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    a.classList.toggle('cur', cur);
+  });
+  document.title = { home: 'SiteMint — Digital systems that turn attention into customers',
+    receptionist: 'AI Receptionist — SiteMint', dashboard: 'Overview — SiteMint Dashboard',
+    ops: 'Leads & Firms — SiteMint Operations' }[name];
+  if (!first) { window.scrollTo(0, 0); $('#main').focus({ preventScroll: true }); }
+  if (name === 'dashboard') animateCounters();
+  onScroll();
+}
+addEventListener('hashchange', () => applyRoute(false));
+
+/* ================= Header light/dark + rail + hero hint ================= */
+function onScroll() {
+  if (currentRoute === 'home') {
+    const heroBottom = $('#heroScroll').getBoundingClientRect().bottom;
+    const overDark = heroBottom > 64;
+    mkHeader.classList.toggle('over-dark', overDark);
+    mkHeader.classList.toggle('over-light', !overDark);
+    $('#heroScroll').classList.toggle('past', heroProgress() > 0.04);
+    rail.classList.toggle('show', scrollY > innerHeight * .5);
+  } else if (currentRoute === 'receptionist') {
+    const b = $('.rx-hero').getBoundingClientRect().bottom;
+    mkHeader.classList.toggle('over-dark', b > 64);
+    mkHeader.classList.toggle('over-light', b <= 64);
+    rail.classList.remove('show');
+  } else rail.classList.remove('show');
+}
+addEventListener('scroll', () => requestAnimationFrame(onScroll), { passive: true });
+
+/* rail scroll-spy */
+const spyTargets = ['ch-hero', 'ch-map', 'ch-build', 'ch-cta'];
+const spy = new IntersectionObserver(es => {
+  es.forEach(e => { if (e.isIntersecting) {
+    $$('#rail a').forEach(a => a.classList.toggle('cur', a.getAttribute('href') === '#' + e.target.id));
+    rail.classList.toggle('at-end', e.target.id === 'ch-cta');
+  } });
+}, { rootMargin: '-40% 0px -50% 0px' });
+spyTargets.forEach(id => { const el = document.getElementById(id); if (el) spy.observe(el); });
+
+/* ================= Mega panel ================= */
+const megaBtn = $('#megaBtn'), mega = $('#megaPanel');
+function openMega() { mega.classList.add('open'); megaBtn.setAttribute('aria-expanded', 'true'); }
+function closeMega(refocus) { if (!mega.classList.contains('open')) return;
+  mega.classList.remove('open'); megaBtn.setAttribute('aria-expanded', 'false'); if (refocus) megaBtn.focus(); }
+megaBtn.addEventListener('click', () => mega.classList.contains('open') ? closeMega() : openMega());
+document.addEventListener('click', e => {
+  if (mega.classList.contains('open') && !mega.contains(e.target) && !megaBtn.contains(e.target)) closeMega();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMega(true); closeSheet(true); endIfActive(); closeAppSides(); } });
+mega.addEventListener('keydown', e => {
+  const cards = $$('.pillar-card', mega); const i = cards.indexOf(document.activeElement);
+  if (e.key === 'ArrowRight' && i > -1) { e.preventDefault(); (cards[i+1] || cards[0]).focus(); }
+  if (e.key === 'ArrowLeft'  && i > -1) { e.preventDefault(); (cards[i-1] || cards[cards.length-1]).focus(); }
+});
+mega.addEventListener('focusout', e => { if (!mega.contains(e.relatedTarget) && e.relatedTarget !== megaBtn) closeMega(); });
+
+/* ================= Mobile sheet ================= */
+const sheet = $('#mobileSheet'), menuBtn = $('#menuBtn');
+function openSheet() { sheet.classList.add('open'); menuBtn.setAttribute('aria-expanded','true');
+  document.body.style.overflow = 'hidden'; $('#sheetClose').focus(); }
+function closeSheet(refocus) { if (!sheet.classList.contains('open')) return;
+  sheet.classList.remove('open'); menuBtn.setAttribute('aria-expanded','false');
+  document.body.style.overflow = ''; if (refocus) menuBtn.focus(); }
+menuBtn.addEventListener('click', openSheet);
+$('#sheetClose').addEventListener('click', () => closeSheet(true));
+sheet.addEventListener('click', e => { if (e.target.closest('a')) closeSheet(); });
+sheet.addEventListener('keydown', e => {           // focus trap
+  if (e.key !== 'Tab') return;
+  const f = $$('a, button', sheet).filter(el => el.offsetParent !== null);
+  const first = f[0], last = f[f.length-1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+$('#sheetAcc').addEventListener('click', () => {
+  const open = $('#sheetSub').classList.toggle('open');
+  $('#sheetAcc').setAttribute('aria-expanded', String(open));
+});
+
+/* ================= App sidebars (mobile) ================= */
+$$('.app-menu-btn').forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation(); document.getElementById(b.dataset.appmenu).classList.toggle('side-open');
+}));
+function closeAppSides() { $$('.app.side-open').forEach(a => a.classList.remove('side-open')); }
+document.addEventListener('click', e => {
+  $$('.app.side-open').forEach(a => { if (!e.target.closest('.app-side') && !e.target.closest('.app-menu-btn')) a.classList.remove('side-open'); });
+});
+
+/* ================= Reveal observer ================= */
+const rev = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add('in'); rev.unobserve(e.target); } }), { threshold: .18 });
+$$('.reveal').forEach(el => reduced ? el.classList.add('in') : rev.observe(el));
+const mapObs = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) { $('#sigmap').classList.add('drawn'); litStage(0); mapObs.disconnect(); } }), { threshold: .4 });
+mapObs.observe($('#sigmap'));
+
+/* ================= Signal map stages ================= */
+const stageInfo = [
+  '<b>Attention.</b> Your website and channels capture the inquiry the moment it appears — no ring-out, no unread message.',
+  '<b>Conversation.</b> The AI Receptionist (or your site) talks back instantly, in your voice, and asks the right questions.',
+  '<b>Organization.</b> Every detail lands in the CRM automatically — contact, context, and lead score.',
+  '<b>Action.</b> Workflows follow up, remind, and book — no sticky notes, no forgotten leads.',
+  '<b>Customer.</b> The inquiry ends as a booked appointment and a real customer. The signal completes.',
+];
+function litStage(n) {
+  $$('.sig-node').forEach(g => { const s = +g.dataset.stage;
+    g.classList.toggle('lit', s === n); g.classList.toggle('done', s < n); });
+  $$('.stage-chip').forEach(c => c.setAttribute('aria-pressed', String(+c.dataset.stage === n)));
+  $('#stageDesc').innerHTML = stageInfo[n];
+}
+$$('.stage-chip').forEach(c => c.addEventListener('click', () => litStage(+c.dataset.stage)));
+
+/* ================= Magnetic CTAs ================= */
+if (finePointer && !reduced) {
+  $$('.magnetic').forEach(btn => {
+    btn.addEventListener('pointermove', e => {
+      const r = btn.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+      btn.style.transform = `translate(${Math.max(-6,Math.min(6,dx*.08))}px, ${Math.max(-6,Math.min(6,dy*.15))}px)`;
+    });
+    btn.addEventListener('pointerleave', () => btn.style.transform = '');
+  });
+}
+
+/* ================= Hero canvas narrative ================= */
+const canvas = $('#heroCanvas'), ctx = canvas.getContext('2d');
+const heroScroll = $('#heroScroll');
+let W = 0, H = 0, dpr = 1, parX = 0, parY = 0, tgX = 0, tgY = 0;
+function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize);
+function heroProgress() {
+  const r = heroScroll.getBoundingClientRect();
+  const total = r.height - innerHeight;
+  return total <= 0 ? 1 : Math.min(1, Math.max(0, -r.top / total));
+}
+/* the signal curve across the viewport */
+function curve(t) {
+  const x = 0.06*W + t * 0.88*W;
+  const y = 0.34*H + Math.sin(t * Math.PI * 1.6 + .4) * 0.14*H - t * 0.10*H;
+  return [x, y];
+}
+const N = 88, parts = [];
+let seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < N; i++) parts.push({
+  fx: rnd(), fy: rnd(),                       // free-drift home (fraction of viewport)
+  dx: (rnd()-.5)*.014, dy: (rnd()-.5)*.01,    // drift velocity
+  t: i / (N-1),                               // slot on the curve
+  gate: 0.22 + (i / (N-1)) * 0.58,            // scroll progress at which it joins
+  amber: rnd() < .3, r: 1 + rnd()*1.8,
+  x: 0, y: 0, phase: rnd()*6.28,
+});
+function drawHero(now) {
+  if (canvas.clientWidth !== W || canvas.clientHeight !== H) resize();
+  const p = heroProgress();
+  parX += (tgX - parX) * .06; parY += (tgY - parY) * .06;
+  ctx.clearRect(0, 0, W, H);
+  // faint haze
+  const hz = ctx.createRadialGradient(W*.6, H*.35, 0, W*.6, H*.35, Math.max(W,H)*.7);
+  hz.addColorStop(0, 'rgba(13,36,64,0.55)'); hz.addColorStop(1, 'rgba(7,19,36,0)');
+  ctx.fillStyle = hz; ctx.fillRect(0, 0, W, H);
+  // thread
+  const drawTo = Math.min(1, Math.max(0, (p - .22) / .6));
+  if (drawTo > 0.01) {
+    const grad = ctx.createLinearGradient(...curve(0), ...curve(1));
+    grad.addColorStop(0, '#22D3EE'); grad.addColorStop(.55, '#2DD4BF'); grad.addColorStop(1, '#4AF2C8');
+    ctx.beginPath();
+    for (let t = 0; t <= drawTo; t += .01) {
+      const [x, y] = curve(t);
+      t === 0 ? ctx.moveTo(x + parX, y + parY) : ctx.lineTo(x + parX, y + parY);
+    }
+    ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.globalAlpha = .55 + drawTo*.45;
+    ctx.shadowColor = 'rgba(34,211,238,.6)'; ctx.shadowBlur = 12;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    // head pulse
+    const [hx, hy] = curve(drawTo);
+    ctx.beginPath(); ctx.arc(hx + parX, hy + parY, 3.5 + Math.sin(now/280)*1.2, 0, 6.28);
+    ctx.fillStyle = drawTo > .97 ? '#4AF2C8' : '#22D3EE'; ctx.fill();
+  }
+  // particles
+  for (const q of parts) {
+    const joined = Math.min(1, Math.max(0, (p - q.gate) / .12));
+    const wob = Math.sin(now/900 + q.phase);
+    const fx = (q.fx + wob*q.dx*8) * W, fy = (q.fy + Math.cos(now/1100+q.phase)*q.dy*8) * H;
+    const [cx, cy] = curve(q.t);
+    const e = joined < .5 ? 2*joined*joined : 1 - ((-2*joined+2)**2)/2;   // easeInOut
+    q.x = fx + (cx - fx) * e + parX * (1 - e*.5);
+    q.y = fy + (cy - fy) * e + parY * (1 - e*.5);
+    const settle = Math.max(0, (p - .85) / .15);
+    const alpha = (q.amber ? .5 : .38) + e*.5 - settle*(joined ? 0 : .3);
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (1 - e*.35), 0, 6.28);
+    ctx.fillStyle = joined
+      ? (q.t > .8 ? '#4AF2C8' : q.t > .45 ? '#2DD4BF' : '#22D3EE')
+      : (q.amber ? `rgba(245,165,36,${alpha*(0.55+0.45*wob)})` : `rgba(244,248,251,${alpha*.8})`);
+    if (joined) ctx.globalAlpha = .75 + settle*.25; else ctx.globalAlpha = 1;
+    ctx.fill(); ctx.globalAlpha = 1;
+  }
+  // node markers lit by progress
+  $$('.hero-node').forEach(nd => nd.classList.toggle('lit', p >= +nd.dataset.at));
+}
+let rafOn = false;
+function loop(now) { if (!rafOn) return; drawHero(now); requestAnimationFrame(loop); }
+const heroVis = new IntersectionObserver(es => es.forEach(e => {
+  if (reduced) return;
+  if (e.isIntersecting && !rafOn && currentRoute === 'home') { rafOn = true; requestAnimationFrame(loop); }
+  else if (!e.isIntersecting) rafOn = false;
+}));
+heroVis.observe(heroScroll);
+if (finePointer && !reduced) heroScroll.addEventListener('pointermove', e => {
+  tgX = (e.clientX / innerWidth - .5) * 24; tgY = (e.clientY / innerHeight - .5) * 16;
+});
+function drawHeroAt1() {
+  ctx.clearRect(0, 0, W, H);
+  const hz = ctx.createRadialGradient(W*.6, H*.35, 0, W*.6, H*.35, Math.max(W,H)*.7);
+  hz.addColorStop(0, 'rgba(13,36,64,0.55)'); hz.addColorStop(1, 'rgba(7,19,36,0)');
+  ctx.fillStyle = hz; ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createLinearGradient(...curve(0), ...curve(1));
+  grad.addColorStop(0, '#22D3EE'); grad.addColorStop(.55, '#2DD4BF'); grad.addColorStop(1, '#4AF2C8');
+  ctx.beginPath();
+  for (let t = 0; t <= 1; t += .01) { const [x,y] = curve(t); t===0?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+  ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.stroke();
+  for (const q of parts) {
+    const [cx, cy] = curve(q.t);
+    ctx.beginPath(); ctx.arc(cx, cy, q.r*.7, 0, 6.28);
+    ctx.fillStyle = q.t > .8 ? '#4AF2C8' : q.t > .45 ? '#2DD4BF' : '#22D3EE'; ctx.fill();
+  }
+  const [hx, hy] = curve(1);
+  ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, 6.28); ctx.fillStyle = '#4AF2C8'; ctx.fill();
+  $$('.hero-node').forEach(nd => nd.classList.add('lit'));
+}
+
+/* ================= Dashboard counters + view toggle ================= */
+function animateCounters() {
+  $$('.t-val[data-count]').forEach(el => {
+    const v = +el.dataset.count;
+    if (reduced) { el.textContent = v; return; }
+    const t0 = performance.now();
+    (function step(t) {
+      const k = Math.min(1, (t - t0) / 600);
+      el.textContent = Math.round(v * (1 - (1-k)**3));
+      if (k < 1) requestAnimationFrame(step);
+    })(t0);
+  });
+}
+$$('[data-vmode]').forEach(b => b.addEventListener('click', () => {
+  $$('[data-vmode]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  $$('[data-v]').forEach(p => p.hidden = p.dataset.v !== b.dataset.vmode);
+  if (b.dataset.vmode === 'data') animateCounters();
+}));
+
+/* ================= Receptionist theater (typed sim adapter) ================= */
+const theater = $('#theater'), stateLbl = $('#stateLbl'), timerEl = $('#timer'),
+      tCtas = $('#tCtas'), convo = $('#convo'), wave = $('#wave'), gemBig = $('.gem-big');
+const LBL = { ready:'Try a live conversation', mic_explain:'Before we start', permission_request:'Microphone permission',
+  connecting:'Connecting…', listening:'Listening', assistant_speaking:'Assistant speaking',
+  session_ending:'Wrapping up', time_limit_reached:'Demo limit reached', unavailable:'Demo at capacity', error:'Something went wrong' };
+let tState = 'ready', tTimers = [], tStartAt = 0, tTick = null, waveRaf = null;
+function clearT() { tTimers.forEach(clearTimeout); tTimers = []; if (tTick) clearInterval(tTick), tTick = null;
+  if (waveRaf) cancelAnimationFrame(waveRaf), waveRaf = null; }
+function after(ms, fn) { tTimers.push(setTimeout(fn, ms)); }
+function fmt(s) { return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }
+function setCtas(html) { tCtas.innerHTML = html; }
+function line(who, text) {
+  const d = document.createElement('p'); d.className = 'line'; d.style.margin = '0';
+  d.innerHTML = `<b>${who}:</b> ${text}`; convo.appendChild(d); convo.scrollTop = convo.scrollHeight;
+}
+function waveLoop(now) {
+  const speaking = tState === 'assistant_speaking';
+  $$('#wave span').forEach((b, i) => {
+    const h = reduced ? 18 : 8 + Math.abs(Math.sin(now/ (speaking?160:220) + i*.9)) * (speaking ? 40 : 26) * (0.4 + Math.abs(Math.sin(now/900+i)));
+    b.style.height = h + 'px';
+  });
+  if (!reduced && (tState === 'listening' || tState === 'assistant_speaking')) waveRaf = requestAnimationFrame(waveLoop);
+}
+function setState(s) {
+  tState = s; theater.dataset.state = s; stateLbl.textContent = LBL[s] || s;
+  const active = ['listening','assistant_speaking','connecting','reconnecting','session_ending'].includes(s);
+  wave.hidden = !(s === 'listening' || s === 'assistant_speaking');
+  gemBig.style.opacity = wave.hidden ? 1 : 0; gemBig.style.position = wave.hidden ? '' : 'absolute';
+  timerEl.hidden = !active || s === 'connecting';
+  if (s === 'listening' || s === 'assistant_speaking') { if (!waveRaf) waveRaf = requestAnimationFrame(waveLoop); if (reduced) waveLoop(0); }
+}
+function startTimer() {
+  tStartAt = Date.now();
+  tTick = setInterval(() => {
+    const s = Math.floor((Date.now() - tStartAt)/1000);
+    timerEl.textContent = fmt(s) + ' / 02:00';
+    if (s >= 120) toLimit();
+  }, 500);
+}
+const endBtnHtml = '<button class="btn btn-danger" id="tEnd">End demo</button>';
+function toReady(msg) {
+  clearT(); convo.innerHTML = ''; setState('ready');
+  if (msg) stateLbl.textContent = msg;
+  timerEl.hidden = true; timerEl.textContent = '00:00 / 02:00';
+  setCtas('<button class="btn btn-primary" id="tStart">Start the demo</button>'); bindT();
+}
+function toLimit() { clearT(); setState('time_limit_reached');
+  line('System', 'Demo limit reached — a real deployment keeps going, books the appointment, and logs everything to your CRM.');
+  setCtas('<button class="btn btn-ghost" id="tReset">Back to start</button>'); bindT(); }
+function endIfActive() { if (['mic_explain','permission_request','connecting','listening','assistant_speaking'].includes(tState)) toReady(); }
+function runScript() {
+  setState('listening'); startTimer();
+  after(1600, () => { line('Caller', '“Hi — do you have any appointments this week?”'); });
+  after(3400, () => { setState('assistant_speaking');
+    line('Assistant', '“We do! I can book you in. Is this for a new consultation, or a follow-up?”'); });
+  after(6800, () => setState('listening'));
+  after(8200, () => line('Caller', '“A new consultation, Thursday if possible.”'));
+  after(9800, () => { setState('assistant_speaking');
+    line('Assistant', '“Thursday works — I have 10:30 and 2:15 open. Which suits you? I’ll text you a confirmation.”'); });
+  after(13400, () => { setState('session_ending'); line('System', 'Appointment booked · contact saved to CRM · confirmation sent.'); });
+  after(15200, () => toLimit());
+}
+function bindT() {
+  const b = id => $(id);
+  b('#tStart')?.addEventListener('click', () => {
+    setState('mic_explain');
+    line('System', 'In the live experience, your browser will ask for microphone access next. This prototype simulates the conversation — no microphone is used.');
+    setCtas('<button class="btn btn-primary" id="tCont">Continue</button><button class="btn btn-ghost" id="tCancel">Cancel</button>'); bindT();
+  });
+  b('#tCont')?.addEventListener('click', () => {
+    setState('permission_request');
+    setCtas('<button class="btn btn-primary" id="tAllow">Simulate “Allow”</button><button class="btn btn-ghost" id="tDeny">Simulate “Block”</button>'); bindT();
+  });
+  b('#tAllow')?.addEventListener('click', () => {
+    setState('connecting'); setCtas(endBtnHtml); bindT();
+    after(1300, runScript);
+  });
+  b('#tDeny')?.addEventListener('click', () => {
+    setState('error'); stateLbl.textContent = 'Microphone blocked';
+    line('System', 'Without a microphone the demo can’t hear you. You can re-enable it in your browser’s site settings and try again.');
+    setCtas('<button class="btn btn-ghost" id="tReset">Back to start</button>'); bindT();
+  });
+  b('#tEnd')?.addEventListener('click', () => { clearT(); setState('session_ending');
+    after(900, () => toReady()); });
+  b('#tCancel')?.addEventListener('click', () => toReady());
+  b('#tReset')?.addEventListener('click', () => toReady());
+}
+bindT();
+
+/* ================= boot ================= */
+resize();
+applyRoute(true);
+if (reduced) { drawHeroAt1(); } else { onScroll(); }
+addEventListener('resize', () => { requestAnimationFrame(onScroll); if (reduced) { resize(); drawHeroAt1(); } });
+document.addEventListener('visibilitychange', () => requestAnimationFrame(onScroll));
+requestAnimationFrame(onScroll);
+addEventListener('load', () => requestAnimationFrame(onScroll));
+})();
+</script>
+<!-- ARTIFACT-END -->
+</body>
+</html>
