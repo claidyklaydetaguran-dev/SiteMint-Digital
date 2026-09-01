@@ -184,7 +184,14 @@ function Router() {
           </DashboardShell>
         )}
       </Route>
-      <Route path="/admin/:rest*">
+      {/* R1 fix (pre-existing defect inherited from main): wouter 3 matches
+          with regexparam 3, which does NOT support the `:rest*` repeat
+          syntax — it silently compiled to a single-segment matcher, so every
+          admin/CRM URL deeper than one segment (e.g. /admin/crm/dashboard)
+          fell through to the public 404. Verified identical on the untouched
+          main baseline build. `*?` is the wouter-3 wildcard that matches the
+          whole subtree. */}
+      <Route path="/admin/*?">
         {() => (
           <DashboardShell routeLabel="The workspace">
             <AdminRoutes />
