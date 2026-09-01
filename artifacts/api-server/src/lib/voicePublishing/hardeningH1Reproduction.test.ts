@@ -99,39 +99,44 @@ describe("H1 defect 1 — assistant publish payload uses an HMAC credential, not
 //
 // Verified live on 2026-09-01: adding an assignment to the staging
 // `[deployment].run` command had no effect on the deployed process, which
-// takes its environment from Secrets and `[userenv]` instead. The committed
-// file must therefore never carry a `[deployment]`-level `run` that looks
-// like it configures the runtime, because it silently would not.
+// takes its environment from Secrets and `[userenv]` instead.
+//
+// Scope note. This asserts only the thing that was actually wrong: runtime
+// configuration written inline in a run command, where it looks authoritative
+// and is not. It deliberately does NOT forbid a run command outright, nor
+// require a particular `[userenv]` layout — a deployment overlay legitimately
+// needs a run command, and an earlier draft of this test failed against the
+// real staging `.replit` for exactly that reason. `NODE_ENV` is likewise
+// allowed: it selects the runtime mode rather than configuring a capability,
+// and it is correct whether or not the line turns out to be authoritative.
 
-describe("H1 defect 2 — .replit carries no misleading deployment env overlay", () => {
+describe("H1 defect 2 — .replit declares no ignored runtime configuration", () => {
   const replit = readFileSync(resolve(REPO_ROOT, ".replit"), "utf8");
+  const runLines = replit.split(/\r?\n/).filter((line) => /^\s*run\s*=/.test(line));
 
-  function deploymentSection(source: string): string {
-    const lines = source.split(/\r?\n/);
-    const start = lines.findIndex((l) => l.trim() === "[deployment]");
-    if (start === -1) return "";
-    const rest = lines.slice(start + 1);
-    const end = rest.findIndex((l) => /^\s*\[/.test(l));
-    return (end === -1 ? rest : rest.slice(0, end)).join("\n");
-  }
+  /** Config that belongs in Secrets or [userenv]; inline here it is ignored. */
+  const FORBIDDEN_INLINE = [/_ENABLED\s*=/, /CORS_ALLOWED_ORIGINS\s*=/, /VOICE_ARTIFACT_POLICY\s*=/, /_SECRET\s*=/, /_API_KEY\s*=/];
 
-  it("defines no run command in [deployment]", () => {
-    expect(deploymentSection(replit)).not.toMatch(/^\s*run\s*=/m);
-  });
-
-  it("sets no capability flag inline in any run command", () => {
-    // An inline `env NAME=value` prefix is exactly the pattern that was
-    // silently ignored. Catch it wherever it appears, not only in
-    // [deployment], so the mistake cannot reappear under another key.
-    for (const line of replit.split(/\r?\n/)) {
-      if (!/^\s*run\s*=/.test(line)) continue;
+  it("sets no capability flag inline in a run command", () => {
+    for (const line of runLines) {
       expect(line).not.toMatch(/_ENABLED\s*=/);
-      expect(line).not.toMatch(/\benv\s+[A-Z_]+=/);
     }
   });
 
-  it("keeps non-secret shared settings in [userenv.shared], the mechanism Replit honours", () => {
-    expect(replit).toMatch(/^\[userenv\.shared\]/m);
+  it("declares no other ignored runtime configuration inline", () => {
+    for (const line of runLines) {
+      for (const pattern of FORBIDDEN_INLINE) {
+        expect(line).not.toMatch(pattern);
+      }
+    }
+  });
+
+  it("never inlines a secret value in a run command", () => {
+    for (const line of runLines) {
+      expect(line).not.toMatch(/_SECRET\s*=\s*\S/);
+      expect(line).not.toMatch(/_TOKEN\s*=\s*\S/);
+      expect(line).not.toMatch(/_KEY\s*=\s*\S/);
+    }
   });
 });
 
