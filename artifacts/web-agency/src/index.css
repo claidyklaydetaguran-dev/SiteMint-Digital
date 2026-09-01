@@ -53,6 +53,10 @@
 @import "./styles/v4-home.css";
 /* Frontend V4 Phase 3: AI Receptionist landing + staging-preview theater. */
 @import "./styles/v4-air.css";
+/* Frontend V4 Phase 4: Signal skin for the retained signup auth surface. */
+@import "./styles/v4-auth.css";
+/* Frontend V4 Phase 5: SiteMint Operations (internal /admin*) Signal skin. */
+@import "./styles/v4-ops.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
