@@ -1,0 +1,115 @@
+/**
+ * Frontend V3 — inner marketing pages (`.v3sp-*` service pages, work,
+ * process, about, insights, start, legal). Shared vocabulary comes from
+ * v3-marketing.css.
+ */
+
+/* Two-column editorial block: section number rail + body. */
+.v3sp-two {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3sp-two__body {
+  display: grid;
+  gap: var(--v3-space-4);
+  max-width: 56rem;
+}
+@media (min-width: 1024px) {
+  .v3sp-two {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: var(--v3-space-8);
+  }
+}
+
+/* ── Work page ── */
+.v3wk-item {
+  display: grid;
+  gap: var(--v3-space-6);
+  padding-block: var(--v3-space-12);
+  border-top: 1px solid var(--v3-line);
+}
+.v3wk-item__meta {
+  display: grid;
+  gap: var(--v3-space-3);
+  align-content: start;
+  justify-items: start;
+}
+.v3wk-item__body {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+@media (min-width: 1024px) {
+  .v3wk-item {
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: var(--v3-space-12);
+  }
+}
+
+/* ── Insights ── */
+.v3in-list {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3in-item {
+  display: grid;
+  gap: var(--v3-space-2);
+  padding: var(--v3-space-6);
+}
+.v3in-item__status {
+  justify-self: start;
+}
+
+/* ── Start page ── */
+.v3st-panel {
+  padding: var(--v3-space-8);
+  display: grid;
+  gap: var(--v3-space-6);
+}
+.v3st-expect {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--v3-space-4);
+  counter-reset: v3st;
+}
+.v3st-expect li {
+  position: relative;
+  counter-increment: v3st;
+  padding-left: var(--v3-space-12);
+  display: grid;
+  gap: var(--v3-space-1);
+}
+.v3st-expect li::before {
+  content: counter(v3st, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  font-family: var(--v3-font-mono);
+  font-size: var(--v3-text-small);
+  font-weight: 600;
+  color: var(--v3-accent-text);
+}
+.v3st-expect strong {
+  font-weight: 620;
+  color: var(--v3-fg);
+}
+.v3st-expect span {
+  font-size: var(--v3-text-small);
+  line-height: 1.55;
+  color: var(--v3-fg-muted);
+}
+
+/* ── Legal ── */
+.v3lg-updated {
+  font-size: var(--v3-text-small);
+  color: var(--v3-fg-muted);
+}
+
+/* ── Services hub ── */
+.v3sv-lead {
+  display: grid;
+  gap: var(--v3-space-4);
+  max-width: 56rem;
+  margin-bottom: var(--v3-space-12);
+}

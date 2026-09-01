@@ -23,6 +23,11 @@
 @import "./styles/v3-chrome.css";
 /* Frontend V3 Phase 2: shared marketing sections + homepage presentation. */
 @import "./styles/v3-marketing.css";
+/* Frontend V3 Phase 2: homepage-only presentation. */
+@import "./styles/v3-home.css";
+/* Frontend V3 Phase 2: inner marketing pages (services, work, process, about,
+   insights, start, legal). */
+@import "./styles/v3-pages.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";

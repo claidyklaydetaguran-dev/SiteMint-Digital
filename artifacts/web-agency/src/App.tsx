@@ -26,9 +26,22 @@ import { DashboardShell } from "@/shells/DashboardShell";
  */
 
 // ── Public marketing ────────────────────────────────────────────────────────
-// Frontend V2 Phase 3: the rebuilt homepage. `PlatformPreview` is retained as
-// a rollback reference and is no longer routed — ROLLBACK: swap HomeV2 back to
-// PlatformPreview below and drop `chrome="v2"` to revert instantly.
+// Frontend V3 Phase 2: the Operational Editorial public site. V2 pages are
+// retained as rollback references — ROLLBACK: swap HomeV3 back to HomeV2 (and
+// chrome="v3" back to chrome="v2") to revert instantly.
+const HomeV3 = lazy(() => import("@/pages/HomeV3"));
+const ServicesV3 = lazy(() => import("@/pages/ServicesV3"));
+const WebsitesAppsV3 = lazy(() => import("@/pages/WebsitesAppsV3"));
+const DiscoverySystemsV3 = lazy(() => import("@/pages/DiscoverySystemsV3"));
+const AutomationV3 = lazy(() => import("@/pages/AutomationV3"));
+const WorkV3 = lazy(() => import("@/pages/WorkV3"));
+const ProcessV3 = lazy(() => import("@/pages/ProcessV3"));
+const AboutV3 = lazy(() => import("@/pages/AboutV3"));
+const InsightsV3 = lazy(() => import("@/pages/InsightsV3"));
+const StartV3 = lazy(() => import("@/pages/StartV3"));
+const LegalPrivacyV3 = lazy(() => import("@/pages/LegalPrivacyV3"));
+const LegalTermsV3 = lazy(() => import("@/pages/LegalTermsV3"));
+// Frontend V2 rollback references (unrouted or route-preserved):
 const HomeV2 = lazy(() => import("@/pages/HomeV2"));
 const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
 const PlatformServicesPreview = lazy(() => import("@/pages/PlatformServicesPreview"));
@@ -205,7 +218,7 @@ function Router() {
           that a later phase still owns. */}
       <Route path={ROUTES.thankYou}>
         {() => (
-          <PublicShell routeLabel="Thank you" chrome="v2">
+          <PublicShell routeLabel="Thank you" chrome="v3">
             <ThankYou />
           </PublicShell>
         )}
@@ -266,28 +279,93 @@ function Router() {
         {() => <LegacyRedirect to={DASHBOARD_URLS.root} />}
       </Route>
 
-      {/* ── Public site ──────────────────────────────────────────────────────
-          Each page component still owns its own chrome (navbar, footer, theme)
-          via PlatformPreviewPageShell. Phase 2 replaces that with the shared V2
-          header/footer; PublicShell is the seam where it will attach. */}
+      {/* ── Public site — Frontend V3 (Operational Editorial) ────────────────
+          Every V3 surface renders under the shared V3 chrome. Ink-hero pages
+          pass heroTone="ink"; editorial pages default to "light". V2 pages
+          that V3 replaced stay imported above as rollback references. */}
       <Route path={ROUTES.home}>
         {() => (
-          <PublicShell routeLabel="The homepage" chrome="v2">
-            <HomeV2 />
+          <PublicShell routeLabel="The homepage" chrome="v3" heroTone="ink">
+            <HomeV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.services}>
         {() => (
-          <PublicShell routeLabel="Services">
-            <PlatformServicesPreview />
+          <PublicShell routeLabel="Services" chrome="v3">
+            <ServicesV3 />
           </PublicShell>
         )}
       </Route>
+      <Route path={ROUTES.websitesApps}>
+        {() => (
+          <PublicShell routeLabel="Websites & Web Apps" chrome="v3">
+            <WebsitesAppsV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.discoverySystems}>
+        {() => (
+          <PublicShell routeLabel="Discovery Systems" chrome="v3">
+            <DiscoverySystemsV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.automation}>
+        {() => (
+          <PublicShell routeLabel="Workflow Automation" chrome="v3">
+            <AutomationV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.workV3}>
+        {() => (
+          <PublicShell routeLabel="Our work" chrome="v3">
+            <WorkV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.process}>
+        {() => (
+          <PublicShell routeLabel="Process" chrome="v3">
+            <ProcessV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.insights}>
+        {() => (
+          <PublicShell routeLabel="Insights" chrome="v3">
+            <InsightsV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.start}>
+        {() => (
+          <PublicShell routeLabel="Start with SiteMint" chrome="v3">
+            <StartV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.privacy}>
+        {() => (
+          <PublicShell routeLabel="Privacy" chrome="v3">
+            <LegalPrivacyV3 />
+          </PublicShell>
+        )}
+      </Route>
+      <Route path={ROUTES.terms}>
+        {() => (
+          <PublicShell routeLabel="Terms" chrome="v3">
+            <LegalTermsV3 />
+          </PublicShell>
+        )}
+      </Route>
+      {/* Legacy Work path — same V3 page, so inbound /portfolio links keep
+          working. */}
       <Route path={ROUTES.work}>
         {() => (
-          <PublicShell routeLabel="Our work">
-            <PlatformPortfolioPreview />
+          <PublicShell routeLabel="Our work" chrome="v3">
+            <WorkV3 />
           </PublicShell>
         )}
       </Route>
@@ -314,11 +392,10 @@ function Router() {
         )}
       </Route>
 
-      {/* 404 — also chrome-less before Phase 2, so it adopts the V2 shell for
-          the same reason. CONTENT-SPECIFICATION.md §7: never a blank screen. */}
+      {/* 404 — V3 chrome. CONTENT-SPECIFICATION.md §7: never a blank screen. */}
       <Route>
         {() => (
-          <PublicShell routeLabel="This page" chrome="v2">
+          <PublicShell routeLabel="This page" chrome="v3">
             <NotFound />
           </PublicShell>
         )}
