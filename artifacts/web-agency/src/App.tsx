@@ -60,10 +60,10 @@ const DiscoveryPage = lazy(() => import("@/pages/DiscoveryPage"));
 const Discovery = lazy(() => import("@/pages/Discovery"));
 
 // ── AI Receptionist public journey ──────────────────────────────────────────
-// Frontend V2 Phase 4: the rebuilt landing page. `LandingReceptionist` is
-// retained as a rollback reference and is no longer routed — ROLLBACK: swap
-// AiReceptionist back to LandingReceptionist below and drop `chrome="v2"` to
-// revert instantly. Signup is untouched by this phase.
+// Frontend V3 Phase 3: the Voice Theater landing. The V2 page stays imported
+// as a rollback reference — ROLLBACK: swap AiReceptionistV3 back to
+// AiReceptionist (and chrome="v3" back to "v2") to revert instantly.
+const AiReceptionistV3 = lazy(() => import("@/pages/AiReceptionistV3"));
 const AiReceptionist = lazy(() => import("@/pages/AiReceptionist"));
 const LandingReceptionist = lazy(() => import("@/pages/LandingReceptionist"));
 const LandingReceptionistSignup = lazy(() => import("@/pages/LandingReceptionistSignup"));
@@ -253,8 +253,8 @@ function Router() {
       </Route>
       <Route path={ROUTES.aiReceptionist}>
         {() => (
-          <PublicShell routeLabel="AI Receptionist" chrome="v2">
-            <AiReceptionist />
+          <PublicShell routeLabel="AI Receptionist" chrome="v3" heroTone="ink">
+            <AiReceptionistV3 />
           </PublicShell>
         )}
       </Route>
