@@ -77,6 +77,15 @@ const comingSoonRoutes = voicePlatformEnabled
     )
   : [];
 
+// R1: the live voice destinations that need an intentional capability state
+// when the flag is off (see the route block below). Empty when the platform
+// is enabled — the real pages own those paths inside the gate.
+const voiceUnavailableRoutes = voicePlatformEnabled
+  ? []
+  : NAV_GROUPS.flatMap((group) => group.items).filter(
+      (item) => item.voiceGated && item.state === "live" && Boolean(item.href),
+    );
+
 function Router() {
   return (
     <Switch>
@@ -120,6 +129,23 @@ function Router() {
                 <Route path={ROUTES.appointments} component={Appointments} />
               </>
             )}
+            {/* R1 capability states: when the voice platform is NOT enabled,
+                direct navigation to the three live voice destinations gets an
+                intentional "not enabled yet" state instead of the branded
+                404. Driven by the committed nav metadata; navigation
+                visibility still follows the capability policy (these never
+                appear in the rail), no action is exposed, and no backend
+                enablement is implied. */}
+            {voiceUnavailableRoutes.map((item) => (
+              <Route key={item.key} path={item.href!}>
+                <ComingSoon
+                  title={item.label}
+                  description="This area is part of the SiteMint voice platform. Voice features are certified and enabled per client — they are not active on this workspace yet, and nothing here is running in the background."
+                  icon={item.icon}
+                  availability="Not enabled on this workspace"
+                />
+              </Route>
+            ))}
             {comingSoonRoutes.map((item) => (
               <Route key={item.key} path={item.href!}>
                 <ComingSoon
