@@ -27,6 +27,9 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { SignalWave } from "@/components/v3/SignalWave";
 import { useReveal } from "@/components/v3/useReveal";
+// Magnific "Voice Loop" poster (approved visual program, DESIGN-SPEC §10):
+// atmospheric media only — all content stays real DOM above it.
+import voicePoster from "@/assets/v3/voice-loop-poster.jpg";
 
 const productNav = [
   { label: "Overview", href: "#overview" },
@@ -198,6 +201,14 @@ export default function AiReceptionistV3() {
           <div className="v3m-split__media">
             <div className="v3m-theater v3a-theater">
               <div className="v3m-theater__stage">
+                <img
+                  className="v3m-theater__poster"
+                  src={voicePoster}
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  fetchPriority="low"
+                />
                 <p className="v3m-theater__status">
                   <span className="v3-dot v3-dot--live" aria-hidden="true" />
                   SiteMint Receptionist · Listening

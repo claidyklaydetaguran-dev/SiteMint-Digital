@@ -28,6 +28,9 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { SignalWave } from "@/components/v3/SignalWave";
 import { useReveal } from "@/components/v3/useReveal";
+// Magnific "Signal Loop" poster (approved visual program, DESIGN-SPEC §10):
+// atmospheric media only — all content stays real DOM above it.
+import signalPoster from "@/assets/v3/signal-loop-poster.jpg";
 
 const heroSequence = [
   {
@@ -164,6 +167,14 @@ export default function HomeV3() {
           <div className="v3h-theater">
             <div className="v3m-theater">
               <div className="v3m-theater__stage">
+                <img
+                  className="v3m-theater__poster"
+                  src={signalPoster}
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  fetchPriority="low"
+                />
                 <p className="v3m-theater__status">
                   <span className="v3-dot v3-dot--live" aria-hidden="true" />
                   SiteMint system · Live
