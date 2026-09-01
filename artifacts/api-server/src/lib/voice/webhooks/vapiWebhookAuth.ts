@@ -5,8 +5,9 @@
 // documentation (docs.vapi.ai/server-url/server-authentication, 2026-07):
 // server-URL requests are authenticated via a Custom Credential. We use the
 // HMAC credential type — Vapi signs the raw request body with a shared
-// secret and sends the signature and a Unix-seconds timestamp in headers we
-// choose when configuring the credential in the Vapi dashboard (see
+// secret and sends the signature and a Unix timestamp (in MILLISECONDS; see
+// the tolerance note below) in headers we choose when configuring the
+// credential in the Vapi dashboard (see
 // docs/ai-receptionist/VOICE_PLATFORM.md for the exact header names to enter
 // there). There is deliberately no NODE_ENV development bypass here (unlike
 // lib/intakeTwilio.ts) — an unsigned or wrongly-signed request is always
@@ -26,6 +27,25 @@ export const VAPI_BEARER_HEADER = "x-vapi-secret";
 
 /** Matches the 300-second skew tolerance recorded in DECISION_LOG.md. */
 export const VAPI_WEBHOOK_TIMESTAMP_TOLERANCE_SEC = 300;
+
+/**
+ * Vapi sends `x-vapi-timestamp` in Unix MILLISECONDS, not seconds — verified
+ * 2026-09-01 against the provider-side webhook log of a live staging call,
+ * which recorded a 13-digit header value (e.g. `1788247410457`) alongside the
+ * matching `x-vapi-signature`. Reading that as seconds put every real delivery
+ * ~1.8e12 seconds from now, so the freshness check rejected it and the whole
+ * webhook path failed closed with `timestamp_out_of_range`.
+ *
+ * Rather than infer the unit from magnitude, a request is fresh when EITHER
+ * reading falls inside the tolerance. The two accepted windows are disjoint by
+ * three orders of magnitude — a seconds value read as milliseconds lands in
+ * 1970, a milliseconds value read as seconds lands around 58 000 AD — so
+ * accepting both does not widen the replay window in either unit: it stays
+ * exactly ±toleranceSec around now.
+ *
+ * The signature is unaffected: both sides sign the raw header string, so the
+ * HMAC always matched even while the freshness check was rejecting.
+ */
 
 export type VapiWebhookAuthFailureReason =
   | "not_configured"
@@ -68,9 +88,11 @@ function constantTimeHexEqual(a: string, b: string): boolean {
 
 /**
  * Verifies a Vapi server-URL webhook request. The signed payload is
- * `${timestamp}.${rawBody}` (the timestamp is bound into the signature so a
- * captured request can't be replayed outside the tolerance window), hashed
- * with HMAC-SHA256 and hex-encoded, compared in constant time.
+ * `${timestamp}.${rawBody}` — the raw header string exactly as sent, so the
+ * signature is independent of whether that value is seconds or milliseconds
+ * (the timestamp is bound into the signature so a captured request can't be
+ * replayed outside the tolerance window), hashed with HMAC-SHA256 and
+ * hex-encoded, compared in constant time.
  *
  * Fails closed: a missing secret, missing/invalid headers, an out-of-range
  * timestamp, or a signature mismatch are all rejected identically from the
@@ -89,13 +111,15 @@ export function verifyVapiWebhookSignature({
   if (!signatureHeader) return { ok: false, reason: "missing_signature" };
   if (!timestampHeader) return { ok: false, reason: "missing_timestamp" };
 
-  const timestampSec = Number(timestampHeader);
-  if (!Number.isFinite(timestampSec) || timestampSec <= 0) {
+  const timestampValue = Number(timestampHeader);
+  if (!Number.isFinite(timestampValue) || timestampValue <= 0) {
     return { ok: false, reason: "invalid_timestamp" };
   }
 
   const nowSec = now() / 1000;
-  if (Math.abs(nowSec - timestampSec) > toleranceSec) {
+  const freshAsSeconds = Math.abs(nowSec - timestampValue) <= toleranceSec;
+  const freshAsMilliseconds = Math.abs(nowSec - timestampValue / 1000) <= toleranceSec;
+  if (!freshAsSeconds && !freshAsMilliseconds) {
     return { ok: false, reason: "timestamp_out_of_range" };
   }
 

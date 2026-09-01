@@ -85,6 +85,74 @@ describe("verifyVapiWebhookSignature", () => {
     expect(result).toEqual({ ok: false, reason: "timestamp_out_of_range" });
   });
 
+  // Regression: Vapi sends x-vapi-timestamp in Unix MILLISECONDS. Verified
+  // 2026-09-01 from the provider-side webhook log of a live staging call,
+  // which recorded a 13-digit header value next to the matching signature.
+  // Reading it as seconds rejected every real delivery as out of range, so
+  // the entire provider webhook path failed closed.
+  it("accepts a millisecond timestamp, the unit Vapi actually sends", () => {
+    const timestampMs = String(nowSec * 1000);
+    const result = verifyVapiWebhookSignature({
+      rawBody: body,
+      // Signed over the raw header string, exactly as Vapi does.
+      signatureHeader: createHmac("sha256", SECRET).update(timestampMs).update(".").update(body).digest("hex"),
+      timestampHeader: timestampMs,
+      secret: SECRET,
+      now: fixedNow(nowSec),
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("still rejects a stale millisecond timestamp (replay in the real unit)", () => {
+    const staleMs = String((nowSec - 10_000) * 1000);
+    const result = verifyVapiWebhookSignature({
+      rawBody: body,
+      signatureHeader: createHmac("sha256", SECRET).update(staleMs).update(".").update(body).digest("hex"),
+      timestampHeader: staleMs,
+      secret: SECRET,
+      now: fixedNow(nowSec),
+    });
+    expect(result).toEqual({ ok: false, reason: "timestamp_out_of_range" });
+  });
+
+  it("rejects a millisecond timestamp just outside the tolerance window", () => {
+    const justStaleMs = String((nowSec - 301) * 1000);
+    const result = verifyVapiWebhookSignature({
+      rawBody: body,
+      signatureHeader: createHmac("sha256", SECRET).update(justStaleMs).update(".").update(body).digest("hex"),
+      timestampHeader: justStaleMs,
+      secret: SECRET,
+      now: fixedNow(nowSec),
+    });
+    expect(result).toEqual({ ok: false, reason: "timestamp_out_of_range" });
+  });
+
+  it("accepts a millisecond timestamp just inside the tolerance window", () => {
+    const justFreshMs = String((nowSec - 299) * 1000);
+    const result = verifyVapiWebhookSignature({
+      rawBody: body,
+      signatureHeader: createHmac("sha256", SECRET).update(justFreshMs).update(".").update(body).digest("hex"),
+      timestampHeader: justFreshMs,
+      secret: SECRET,
+      now: fixedNow(nowSec),
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  // Widening to two units must not weaken tampering detection: the signature
+  // still covers the body, whichever unit the timestamp is expressed in.
+  it("rejects a tampered body even with a fresh millisecond timestamp", () => {
+    const timestampMs = String(nowSec * 1000);
+    const result = verifyVapiWebhookSignature({
+      rawBody: Buffer.from(JSON.stringify({ message: { type: "end-of-call-report" } })),
+      signatureHeader: createHmac("sha256", SECRET).update(timestampMs).update(".").update(body).digest("hex"),
+      timestampHeader: timestampMs,
+      secret: SECRET,
+      now: fixedNow(nowSec),
+    });
+    expect(result).toEqual({ ok: false, reason: "signature_mismatch" });
+  });
+
   it("rejects a signature computed with the wrong secret", () => {
     const result = verifyVapiWebhookSignature({
       rawBody: body,
