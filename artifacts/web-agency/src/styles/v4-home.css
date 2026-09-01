@@ -1,0 +1,693 @@
+/**
+ * Frontend V4 — Signal homepage presentation (hero, journey, pillars, CTA)
+ * plus the shared V4 marketing section vocabulary reused by inner pages.
+ *
+ * Hero layout is the owner-corrected composition: three stacked regions
+ * (copy → field → HUD). The copy region is normal flow and nothing animated
+ * ever enters it — legibility is guaranteed structurally at every scroll
+ * progress and width, not tuned per breakpoint.
+ */
+
+/* ── Shared V4 marketing vocabulary ────────────────────────────────────── */
+.v4-container {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+}
+
+.v4-section {
+  padding-block: clamp(4rem, 6vw + 1rem, 7.5rem);
+}
+
+.v4-chapter-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 2.2rem;
+}
+
+.v4-chapter-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--v3-line, var(--v4-mist));
+}
+
+.v4-h2 {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.08;
+  margin: 0 0 1rem;
+  max-width: 16em;
+  text-wrap: balance;
+}
+
+.v4-lede {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--v3-fg-muted, var(--v4-mute));
+  max-width: 44em;
+  margin: 0;
+}
+
+.v4-pull-quote {
+  font-family: var(--v4-font-editorial);
+  font-style: italic;
+  font-size: 1.5rem;
+  line-height: 1.4;
+  border-left: 3px solid var(--v4-cyan);
+  padding-left: 1.2rem;
+  margin: 1.6rem 0 0;
+  max-width: 26em;
+}
+
+/* Entrance reveal — V3 mechanism, V4 hook name. Content is never hidden
+   without JS, and never animated under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-v4-reveal][data-reveal-ready] {
+    opacity: 0;
+    transform: translateY(22px);
+    transition:
+      opacity 600ms cubic-bezier(0.22, 0.9, 0.28, 1),
+      transform 600ms cubic-bezier(0.22, 0.9, 0.28, 1);
+  }
+
+  [data-v4-reveal][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+.v4-hero {
+  position: relative;
+  height: 260vh; /* the scroll runway that drives the five phases */
+  background: var(--v4-ink);
+}
+
+.v4-hero__stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(
+      120% 70% at 60% 0%,
+      rgba(13, 36, 64, 0.55) 0%,
+      rgba(7, 19, 36, 0) 60%
+    ),
+    var(--v4-ink);
+}
+
+/* Region 1 — copy. Normal flow, static, first. */
+.v4-hero__copy {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+  padding-top: calc(var(--v4-hdr-h) + clamp(1.25rem, 4vh, 3rem));
+  position: relative;
+  z-index: 2;
+}
+
+.v4-hero__title {
+  color: var(--v4-cloud);
+  font-size: clamp(2.1rem, 4.6vw, 4rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin: 0.6rem 0 0.25em;
+  max-width: 14em;
+  text-wrap: balance;
+}
+
+.v4-hero__sub1 {
+  font-family: var(--v4-font-display);
+  color: var(--v4-cyan);
+  font-size: clamp(1.1rem, 2vw, 1.55rem);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.8rem;
+  text-wrap: balance;
+}
+
+.v4-hero__sub {
+  color: var(--v4-mute-dark);
+  font-size: clamp(0.98rem, 1.3vw, 1.15rem);
+  line-height: 1.55;
+  max-width: 40em;
+  margin: 0 0 1.3rem;
+}
+
+.v4-hero__sub b {
+  color: var(--v4-cloud);
+  font-weight: 500;
+}
+
+.v4-hero__ctas {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+/* Region 2 — the Signal field. Everything animated lives HERE, below the
+   copy. A meaningful composition is guaranteed at every width via
+   min-height (owner correction 4). */
+.v4-hero__field {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+  z-index: 1;
+}
+
+.v4-hero__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.v4-hero__node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 600ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-hero__node.is-lit {
+  opacity: 1;
+}
+
+.v4-hero__node-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid var(--v4-navy-line);
+  display: grid;
+  place-items: center;
+  background: rgba(13, 36, 64, 0.55);
+  transition:
+    border-color 320ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    box-shadow 320ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-hero__node-ring svg {
+  width: 24px;
+  height: 24px;
+  color: var(--v4-cyan);
+}
+
+.v4-hero__node.is-lit .v4-hero__node-ring {
+  border-color: var(--v4-cyan);
+}
+
+.v4-hero__node.is-done .v4-hero__node-ring {
+  border-color: var(--v4-turquoise);
+  box-shadow: 0 0 18px -4px rgba(45, 212, 191, 0.5);
+}
+
+.v4-hero__node.is-done .v4-hero__node-ring svg {
+  color: var(--v4-turquoise);
+}
+
+.v4-hero__node--terminus.is-done .v4-hero__node-ring {
+  border-color: var(--v4-mint);
+  box-shadow: 0 0 22px -4px rgba(74, 242, 200, 0.55);
+}
+
+.v4-hero__node--terminus.is-done .v4-hero__node-ring svg {
+  color: var(--v4-mint);
+}
+
+.v4-hero__node-label {
+  font-family: var(--v4-font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--v4-mute-dark);
+  max-width: 9.5em;
+  line-height: 1.4;
+}
+
+.v4-hero__node.is-lit .v4-hero__node-label {
+  color: var(--v4-cloud);
+}
+
+/* Region 3 — phase HUD. */
+.v4-hero__hud {
+  flex-shrink: 0;
+  z-index: 2;
+  padding: 0.6rem 1rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.v4-hero__hud-steps {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.v4-hero__hud-step {
+  font-family: var(--v4-font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v4-mute-dark);
+  opacity: 0.45;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition:
+    opacity 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.v4-hero__hud-step::after {
+  content: "";
+  width: 16px;
+  height: 1px;
+  background: var(--v4-navy-line);
+}
+
+.v4-hero__hud-step:last-child::after {
+  display: none;
+}
+
+.v4-hero__hud-step.is-cur {
+  opacity: 1;
+  color: var(--v4-cyan);
+}
+
+.v4-hero__hud-step.is-done {
+  opacity: 0.8;
+  color: var(--v4-turquoise);
+}
+
+/* Compact HUD — progress line + current stage only (owner correction 5). */
+.v4-hero__hud-compact {
+  display: none;
+  align-items: center;
+  gap: 0.8rem;
+  width: min(100%, 320px);
+}
+
+.v4-hero__hud-track {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--v4-navy-line);
+  overflow: hidden;
+}
+
+.v4-hero__hud-bar {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0.02);
+  background: var(--v4-signal-gradient);
+}
+
+.v4-hero__hud-current {
+  font-family: var(--v4-font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--v4-cyan);
+  white-space: nowrap;
+  min-width: 8.5em;
+}
+
+@media (max-width: 639px) {
+  .v4-hero__hud-steps {
+    display: none;
+  }
+
+  .v4-hero__hud-compact {
+    display: flex;
+  }
+}
+
+/* Field density at small widths: rings shrink, labels stay legible; below
+   420px the two least-critical labels would collide, so nodes tighten. */
+@media (max-width: 767px) {
+  .v4-hero__node-ring {
+    width: 44px;
+    height: 44px;
+  }
+
+  .v4-hero__node-ring svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .v4-hero__node-label {
+    font-size: 0.56rem;
+    max-width: 8em;
+  }
+}
+
+/* ── Journey (chapter 01) ──────────────────────────────────────────────── */
+.v4-journey {
+  display: grid;
+  grid-template-columns: 4fr 8fr;
+  gap: clamp(2rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.v4-sigmap {
+  border-radius: 14px;
+  padding: clamp(1.5rem, 3.5vw, 2.75rem);
+}
+
+.v4-sigmap svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.v4-sigmap__path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 900ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-sigmap.is-drawn .v4-sigmap__path {
+  stroke-dashoffset: 0;
+}
+
+.v4-sigmap__dot {
+  transition:
+    cx 480ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    cy 480ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-sigmap__core {
+  fill: var(--v4-navy);
+  stroke: var(--v4-navy-line);
+  stroke-width: 1.5;
+  transition: stroke 320ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-sigmap__node.is-lit .v4-sigmap__core {
+  stroke: var(--v4-cyan);
+}
+
+.v4-sigmap__node.is-done .v4-sigmap__core {
+  stroke: var(--v4-turquoise);
+}
+
+.v4-sigmap__node text {
+  fill: var(--v4-mute-dark);
+  font-family: var(--v4-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: fill 320ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-sigmap__node.is-lit text {
+  fill: #ffffff;
+}
+
+.v4-sigmap__chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.v4-sigmap__chip {
+  border: 1px solid var(--v4-navy-line);
+  background: none;
+  color: var(--v4-mute-dark);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  min-height: 44px;
+  font-family: var(--v4-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 160ms ease-out,
+    border-color 160ms ease-out,
+    background 160ms ease-out;
+}
+
+.v4-sigmap__chip:hover {
+  color: var(--v4-cloud);
+  border-color: var(--v4-cyan);
+}
+
+.v4-sigmap__chip[aria-pressed="true"] {
+  color: var(--v4-ink);
+  background: var(--v4-cyan);
+  border-color: var(--v4-cyan);
+}
+
+.v4-sigmap__panel {
+  margin-top: 1.2rem;
+  border-top: 1px solid var(--v4-navy-line);
+  padding-top: 1.1rem;
+  min-height: 7.5em;
+}
+
+.v4-sigmap__panel-title {
+  font-family: var(--v4-font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--v4-cloud);
+  margin: 0 0 0.3rem;
+}
+
+.v4-sigmap__panel-desc {
+  margin: 0;
+  color: var(--v4-mute-dark);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.v4-sigmap__panel-outcome {
+  display: block;
+  margin-top: 0.55rem;
+  font-family: var(--v4-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--v4-mint);
+}
+
+/* ── Pillars (chapter 02) ──────────────────────────────────────────────── */
+.v4-pillars {
+  position: relative;
+  margin-top: 2.6rem;
+  padding-top: 1.55rem;
+}
+
+.v4-pillars__line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--v4-signal-gradient);
+  opacity: 0.7;
+}
+
+.v4-pillars__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.1rem;
+}
+
+.v4-pillar {
+  position: relative;
+  background: var(--v4-paper);
+  border: 1px solid var(--v4-mist);
+  border-radius: 10px;
+  padding: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  transition:
+    transform 320ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    box-shadow 320ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    border-color 320ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-pillar::before {
+  content: "";
+  position: absolute;
+  top: -1.55rem;
+  left: 50%;
+  width: 2px;
+  height: 1.55rem;
+  background: var(--v4-mist);
+  transition: background 320ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-pillar:hover,
+.v4-pillar:focus-within {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 64px -32px rgba(7, 19, 36, 0.4);
+  border-color: var(--v4-cyan-deep);
+}
+
+.v4-pillar:hover::before,
+.v4-pillar:focus-within::before {
+  background: var(--v4-cyan-deep);
+}
+
+.v4-pillar:nth-child(2),
+.v4-pillar:nth-child(4) {
+  margin-top: 1.6rem;
+}
+
+.v4-pillar__glyph {
+  width: 44px;
+  height: 44px;
+  color: var(--v4-cyan-deep);
+  margin-bottom: 0.3rem;
+}
+
+.v4-pillar:hover .v4-glyph-anim,
+.v4-pillar:focus-within .v4-glyph-anim,
+[data-revealed] .v4-pillar .v4-glyph-anim {
+  stroke-dashoffset: 0;
+}
+
+.v4-pillar__title {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.v4-pillar__desc {
+  margin: 0;
+  color: var(--v4-mute);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.v4-pillar__link {
+  font-weight: 500;
+  font-size: 0.92rem;
+  text-decoration: none;
+  color: var(--v4-cyan-deep);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── CTA band (chapter 03) ─────────────────────────────────────────────── */
+.v4-cta-band {
+  position: relative;
+  overflow: hidden;
+}
+
+.v4-cta-band .v4-h2 {
+  max-width: 18em;
+}
+
+.v4-cta-band__actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.6rem;
+}
+
+.v4-cta-band__thread {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.85;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .v4-journey {
+    grid-template-columns: 1fr;
+  }
+
+  .v4-pillars__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .v4-pillar:nth-child(2),
+  .v4-pillar:nth-child(4) {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .v4-pillars__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Reduced motion: the story is complete, immediately ────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .v4-hero {
+    height: auto;
+  }
+
+  .v4-hero__stage {
+    position: relative;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  .v4-hero__field {
+    min-height: 320px;
+  }
+
+  .v4-hero__node {
+    opacity: 1;
+    transition: none;
+  }
+
+  .v4-hero__node .v4-hero__node-ring {
+    border-color: var(--v4-turquoise);
+  }
+
+  .v4-hero__node--terminus .v4-hero__node-ring {
+    border-color: var(--v4-mint);
+  }
+
+  .v4-hero__hud-step:nth-child(-n + 4) {
+    opacity: 0.8;
+    color: var(--v4-turquoise);
+  }
+
+  .v4-hero__hud-step:last-child {
+    opacity: 1;
+    color: var(--v4-cyan);
+  }
+
+  .v4-hero__hud-bar {
+    transform: scaleX(1);
+  }
+
+  .v4-sigmap__path {
+    stroke-dashoffset: 0 !important;
+    transition: none;
+  }
+
+  .v4-sigmap__dot,
+  .v4-sigmap__core,
+  .v4-sigmap__node text,
+  .v4-pillar,
+  .v4-pillar::before {
+    transition: none;
+  }
+}

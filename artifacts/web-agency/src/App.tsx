@@ -26,9 +26,12 @@ import { DashboardShell } from "@/shells/DashboardShell";
  */
 
 // ── Public marketing ────────────────────────────────────────────────────────
-// Frontend V3 Phase 2: the Operational Editorial public site. V2 pages are
-// retained as rollback references — ROLLBACK: swap HomeV3 back to HomeV2 (and
-// chrome="v3" back to chrome="v2") to revert instantly.
+// Frontend V4 "Signal" (owner-approved implementation): the homepage renders
+// HomeV4 under chrome="v4". V3 pages remain routed under the V4 chrome (the
+// .v4-shell token remap re-skins their vocabulary); V3 components stay
+// untouched as the rollback layer — ROLLBACK: swap HomeV4 back to HomeV3 and
+// chrome="v4" back to "v3" to revert instantly.
+const HomeV4 = lazy(() => import("@/pages/HomeV4"));
 const HomeV3 = lazy(() => import("@/pages/HomeV3"));
 const ServicesV3 = lazy(() => import("@/pages/ServicesV3"));
 const WebsitesAppsV3 = lazy(() => import("@/pages/WebsitesAppsV3"));
@@ -292,8 +295,8 @@ function Router() {
           that V3 replaced stay imported above as rollback references. */}
       <Route path={ROUTES.home}>
         {() => (
-          <PublicShell routeLabel="The homepage" chrome="v3" heroTone="ink">
-            <HomeV3 />
+          <PublicShell routeLabel="The homepage" chrome="v4" heroTone="ink">
+            <HomeV4 />
           </PublicShell>
         )}
       </Route>

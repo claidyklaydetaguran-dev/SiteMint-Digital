@@ -48,6 +48,9 @@
 @import "./styles/tokens-v4.css";
 /* Frontend V4 Phase 1: Signal public chrome (header, panel, sheet, footer). */
 @import "./styles/v4-chrome.css";
+/* Frontend V4 Phase 2: homepage presentation + shared V4 marketing
+   vocabulary (sections, reveal, journey, pillars, CTA band). */
+@import "./styles/v4-home.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
