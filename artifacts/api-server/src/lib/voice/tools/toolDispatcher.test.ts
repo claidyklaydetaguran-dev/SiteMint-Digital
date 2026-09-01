@@ -29,7 +29,7 @@ import type { SchedulingAppointmentRequest } from "@workspace/db/schema/scheduli
 
 const FIRM = 7;
 const NOW = new Date("2026-08-31T15:00:00.000Z");
-const SERVER = { url: "https://staging.example.com/api/voice/webhooks/vapi", secret: "webhook-secret-0123456789abcdef" };
+const SERVER = { url: "https://staging.example.com/api/voice/webhooks/vapi", credentialId: "cred-0123456789abcdef" };
 
 function requestRow(overrides: Partial<SchedulingAppointmentRequest> = {}): SchedulingAppointmentRequest {
   return {
@@ -347,7 +347,7 @@ describe("toolsConfig", () => {
       const params = fn.parameters as Record<string, unknown>;
       expect(params.type).toBe("object");
       expect(params.additionalProperties).toBe(false);
-      expect(def.server).toEqual({ url: SERVER.url, secret: SERVER.secret });
+      expect(def.server).toEqual({ url: SERVER.url, credentialId: SERVER.credentialId });
     }
   });
 

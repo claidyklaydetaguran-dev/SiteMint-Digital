@@ -53,7 +53,7 @@ const FLAGS: Array<[string, string, string]> = [
 
 const SECRETS: Array<[string, string, string]> = [
   ["VAPI_API_KEY", "pre", "Vapi private key (server-only, never in a browser build)"],
-  ["VAPI_WEBHOOK_SECRET", "P2", "HMAC secret for the Vapi webhook (also the publish server credential)"],
+  ["VAPI_WEBHOOK_SECRET", "P2", "HMAC secret the Vapi webhook route verifies (never sent to the provider)"],
   ["VAPI_WEBHOOK_SECRET_PREVIOUS", "P2", "Rotation-overlap secret for the Vapi webhook"],
   ["CALENDAR_TOKEN_KEY", "P4", "32-byte base64 AES-256-GCM key for calendar token envelopes"],
   ["GOOGLE_OAUTH_CLIENT_ID", "P4", "Google OAuth client id"],
@@ -70,6 +70,7 @@ const CONFIGS: Array<[string, string, string]> = [
   ["VOICE_ARTIFACT_POLICY", "pre", "Provider artifact capture: none | transcript_only | full — required for publish; only 'none' approved"],
   ["VOICE_RUNTIME_CATALOG_JSON", "pre", "Model/voice/transcriber catalog for publish"],
   ["VOICE_SERVER_URL", "P2", "Webhook URL sent to the provider when attachment is enabled"],
+  ["VAPI_WEBHOOK_CREDENTIAL_ID", "P2", "Id of the Vapi HMAC Custom Credential attached to published assistants (identifier, not a secret)"],
   ["VOICE_CALL_POLICY_JSON", "P6", "Call behavior: silence/max-duration/end/voicemail lines"],
   ["VOICE_USAGE_INCLUDED_MINUTES", "P7", "Flat included-minutes cap (metering-only when unset)"],
   ["VOICE_ALERTS_FROM", "P7", "Alert sender address"],

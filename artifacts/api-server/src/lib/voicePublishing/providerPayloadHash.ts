@@ -15,16 +15,33 @@
 // `updated_at` moves on any local edit, so it cannot answer this question,
 // while this digest only moves when the provider's view would actually differ.
 //
-// The digest is of our own request body. It contains no credential and no
-// provider identifier, and it is one-way, so it is safe to persist, log, and
-// return to an authenticated owner.
+// The digest is of our own request body, with one deliberate exception: every
+// `server` block is reduced to {url, auth mode, credential fingerprint} before
+// hashing. That keeps the promise below literally true — before H1 it was not,
+// because `config.server` carried `{url, secret}` and the stored digest was
+// therefore taken over the raw webhook secret.
+//
+// It contains no credential and no provider identifier, and it is one-way, so
+// it is safe to persist, log, and return to an authenticated owner.
 
 import { createHash } from "node:crypto";
 import type { JsonValue, VoiceAssistantInput } from "../voice/types.js";
 import type { VoiceArtifactPolicy } from "../voice/providers/vapi/artifactPolicy.js";
 
-/** Bumped only if the hashed shape changes meaning; forces one re-sync rather than a silent false match. */
-export const PROVIDER_PAYLOAD_HASH_VERSION = 1;
+/**
+ * Bumped only if the hashed shape changes meaning; forces one re-sync rather
+ * than a silent false match.
+ *
+ * v2 (H1): the server block is hashed as a redacted descriptor — url, auth
+ * mode, and a one-way fingerprint of the credential id — instead of verbatim.
+ * Before this, `config.server` was hashed as `{url, secret}`, so the stored
+ * digest was taken over the raw webhook secret, which contradicted this
+ * module's own no-credential invariant. The bump is also what makes
+ * reconciliation notice bearer→HMAC: any assistant last synced under a
+ * v1/bearer payload no longer matches, so the next sync re-sends and replaces
+ * the bearer configuration at the provider.
+ */
+export const PROVIDER_PAYLOAD_HASH_VERSION = 2;
 
 /**
  * Canonical JSON: object keys sorted by code unit, array order preserved,
@@ -50,6 +67,56 @@ export function canonicalJsonStringify(value: JsonValue): string {
 }
 
 /**
+ * Classifies a server block by the authentication it selects at the provider.
+ * `credentialId` means an HMAC Custom Credential; a lingering `secret` means
+ * the bearer mechanism. Exported so reconciliation and tests can assert which
+ * one a payload would configure without inspecting raw values.
+ */
+export type ServerAuthMode = "hmac_credential" | "bearer_secret" | "none";
+
+export function classifyServerAuthMode(server: unknown): ServerAuthMode {
+  if (typeof server !== "object" || server === null || Array.isArray(server)) return "none";
+  const record = server as Record<string, unknown>;
+  if (typeof record.credentialId === "string" && record.credentialId.length > 0) return "hmac_credential";
+  if (typeof record.secret === "string" && record.secret.length > 0) return "bearer_secret";
+  return "none";
+}
+
+/**
+ * Replaces every `server` block with a descriptor that preserves what drift
+ * detection needs — the URL and the auth mode — plus a one-way fingerprint of
+ * the credential id, so rotating the credential still moves the digest while
+ * the digest itself carries no credential and no recoverable provider id.
+ */
+function redactServerBlocks(config: JsonValue): JsonValue {
+  if (Array.isArray(config)) return config.map((entry) => redactServerBlocks(entry));
+  if (typeof config !== "object" || config === null) return config;
+
+  const out: Record<string, JsonValue> = {};
+  for (const [key, value] of Object.entries(config as Record<string, JsonValue>)) {
+    if (value === undefined) continue;
+    if (key !== "server") {
+      out[key] = redactServerBlocks(value);
+      continue;
+    }
+    const mode = classifyServerAuthMode(value);
+    const block = (value ?? {}) as Record<string, JsonValue>;
+    const descriptor: Record<string, JsonValue> = {
+      url: typeof block.url === "string" ? block.url : "",
+      auth: mode,
+    };
+    if (mode === "hmac_credential") {
+      descriptor.credentialFingerprint = createHash("sha256")
+        .update(String(block.credentialId), "utf8")
+        .digest("hex")
+        .slice(0, 16);
+    }
+    out[key] = descriptor;
+  }
+  return out;
+}
+
+/**
  * SHA-256 (lowercase hex, 64 chars) over the canonical serialization of the
  * versioned payload envelope. The database CHECK constraint
  * `ck_voice_assistants_provider_config_hash_shape` pins that shape.
@@ -61,7 +128,7 @@ export function computeProviderPayloadHash(
   const envelope: JsonValue = {
     v: PROVIDER_PAYLOAD_HASH_VERSION,
     name: input.name,
-    config: input.config as JsonValue,
+    config: redactServerBlocks(input.config as JsonValue),
     artifactPolicy,
   };
 

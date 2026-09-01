@@ -443,6 +443,9 @@ function assistantRow(): VoiceAssistant {
 
 const GOOD_URL = "https://staging.example.com/api/voice/webhooks/vapi";
 const GOOD_SECRET = "webhook-secret-0123456789abcdef";
+/** Invented fixture id — never a real provider credential. */
+const GOOD_CREDENTIAL_ID = "11111111-2222-4333-8444-555555555555";
+const CREDENTIAL_ID_ENV_VAR = "VAPI_WEBHOOK_CREDENTIAL_ID";
 
 describe("serverConfig", () => {
   it("returns null when the attach flag is off (the default)", () => {
@@ -451,13 +454,16 @@ describe("serverConfig", () => {
     expect(loadVoiceServerConfigFromEnv({ [VOICE_WEBHOOK_ATTACH_ENABLED_ENV_VAR]: "TRUE" })).toBeNull();
   });
 
-  it("returns the validated url+secret when enabled and configured", () => {
+  it("returns the validated url+credentialId when enabled and configured", () => {
     const config = loadVoiceServerConfigFromEnv({
       [VOICE_WEBHOOK_ATTACH_ENABLED_ENV_VAR]: "true",
       [VOICE_SERVER_URL_ENV_VAR]: GOOD_URL,
       [VOICE_SERVER_SECRET_ENV_VAR]: GOOD_SECRET,
+      [CREDENTIAL_ID_ENV_VAR]: GOOD_CREDENTIAL_ID,
     });
-    expect(config).toEqual({ url: GOOD_URL, secret: GOOD_SECRET });
+    expect(config).toEqual({ url: GOOD_URL, credentialId: GOOD_CREDENTIAL_ID });
+    // H1: the webhook secret is a precondition, never part of the config.
+    expect(JSON.stringify(config)).not.toContain(GOOD_SECRET);
   });
 
   it("fails closed on every invalid enabled configuration", () => {
@@ -465,6 +471,7 @@ describe("serverConfig", () => {
       [VOICE_WEBHOOK_ATTACH_ENABLED_ENV_VAR]: "true",
       [VOICE_SERVER_URL_ENV_VAR]: GOOD_URL,
       [VOICE_SERVER_SECRET_ENV_VAR]: GOOD_SECRET,
+      [CREDENTIAL_ID_ENV_VAR]: GOOD_CREDENTIAL_ID,
     };
     const bad = [
       { ...base, [VOICE_SERVER_URL_ENV_VAR]: undefined },
@@ -474,6 +481,13 @@ describe("serverConfig", () => {
       { ...base, [VOICE_SERVER_URL_ENV_VAR]: "https://user:pw@staging.example.com/hook" },
       { ...base, [VOICE_SERVER_SECRET_ENV_VAR]: "short" },
       { ...base, [VOICE_SERVER_SECRET_ENV_VAR]: undefined },
+      // H1: missing, ambiguous, and malformed credential references.
+      { ...base, [CREDENTIAL_ID_ENV_VAR]: undefined },
+      { ...base, [CREDENTIAL_ID_ENV_VAR]: "   " },
+      { ...base, [CREDENTIAL_ID_ENV_VAR]: `${GOOD_CREDENTIAL_ID},${GOOD_CREDENTIAL_ID}` },
+      { ...base, [CREDENTIAL_ID_ENV_VAR]: `${GOOD_CREDENTIAL_ID} ${GOOD_CREDENTIAL_ID}` },
+      { ...base, [CREDENTIAL_ID_ENV_VAR]: "short" },
+      { ...base, [CREDENTIAL_ID_ENV_VAR]: "has/slash/and:colon" },
     ];
     for (const env of bad) {
       let thrown: unknown;
@@ -494,8 +508,14 @@ describe("serverConfig", () => {
     const without = buildSyncProviderInput(assistantRow(), catalog());
     expect((without.config as Record<string, unknown>).server).toBeUndefined();
 
-    const withServer = buildSyncProviderInput(assistantRow(), catalog(), { url: GOOD_URL, secret: GOOD_SECRET });
-    expect((withServer.config as Record<string, unknown>).server).toEqual({ url: GOOD_URL, secret: GOOD_SECRET });
+    const withServer = buildSyncProviderInput(assistantRow(), catalog(), {
+      url: GOOD_URL,
+      credentialId: GOOD_CREDENTIAL_ID,
+    });
+    expect((withServer.config as Record<string, unknown>).server).toEqual({
+      url: GOOD_URL,
+      credentialId: GOOD_CREDENTIAL_ID,
+    });
 
     const hashWithout = computeProviderPayloadHash(without, "none");
     const hashWith = computeProviderPayloadHash(withServer, "none");
@@ -509,12 +529,26 @@ describe("serverConfig", () => {
       transcriber: { provider: "tp" },
       firstMessageMode: "assistant-speaks-first",
       systemInstructions: "Hello.",
-      server: { url: GOOD_URL, secret: GOOD_SECRET },
+      server: { url: GOOD_URL, credentialId: GOOD_CREDENTIAL_ID },
     });
-    expect(validated.server).toEqual({ url: GOOD_URL, secret: GOOD_SECRET });
+    expect(validated.server).toEqual({ url: GOOD_URL, credentialId: GOOD_CREDENTIAL_ID });
 
     const body = buildVapiAssistantRequestBody("Front Desk", validated, { recordingEnabled: false });
-    expect(body.server).toEqual({ url: GOOD_URL, secret: GOOD_SECRET });
+    expect(body.server).toEqual({ url: GOOD_URL, credentialId: GOOD_CREDENTIAL_ID });
+    expect(JSON.stringify(body)).not.toContain(GOOD_SECRET);
+  });
+
+  it("rejects a legacy bearer server block instead of silently ignoring it", () => {
+    expect(() =>
+      validateVapiRuntimeConfig({
+        model: { provider: "p", model: "m" },
+        voice: { provider: "vp", voiceId: "vid" },
+        transcriber: { provider: "tp" },
+        firstMessageMode: "assistant-speaks-first",
+        systemInstructions: "Hello.",
+        server: { url: GOOD_URL, secret: GOOD_SECRET },
+      }),
+    ).toThrow();
   });
 
   it("rejects malformed server blocks in the Vapi validator", () => {

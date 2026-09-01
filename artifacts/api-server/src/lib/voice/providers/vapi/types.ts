@@ -42,7 +42,12 @@ export interface VapiAssistantRuntimeConfig {
    */
   server?: {
     url: string;
-    secret: string;
+    /**
+     * H1: reference to a provider-side HMAC Custom Credential. There is no
+     * `secret` field by design — carrying one selected Vapi's bearer
+     * mechanism and placed our own webhook secret in a provider payload.
+     */
+    credentialId: string;
   };
   /** P3: closed-catalog tool definitions, validated structurally below. */
   tools?: JsonObject[];
@@ -70,7 +75,13 @@ const TOP_LEVEL_KEYS = new Set([
   "callPolicy",
 ]);
 const CALL_POLICY_KEYS = new Set(["silenceTimeoutSeconds", "maxDurationSeconds", "endCallMessage", "voicemailMessage"]);
-const SERVER_KEYS = new Set(["url", "secret"]);
+// H1: the server block references an HMAC Custom Credential by id. `secret`
+// is deliberately NOT accepted — it selected Vapi's bearer mechanism and put
+// our own webhook secret into a provider payload. A config still carrying it
+// is rejected by requireNoUnknownKeys rather than silently ignored.
+const SERVER_KEYS = new Set(["url", "credentialId"]);
+/** One credential id: a single run of id-safe characters, never a list. */
+const CREDENTIAL_ID_SHAPE = /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/;
 const TOOL_KEYS = new Set(["type", "function", "server"]);
 const TOOL_FUNCTION_KEYS = new Set(["name", "description", "parameters"]);
 const MAX_TOOLS = 8;
@@ -173,7 +184,7 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
   const firstMessage = optionalNonEmptyString(value.firstMessage, "firstMessage");
   const systemInstructions = requireNonEmptyString(value.systemInstructions, "systemInstructions");
 
-  let server: { url: string; secret: string } | undefined;
+  let server: { url: string; credentialId: string } | undefined;
   if (value.server !== undefined) {
     if (!isPlainObject(value.server)) {
       fail('Vapi runtime config "server" must be a plain object when present.');
@@ -188,9 +199,11 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
     }
     if (parsedUrl.protocol !== "https:") fail("server.url must use https.");
     if (parsedUrl.username || parsedUrl.password) fail("server.url must not contain userinfo.");
-    const secret = requireNonEmptyString(value.server.secret, "server.secret");
-    if (secret.length < 16) fail("server.secret must be at least 16 characters.");
-    server = { url, secret };
+    const credentialId = requireNonEmptyString(value.server.credentialId, "server.credentialId");
+    if (!CREDENTIAL_ID_SHAPE.test(credentialId)) {
+      fail("server.credentialId must be a single well-formed provider credential id.");
+    }
+    server = { url, credentialId };
   }
 
   let tools: JsonObject[] | undefined;
@@ -216,8 +229,10 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
       let parsedToolUrl: URL;
       try { parsedToolUrl = new URL(toolUrl); } catch { fail(`tools[${index}].server.url must be a valid absolute URL.`); }
       if (parsedToolUrl.protocol !== "https:") fail(`tools[${index}].server.url must use https.`);
-      const toolSecret = requireNonEmptyString(tool.server.secret, `tools[${index}].server.secret`);
-      if (toolSecret.length < 16) fail(`tools[${index}].server.secret must be at least 16 characters.`);
+      const toolCredentialId = requireNonEmptyString(tool.server.credentialId, `tools[${index}].server.credentialId`);
+      if (!CREDENTIAL_ID_SHAPE.test(toolCredentialId)) {
+        fail(`tools[${index}].server.credentialId must be a single well-formed provider credential id.`);
+      }
       return tool as JsonObject;
     });
   }
