@@ -341,6 +341,33 @@ describe("event writer", () => {
     expect(JSON.stringify(body)).not.toContain("+1555");
   });
 
+  // Regression: Google rejected EVERY insert with
+  //   400 invalid — "Invalid source url: ."
+  // because the body carried source={title} with no url. Google validates
+  // Event.source whenever the block is present: url is required and its scheme
+  // must be http(s). The result was not a degraded event — it was no event at
+  // all, on every approval, for the entire life of the write path.
+  //
+  // Two assertions, deliberately: the first pins the wire contract we actually
+  // send, so an added field is a decision rather than an accident; the second
+  // states the Google rule itself, so re-adding a source block without a valid
+  // url fails here instead of in production.
+  it("sends only fields Google accepts on events.insert", () => {
+    const body = buildEventBody({
+      requestPublicId: "pub-1",
+      summary: "Appointment — Pat",
+      startUtc: new Date("2026-09-01T14:00:00Z"),
+      endUtc: new Date("2026-09-01T14:30:00Z"),
+      timezone: "America/New_York",
+    });
+    expect(Object.keys(body).sort()).toEqual(["end", "iCalUID", "start", "summary"]);
+
+    const source = body.source as { url?: unknown } | undefined;
+    if (source !== undefined) {
+      expect(String(source.url)).toMatch(/^https?:\/\/\S+$/);
+    }
+  });
+
   it("inserts against the connection's calendar and tolerates 404 on delete", async () => {
     const calls: Array<{ method: string; url: string }> = [];
     const transport: EventsTransport = async (method, url) => {

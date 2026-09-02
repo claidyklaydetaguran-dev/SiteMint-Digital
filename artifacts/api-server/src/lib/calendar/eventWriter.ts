@@ -69,13 +69,21 @@ export const defaultEventsTransport: EventsTransport = async (method, url, acces
   return { status: response.status, body: parsed };
 };
 
+/**
+ * Every field here must be one Google accepts on events.insert.
+ *
+ * There is no `source` block: Google validates Event.source whenever it is
+ * present and requires a url with an http(s) scheme, so `source={title}` alone
+ * made the API reject the whole insert with 400 "Invalid source url: .". The
+ * attribution it was meant to carry is not worth putting a customer-facing URL
+ * into a firm's calendar, and `summary` already identifies the booking.
+ */
 export function buildEventBody(input: CalendarEventInput): Record<string, unknown> {
   return {
     summary: input.summary,
     start: { dateTime: input.startUtc.toISOString(), timeZone: input.timezone },
     end: { dateTime: input.endUtc.toISOString(), timeZone: input.timezone },
     iCalUID: `${input.requestPublicId}@sitemint.digital`,
-    source: { title: "SiteMint AI Receptionist" },
   };
 }
 
