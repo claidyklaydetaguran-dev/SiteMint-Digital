@@ -123,6 +123,8 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/receptionist/calendar/google/start": "session",
   "POST /api/receptionist/calendar/reconcile": "session",
   "POST /api/receptionist/calendar/requests/:publicId/approve": "session",
+  "POST /api/receptionist/calendar/requests/:publicId/cancel": "session",
+  "POST /api/receptionist/calendar/requests/:publicId/reschedule": "session",
   "POST /api/receptionist/voice/assistants": "session",
   "POST /api/receptionist/voice/assistants/:id/duplicate": "session",
   "POST /api/receptionist/voice/assistants/:id/publish": "session",

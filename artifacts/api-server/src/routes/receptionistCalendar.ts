@@ -30,6 +30,8 @@ import {
 } from "../lib/calendar/calendarConnectionsRepository.js";
 import {
   approveRequestToBooked,
+  cancelBookedRequest,
+  rescheduleBookedRequest,
   reconcileCalendarForFirm,
   isCalendarWriteEnabled,
 } from "../lib/calendar/calendarEventSync.js";
@@ -175,6 +177,95 @@ router.post("/receptionist/calendar/requests/:publicId/approve", requireReceptio
     req.log.error(
       { firmId, errorClass: err instanceof Error ? err.name : "unknown" },
       "[calendar] appointment approval failed",
+    );
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /api/receptionist/calendar/requests/:publicId/cancel ────────────────
+//
+// The booked-row cancel. The availability router's cancel is deliberately
+// pending/held-only (its repository function is shared with the voice tool
+// dispatcher), so until this route existed nothing in the application could
+// cancel a booked appointment at all. Firm-scoped like approve; the DB
+// cancellation always proceeds, event removal is best-effort with an issue +
+// reconciliation as the backstop. A repeat cancel finds the row no longer
+// booked and changes nothing (409 not_booked).
+
+const CANCEL_BOOKED_STATUS: Record<string, number> = {
+  cancelled: 200,
+  not_found: 404,
+  not_booked: 409,
+  conflict: 409,
+};
+
+router.post("/receptionist/calendar/requests/:publicId/cancel", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const firmId = req.firmId!;
+  try {
+    const result = await cancelBookedRequest(firmId, req.params.publicId as string, calendarSyncDeps());
+    req.log.info({ firmId, ...result }, "[calendar] booked cancel");
+    res
+      .status(CANCEL_BOOKED_STATUS[result.outcome] ?? 500)
+      .json(
+        result.outcome === "cancelled"
+          ? { ok: true, status: "cancelled", calendar: result.calendar }
+          : { ok: false, reason: result.outcome },
+      );
+  } catch (err) {
+    req.log.error(
+      { firmId, errorClass: err instanceof Error ? err.name : "unknown" },
+      "[calendar] booked cancel failed",
+    );
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /api/receptionist/calendar/requests/:publicId/reschedule ────────────
+//
+// The booked-row reschedule, replacement-request model: a new fully-validated
+// pending_review request at the new time (approved separately through the
+// normal approve path), the old row moved booked→rescheduled by a guarded
+// UPDATE, and the old event removed best-effort. An unavailable slot or a
+// lost race changes nothing durable.
+
+const RESCHEDULE_STATUS: Record<string, number> = {
+  rescheduled: 200,
+  not_found: 404,
+  not_booked: 409,
+  slot_unavailable: 409,
+  conflict: 409,
+};
+
+router.post("/receptionist/calendar/requests/:publicId/reschedule", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const firmId = req.firmId!;
+  const { startUtc } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof startUtc !== "string" || Number.isNaN(new Date(startUtc).getTime())) {
+    res.status(400).json({ error: "startUtc must be a valid ISO datetime" });
+    return;
+  }
+  try {
+    const result = await rescheduleBookedRequest(firmId, req.params.publicId as string, new Date(startUtc), calendarSyncDeps());
+    req.log.info({ firmId, outcome: result.outcome, calendar: result.calendar }, "[calendar] booked reschedule");
+    res
+      .status(RESCHEDULE_STATUS[result.outcome] ?? 500)
+      .json(
+        result.outcome === "rescheduled" && result.replacement
+          ? {
+              ok: true,
+              status: "rescheduled",
+              calendar: result.calendar,
+              replacement: {
+                id: result.replacement.publicId,
+                startUtc: result.replacement.startUtc.toISOString(),
+                endUtc: result.replacement.endUtc.toISOString(),
+              },
+            }
+          : { ok: false, reason: result.outcome },
+      );
+  } catch (err) {
+    req.log.error(
+      { firmId, errorClass: err instanceof Error ? err.name : "unknown" },
+      "[calendar] booked reschedule failed",
     );
     res.status(500).json({ error: "Internal error" });
   }

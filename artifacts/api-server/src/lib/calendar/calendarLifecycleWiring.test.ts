@@ -19,8 +19,11 @@ import {
   approveRequestToBooked,
   removeCalendarEventForRequest,
   reconcileCalendarForFirm,
+  cancelBookedRequest,
+  rescheduleBookedRequest,
   isCalendarWriteEnabled,
   type CalendarSyncDeps,
+  type BookedLifecycleDeps,
 } from "./calendarEventSync.js";
 import { buildEventBody } from "./eventWriter.js";
 import type { SchedulingAppointmentRequest, SchedulingCalendarConnection } from "@workspace/db/schema/scheduling";
@@ -59,6 +62,20 @@ describe("the calendar writer is reachable from a route", () => {
     expect(reconcile).not.toBeNull();
     expect(approve![0]).toContain("requireReceptionistAuth");
     expect(reconcile![0]).toContain("requireReceptionistAuth");
+  });
+
+  it("exposes booked cancel and reschedule actions, both behind receptionist auth", () => {
+    // Until these existed nothing in the application could move a row out of
+    // 'booked' — the repository cancel is pending/held-only and 'rescheduled'
+    // had no writer at all, so a booked appointment was permanent.
+    const cancel = calendarRoutes.match(/router\.post\(\s*["'][^"']*requests\/:publicId\/cancel["'][^)]*/s);
+    const reschedule = calendarRoutes.match(/router\.post\(\s*["'][^"']*requests\/:publicId\/reschedule["'][^)]*/s);
+    expect(cancel).not.toBeNull();
+    expect(reschedule).not.toBeNull();
+    expect(cancel![0]).toContain("requireReceptionistAuth");
+    expect(reschedule![0]).toContain("requireReceptionistAuth");
+    expect(calendarRoutes).toMatch(/cancelBookedRequest/);
+    expect(calendarRoutes).toMatch(/rescheduleBookedRequest/);
   });
 
   it("never takes firmId from the request body, query, or params", () => {
@@ -318,5 +335,173 @@ describe("event body carries nothing it should not", () => {
     const serialized = JSON.stringify(body);
     expect(serialized).not.toMatch(/@(?!sitemint\.digital)/);
     expect(serialized).not.toMatch(/\+\d{7,}/);
+  });
+});
+
+// ── booked-row lifecycle: cancel and reschedule ──────────────────────────────
+//
+// The wiring defect these guard against: 'booked' was a terminal status. The
+// repository cancel is deliberately pending/held-only (shared with the voice
+// tool dispatcher) and nothing wrote 'rescheduled', so no reachable path could
+// cancel or reschedule a booked appointment — its event was permanent too.
+
+interface BookedHarness extends Omit<Harness, "deps"> {
+  deps: BookedLifecycleDeps;
+  replacements: Array<{ publicId: string; status: string }>;
+}
+
+function bookedHarness(opts: {
+  enabled?: boolean;
+  row?: SchedulingAppointmentRequest;
+  deleteResult?: { ok: true } | { ok: false; reason: "revoked" | "provider_error" };
+  replacementOk?: boolean;
+  transitionReturns?: boolean;
+} = {}): BookedHarness {
+  const base = harness({
+    enabled: opts.enabled,
+    row: opts.row ?? request({ status: "booked", providerEventId: "evt-1", providerCalendarId: "primary" }),
+    deleteResult: opts.deleteResult,
+  });
+  const state = base as unknown as BookedHarness;
+  state.replacements = [];
+  const transition = (to: "cancelled" | "rescheduled") => async (firmId: number, requestId: number) => {
+    if (opts.transitionReturns === false) return false;
+    if (firmId !== state.row.firmId || requestId !== state.row.id || state.row.status !== "booked") return false;
+    state.row = { ...state.row, status: to } as SchedulingAppointmentRequest;
+    return true;
+  };
+  state.deps = {
+    ...base.deps,
+    cancelBooked: transition("cancelled"),
+    markRescheduled: transition("rescheduled"),
+    submitReplacement: async (_firmId, before, startUtc) => {
+      if (opts.replacementOk === false) return { ok: false };
+      const publicId = "99999999-8888-4777-8666-555555555555";
+      state.replacements.push({ publicId, status: "pending_review" });
+      return {
+        ok: true,
+        publicId,
+        startUtc,
+        endUtc: new Date(startUtc.getTime() + (before.requestedEndAt.getTime() - before.requestedStartAt.getTime())),
+      };
+    },
+    discardReplacement: async (_firmId, publicId) => {
+      const r = state.replacements.find((x) => x.publicId === publicId);
+      if (r) r.status = "cancelled";
+    },
+  };
+  return state;
+}
+
+describe("booked cancel", () => {
+  it("cancels the row, removes exactly its event, and clears the linkage", async () => {
+    const h = bookedHarness();
+    const result = await cancelBookedRequest(1, h.row.publicId, h.deps);
+    expect(result).toEqual({ outcome: "cancelled", calendar: "deleted" });
+    expect(h.row.status).toBe("cancelled");
+    expect(h.deletes).toEqual(["evt-1"]);
+    expect(h.row.providerEventId).toBeNull();
+    expect(h.inserts).toBe(0);
+  });
+
+  it("with the flag off the cancellation still lands; the event waits for reconciliation", async () => {
+    const h = bookedHarness({ enabled: false });
+    const result = await cancelBookedRequest(1, h.row.publicId, h.deps);
+    expect(result).toEqual({ outcome: "cancelled", calendar: "disabled" });
+    expect(h.row.status).toBe("cancelled");
+    expect(h.deletes).toHaveLength(0);
+    expect(h.row.providerEventId).toBe("evt-1");
+  });
+
+  it("refuses a cross-firm public id with zero side effects", async () => {
+    const h = bookedHarness();
+    expect(await cancelBookedRequest(2, h.row.publicId, h.deps)).toEqual({ outcome: "not_found" });
+    expect(h.row.status).toBe("booked");
+    expect(h.deletes).toHaveLength(0);
+  });
+
+  it("refuses a non-booked row — the pending cancel belongs to the availability route", async () => {
+    const h = bookedHarness({ row: request({ status: "pending_review" }) });
+    expect(await cancelBookedRequest(1, h.row.publicId, h.deps)).toEqual({ outcome: "not_booked" });
+    expect(h.deletes).toHaveLength(0);
+  });
+
+  it("a repeat cancel is safe: the second call finds the row no longer booked and deletes nothing", async () => {
+    const h = bookedHarness();
+    expect((await cancelBookedRequest(1, h.row.publicId, h.deps)).outcome).toBe("cancelled");
+    expect((await cancelBookedRequest(1, h.row.publicId, h.deps)).outcome).toBe("not_booked");
+    expect(h.deletes).toEqual(["evt-1"]);
+  });
+
+  it("a lost race reports conflict and touches nothing", async () => {
+    const h = bookedHarness({ transitionReturns: false });
+    expect(await cancelBookedRequest(1, h.row.publicId, h.deps)).toEqual({ outcome: "conflict" });
+    expect(h.deletes).toHaveLength(0);
+  });
+
+  it("a provider delete failure keeps the linkage and opens an issue; the cancel itself stands", async () => {
+    const h = bookedHarness({ deleteResult: { ok: false, reason: "provider_error" } });
+    const result = await cancelBookedRequest(1, h.row.publicId, h.deps);
+    expect(result).toEqual({ outcome: "cancelled", calendar: "failed" });
+    expect(h.row.status).toBe("cancelled");
+    expect(h.row.providerEventId).toBe("evt-1");
+    expect(h.issues).toEqual(["calendar_sync_failed"]);
+  });
+});
+
+describe("booked reschedule", () => {
+  const NEW_START = new Date("2026-09-14T19:00:00.000Z");
+
+  it("creates the replacement, marks the old row rescheduled, and removes only the old event", async () => {
+    const h = bookedHarness();
+    const result = await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps);
+    expect(result.outcome).toBe("rescheduled");
+    expect(result.calendar).toBe("deleted");
+    expect(result.replacement?.startUtc).toEqual(NEW_START);
+    expect(h.row.status).toBe("rescheduled");
+    expect(h.row.providerEventId).toBeNull();
+    expect(h.deletes).toEqual(["evt-1"]);
+    // The replacement books later through the normal approve path — nothing
+    // here may write an event.
+    expect(h.inserts).toBe(0);
+    expect(h.replacements).toEqual([{ publicId: "99999999-8888-4777-8666-555555555555", status: "pending_review" }]);
+  });
+
+  it("an unavailable slot changes nothing at all", async () => {
+    const h = bookedHarness({ replacementOk: false });
+    expect((await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps)).outcome).toBe("slot_unavailable");
+    expect(h.row.status).toBe("booked");
+    expect(h.deletes).toHaveLength(0);
+    expect(h.replacements).toHaveLength(0);
+  });
+
+  it("a lost race discards the replacement and leaves the winner's state untouched", async () => {
+    const h = bookedHarness({ transitionReturns: false });
+    expect((await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps)).outcome).toBe("conflict");
+    expect(h.deletes).toHaveLength(0);
+    expect(h.replacements).toEqual([{ publicId: "99999999-8888-4777-8666-555555555555", status: "cancelled" }]);
+  });
+
+  it("refuses cross-firm and non-booked rows with zero side effects", async () => {
+    const foreign = bookedHarness();
+    expect(await rescheduleBookedRequest(2, foreign.row.publicId, NEW_START, foreign.deps)).toEqual({ outcome: "not_found" });
+    expect(foreign.replacements).toHaveLength(0);
+
+    for (const status of ["pending_review", "held", "cancelled", "rescheduled", "expired"]) {
+      const h = bookedHarness({ row: request({ status } as Partial<SchedulingAppointmentRequest>) });
+      expect((await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps)).outcome).toBe("not_booked");
+      expect(h.replacements).toHaveLength(0);
+      expect(h.deletes).toHaveLength(0);
+    }
+  });
+
+  it("a provider delete failure degrades to an issue; the reschedule itself stands", async () => {
+    const h = bookedHarness({ deleteResult: { ok: false, reason: "provider_error" } });
+    const result = await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps);
+    expect(result.outcome).toBe("rescheduled");
+    expect(result.calendar).toBe("failed");
+    expect(h.row.status).toBe("rescheduled");
+    expect(h.row.providerEventId).toBe("evt-1");
+    expect(h.issues).toEqual(["calendar_sync_failed"]);
   });
 });
