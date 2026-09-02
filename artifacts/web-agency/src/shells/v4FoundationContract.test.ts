@@ -144,37 +144,46 @@ check(
 );
 
 console.log("5. Capability states for gated voice routes");
-check(
-  "flag-off capability routes are derived from committed nav metadata (live + voiceGated)",
-  /const voiceUnavailableRoutes = voicePlatformEnabled\s*\?\s*\[\]/.test(hdApp) &&
-    /item\.voiceGated && item\.state === "live"/.test(hdApp),
+const unavailableSrc = read(
+  "artifacts/helpdesk/src/components/common/VoiceUnavailable.tsx",
 );
 check(
-  "…and from the UNFILTERED nav (NAV_GROUPS is flag-filtered and would be empty when off)",
-  /:\s*navGroupsWith\(VOICE_NAV\)/.test(hdApp),
-);
-check(
-  "they render the ComingSoon capability state, not a fabricated surface",
-  /voiceUnavailableRoutes\.map\(\(item\) => \(\s*<Route key=\{item\.key\} path=\{item\.href!\}>\s*<ComingSoon/s.test(
+  "flag-off capability paths come from the always-bundled route table only",
+  /const voiceUnavailablePaths = voicePlatformEnabled\s*\?\s*\[\]\s*:\s*\[ROUTES\.assistants, ROUTES\.appointments, ROUTES\.logs\];/.test(
     hdApp,
   ),
 );
 check(
-  "the capability copy claims nothing is enabled",
-  /not active on this workspace/.test(hdApp) &&
-    /Not enabled on this workspace/.test(hdApp),
+  "they render the neutral VoiceUnavailable state, not a fabricated surface",
+  /voiceUnavailablePaths\.map\(\(path\) => \(\s*<Route key=\{path\} path=\{path\}>\s*<VoiceUnavailable \/>/s.test(
+    hdApp,
+  ),
+);
+check(
+  "content boundary: App.tsx does NOT import the voice nav metadata for this",
+  !/VOICE_NAV/.test(hdApp) && !/navGroupsWith/.test(hdApp),
+);
+check(
+  "content boundary: the page emits no voice-gated nav label",
+  !/Assistants|Call Logs|Phone Numbers|Voice Library|Knowledge Base/.test(
+    unavailableSrc,
+  ),
+);
+check(
+  "the capability copy is honest — not enabled, nothing running, safe exit",
+  /not enabled/i.test(unavailableSrc) &&
+    /Nothing is running in the background/.test(unavailableSrc) &&
+    /Back to Overview/.test(unavailableSrc),
+);
+check(
+  "the page exposes no action and uses an inline mark, not a gated icon",
+  !/lucide-react/.test(unavailableSrc) && !/<Button/.test(unavailableSrc),
 );
 check(
   "the NotFound fallthrough still closes the switch after the placeholder maps",
   /<Route component=\{NotFound\} \/>/.test(hdApp) &&
     hdApp.indexOf("<Route component={NotFound} />") >
-      hdApp.indexOf("voiceUnavailableRoutes.map("),
-);
-check(
-  "the ComingSoon action stays disabled (no unavailable action exposed)",
-  /<Button variant="secondary" className="mt-6" disabled>/.test(
-    read("artifacts/helpdesk/src/components/common/ComingSoon.tsx"),
-  ),
+      hdApp.indexOf("voiceUnavailablePaths.map("),
 );
 
 console.log("6. Canvas lifecycle");

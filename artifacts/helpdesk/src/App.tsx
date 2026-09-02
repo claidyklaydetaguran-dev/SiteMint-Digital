@@ -6,7 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComingSoon } from "@/components/common/ComingSoon";
-import { NAV_GROUPS, navGroupsWith, VOICE_NAV } from "@/lib/nav";
+import { VoiceUnavailable } from "@/components/common/VoiceUnavailable";
+import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAssistantSessionGuard } from "@/hooks/useAssistants";
 import { ROUTER_BASE, ROUTES } from "@/lib/routes";
@@ -77,16 +78,13 @@ const comingSoonRoutes = voicePlatformEnabled
     )
   : [];
 
-// R1: the live voice destinations that need an intentional capability state
-// when the flag is off (see the route block below). Empty when the platform
-// is enabled — the real pages own those paths inside the gate.
-const voiceUnavailableRoutes = voicePlatformEnabled
+// R1: when the voice platform flag is off, the three live voice paths get an
+// intentional capability state instead of the 404. The paths come from the
+// always-bundled route table — deliberately NOT from the voice nav metadata,
+// which the AR-001M content boundary forbids a disabled build from emitting.
+const voiceUnavailablePaths = voicePlatformEnabled
   ? []
-  : navGroupsWith(VOICE_NAV)
-      .flatMap((group) => group.items)
-      .filter(
-        (item) => item.voiceGated && item.state === "live" && Boolean(item.href),
-      );
+  : [ROUTES.assistants, ROUTES.appointments, ROUTES.logs];
 
 function Router() {
   return (
@@ -131,21 +129,17 @@ function Router() {
                 <Route path={ROUTES.appointments} component={Appointments} />
               </>
             )}
-            {/* R1 capability states: when the voice platform is NOT enabled,
-                direct navigation to the three live voice destinations gets an
-                intentional "not enabled yet" state instead of the branded
-                404. Driven by the committed nav metadata; navigation
-                visibility still follows the capability policy (these never
-                appear in the rail), no action is exposed, and no backend
-                enablement is implied. */}
-            {voiceUnavailableRoutes.map((item) => (
-              <Route key={item.key} path={item.href!}>
-                <ComingSoon
-                  title={item.label}
-                  description="This area is part of the SiteMint voice platform. Voice features are certified and enabled per client — they are not active on this workspace yet, and nothing here is running in the background."
-                  icon={item.icon}
-                  availability="Not enabled on this workspace"
-                />
+            {/* R1 capability states: when the voice platform is NOT enabled, the
+                three live voice paths render a neutral capability state
+                instead of the 404. Navigation visibility still follows the
+                committed policy (nothing appears in the rail), no action is
+                exposed, no backend enablement is implied — and the page stays
+                inside the AR-001M content boundary: no voice-gated labels,
+                descriptions, nav-only hrefs, or gated-only icons enter the
+                disabled bundle. */}
+            {voiceUnavailablePaths.map((path) => (
+              <Route key={path} path={path}>
+                <VoiceUnavailable />
               </Route>
             ))}
             {comingSoonRoutes.map((item) => (
