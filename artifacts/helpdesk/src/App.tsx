@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComingSoon } from "@/components/common/ComingSoon";
-import { NAV_GROUPS } from "@/lib/nav";
+import { NAV_GROUPS, navGroupsWith, VOICE_NAV } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAssistantSessionGuard } from "@/hooks/useAssistants";
 import { ROUTER_BASE, ROUTES } from "@/lib/routes";
@@ -82,9 +82,11 @@ const comingSoonRoutes = voicePlatformEnabled
 // is enabled — the real pages own those paths inside the gate.
 const voiceUnavailableRoutes = voicePlatformEnabled
   ? []
-  : NAV_GROUPS.flatMap((group) => group.items).filter(
-      (item) => item.voiceGated && item.state === "live" && Boolean(item.href),
-    );
+  : navGroupsWith(VOICE_NAV)
+      .flatMap((group) => group.items)
+      .filter(
+        (item) => item.voiceGated && item.state === "live" && Boolean(item.href),
+      );
 
 function Router() {
   return (

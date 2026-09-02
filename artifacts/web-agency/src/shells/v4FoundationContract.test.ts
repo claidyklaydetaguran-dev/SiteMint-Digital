@@ -150,6 +150,10 @@ check(
     /item\.voiceGated && item\.state === "live"/.test(hdApp),
 );
 check(
+  "…and from the UNFILTERED nav (NAV_GROUPS is flag-filtered and would be empty when off)",
+  /:\s*navGroupsWith\(VOICE_NAV\)/.test(hdApp),
+);
+check(
   "they render the ComingSoon capability state, not a fabricated surface",
   /voiceUnavailableRoutes\.map\(\(item\) => \(\s*<Route key=\{item\.key\} path=\{item\.href!\}>\s*<ComingSoon/s.test(
     hdApp,
