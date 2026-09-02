@@ -16,18 +16,6 @@ const RAW_BASE = import.meta.env.BASE_URL || "/";
 
 /** Normalised base with no trailing slash — the form `wouter` expects. */
 
-/**
- * The live voice-platform destinations that receive an intentional
- * capability state when the platform flag is off (V4 R1). Kept here so the
- * route layer stays the single source of truth for these paths and the
- * router never has to name a gated route token outside its flag gate.
- */
-export const VOICE_CAPABILITY_PATHS: readonly string[] = [
-  ROUTES.assistants,
-  ROUTES.appointments,
-  ROUTES.logs,
-] as const;
-
 export const ROUTER_BASE = RAW_BASE.replace(/\/+$/, "");
 
 /** Dashboard route paths, base-relative. */
@@ -57,6 +45,18 @@ export const ROUTES = {
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;
+
+/**
+ * The live voice-platform destinations that receive an intentional
+ * capability state when the platform flag is off (V4 R1). Kept here so the
+ * route layer stays the single source of truth for these paths and the
+ * router never has to name a gated route token outside its flag gate.
+ */
+export const VOICE_CAPABILITY_PATHS: readonly string[] = [
+  ROUTES.assistants,
+  ROUTES.appointments,
+  ROUTES.logs,
+] as const;
 
 /**
  * Absolute URL back to the public marketing site. Like the public site's
