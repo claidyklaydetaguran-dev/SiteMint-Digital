@@ -8,7 +8,7 @@
 |---|---|---|
 | A | Visual calendar, availability settings, server-side availability engine, in-memory Development store, sanitized fixtures. No real calendar, no real appointments. | **Done** |
 | B | Durable per-firm storage, read-only Google Calendar free/busy, public scheduling page. No calendar writes, no booked records, no messages sent. | **Done** |
-| C | Create/reschedule/cancel Development appointments with authoritative provider confirmation and double-booking protection. | Not started — requires owner approval |
+| C | Create/reschedule/cancel Development appointments with authoritative provider confirmation and double-booking protection. | **Done** — certified on staging 2026-09-02, see [M4_CALENDAR_WRITE_CERTIFICATION.md](M4_CALENDAR_WRITE_CERTIFICATION.md). Both calendar flags are back to `false`. |
 | D | Vapi Development assistant checks availability and books only after explicit caller confirmation. | Not started — requires owner approval |
 
 Checkpoint B intentionally does **not**: create, update, or delete a Google Calendar event; mark any request `booked`; send SMS or email; send a scheduling link; touch Production; change Stripe; or request Google write access.
