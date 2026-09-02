@@ -10,7 +10,7 @@ import { VoiceUnavailable } from "@/components/common/VoiceUnavailable";
 import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAssistantSessionGuard } from "@/hooks/useAssistants";
-import { ROUTER_BASE, ROUTES } from "@/lib/routes";
+import { ROUTER_BASE, ROUTES, VOICE_CAPABILITY_PATHS } from "@/lib/routes";
 import { voiceRoutePages } from "@/routes/voiceRoutes";
 import { DashboardShell } from "@/shells/DashboardShell";
 import { AuthShell } from "@/shells/AuthShell";
@@ -84,7 +84,7 @@ const comingSoonRoutes = voicePlatformEnabled
 // which the AR-001M content boundary forbids a disabled build from emitting.
 const voiceUnavailablePaths = voicePlatformEnabled
   ? []
-  : [ROUTES.assistants, ROUTES.appointments, ROUTES.logs];
+  : VOICE_CAPABILITY_PATHS;
 
 function Router() {
   return (

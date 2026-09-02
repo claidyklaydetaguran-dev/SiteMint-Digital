@@ -148,10 +148,13 @@ const unavailableSrc = read(
   "artifacts/helpdesk/src/components/common/VoiceUnavailable.tsx",
 );
 check(
-  "flag-off capability paths come from the always-bundled route table only",
-  /const voiceUnavailablePaths = voicePlatformEnabled\s*\?\s*\[\]\s*:\s*\[ROUTES\.assistants, ROUTES\.appointments, ROUTES\.logs\];/.test(
+  "flag-off capability paths come from the route layer's own export",
+  /const voiceUnavailablePaths = voicePlatformEnabled\s*\?\s*\[\]\s*:\s*VOICE_CAPABILITY_PATHS;/.test(
     hdApp,
-  ),
+  ) &&
+    /export const VOICE_CAPABILITY_PATHS[\s\S]*ROUTES\.assistants,\s*ROUTES\.appointments,\s*ROUTES\.logs,/.test(
+      read("artifacts/helpdesk/src/lib/routes.ts"),
+    ),
 );
 check(
   "they render the neutral VoiceUnavailable state, not a fabricated surface",
