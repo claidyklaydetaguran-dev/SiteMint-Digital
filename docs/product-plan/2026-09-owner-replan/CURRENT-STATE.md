@@ -213,7 +213,7 @@ Integrations marketplace · human transfer UI · SMS for voice product (Stage 6,
 | Route sweep, mode A | 34 routes × 5 widths (360/768/1024/1440/1920) = 170 combinations; 0 horizontal overflow; 0 nested scroll regions; only console entries are the expected 401s from the unattached backend |
 | Route sweep, mode B dashboard | 19 routes × 5 widths = 95 combinations, 0 overflow, 0 console errors; **nested scroll region `.sd-rail__nav` present at 360, 1024 and 1440 on every dashboard page**, plus a second region (`main#sd-main`, or the builder's `div.min-w-0.flex-1`) on Overview, SMS receptionist, Settings, 404 and all builder tabs; no breadcrumbs anywhere; `aria-current` correct on every sidebar route, absent on coming-soon pages |
 | Route sweep, mode B dashboard states | fresh / empty / locked / error / denied / slow at 360 + 1440 — 0 overflow, 0 console errors in fresh/empty/locked (error/denied/slow captured for the workbook) |
-| Route sweep, mode B CRM | 28 routes × 3 widths = 84 combinations captured, 0 console errors (probe metrics re-run separately) |
+| Route sweep, mode B CRM | 28 routes × 3 widths = 84 combinations captured signed-in (screenshots), 0 console errors; a separate 10-route × 5-width metric pass (50 combinations) found 0 horizontal overflow — note that without a token most CRM pages redirect to the login wall client-side, so the metric pass only exercised Discovery, Receptionist Accounts, 404 and the login page at all five widths |
 | Keyboard / focus / Escape / anchors / reduced motion (site) | 26 checks, 0 failures |
 | CI on the exact head | `gates` ✔ and `voice-matrix` ✔ (20/20 variants) — reused as durable evidence |
 
