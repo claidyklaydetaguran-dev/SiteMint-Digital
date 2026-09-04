@@ -58,7 +58,7 @@ const SCOPE_ADD_ONS = [
 
 function TierCard({ tier }: { tier: PricingTierV5 }) {
   return (
-    <div className={`v3-card${tier.recommended ? " v3-card--hover" : ""}`} style={{ padding: "1.75rem", display: "grid", gap: "0.75rem" }}>
+    <div className={`v3-card reveal-scale-settle${tier.recommended ? " v3-card--hover" : ""}`} style={{ padding: "1.75rem", display: "grid", gap: "0.75rem" }}>
       {tier.recommended && (
         <span className="v3-eyebrow" style={{ color: "var(--sm-mint-700, #0B7487)" }}>
           Most common starting point
@@ -198,13 +198,23 @@ export default function PricingV5() {
   return (
     <div className="v3-services-hub sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner">
-          <span className="v3-eyebrow">Pricing</span>
+        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow reveal-fade-up">Pricing</span>
+          {/* Headline is the hero LCP text — left static (no mask-reveal) so
+              first paint isn't delayed; eyebrow/lede/actions carry the motion. */}
           <h1 className="v3-display">Three starting points. Every system is scoped.</h1>
-          <p className="v3-lede">
+          <p className="v3-lede reveal-fade-up">
             These are starting estimates, not quotes. Every project is scoped
             through discovery before we commit to a price.
           </p>
+          <div className="v3m-hero__actions reveal-fade-up">
+            <a href="#configure" className="v3-btn v3-btn--primary">
+              Configure Your Scope
+            </a>
+            <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
+              Build Your SiteMint System
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -227,10 +237,10 @@ export default function PricingV5() {
       <section className="v3-section" data-tone="porcelain">
         <div className="v3-container v3-reveal" ref={reveal}>
           <span className="v3-eyebrow">What affects the price</span>
-          <h2 className="v3-h2" style={{ marginTop: "0.5rem" }}>
+          <h2 className="v3-h2 reveal-clip" style={{ marginTop: "0.5rem" }}>
             Six things that move a project between tiers.
           </h2>
-          <p className="v3-body" style={{ marginTop: "0.5rem" }}>
+          <p className="v3-body reveal-fade-up" style={{ marginTop: "0.5rem" }}>
             The three tiers above are starting points, not the final word —
             these are the factors that shift a project up or down from its
             starting price, and every one of them gets discussed plainly
@@ -238,7 +248,7 @@ export default function PricingV5() {
           </p>
           <div className="sm-price-factors">
             {PRICE_FACTORS.map((factor) => (
-              <div className="sm-price-factor" key={factor.title}>
+              <div className="sm-price-factor reveal-scale-settle" key={factor.title}>
                 <span className="sm-price-factor__title">{factor.title}</span>
                 <p className="sm-price-factor__desc">{factor.desc}</p>
               </div>
@@ -247,22 +257,24 @@ export default function PricingV5() {
         </div>
       </section>
 
-      <section className="v3-section" data-tone="white">
+      <section className="v3-section" data-tone="white" id="configure" style={{ scrollMarginTop: "5rem" }}>
         <div className="v3-container v3-reveal" ref={reveal}>
-          <ScopeConfigurator />
+          <div className="reveal-scale-settle">
+            <ScopeConfigurator />
+          </div>
         </div>
       </section>
 
       <section className="v3-section v3m-cta" data-tone="ink">
         <div className="v3-container v3m-cta__inner v3-reveal" ref={reveal}>
-          <h2 className="v3-display">Ready to scope your project?</h2>
-          <p className="v3-lede">
+          <h2 className="v3-display reveal-clip">Ready to scope your project?</h2>
+          <p className="v3-lede reveal-fade-up">
             Start with the discovery brief — you'll get a straight
             recommendation, not a sales sequence.
           </p>
           <div className="v3m-cta__actions">
-            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
+              Build Your SiteMint System
             </Link>
           </div>
         </div>

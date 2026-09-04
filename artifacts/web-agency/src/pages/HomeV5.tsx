@@ -60,14 +60,14 @@ function WhatWeBuildLedger() {
         <Reveal as="h2" className="v4-h2" words>
           Six capabilities. One connected system.
         </Reveal>
-        <p className="v4-lede">
+        <p className="v4-lede reveal-fade-up" ref={reveal} data-v4-reveal>
           Every SiteMint engagement draws from the same six capabilities —
           alone or combined into one system, depending on what the business
           actually needs.
         </p>
         <ol className="sm-ledger__list" ref={reveal} data-v4-reveal>
           {LEDGER_ROWS.map((row, i) => (
-            <li className="sm-ledger__row" key={row.label}>
+            <li className="sm-ledger__row reveal-scale-settle" key={row.label}>
               <span className="sm-ledger__no">{String(i + 1).padStart(2, "0")}</span>
               <span className="sm-ledger__label">{row.label}</span>
               <span className="sm-ledger__outcome">{row.outcome}</span>
@@ -86,16 +86,16 @@ function WebsitesAppsSection() {
   return (
     <section className="v4-section" id="websites-apps" data-tone="porcelain">
       <div className="v4-container sm-split">
-        <div className="sm-split__copy" ref={reveal} data-v4-reveal>
+        <div className="sm-split__copy reveal-h-left" ref={reveal} data-v4-reveal>
           <span className="v4-kicker">03 — Websites & Web Apps</span>
-          <h2 className="v4-h2">A site that knows what happens after the click.</h2>
-          <p className="v4-lede">
+          <h2 className="v4-h2 reveal-clip">A site that knows what happens after the click.</h2>
+          <p className="v4-lede reveal-fade-up">
             For businesses whose current site is a brochure nobody acts on:
             marketing sites and custom applications built around the action a
             real visitor should take next — a form that reaches an inbox, a
             tracked event, a clean hand-off to the next system.
           </p>
-          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
             A Starter Site System ships with the pages and lead capture most
             businesses need as-is; a custom application is scoped and built
             around your specific workflow. Either way, every form and event
@@ -106,7 +106,7 @@ function WebsitesAppsSection() {
             Explore Websites &amp; Web Apps →
           </Link>
         </div>
-        <div className="sm-devices" ref={reveal} data-v4-reveal aria-hidden="true">
+        <div className="sm-devices reveal-scale-settle" ref={reveal} data-v4-reveal aria-hidden="true">
           <div className="sm-devices__browser">
             <span className="sm-devices__dot" />
             <span className="sm-devices__dot" />
@@ -136,16 +136,16 @@ function CrmSystemsSection() {
   return (
     <section className="v4-section" id="crm-systems" data-tone="white">
       <div className="v4-container sm-split sm-split--reverse">
-        <div className="sm-split__copy" ref={reveal} data-v4-reveal>
+        <div className="sm-split__copy reveal-h-right" ref={reveal} data-v4-reveal>
           <span className="v4-kicker">04 — CRM &amp; Internal Systems</span>
-          <h2 className="v4-h2">Where the business runs, in one place.</h2>
-          <p className="v4-lede">
+          <h2 className="v4-h2 reveal-clip">Where the business runs, in one place.</h2>
+          <p className="v4-lede reveal-fade-up">
             For teams whose leads live in a spreadsheet, an inbox, and
             someone's memory: pipeline, tasks, and records the owner actually
             looks at — built around how the business already works instead of
             forcing a generic template onto it.
           </p>
-          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
             A CRM connection is part of the Growth and Custom systems above,
             configured to your pipeline during discovery — it's the record
             every website form, automated follow-up, and receptionist call
@@ -155,7 +155,7 @@ function CrmSystemsSection() {
             See CRM &amp; internal systems →
           </Link>
         </div>
-        <div className="sm-record" ref={reveal} data-v4-reveal aria-hidden="true">
+        <div className="sm-record reveal-scale-settle" ref={reveal} data-v4-reveal aria-hidden="true">
           <span className="sm-record__badge">Illustration</span>
           <div className="sm-record__row">
             <span className="sm-record__dot" />
@@ -185,16 +185,16 @@ function AiSystemsSection() {
   return (
     <section className="v4-section" id="ai-systems" data-tone="ink">
       <div className="v4-container sm-split">
-        <div className="sm-split__copy" ref={reveal} data-v4-reveal>
+        <div className="sm-split__copy reveal-h-left" ref={reveal} data-v4-reveal>
           <span className="v4-kicker">05 — AI Systems &amp; Automation</span>
-          <h2 className="v4-h2">Evaluate, route, follow up, draft — where it's allowed to act.</h2>
-          <p className="v4-lede">
+          <h2 className="v4-h2 reveal-clip">Evaluate, route, follow up, draft — where it's allowed to act.</h2>
+          <p className="v4-lede reveal-fade-up">
             For operators whose growth is capped by follow-through, not
             demand: automation handles the mechanical steps; anything
             requiring judgment lands as a task for a person, with context
             attached. Every automated action is logged and stoppable.
           </p>
-          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
             AI-assisted development is how we build every SiteMint system
             faster, with the same human review and testing on everything that
             ships; AI automation inside your own system — the kind pictured
@@ -204,7 +204,7 @@ function AiSystemsSection() {
             Explore AI Systems &amp; Automation →
           </Link>
         </div>
-        <div className="sm-nodes-wrap" ref={reveal} data-v4-reveal>
+        <div className="sm-nodes-wrap reveal-scale-settle" ref={reveal} data-v4-reveal>
           <svg
             className="sm-nodes"
             viewBox="0 0 420 160"
@@ -212,11 +212,13 @@ function AiSystemsSection() {
             aria-label="Diagram: an inquiry moves through evaluation, routing, and follow-up nodes"
           >
             <path
+              className="sm-nodes__path"
               d="M30 130 C 100 60, 150 150, 210 90 S 320 40, 390 60"
               fill="none"
               stroke="var(--sm-mint-500, #32C5D2)"
               strokeWidth="2"
               opacity="0.7"
+              pathLength={1}
             />
             {[
               { x: 30, y: 130, label: "Evaluate" },
@@ -245,16 +247,16 @@ function ReceptionistSpotlight() {
   return (
     <section className="v4-section" id="ai-receptionist" data-tone="porcelain">
       <div className="v4-container sm-split sm-split--reverse">
-        <div className="sm-split__copy" ref={reveal} data-v4-reveal>
+        <div className="sm-split__copy reveal-h-right" ref={reveal} data-v4-reveal>
           <span className="v4-kicker">06 — AI Receptionist</span>
           <span className="sm-badge sm-badge--beta">Private beta — invite only</span>
-          <h2 className="v4-h2">Never let a good opportunity end at a missed call.</h2>
-          <p className="v4-lede">
+          <h2 className="v4-h2 reveal-clip">Never let a good opportunity end at a missed call.</h2>
+          <p className="v4-lede reveal-fade-up">
             SiteMint AI Receptionist is built to answer incoming calls, handle
             routine questions, and help callers reach the right next step
             using the business's actual rules and availability.
           </p>
-          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
             Every call it handles becomes a CRM record and, where automation
             is in scope, a follow-up — the same connected pipeline the rest
             of this page describes, by phone instead of by form.
@@ -263,7 +265,7 @@ function ReceptionistSpotlight() {
             See the AI Receptionist →
           </Link>
         </div>
-        <div className="sm-ring" ref={reveal} data-v4-reveal aria-hidden="true">
+        <div className="sm-ring reveal-scale-settle" ref={reveal} data-v4-reveal aria-hidden="true">
           <span className="sm-ring__pulse sm-ring__pulse--1" />
           <span className="sm-ring__pulse sm-ring__pulse--2" />
           <span className="sm-ring__pulse sm-ring__pulse--3" />
@@ -285,16 +287,16 @@ function DiscoverySection() {
           <span className="v4-kicker">07 — Discovery &amp; lead capture</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
-        <h2 className="v4-h2">A structured brief, not a contact form.</h2>
-        <p className="v4-lede">
+        <h2 className="v4-h2 reveal-clip">A structured brief, not a contact form.</h2>
+        <p className="v4-lede reveal-fade-up">
           Every project starts with a guided, structured intake — the same
           one live on this site right now. It saves as you go, and a person
           reads every answer before you hear back.
         </p>
         <ol className="sm-steps-inline">
-          <li>Answer structured questions about the business and the goal</li>
-          <li>Save and resume any time — nothing is lost</li>
-          <li>SiteMint reviews the brief and replies with a straight answer</li>
+          <li className="reveal-fade-up">Answer structured questions about the business and the goal</li>
+          <li className="reveal-fade-up">Save and resume any time — nothing is lost</li>
+          <li className="reveal-fade-up">SiteMint reviews the brief and replies with a straight answer</li>
         </ol>
         <div className="sm-actions">
           <Link href={ROUTES.discovery} className="v3-btn v3-btn--primary">
@@ -344,10 +346,10 @@ function SelectedWorkSection() {
           <span className="v4-kicker">08 — Selected work</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
-        <h2 className="v4-h2">What SiteMint has actually built and run.</h2>
+        <h2 className="v4-h2 reveal-clip">What SiteMint has actually built and run.</h2>
         <div className="sm-work-grid">
           {SELECTED_WORK.map((item) => (
-            <article className="sm-work-card" key={item.title}>
+            <article className="sm-work-card reveal-scale-settle" key={item.title}>
               <span className={`sm-badge sm-badge--${item.status}`}>
                 {capabilityLabelsV5[item.status]}
               </span>
@@ -383,10 +385,10 @@ function HowItWorksSection() {
           <span className="v4-kicker">09 — How SiteMint works</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
-        <h2 className="v4-h2">Five stages, each with a visible outcome.</h2>
+        <h2 className="v4-h2 reveal-clip">Five stages, each with a visible outcome.</h2>
         <ol className="sm-timeline">
           {PROCESS_STEPS.map((step, i) => (
-            <li className="sm-timeline__step" key={step.title}>
+            <li className="sm-timeline__step reveal-scale-settle" key={step.title}>
               <span className="sm-timeline__no">{String(i + 1).padStart(2, "0")}</span>
               <span className="sm-timeline__title">{step.title}</span>
               <span className="sm-timeline__output">{step.output}</span>
@@ -412,10 +414,10 @@ function PricingSection() {
           <span className="v4-kicker">10 — Pricing estimates</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
-        <h2 className="v4-h2">Three starting points. Every system is scoped.</h2>
+        <h2 className="v4-h2 reveal-clip">Three starting points. Every system is scoped.</h2>
         <div className="sm-pricing-grid">
           {pricingTiersV5.map((tier) => (
-            <div className={`sm-pricing-card${tier.recommended ? " is-recommended" : ""}`} key={tier.id}>
+            <div className={`sm-pricing-card reveal-scale-settle${tier.recommended ? " is-recommended" : ""}`} key={tier.id}>
               {tier.recommended && <span className="sm-badge sm-badge--available">Most common</span>}
               <h3 className="sm-pricing-card__name">{tier.name}</h3>
               <p className="sm-pricing-card__price">{tier.priceFrom}</p>
@@ -465,7 +467,7 @@ function WhySiteMintSection() {
         </div>
         <div className="sm-why-grid">
           {WHY_POINTS.map((point) => (
-            <div className="sm-why-item" key={point.title}>
+            <div className="sm-why-item reveal-scale-settle" key={point.title}>
               <h3 className="sm-why-item__title">{point.title}</h3>
               <p className="sm-why-item__body">{point.body}</p>
             </div>
@@ -487,10 +489,10 @@ function TeamSection() {
           <span className="v4-kicker">12 — Team</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
-        <h2 className="v4-h2">The people doing the work.</h2>
+        <h2 className="v4-h2 reveal-clip">The people doing the work.</h2>
         <div className="sm-team-grid">
           {teamV5.map((member) => (
-            <div className="sm-team-card" key={member.name}>
+            <div className="sm-team-card reveal-scale-settle" key={member.name}>
               <span className="sm-team-card__avatar" aria-hidden="true">
                 {member.name
                   .split(" ")
@@ -548,12 +550,12 @@ function FaqSection() {
           <span className="v4-kicker">13 — FAQ</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
-        <h2 className="v4-h2">Straight answers to common questions.</h2>
+        <h2 className="v4-h2 reveal-clip">Straight answers to common questions.</h2>
         <div className="sm-faq">
           {FAQ_ITEMS.map((item, i) => {
             const isOpen = open === i;
             return (
-              <div className="sm-faq__item" key={item.q}>
+              <div className="sm-faq__item reveal-fade-up" key={item.q}>
                 <button
                   type="button"
                   className="sm-faq__question"
@@ -581,11 +583,12 @@ function FaqSection() {
 /* ── Section 15 — Final CTA ───────────────────────────────────────────────── */
 
 function FinalCtaSection() {
+  const reveal = useReveal();
   return (
     <section className="v4-section v4-cta-band" id="final-cta" data-tone="ink">
-      <div className="v4-container">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
         <span className="v4-kicker">14 — Start</span>
-        <h2 className="v4-h2">
+        <h2 className="v4-h2 reveal-clip">
           Tell us where attention leaks out of your business. We'll design
           the system that catches it.
         </h2>
@@ -646,7 +649,7 @@ export default function HomeV5() {
           placeholder poster only — `videoSrc` stays unset until the owner
           approves a produced asset per the hero storyboard. */}
       <section className="v4-section sm-media-break" data-tone="ink" aria-label="SiteMint connected system, visualised">
-        <div className="v4-container">
+        <div className="v4-container reveal-scale-settle" ref={reveal} data-v4-reveal>
           <HeroMedia label="Development placeholder — SiteMint connected-system visual, final media pending" />
         </div>
       </section>

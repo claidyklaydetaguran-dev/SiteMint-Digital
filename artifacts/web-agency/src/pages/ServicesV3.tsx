@@ -110,15 +110,17 @@ function SystemsMap() {
         style={{ width: "100%", height: "auto" }}
       >
         <path
+          className="sm-map-path"
           d="M70 140 L230 60 L390 140 L390 240"
           fill="none"
           stroke="var(--v3-line, #CFE7EA)"
           strokeWidth={2}
+          pathLength={1}
         />
         {pillars.map((p) => {
           const isActive = active === p.id;
           return (
-            <a key={p.id} href={`#${p.id}`} tabIndex={-1}>
+            <a key={p.id} href={`#${p.id}`} tabIndex={-1} className="sm-map-node">
               <circle
                 cx={p.mapPos.x}
                 cy={p.mapPos.y}
@@ -179,18 +181,31 @@ export default function ServicesV3() {
   return (
     <div className="v3-services-hub sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner">
-          <span className="v3-eyebrow">Services</span>
+        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow reveal-fade-up">Services</span>
+          {/* Headline is the hero LCP text — left static (no mask-reveal) so
+              first paint isn't delayed; eyebrow/lede/actions/map carry the
+              motion. */}
           <h1 className="v3-display">
             Four connected systems. One SiteMint build.
           </h1>
-          <p className="v3-lede">
+          <p className="v3-lede reveal-fade-up">
             Each system stands on its own. Together they form the SiteMint
             system: attention arrives at the website, discovery turns it into
             a brief, AI systems and automation carry the work, and the CRM is
             where your team sees it all.
           </p>
-          <SystemsMap />
+          <div className="v3m-hero__actions reveal-fade-up">
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
+              Build Your SiteMint System
+            </Link>
+            <a href="#websites-apps" className="v3-btn v3-btn--outline">
+              Explore each pillar
+            </a>
+          </div>
+          <div className="reveal-scale-settle">
+            <SystemsMap />
+          </div>
         </div>
       </section>
 
@@ -198,7 +213,7 @@ export default function ServicesV3() {
         <div className="v3-container v3-reveal" ref={reveal}>
           {pillars.map((service, i) => (
             <Fragment key={service.title}>
-              <article className="v3wk-item" id={service.id} style={{ scrollMarginTop: "5rem" }}>
+              <article className="v3wk-item reveal-scale-settle" id={service.id} style={{ scrollMarginTop: "5rem" }}>
                 <div className="v3wk-item__meta">
                   <span className="v3m-sechead__no">
                     {String(i + 1).padStart(2, "0")}
@@ -228,7 +243,7 @@ export default function ServicesV3() {
             </Fragment>
           ))}
 
-          <article className="v3wk-item" id="integrations" style={{ scrollMarginTop: "5rem" }}>
+          <article className="v3wk-item reveal-scale-settle" id="integrations" style={{ scrollMarginTop: "5rem" }}>
             <div className="v3wk-item__meta">
               <span className="v3m-sechead__no">05</span>
               <span className="v3-eyebrow">
@@ -256,7 +271,7 @@ export default function ServicesV3() {
             </div>
           </article>
 
-          <article className="v3wk-item" id="pricing-estimates" style={{ scrollMarginTop: "5rem" }}>
+          <article className="v3wk-item reveal-scale-settle" id="pricing-estimates" style={{ scrollMarginTop: "5rem" }}>
             <div className="v3wk-item__meta">
               <span className="v3m-sechead__no">06</span>
               <span className="v3-eyebrow">Pricing estimates</span>
@@ -281,14 +296,14 @@ export default function ServicesV3() {
 
       <section className="v3-section v3m-cta" data-tone="ink">
         <div className="v3-container v3m-cta__inner v3-reveal" ref={reveal}>
-          <h2 className="v3-display">Not sure which piece comes first?</h2>
-          <p className="v3-lede">
+          <h2 className="v3-display reveal-clip">Not sure which piece comes first?</h2>
+          <p className="v3-lede reveal-fade-up">
             Start with discovery. You'll get a straight recommendation — and
             we'll tell you plainly what you don't need yet.
           </p>
           <div className="v3m-cta__actions">
-            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
+              Build Your SiteMint System
             </Link>
           </div>
         </div>

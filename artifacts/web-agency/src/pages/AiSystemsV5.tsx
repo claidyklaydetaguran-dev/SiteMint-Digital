@@ -183,14 +183,14 @@ function CrmSystemsSection() {
       <div className="v3-container v3-reveal" ref={reveal}>
         <div className="v3m-sechead">
           <span className="v3m-sechead__no">04b · CRM &amp; internal systems</span>
-          <h2 className="v3-h2">Where the business runs, in one place.</h2>
-          <p className="v3-lede">
+          <h2 className="v3-h2 reveal-clip">Where the business runs, in one place.</h2>
+          <p className="v3-lede reveal-fade-up">
             There is no separate CRM route yet — CRM &amp; internal systems is
             part of this service, because the CRM is where automation's
             output actually lives: the pipeline, the tasks, and the records
             your team looks at every day.
           </p>
-          <p className="v3-body">
+          <p className="v3-body reveal-fade-up">
             It's the record every website form, AI Receptionist call, and
             discovery brief writes to — so the CRM is honest by construction:
             it only ever shows what actually happened, not what someone
@@ -198,7 +198,7 @@ function CrmSystemsSection() {
           </p>
         </div>
         <div className="v3m-pillars v3m-pillars--3">
-          <div className="v3-card v3m-pillar">
+          <div className="v3-card v3m-pillar reveal-scale-settle">
             <span className="v3m-pillar__icon">
               <Database aria-hidden="true" />
             </span>
@@ -208,7 +208,7 @@ function CrmSystemsSection() {
               spreadsheet, an inbox, and someone's memory.
             </p>
           </div>
-          <div className="v3-card v3m-pillar">
+          <div className="v3-card v3m-pillar reveal-scale-settle">
             <span className="v3m-pillar__icon">
               <ListChecks aria-hidden="true" />
             </span>
@@ -218,7 +218,7 @@ function CrmSystemsSection() {
               overdue, and who owns it.
             </p>
           </div>
-          <div className="v3-card v3m-pillar">
+          <div className="v3-card v3m-pillar reveal-scale-settle">
             <span className="v3m-pillar__icon">
               <Users aria-hidden="true" />
             </span>
@@ -251,14 +251,20 @@ export default function AiSystemsV5() {
         content={content}
         extraSection={<CrmSystemsSection />}
         demo={
-          <div className="v3-card v3h-demo" data-tone="ice" id="integrations">
-            <div className="sm-flow" role="img" aria-label="Workflow: evaluate, then route, then follow up, then draft">
+          <div className="v3-card v3h-demo reveal-scale-settle" data-tone="ice" id="integrations">
+            <div className="sm-flow reveal-h-left" role="img" aria-label="Workflow: evaluate, then route, then follow up, then draft">
               <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Evaluate</span>
-              <span className="sm-flow__arrow" aria-hidden="true" />
+              <svg className="sm-flow__arrow" viewBox="0 0 24 2" aria-hidden="true" focusable="false">
+                <line x1="0" y1="1" x2="24" y2="1" pathLength={1} />
+              </svg>
               <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Route</span>
-              <span className="sm-flow__arrow" aria-hidden="true" />
+              <svg className="sm-flow__arrow" viewBox="0 0 24 2" aria-hidden="true" focusable="false">
+                <line x1="0" y1="1" x2="24" y2="1" pathLength={1} />
+              </svg>
               <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Follow up</span>
-              <span className="sm-flow__arrow" aria-hidden="true" />
+              <svg className="sm-flow__arrow" viewBox="0 0 24 2" aria-hidden="true" focusable="false">
+                <line x1="0" y1="1" x2="24" y2="1" pathLength={1} />
+              </svg>
               <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Draft</span>
             </div>
             <div className="v3h-demo__head">

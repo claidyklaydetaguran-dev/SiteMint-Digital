@@ -639,3 +639,360 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Motion enrichment pass (owner: "more interactives, more text transitions,
+   container transitions, transitions while scrolling, and hovers").
+   CSS-only, transform/opacity/clip-path only, zero CLS, no new dependency.
+   Mirrors the same variant contract added to `v5-pages.css` — see that
+   file's banner for the full rationale — re-declared here because HomeV5
+   loads only this stylesheet.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Staggered reveal variants ────────────────────────────────────────────
+   Reads the same `[data-reveal-ready]`/`[data-revealed]` attributes
+   `useReveal()` already toggles on every `data-v4-reveal` node in this
+   page — no new ref, no new observer. */
+.sm-home-v5 .reveal-clip,
+.sm-home-v5 .reveal-fade-up,
+.sm-home-v5 .reveal-scale-settle,
+.sm-home-v5 .reveal-h-left,
+.sm-home-v5 .reveal-h-right {
+  opacity: 1;
+  transform: none;
+  clip-path: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Tier 1 — headings: unclip upward from the baseline. */
+  .sm-home-v5 [data-reveal-ready] .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready] {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(6px);
+    transition:
+      clip-path var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      opacity var(--sm-dur-base, 240ms) ease,
+      transform var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 0ms;
+  }
+  .sm-home-v5 [data-revealed] .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: none;
+  }
+
+  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
+  .sm-home-v5 [data-reveal-ready] .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready] {
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease, ease),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease, ease);
+    transition-delay: 110ms;
+  }
+  .sm-home-v5 [data-revealed] .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
+  .sm-home-v5 [data-reveal-ready] .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready] {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 190ms;
+  }
+  .sm-home-v5 [data-revealed] .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Tier 4 — horizontal reveal, used only where direction carries meaning:
+     the split-section copy blocks slide in from the side they visually
+     occupy (left copy from the left, right/reversed copy from the right). */
+  .sm-home-v5 [data-reveal-ready] .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready] {
+    opacity: 0;
+    transform: translateX(-24px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+  .sm-home-v5 [data-revealed] .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+  .sm-home-v5 [data-reveal-ready] .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready] {
+    opacity: 0;
+    transform: translateX(24px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+  .sm-home-v5 [data-revealed] .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Diagram / path progression — the AI Systems node diagram's connecting
+     curve draws in via SVG stroke-dashoffset (owner §11: "diagram/path
+     progression for workflows"). `pathLength={1}` on the `<path>` normalizes
+     length so the draw distance is exactly 0→1 regardless of geometry. */
+  .sm-home-v5 [data-reveal-ready] .sm-nodes__path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 800ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 220ms;
+  }
+  .sm-home-v5 [data-revealed] .sm-nodes__path {
+    stroke-dashoffset: 0;
+  }
+
+  /* Stagger ladder — direct grid/list children carrying the same variant
+     class step further apart purely by sibling position. */
+  .sm-home-v5 .reveal-scale-settle:nth-child(2) { transition-delay: 260ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(3) { transition-delay: 330ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(4) { transition-delay: 400ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(5) { transition-delay: 470ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(6) { transition-delay: 540ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(n+7) { transition-delay: 610ms; }
+
+  .sm-home-v5 .reveal-fade-up:nth-child(2) { transition-delay: 170ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(3) { transition-delay: 230ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(4) { transition-delay: 290ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(5) { transition-delay: 350ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(n+6) { transition-delay: 410ms; }
+}
+
+/* ── Card-family hover signatures ─────────────────────────────────────────
+   Selected-work cards, pricing-estimate cards, team cards, and why-grid
+   panels all lift, deepen their shadow, and shift their border toward
+   mint; each family's badge/avatar/title also picks up a small accent. ── */
+.sm-home-v5 .sm-work-card,
+.sm-home-v5 .sm-pricing-card,
+.sm-home-v5 .sm-team-card,
+.sm-home-v5 .sm-why-item {
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-work-card:hover,
+.sm-home-v5 .sm-work-card:focus-within,
+.sm-home-v5 .sm-pricing-card:hover,
+.sm-home-v5 .sm-pricing-card:focus-within,
+.sm-home-v5 .sm-team-card:hover,
+.sm-home-v5 .sm-team-card:focus-within,
+.sm-home-v5 .sm-why-item:hover,
+.sm-home-v5 .sm-why-item:focus-within {
+  transform: translateY(-4px);
+  border-color: var(--sm-mint-500, #32c5d2);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-home-v5 .sm-team-card__avatar {
+  transition:
+    background-color 220ms ease,
+    color 220ms ease,
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-team-card:hover .sm-team-card__avatar,
+.sm-home-v5 .sm-team-card:focus-within .sm-team-card__avatar {
+  background: var(--sm-mint-500, #32c5d2);
+  color: var(--sm-white, #fff);
+  transform: translateY(-2px) scale(1.05);
+}
+.sm-home-v5 .sm-work-card__title,
+.sm-home-v5 .sm-why-item__title {
+  transition: color 220ms ease;
+}
+.sm-home-v5 .sm-work-card:hover .sm-work-card__title,
+.sm-home-v5 .sm-work-card:focus-within .sm-work-card__title,
+.sm-home-v5 .sm-why-item:hover .sm-why-item__title,
+.sm-home-v5 .sm-why-item:focus-within .sm-why-item__title {
+  color: var(--sm-mint-700, #0b7487);
+}
+
+/* Ledger rows and timeline steps — the numbered lists get the same
+   "row nudges, number picks up the accent" treatment as the service pages'
+   process/step lists. */
+.sm-home-v5 .sm-ledger__row,
+.sm-home-v5 .sm-timeline__step {
+  transition: transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-ledger__row:hover,
+.sm-home-v5 .sm-ledger__row:focus-within,
+.sm-home-v5 .sm-timeline__step:hover,
+.sm-home-v5 .sm-timeline__step:focus-within {
+  transform: translateX(4px);
+}
+.sm-home-v5 .sm-ledger__no,
+.sm-home-v5 .sm-timeline__no {
+  display: inline-block;
+  transition: color 220ms ease, transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-ledger__row:hover .sm-ledger__no,
+.sm-home-v5 .sm-ledger__row:focus-within .sm-ledger__no,
+.sm-home-v5 .sm-timeline__step:hover .sm-timeline__no,
+.sm-home-v5 .sm-timeline__step:focus-within .sm-timeline__no {
+  color: var(--sm-mint-500, #32c5d2);
+  transform: translateX(2px);
+}
+
+/* FAQ — a mint inset rail on hover/focus (no layout shift) and a small
+   accent pop on the open chevron. */
+.sm-home-v5 .sm-faq__item {
+  transition: box-shadow 200ms ease;
+}
+.sm-home-v5 .sm-faq__item:hover,
+.sm-home-v5 .sm-faq__item:focus-within {
+  box-shadow: inset 3px 0 0 var(--sm-mint-500, #32c5d2);
+}
+.sm-home-v5 .sm-faq__chevron {
+  display: inline-block;
+  transition:
+    transform 200ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    color 200ms ease;
+}
+.sm-home-v5 .sm-faq__question[aria-expanded="true"] .sm-faq__chevron {
+  transform: scale(1.15);
+  color: var(--sm-mint-400, #56d2cf);
+}
+
+/* ── Button micro-interactions ─────────────────────────────────────────── */
+.sm-home-v5 .v3-btn,
+.sm-home-v5 .v4-btn {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 180ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+.sm-home-v5 .v3-btn::after,
+.sm-home-v5 .v4-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgb(255 255 255 / 0.35) 50%, transparent 80%);
+  transform: translateX(-120%);
+  transition: transform 500ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  pointer-events: none;
+}
+.sm-home-v5 .v3-btn:hover,
+.sm-home-v5 .v3-btn:focus-visible,
+.sm-home-v5 .v4-btn:hover,
+.sm-home-v5 .v4-btn:focus-visible {
+  transform: translateY(-1px);
+}
+.sm-home-v5 .v3-btn:hover::after,
+.sm-home-v5 .v3-btn:focus-visible::after,
+.sm-home-v5 .v4-btn:hover::after,
+.sm-home-v5 .v4-btn:focus-visible::after {
+  transform: translateX(120%);
+}
+
+/* ── Section-boundary seam ─────────────────────────────────────────────── */
+.sm-home-v5 .v4-section {
+  position: relative;
+}
+.sm-home-v5 .v4-section[data-tone] + .v4-section[data-tone]::before,
+.sm-home-v5 .v4-section:not(:first-of-type)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(2rem, 6vw, 4rem);
+  background: linear-gradient(to bottom, rgb(11 58 62 / 0.05), transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-home-v5 .sm-work-card,
+  .sm-home-v5 .sm-pricing-card,
+  .sm-home-v5 .sm-team-card,
+  .sm-home-v5 .sm-why-item,
+  .sm-home-v5 .sm-team-card__avatar,
+  .sm-home-v5 .sm-work-card__title,
+  .sm-home-v5 .sm-why-item__title,
+  .sm-home-v5 .sm-ledger__row,
+  .sm-home-v5 .sm-timeline__step,
+  .sm-home-v5 .sm-ledger__no,
+  .sm-home-v5 .sm-timeline__no,
+  .sm-home-v5 .sm-faq__item,
+  .sm-home-v5 .sm-faq__chevron,
+  .sm-home-v5 .v3-btn,
+  .sm-home-v5 .v4-btn,
+  .sm-home-v5 .v3-btn::after,
+  .sm-home-v5 .v4-btn::after {
+    transition: none;
+  }
+  .sm-home-v5 .sm-work-card:hover,
+  .sm-home-v5 .sm-work-card:focus-within,
+  .sm-home-v5 .sm-pricing-card:hover,
+  .sm-home-v5 .sm-pricing-card:focus-within,
+  .sm-home-v5 .sm-team-card:hover,
+  .sm-home-v5 .sm-team-card:focus-within,
+  .sm-home-v5 .sm-why-item:hover,
+  .sm-home-v5 .sm-why-item:focus-within,
+  .sm-home-v5 .sm-ledger__row:hover,
+  .sm-home-v5 .sm-ledger__row:focus-within,
+  .sm-home-v5 .sm-timeline__step:hover,
+  .sm-home-v5 .sm-timeline__step:focus-within,
+  .sm-home-v5 .v3-btn:hover,
+  .sm-home-v5 .v3-btn:focus-visible,
+  .sm-home-v5 .v4-btn:hover,
+  .sm-home-v5 .v4-btn:focus-visible {
+    transform: none;
+  }
+}
+
+/* ── Mobile simplification (owner §11: "simplify below 768px") ────────────
+   Shorter travel distances, faster settle, and a flattened stagger ladder —
+   mirrors the same rule added to `v5-pages.css`. ─────────────────────────── */
+@media (prefers-reduced-motion: no-preference) and (max-width: 767px) {
+  .sm-home-v5 [data-reveal-ready] .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready] {
+    clip-path: inset(60% 0 0 0);
+    transform: translateY(3px);
+    transition-duration: 280ms;
+  }
+  .sm-home-v5 [data-reveal-ready] .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready] {
+    transform: translateY(8px);
+    transition-duration: 180ms;
+  }
+  .sm-home-v5 [data-reveal-ready] .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready] {
+    transform: scale(0.99) translateY(5px);
+    transition-duration: 180ms;
+  }
+  .sm-home-v5 [data-reveal-ready] .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready],
+  .sm-home-v5 [data-reveal-ready] .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready] {
+    transform: translateX(0) translateY(8px);
+    transition-duration: 180ms;
+  }
+  /* Flatten the stagger ladder to two short steps instead of up to seven —
+     fewer staggers, per the mobile simplification rule. */
+  .sm-home-v5 .reveal-scale-settle:nth-child(n+2) { transition-delay: 90ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(n+4) { transition-delay: 150ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(n+2) { transition-delay: 70ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(n+4) { transition-delay: 120ms; }
+  .sm-home-v5 .sm-nodes__path {
+    transition-duration: 500ms;
+  }
+}
