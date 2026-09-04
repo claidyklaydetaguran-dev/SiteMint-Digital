@@ -36,6 +36,18 @@ export function tabs(): { id: AvailabilityTab; label: string }[] {
   ];
 }
 
+/**
+ * The approved nav lists "Appointment Types" as its own entry under
+ * Scheduling, but it renders as a tab of this same screen rather than a
+ * second route (see the module doc). `?tab=types` is how a nav item — or any
+ * other deep link — lands directly on that tab; anything else, including no
+ * param at all, opens on Settings.
+ */
+export function initialTabFromSearch(search: string): AvailabilityTab {
+  const params = new URLSearchParams(search);
+  return params.get("tab") === "types" ? "types" : "settings";
+}
+
 export const SETTINGS = {
   timezoneHeading: "Time zone",
   timezoneLabel: "IANA time zone",

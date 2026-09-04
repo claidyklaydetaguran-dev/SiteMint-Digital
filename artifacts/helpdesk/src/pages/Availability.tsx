@@ -11,7 +11,7 @@
 import { useSession } from "@/hooks/useSession";
 import { useAvailabilityConfig } from "@/hooks/useAvailability";
 import { AvailabilitySettingsForm } from "@/components/booking/AvailabilitySettingsForm";
-import { PAGE, tabs, type AvailabilityTab } from "@/pages/availability/availabilityContract";
+import { PAGE, initialTabFromSearch, tabs, type AvailabilityTab } from "@/pages/availability/availabilityContract";
 import { useState } from "react";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-appointments.css";
@@ -19,7 +19,12 @@ import "@/styles/v2-appointments.css";
 export default function Availability() {
   const { data: me, isLoading } = useSession();
   const configQuery = useAvailabilityConfig();
-  const [tab, setTab] = useState<AvailabilityTab>("settings");
+  // The "Appointment Types" nav entry deep-links here as `?tab=types`; read
+  // once, on mount, exactly the way `AvailabilitySettingsForm` reads its seed
+  // config once — a later navigation to the same route remounts the page.
+  const [tab, setTab] = useState<AvailabilityTab>(() =>
+    typeof window === "undefined" ? "settings" : initialTabFromSearch(window.location.search),
+  );
 
   if (isLoading) {
     return (

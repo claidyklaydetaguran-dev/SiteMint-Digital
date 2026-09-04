@@ -10,6 +10,7 @@ import {
   TYPES,
   everyRenderableString,
   fieldForError,
+  initialTabFromSearch,
   isAdvancedField,
   publicLinkActions,
   publicLinkUrlVisible,
@@ -42,6 +43,12 @@ check("buffers, notice, window, daily limit and blocked dates are all advanced",
 check("timezone, weeklyHours and appointmentTypes are not advanced", [
   "timezone", "weeklyHours", "appointmentTypes",
 ].every((f) => !isAdvancedField(f as Parameters<typeof isAdvancedField>[0])));
+
+section("The 'Appointment Types' nav entry deep-links to the types tab");
+
+eq("?tab=types opens on the types tab", initialTabFromSearch("?tab=types"), "types");
+eq("no param opens on settings", initialTabFromSearch(""), "settings");
+eq("an unrecognised tab value falls back to settings, never guessed at", initialTabFromSearch("?tab=nonsense"), "settings");
 
 section("Field → tab routing, so a rejected value moves the operator to where it lives");
 
