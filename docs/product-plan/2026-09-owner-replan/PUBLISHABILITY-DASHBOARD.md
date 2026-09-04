@@ -17,7 +17,7 @@ owner-authorised migrations (B-09) and external certification (X-01…X-07).
 ## Scores
 
 <!-- scores:start -->
-_Computed 2026-09-04 11:02 UTC from V5-BUILD-CHECKLIST.md._
+_Computed 2026-09-04 13:27 UTC from V5-BUILD-CHECKLIST.md._
 
 Program-wide: **P0 items remaining 62** · owner blockers 15 · external blockers 1.
 
@@ -27,14 +27,14 @@ Program-wide: **P0 items remaining 62** · owner blockers 15 · external blocker
 
 | Category | Items (status) |
 |---|---|
-| Brand and visual consistency | F-01:NOT STARTED, F-02:NOT STARTED, F-04:NOT STARTED, F-07:NOT STARTED |
-| Content and truthful claims | W-01:NOT STARTED, W-02:NOT STARTED, W-03:NOT STARTED, W-07:NOT STARTED, W-08:NOT STARTED, W-13:NOT STARTED |
-| Responsive navigation | W-04:NOT STARTED, W-05:NOT STARTED, W-06:NOT STARTED, W-12:NOT STARTED, F-05:NOT STARTED |
-| Discovery conversion | W-09:NOT STARTED, W-10:NOT STARTED |
-| Pricing | W-11:NOT STARTED |
+| Brand and visual consistency | F-01:IN PROGRESS, F-02:IN PROGRESS, F-04:IN PROGRESS, F-07:IN PROGRESS |
+| Content and truthful claims | W-01:IN PROGRESS, W-02:IN PROGRESS, W-03:IN PROGRESS, W-07:IN PROGRESS, W-08:IN PROGRESS, W-13:IN PROGRESS |
+| Responsive navigation | W-04:IN PROGRESS, W-05:IN PROGRESS, W-06:IN PROGRESS, W-12:IN PROGRESS, F-05:IN PROGRESS |
+| Discovery conversion | W-09:IN PROGRESS, W-10:IN PROGRESS |
+| Pricing | W-11:IN PROGRESS |
 | Accessibility | V-04:NOT STARTED, V-05:NOT STARTED |
-| Performance | V-06:NOT STARTED, W-14:NOT STARTED |
-| SEO and metadata | W-15:NOT STARTED |
+| Performance | V-06:NOT STARTED, W-14:IN PROGRESS |
+| SEO and metadata | W-15:IN PROGRESS |
 | Legal approval | W-16:BLOCKED—OWNER |
 | Production-domain verification | X-10:BLOCKED—OWNER, X-14:BLOCKED—EXTERNAL |
 
@@ -44,11 +44,11 @@ Program-wide: **P0 items remaining 62** · owner blockers 15 · external blocker
 
 | Category | Items (status) |
 |---|---|
-| Complete navigable product UI | C-01:NOT STARTED, C-04:NOT STARTED, C-05:NOT STARTED, C-06:NOT STARTED, C-08:NOT STARTED, C-11:NOT STARTED, C-12:NOT STARTED, C-13:NOT STARTED, C-15:NOT STARTED, C-16:NOT STARTED, C-17:NOT STARTED, C-18:NOT STARTED, C-19:NOT STARTED |
+| Complete navigable product UI | C-01:IN PROGRESS, C-04:IN PROGRESS, C-05:IN PROGRESS, C-06:IN PROGRESS, C-08:IN PROGRESS, C-11:IN PROGRESS, C-12:IN PROGRESS, C-13:IN PROGRESS, C-15:IN PROGRESS, C-16:IN PROGRESS, C-17:IN PROGRESS, C-18:IN PROGRESS, C-19:IN PROGRESS |
 | Synthetic preview states | V-08:NOT STARTED |
-| Responsive behaviour | C-21:NOT STARTED, V-03:NOT STARTED |
-| No dead routes | C-01:NOT STARTED, W-12:NOT STARTED |
-| No misleading live claims | R-01:NOT STARTED, R-02:NOT STARTED, W-01:NOT STARTED |
+| Responsive behaviour | C-21:IN PROGRESS, V-03:NOT STARTED |
+| No dead routes | C-01:IN PROGRESS, W-12:IN PROGRESS |
+| No misleading live claims | R-01:IN PROGRESS, R-02:IN PROGRESS, W-01:IN PROGRESS |
 | Owner-review evidence | V-01:NOT STARTED, V-02:NOT STARTED, V-08:NOT STARTED |
 
 ### C. AI Receptionist private-beta readiness
@@ -57,22 +57,22 @@ Program-wide: **P0 items remaining 62** · owner blockers 15 · external blocker
 
 | Category | Items (status) |
 |---|---|
-| Invitation signup | C-02:NOT STARTED, B-04:NOT STARTED |
-| Login and password reset | C-03:NOT STARTED |
-| Persistent onboarding | C-04:NOT STARTED, B-02:NOT STARTED, B-09:BLOCKED—OWNER |
-| One assistant | C-06:NOT STARTED, C-07:NOT STARTED |
-| Prompt and voice configuration | C-08:NOT STARTED, C-09:NOT STARTED, C-10:NOT STARTED, X-08:BLOCKED—OWNER |
-| Google Calendar | C-12:NOT STARTED, X-04:BLOCKED—OWNER |
-| Availability and appointment types | C-11:NOT STARTED |
+| Invitation signup | C-02:IN PROGRESS, B-04:IN PROGRESS |
+| Login and password reset | C-03:IN PROGRESS |
+| Persistent onboarding | C-04:IN PROGRESS, B-02:IN PROGRESS, B-09:BLOCKED—OWNER |
+| One assistant | C-06:IN PROGRESS, C-07:IN PROGRESS |
+| Prompt and voice configuration | C-08:IN PROGRESS, C-09:IN PROGRESS, C-10:IN PROGRESS, X-08:BLOCKED—OWNER |
+| Google Calendar | C-12:IN PROGRESS, X-04:BLOCKED—OWNER |
+| Availability and appointment types | C-11:IN PROGRESS |
 | Browser test certification | X-01:BLOCKED—OWNER |
-| Phone-number assignment | C-17:NOT STARTED, X-02:BLOCKED—OWNER |
+| Phone-number assignment | C-17:IN PROGRESS, X-02:BLOCKED—OWNER |
 | Inbound-call certification | X-03:BLOCKED—OWNER |
-| Appointment lifecycle | C-13:NOT STARTED, C-14:NOT STARTED |
-| Calls | C-15:NOT STARTED |
-| Minimal Contacts | C-16:NOT STARTED, B-03:NOT STARTED |
-| Usage and limits | C-18:NOT STARTED |
-| Safe failures | C-19:NOT STARTED, B-07:NOT STARTED, X-05:BLOCKED—OWNER |
-| Receptionist Ops | O-01:NOT STARTED, O-02:NOT STARTED, O-05:NOT STARTED, B-01:NOT STARTED, B-07:NOT STARTED |
+| Appointment lifecycle | C-13:IN PROGRESS, C-14:IN PROGRESS |
+| Calls | C-15:IN PROGRESS |
+| Minimal Contacts | C-16:IN PROGRESS, B-03:IN PROGRESS |
+| Usage and limits | C-18:IN PROGRESS |
+| Safe failures | C-19:IN PROGRESS, B-07:IN PROGRESS, X-05:BLOCKED—OWNER |
+| Receptionist Ops | O-01:IN PROGRESS, O-02:IN PROGRESS, O-05:IN PROGRESS, B-01:IN PROGRESS, B-07:IN PROGRESS |
 | Private-beta legal documents | X-06:BLOCKED—OWNER |
 | Rollback and support procedures | X-07:BLOCKED—OWNER |
 
@@ -82,7 +82,7 @@ Program-wide: **P0 items remaining 62** · owner blockers 15 · external blocker
 
 | Category | Items (status) |
 |---|---|
-| Company website production-ready | W-01:NOT STARTED, W-02:NOT STARTED, W-03:NOT STARTED, W-04:NOT STARTED, W-07:NOT STARTED, W-09:NOT STARTED, W-10:NOT STARTED, W-11:NOT STARTED, W-12:NOT STARTED, W-13:NOT STARTED, W-15:NOT STARTED |
+| Company website production-ready | W-01:IN PROGRESS, W-02:IN PROGRESS, W-03:IN PROGRESS, W-04:IN PROGRESS, W-07:IN PROGRESS, W-09:IN PROGRESS, W-10:IN PROGRESS, W-11:IN PROGRESS, W-12:IN PROGRESS, W-13:IN PROGRESS, W-15:IN PROGRESS |
 | Private-beta evidence complete | X-01:BLOCKED—OWNER, X-03:BLOCKED—OWNER, X-04:BLOCKED—OWNER, X-06:BLOCKED—OWNER |
 | Public pricing decisions | X-11:BLOCKED—OWNER |
 | Production OAuth and domains | X-10:BLOCKED—OWNER |
