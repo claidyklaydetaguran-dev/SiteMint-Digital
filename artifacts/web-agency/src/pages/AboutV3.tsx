@@ -21,12 +21,14 @@ export default function AboutV3() {
   return (
     <div className="v3-about-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner">
-          <span className="v3-eyebrow">About</span>
+        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow reveal-fade-up">About</span>
+          {/* Headline is the hero LCP text — left static (no mask-reveal) so
+              first paint isn't delayed; eyebrow/lede/visual carry the motion. */}
           <h1 className="v3-display">
             A small studio that builds like an operator.
           </h1>
-          <p className="v3-lede">
+          <p className="v3-lede reveal-fade-up">
             SiteMint Digital designs, builds, and runs business systems —
             including our own. The discovery flow on this site is the same
             structured intake we build for clients. The automation and CRM
@@ -41,11 +43,11 @@ export default function AboutV3() {
         <div className="v3-container v3-reveal" ref={reveal}>
           <div className="v3m-sechead">
             <span className="v3m-sechead__no">00</span>
-            <h2 className="v3-h2">The people doing the work.</h2>
+            <h2 className="v3-h2 reveal-clip">The people doing the work.</h2>
           </div>
           <div className="v3m-pillars v3m-pillars--3">
             {teamV5.map((member) => (
-              <div className="v3-card v3m-pillar" key={member.name}>
+              <div className="v3-card v3m-pillar reveal-scale-settle" key={member.name}>
                 <h3 className="v3m-pillar__title">{member.name}</h3>
                 <p className="v3m-pillar__desc">{member.role}</p>
               </div>
@@ -58,10 +60,10 @@ export default function AboutV3() {
         <div className="v3-container v3-reveal" ref={reveal}>
           <div className="v3m-sechead">
             <span className="v3m-sechead__no">01</span>
-            <h2 className="v3-h2">What we believe.</h2>
+            <h2 className="v3-h2 reveal-clip">What we believe.</h2>
           </div>
           <div className="v3m-pillars v3m-pillars--4">
-            <div className="v3-card v3m-pillar">
+            <div className="v3-card v3m-pillar reveal-scale-settle">
               <span className="v3m-pillar__icon">
                 <Compass aria-hidden="true" />
               </span>
@@ -71,7 +73,7 @@ export default function AboutV3() {
                 connections, not collections.
               </p>
             </div>
-            <div className="v3-card v3m-pillar">
+            <div className="v3-card v3m-pillar reveal-scale-settle">
               <span className="v3m-pillar__icon">
                 <Wrench aria-hidden="true" />
               </span>
@@ -81,7 +83,7 @@ export default function AboutV3() {
                 while it's being built.
               </p>
             </div>
-            <div className="v3-card v3m-pillar">
+            <div className="v3-card v3m-pillar reveal-scale-settle">
               <span className="v3m-pillar__icon">
                 <HandMetal aria-hidden="true" />
               </span>
@@ -91,7 +93,7 @@ export default function AboutV3() {
                 Every automation has an off switch.
               </p>
             </div>
-            <div className="v3-card v3m-pillar">
+            <div className="v3-card v3m-pillar reveal-scale-settle">
               <span className="v3m-pillar__icon">
                 <ShieldCheck aria-hidden="true" />
               </span>
@@ -107,10 +109,10 @@ export default function AboutV3() {
 
       <section className="v3-section" data-tone="ink">
         <div className="v3-container v3m-split v3-reveal" ref={reveal}>
-          <div className="v3m-split__copy">
+          <div className="v3m-split__copy reveal-h-left">
             <span className="v3-eyebrow">How we're organized</span>
-            <h2 className="v3-h2">Small on purpose.</h2>
-            <p className="v3-body">
+            <h2 className="v3-h2 reveal-clip">Small on purpose.</h2>
+            <p className="v3-body reveal-fade-up">
               SiteMint is a focused team, not a layered agency. The people who
               design your system are the people who build it and the people who
               answer when something needs attention. That's only possible
@@ -118,7 +120,7 @@ export default function AboutV3() {
             </p>
           </div>
           <div className="v3m-split__media">
-            <div className="v3m-receipt">
+            <div className="v3m-receipt reveal-scale-settle">
               <div className="v3m-receipt__row">
                 <span className="v3m-receipt__k">What that means for you</span>
                 <span className="v3m-receipt__v">
@@ -140,16 +142,16 @@ export default function AboutV3() {
 
       <section className="v3-section v3m-cta" data-tone="ink">
         <div className="v3-container v3m-cta__inner v3-reveal" ref={reveal}>
-          <h2 className="v3-display">See if we're the right fit.</h2>
-          <p className="v3-lede">
+          <h2 className="v3-display reveal-clip">See if we're the right fit.</h2>
+          <p className="v3-lede reveal-fade-up">
             The fastest way to find out is a discovery brief — and a straight
             answer.
           </p>
           <div className="v3m-cta__actions">
-            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
+              Build Your SiteMint System
             </Link>
-            <Link href={ROUTES.workV3} className="v3-btn v3-btn--outline">
+            <Link href={ROUTES.workV3} className="v3-btn v3-btn--outline reveal-fade-up">
               Inspect our work first
             </Link>
           </div>

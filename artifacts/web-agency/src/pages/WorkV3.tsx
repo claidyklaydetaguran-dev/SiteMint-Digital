@@ -79,14 +79,24 @@ export default function WorkV3() {
   return (
     <div className="v3-work-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner">
-          <span className="v3-eyebrow">Work</span>
+        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow reveal-fade-up">Work</span>
+          {/* Headline is the hero LCP text — left static (no mask-reveal) so
+              first paint isn't delayed; eyebrow/lede/actions carry the motion. */}
           <h1 className="v3-display">Proof you can inspect.</h1>
-          <p className="v3-lede">
+          <p className="v3-lede reveal-fade-up">
             We don't decorate this page with logos we can't verify or numbers
             we can't stand behind. Here is what SiteMint actually builds and
             runs — and honest examples of what we compose for clients.
           </p>
+          <div className="v3m-hero__actions reveal-fade-up">
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
+              Build Your SiteMint System
+            </Link>
+            <Link href={ROUTES.process} className="v3-btn v3-btn--outline">
+              See the process
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -94,10 +104,10 @@ export default function WorkV3() {
         <div className="v3-container v3-reveal" ref={reveal}>
           <div className="v3m-sechead">
             <span className="v3m-sechead__no">01</span>
-            <h2 className="v3-h2">Built and operated by SiteMint.</h2>
+            <h2 className="v3-h2 reveal-clip">Built and operated by SiteMint.</h2>
           </div>
           {productionWork.map((item) => (
-            <article key={item.title} className="v3wk-item">
+            <article key={item.title} className="v3wk-item reveal-scale-settle">
               <div className="v3wk-item__meta">
                 <span className="v3-eyebrow">
                   <item.icon aria-hidden="true" size={14} />
@@ -124,8 +134,8 @@ export default function WorkV3() {
         <div className="v3-container v3-reveal" ref={reveal}>
           <div className="v3m-sechead">
             <span className="v3m-sechead__no">02</span>
-            <h2 className="v3-h2">What we compose for clients.</h2>
-            <p className="v3-lede">
+            <h2 className="v3-h2 reveal-clip">What we compose for clients.</h2>
+            <p className="v3-lede reveal-fade-up">
               These are capability demonstrations — representative system
               compositions, not client case studies. They show how the pieces
               fit; your system starts from your business.
@@ -133,7 +143,7 @@ export default function WorkV3() {
           </div>
           <div className="v3m-cards v3m-cards--3">
             {capabilityWork.map((item) => (
-              <div key={item.title} className="v3-card v3m-card-link">
+              <div key={item.title} className="v3-card v3m-card-link reveal-scale-settle">
                 <span className="v3m-card-link__kicker">{item.kicker}</span>
                 <h3 className="v3m-card-link__title">{item.title}</h3>
                 <p className="v3m-card-link__desc">{item.body}</p>
@@ -145,13 +155,13 @@ export default function WorkV3() {
 
       <section className="v3-section v3m-cta" data-tone="ink">
         <div className="v3-container v3m-cta__inner v3-reveal" ref={reveal}>
-          <h2 className="v3-display">The next system here could be yours.</h2>
-          <p className="v3-lede">
+          <h2 className="v3-display reveal-clip">The next system here could be yours.</h2>
+          <p className="v3-lede reveal-fade-up">
             Start with a discovery brief and see how we'd compose it.
           </p>
           <div className="v3m-cta__actions">
-            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
+              Build Your SiteMint System
             </Link>
           </div>
         </div>

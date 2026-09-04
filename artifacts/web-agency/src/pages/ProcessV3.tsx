@@ -52,14 +52,24 @@ export default function ProcessV3() {
   return (
     <div className="v3-process-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner">
-          <span className="v3-eyebrow">Process</span>
-          <p className="v3-serif-note">No mystery, no big reveal.</p>
+        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow reveal-fade-up">Process</span>
+          <p className="v3-serif-note reveal-fade-up">No mystery, no big reveal.</p>
+          {/* Headline is the hero LCP text — left static (no mask-reveal) so
+              first paint isn't delayed; eyebrow/lede/actions carry the motion. */}
           <h1 className="v3-display">How a SiteMint project runs.</h1>
-          <p className="v3-lede">
+          <p className="v3-lede reveal-fade-up">
             Five stages, each with a concrete output. You always know where
             the project is, what happens next, and what you can already use.
           </p>
+          <div className="v3m-hero__actions reveal-fade-up">
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
+              Build Your SiteMint System
+            </Link>
+            <Link href={ROUTES.pricing} className="v3-btn v3-btn--outline">
+              See pricing
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -67,7 +77,7 @@ export default function ProcessV3() {
         <div className="v3-container v3-reveal" ref={reveal}>
           <ol className="v3m-steps">
             {steps.map((step, i) => (
-              <li key={step.title} className="v3m-step">
+              <li key={step.title} className="v3m-step reveal-scale-settle">
                 <span className="v3m-step__no" aria-hidden="true">
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -86,37 +96,37 @@ export default function ProcessV3() {
 
       <section className="v3-section" data-tone="ink">
         <div className="v3-container v3m-split v3-reveal" ref={reveal}>
-          <div className="v3m-split__copy">
+          <div className="v3m-split__copy reveal-h-left">
             <span className="v3-eyebrow">
               <ShieldCheck aria-hidden="true" size={14} />
               The standing rules
             </span>
-            <h2 className="v3-h2">Four things that are true in every stage.</h2>
+            <h2 className="v3-h2 reveal-clip">Four things that are true in every stage.</h2>
           </div>
           <div className="v3m-split__media">
             <ul className="v3m-checks">
-              <li>
+              <li className="reveal-fade-up">
                 <Eye aria-hidden="true" />
                 <span>
                   <strong>You can always see the state of the work.</strong> No
                   status meetings required to find out what's happening.
                 </span>
               </li>
-              <li>
+              <li className="reveal-fade-up">
                 <MessagesSquare aria-hidden="true" />
                 <span>
                   <strong>Plain language, always.</strong> If we can't explain a
                   decision simply, we haven't finished making it.
                 </span>
               </li>
-              <li>
+              <li className="reveal-fade-up">
                 <PauseCircle aria-hidden="true" />
                 <span>
                   <strong>You can stop at any stage.</strong> Each checkpoint
                   leaves you with something whole, not a construction site.
                 </span>
               </li>
-              <li>
+              <li className="reveal-fade-up">
                 <ShieldCheck aria-hidden="true" />
                 <span>
                   <strong>Your data and access stay yours.</strong> Credentials,
@@ -130,13 +140,16 @@ export default function ProcessV3() {
 
       <section className="v3-section v3m-cta" data-tone="ink">
         <div className="v3-container v3m-cta__inner v3-reveal" ref={reveal}>
-          <h2 className="v3-display">Stage one takes about ten minutes.</h2>
-          <p className="v3-lede">
+          <h2 className="v3-display reveal-clip">Stage one takes about ten minutes.</h2>
+          <p className="v3-lede reveal-fade-up">
             The discovery brief is short, structured, and genuinely read.
           </p>
           <div className="v3m-cta__actions">
-            <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+            <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
+              Build Your SiteMint System
+            </Link>
+            <Link href={ROUTES.pricing} className="v3-btn v3-btn--outline reveal-fade-up">
+              See pricing
             </Link>
           </div>
         </div>

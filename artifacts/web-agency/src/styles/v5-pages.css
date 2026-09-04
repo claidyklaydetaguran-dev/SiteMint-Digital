@@ -96,9 +96,14 @@
 }
 .sm-v5page .sm-flow__arrow {
   width: 1.5rem;
-  height: 1px;
-  background: var(--sm-line-strong, #A9CFD6);
+  height: 6px;
   margin: 0 0.6rem;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.sm-v5page .sm-flow__arrow line {
+  stroke: var(--sm-line-strong, #A9CFD6);
+  stroke-width: 1.5;
 }
 
 /* ── Pricing — "What affects the price" factor list ──────────────────────── */
@@ -196,4 +201,396 @@
   .sm-v5page .sm-price-factors {
     margin-top: 1.25rem;
   }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Motion enrichment pass (owner: "more interactives, more text transitions,
+   container transitions, transitions while scrolling, and hovers").
+   CSS-only, transform/opacity/clip-path only, zero CLS, no new dependency.
+   Every rule below is scoped under `.sm-v5page` so nothing here leaks onto a
+   page this workstream does not own, and nothing here touches a protected
+   stylesheet (`v3-marketing.css`, `v3-pages.css`, `tokens-v3.css`).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Staggered reveal variants ────────────────────────────────────────────
+   These read the SAME `[data-reveal-ready]`/`[data-revealed]` attributes
+   `useReveal()` (components/v3/useReveal.ts) already toggles — no new ref,
+   no new observer. A variant class may sit on the element that itself
+   carries `ref={reveal}` (the "self" case, e.g. a lone heading) or on a
+   descendant of it (the "child" case, e.g. a card inside a revealed
+   section) — both forms are matched below so either usage works. Content
+   is fully visible with no JS and with `prefers-reduced-motion: reduce`
+   (the hiding rules only exist inside the no-preference query). ────────── */
+.sm-v5page .reveal-clip,
+.sm-v5page .reveal-fade-up,
+.sm-v5page .reveal-scale-settle,
+.sm-v5page .reveal-h-left,
+.sm-v5page .reveal-h-right {
+  opacity: 1;
+  transform: none;
+  clip-path: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Tier 1 — headings: unclip upward from the baseline. */
+  .sm-v5page [data-reveal-ready] .reveal-clip,
+  .sm-v5page .reveal-clip[data-reveal-ready] {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(6px);
+    transition:
+      clip-path var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      opacity var(--sm-dur-base, 240ms) ease,
+      transform var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 0ms;
+  }
+  .sm-v5page [data-revealed] .reveal-clip,
+  .sm-v5page .reveal-clip[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: none;
+  }
+
+  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
+  .sm-v5page [data-reveal-ready] .reveal-fade-up,
+  .sm-v5page .reveal-fade-up[data-reveal-ready] {
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease, ease),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease, ease);
+    transition-delay: 110ms;
+  }
+  .sm-v5page [data-revealed] .reveal-fade-up,
+  .sm-v5page .reveal-fade-up[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
+  .sm-v5page [data-reveal-ready] .reveal-scale-settle,
+  .sm-v5page .reveal-scale-settle[data-reveal-ready] {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 190ms;
+  }
+  .sm-v5page [data-revealed] .reveal-scale-settle,
+  .sm-v5page .reveal-scale-settle[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Tier 4 — horizontal reveal, used only where direction carries meaning
+     (a split section's copy sliding in from the side it visually occupies —
+     e.g. the AI Systems workflow strip, which reads left-to-right). */
+  .sm-v5page [data-reveal-ready] .reveal-h-left,
+  .sm-v5page .reveal-h-left[data-reveal-ready] {
+    opacity: 0;
+    transform: translateX(-24px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+  .sm-v5page [data-revealed] .reveal-h-left,
+  .sm-v5page .reveal-h-left[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+  .sm-v5page [data-reveal-ready] .reveal-h-right,
+  .sm-v5page .reveal-h-right[data-reveal-ready] {
+    opacity: 0;
+    transform: translateX(24px);
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+  .sm-v5page [data-revealed] .reveal-h-right,
+  .sm-v5page .reveal-h-right[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Diagram / path progression — SVG stroke-dashoffset draw-on, owner §11
+     naming the services map connection line and the AI Systems workflow
+     strip explicitly. `pathLength={1}` on each `<path>`/`<line>` normalizes
+     length so the draw distance is exactly 0→1 regardless of geometry. The
+     container isn't hidden (only the stroke animates), so this never risks
+     an LCP element's paint. */
+  .sm-v5page [data-reveal-ready] .sm-map-path,
+  .sm-v5page [data-reveal-ready] .sm-flow__arrow line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 700ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 200ms;
+  }
+  .sm-v5page [data-revealed] .sm-map-path,
+  .sm-v5page [data-revealed] .sm-flow__arrow line {
+    stroke-dashoffset: 0;
+  }
+  /* The workflow strip's three arrows draw in sequence, left to right. */
+  .sm-v5page .sm-flow__arrow:nth-of-type(2) line { transition-delay: 350ms; }
+  .sm-v5page .sm-flow__arrow:nth-of-type(3) line { transition-delay: 500ms; }
+
+  /* Stagger ladder — direct grid/list children carrying the same variant
+     class step further apart purely by sibling position (no extra refs,
+     no inline custom properties). Ten slots comfortably covers every grid
+     these variants are applied to across the owned pages. */
+  .sm-v5page .reveal-scale-settle:nth-child(2) { transition-delay: 260ms; }
+  .sm-v5page .reveal-scale-settle:nth-child(3) { transition-delay: 330ms; }
+  .sm-v5page .reveal-scale-settle:nth-child(4) { transition-delay: 400ms; }
+  .sm-v5page .reveal-scale-settle:nth-child(5) { transition-delay: 470ms; }
+  .sm-v5page .reveal-scale-settle:nth-child(6) { transition-delay: 540ms; }
+  .sm-v5page .reveal-scale-settle:nth-child(n+7) { transition-delay: 610ms; }
+
+  .sm-v5page .reveal-fade-up:nth-child(2) { transition-delay: 170ms; }
+  .sm-v5page .reveal-fade-up:nth-child(3) { transition-delay: 230ms; }
+  .sm-v5page .reveal-fade-up:nth-child(4) { transition-delay: 290ms; }
+  .sm-v5page .reveal-fade-up:nth-child(5) { transition-delay: 350ms; }
+  .sm-v5page .reveal-fade-up:nth-child(n+6) { transition-delay: 410ms; }
+}
+
+/* ── Card-family hover signatures ─────────────────────────────────────────
+   `.v3-card` already owns a hover lift under its `--hover` modifier
+   (tokens-v3.css); here every `.v3-card` on an owned page gets the full
+   signature regardless of that modifier, plus a mint border-color shift the
+   protected file doesn't carry. Higher-specificity override, no edit to the
+   protected file. ───────────────────────────────────────────────────────── */
+.sm-v5page .v3-card {
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3-card:hover,
+.sm-v5page .v3-card:focus-within {
+  transform: translateY(-3px);
+  border-color: var(--sm-mint-500, #32c5d2);
+  box-shadow: var(--v3-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-v5page .v3m-pillar__icon {
+  transition:
+    background-color 220ms ease,
+    color 220ms ease,
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3-card:hover .v3m-pillar__icon,
+.sm-v5page .v3-card:focus-within .v3m-pillar__icon {
+  background: var(--sm-mint-500, #32c5d2);
+  color: var(--sm-white, #fff);
+  transform: translateY(-2px);
+}
+
+/* Services pillar articles / Work items — the whole row nudges right and
+   its running number picks up the accent color. */
+.sm-v5page .v3wk-item {
+  transition: transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3wk-item:hover,
+.sm-v5page .v3wk-item:focus-within {
+  transform: translateX(4px);
+}
+.sm-v5page .v3wk-item .v3m-sechead__no {
+  display: inline-block;
+  transition: color 220ms ease, transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3wk-item:hover .v3m-sechead__no,
+.sm-v5page .v3wk-item:focus-within .v3m-sechead__no {
+  color: var(--sm-mint-500, #32c5d2);
+  transform: translateX(2px);
+}
+
+/* Process phase blocks — the whole stage nudges right; its number and the
+   connecting rail (defined above) read as one accented unit. */
+.sm-v5page .v3m-step {
+  transition: transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3m-step:hover,
+.sm-v5page .v3m-step:focus-within {
+  transform: translateX(4px);
+}
+.sm-v5page .v3m-step__no {
+  display: inline-block;
+  transition: color 220ms ease, transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3m-step:hover .v3m-step__no,
+.sm-v5page .v3m-step:focus-within .v3m-step__no {
+  color: var(--sm-mint-500, #32c5d2);
+  transform: translateX(2px);
+}
+
+/* Pricing — "what affects the price" factor list. */
+.sm-v5page .sm-price-factor {
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 220ms ease;
+}
+.sm-v5page .sm-price-factor:hover,
+.sm-v5page .sm-price-factor:focus-within {
+  transform: translateY(-3px);
+  border-top-color: var(--sm-mint-400, #56d2cf);
+}
+
+/* Services — interactive systems-map nodes (inline-styled SVG; `fill` and
+   `stroke-width` already animate via inline style on active state, so this
+   adds only the transform this workstream owns, via a new wrapper class
+   applied in ServicesV3.tsx). `transform-box: fill-box` is required for an
+   SVG shape's own bounding box to be the transform origin. */
+.sm-v5page .sm-map-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 200ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .sm-map-node:hover,
+.sm-v5page .sm-map-node:focus-visible {
+  transform: scale(1.08);
+}
+
+/* ── Button / link micro-interactions ─────────────────────────────────────
+   A soft diagonal sheen sweep on every `.v3-btn` (works whether the label
+   ends in a literal "→" or an actual icon), plus an explicit icon-nudge for
+   the buttons that do carry one (lucide `ArrowRight`, rendered as an inline
+   `<svg>`). In-text links get a underline-offset transition, not a color
+   change. ───────────────────────────────────────────────────────────────── */
+.sm-v5page .v3-btn {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 180ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+.sm-v5page .v3-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgb(255 255 255 / 0.35) 50%, transparent 80%);
+  transform: translateX(-120%);
+  transition: transform 500ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  pointer-events: none;
+}
+.sm-v5page .v3-btn:hover,
+.sm-v5page .v3-btn:focus-visible {
+  transform: translateY(-1px);
+}
+.sm-v5page .v3-btn:hover::after,
+.sm-v5page .v3-btn:focus-visible::after {
+  transform: translateX(120%);
+}
+.sm-v5page .v3-btn svg {
+  transition: transform 180ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-v5page .v3-btn:hover svg,
+.sm-v5page .v3-btn:focus-visible svg {
+  transform: translateX(3px);
+}
+.sm-v5page .v3-body a,
+.sm-v5page .v3-lede a,
+.sm-v5page .v3m-checks a {
+  text-underline-offset: 2px;
+  transition: text-underline-offset 180ms ease;
+}
+.sm-v5page .v3-body a:hover,
+.sm-v5page .v3-lede a:hover,
+.sm-v5page .v3m-checks a:hover {
+  text-underline-offset: 4px;
+}
+
+/* ── Section-boundary seam ─────────────────────────────────────────────────
+   A quiet hairline wash at the top of every toned section (after the first)
+   so adjacent bands hand off with a soft overlap instead of a hard cut.
+   Purely decorative — absolutely positioned, zero height impact, so it adds
+   no CLS. ───────────────────────────────────────────────────────────────── */
+.sm-v5page section[data-tone] {
+  position: relative;
+}
+.sm-v5page section[data-tone]:not(:first-of-type)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(2rem, 6vw, 4rem);
+  background: linear-gradient(to bottom, rgb(11 58 62 / 0.05), transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-v5page .v3-card,
+  .sm-v5page .v3m-pillar__icon,
+  .sm-v5page .v3wk-item,
+  .sm-v5page .v3wk-item .v3m-sechead__no,
+  .sm-v5page .v3m-step,
+  .sm-v5page .v3m-step__no,
+  .sm-v5page .sm-price-factor,
+  .sm-v5page .sm-map-node,
+  .sm-v5page .v3-btn,
+  .sm-v5page .v3-btn::after,
+  .sm-v5page .v3-btn svg,
+  .sm-v5page .v3-body a,
+  .sm-v5page .v3-lede a,
+  .sm-v5page .v3m-checks a {
+    transition: none;
+  }
+  .sm-v5page .v3-card:hover,
+  .sm-v5page .v3-card:focus-within,
+  .sm-v5page .v3wk-item:hover,
+  .sm-v5page .v3wk-item:focus-within,
+  .sm-v5page .v3m-step:hover,
+  .sm-v5page .v3m-step:focus-within,
+  .sm-v5page .sm-price-factor:hover,
+  .sm-v5page .sm-price-factor:focus-within,
+  .sm-v5page .sm-map-node:hover,
+  .sm-v5page .sm-map-node:focus-visible,
+  .sm-v5page .v3-btn:hover,
+  .sm-v5page .v3-btn:focus-visible {
+    transform: none;
+  }
+}
+
+/* ── Mobile simplification (owner §11: "simplify below 768px") ────────────
+   Shorter travel distances, faster settle, and a flattened stagger ladder
+   so small screens get quick, legible motion instead of a long queue of
+   staggered entrances. Still gated by the same `[data-reveal-ready]` no-JS
+   fallback and by `prefers-reduced-motion`, since this lives inside the
+   existing no-preference query's cascade. ───────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) and (max-width: 767px) {
+  .sm-v5page [data-reveal-ready] .reveal-clip,
+  .sm-v5page .reveal-clip[data-reveal-ready] {
+    clip-path: inset(60% 0 0 0);
+    transform: translateY(3px);
+    transition-duration: 280ms;
+  }
+  .sm-v5page [data-reveal-ready] .reveal-fade-up,
+  .sm-v5page .reveal-fade-up[data-reveal-ready] {
+    transform: translateY(8px);
+    transition-duration: 180ms;
+  }
+  .sm-v5page [data-reveal-ready] .reveal-scale-settle,
+  .sm-v5page .reveal-scale-settle[data-reveal-ready] {
+    transform: scale(0.99) translateY(5px);
+    transition-duration: 180ms;
+  }
+  .sm-v5page [data-reveal-ready] .reveal-h-left,
+  .sm-v5page .reveal-h-left[data-reveal-ready],
+  .sm-v5page [data-reveal-ready] .reveal-h-right,
+  .sm-v5page .reveal-h-right[data-reveal-ready] {
+    transform: translateX(0) translateY(8px);
+    transition-duration: 180ms;
+  }
+  /* Flatten the stagger ladder to two short steps instead of up to seven —
+     fewer staggers, per the mobile simplification rule. */
+  .sm-v5page .reveal-scale-settle:nth-child(n+2) { transition-delay: 90ms; }
+  .sm-v5page .reveal-scale-settle:nth-child(n+4) { transition-delay: 150ms; }
+  .sm-v5page .reveal-fade-up:nth-child(n+2) { transition-delay: 70ms; }
+  .sm-v5page .reveal-fade-up:nth-child(n+4) { transition-delay: 120ms; }
+  .sm-v5page .sm-map-path,
+  .sm-v5page .sm-flow__arrow line {
+    transition-duration: 450ms;
+  }
+  .sm-v5page .sm-flow__arrow:nth-of-type(2) line { transition-delay: 220ms; }
+  .sm-v5page .sm-flow__arrow:nth-of-type(3) line { transition-delay: 320ms; }
 }

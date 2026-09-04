@@ -7,14 +7,15 @@
 
 import { Link } from "wouter";
 import { ROUTES, dashboardUrl } from "@/lib/routes";
+import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import "@/styles/v5-pages.css";
 
 const EXITS = [
   { label: "Home", href: ROUTES.home, isRoute: true },
+  { label: "Build Your SiteMint System", href: ROUTES.start, isRoute: true },
   { label: "What We Build", href: ROUTES.services, isRoute: true },
   { label: "AI Receptionist", href: ROUTES.aiReceptionist, isRoute: true },
-  { label: "Start a Project", href: ROUTES.start, isRoute: true },
   { label: "Client Sign In", href: dashboardUrl("/login"), isRoute: false },
 ] as const;
 
@@ -49,6 +50,7 @@ function NotFoundMark() {
 }
 
 export default function NotFoundV5() {
+  const reveal = useReveal();
   usePageMeta({
     title: "Page not found — SiteMint Digital",
     description: "This page doesn't exist. Find your way back to SiteMint Digital.",
@@ -56,24 +58,29 @@ export default function NotFoundV5() {
 
   return (
     <section className="v4-section sm-v5page sm-notfound" data-tone="ink">
-      <div className="v4-container">
-        <NotFoundMark />
-        <span className="v4-kicker">404</span>
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="reveal-scale-settle">
+          <NotFoundMark />
+        </div>
+        <span className="v4-kicker reveal-fade-up">404</span>
+        {/* Headline is this page's LCP text — left static (no mask-reveal) so
+            first paint isn't delayed; the mark/kicker/lede/exits carry the
+            motion. */}
         <h1 className="v4-h2">We couldn't find that page.</h1>
-        <p className="v4-lede">
+        <p className="v4-lede reveal-fade-up">
           The link may be out of date, or the page may have moved as part of
           a recent update to the site. Here's where you probably meant to go.
         </p>
         <ul className="sm-notfound__exits">
           {EXITS.map((exit) =>
             exit.isRoute ? (
-              <li key={exit.label}>
+              <li className="reveal-scale-settle" key={exit.label}>
                 <Link href={exit.href} className="v4-btn v4-btn--outline">
                   {exit.label}
                 </Link>
               </li>
             ) : (
-              <li key={exit.label}>
+              <li className="reveal-scale-settle" key={exit.label}>
                 <a href={exit.href} className="v4-btn v4-btn--outline">
                   {exit.label}
                 </a>
@@ -81,7 +88,7 @@ export default function NotFoundV5() {
             ),
           )}
         </ul>
-        <p className="sm-notfound__hint">
+        <p className="sm-notfound__hint reveal-fade-up">
           Still stuck? Every page on sitemintdigital.com is reachable from the
           navigation above, or you can{" "}
           <Link href={ROUTES.start}>tell us what you were looking for</Link>{" "}
