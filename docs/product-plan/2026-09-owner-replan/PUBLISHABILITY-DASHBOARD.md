@@ -17,9 +17,9 @@ owner-authorised migrations (B-09) and external certification (X-01…X-07).
 ## Scores
 
 <!-- scores:start -->
-_Computed 2026-09-04 15:24 UTC from V5-BUILD-CHECKLIST.md._
+_Computed 2026-09-04 18:33 UTC from V5-BUILD-CHECKLIST.md._
 
-Program-wide: **P0 items remaining 12** · owner blockers 15 · external blockers 1.
+Program-wide: **P0 items remaining 11** · owner blockers 15 · external blockers 1.
 
 ### A. Company website
 
@@ -32,15 +32,15 @@ Program-wide: **P0 items remaining 12** · owner blockers 15 · external blocker
 | Responsive navigation | W-04:VERIFIED COMPLETE, W-05:VERIFIED COMPLETE, W-06:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE, F-05:VERIFIED COMPLETE |
 | Discovery conversion | W-09:IMPLEMENTED—UNVERIFIED, W-10:VERIFIED COMPLETE |
 | Pricing | W-11:VERIFIED COMPLETE |
-| Accessibility | V-04:VERIFIED COMPLETE, V-05:NOT STARTED |
-| Performance | V-06:NOT STARTED, W-14:VERIFIED COMPLETE |
+| Accessibility | V-04:VERIFIED COMPLETE, V-05:IMPLEMENTED—UNVERIFIED |
+| Performance | V-06:IN PROGRESS, W-14:VERIFIED COMPLETE |
 | SEO and metadata | W-15:IMPLEMENTED—UNVERIFIED |
 | Legal approval | W-16:BLOCKED—OWNER |
 | Production-domain verification | X-10:BLOCKED—OWNER, X-14:BLOCKED—EXTERNAL |
 
 ### B. AI Receptionist owner-preview readiness
 
-**Readiness 95.3%** = 102 ÷ 107 applicable weight · P0 remaining 1 · blockers 0 (owner 0, external 0)
+**Readiness 100%** = 107 ÷ 107 applicable weight · P0 remaining 0 · blockers 0 (owner 0, external 0)
 
 | Category | Items (status) |
 |---|---|
@@ -49,7 +49,7 @@ Program-wide: **P0 items remaining 12** · owner blockers 15 · external blocker
 | Responsive behaviour | C-21:VERIFIED COMPLETE, V-03:VERIFIED COMPLETE |
 | No dead routes | C-01:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE |
 | No misleading live claims | R-01:VERIFIED COMPLETE, R-02:VERIFIED COMPLETE, W-01:VERIFIED COMPLETE |
-| Owner-review evidence | V-01:VERIFIED COMPLETE, V-02:NOT STARTED, V-08:VERIFIED COMPLETE |
+| Owner-review evidence | V-01:VERIFIED COMPLETE, V-02:VERIFIED COMPLETE, V-08:VERIFIED COMPLETE |
 
 ### C. AI Receptionist private-beta readiness
 

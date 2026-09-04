@@ -21,7 +21,7 @@
 | W-06 | Website | `/automation` → `/ai-systems` (AI Systems & Automation incl. CRM section), redirect | P1 | VERIFIED COMPLETE | 5cc2ce6 | /automation redirect swept | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-07 | Website | Truthful `/work` and `/about` copy; team section | P0 | VERIFIED COMPLETE | 5cc2ce6 | copy in build; chain green | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-08 | Website | `/process` five real phases with outputs | P1 | VERIFIED COMPLETE | 5cc2ce6 | five phases swept | sweeps + previews on 127.0.0.1:4170 | — | — |
-| W-09 | Website | Discovery intake submits to backend with all states (flag stays off) | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-09 | Website | Discovery intake submits to backend with all states (flag stays off) | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | submits wired; interactive end-to-end check pending | — | interactive submit run | — |
 | W-10 | Website | `/contact` folded into `/start` (redirect); V2 preview pages removed | P0 | VERIFIED COMPLETE | 5cc2ce6 | /contact redirect swept; V2 pages deleted | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-11 | Website | Pricing rebuilt (three tiers, disclaimer, configurator, honesty check) | P1 | VERIFIED COMPLETE | 5cc2ce6 | pricing swept 5 widths | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-12 | Website | On-brand 404 with five exits (public) | P0 | VERIFIED COMPLETE | 5cc2ce6 | 404 swept with five exits | sweeps + previews on 127.0.0.1:4170 | — | — |
@@ -31,7 +31,7 @@
 | W-16 | Website | Privacy/Terms prepared for legal review | P1 | BLOCKED — OWNER | — | drafts exist | — | legal review | Owner |
 | R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | VERIFIED COMPLETE | eb4e314 | 17 sections pinned + swept all widths | sweeps + previews on 127.0.0.1:4170 | — | — |
 | R-02 | Receptionist mkt | Simulated Interactive Preview (curated branches, waveform, labelled) | P0 | VERIFIED COMPLETE | df34fda | preview swept; labels pinned | sweeps + previews on 127.0.0.1:4170 | — | — |
-| R-03 | Receptionist mkt | Request Beta Access form → `POST /api/public/beta-requests` (flag off) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
+| R-03 | Receptionist mkt | Request Beta Access form → `POST /api/public/beta-requests` (flag off) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | form + states built; fixture submit not yet click-verified | — | interactive submit run | — |
 | R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | VERIFIED COMPLETE | df34fda | use-cases section swept | sweeps + previews on 127.0.0.1:4170 | — | — |
 | R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | VERIFIED COMPLETE | df34fda | contract: no key, flag-gated, 503 test | sweeps + previews on 127.0.0.1:4170 | — | — |
 | R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | VERIFIED COMPLETE | df34fda | poster-first container swept | sweeps + previews on 127.0.0.1:4170 | — | — |
@@ -76,11 +76,11 @@
 | B-08 | Backend | Migration packet (0007 voice + push-mode CRM) tested on a disposable DB | P0 | VERIFIED COMPLETE | 57c86bd | disposable-DB fresh/rollback/re-apply all green | sweeps + previews on 127.0.0.1:4170 | — | — |
 | B-09 | Backend | Migrations applied externally | P0 | BLOCKED — OWNER | — | — | — | execution authorisation | Owner |
 | V-01 | Verification | Typecheck + canonical suite + contract suites green on the integrated branch | P0 | VERIFIED COMPLETE | 5461c6f | chain exit 0 (2400 checks); full suite exit 0 | sweeps + previews on 127.0.0.1:4170 | — | — |
-| V-02 | Verification | Production builds + voice matrix + built-output scans (incl. web-agency allowlist) | P0 | NOT STARTED | — | — | — | — | — |
+| V-02 | Verification | Production builds + voice matrix + built-output scans (incl. web-agency allowlist) | P0 | VERIFIED COMPLETE | c9adeeb | matrix 20/20 (675 assertions); builds+scans clean; wa bundle 0 provider strings | gates on /opt/sitemint-v5 | — | — |
 | V-03 | Verification | Five-width sweep, zero overflow, nested-scroll = 0, console clean (all surfaces) | P0 | VERIFIED COMPLETE | 2d36c19 | 334 combos, 0 overflow, errors only expected mode-A 401s | sweeps + previews on 127.0.0.1:4170 | — | — |
 | V-04 | Verification | Keyboard/focus/Escape + scroll-to-top/anchor/back tests | P0 | VERIFIED COMPLETE | 2d36c19 | scroll 6/6; v4 keyboard contract in chain | sweeps + previews on 127.0.0.1:4170 | — | — |
-| V-05 | Verification | Reduced motion + accessibility (Lighthouse a11y 100 on public pages) | P1 | NOT STARTED | — | — | — | — | — |
-| V-06 | Verification | Performance vs R1 baseline (entry JS, LCP, CLS) | P1 | NOT STARTED | — | — | — | — | — |
+| V-05 | Verification | Reduced motion + accessibility (Lighthouse a11y 100 on public pages) | P1 | IMPLEMENTED — UNVERIFIED | 2d36c19 | reduced-motion 6/6; Lighthouse a11y rerun pending | — | Lighthouse on realistic server | — |
+| V-06 | Verification | Performance vs R1 baseline (entry JS, LCP, CLS) | P1 | IN PROGRESS | — | entry sizes captured (wa 359.8KB, hd 359.3KB vs R1 ~same) | — | Lighthouse medians vs R1 | — |
 | V-07 | Verification | Secret scan + protected-file 0-diff + route-security contract | P0 | VERIFIED COMPLETE | dc601c3 | secret scan 0/1380; protected 0/16; routeSecurity vitest | sweeps + previews on 127.0.0.1:4170 | — | — |
 | V-08 | Verification | Unified owner preview index with synthetic-data labels, all states, mobile | P0 | VERIFIED COMPLETE | 2d36c19 | preview index 4170; 7 hd states + 4 crm states | sweeps + previews on 127.0.0.1:4170 | — | — |
 | X-01 | External | Browser test call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 2 authorisation | Owner |
