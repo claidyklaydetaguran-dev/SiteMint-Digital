@@ -1539,9 +1539,11 @@ const GATED_ONLY_ICONS: [string, string][] = [
       /AlertTriangle/.test(read("artifacts/helpdesk/src/components/ErrorBoundary.tsx")),
   );
   check(
-    "Bot is excluded because ungated modules import it independently (V5 Setup marks)",
+    "Bot is excluded because ungated modules import it independently (the SMS Inbox message icon)",
     onlyInCatalogue.includes("Bot") &&
-      /\bBot\b/.test(read("artifacts/helpdesk/src/components/common/ProgressSteps.tsx")),
+      /import \{[^}]*\bBot\b[^}]*\} from "lucide-react"/.test(
+        read("artifacts/helpdesk/src/pages/Inbox.tsx"),
+      ),
   );
 }
 
