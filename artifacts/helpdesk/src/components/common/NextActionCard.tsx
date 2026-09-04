@@ -38,7 +38,14 @@ export function NextActionCard({ title, detail, actionLabel, href }: NextActionC
             margin: 0,
             fontSize: "var(--sd-text-h2, .9375rem)",
             fontWeight: 600,
-            color: "var(--sd-text, #051824)",
+            /* This card's background is always the light mint accent
+               surface (`--sm-mint-100`), independent of the dashboard's
+               dark/light mode — so its text must always use the
+               light-surface-safe ink tokens (`--sm-text*`), never the
+               dashboard's mode-dependent `--sd-text*` tokens, which
+               resolve to near-white in dark mode and washed the title
+               out against this light card (illegible). */
+            color: "var(--sm-text, #173642)",
           }}
         >
           {title}
@@ -48,7 +55,7 @@ export function NextActionCard({ title, detail, actionLabel, href }: NextActionC
             margin: "2px 0 0",
             fontSize: "var(--sd-text-small, .8125rem)",
             lineHeight: 1.5,
-            color: "var(--sd-text-muted, #3b5265)",
+            color: "var(--sm-text-muted, #4a6472)",
           }}
         >
           {detail}
