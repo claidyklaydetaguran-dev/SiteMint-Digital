@@ -310,26 +310,9 @@
   color: var(--v4-cloud);
 }
 
-/* ── Product-mode header density fix (owner review finding #2) ───────────
-   `headerMode="product"` (AI Receptionist page) puts three extra items in
-   the row — the outlined pill, "Already a client? Sign in", an outline
-   button, and a primary button, on top of the three primary nav links.
-   `.v4-header__inner` caps at 1280px (`max-width`), so the row's available
-   width plateaus there regardless of viewport — there is no wider desktop
-   breakpoint where the two full CTA sentences would newly fit, which is
-   why the short labels below are unconditional for product mode rather
-   than swapped in only under some width, a threshold that would have had
-   no real layout meaning past the 1280px cap anyway.
-
-   Three layers: (1) `white-space: nowrap` everywhere a label was wrapping
-   internally instead of the row overflowing, (2) tightened horizontal
-   rhythm so the nav needs less width in the first place, and (3) —
-   because (1)+(2) alone still don't leave room for the two full CTA
-   sentences at any desktop width — `SiteHeaderV4.tsx` renders a short
-   label in their place for product mode; the anchor's own `aria-label`
-   keeps one constant accessible name regardless, so this is a visual
-   density fix only, never a copy change (the mobile sheet, which has
-   plenty of width, keeps the full sentences unchanged). */
+/* Shared with company mode — keep labels on one line at any width the row
+   is actually rendered at. `.v4-nav__link`/`.v4-nav__prod` are company-mode
+   only; `.v4-header__signin`/`.v4-header__cta` are shared by both modes. */
 .v4-nav__link,
 .v4-nav__prod,
 .v4-header__signin,
@@ -337,8 +320,109 @@
   white-space: nowrap;
 }
 
-.v4-header[data-mode="product"] .v4-header__signin-full,
-.v4-header[data-mode="product"] .v4-header__cta-full {
+/* ── Product-mode header (owner review: "the nav bar on AI Receptionist,
+   it's too messy") ────────────────────────────────────────────────────────
+   The old product-mode row reused the *entire* company nav (What We Build
+   panel + Work/Process/Company + the redundant AI Receptionist pill) and
+   bolted two extra CTAs on the end — seven interactive targets. SiteHeaderV4
+   now renders a dedicated, lean row for product mode instead (see the
+   component): brand → quiet separator → "AI Receptionist" as plain text →
+   up to three quiet in-page anchors → "Sign in" → one primary CTA. Every
+   rule below either targets a class that exists only in the product-mode
+   DOM, or is scoped under `[data-mode="product"]` — company mode is
+   untouched.
+
+   Collapse strategy (content-width reasoned against real font metrics for
+   360/480/768/1024/1280/1440/1920 — the Windows worktree cannot run the Vite
+   dev server itself, see docs/ai-receptionist SESSION_HANDOFF/QA notes on the
+   pruned win32 native bindings, so this was not re-confirmed in a live
+   render):
+     ≥1024px  full row: brand + wordmark, separator, product name, the three
+              quick links, "Sign in", the CTA.
+     640–1023 the quick links fold away (they duplicate the page's own
+              in-page navigation — no loss). Brand, product name, "Sign in"
+              and the CTA stay exactly where they are; only the mobile
+              toggle joins them, for the "What We Build"/"Explore" pages the
+              row no longer carries directly.
+     <640     "Sign in" folds away too — the mobile sheet still reaches
+              sign-in cross-app navigation, and the page's own hero repeats
+              it. Brand, product name and the CTA remain.
+     <480     the "SiteMint" wordmark hides (icon-only brand, a common
+              pattern once a header is this narrow); horizontal rhythm
+              tightens further. Product name and the CTA never shrink to
+              the point of truncation — they are the two things this
+              redesign is protecting. */
+
+.v4-header__product-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--v4-mist);
+  flex: 0 0 auto;
+}
+
+.v4-header[data-surface="dark"] .v4-header__product-sep {
+  background: var(--v4-navy-line);
+}
+
+.v4-header__product-name {
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--v4-mute);
+  white-space: nowrap;
+}
+
+.v4-header[data-surface="dark"] .v4-header__product-name {
+  color: var(--v4-mute-dark);
+}
+
+.v4-product-nav {
+  margin-left: auto;
+}
+
+.v4-product-nav__list {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.v4-product-nav__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--v4-mute);
+  white-space: nowrap;
+}
+
+.v4-header[data-surface="dark"] .v4-product-nav__link {
+  color: var(--v4-mute-dark);
+}
+
+.v4-product-nav__link:hover {
+  color: var(--v4-text);
+}
+
+.v4-header[data-surface="dark"] .v4-product-nav__link:hover {
+  color: var(--v4-cloud);
+}
+
+.v4-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* The short CTA label ("Beta") only ever shows below 480px — see that tier
+   further down. */
+.v4-header__cta-short {
   display: none;
 }
 
@@ -346,21 +430,81 @@
   .v4-header[data-mode="product"] .v4-header__inner {
     gap: 0.85rem;
   }
-  .v4-header[data-mode="product"] .v4-nav__list {
-    gap: 0.05rem;
+  .v4-header[data-mode="product"] .v4-product-nav__list {
+    gap: 0.1rem;
   }
-  .v4-header[data-mode="product"] .v4-nav__link {
-    padding-inline: 0.55rem;
+  .v4-header[data-mode="product"] .v4-product-nav__link {
+    padding-inline: 0.6rem;
   }
-  .v4-header[data-mode="product"] .v4-nav__prod {
-    padding-inline: 0.7rem;
+}
+
+@media (max-width: 1023px) {
+  /* The quick links duplicate the page's own in-page navigation, so they
+     are the first thing to go — not the CTA or the product name. */
+  .v4-header[data-mode="product"] .v4-product-nav {
+    display: none;
   }
-  .v4-header[data-mode="product"] .v4-header__signin {
-    padding-inline: 0.4rem;
+  /* `.v4-header__actions` (not `.v4-product-nav`) is now the last row
+     child, so it — not the links — carries the push-right margin. */
+  .v4-header[data-mode="product"] .v4-header__actions {
+    margin-left: auto;
+  }
+  /* Undo the generic company-mode mobile hide immediately below: product
+     mode keeps "Sign in" and the primary CTA in the bar itself rather than
+     folding everything behind the hamburger. */
+  .v4-header[data-mode="product"] .v4-header__signin,
+  .v4-header[data-mode="product"] .v4-header__cta {
+    display: inline-flex;
+  }
+  /* Tightened rhythm buys back the width the brand + product name + CTA
+     need once the quick links are gone but the row is still narrower than
+     desktop. */
+  .v4-header[data-mode="product"] .v4-header__inner {
+    gap: 0.45rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__brand-word {
+    font-size: 1.05rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__product-name {
     font-size: 0.85rem;
   }
   .v4-header[data-mode="product"] .v4-header__cta {
     padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 639px) {
+  /* "Sign in" folds away next — the mobile sheet and the page's own hero
+     both still offer it. */
+  .v4-header[data-mode="product"] .v4-header__signin {
+    display: none;
+  }
+}
+
+@media (max-width: 479px) {
+  /* Icon-only brand at the narrowest widths — a common, well-understood
+     pattern — protects the product name and the CTA from crowding. */
+  .v4-header[data-mode="product"] .v4-header__brand-word {
+    display: none;
+  }
+  .v4-header[data-mode="product"] .v4-header__inner {
+    gap: 0.4rem;
+    padding-inline: 1rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__product-name {
+    font-size: 0.8rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__cta {
+    padding-inline: 0.85rem;
+  }
+  /* The short CTA label buys back the width the product name needs to
+     never truncate at the narrowest supported width. One constant
+     accessible name either way, via the Link's own aria-label. */
+  .v4-header[data-mode="product"] .v4-header__cta-full {
+    display: none;
+  }
+  .v4-header[data-mode="product"] .v4-header__cta-short {
+    display: inline;
   }
 }
 
