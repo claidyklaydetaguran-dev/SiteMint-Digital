@@ -5,14 +5,17 @@ import {
   type AssistantSetupState,
   type AssistantPromptState,
   type AssistantVoiceModelState,
+  type AssistantToolsState,
   type AssistantAnalysisState,
   type AssistantAdvancedState,
   type FirstMessageMode,
+  type PromptMode,
 } from "@/hooks/useAssistantDrafts";
 import {
   isStoredVoicePreset,
   type StoredVoicePresetId,
 } from "@/pages/assistants/assistantsContract";
+import { composeSystemPrompt, normalizePermittedActions } from "@/lib/promptComposer";
 
 /**
  * Milestone 1 / Checkpoint E2: deterministic, provider-neutral mapping
@@ -61,6 +64,21 @@ function firstMessageMode(value: unknown, fallback: FirstMessageMode): FirstMess
 }
 
 /**
+ * V5 PR-6 (C-3): a config saved before this field existed carries no
+ * `promptMode` at all. It must NOT default to `"guided"` — this assistant's
+ * `systemInstructions` is whatever the customer wrote (by hand, or from a
+ * template's old canned text), and every guided section below it is empty.
+ * Composing from empty sections on the very next save would silently replace
+ * that text with a near-blank prompt. So a missing/invalid value always
+ * resolves to `"advanced"`, regardless of what a caller's fallback prefers —
+ * only an explicit stored `"guided"` (which a customer can only reach by
+ * saving from this builder, after this field existed) turns composition on.
+ */
+function promptMode(value: unknown): PromptMode {
+  return value === "guided" || value === "advanced" ? value : "advanced";
+}
+
+/**
  * AR-001I: a stored preset is preserved exactly as saved, including a
  * retired one such as `custom`. Collapsing it to the template default here
  * would silently re-label the customer's configuration as a preset they
@@ -96,12 +114,29 @@ function sanitizePrompt(value: unknown, fallback: AssistantPromptState): Assista
     escalationRules: str(src.escalationRules, fallback.escalationRules),
     prohibitedBehavior: str(src.prohibitedBehavior, fallback.prohibitedBehavior),
     callEndingRules: str(src.callEndingRules, fallback.callEndingRules),
+    promptMode: promptMode(src.promptMode),
+    businessInformation: str(src.businessInformation, fallback.businessInformation),
+    appointmentRules: str(src.appointmentRules, fallback.appointmentRules),
+    additionalInstructions: str(src.additionalInstructions, fallback.additionalInstructions),
   };
 }
 
 function sanitizeVoiceModel(value: unknown, fallback: AssistantVoiceModelState): AssistantVoiceModelState {
   const src = isPlainObject(value) ? value : {};
   return { preset: voicePresetId(src.preset, fallback.preset) };
+}
+
+/**
+ * V5 PR-6 (C-2): a config saved before this section existed carries no
+ * `tools.permittedActions` at all. It falls back to every known action
+ * enabled — matching what that assistant could already do before this
+ * checklist existed to say so explicitly, rather than silently narrowing an
+ * existing assistant's behavior the first time its config is merely re-read.
+ */
+function sanitizeTools(value: unknown, fallback: AssistantToolsState): AssistantToolsState {
+  const src = isPlainObject(value) ? value : {};
+  const raw = Array.isArray(src.permittedActions) ? src.permittedActions : undefined;
+  return { permittedActions: raw ? normalizePermittedActions(raw) : [...fallback.permittedActions] };
 }
 
 function sanitizeAnalysis(value: unknown, fallback: AssistantAnalysisState): AssistantAnalysisState {
@@ -130,19 +165,74 @@ function sanitizeAdvanced(value: unknown, fallback: AssistantAdvancedState): Ass
 }
 
 /**
+ * V5 PR-6 (C-2): the firm's business name/industry as read live from
+ * Workspace Settings (`useWorkspaceBusinessInfo`). Passed in only at save
+ * time — never stored into the draft or diffed for "unsaved changes" — so a
+ * background refetch of Workspace Settings can never make the builder look
+ * dirty on its own. When omitted (the fetch hasn't resolved yet), the
+ * draft's own last-hydrated values are used instead.
+ */
+export interface BusinessInfoOverride {
+  name: string;
+  industry: string;
+}
+
+/**
  * Builder state -> API config. Deterministic key order; plain
  * JSON-serializable data only. Unknown provider-neutral keys from a prior
  * hydration are intentionally NOT preserved here — E2 only round-trips the
  * fields the B3 builder actually edits, so re-saving cannot silently persist
  * stray data the UI never showed the customer.
+ *
+ * V5 PR-6 (C-3): while `prompt.promptMode` is `"guided"`, this is also the
+ * one place `systemInstructions` is generated — `composeSystemPrompt` runs
+ * here, on every save, so the persisted config's `systemInstructions` is
+ * always exactly what the Prompt tab's "generated full prompt" preview last
+ * showed. While `"advanced"`, the customer's own text is saved unchanged.
  */
-export function serializeDraftToConfig(draft: AssistantDraft): Record<string, unknown> {
+export function serializeDraftToConfig(
+  draft: AssistantDraft,
+  businessInfo?: BusinessInfoOverride,
+): Record<string, unknown> {
+  const businessName = businessInfo?.name ?? draft.setup.businessName;
+  const industry = businessInfo?.industry ?? draft.setup.industry;
+
+  const systemInstructions =
+    draft.prompt.promptMode === "guided"
+      ? composeSystemPrompt({
+          assistantName: draft.setup.assistantName,
+          role: draft.setup.role,
+          primaryGoal: draft.setup.primaryGoal,
+          timezone: draft.setup.timezone,
+          language: draft.setup.language,
+          tone: draft.prompt.tone,
+          businessName,
+          industry,
+          businessInformation: draft.prompt.businessInformation,
+          objectives: draft.prompt.objectives,
+          questionsToAsk: draft.prompt.informationToCollect,
+          appointmentRules: draft.prompt.appointmentRules,
+          permittedActions: draft.tools.permittedActions,
+          escalationInstructions: draft.prompt.escalationRules,
+          prohibitedTopics: draft.prompt.prohibitedBehavior,
+          closingBehaviour: draft.prompt.callEndingRules,
+          additionalInstructions: draft.prompt.additionalInstructions,
+          firstMessageBehaviour: draft.prompt.firstMessageMode,
+          greeting: draft.prompt.firstMessage,
+        })
+      : draft.prompt.systemInstructions;
+
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    setup: { ...draft.setup },
-    prompt: { ...draft.prompt, objectives: [...draft.prompt.objectives], informationToCollect: [...draft.prompt.informationToCollect] },
+    setup: { ...draft.setup, businessName, industry },
+    prompt: {
+      ...draft.prompt,
+      systemInstructions,
+      objectives: [...draft.prompt.objectives],
+      informationToCollect: [...draft.prompt.informationToCollect],
+    },
     voiceModel: { ...draft.voiceModel },
-    tools: {},
+    tools: { permittedActions: [...draft.tools.permittedActions] },
     knowledge: {},
     testing: {},
     analysis: { ...draft.analysis, leadQualificationFields: [...draft.analysis.leadQualificationFields] },
@@ -176,6 +266,7 @@ export function hydrateConfigToDraft(config: unknown, templateKey: string, name:
     setup: { ...sanitizeSetup(config.setup, fallback.setup), assistantName: name },
     prompt: sanitizePrompt(config.prompt, fallback.prompt),
     voiceModel: sanitizeVoiceModel(config.voiceModel, fallback.voiceModel),
+    tools: sanitizeTools(config.tools, fallback.tools),
     analysis: sanitizeAnalysis(config.analysis, fallback.analysis),
     advanced: sanitizeAdvanced(config.advanced, fallback.advanced),
   };

@@ -68,14 +68,14 @@ export const SyncAssistantButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, S
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               )}
-              Update assistant
+              Publish update
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-52 text-xs">
             {reason}
           </TooltipContent>
           <span id={descriptionId} className="sr-only">
-            Update assistant — {reason}
+            Publish update — {reason}
           </span>
         </Tooltip>
       );
@@ -89,7 +89,7 @@ export const SyncAssistantButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, S
         className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 gap-1.5 md:min-h-8")}
       >
         <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-        Update assistant
+        Publish update
       </button>
     );
   },
@@ -136,7 +136,7 @@ export function SyncConfirmDialog({ open, assistantName, onCancel, onConfirm }: 
               onConfirm();
             }}
           >
-            Update assistant
+            Publish update
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

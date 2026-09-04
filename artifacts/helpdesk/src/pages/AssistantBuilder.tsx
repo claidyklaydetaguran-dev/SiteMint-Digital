@@ -15,10 +15,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useAssistantDetail, useUpdateAssistant, usePublishAssistant, useSyncAssistant } from "@/hooks/useAssistants";
 import { useBrowserVoiceTest, type UseBrowserVoiceTestResult } from "@/hooks/useBrowserVoiceTest";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
+import { useWorkspaceBusinessInfo } from "@/hooks/useWorkspaceBusinessInfo";
 import { AssistantApiRequestError, normalizeSyncRouteErrorCode, fetchBrowserTestSession } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, hydrateConfigToDraft } from "@/lib/assistantConfig";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
-import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
+import {
+  BuilderShell,
+  isBuilderTabKey,
+  resolveBuilderTab,
+  type BuilderTabKey,
+} from "@/pages/assistant-builder/BuilderShell";
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
@@ -29,6 +35,7 @@ import {
   SAVE_PROMPT_EITHER,
   SAVE_PROMPT_PUBLISH,
   SAVE_PROMPT_TEST,
+  DEFAULT_BUILDER_TAB,
   assistantHref,
   isSupportedVoicePreset,
   lastSyncedNote,
@@ -53,7 +60,10 @@ function BuilderDetailSkeleton() {
   );
 }
 
-function draftKey(draft: Pick<AssistantDraft, "setup" | "prompt" | "voiceModel" | "analysis" | "advanced">, name: string): string {
+function draftKey(
+  draft: Pick<AssistantDraft, "setup" | "prompt" | "voiceModel" | "tools" | "analysis" | "advanced">,
+  name: string,
+): string {
   return JSON.stringify({ name, config: serializeDraftToConfig(draft as AssistantDraft) });
 }
 
@@ -201,7 +211,8 @@ export default function AssistantBuilder() {
   const rawId = params.id;
   const isValidId = ROUTE_ID_PATTERN.test(rawId ?? "");
   const numericId = isValidId ? Number(rawId) : undefined;
-  const tab: BuilderTabKey = isBuilderTabKey(params.tab) ? params.tab : "setup";
+  const resolvedTab = resolveBuilderTab(params.tab);
+  const tab: BuilderTabKey = resolvedTab ?? DEFAULT_BUILDER_TAB;
 
   const { data: assistant, isLoading, isError, error, refetch } = useAssistantDetail(numericId);
   const updateMutation = useUpdateAssistant(numericId ?? -1);
@@ -229,12 +240,24 @@ export default function AssistantBuilder() {
 
   const firmId = useAuthenticatedFirmId();
   const browserTest = useBuilderBrowserTest();
+  // V5 PR-6 (C-2): the current workspace business name/industry, used only
+  // at save time so a saved config's `setup.businessName`/`industry` (and
+  // therefore the composed prompt) always reflects Workspace Settings, not
+  // whatever this draft last hydrated. Never affects the dirty check.
+  const businessInfo = useWorkspaceBusinessInfo();
 
   useEffect(() => {
-    if (!params.tab && numericId !== undefined) {
-      navigate(`/assistants/${numericId}/setup`, { replace: true });
+    if (numericId === undefined) return;
+    if (!params.tab) {
+      navigate(assistantHref(numericId), { replace: true });
+      return;
     }
-  }, [params.tab, numericId, navigate]);
+    // A legacy tab key ("setup", "voice-model") resolves via the alias map
+    // but isn't itself canonical — redirect once so the URL self-heals.
+    if (!isBuilderTabKey(params.tab) && resolvedTab) {
+      navigate(assistantHref(numericId, resolvedTab), { replace: true });
+    }
+  }, [params.tab, numericId, navigate, resolvedTab]);
 
   useEffect(() => {
     if (!assistant) return;
@@ -348,7 +371,7 @@ export default function AssistantBuilder() {
     updateMutation.mutate(
       {
         name: draft.setup.assistantName.trim(),
-        config: serializeDraftToConfig(draft),
+        config: serializeDraftToConfig(draft, businessInfo.data ?? undefined),
       },
       {
         onSuccess: (updated) => {
@@ -399,6 +422,17 @@ export default function AssistantBuilder() {
         // an attempted publish, and the two must never drift apart.
         if (isDirty) return SAVE_PROMPT_PUBLISH;
         if (!isNameValid) return "Enter a valid assistant name before publishing.";
+        // V5 PR-6 (C-5): named before the customer spends a publish attempt on
+        // it. The server independently requires a non-empty greeting when
+        // firstMessageMode is "assistant-speaks-first" (see
+        // persistedConfigMapper.ts, read-only) — this only says so first.
+        if (draft.prompt.firstMessageMode === "assistant-speaks-first" && draft.prompt.firstMessage.trim().length === 0) {
+          return "Add a greeting before publishing.";
+        }
+        // Not a server-enforced rule — a business prerequisite for a
+        // trustworthy call: every assistant should know the business's
+        // timezone before it goes live.
+        if (draft.setup.timezone.trim().length === 0) return "Add a business timezone before publishing.";
         // Checked before the in-flight reasons so a retired preset is named as
         // the blocker rather than being hidden behind a transient one. The server
         // would reject it with `unsupported_preset` anyway; this only says so
@@ -869,7 +903,7 @@ export default function AssistantBuilder() {
               ) : (
                 <Save className="h-4 w-4" aria-hidden="true" />
               )}
-              {updateMutation.isPending ? "Saving…" : "Save Draft"}
+              {updateMutation.isPending ? "Saving…" : "Save changes"}
             </Button>
           </div>
         }

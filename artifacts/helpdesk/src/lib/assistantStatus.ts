@@ -48,3 +48,38 @@ export function isEligibleForDelete(
 export function isPublishableStatus(status: AssistantStatus): boolean {
   return status === "draft" || status === "error";
 }
+
+/**
+ * V5 PR-6 (C-1): the one-assistant status card collapses the six detailed
+ * statuses this journey can report into the three an owner needs at a
+ * glance. "Needs update" covers every state that is not a clean, confirmed
+ * publish: error, publish_uncertain, publishing, an unrecognized status, or a
+ * published assistant whose provider hasn't confirmed the saved
+ * configuration (`providerSyncState !== "synchronized"`) — never claiming
+ * "Published" for a state this journey cannot actually confirm is live.
+ */
+export type CardStatusKey = "draft" | "published" | "needs_update";
+
+export const CARD_STATUS_LABEL: Record<CardStatusKey, string> = {
+  draft: "Draft",
+  published: "Published",
+  needs_update: "Needs update",
+};
+
+export const CARD_STATUS_TONE: Record<CardStatusKey, StatusTone> = {
+  draft: "neutral",
+  published: "success",
+  needs_update: "warning",
+};
+
+export function assistantCardStatus(
+  assistant: Pick<AssistantDto, "status" | "providerSyncState">,
+): { key: CardStatusKey; label: string; tone: StatusTone } {
+  const key: CardStatusKey =
+    assistant.status === "draft"
+      ? "draft"
+      : assistant.status === "published" && assistant.providerSyncState === "synchronized"
+        ? "published"
+        : "needs_update";
+  return { key, label: CARD_STATUS_LABEL[key], tone: CARD_STATUS_TONE[key] };
+}

@@ -65,9 +65,11 @@ import {
   STATUS_LABEL,
   STATUS_TONE,
   isEligibleForDelete,
+  assistantCardStatus,
 } from "@/lib/assistantStatus";
 import {
   LIST,
+  CARD,
   NEW_PATH,
   assistantHref,
   deleteDialogTitle,
@@ -203,6 +205,82 @@ function RowActions({
   );
 }
 
+/**
+ * V5 PR-6 (C-1): the one-assistant experience. Shown instead of the
+ * list/table whenever exactly one assistant exists — the beta's normal case.
+ * The list/table stay for the >1 case (legacy data only; "New Assistant" is
+ * hidden once one exists, so a firm cannot reach two through this UI).
+ */
+function AssistantStatusCard({
+  assistant,
+  onOpen,
+  onOpenTab,
+  onDuplicate,
+  onDelete,
+  duplicatePending,
+  menuTriggerRef,
+}: {
+  assistant: AssistantDto;
+  onOpen: () => void;
+  onOpenTab: (tab: string) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  duplicatePending: boolean;
+  menuTriggerRef: (el: HTMLButtonElement | null) => void;
+}) {
+  const cardStatus = assistantCardStatus(assistant);
+
+  return (
+    <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 shadow-xs">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate font-display text-lg font-semibold text-foreground">{assistant.name}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{templateDisplayName(assistant.templateKey)}</p>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <StatusBadge label={cardStatus.label} tone={cardStatus.tone} />
+          <RowActions
+            assistant={assistant}
+            onOpen={onOpen}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+            duplicatePending={duplicatePending}
+            menuTriggerRef={menuTriggerRef}
+          />
+        </div>
+      </div>
+
+      <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4 text-xs sm:grid-cols-3">
+        <div>
+          <dt className="text-muted-foreground">{CARD.providerLinkLabel}</dt>
+          <dd className="mt-0.5 font-medium text-foreground">{providerLinkLabel(assistant)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">{CARD.lastPublishedLabel}</dt>
+          <dd className="mt-0.5 font-medium text-foreground">
+            {assistant.lastSyncedAt ? formatUpdatedAt(assistant.lastSyncedAt) : CARD.notYetPublished}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("configuration")}>
+          {CARD.configuration}
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("prompt")}>
+          {CARD.prompt}
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("voice")}>
+          {CARD.voice}
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("voice")}>
+          {CARD.test}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function Assistants() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -238,6 +316,11 @@ export default function Assistants() {
 
   const openAssistant = (assistant: AssistantDto) => {
     navigate(assistantHref(assistant.id));
+  };
+
+  /** V5 PR-6 (C-1): the status card's per-tab quick links. */
+  const openAssistantTab = (assistant: AssistantDto, tab: string) => {
+    navigate(assistantHref(assistant.id, tab));
   };
 
   const handleDuplicate = (assistant: AssistantDto) => {
@@ -300,6 +383,13 @@ export default function Assistants() {
     });
   };
 
+  // V5 PR-6 (C-1): one assistant per firm in beta. Exactly one existing
+  // assistant switches this page from the list/table to a single status
+  // card, and hides "New Assistant" — a firm cannot reach a second assistant
+  // through this UI. Zero or more-than-one (legacy data) keep the page
+  // exactly as it was.
+  const singleAssistant = assistants && assistants.length === 1 ? assistants[0] : null;
+
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-background">
       <div className="flex-shrink-0 px-6 pb-5 pt-6">
@@ -312,62 +402,68 @@ export default function Assistants() {
               {LIST.detail}
             </p>
           </div>
-          <Button
-            onClick={() => navigate(NEW_PATH)}
-            className="h-9 gap-1.5 text-sm"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {LIST.newAssistant}
-          </Button>
+          {singleAssistant ? (
+            <p className="text-xs text-muted-foreground">{LIST.contactToAddAnother}</p>
+          ) : (
+            <Button
+              onClick={() => navigate(NEW_PATH)}
+              className="h-9 gap-1.5 text-sm"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {LIST.newAssistant}
+            </Button>
+          )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2.5">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder={LIST.searchPlaceholder}
-            aria-label={LIST.searchLabel}
-            className="w-full sm:max-w-xs"
-          />
-          <Select
-            value={status}
-            onValueChange={(v) => setStatus(v as StatusFilter)}
-          >
-            <SelectTrigger
-              className="h-9 w-full text-sm sm:w-40"
-              aria-label={LIST.statusFilterLabel}
+        {!singleAssistant && !isLoading && !isError && assistants && assistants.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2.5">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder={LIST.searchPlaceholder}
+              aria-label={LIST.searchLabel}
+              className="w-full sm:max-w-xs"
+            />
+            <Select
+              value={status}
+              onValueChange={(v) => setStatus(v as StatusFilter)}
             >
-              <SelectValue placeholder={LIST.allStatuses} />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_FILTER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <SegmentedControl<ViewMode>
-            value={view}
-            onChange={setView}
-            aria-label={LIST.viewLabel}
-            className="sm:ml-auto"
-            options={[
-              {
-                value: "cards",
-                label: LIST.cards,
-                icon: LayoutGrid,
-                "aria-label": LIST.cardsView,
-              },
-              {
-                value: "table",
-                label: LIST.table,
-                icon: ListIcon,
-                "aria-label": LIST.tableView,
-              },
-            ]}
-          />
-        </div>
+              <SelectTrigger
+                className="h-9 w-full text-sm sm:w-40"
+                aria-label={LIST.statusFilterLabel}
+              >
+                <SelectValue placeholder={LIST.allStatuses} />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <SegmentedControl<ViewMode>
+              value={view}
+              onChange={setView}
+              aria-label={LIST.viewLabel}
+              className="sm:ml-auto"
+              options={[
+                {
+                  value: "cards",
+                  label: LIST.cards,
+                  icon: LayoutGrid,
+                  "aria-label": LIST.cardsView,
+                },
+                {
+                  value: "table",
+                  label: LIST.table,
+                  icon: ListIcon,
+                  "aria-label": LIST.tableView,
+                },
+              ]}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex-1 px-6 pb-6">
@@ -386,6 +482,19 @@ export default function Assistants() {
               className="py-16"
             />
           </div>
+        ) : singleAssistant ? (
+          <AssistantStatusCard
+            assistant={singleAssistant}
+            onOpen={() => openAssistant(singleAssistant)}
+            onOpenTab={(tab) => openAssistantTab(singleAssistant, tab)}
+            onDuplicate={() => handleDuplicate(singleAssistant)}
+            onDelete={() => setDeleteTarget(singleAssistant)}
+            duplicatePending={duplicateMutation.isPending}
+            menuTriggerRef={(el) => {
+              if (el) rowMenuRefs.current.set(singleAssistant.id, el);
+              else rowMenuRefs.current.delete(singleAssistant.id);
+            }}
+          />
         ) : !assistants || assistants.length === 0 ? (
           <div className="rounded-xl border border-border bg-card shadow-xs">
             <EmptyState

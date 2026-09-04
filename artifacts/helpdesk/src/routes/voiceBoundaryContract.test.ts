@@ -1005,17 +1005,23 @@ check(
  * build, so a build with none of them still drops the row rather than leaving
  * an empty one.
  */
+/**
+ * V5 PR-6 (C-5) update: within a voice-enabled build, Test call and Publish
+ * are now always rendered — a real control when their own sub-flag is on, a
+ * disabled placeholder naming "Not enabled on this workspace yet" when it is
+ * off. The row's own gate is therefore the platform flag alone
+ * (`voicePlatformEnabled`), not the three-way OR that used to hide the whole
+ * row whenever every sub-flag was off — a default (voice-disabled) build
+ * still shows nothing here, which is the property this assertion protects.
+ */
 check(
-  "so does the shell, and it drops the whole action row rather than leaving an empty one",
+  "so does the shell, and a build with the platform flag off drops the whole action row rather than leaving an empty one",
   /const publishInBuild = voicePlatformEnabled && voicePublishEnabled;/.test(builderShellCode) &&
     /const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;/.test(
       builderShellCode,
     ) &&
     /const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;/.test(builderShellCode) &&
-    /const anyBuilderActionInBuild = publishInBuild \|\| browserTestInBuild \|\| syncInBuild;/.test(
-      builderShellCode,
-    ) &&
-    /\{anyBuilderActionInBuild && \(/.test(builderShellCode),
+    /\{voicePlatformEnabled && \(/.test(builderShellCode),
 );
 
 check(
@@ -1057,9 +1063,11 @@ check(
 );
 
 check(
-  "the standing Test and Publish placeholders are inside that gate, not beside it",
-  /\{browserTestInBuild &&\s*\(testControl \?\?/.test(builderShellCode) &&
-    /\{publishInBuild &&\s*\(publishControl \?\?/.test(builderShellCode),
+  "the standing Test call and Publish placeholders are inside that gate, not beside it — real control when the sub-flag is on, a disabled 'not enabled' placeholder when it is off",
+  /\{browserTestInBuild \? \(\s*testControl \?\?/.test(builderShellCode) &&
+    /\{publishInBuild \? \(\s*publishControl \?\?/.test(builderShellCode) &&
+    /label="Test call" availability=\{NOT_ENABLED_REASON\}/.test(builderShellCode) &&
+    /label="Publish" availability=\{NOT_ENABLED_REASON\}/.test(builderShellCode),
 );
 
 check(
@@ -1888,7 +1896,9 @@ if (!existsSync(distDir)) {
 
       check(
         "and the builder itself — tabs, name, save — is untouched by either flag",
-        ["Setup", "Prompt", "Voice & Model", "Save Draft", "Assistant Builder"].every((s) =>
+        // V5 PR-6: "Setup" -> "Configuration", "Voice & Model" -> "Voice",
+        // "Save Draft" -> "Save changes".
+        ["Configuration", "Prompt", "Voice", "Save changes", "Assistant Builder"].every((s) =>
           everyAsset.includes(s),
         ),
       );
