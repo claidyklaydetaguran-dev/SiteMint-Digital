@@ -14,6 +14,19 @@
  * - The AI Receptionist product entry is an outlined pill with a live dot.
  * - The mobile sheet groups destinations into deliberate expandables
  *   (What We Build · Company) instead of one flat list.
+ *
+ * Product-mode redesign (owner review: "the nav bar on AI Receptionist,
+ * it's too messy"). The defect was structural, not cosmetic: `headerMode=
+ * "product"` used to render the *entire* company nav (What We Build panel +
+ * Work/Process/Company + the redundant AI Receptionist pill) and then bolt
+ * two extra CTAs onto the end — seven interactive targets in one row.
+ * Product mode now renders its own lean row instead of extending the
+ * company one: brand → quiet separator → "AI Receptionist" as plain text
+ * (no pill, we're already on that page) → up to three quiet in-page anchors
+ * → "Sign in" → one primary CTA. See the "Product-mode header" CSS block in
+ * v4-chrome.css for the responsive collapse strategy. Company mode's JSX
+ * and CSS are untouched — every product-only rule is scoped under
+ * `[data-mode="product"]`.
  */
 
 import {
@@ -25,6 +38,7 @@ import {
 } from "react";
 import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, X } from "lucide-react";
+import { ROUTES } from "@/lib/routes";
 import { SignalMarkV4 } from "./SignalMarkV4";
 import { SignalGlyphV4 } from "./SignalGlyphsV4";
 import {
@@ -36,11 +50,20 @@ import {
   startLabelV4,
   whatWeBuildV4,
   requestBetaHrefV4,
-  requestBetaLabelV4,
-  explorePreviewHrefV4,
-  explorePreviewLabelV4,
-  productSignInLabelV4,
 } from "./publicNavV4";
+
+/**
+ * Product-mode quick links (owner review fix). At most three, into the
+ * strongest sections of the AI Receptionist page — real ids from
+ * `pages/receptionist-v5/sections.ts` (`RECEPTIONIST_V5_SECTIONS`). Kept
+ * local to the header rather than in `publicNavV4.ts` since this component
+ * is the only consumer.
+ */
+const productQuickLinksV4 = [
+  { label: "What it does", href: `${ROUTES.aiReceptionist}#what-it-does` },
+  { label: "Try it", href: `${ROUTES.aiReceptionist}#try` },
+  { label: "FAQ", href: `${ROUTES.aiReceptionist}#faq` },
+];
 
 function isActive(location: string, href?: string): boolean {
   if (!href || href.includes("#")) return false;
@@ -55,10 +78,11 @@ function isPillarActive(location: string): boolean {
 export interface SiteHeaderV4Props {
   tone?: "ink" | "light";
   /**
-   * IA §3 / L-7: `"product"` swaps the company CTA (Client Sign In + Start a
-   * Project) for the AI Receptionist product actions (Request Beta Access,
-   * Explore the Interactive Preview, Already a client? Sign in) — no
-   * "Start a Project" on a product-mode page. The AI Receptionist route
+   * IA §3 / L-7: `"product"` replaces the whole company row (What We Build
+   * panel, Work/Process/Company, the AI Receptionist pill, Client Sign In,
+   * Start a Project) with a dedicated, lean product row: brand, "AI
+   * Receptionist" as plain text, up to three in-page quick links, "Sign
+   * in", and one primary CTA ("Request Beta"). The AI Receptionist route
    * passes this; every other public route stays `"company"` (default).
    */
   headerMode?: "company" | "product";
@@ -222,9 +246,51 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
           aria-label="SiteMint Digital — home"
         >
           <SignalMarkV4 size={22} />
-          SiteMint
+          {/* Product mode hides the wordmark below ~480px to protect the
+              product name + primary CTA from crowding (v4-chrome.css). The
+              span is inert for company mode — no visual change there. */}
+          <span className="v4-header__brand-word">SiteMint</span>
         </Link>
 
+        {headerMode === "product" ? (
+          <>
+            <span className="v4-header__product-sep" aria-hidden="true" />
+            <span className="v4-header__product-name">AI Receptionist</span>
+
+            <nav className="v4-product-nav" aria-label="Primary">
+              <ul className="v4-product-nav__list">
+                {productQuickLinksV4.map((item) => (
+                  <li key={item.label}>
+                    <Link href={item.href} className="v4-product-nav__link">
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <div className="v4-header__actions">
+              {/* Cross-application document navigation — never a <Link>. */}
+              <a href={signInHrefV4} className="v4-header__signin">
+                Sign in
+              </a>
+              <Link
+                href={requestBetaHrefV4}
+                className="v4-btn v4-btn--primary v4-header__cta"
+                aria-label="Request Beta"
+              >
+                {/* Below ~480px the brand wordmark is already gone (CSS);
+                    shortening "Request Beta" → "Beta" buys back the width
+                    the product name needs to never truncate. "Beta" is a
+                    substring of the constant aria-label above, so the
+                    visible text is always contained in the accessible name
+                    at both sizes. */}
+                <span className="v4-header__cta-full" aria-hidden="true">Request Beta</span>
+                <span className="v4-header__cta-short" aria-hidden="true">Beta</span>
+              </Link>
+            </div>
+          </>
+        ) : (
         <nav className="v4-nav" aria-label="Primary">
           <ul className="v4-nav__list">
             <li onBlur={onPanelBlur}>
@@ -311,62 +377,23 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
 
             <li className="v4-header__sep" role="presentation" aria-hidden="true" />
 
-            {headerMode === "product" ? (
-              <>
-                <li>
-                  {/* Cross-application document navigation — never a <Link>.
-                      Density fix: the full label ("Already a client? Sign
-                      in") plus two CTA buttons plus the product pill was
-                      wrapping onto two lines at ≥1024px (owner review
-                      finding #2) — `aria-label` keeps one accessible name
-                      constant while the visible text shortens below the
-                      width the full sentence needs. */}
-                  <a href={signInHrefV4} className="v4-header__signin" aria-label={productSignInLabelV4}>
-                    <span className="v4-header__signin-full" aria-hidden="true">{productSignInLabelV4}</span>
-                    <span className="v4-header__signin-short" aria-hidden="true">Sign in</span>
-                  </a>
-                </li>
-                <li>
-                  <Link
-                    href={explorePreviewHrefV4}
-                    className="v4-btn v4-btn--outline v4-header__cta"
-                    aria-label={explorePreviewLabelV4}
-                  >
-                    <span className="v4-header__cta-full" aria-hidden="true">{explorePreviewLabelV4}</span>
-                    <span className="v4-header__cta-short" aria-hidden="true">Preview</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href={requestBetaHrefV4}
-                    className="v4-btn v4-btn--primary v4-header__cta"
-                    aria-label={requestBetaLabelV4}
-                  >
-                    <span className="v4-header__cta-full" aria-hidden="true">{requestBetaLabelV4}</span>
-                    <span className="v4-header__cta-short" aria-hidden="true">Request Beta</span>
-                  </Link>
-                </li>
-              </>
-            ) : (
-              <>
-                <li>
-                  {/* Cross-application document navigation — never a <Link>. */}
-                  <a href={signInHrefV4} className="v4-header__signin">
-                    {signInLabelV4}
-                  </a>
-                </li>
-                <li>
-                  <Link
-                    href={startHrefV4}
-                    className="v4-btn v4-btn--primary v4-header__cta"
-                  >
-                    {startLabelV4}
-                  </Link>
-                </li>
-              </>
-            )}
+            <li>
+              {/* Cross-application document navigation — never a <Link>. */}
+              <a href={signInHrefV4} className="v4-header__signin">
+                {signInLabelV4}
+              </a>
+            </li>
+            <li>
+              <Link
+                href={startHrefV4}
+                className="v4-btn v4-btn--primary v4-header__cta"
+              >
+                {startLabelV4}
+              </Link>
+            </li>
           </ul>
         </nav>
+        )}
 
         <button
           ref={sheetTriggerRef}
@@ -432,19 +459,13 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
             {headerMode === "product" ? (
               <>
                 <a href={signInHrefV4} className="v4-sheet__quiet">
-                  {productSignInLabelV4}
+                  Sign in
                 </a>
-                <Link
-                  href={explorePreviewHrefV4}
-                  className="v4-btn v4-btn--outline v4-sheet__cta"
-                >
-                  {explorePreviewLabelV4}
-                </Link>
                 <Link
                   href={requestBetaHrefV4}
                   className="v4-btn v4-btn--primary v4-sheet__cta"
                 >
-                  {requestBetaLabelV4}
+                  Request Beta
                 </Link>
               </>
             ) : (
