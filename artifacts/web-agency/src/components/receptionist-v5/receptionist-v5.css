@@ -49,8 +49,15 @@
   box-sizing: border-box;
 }
 
-.smv5 a {
+.smv5 a:where(:not(.smv5-btn)) {
   color: var(--smv5-mint-700);
+}
+
+/* Links inside running text must be distinguishable without color alone
+   (WCAG 1.4.1 / Lighthouse link-in-text-block). */
+.smv5 p a:where(:not(.smv5-btn)) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .smv5__container {
@@ -913,6 +920,11 @@
 
 .smv5-cta-band .smv5__lede {
   color: #cfe9e4;
+}
+
+/* Eyebrow on the dark band: mint-700 fails contrast on ink; mint-400 is 5.46:1. */
+.smv5-cta-band .smv5__eyebrow {
+  color: var(--smv5-mint-400);
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */

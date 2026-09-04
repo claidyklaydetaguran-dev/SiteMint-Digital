@@ -78,7 +78,7 @@
   --pp-mint-100: var(--pp-mint-pale);
   --pp-surface: var(--pp-white);
   --pp-text: 207 26% 31%; /* = slate-600, cool blue-gray body text */
-  --pp-text-muted: 207 12% 55%; /* = slate-mid */
+  --pp-text-muted: 207 21% 37%; /* deep slate, 6.26:1 on white (was 12% 55%, 3.37:1) */
   --pp-border: var(--pp-border-pale);
   --pp-shadow: 203 76% 8%; /* = navy-950, navy-based shadow tint */
   --pp-glow: var(--pp-cyan-mint);
@@ -145,7 +145,7 @@
   --sm-color-border-strong: 207 12% 55%; /* = slate-mid */
   --sm-color-text-primary: 203 76% 8%; /* = navy-950 */
   --sm-color-text-secondary: 207 26% 31%; /* = slate-600 */
-  --sm-color-text-muted: 207 12% 55%; /* = slate-mid */
+  --sm-color-text-muted: 207 21% 37%; /* deep slate, 6.26:1 on white (was 12% 55%, 3.37:1) */
 
   /* Round-5: primary CTA color changes to bright cyan-mint per explicit
      owner override of the earlier "no bright cyan buttons" rule. Overridden

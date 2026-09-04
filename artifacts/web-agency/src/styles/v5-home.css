@@ -636,4 +636,6 @@
 }
 .sm-final-cta__signin a {
   color: var(--sm-mint-400, #56D2CF);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
