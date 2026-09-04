@@ -1,0 +1,199 @@
+/**
+ * Frontend V5 — shared presentation for the inner public pages touched by
+ * the visual-completion pass (Services, Work, Process, Company, Start,
+ * Pricing, AI Systems, NotFound). Owned by the Public Website workstream.
+ *
+ * Scoping rule: every rule in this file lives under `.sm-v5page` (added to
+ * each owned page's own root element alongside its existing wrapper class).
+ * Several of these pages share base vocabulary (`.v3-section`, `.v3-h2`,
+ * `.v3-service-page`, …) with pages this workstream does NOT own (legacy
+ * `AutomationV3`, `DiscoverySystemsV3`, `WebsitesAppsV3`, the V2 pages, the
+ * CRM). Scoping every rule to `.sm-v5page` — and, for the two custom
+ * properties below, redefining them only on that same class so the cascade
+ * carries the tightened value to every `.v3-section`/`.v3-body` *inside* an
+ * owned page without touching `tokens-v3.css` — guarantees nothing here
+ * leaks onto a page this file does not own, even though the class names are
+ * shared globally.
+ *
+ * Imported directly by the pages that use it (never `index.css`).
+ */
+
+.sm-v5page {
+  /* Owner §6: section rhythm was excessive (up to 8rem top+bottom between
+     adjacent sections desktop). Tightened, with the same clamp() shape so
+     mobile still compresses further via the vw term. */
+  --v3-section-y: clamp(3rem, 4vw + 1rem, 5.5rem);
+  /* Owner §6: text columns ≤65ch. */
+  --v3-measure: 62ch;
+}
+
+/* ── Section-head → body rhythm tightened (owner §6: "headline→description
+   →visual distances tightened") ─────────────────────────────────────────── */
+.sm-v5page .v3m-sechead {
+  margin-bottom: var(--v3-space-8, 2rem);
+}
+
+/* ── Small caption under an interactive diagram (Services systems map) ──── */
+.sm-v5page .sm-map-caption {
+  max-width: 36ch;
+  margin: 0.85rem auto 0;
+  text-align: center;
+  font-size: var(--v3-text-small, 0.9rem);
+}
+
+/* ── "Connects to" mini-list under a pillar summary (Services) ──────────── */
+.sm-v5page .sm-connects {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin: 0;
+  padding: 0;
+}
+.sm-v5page .sm-connects__label {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-text-muted, #4A6472);
+  margin-right: 0.15rem;
+}
+.sm-v5page .sm-connects__item {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-pill, 999px);
+  color: var(--sm-text-muted, #4A6472);
+}
+
+/* ── AI Systems — compact workflow strip (finishes the "AI Systems workflow
+   visualization" interaction signature on the service page itself; Home's
+   own copy of this diagram is untouched). ─────────────────────────────── */
+.sm-v5page .sm-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0 0 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+  flex-wrap: wrap;
+}
+.sm-v5page .sm-flow__node {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-v5page .sm-flow__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sm-mint-500, #32C5D2);
+  flex-shrink: 0;
+}
+.sm-v5page .sm-flow__arrow {
+  width: 1.5rem;
+  height: 1px;
+  background: var(--sm-line-strong, #A9CFD6);
+  margin: 0 0.6rem;
+}
+
+/* ── Pricing — "What affects the price" factor list ──────────────────────── */
+.sm-v5page .sm-price-factors {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 1.75rem;
+}
+@media (min-width: 780px) {
+  .sm-v5page .sm-price-factors {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.sm-v5page .sm-price-factor {
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.9rem;
+  border-top: 2px solid var(--sm-mint-500, #32C5D2);
+}
+.sm-v5page .sm-price-factor__title {
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-v5page .sm-price-factor__desc {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.92rem;
+  max-width: 42ch;
+}
+
+/* ── Process — connecting rail on the numbered stage list (finishes the
+   "Process scroll timeline" interaction signature with a real visual rail,
+   CSS-only — no scroll-linked JS risk). Anchored to the 120px number-column
+   boundary that `.v3m-step` already establishes at ≥768px (`v3-marketing.css`),
+   not to the number glyph's own metrics, so it stays correctly placed at any
+   digit width. Single-column mobile layout doesn't get a rail — nothing to
+   connect once the stages stack, and it would run behind the number text. */
+@media (min-width: 768px) {
+  .sm-v5page .v3m-steps {
+    position: relative;
+  }
+  .sm-v5page .v3m-step {
+    position: relative;
+  }
+  .sm-v5page .v3m-step::before {
+    content: "";
+    position: absolute;
+    left: 120px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--sm-mint-500, #32C5D2);
+    opacity: 0.35;
+  }
+  .sm-v5page .v3m-step:first-child::before {
+    top: var(--v3-space-8, 2rem);
+  }
+  .sm-v5page .v3m-step:last-child::before {
+    bottom: var(--v3-space-8, 2rem);
+  }
+}
+
+/* ── NotFound — a composed page instead of a vertically-centred void ────── */
+.sm-v5page.sm-notfound {
+  padding-block: clamp(3.5rem, 8vh, 6rem) clamp(2.5rem, 6vh, 4rem);
+}
+.sm-v5page .sm-notfound__mark {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1.5rem;
+}
+.sm-v5page .sm-notfound__exits {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.sm-v5page .sm-notfound__hint {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--v4-navy-line, rgba(159, 194, 204, 0.25));
+  color: var(--v4-mute-dark, #9FC2CC);
+  font-size: 0.92rem;
+  max-width: 52ch;
+}
+
+/* ── Mobile compression (owner §6: desktop gaps must shrink further below
+   768px, beyond what the clamp() alone gives the shared vocabulary). ────── */
+@media (max-width: 767px) {
+  .sm-v5page .v3m-page-hero {
+    padding-top: var(--v3-space-8, 2rem);
+    padding-bottom: var(--v3-space-6, 1.5rem);
+  }
+  .sm-v5page .sm-price-factors {
+    margin-top: 1.25rem;
+  }
+}

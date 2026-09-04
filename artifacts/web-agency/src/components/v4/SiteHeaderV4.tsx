@@ -213,6 +213,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
       className="v4-header"
       data-surface={surface}
       data-scrolled={scrolled || undefined}
+      data-mode={headerMode}
     >
       <div className="v4-header__inner">
         <Link
@@ -313,25 +314,36 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
             {headerMode === "product" ? (
               <>
                 <li>
-                  {/* Cross-application document navigation — never a <Link>. */}
-                  <a href={signInHrefV4} className="v4-header__signin">
-                    {productSignInLabelV4}
+                  {/* Cross-application document navigation — never a <Link>.
+                      Density fix: the full label ("Already a client? Sign
+                      in") plus two CTA buttons plus the product pill was
+                      wrapping onto two lines at ≥1024px (owner review
+                      finding #2) — `aria-label` keeps one accessible name
+                      constant while the visible text shortens below the
+                      width the full sentence needs. */}
+                  <a href={signInHrefV4} className="v4-header__signin" aria-label={productSignInLabelV4}>
+                    <span className="v4-header__signin-full" aria-hidden="true">{productSignInLabelV4}</span>
+                    <span className="v4-header__signin-short" aria-hidden="true">Sign in</span>
                   </a>
                 </li>
                 <li>
                   <Link
                     href={explorePreviewHrefV4}
                     className="v4-btn v4-btn--outline v4-header__cta"
+                    aria-label={explorePreviewLabelV4}
                   >
-                    {explorePreviewLabelV4}
+                    <span className="v4-header__cta-full" aria-hidden="true">{explorePreviewLabelV4}</span>
+                    <span className="v4-header__cta-short" aria-hidden="true">Preview</span>
                   </Link>
                 </li>
                 <li>
                   <Link
                     href={requestBetaHrefV4}
                     className="v4-btn v4-btn--primary v4-header__cta"
+                    aria-label={requestBetaLabelV4}
                   >
-                    {requestBetaLabelV4}
+                    <span className="v4-header__cta-full" aria-hidden="true">{requestBetaLabelV4}</span>
+                    <span className="v4-header__cta-short" aria-hidden="true">Request Beta</span>
                   </Link>
                 </li>
               </>

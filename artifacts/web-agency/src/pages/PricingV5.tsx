@@ -19,6 +19,34 @@ import {
   AI_RECEPTIONIST_PRICING_NOTE_V5,
   type PricingTierV5,
 } from "@/components/v5/pricingTiersV5";
+import "@/styles/v5-pages.css";
+
+const PRICE_FACTORS = [
+  {
+    title: "Number of pages & flows",
+    desc: "A five-page brochure site and a twenty-page site with gated content are different builds, even at the same tier.",
+  },
+  {
+    title: "Integrations & CRM connections",
+    desc: "Connecting to a calendar or an existing tool takes less time than replacing that tool with a SiteMint CRM.",
+  },
+  {
+    title: "Automation complexity",
+    desc: "A single follow-up sequence is a different scope than routing, reminders, and record-keeping across a whole pipeline.",
+  },
+  {
+    title: "Content & design readiness",
+    desc: "Ready copy and brand assets move faster than starting from a blank page — we'll tell you which applies during discovery.",
+  },
+  {
+    title: "Timeline",
+    desc: "A compressed launch date can change scope or cost; discovery is where we'll say so plainly, not after you've committed.",
+  },
+  {
+    title: "Ongoing support",
+    desc: "Launch-only versus continued tuning and support changes the total, not just the build price.",
+  },
+] as const;
 
 const SCOPE_ADD_ONS = [
   { id: "crm", label: "CRM or workflow connection" },
@@ -168,7 +196,7 @@ export default function PricingV5() {
   });
 
   return (
-    <div className="v3-services-hub">
+    <div className="v3-services-hub sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">Pricing</span>
@@ -197,6 +225,29 @@ export default function PricingV5() {
       </section>
 
       <section className="v3-section" data-tone="porcelain">
+        <div className="v3-container v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow">What affects the price</span>
+          <h2 className="v3-h2" style={{ marginTop: "0.5rem" }}>
+            Six things that move a project between tiers.
+          </h2>
+          <p className="v3-body" style={{ marginTop: "0.5rem" }}>
+            The three tiers above are starting points, not the final word —
+            these are the factors that shift a project up or down from its
+            starting price, and every one of them gets discussed plainly
+            during discovery, before we commit to a number.
+          </p>
+          <div className="sm-price-factors">
+            {PRICE_FACTORS.map((factor) => (
+              <div className="sm-price-factor" key={factor.title}>
+                <span className="sm-price-factor__title">{factor.title}</span>
+                <p className="sm-price-factor__desc">{factor.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="v3-section" data-tone="white">
         <div className="v3-container v3-reveal" ref={reveal}>
           <ScopeConfigurator />
         </div>

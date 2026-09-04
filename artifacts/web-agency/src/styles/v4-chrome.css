@@ -310,6 +310,60 @@
   color: var(--v4-cloud);
 }
 
+/* ── Product-mode header density fix (owner review finding #2) ───────────
+   `headerMode="product"` (AI Receptionist page) puts three extra items in
+   the row — the outlined pill, "Already a client? Sign in", an outline
+   button, and a primary button, on top of the three primary nav links.
+   `.v4-header__inner` caps at 1280px (`max-width`), so the row's available
+   width plateaus there regardless of viewport — there is no wider desktop
+   breakpoint where the two full CTA sentences would newly fit, which is
+   why the short labels below are unconditional for product mode rather
+   than swapped in only under some width, a threshold that would have had
+   no real layout meaning past the 1280px cap anyway.
+
+   Three layers: (1) `white-space: nowrap` everywhere a label was wrapping
+   internally instead of the row overflowing, (2) tightened horizontal
+   rhythm so the nav needs less width in the first place, and (3) —
+   because (1)+(2) alone still don't leave room for the two full CTA
+   sentences at any desktop width — `SiteHeaderV4.tsx` renders a short
+   label in their place for product mode; the anchor's own `aria-label`
+   keeps one constant accessible name regardless, so this is a visual
+   density fix only, never a copy change (the mobile sheet, which has
+   plenty of width, keeps the full sentences unchanged). */
+.v4-nav__link,
+.v4-nav__prod,
+.v4-header__signin,
+.v4-header__cta {
+  white-space: nowrap;
+}
+
+.v4-header[data-mode="product"] .v4-header__signin-full,
+.v4-header[data-mode="product"] .v4-header__cta-full {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .v4-header[data-mode="product"] .v4-header__inner {
+    gap: 0.85rem;
+  }
+  .v4-header[data-mode="product"] .v4-nav__list {
+    gap: 0.05rem;
+  }
+  .v4-header[data-mode="product"] .v4-nav__link {
+    padding-inline: 0.55rem;
+  }
+  .v4-header[data-mode="product"] .v4-nav__prod {
+    padding-inline: 0.7rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__signin {
+    padding-inline: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__cta {
+    padding-inline: 1rem;
+  }
+}
+
 /* ── What We Build panel (click-operated) ──────────────────────────────── */
 .v4-panel {
   position: fixed;

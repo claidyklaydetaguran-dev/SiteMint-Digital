@@ -7,6 +7,7 @@ import { ShieldCheck, Eye, PauseCircle, MessagesSquare } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import "@/styles/v5-pages.css";
 
 /**
  * V5 (W-8): the five real phases — Discover · Design · Build · Validate ·
@@ -49,7 +50,7 @@ export default function ProcessV3() {
   });
 
   return (
-    <div className="v3-process-page">
+    <div className="v3-process-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">Process</span>

@@ -9,6 +9,7 @@ import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { teamV5 } from "@/components/v5/teamV5";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import "@/styles/v5-pages.css";
 
 export default function AboutV3() {
   const reveal = useReveal();
@@ -18,7 +19,7 @@ export default function AboutV3() {
   });
 
   return (
-    <div className="v3-about-page">
+    <div className="v3-about-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">About</span>

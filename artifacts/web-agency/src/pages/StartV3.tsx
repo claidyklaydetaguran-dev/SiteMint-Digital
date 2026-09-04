@@ -11,6 +11,7 @@ import { ArrowRight, Clock, FileText, MessagesSquare, Phone, Mail, ShieldCheck }
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import "@/styles/v5-pages.css";
 
 /** Real contact details (W-12) — same values as `ThankYou.tsx`. */
 const SUPPORT_PHONE = "949-880-6515";
@@ -26,7 +27,7 @@ export default function StartV3() {
   });
 
   return (
-    <div className="v3-start-page">
+    <div className="v3-start-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">Start with SiteMint</span>
