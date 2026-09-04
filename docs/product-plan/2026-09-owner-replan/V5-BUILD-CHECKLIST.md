@@ -40,11 +40,11 @@
 | C-03 | Customer app | Forgot password + reset UI | P0 | IN PROGRESS | — | — | — | — | — |
 | C-04 | Customer app | Persistent 10-step onboarding hub (Setup) | P0 | IN PROGRESS | — | — | — | — | — |
 | C-05 | Customer app | Overview redesign (D-1) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-06 | Customer app | One-assistant status card; hide create-another | P0 | IN PROGRESS | — | — | — | — | — |
-| C-07 | Customer app | Configuration fields (C-2) from workspace settings | P0 | IN PROGRESS | — | — | — | — | — |
-| C-08 | Customer app | Structured prompt + full-prompt preview + "how callers hear this"; Advanced | P0 | IN PROGRESS | — | — | — | — | — |
-| C-09 | Customer app | Voice presets with sample player + provider-neutral asset adapter (no paid samples) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-10 | Customer app | Test / Publish controls with prerequisite states; "Save changes"/"Publish update" | P0 | IN PROGRESS | — | — | — | — | — |
+| C-06 | Customer app | One-assistant status card; hide create-another | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
+| C-07 | Customer app | Configuration fields (C-2) from workspace settings | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
+| C-08 | Customer app | Structured prompt + full-prompt preview + "how callers hear this"; Advanced | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
+| C-09 | Customer app | Voice presets with sample player + provider-neutral asset adapter (no paid samples) | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
+| C-10 | Customer app | Test / Publish controls with prerequisite states; "Save changes"/"Publish update" | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
 | C-11 | Customer app | Availability + Appointment Types unbundled from voice flag; Advanced grouping | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-12 | Customer app | Scheduling → Calendar screen (connect/status/reconnect/disconnect/post-OAuth) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-13 | Customer app | Appointment lifecycle UI (approve/reschedule/cancel/reconcile) + drawer + confirmations | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
@@ -56,7 +56,7 @@
 | C-19 | Customer app | Customer Issues page (safe failures) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IN PROGRESS | — | — | — | — | — |
 | C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IN PROGRESS | — | — | — | — | — |
-| C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IN PROGRESS | — | — | — | — | — |
+| C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
 | O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
 | O-02 | Operations | Secure admin sessions UI (cookie login/logout/me) | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
 | O-03 | Operations | Breadcrumbs, single scroll region, in-layout 404 | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
