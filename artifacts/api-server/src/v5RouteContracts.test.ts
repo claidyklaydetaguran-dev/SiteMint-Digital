@@ -24,7 +24,8 @@ import { describe, expect, it } from "vitest";
 const SRC = join(dirname(fileURLToPath(import.meta.url)), ".");
 const read = (p: string) => readFileSync(join(SRC, p), "utf8");
 // Comments may legitimately NAME Vapi to document its absence; only code counts.
-const stripComments = (src: string) => src.replace(//*[sS]*?*//g, "").replace(/^s*//.*$/gm, "");
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
