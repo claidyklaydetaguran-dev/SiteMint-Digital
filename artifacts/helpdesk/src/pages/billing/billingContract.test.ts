@@ -31,6 +31,7 @@ import {
   CHECKOUT_TIMEOUT_MS,
   canUpgrade,
   checkoutCopy,
+  checkoutEnabled,
   checkoutLabel,
   checkoutUrl,
   countOrNull,
@@ -40,6 +41,7 @@ import {
   isKnownPlan,
   LIMIT_REACHED_DETAIL,
   LOADING_MESSAGE,
+  manualInvoicingCopy,
   METER_LABEL,
   NOT_AVAILABLE,
   PAID_LIMIT_DETAIL,
@@ -246,8 +248,42 @@ eq("an undefined plan is not offered an upgrade", canUpgrade(undefined), false);
 eq("eligibility is not case-tolerant — only the stored value counts", canUpgrade("Trial"), false);
 
 check(
-  "the page renders the Upgrade section only behind that check",
-  /eligible = canUpgrade\(/.test(pageCode) && /\{eligible && \(/.test(pageCode),
+  // D-6: eligibility (a real trial account) is necessary but no longer
+  // sufficient — the Stripe control also requires the checkoutEnabled()
+  // build flag, so the two conditions must both appear on the gate.
+  "the page renders the Upgrade section only behind trial eligibility AND the checkout-enabled flag",
+  /eligible = canUpgrade\(/.test(pageCode) && /\{eligible && checkoutEnabled\(\) && \(/.test(pageCode),
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// D-6 — manual invoicing during the private beta
+// ═══════════════════════════════════════════════════════════════════════════
+
+section("D-6 — Stripe checkout hidden; manual invoicing shown instead");
+
+check(
+  "checkoutEnabled reads the same VITE_* flag pattern every other flag in this app uses",
+  contractSrc.includes('import.meta.env.VITE_BILLING_CHECKOUT_ENABLED === "true"'),
+);
+check(
+  "outside a bundler (the plain tsx test runner) the flag defaults closed",
+  checkoutEnabled() === false,
+);
+eq("the manual-invoicing title names the private beta", manualInvoicingCopy().title, "Billing during the private beta");
+eq(
+  "the manual-invoicing detail is the exact brief wording",
+  manualInvoicingCopy().detail,
+  "Billing during the private beta is handled by SiteMint (manual invoicing).",
+);
+check(
+  "an eligible trial account sees the manual-invoicing notice when checkout is disabled",
+  /\{eligible && !checkoutEnabled\(\) && \(/.test(pageCode) && pageCode.includes("manualInvoicingCopy()"),
+);
+check(
+  "every checkout mechanic (path, mutation, response handling, copy) is still fully built — only its visibility changed",
+  pageCode.includes("CHECKOUT_PATH") &&
+    pageCode.includes("handleUpgrade") &&
+    pageCode.includes("checkoutCopy()"),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -909,8 +945,16 @@ check(
   /key: "billing", label: "Billing", href: "\/billing"[\s\S]{0,80}voiceGated: false/.test(navSrc),
 );
 check(
-  "the route adds no feature flag of its own",
-  !/featureFlags|voicePlatformEnabled|import\.meta\.env/.test(routeCode),
+  // D-6 adds exactly one flag, VITE_BILLING_CHECKOUT_ENABLED, read directly
+  // in billingContract.ts rather than through the shared `lib/featureFlags.ts`
+  // module that documents itself as the single import site for VITE_*
+  // flags. That file is outside this session's edit scope (helpdesk
+  // nav/shell/flags belong to a different owner); consolidating this flag
+  // into it is reported to that owner rather than done here. No *other*
+  // flag or voice-platform gating was introduced.
+  "the route adds exactly the one documented D-6 flag, no voice-platform gating",
+  (routeCode.match(/import\.meta\.env\.VITE_BILLING_CHECKOUT_ENABLED/g) ?? []).length >= 1 &&
+    !/featureFlags|voicePlatformEnabled|VITE_VOICE/.test(routeCode),
 );
 check(
   "voice gating is untouched by this route",

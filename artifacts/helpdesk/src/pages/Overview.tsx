@@ -1,66 +1,57 @@
 /**
- * Frontend V2 Phase 7 — the default authenticated dashboard overview.
+ * V5 customer-shell foundation — the redesigned dashboard overview (D-1).
  *
- * The page answers one question: *is my SMS receptionist set up, and is
- * anything waiting on me?* Everything on it is derived from the three
- * authenticated endpoints the dashboard already called — no request, method,
- * payload, query key, or caching behaviour is changed by this file.
+ * Answers four questions, in this order: is the receptionist live and
+ * healthy? what happened recently? what needs attention? what's next? A
+ * status header (state chip, assigned number, calendar connection), a setup
+ * progress pointer while incomplete, a needs-attention list, today's
+ * activity, recent calls and recent conversations, a compact usage tile, and
+ * exactly one next-best-action button. No fabricated metric: every value
+ * traces to a real response, and an unknown count is never shown as zero.
  *
- * ── What changed, and why ─────────────────────────────────────────────────
- *
- *  1. **The "Receptionist active" badge is gone.** No endpoint reports whether
- *     a number is live, so that badge was an assertion with nothing behind it.
- *     The page now shows evidence instead: configuration state (real, from
- *     agent-config) and the timestamp of the most recent real conversation.
- *
- *  2. **The setup checklist reports the truth.** The server sends agent-config
- *     wrapped in `{ firm: … }`; the previous page read the fields off the top
- *     level, so every field was `undefined` and a fully configured firm was
- *     told "0 of 3 steps completed". `readAgentConfig` reads the documented
- *     shape. Frontend misread only — see `overviewContract.ts`.
- *
- *  3. **The recharts bar chart is gone.** A seven-bar count of conversations
- *     cost 380 kB on the dashboard's own route chunk and told an owner less
- *     than the conversation list directly beneath it. The real counts remain,
- *     as figures.
- *
- *  4. **The three voice metric tiles are gone.** "Calls answered — Voice add-on
- *     required" implied a purchasable add-on that does not exist. Voice
- *     readiness is stated once, honestly, in the capability ladder.
- *
- * ── States ────────────────────────────────────────────────────────────────
- * Authentication loading is handled by `AppShell` before this renders.
- * This component covers: authenticated loading, empty account, populated,
- * partial data (agent-config failed but conversations loaded, and the
- * reverse), and request failure. A session expiry surfaces as a session error
- * and `AppShell` redirects — this page never renders authenticated content
- * without a resolved session.
+ * Voice-platform data (assistant status, assigned number, open issues,
+ * recent calls) is fetched only when `voicePlatformEnabled` is true — the
+ * same gating pattern `useAssistantsList` already uses — so this page
+ * degrades gracefully to its SMS-only sections in the canonical build.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowRight, Check, CircleDashed } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
 import { useSession } from "@/hooks/useSession";
 import { relativeTime } from "@/lib/conversationUi";
-import { CAPABILITY_STATUS, READINESS } from "@/pages/login/readiness";
+import { voicePlatformEnabled } from "@/lib/featureFlags";
+import { StatusChip, type StatusTone } from "@/components/common/StatusChip";
+import { NextActionCard } from "@/components/common/NextActionCard";
+import { PageHeader } from "@/components/common/PageHeader";
+import {
+  useAssignedNumber,
+  useAssistantPublished,
+  useCalendarConnectedFlag,
+  useOnboardingProgress,
+  useOpenIssuesCount,
+  usePendingAppointmentRequestsCount,
+  useRecentCalls,
+  countCallsToday,
+} from "@/pages/overview/overviewApi";
 import {
   buildActivityFigures,
-  buildAttention,
-  deriveReadiness,
-  readAgentConfig,
+  buildNeedsAttention,
+  buildNextBestAction,
+  buildTodayFigures,
+  buildUsage,
+  countToday,
+  deriveReceptionistState,
+  pageCopy,
+  recentCalls as recentCallsOf,
   recentConversations,
-  type Readiness,
+  RECEPTIONIST_STATE_LABEL,
+  type ReceptionistState,
 } from "@/pages/overview/overviewContract";
 import "@/styles/v2-dashboard.css";
 
 function todayLabel(): string {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
 // ─── Loading ───────────────────────────────────────────────────────────────
@@ -79,94 +70,40 @@ function OverviewSkeleton() {
   );
 }
 
-// ─── Status rail ───────────────────────────────────────────────────────────
+const STATE_TONE: Record<ReceptionistState, StatusTone> = {
+  not_set_up: "pending",
+  setup_in_progress: "next",
+  ready_for_activation: "warn",
+  live: "live",
+};
 
-function statusCopy(readiness: Readiness): { title: string; detail: string } {
-  switch (readiness.state) {
-    case "answering":
-      return {
-        title: "SMS receptionist configured",
-        detail: `Most recent conversation activity ${relativeTime(readiness.lastActivityAt!)} ago.`,
-      };
-    case "configured":
-      return {
-        title: "SMS receptionist configured",
-        detail: readiness.activityKnown
-          ? "No conversations yet. The first one appears here once someone texts your business number."
-          : "Setup is complete. Conversation activity could not be loaded just now.",
-      };
-    case "incomplete":
-      // The count lives in the chip beside this copy, so it is not repeated
-      // here — the sentence says what finishing the steps buys instead.
-      return {
-        title: "Finish setting up your receptionist",
-        detail: "The receptionist answers with your own details once these are set.",
-      };
-    case "unknown":
-    default:
-      return {
-        title: "Setup status unavailable",
-        detail: "Your receptionist settings could not be loaded. Everything else on this page is current.",
-      };
-  }
-}
+// ─── Status header ───────────────────────────────────────────────────────
 
-function StatusRail({ readiness }: { readiness: Readiness }) {
-  const { title, detail } = statusCopy(readiness);
-  const showSteps = readiness.state === "incomplete";
-
+function StatusHeader({
+  state,
+  numberDisplay,
+  calendarConnected,
+}: {
+  state: ReceptionistState;
+  numberDisplay: string | null;
+  calendarConnected: boolean | null;
+}) {
   return (
-    <section className="sd-status" data-state={readiness.state} aria-labelledby="sd-status-title">
+    <section className="sd-status" data-state={state === "live" ? "answering" : "incomplete"} aria-labelledby="sd-status-title">
       <div className="sd-status__head">
         <span className="sd-status__dot" aria-hidden="true" />
         <div className="sd-status__body">
           <h2 className="sd-status__title" id="sd-status-title">
-            {title}
+            Receptionist status
           </h2>
-          <p className="sd-status__detail">{detail}</p>
+          <p className="sd-status__detail">
+            {numberDisplay ? `Number: ${numberDisplay}` : "No phone number assigned yet."}
+            {" — "}
+            {calendarConnected === null ? "Calendar status unavailable." : calendarConnected ? "Calendar connected." : "Calendar not connected."}
+          </p>
         </div>
-        {showSteps ? (
-          <span className="sd-status__count">
-            {readiness.completed}/{readiness.total} done
-          </span>
-        ) : (
-          /* The capability whose status this card reports, stated in the same
-             three-tier vocabulary the rest of the product uses. */
-          <span className="sd-tier" data-tier="available">
-            {READINESS.available.label}
-          </span>
-        )}
+        <StatusChip label={RECEPTIONIST_STATE_LABEL[state]} tone={STATE_TONE[state]} />
       </div>
-
-      {showSteps && (
-        <>
-          <ul className="sd-steps">
-            {readiness.steps.map((step) => (
-              <li className="sd-step" key={step.key} data-done={step.done ? "true" : "false"}>
-                {step.done ? (
-                  <Check className="sd-step__mark" aria-hidden="true" />
-                ) : (
-                  <CircleDashed className="sd-step__mark" aria-hidden="true" />
-                )}
-                <div className="sd-step__body">
-                  <span className="sd-step__label">
-                    {step.label}
-                    <span className="sd-sr">{step.done ? " — done" : " — not done yet"}</span>
-                  </span>
-                  <p className="sd-step__detail">{step.detail}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {/* All three steps are edited on the same page, so there is one
-              action rather than a repeated button on every row. */}
-          <div className="sd-status__foot">
-            <Link href={readiness.steps[0]!.href} className="sd-step__action">
-              Open receptionist settings
-            </Link>
-          </div>
-        </>
-      )}
     </section>
   );
 }
@@ -183,32 +120,75 @@ export default function Overview() {
 
   const { data: session, isLoading: sessionLoading } = useSession();
 
-  // agent-config is partial data: its failure never blanks the page, and it is
-  // never substituted with "nothing is configured".
-  const { data: agentConfigBody, isLoading: configLoading, isError: configError } = useQuery({
-    queryKey: ["agent-config"],
-    queryFn: () => apiFetch<unknown>("/receptionist/agent-config"),
-  });
+  const onboarding = useOnboardingProgress();
+  const assistantPublished = useAssistantPublished();
+  const { data: numbers, isLoading: numbersLoading } = useAssignedNumber();
+  const calendarConnected = useCalendarConnectedFlag();
+  const openIssuesCount = useOpenIssuesCount();
+  const pendingRequests = usePendingAppointmentRequestsCount();
+  const recentCallsQuery = useRecentCalls();
 
-  if (sessionLoading || convsLoading || configLoading) return <OverviewSkeleton />;
+  if (sessionLoading || convsLoading || onboarding.isLoading || (voicePlatformEnabled && numbersLoading)) {
+    return <OverviewSkeleton />;
+  }
   if (!session) return null;
 
   const convs = conversations ?? [];
-  const config = configError ? null : readAgentConfig(agentConfigBody);
-  const readiness = deriveReadiness(config, convs, !convsError);
+  const numberAssigned = Boolean(numbers?.items && numbers.items.length > 0);
+  const numberDisplay = numbers?.items?.[0]?.phoneNumberDisplay ?? null;
+
+  const state = deriveReceptionistState({
+    setupComplete: onboarding.setupComplete,
+    anyStepDone: onboarding.anyStepDone,
+    numberAssigned,
+    assistantPublished,
+  });
+
   const isPaid = session.firm.planTier === "paid";
-  const attention = convsError ? [] : buildAttention(convs, isPaid);
+  const attention = convsError
+    ? []
+    : buildNeedsAttention({
+        overCapCount: isPaid ? 0 : convs.filter((c) => c.isOverCap === true).length,
+        needsReviewCount: convs.filter((c) => c.tier === "Needs Review").length,
+        openIssuesCount,
+        pendingAppointmentRequestsCount: pendingRequests,
+      });
+
   const figures = buildActivityFigures(convs);
   const recent = recentConversations(convs);
+  const usage = buildUsage(session);
+
+  const todayFigures = buildTodayFigures({
+    callsToday: countCallsToday(recentCallsQuery.items),
+    conversationsToday: countToday(convs),
+    pendingAppointmentRequests: pendingRequests,
+  });
+
+  const nextAction = buildNextBestAction({ receptionistState: state, attentionCount: attention.length });
+  const recentVoiceCalls = recentCallsOf(recentCallsQuery.items);
+  const page = pageCopy();
 
   return (
     <div className="sd-page sd-enter">
-      <div className="sd-page__head">
-        <h1 className="sd-page__title">Overview</h1>
+      <PageHeader eyebrow={page.eyebrow} title={page.title} />
+      <div className="sd-page__head" style={{ marginTop: "calc(-1 * var(--sd-space-4, 1rem))" }}>
         <span className="sd-page__meta">{todayLabel()}</span>
       </div>
 
-      <StatusRail readiness={readiness} />
+      <StatusHeader state={state} numberDisplay={numberDisplay} calendarConnected={calendarConnected} />
+
+      {/* Exactly one next-best-action control (D-1) — its content already
+          covers every state (setup incomplete, ready for activation, live
+          with attention, live and healthy), so it is rendered once rather
+          than duplicated per branch. */}
+      <div style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
+        <NextActionCard
+          title={nextAction.title}
+          detail={nextAction.detail}
+          actionLabel={nextAction.actionLabel}
+          href={nextAction.href}
+        />
+      </div>
 
       {attention.length > 0 && (
         <section className="sd-section" aria-labelledby="sd-attention-title">
@@ -249,6 +229,28 @@ export default function Overview() {
         </section>
       ) : (
         <>
+          <section className="sd-section" aria-labelledby="sd-today-title">
+            <h2 className="sd-h2" id="sd-today-title">
+              Today&rsquo;s activity
+            </h2>
+            <div className="sd-figures">
+              {todayFigures.map((figure) => (
+                <Link
+                  key={figure.key}
+                  href={figure.href}
+                  className="sd-figure"
+                  data-emphasis={figure.emphasis ? "true" : "false"}
+                  data-nonzero={figure.value ? "true" : "false"}
+                >
+                  <span className="sd-figure__value" data-empty={figure.value === null ? "true" : "false"}>
+                    {figure.value === null ? "None yet" : figure.value}
+                  </span>
+                  <span className="sd-figure__label">{figure.label}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
           <section className="sd-section" aria-labelledby="sd-activity-title">
             <h2 className="sd-h2 sd-sr" id="sd-activity-title">
               Conversation activity
@@ -270,6 +272,40 @@ export default function Overview() {
               ))}
             </div>
           </section>
+
+          {voicePlatformEnabled && (
+            <section className="sd-section" aria-labelledby="sd-calls-title">
+              <div className="sd-section__head">
+                <h2 className="sd-h2" id="sd-calls-title">
+                  Recent calls
+                </h2>
+                {recentVoiceCalls.length > 0 && (
+                  <Link href="/logs" className="sd-link">
+                    View all
+                    <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+              {recentVoiceCalls.length === 0 ? (
+                <div className="sd-empty">
+                  <h3 className="sd-empty__title">No calls yet</h3>
+                  <p className="sd-empty__detail">Calls to your assigned number will appear here.</p>
+                </div>
+              ) : (
+                <ul className="sd-list">
+                  {recentVoiceCalls.map((call) => (
+                    <li className="sd-list__item" key={call.callId}>
+                      <Link href="/logs" className="sd-row">
+                        <span className="sd-row__who">{call.callerNumberDisplay}</span>
+                        <span className="sd-chip">{call.stateLabel}</span>
+                        <span className="sd-row__when">{relativeTime(call.startedAt)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <section className="sd-section" aria-labelledby="sd-recent-title">
             <div className="sd-section__head">
@@ -304,9 +340,7 @@ export default function Overview() {
                           {conversation.tier}
                         </span>
                       )}
-                      <span className="sd-row__when">
-                        {relativeTime(conversation.lastMessageAt)}
-                      </span>
+                      <span className="sd-row__when">{relativeTime(conversation.lastMessageAt)}</span>
                     </Link>
                   </li>
                 ))}
@@ -316,22 +350,22 @@ export default function Overview() {
         </>
       )}
 
-      {/* Product readiness, stated once. The wording is the public site's,
-          character-for-character — see pages/login/readiness.ts. */}
-      <section className="sd-section" aria-labelledby="sd-ladder-title">
-        <h2 className="sd-h2" id="sd-ladder-title">
-          What&rsquo;s available
-        </h2>
-        <ul className="sd-ladder">
-          {CAPABILITY_STATUS.map(({ capability, tier }) => (
-            <li className="sd-ladder__item" key={capability} data-tier={tier}>
-              <span className="sd-ladder__name">{capability}</span>
-              <span className="sd-tier" data-tier={tier}>
-                {READINESS[tier].label}
-              </span>
-            </li>
-          ))}
-        </ul>
+      {/* Compact usage tile (D-1). Trial percentage only; a paid plan carries
+          no percentage, per overviewContract.buildUsage. */}
+      <section className="sd-section" aria-labelledby="sd-usage-title">
+        <div className="sd-section__head">
+          <h2 className="sd-h2" id="sd-usage-title">
+            Usage
+          </h2>
+          <Link href="/billing" className="sd-link">
+            View billing
+          </Link>
+        </div>
+        <p style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)", color: "var(--sd-text-muted, #3b5265)" }}>
+          {usage.isPaid
+            ? `${usage.used} conversations recorded this period.`
+            : `${usage.used} of ${usage.limit} trial conversations used${usage.percent !== null ? ` (${usage.percent}%)` : ""}.`}
+        </p>
       </section>
     </div>
   );

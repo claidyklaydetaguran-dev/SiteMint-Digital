@@ -392,6 +392,34 @@ export function checkoutLabel(state: CheckoutState): string {
   return state === "pending" ? copy.pendingLabel : copy.idleLabel;
 }
 
+// ─── D-6: Stripe checkout hidden during the private beta ───────────────────
+
+/**
+ * D-6: billing during the private beta is handled by SiteMint via manual
+ * invoicing; the Stripe checkout control is hidden unless this build flag is
+ * explicitly `"true"`. Read once here, the same pattern every other
+ * `VITE_*` flag in this app uses (`lib/featureFlags.ts`) — this file does
+ * not add a second interpretation of `import.meta.env`, it just reads one
+ * more variable the same way.
+ */
+export function checkoutEnabled(): boolean {
+  if (typeof import.meta.env === "undefined") return false;
+  return import.meta.env.VITE_BILLING_CHECKOUT_ENABLED === "true";
+}
+
+export interface ManualInvoicingCopy {
+  title: string;
+  detail: string;
+}
+
+/** Shown instead of the Upgrade control while `checkoutEnabled()` is false. */
+export function manualInvoicingCopy(): ManualInvoicingCopy {
+  return {
+    title: "Billing during the private beta",
+    detail: "Billing during the private beta is handled by SiteMint (manual invoicing).",
+  };
+}
+
 // ─── Views ─────────────────────────────────────────────────────────────────
 
 export type ViewId = "plan" | "usage";

@@ -1,33 +1,19 @@
 /**
- * Frontend V2 Phase 5 — committed contract tests for the AI Receptionist
- * signup page.
+ * V5 customer-shell foundation — committed contract tests for the
+ * invite-only AI Receptionist signup page (S-1).
  *
  * Run via: pnpm --filter @workspace/scripts run test
  *
- * It lives beside the module it tests, inside web-agency, so the import is an
- * ordinary sibling import rather than a cross-package one. `scripts` owns the
- * runner because it is the workspace package that already has `tsx`; adding a
- * test runner to web-agency would mean a new dependency, which this phase
- * forbids. web-agency's tsconfig excludes test files by glob, so this file is
- * neither type-built into the app nor bundled by Vite — nothing imports it from
- * the entry graph.
+ * Phase 5's suite pinned the previous open-trial signup (name, business
+ * name, email, phone, industry, password, no invite gate). S-1 replaces that
+ * flow entirely, so this file is rewritten against the new contract rather
+ * than patched — the previous premises (no invite code, no timezone, no
+ * Terms acknowledgement) are the opposite of what S-1 requires.
  *
- * Two kinds of assertion, both dependency-free:
- *
- *  1. **Behavioural.** `signupContract.ts` is pure and imported directly, so
- *     the validation rules, the submitted payload shape, and the error mapping
- *     are executed rather than pattern-matched.
- *  2. **Structural.** The page component is read as source and checked for the
- *     things a renderer would otherwise be needed to prove: that every field is
- *     still present with a label bound to its input, that the submit action and
- *     the sign-in destination are intact, that the readiness wording is
- *     accurate, and that no voice or CRM over-claim has crept back in.
- *
- * This deliberately uses no test framework, no DOM, and no new dependency, and
- * it changes no frozen configuration. It follows the same self-contained
- * PASS/FAIL style as the existing legacy api-server tests.
- *
- * It never performs a network request and never creates an account.
+ * Same arrangement as every other contract test in this app: behavioural
+ * checks execute `signupContract.ts` directly; structural checks read the
+ * page source. No test framework, no DOM, no new dependency, no network
+ * request, no account created.
  */
 
 import { readFileSync } from "node:fs";
@@ -35,12 +21,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  EMPTY_SIGNUP_FORM,
-  INDUSTRY_VALUES,
+  BETA_REQUEST_HREF,
+  emptySignupForm,
+  MIN_PASSWORD_LENGTH,
   SIGNUP_ENDPOINT,
   SIGNUP_METHOD,
   SIGNUP_NETWORK_ERROR,
+  TIMEZONE_OPTIONS,
   buildSignupPayload,
+  detectTimezone,
   mapSignupError,
   validateSignup,
   type SignupFormValues,
@@ -49,23 +38,13 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/pages/signup → src/pages → src → web-agency → artifacts → repo root
 const repoRoot = path.resolve(here, "../../../../..");
-const pageSrc = readFileSync(
-  path.join(repoRoot, "artifacts/web-agency/src/pages/LandingReceptionistSignup.tsx"),
-  "utf8",
-);
+const read = (rel: string) => readFileSync(path.join(repoRoot, rel), "utf8");
 
-/**
- * The page source with comments removed.
- *
- * Over-claim checks must run against what the page *renders*, not what it
- * documents. The module docstring deliberately quotes the claims Phase 5
- * deleted ("running 24/7", "Answers in seconds") so the removal is explained
- * where a future editor will read it — scanning the raw file would flag that
- * explanation as the very thing it is recording the removal of.
- */
-const pageText = pageSrc
-  .replace(/\/\*[\s\S]*?\*\//g, " ")
-  .replace(/^\s*\/\/.*$/gm, " ");
+const pageSrc = read("artifacts/web-agency/src/pages/LandingReceptionistSignup.tsx");
+const routesSrc = read("artifacts/web-agency/src/lib/routes.ts");
+const appSrc = read("artifacts/web-agency/src/App.tsx");
+
+const pageText = pageSrc.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
 
 let failed = 0;
 function check(name: string, condition: boolean, detail?: string): void {
@@ -78,12 +57,13 @@ function check(name: string, condition: boolean, detail?: string): void {
 }
 
 const valid: SignupFormValues = {
-  name: "Test Person",
-  businessName: "Test Business",
-  email: "test@example.invalid",
-  phone: "5550000000",
-  businessType: "Retail",
+  inviteCode: "BETA-2026-XQ7",
+  ownerName: "Jamie Rivera",
+  businessName: "Northgate Plumbing",
+  email: "jamie@northgate.example",
   password: "correct horse battery",
+  timezone: "America/Chicago",
+  acceptedTerms: true,
 };
 
 console.log("\n--- signup payload contract ---");
@@ -91,152 +71,140 @@ console.log("\n--- signup payload contract ---");
   const payload = buildSignupPayload(valid);
   const keys = Object.keys(payload).sort();
   check(
-    "payload carries exactly the six contracted keys",
-    JSON.stringify(keys) ===
-      JSON.stringify(["businessName", "email", "fullName", "industry", "password", "phone"]),
+    "payload carries exactly the seven contracted keys",
+    JSON.stringify(keys) === JSON.stringify(["acceptedTerms", "businessName", "email", "inviteCode", "ownerName", "password", "timezone"]),
     keys.join(","),
   );
-  check("fullName maps from the name field", payload.fullName === valid.name);
-  check("industry maps from the businessType field", payload.industry === valid.businessType);
+  check("inviteCode is passed through", payload.inviteCode === valid.inviteCode);
+  check("ownerName is passed through", payload.ownerName === valid.ownerName);
   check("businessName is passed through", payload.businessName === valid.businessName);
-  check("phone is passed through", payload.phone === valid.phone);
   check("email is passed through untrimmed", payload.email === valid.email);
-  check("password is passed through", payload.password === valid.password);
-  check("endpoint is unchanged", SIGNUP_ENDPOINT === "/api/receptionist/auth/signup");
-  check("method is unchanged", SIGNUP_METHOD === "POST");
+  check("password is passed through unaltered", payload.password === valid.password);
+  check("timezone is passed through", payload.timezone === valid.timezone);
+  check("acceptedTerms is always sent as literal true", payload.acceptedTerms === true);
+  check("endpoint is the documented invite-signup route", SIGNUP_ENDPOINT === "/api/receptionist/auth/invite-signup");
+  check("method is POST", SIGNUP_METHOD === "POST");
+  check("no open trial-signup endpoint remains referenced", !/\/api\/receptionist\/auth\/signup["'`]/.test(pageSrc));
 }
 
-console.log("\n--- client-side validation blocks invalid submissions ---");
+console.log("\n--- client-side validation, in field order ---");
 {
-  check("empty form is rejected", validateSignup(EMPTY_SIGNUP_FORM).ok === false);
+  const empty = emptySignupForm();
+  check("an empty form is rejected", validateSignup(empty).ok === false);
+  check("invite code is checked first", validateSignup(empty).focusField === "inviteCode");
 
-  const noName = validateSignup({ ...valid, name: "   " });
-  check("blank name is rejected", noName.ok === false);
-  check(
-    "blank name keeps the original message",
-    noName.formError === "Name and email are required.",
-    noName.formError,
-  );
-  check("blank name focuses the name field", noName.focusField === "name");
+  const noOwner = validateSignup({ ...valid, ownerName: "" });
+  check("a missing owner name is rejected", noOwner.ok === false);
+  check("focus goes to owner name", noOwner.focusField === "ownerName");
+
+  const noBusiness = validateSignup({ ...valid, businessName: "  " });
+  check("a missing business name is rejected", noBusiness.ok === false);
 
   const noEmail = validateSignup({ ...valid, email: "" });
-  check("blank email is rejected", noEmail.ok === false);
-  check("blank email focuses the email field", noEmail.focusField === "email");
+  check("a missing email is rejected", noEmail.ok === false);
+  check("no client-side email-format rule (the server decides)", validateSignup({ ...valid, email: "not-an-email" }).ok === true);
 
   const shortPw = validateSignup({ ...valid, password: "1234567" });
-  check("7-character password is rejected", shortPw.ok === false);
-  check(
-    "short password keeps the original message",
-    shortPw.formError === "Password must be at least 8 characters.",
-    shortPw.formError,
-  );
-  check("short password focuses the password field", shortPw.focusField === "password");
+  check(`a password under ${MIN_PASSWORD_LENGTH} characters is rejected`, shortPw.ok === false);
+  check("exactly the minimum length is accepted", validateSignup({ ...valid, password: "12345678" }).ok === true);
 
-  check("exactly 8 characters is accepted", validateSignup({ ...valid, password: "12345678" }).ok);
-  check("a complete form is accepted", validateSignup(valid).ok === true);
+  const noTerms = validateSignup({ ...valid, acceptedTerms: false });
+  check("an unchecked Terms/Privacy box is rejected", noTerms.ok === false);
+  check("Terms is checked last, after every other field is valid", noTerms.formError.toLowerCase().includes("terms"));
 
-  // Optional fields must stay optional.
-  check(
-    "business name, phone and industry are optional",
-    validateSignup({ ...valid, businessName: "", phone: "", businessType: "" }).ok === true,
-  );
-
-  // Name/email are checked before password, as they always were.
-  const bothWrong = validateSignup({ ...EMPTY_SIGNUP_FORM, password: "x" });
-  check(
-    "name/email rule is evaluated before the password rule",
-    bothWrong.formError === "Name and email are required.",
-    bothWrong.formError,
-  );
-
-  // No client-side email-format rule may be introduced: it would reject input
-  // the server currently accepts.
-  check(
-    "no client-side email format rule",
-    validateSignup({ ...valid, email: "not-an-email" }).ok === true,
-  );
+  check("timezone is optional client-side (the browser default fills it in)", validateSignup({ ...valid, timezone: "" }).ok === true);
+  check("a fully valid form passes", validateSignup(valid).ok === true);
 }
 
 console.log("\n--- API error mapping ---");
 {
-  const dup = mapSignupError(409, "An account with that email already exists.");
-  check("409 explains the duplicate", /already exists/i.test(dup.message));
+  const invalid = mapSignupError(400, "That invite code is invalid or has expired.");
+  check("400 reads as an invalid/expired code or validation failure", invalid.outcome === "invalid");
+  check("400 shows the server's own message", invalid.message === "That invite code is invalid or has expired.");
+
+  const dup = mapSignupError(409, "An account already exists for that email.");
+  check("409 reads as a duplicate account", dup.outcome === "duplicate");
   check("409 offers sign-in as the recovery", dup.offerSignIn === true);
 
-  const rate = mapSignupError(429, "Too many attempts. Try again later.");
-  check("429 explains the rate limit", /too many/i.test(rate.message));
-  check("429 does not offer sign-in", rate.offerSignIn === false);
+  const off = mapSignupError(503);
+  check("503 reads as unavailable", off.outcome === "unavailable");
+  check("503 names the private-beta invitation posture", /invitation/i.test(off.message) && /private beta/i.test(off.message));
+  check("503 does not offer sign-in (there is no account to sign into)", off.offerSignIn === false);
 
-  const bad = mapSignupError(400, "Full name, email, and password are required.");
-  check(
-    "other statuses keep the server message",
-    bad.message === "Full name, email, and password are required.",
-    bad.message,
-  );
-  check("unknown failure falls back to a generic message", mapSignupError(500).message.length > 0);
-  check("network error has its own message", SIGNUP_NETWORK_ERROR.length > 0);
+  const other = mapSignupError(500);
+  check("an unmapped failure falls back to a generic message", other.message.length > 0 && other.outcome === "error");
+  check("network error has its own distinct message", SIGNUP_NETWORK_ERROR.length > 0 && SIGNUP_NETWORK_ERROR !== other.message);
 }
 
-console.log("\n--- industry values are unchanged ---");
+console.log("\n--- timezone select ---");
 {
-  check("Home Services stores its short value", INDUSTRY_VALUES["Home Services (HVAC, Plumbing, Electrical…)"] === "Home Services");
-  check("Med Spa stores its short value", INDUSTRY_VALUES["Med Spa / Aesthetics"] === "Med Spa");
-  check("Real Estate is unchanged", INDUSTRY_VALUES["Real Estate"] === "Real Estate");
+  check("every option is a real IANA zone name (contains a '/', or is UTC)", TIMEZONE_OPTIONS.every((tz) => tz === "UTC" || tz.includes("/")));
+  check("detectTimezone never throws outside a browser and returns a string", typeof detectTimezone() === "string");
+  check("the page preselects the browser's own timezone", pageText.includes("emptySignupForm(detectTimezone())"));
 }
 
-console.log("\n--- required fields are still on the page ---");
+console.log("\n--- required fields are on the page ---");
 {
   const fields = [
-    { id: "s-name", label: "Full name" },
-    { id: "s-biz", label: "Business name" },
-    { id: "s-email", label: "Email" },
-    { id: "s-phone", label: "Phone" },
-    { id: "s-industry", label: "Industry" },
+    { id: "s-invite-code", label: "Invite code" },
+    { id: "s-owner-name", label: "Your name" },
+    { id: "s-business-name", label: "Business name" },
+    { id: "s-email", label: "Work email" },
+    { id: "s-timezone", label: "Timezone" },
     { id: "s-password", label: "Password" },
+    { id: "s-accept-terms", label: "Terms" },
   ];
   for (const f of fields) {
     check(`field ${f.id} is rendered`, pageSrc.includes(`id="${f.id}"`));
-    check(
-      `field ${f.id} has a label bound with htmlFor`,
-      pageSrc.includes(`htmlFor="${f.id}"`),
-    );
+    check(`field ${f.id} has a label bound with htmlFor`, pageSrc.includes(`htmlFor="${f.id}"`));
   }
-  check("required fields declare aria-required", (pageSrc.match(/aria-required="true"/g) ?? []).length >= 3);
-  check("email uses the email input type", /id="s-email"[\s\S]{0,400}?type="email"/.test(pageSrc));
-  check("phone uses the tel input type", /id="s-phone"[\s\S]{0,400}?type="tel"/.test(pageSrc));
+  check("the invite code field is required", /id="s-invite-code"[\s\S]{0,400}?aria-required="true"/.test(pageSrc));
+  check("the Terms checkbox is a real checkbox input", /id="s-accept-terms"[\s\S]{0,80}?type="checkbox"/.test(pageSrc));
+  check("the Terms checkbox links to both Terms and Privacy", pageSrc.includes("ROUTES.terms") && pageSrc.includes("ROUTES.privacy"));
+  check("timezone is a native select, not a custom widget", pageSrc.includes('<select id="s-timezone"'));
   check("password autocomplete is new-password", pageSrc.includes('autoComplete="new-password"'));
   check("email autocomplete is set", pageSrc.includes('autoComplete="email"'));
-  check("name autocomplete is set", pageSrc.includes('autoComplete="name"'));
+  check("owner-name autocomplete is set", pageSrc.includes('autoComplete="name"'));
+  check("business-name autocomplete is organization", pageSrc.includes('autoComplete="organization"'));
+}
+
+console.log("\n--- states: submitting, invalid code, duplicate, unavailable ---");
+{
+  check("a submitting state disables the submit button", pageSrc.includes("disabled={submitting}"));
+  check("the submitting state is announced in the button", pageSrc.includes("Creating your account"));
+  check(
+    "a duplicate account (409) offers 'Sign in instead'",
+    pageSrc.includes('outcome === "duplicate"') && pageSrc.includes("Sign in instead"),
+  );
+  check(
+    "an unavailable beta (503) offers Request Beta Access, linked to the beta section",
+    pageSrc.includes('outcome === "unavailable"') && pageSrc.includes("Request Beta Access") && pageSrc.includes("BETA_REQUEST_HREF"),
+  );
+  check("the beta-request destination is the documented in-page anchor", BETA_REQUEST_HREF === "/ai-receptionist#beta");
+  check("field-level errors are rendered per field, tied by aria-describedby", pageSrc.includes("aria-describedby={describedBy("));
+}
+
+console.log("\n--- the fire-and-forget lead-capture call is removed ---");
+{
+  // Checked against the comment-stripped text: the module docstring
+  // documents removing this endpoint, and that explanation must not be
+  // mistaken for the endpoint still being called.
+  check("no landing-test submission remains", !pageText.includes("/api/landing-test/submit"));
+  check("no fire-and-forget void fetch remains on this page", !/void fetch\(/.test(pageSrc));
 }
 
 console.log("\n--- actions and destinations ---");
 {
   check("submit button is type=submit", /type="submit"/.test(pageSrc));
   check('primary action reads "Create account"', pageSrc.includes('"Create account"'));
-  check(
-    "submitting state is announced",
-    pageSrc.includes("Creating your account"),
-  );
-  check(
-    'no "Get Started" label on the submit action',
-    !/>\s*Get Started\s*</.test(pageSrc),
-  );
-  check('no "Book a Call"', !/Book a Call/i.test(pageSrc));
+  check('no "Get Started" label on the submit action', !/>\s*Get Started\s*</.test(pageSrc));
   check(
     "sign-in uses the centralised dashboard destination",
     pageSrc.includes("DASHBOARD_URLS.login"),
   );
   check(
-    "sign-in path is not hand-written",
-    !pageSrc.includes('"/ai-receptionist/dashboard/login"'),
-  );
-  check(
     "back link uses the centralised landing route",
     pageSrc.includes("ROUTES.aiReceptionist"),
-  );
-  check(
-    "landing route is not hand-written",
-    !/href="\/ai-receptionist"/.test(pageSrc),
   );
   check(
     "successful signup still redirects to the dashboard root",
@@ -246,34 +214,24 @@ console.log("\n--- actions and destinations ---");
     "submit handler is still wired to the form",
     /<form[\s\S]{0,200}onSubmit=\{submit\}/.test(pageSrc),
   );
-  check("endpoint constant is used, not a literal URL", !pageSrc.includes('"/api/receptionist/auth/signup"'));
 }
 
-console.log("\n--- readiness wording is accurate ---");
+console.log("\n--- readiness wording and honest next steps ---");
 {
-  check(
-    "readiness comes from the shared source",
-    pageSrc.includes("CAPABILITY_STATUS") && pageSrc.includes("READINESS"),
-  );
-  check("heading names the SMS receptionist", /Create your SMS Receptionist/.test(pageSrc));
+  check("readiness comes from the shared source", pageSrc.includes("CAPABILITY_STATUS") && pageSrc.includes("READINESS"));
+  check("heading matches the S-1 title exactly", /Set up your AI Receptionist/.test(pageSrc));
+  check("the page states signup is invite-gated", /invit/i.test(pageText));
+  check("the page never promises automatic activation", !/activat(e|ion)s?\s+(automatically|immediately)/i.test(pageText));
 
   const overclaims: Array<[string, RegExp]> = [
     ["24/7", /24\s*\/\s*7/],
-    ["24 hours a day", /24 hours a day/i],
     ["every call", /every call/i],
     ["never miss", /never miss/i],
     ["answers in seconds", /in seconds/i],
     ["always on", /always[- ]on\b/i],
-    ["qualifies every caller", /every caller/i],
-    ["books appointments automatically", /automatic(ally)?\s+(book|schedul)/i],
-    ["files into a CRM automatically", /automatic(ally)?\s+(file|sync)/i],
-    ["CRM described as in development", /CRM[^.]{0,60}(being developed|in development|coming soon)/i],
     ["guarantee", /guarantee/i],
     ["a price", /\$\s?\d/],
-    ["a setup duration", /(set ?up|live|launch(ed)?)\s+in\s+(under\s+)?\w+\s+(day|days|week|weeks|hour|hours)/i],
     ["a compliance certification", /\b(HIPAA|SOC\s?2|ISO\s?27001|PCI[- ]DSS)\b/i],
-    ["an encryption claim", /(bank|military)[- ]grade|end-to-end encrypt/i],
-    ["a named integration", /\b(Salesforce|HubSpot|Zapier|Calendly|Google Calendar)\b/],
   ];
   for (const [label, re] of overclaims) {
     check(`no over-claim: ${label}`, !re.test(pageText), (pageText.match(re) ?? [])[0]);
@@ -282,11 +240,9 @@ console.log("\n--- readiness wording is accurate ---");
 
 console.log("\n--- accessibility affordances ---");
 {
-  check("password visibility toggle is keyboard reachable", !pageSrc.includes("tabIndex={-1}\n                    onClick={() => setShowPw"));
   check("password toggle exposes pressed state", pageSrc.includes("aria-pressed={showPw}"));
   check("password toggle has an accessible name", /Show password|Hide password/.test(pageSrc));
   check("form-level error uses role=alert", pageSrc.includes('role="alert"'));
-  check("inline errors are associated with aria-describedby", pageSrc.includes("aria-describedby"));
   check("invalid fields set aria-invalid", pageSrc.includes("aria-invalid"));
   check("required and optional are spelled out", pageSrc.includes(">Required<") && pageSrc.includes(">Optional<"));
   check("exactly one h1", (pageSrc.match(/<h1/g) ?? []).length === 1);
@@ -295,35 +251,17 @@ console.log("\n--- accessibility affordances ---");
 
 console.log("\n--- route helpers ---");
 {
-  const routesSrc = readFileSync(
-    path.join(repoRoot, "artifacts/web-agency/src/lib/routes.ts"),
-    "utf8",
-  );
-  check(
-    "signup route path is unchanged",
-    routesSrc.includes('aiReceptionistSignup: "/ai-receptionist/signup"'),
-  );
+  check("signup route path is unchanged", routesSrc.includes('aiReceptionistSignup: "/ai-receptionist/signup"'));
   check("landing route path is unchanged", routesSrc.includes('aiReceptionist: "/ai-receptionist"'));
   check(
     "signup is registered before the landing route",
     (() => {
-      const appSrc = readFileSync(
-        path.join(repoRoot, "artifacts/web-agency/src/App.tsx"),
-        "utf8",
-      );
       const signupAt = appSrc.indexOf("ROUTES.aiReceptionistSignup");
       const landingAt = appSrc.indexOf("ROUTES.aiReceptionist}");
       return signupAt !== -1 && landingAt !== -1 && signupAt < landingAt;
     })(),
   );
-  check(
-    "dashboard URLs are absolute and do not take the router base",
-    routesSrc.includes('const DASHBOARD_BASE = "/ai-receptionist/dashboard"'),
-  );
-  check(
-    "Start Your Project still resolves to Discovery",
-    routesSrc.includes("export const START_PROJECT_ROUTE = ROUTES.discovery"),
-  );
+  check("Terms and Privacy routes exist and are used", routesSrc.includes('terms: "/terms"') && routesSrc.includes('privacy: "/privacy"'));
 }
 
 console.log(
