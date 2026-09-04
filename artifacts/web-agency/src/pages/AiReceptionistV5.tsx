@@ -78,17 +78,39 @@ function useHeroVideoEligible(): boolean {
   return eligible;
 }
 
+/**
+ * A composed Glacier Mint placeholder — a faint availability-grid motif
+ * (echoing the calendar/scheduling capability) behind the same concentric
+ * voice-object ring used in the Interactive Preview, tying the hero
+ * visually to the product it's introducing. The caption lives once, in the
+ * overlay label below (`smv5-hero__media-label`) — this graphic carries no
+ * text of its own beyond the non-visual `<title>` for assistive tech.
+ */
 function HeroPosterSvg() {
+  const availabilityDots: Array<[number, number]> = [
+    [88, 71], [258, 71], [428, 71], [564, 71],
+    [54, 275], [190, 309], [394, 309], [599, 275],
+  ];
   return (
     <svg viewBox="0 0 640 400" role="img" aria-labelledby="smv5-hero-poster-title">
       <title id="smv5-hero-poster-title">Development placeholder — final media pending</title>
-      <rect width="640" height="400" fill="#072022" />
-      <circle cx="320" cy="180" r="86" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.8" />
-      <circle cx="320" cy="180" r="52" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.55" />
-      <circle cx="320" cy="180" r="6" fill="#32C5D2" />
-      <text x="320" y="330" textAnchor="middle" fill="#cfe9e4" fontSize="15" fontFamily="sans-serif">
-        Development placeholder — final media pending
-      </text>
+      <defs>
+        <pattern id="smv5-avail-grid" width="34" height="34" patternUnits="userSpaceOnUse">
+          <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="#1c4a4d" strokeWidth="1.1" />
+        </pattern>
+        <radialGradient id="smv5-hero-glow" cx="50%" cy="42%" r="70%">
+          <stop offset="0%" stopColor="#0d3336" />
+          <stop offset="100%" stopColor="#04181a" />
+        </radialGradient>
+      </defs>
+      <rect width="640" height="400" fill="url(#smv5-hero-glow)" />
+      <rect width="640" height="400" fill="url(#smv5-avail-grid)" opacity="0.6" />
+      {availabilityDots.map(([x, y]) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r="4" fill="#32C5D2" opacity="0.65" />
+      ))}
+      <circle cx="320" cy="200" r="92" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.85" />
+      <circle cx="320" cy="200" r="56" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.6" />
+      <circle cx="320" cy="200" r="6" fill="#32C5D2" />
     </svg>
   );
 }
@@ -106,6 +128,74 @@ function HeroMedia() {
         <HeroPosterSvg />
       )}
       <span className="smv5-hero__media-label">Development placeholder — final media pending</span>
+    </div>
+  );
+}
+
+/* ── Hero capability strip — three qualitative outcomes as compact inline
+ * items, balancing the left column against the media card at desktop
+ * heights instead of leaving empty space below the sign-in link. ───────── */
+
+const HERO_CAPABILITY_HIGHLIGHTS = [
+  "Fewer missed opportunities",
+  "Consistent caller handling",
+  "Less repetitive admin",
+];
+
+function HeroCheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <circle cx="7" cy="7" r="7" fill="#32C5D2" opacity="0.22" />
+      <path d="M4 7.2 6.1 9.3 10 5" fill="none" stroke="#56D2CF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The same check mark, sized for the mint outcome chips (§outcomes strip). */
+function OutcomeCheckIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 14 14" aria-hidden="true">
+      <path d="M3 7.4 5.6 10 11 4.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * A composed placeholder for the owner-dashboard section — a small mock
+ * console (header bar, three stat tiles, four data rows) rather than a
+ * dashed box holding only a caption. Purely illustrative, no real or
+ * implied numbers.
+ */
+function DashboardIllustration() {
+  return (
+    <div className="smv5-illustration">
+      <svg viewBox="0 0 320 220" aria-hidden="true" className="smv5-illustration__svg">
+        <rect x="1" y="1" width="318" height="218" rx="14" fill="var(--smv5-white, #fff)" stroke="var(--smv5-line, #CFE7EA)" />
+        <circle cx="30" cy="30" r="6" fill="var(--smv5-mint-500, #32C5D2)" />
+        <rect x="44" y="26" width="120" height="8" rx="4" fill="var(--smv5-line-strong, #A9CFD6)" />
+        {[0, 1, 2].map((i) => (
+          <g key={i} transform={`translate(${16 + i * 100}, 56)`}>
+            <rect width="88" height="46" rx="8" fill="var(--smv5-mint-100, #DFF7F7)" />
+            <rect x="10" y="12" width="40" height="6" rx="3" fill="var(--smv5-mint-700, #0B7487)" opacity="0.5" />
+            <rect x="10" y="24" width="28" height="10" rx="4" fill="var(--smv5-mint-700, #0B7487)" />
+          </g>
+        ))}
+        {[0, 1, 2, 3].map((i) => (
+          <rect
+            key={i}
+            x="16"
+            y={116 + i * 24}
+            width="288"
+            height="16"
+            rx="4"
+            fill={i % 2 === 0 ? "var(--smv5-mist-100, #EDF9FA)" : "var(--smv5-white, #fff)"}
+            stroke="var(--smv5-line, #CFE7EA)"
+          />
+        ))}
+      </svg>
+      <span className="smv5-illustration__label">
+        Illustration — dashboard overview, development placeholder
+      </span>
     </div>
   );
 }
@@ -227,12 +317,53 @@ const USE_CASES: { title: string; body: string }[] = [
 ];
 
 const SETUP_STEPS = [
-  "Tell SiteMint about your business.",
-  "Configure the receptionist, its voice, and its permitted actions.",
-  "Set availability and connect Google Calendar.",
-  "Test and approve the experience.",
-  "Activate the assigned number.",
-  "Review calls, contacts, and appointments.",
+  {
+    title: "Tell SiteMint about your business",
+    body: "Share your business details, hours, and services so the receptionist starts with real context.",
+  },
+  {
+    title: "Configure the receptionist",
+    body: "Set its voice, its structured prompt, and exactly what it's permitted to say and do.",
+  },
+  {
+    title: "Set availability",
+    body: "Connect Google Calendar so scheduling reflects your real, current openings.",
+  },
+  {
+    title: "Test and approve",
+    body: "Run through real scenarios yourself before anything is activated.",
+  },
+  {
+    title: "Activate the assigned number",
+    body: "Turn on live inbound calling once testing is approved.",
+  },
+  {
+    title: "Review calls and appointments",
+    body: "See what happened on each call and how requests were handled.",
+  },
+];
+
+/* ── Content used to ground the thinner text-only sections in specifics
+ * (voice/prompt, calls & outcomes, safe-failure) without adding new claims
+ * — each restates, as scannable tags, what its section's lede already
+ * says. ─────────────────────────────────────────────────────────────── */
+
+const CONFIG_TOPICS = [
+  "Greeting",
+  "Business info",
+  "Questions to ask",
+  "Appointment rules",
+  "Permitted actions",
+  "Escalation behaviour",
+  "Closing",
+];
+
+const CALL_RECORD_FIELDS = ["Status", "Outcome", "Linked contact", "Linked appointment"];
+
+const SAFE_FAILURE_EXAMPLES = [
+  { situation: "Outside its script", response: "Hands off with context" },
+  { situation: "Caller sounds upset", response: "Hands off with context" },
+  { situation: "Request is ambiguous", response: "Hands off instead of guessing" },
 ];
 
 const OUTCOMES = [
@@ -298,6 +429,14 @@ export default function AiReceptionistV5() {
                 {HERO_COPY.signInPrompt}{" "}
                 <a href={DASHBOARD_URLS.login}>{HERO_COPY.signInCta}</a>
               </p>
+              <ul className="smv5-hero__capabilities">
+                {HERO_CAPABILITY_HIGHLIGHTS.map((c) => (
+                  <li key={c}>
+                    <HeroCheckIcon />
+                    {c}
+                  </li>
+                ))}
+              </ul>
             </div>
             <HeroMedia />
           </div>
@@ -330,8 +469,9 @@ export default function AiReceptionistV5() {
               <div className="smv5-card">
                 <h3>Interactive Preview</h3>
                 <p>
-                  Curated, scripted branches that show the product's behaviour today. Try it in
-                  the section above.
+                  Seven curated topics — what SiteMint builds, what the receptionist does, how
+                  setup works, and more — showing exactly how it responds today. Try it in the
+                  section above.
                 </p>
               </div>
               <LiveDemoPanel />
@@ -395,8 +535,12 @@ export default function AiReceptionistV5() {
                 <div className="smv5-example" key={ex.label}>
                   <span className="smv5-example__label">{ex.label}</span>
                   {ex.lines.map((line, i) => (
-                    <p key={i}>
-                      <b>{line.who}:</b> {line.text}
+                    <p
+                      key={i}
+                      className={`smv5-example__line smv5-example__line--${line.who.toLowerCase()}`}
+                    >
+                      <span className="smv5-example__who">{line.who}</span>
+                      {line.text}
                     </p>
                   ))}
                 </div>
@@ -416,9 +560,7 @@ export default function AiReceptionistV5() {
                 appointments, and usage — with one clear next action, not a wall of numbers.
               </p>
             </div>
-            <div className="smv5-illustration" role="img" aria-label="Illustration — dashboard overview, development placeholder">
-              Illustration — dashboard overview
-            </div>
+            <DashboardIllustration />
           </div>
         </section>
 
@@ -433,6 +575,13 @@ export default function AiReceptionistV5() {
               closing — with a preview of how callers will hear it. Curated voice presets ship
               with samples so you can hear the receptionist before it ever answers a call.
             </p>
+            <ul className="smv5-tag-row">
+              {CONFIG_TOPICS.map((topic) => (
+                <li className="smv5-tag" key={topic}>
+                  {topic}
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -446,6 +595,13 @@ export default function AiReceptionistV5() {
               contact and appointment, so you can see what happened without listening to
               audio that was never kept.
             </p>
+            <ul className="smv5-tag-row">
+              {CALL_RECORD_FIELDS.map((field) => (
+                <li className="smv5-tag" key={field}>
+                  {field}
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -460,6 +616,14 @@ export default function AiReceptionistV5() {
               ambiguous — where it hands off to a person with the conversation's context
               instead of guessing.
             </p>
+            <ul className="smv5-tag-row">
+              {SAFE_FAILURE_EXAMPLES.map((ex) => (
+                <li className="smv5-tag" key={ex.situation}>
+                  {ex.situation} <span className="smv5-tag__arrow">→</span>{" "}
+                  <span className="smv5-tag--rule">{ex.response}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -477,6 +641,10 @@ export default function AiReceptionistV5() {
           <div className="smv5__container">
             <span className="smv5__eyebrow">Built for different businesses</span>
             <h2 className="smv5__h2">Where it fits</h2>
+            <p className="smv5__lede">
+              The same underlying receptionist, configured differently for how each business
+              actually uses its phone.
+            </p>
             <div className="smv5-grid">
               {USE_CASES.map((uc) => (
                 <div className="smv5-card smv5-usecase" key={uc.title}>
@@ -495,9 +663,12 @@ export default function AiReceptionistV5() {
             <h2 className="smv5__h2">Six steps from invite to first call</h2>
             <ol className="smv5-steps smv5-steps--horizontal">
               {SETUP_STEPS.map((step, i) => (
-                <li className="smv5-step" key={step}>
+                <li className="smv5-step" key={step.title}>
                   <span className="smv5-step__num">{String(i + 1).padStart(2, "0")}</span>
-                  <p>{step}</p>
+                  <div>
+                    <h3>{step.title}</h3>
+                    <p>{step.body}</p>
+                  </div>
                 </li>
               ))}
             </ol>
@@ -518,10 +689,11 @@ export default function AiReceptionistV5() {
         <section className="smv5__section smv5__section--tight">
           <div className="smv5__container">
             <span className="smv5__eyebrow">What businesses notice</span>
-            <ul className="smv5-grid" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            <ul className="smv5-outcomes">
               {OUTCOMES.map((o) => (
-                <li className="smv5-card" key={o}>
-                  <p style={{ color: "var(--smv5-teal-900)", fontWeight: 600 }}>{o}</p>
+                <li key={o}>
+                  <OutcomeCheckIcon />
+                  {o}
                 </li>
               ))}
             </ul>
