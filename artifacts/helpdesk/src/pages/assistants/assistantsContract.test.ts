@@ -460,8 +460,12 @@ check(
  */
 check(
   "App.tsx no longer imports the Assistants page unconditionally",
+  // V5: the boundary import also carries the gated session guard, so App.tsx
+  // never touches hooks/useAssistants directly (AR-001M entry-chunk fix).
   !/import\("@\/pages\/Assistants"\)/.test(appSrc) &&
-    appSrc.includes('import { voiceRoutePages } from "@/routes/voiceRoutes";'),
+    appSrc.includes(
+      'import { voiceRoutePages, AssistantSessionGuardGate } from "@/routes/voiceRoutes";',
+    ),
 );
 check(
   "the boundary gates that import on the shared foldable flag, not a parser call of its own",
