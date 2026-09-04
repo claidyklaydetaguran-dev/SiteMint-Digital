@@ -45,6 +45,7 @@ const DiscoverySystemsV3 = lazy(() => import("@/pages/DiscoverySystemsV3"));
 // folds in a substantial CRM & internal systems section. `AutomationV3`
 // stays in the repository, unrouted, as a rollback reference — the old
 // `/automation` path 301s to `aiSystems` below instead of rendering it.
+const AiReceptionistV5 = lazy(() => import("@/pages/AiReceptionistV5"));
 const AiSystemsV5 = lazy(() => import("@/pages/AiSystemsV5"));
 const WorkV3 = lazy(() => import("@/pages/WorkV3"));
 const ProcessV3 = lazy(() => import("@/pages/ProcessV3"));
@@ -74,7 +75,6 @@ const Discovery = lazy(() => import("@/pages/Discovery"));
 // file — not edited by this workstream). `AiReceptionistV3` and
 // `AiReceptionist` (V2) are left exactly as the receptionist owner has them;
 // this workstream does not delete or otherwise touch `AiReceptionist*.tsx`.
-const AiReceptionistV4 = lazy(() => import("@/pages/AiReceptionistV4"));
 const LandingReceptionistSignup = lazy(() => import("@/pages/LandingReceptionistSignup"));
 
 // ── Retired verticals (W-18 / amendment §11) ────────────────────────────────
@@ -280,18 +280,9 @@ function Router() {
           </AuthShell>
         )}
       </Route>
-      <Route path={ROUTES.aiReceptionist}>
-        {() => (
-          <PublicShell
-            routeLabel="AI Receptionist"
-            chrome="v4"
-            heroTone="ink"
-            headerMode="product"
-          >
-            <AiReceptionistV4 />
-          </PublicShell>
-        )}
-      </Route>
+      {/* V5: the product page renders its own PublicShell (product header
+          actions, ink hero) — no App-level shell wrapper here. */}
+      <Route path={ROUTES.aiReceptionist}>{() => <AiReceptionistV5 />}</Route>
 
       {/* ── Legacy AI Receptionist routes — redirect to helpdesk SPA ──────────
           Cross-application document navigations. These resolve through the

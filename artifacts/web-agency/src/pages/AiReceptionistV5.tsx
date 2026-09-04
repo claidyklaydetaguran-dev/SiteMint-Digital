@@ -276,12 +276,7 @@ export default function AiReceptionistV5() {
       routeLabel="AI Receptionist"
       chrome="v4"
       heroTone="ink"
-      // INTEGRATION: headerMode prop from website owner. `PublicShellProps`
-      // does not declare `headerMode` in this worktree yet — the website
-      // owner is adding it in a parallel worktree so this route's header
-      // shows product-only actions (Request Beta Access / Explore the
-      // Interactive Preview / sign in) instead of the company CTA.
-      {...({ headerMode: "product" } as any)}
+      headerMode="product"
     >
       <div className="smv5">
         {/* ── 1 · Hero ──────────────────────────────────────────────── */}
