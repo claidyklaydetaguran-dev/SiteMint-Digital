@@ -1,10 +1,11 @@
 /**
- * SiteMint V5 — scroll-to-top routing (V5-BLUEPRINT §12).
+ * SiteMint V5 — scroll-to-top routing (V5-BLUEPRINT §12; corrected under the
+ * 2026-09-05 owner routing directive).
  *
- * Helpdesk counterpart of `artifacts/web-agency/src/components/v5/RouteScrollManager.tsx`
- * — same behaviour, the app's own focus landmark (`#sd-main`, the
- * `AppShell` `<main>`). See that file's header comment for the full
- * rationale; kept here rather than shared because the two apps do not share
+ * Helpdesk counterpart of
+ * `artifacts/web-agency/src/components/v5/RouteScrollManager.tsx` — same
+ * behaviour, the app's own focus landmark (`#sd-main`, the `AppShell`
+ * `<main>`). Kept here rather than shared because the two apps do not share
  * a components package.
  *
  * wouter has no scroll restoration of its own. Mounted once inside each of
@@ -17,20 +18,34 @@
  *   in-page anchors, but the no-op keeps this component's contract
  *   consistent with the web-agency original rather than assuming there
  *   never will be one.
- * - the navigation was a browser back/forward (POP) → restores the scroll
- *   position this component recorded for that pathname.
  * - the very first render (a fresh load or hard refresh) → does nothing, so
  *   the browser's own reload scroll position is never overridden.
  *
- * `history.scrollRestoration = "manual"` is set once (module-level guard).
+ * Correction (owner directive): a browser back/forward (POP) navigation
+ * used to restore whatever scroll position this component had last
+ * recorded for that pathname. Primary navigation to another route must
+ * start the new page at the top and must not inherit a prior scroll
+ * position — POP included, so it now gets the same top-of-page + focus
+ * treatment as a forward navigation. There is no longer a POP branch, and
+ * nothing records or restores a per-pathname scroll position.
+ *
+ * (Searched the app for an intentional list→detail→back scroll-preservation
+ * feature before removing this — e.g. Contacts list → ContactDetail → back,
+ * Inbox list → conversation → back. None exists: no code reads or writes
+ * `scrollY`/`scrollTop` anywhere outside this file, so nothing is being
+ * taken away here beyond the buggy generic restore.)
+ *
+ * `history.scrollRestoration = "manual"` (module-level guard) is still the
+ * right tool even though this component no longer restores anything
+ * itself: without it, the browser's own native restore fires on POP before
+ * this effect runs, so a same-tick scroll-to-top either loses the race
+ * against it or paints one frame of the old position first. "manual" tells
+ * the browser to leave scroll exactly where it is on traversal, so this
+ * effect is the only thing that ever moves it.
  */
 
 import { useLayoutEffect, useRef } from "react";
 import { useLocation } from "wouter";
-
-/** Pathname → last recorded scrollY, kept for the session — see the
- *  web-agency counterpart's header comment for why this is module scope. */
-const scrollPositions = new Map<string, number>();
 
 let scrollRestorationSet = false;
 
@@ -40,7 +55,6 @@ const MAIN_CONTENT_ID = "sd-main";
 
 export function RouteScrollManager(): null {
   const [location] = useLocation();
-  const isPopRef = useRef(false);
   const hasMountedRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -48,45 +62,20 @@ export function RouteScrollManager(): null {
       window.history.scrollRestoration = "manual";
       scrollRestorationSet = true;
     }
-    const onPopState = () => {
-      isPopRef.current = true;
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
   }, []);
-
-  useLayoutEffect(() => {
-    const onScroll = () => {
-      scrollPositions.set(location, window.scrollY);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [location]);
 
   useLayoutEffect(() => {
     if (!hasMountedRef.current) {
       hasMountedRef.current = true;
-      isPopRef.current = false;
       return;
     }
-
-    const wasPop = isPopRef.current;
-    isPopRef.current = false;
 
     if (window.location.hash) {
       return;
     }
 
-    if (wasPop) {
-      const saved = scrollPositions.get(location);
-      window.scrollTo({ top: saved ?? 0, left: 0, behavior: "auto" });
-      return;
-    }
-
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    const main = document.getElementById(MAIN_CONTENT_ID);
-    main?.focus({ preventScroll: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    document.getElementById(MAIN_CONTENT_ID)?.focus({ preventScroll: true });
   }, [location]);
 
   return null;

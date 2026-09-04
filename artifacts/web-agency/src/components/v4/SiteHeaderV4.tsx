@@ -35,10 +35,12 @@ import {
   useRef,
   useState,
   type FocusEvent as ReactFocusEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
+import { dispatchIntroReplay, scrollToTop } from "@/lib/scrollBehavior";
 import { SignalMarkV4 } from "./SignalMarkV4";
 import { SignalGlyphV4 } from "./SignalGlyphsV4";
 import {
@@ -73,6 +75,28 @@ function isActive(location: string, href?: string): boolean {
 /** True when the current route is one of the "What We Build" pillar pages. */
 function isPillarActive(location: string): boolean {
   return whatWeBuildV4.some((item) => isActive(location, item.href));
+}
+
+/**
+ * Owner routing directive (2026-09-05): clicking the wordmark, or a
+ * top-level nav item, for the page the visitor is ALREADY on must not
+ * navigate — wouter would no-op that anyway, since the pathname doesn't
+ * change — it resets that page to the top and replays its introduction in
+ * place (see `useIntroReplay.ts`). `active` says whether the link's target
+ * is the current route; `onNavigate` runs first so a caller can close a
+ * mobile sheet, which a same-pathname click otherwise leaves open (the
+ * sheet's own auto-close effect only fires on an actual location change).
+ */
+function handleActiveNavClick(
+  e: ReactMouseEvent<HTMLAnchorElement>,
+  active: boolean,
+  onNavigate?: () => void,
+): void {
+  if (!active) return;
+  e.preventDefault();
+  onNavigate?.();
+  scrollToTop();
+  dispatchIntroReplay();
 }
 
 export interface SiteHeaderV4Props {
@@ -244,6 +268,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
           href="/"
           className="v4-header__brand"
           aria-label="SiteMint Digital — home"
+          onClick={(e) => handleActiveNavClick(e, location === ROUTES.home)}
         >
           <SignalMarkV4 size={22} />
           {/* Product mode hides the wordmark below ~480px to protect the
@@ -348,19 +373,21 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
               )}
             </li>
 
-            {primaryNavV4.map((item) => (
-              <li key={item.label}>
-                <Link
-                  href={item.href}
-                  className="v4-nav__link"
-                  aria-current={
-                    isActive(location, item.href) ? "page" : undefined
-                  }
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
+            {primaryNavV4.map((item) => {
+              const active = isActive(location, item.href);
+              return (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    className="v4-nav__link"
+                    aria-current={active ? "page" : undefined}
+                    onClick={(e) => handleActiveNavClick(e, active)}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
 
             <li>
               <Link
@@ -368,6 +395,9 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                 className="v4-nav__link v4-nav__prod"
                 aria-current={
                   isActive(location, productNavV4.href) ? "page" : undefined
+                }
+                onClick={(e) =>
+                  handleActiveNavClick(e, isActive(location, productNavV4.href))
                 }
               >
                 <span className="v4-nav__prod-dot" aria-hidden="true" />
@@ -432,14 +462,22 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
 
             <nav aria-label="Mobile primary">
               <ul className="v4-sheet__list">
-                <MobileGroup title="What We Build" location={location}>
+                <MobileGroup
+                  title="What We Build"
+                  location={location}
+                  onCloseMenu={() => setMenuOpen(false)}
+                >
                   {whatWeBuildV4.map((item) => ({
                     label: item.label,
                     href: item.href,
                   }))}
                 </MobileGroup>
                 {/* W-17: mobile group renamed "Company" → "Explore". */}
-                <MobileGroup title="Explore" location={location}>
+                <MobileGroup
+                  title="Explore"
+                  location={location}
+                  onCloseMenu={() => setMenuOpen(false)}
+                >
                   {primaryNavV4}
                 </MobileGroup>
                 <li>
@@ -448,6 +486,11 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                     className="v4-sheet__link"
                     aria-current={
                       isActive(location, productNavV4.href) ? "page" : undefined
+                    }
+                    onClick={(e) =>
+                      handleActiveNavClick(e, isActive(location, productNavV4.href), () =>
+                        setMenuOpen(false),
+                      )
                     }
                   >
                     {productNavV4.label}
@@ -492,10 +535,13 @@ interface MobileGroupProps {
   title: string;
   location: string;
   children: Array<{ label: string; href: string }>;
+  /** Closes the mobile sheet on a same-page re-click, which the sheet's own
+   *  auto-close effect (keyed on route change) never sees. */
+  onCloseMenu: () => void;
 }
 
 /** A deliberate expandable group in the mobile sheet (owner correction 2). */
-function MobileGroup({ title, location, children }: MobileGroupProps) {
+function MobileGroup({ title, location, children, onCloseMenu }: MobileGroupProps) {
   // A group containing the current page starts open so location is obvious.
   const containsCurrent = children.some((c) => isActive(location, c.href));
   const [open, setOpen] = useState(containsCurrent);
@@ -519,17 +565,21 @@ function MobileGroup({ title, location, children }: MobileGroupProps) {
       </button>
       {open && (
         <ul className="v4-sheet__sub" id={subId}>
-          {children.map((child) => (
-            <li key={child.label}>
-              <Link
-                href={child.href}
-                className="v4-sheet__link"
-                aria-current={isActive(location, child.href) ? "page" : undefined}
-              >
-                {child.label}
-              </Link>
-            </li>
-          ))}
+          {children.map((child) => {
+            const active = isActive(location, child.href);
+            return (
+              <li key={child.label}>
+                <Link
+                  href={child.href}
+                  className="v4-sheet__link"
+                  aria-current={active ? "page" : undefined}
+                  onClick={(e) => handleActiveNavClick(e, active, onCloseMenu)}
+                >
+                  {child.label}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </li>
