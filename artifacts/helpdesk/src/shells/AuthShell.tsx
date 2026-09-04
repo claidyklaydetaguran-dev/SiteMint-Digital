@@ -13,6 +13,7 @@ import { Suspense, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
+import { RouteScrollManager } from "@/components/layout/RouteScrollManager";
 
 interface AuthShellProps {
   children: ReactNode;
@@ -24,6 +25,7 @@ export function AuthShell({ children, routeLabel = "Sign in" }: AuthShellProps) 
 
   return (
     <div data-shell="auth">
+      <RouteScrollManager />
       <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
         <Suspense fallback={<RouteFallback label={routeLabel} />}>{children}</Suspense>
       </RouteErrorBoundary>

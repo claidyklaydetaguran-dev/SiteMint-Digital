@@ -1,0 +1,108 @@
+/**
+ * SiteMint V5 "Signal, mint-led" — retheme of the customer dashboard and
+ * sign-in (V5-BLUEPRINT §1, §2). Same mechanism as v3-app.css/v4-app.css,
+ * one layer later: a pure token-value override inside the existing
+ * `.sd-app` / `.si-page` scopes. No markup, contract literal, or geometry
+ * change — the committed contract tests keep reading the same source
+ * literals, and control radii/typography stay exactly as V4 left them.
+ *
+ * System B palette (owner-approved, V5-BLUEPRINT §1): mint #25D0B0 is never
+ * text on a light ground; deep mint #0E7F6B carries links/labels/focus on
+ * light; ink-950 #0A2A2E is the dark rail/canvas, replacing the retired V4
+ * navy; amber stays reserved for attention only.
+ *
+ * The `--sm-*` custom properties consumed below come from `tokens-v5.css`
+ * (imported once by index.css, scoped to `.sd-app`/`.si-page` among other
+ * V5 shells — see that file's SCOPE NOTE) so this layer states roles, not
+ * hex, wherever a token already names the value.
+ *
+ * Doubled class selectors keep the override order-proof, matching
+ * v3-app.css/v4-app.css. This file is imported AFTER v4-app.css by the same
+ * two modules (AppShell.tsx, Login.tsx).
+ * ROLLBACK: remove the v5-app.css imports to restore the V4 appearance
+ * byte-for-byte.
+ */
+
+.sd-app.sd-app {
+  /* ── V5 palette through the V2 token names the roles read ────────────── */
+  --v2-warm-white: var(--sm-porcelain); /* #F7FBF9 — app canvas */
+  --v2-offwhite: var(--sm-mist-100); /* #EEFAF8 */
+  --v2-mint-mist: var(--sm-mint-100); /* #E6F9F3 */
+  --v2-mint-100: var(--sm-mint-100);
+  --v2-mint-500: var(--sm-mint-500); /* #25D0B0 — accent, never text-on-light */
+  --v2-navy-900: var(--sm-ink-950); /* #0A2A2E — darkest: the rail */
+  --v2-navy-700: var(--sm-teal-900); /* #0B3A3E — secondary dark surface */
+  --v2-slate-500: var(--sm-slate-600); /* #526B70 — muted text */
+
+  /* ── Role refinements ─────────────────────────────────────────────────── */
+  --sd-border: color-mix(in oklab, var(--sm-teal-900) 9%, transparent);
+  --sd-border-strong: color-mix(in oklab, var(--sm-teal-900) 20%, transparent);
+
+  /* The ink-950 rail and everything printed on it. */
+  --sd-rail: var(--sm-ink-950);
+  --sd-rail-text: var(--sm-dark-text);
+  --sd-rail-muted: var(--sm-dark-muted);
+  --sd-rail-border: color-mix(in oklab, var(--sm-dark-text) 12%, transparent);
+  --sd-rail-hover: color-mix(in oklab, var(--sm-dark-text) 7%, transparent);
+  --sd-rail-active: color-mix(in oklab, var(--sm-mint-500) 14%, transparent);
+  --sd-rail-accent: var(--sm-mint-500);
+
+  /* Focus ring needs the text-safe deep mint for contrast on light surfaces
+     (4.92:1 on white — V5-BLUEPRINT §1). */
+  --sd-focus-color: var(--sm-mint-700);
+
+  /* Geometry and type are unchanged from V4 — this file is a colour retheme
+     only (V5-BLUEPRINT §14, PR-1 scope). */
+  --sd-radius-control: 8px;
+  --sd-radius-card: 12px;
+  --sd-font: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark counterpart moves from navy to ink-950 + mint. */
+:where(.dark) .sd-app.sd-app {
+  --sd-canvas: var(--sm-ink-950);
+  --sd-surface: var(--sm-teal-900);
+  --sd-surface-alt: color-mix(in oklab, var(--sm-ink-950) 92%, black);
+  --sd-surface-accent: color-mix(in oklab, var(--sm-teal-900) 92%, white);
+  --sd-text: var(--sm-dark-text);
+  --sd-text-muted: var(--sm-dark-muted);
+  --sd-border: color-mix(in oklab, var(--sm-dark-text) 12%, transparent);
+  --sd-border-strong: color-mix(in oklab, var(--sm-dark-text) 24%, transparent);
+
+  --sd-accent: var(--sm-mint-500);
+  --sd-accent-soft: color-mix(in oklab, var(--sm-mint-500) 14%, transparent);
+
+  --sd-rail: color-mix(in oklab, var(--sm-ink-950) 82%, black);
+
+  --sd-muted-surface: color-mix(in oklab, var(--sm-dark-text) 5%, transparent);
+  --sd-muted-text: var(--sm-dark-muted);
+
+  --sd-focus-color: var(--sm-mint-500);
+}
+
+/* ── Sign-in page (its own scope, its own token copies) ─────────────────── */
+.si-page.si-page {
+  --v2-warm-white: var(--sm-porcelain);
+  --v2-offwhite: var(--sm-white);
+  --v2-mint-mist: var(--sm-mint-100);
+  --v2-mint-100: var(--sm-mint-100);
+  --v2-mint-500: var(--sm-mint-500);
+  --v2-navy-900: var(--sm-ink-950);
+  --v2-navy-700: var(--sm-teal-900);
+  --v2-slate-500: var(--sm-slate-600);
+  --v2-radius-control: 8px;
+  --v2-radius-card: 12px;
+  --v2-font-sans: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Display voice for app headings — unchanged from V4, restated so this file
+   stays order-proof if it is ever loaded standalone. */
+.sd-app.sd-app h1,
+.sd-app.sd-app h2,
+.si-page.si-page h1 {
+  font-family: "Space Grotesk", "Space Grotesk Fallback", "DM Sans",
+    "DM Sans Fallback", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}

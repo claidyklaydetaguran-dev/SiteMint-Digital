@@ -1,0 +1,215 @@
+/**
+ * SiteMint V5 — System B semantic tokens (V5-BLUEPRINT §2) and the global
+ * motion system (§11).
+ *
+ * Two identical copies exist by design (one per app, no shared package):
+ *   artifacts/web-agency/src/styles/tokens-v5.css
+ *   artifacts/helpdesk/src/styles/tokens-v5.css
+ * The v5FoundationContract test asserts they stay byte-identical.
+ *
+ * Retheme-not-rewrite: this file DEFINES `--sm-*`; the primitive layers that
+ * the V2/V3/V4 sheets already consume are re-pointed at these names by
+ * v5-remap.css (web-agency) and v5-app.css (helpdesk). No pinned file is
+ * edited.
+ *
+ * SCOPE NOTE (why this is not a bare `:root` block): the shared
+ * `@workspace/design-tokens` package already owns a `--sm-*` namespace on
+ * `:root` — `--sm-mint-500` / `--sm-mint-100` are HSL *triplets* consumed as
+ * `hsl(var(--sm-mint-500))` by the chrome-less discovery/platform-preview
+ * surfaces, and `--sm-font-body|display|mono` are full stacks aliased by the
+ * helpdesk's shadcn `:root` layer. A `:root` definition of the §2 hex values
+ * would turn those into `hsl(#25D0B0)` — invalid — on pages this program
+ * does not own. So the V5 tokens are declared on the V5-themed shell scopes
+ * instead (zero specificity via `:where()` so page owners can override):
+ * every V4-chromed public route, the auth shell, the ops shell, the customer
+ * app and sign-in, and the helpdesk's chrome-less shells. The design-tokens
+ * `:root` layer is untouched and keeps resolving on `.v2-public-shell`.
+ */
+
+:where(
+    .v4-shell,
+    .v3-shell,
+    .v2-auth-shell,
+    .v2-dashboard-shell,
+    .sd-app,
+    .si-page,
+    [data-shell="auth"],
+    [data-shell="dashboard"],
+    [data-shell="public"]:not(.v2-public-shell)
+  ) {
+  /* ── brand ─────────────────────────────────────────────────────────── */
+  --sm-mint-500: #25D0B0;
+  --sm-mint-400: #4FD9CF;
+  --sm-mint-600: #16B597;
+  --sm-mint-700: #0E7F6B; /* text-safe mint: links, labels, chips */
+  --sm-mint-100: #E6F9F3;
+  --sm-mist-100: #EEFAF8;
+  --sm-porcelain: #F7FBF9;
+  --sm-white: #FFFFFF;
+  --sm-teal-900: #0B3A3E; /* primary text */
+  --sm-ink-950: #0A2A2E; /* hero field, ops chrome */
+  --sm-slate-600: #526B70; /* secondary text */
+  --sm-slate-300: #B9CBCE; /* hairlines on dark */
+  --sm-line: #D7E7E3;
+  --sm-line-strong: #B5D2CB;
+  --sm-amber-600: #B45309; /* human attention only */
+  --sm-amber-100: #FFF4DE;
+  --sm-red-600: #B42318; /* errors */
+  --sm-red-100: #FEE4E2;
+  --sm-green-700: #15803D; /* success/status only, never brand */
+  --sm-green-100: #DCFCE7;
+
+  /* ── semantic ──────────────────────────────────────────────────────── */
+  --sm-bg: var(--sm-porcelain);
+  --sm-surface: var(--sm-white);
+  --sm-surface-alt: var(--sm-mist-100);
+  --sm-surface-brand: var(--sm-mint-100);
+  --sm-text: var(--sm-teal-900);
+  --sm-text-muted: var(--sm-slate-600);
+  --sm-link: var(--sm-mint-700);
+  --sm-accent: var(--sm-mint-500);
+  --sm-accent-ink: var(--sm-teal-900);
+  --sm-focus: 0 0 0 3px color-mix(in oklab, var(--sm-mint-500) 45%, transparent);
+  --sm-dark-bg: var(--sm-ink-950);
+  --sm-dark-text: #E9F7F3;
+  --sm-dark-muted: #9FC3BC;
+  --sm-dark-accent: var(--sm-mint-500);
+
+  /* ── §1: the one permitted gradient — the signal thread itself.
+     2-stop mint→aqua; never a fill, never a button. ─────────────────── */
+  --sm-signal-thread: linear-gradient(90deg, var(--sm-mint-500), var(--sm-mint-400));
+
+  /* ── shape, depth ──────────────────────────────────────────────────── */
+  --sm-radius-s: 6px;
+  --sm-radius-m: 10px;
+  --sm-radius-l: 16px;
+  --sm-radius-pill: 999px;
+  --sm-shadow-1: 0 1px 2px rgb(11 58 62 / .06), 0 6px 20px rgb(11 58 62 / .06);
+  --sm-shadow-2: 0 2px 6px rgb(11 58 62 / .08), 0 16px 40px rgb(11 58 62 / .10);
+
+  /* ── type — the approved D5 voices (already self-hosted via @fontsource);
+     each stack falls through the metric-matched local face the V4 layer
+     defines, so swap-in stays CLS-free. ─────────────────────────────── */
+  --sm-font-display: "Space Grotesk", "Space Grotesk Fallback", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sm-font-body: "DM Sans", "DM Sans Fallback", ui-sans-serif, system-ui,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sm-font-mono: "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace,
+    "Cascadia Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sm-font-editorial: "Newsreader", "Newsreader Fallback", Didot, Georgia,
+    ui-serif, serif;
+
+  /* --sm-scale: 12 / 14 / 16 / 18 / 22 / 28 / 36 / 48 / 64 (px, 1.25 ratio
+     above 18) — one custom property per step so it is consumable. */
+  --sm-scale-12: 12px;
+  --sm-scale-14: 14px;
+  --sm-scale-16: 16px;
+  --sm-scale-18: 18px;
+  --sm-scale-22: 22px;
+  --sm-scale-28: 28px;
+  --sm-scale-36: 36px;
+  --sm-scale-48: 48px;
+  --sm-scale-64: 64px;
+
+  /* --sm-space: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 / 96 / 128 */
+  --sm-space-4: 4px;
+  --sm-space-8: 8px;
+  --sm-space-12: 12px;
+  --sm-space-16: 16px;
+  --sm-space-24: 24px;
+  --sm-space-32: 32px;
+  --sm-space-48: 48px;
+  --sm-space-64: 64px;
+  --sm-space-96: 96px;
+  --sm-space-128: 128px;
+
+  /* ── motion ────────────────────────────────────────────────────────── */
+  --sm-dur-fast: 160ms;
+  --sm-dur-base: 240ms;
+  --sm-dur-slow: 420ms;
+  --sm-dur-scene: 700ms;
+  --sm-ease: cubic-bezier(.2,.7,.2,1);
+  --sm-ease-out: cubic-bezier(.16,1,.3,1);
+  --sm-stagger: 60ms;
+  --sm-rise: 16px;
+  --sm-threshold: 0.35;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   §11 motion system — opacity + transform only.
+
+   Progressive by construction: markup renders at rest with NO class; the
+   `useRevealV5` hook adds `.sm-reveal` in a layout effect (before first
+   paint) and `.sm-reveal--in` when the IntersectionObserver crosses the
+   threshold. With JavaScript absent nothing is ever hidden.
+
+   Supporting copy (rule 3): one group, 240 ms, 16 px rise.
+   Headline (rule 2): `.sm-reveal-words` — word-group clip-rise, 420 ms,
+   staggered 60 ms via `--sm-stagger-index` on each `.sm-reveal__word`.
+   `--sm-reveal-delay` (set by the Reveal `delay` prop) offsets a whole group.
+   Token fallbacks keep the classes usable outside the token scopes.
+   ───────────────────────────────────────────────────────────────────────── */
+.sm-reveal {
+  opacity: 0;
+  transform: translateY(var(--sm-rise, 16px));
+  transition:
+    opacity var(--sm-dur-base, 240ms) var(--sm-ease, cubic-bezier(.2,.7,.2,1)),
+    transform var(--sm-dur-base, 240ms) var(--sm-ease, cubic-bezier(.2,.7,.2,1));
+  transition-delay: calc(
+    var(--sm-reveal-delay, 0ms) +
+      var(--sm-stagger-index, 0) * var(--sm-stagger, 60ms)
+  );
+}
+
+.sm-reveal--in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Word groups: the container stays static; each word carries the rise. */
+.sm-reveal.sm-reveal-words {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+.sm-reveal-words .sm-reveal__word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  /* room for descenders inside the clip box at tight display leading */
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.sm-reveal-words .sm-reveal__word > span {
+  display: inline-block;
+}
+
+.sm-reveal.sm-reveal-words .sm-reveal__word > span {
+  opacity: 0;
+  transform: translateY(100%);
+  transition:
+    opacity var(--sm-dur-slow, 420ms) var(--sm-ease, cubic-bezier(.2,.7,.2,1)),
+    transform var(--sm-dur-slow, 420ms) var(--sm-ease, cubic-bezier(.2,.7,.2,1));
+  transition-delay: calc(
+    var(--sm-reveal-delay, 0ms) +
+      var(--sm-stagger-index, 0) * var(--sm-stagger, 60ms)
+  );
+}
+
+.sm-reveal--in.sm-reveal-words .sm-reveal__word > span {
+  opacity: 1;
+  transform: none;
+}
+
+/* Rule 8: reduced motion renders the final state immediately — no
+   transition, no rise. The hook also skips the observer entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .sm-reveal,
+  .sm-reveal.sm-reveal-words .sm-reveal__word > span {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

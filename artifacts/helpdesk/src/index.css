@@ -6,6 +6,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@workspace/design-tokens/css";
+/* SiteMint V5 "Signal, mint-led" — System B semantic tokens (V5-BLUEPRINT §2)
+   and the global motion system (§11), byte-identical to the web-agency copy
+   (see v5FoundationContract). Defines `--sm-*` only, scoped to the V5-themed
+   shells (including `.sd-app` / `.si-page`); changes no pixel on its own —
+   `styles/v5-app.css` (imported after v4-app.css by AppShell.tsx and
+   Login.tsx, the same seam v3-app.css/v4-app.css use) consumes it. */
+@import "./styles/tokens-v5.css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));

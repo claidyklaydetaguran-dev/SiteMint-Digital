@@ -49,11 +49,15 @@ import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboard
 // places. It previously read "Pro plan" — a product this repository does not
 // have; see `pages/settings/settingsContract.ts` for the evidence.
 import { planLabel } from "@/pages/settings/settingsContract";
+import { RouteScrollManager } from "@/components/layout/RouteScrollManager";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v3-app.css";
 // Frontend V4 Signal retheme — token-value override one layer above V3.
 // ROLLBACK: remove this import to restore the V3 appearance.
 import "@/styles/v4-app.css";
+// SiteMint V5 "Signal, mint-led" retheme — token-value override one layer
+// above V4. ROLLBACK: remove this import to restore the V4 appearance.
+import "@/styles/v5-app.css";
 
 const DESKTOP_QUERY = "(min-width: 64rem)";
 
@@ -318,6 +322,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="sd-app">
+      <RouteScrollManager />
       <a className="sd-skip" href="#sd-main">
         Skip to main content
       </a>
