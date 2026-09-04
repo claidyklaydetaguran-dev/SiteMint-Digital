@@ -128,9 +128,9 @@ export function buildActivityFigures(
   const open = conversations.filter((c) => c.status === "in_progress").length;
 
   return [
-    { key: "week", value: empty ? null : week, label: "Conversations this week", href: "/conversations", emphasis: false },
-    { key: "hot", value: empty ? null : hot, label: "Hot leads", href: "/conversations", emphasis: true },
-    { key: "open", value: empty ? null : open, label: "Still open", href: "/conversations", emphasis: false },
+    { key: "week", value: empty ? null : week, label: "Conversations this week", href: "/activity/conversations", emphasis: false },
+    { key: "hot", value: empty ? null : hot, label: "Hot leads", href: "/activity/conversations", emphasis: true },
+    { key: "open", value: empty ? null : open, label: "Still open", href: "/activity/conversations", emphasis: false },
   ];
 }
 
@@ -144,9 +144,9 @@ export interface TodayActivityInput {
 
 export function buildTodayFigures(input: TodayActivityInput): ActivityFigure[] {
   return [
-    { key: "calls-today", value: input.callsToday, label: "Calls today", href: "/logs", emphasis: false },
-    { key: "conversations-today", value: input.conversationsToday, label: "Conversations today", href: "/conversations", emphasis: false },
-    { key: "requests-pending", value: input.pendingAppointmentRequests, label: "Appointment requests pending", href: "/appointments", emphasis: true },
+    { key: "calls-today", value: input.callsToday, label: "Calls today", href: "/activity/calls", emphasis: false },
+    { key: "conversations-today", value: input.conversationsToday, label: "Conversations today", href: "/activity/conversations", emphasis: false },
+    { key: "requests-pending", value: input.pendingAppointmentRequests, label: "Appointment requests pending", href: "/scheduling/appointments", emphasis: true },
   ];
 }
 
@@ -195,7 +195,7 @@ export function buildNeedsAttention(input: NeedsAttentionInput): AttentionItem[]
       key: "open-issues",
       title: `${input.openIssuesCount} open issue${input.openIssuesCount === 1 ? "" : "s"}`,
       detail: "Something about your receptionist needs a look.",
-      href: "/logs",
+      href: "/account/issues",
       action: "Review issues",
     });
   }
@@ -205,7 +205,7 @@ export function buildNeedsAttention(input: NeedsAttentionInput): AttentionItem[]
       key: "over-cap",
       title: `${input.overCapCount} conversation${input.overCapCount === 1 ? "" : "s"} past your trial limit`,
       detail: "Conversations beyond the trial limit are not handled. Upgrading resumes them.",
-      href: "/billing",
+      href: "/account/billing",
       action: "Review plan",
     });
   }
@@ -215,7 +215,7 @@ export function buildNeedsAttention(input: NeedsAttentionInput): AttentionItem[]
       key: "needs-review",
       title: `${input.needsReviewCount} conversation${input.needsReviewCount === 1 ? "" : "s"} need${input.needsReviewCount === 1 ? "s" : ""} review`,
       detail: "The receptionist could not score these on its own.",
-      href: "/conversations",
+      href: "/activity/conversations",
       action: "Open conversations",
     });
   }
@@ -225,7 +225,7 @@ export function buildNeedsAttention(input: NeedsAttentionInput): AttentionItem[]
       key: "pending-requests",
       title: `${input.pendingAppointmentRequestsCount} appointment request${input.pendingAppointmentRequestsCount === 1 ? "" : "s"} pending`,
       detail: "A caller is waiting on a decision.",
-      href: "/appointments",
+      href: "/scheduling/appointments",
       action: "Review requests",
     });
   }
@@ -320,14 +320,14 @@ export function buildNextBestAction(input: NextBestActionInput): NextBestAction 
       title: "Something needs your attention",
       detail: "Review the items below before they wait any longer.",
       actionLabel: "Review what needs attention",
-      href: "/conversations",
+      href: "/activity/conversations",
     };
   }
   return {
     title: "Everything looks good",
     detail: "No open issues right now. Here's what happened recently.",
     actionLabel: "View recent activity",
-    href: "/conversations",
+    href: "/activity/conversations",
   };
 }
 

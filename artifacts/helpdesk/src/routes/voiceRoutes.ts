@@ -2,7 +2,7 @@
  * Frontend V2 / AR-001J — the voice-platform **build** boundary.
  *
  * Before this module existed, `App.tsx` declared all seventeen pages with
- * `lazy(() => import("@/pages/X"))` at module scope, the seven voice-platform
+ * `lazy(() => import("@/pages/X"))` at module scope, the voice-platform
  * pages included, and only the `<Route>` registrations sat behind
  * `voicePlatformEnabled`. But a dynamic import is a bundler instruction, not a
  * runtime one: Rollup emits a chunk for every `import()` it can reach, whether
@@ -28,9 +28,30 @@
  * The disabled branch resolves each voice page to the existing not-found page
  * rather than to nothing. With a single interpretation it is unreachable —
  * whenever it is selected, `App.tsx` registers no voice route to render it —
- * and it stays as the branch's total answer for all seven keys, and as the
+ * and it stays as the branch's total answer for every key, and as the
  * defence if a route were ever registered without its gate. Neither flag's
  * meaning nor default changes.
+ *
+ * ── 2026-09 owner replan (D-2) ─────────────────────────────────────────────
+ *
+ * The gated set changed shape, not principle. Appointments moved out of the
+ * voice gate entirely (owner decision B-1: calendar features, not voice
+ * features) and is now imported inline in `App.tsx` like Overview or
+ * Settings. Call Logs was renamed Calls (owner decision A-1) and kept its
+ * `CallLogDetail` file name — only the exported key changed, to `Calls` /
+ * `CallDetail`. Phone Number, Usage and Issues are new voice-gated surfaces
+ * and go through this same boundary, for the same reason: an `import()`
+ * written directly in `App.tsx` is emitted by every build regardless of any
+ * runtime check around it.
+ *
+ * `UsageRailIndicatorGate` extends the same boundary to a component rather
+ * than a route: `AppShell`'s navigation rail wants to show voice usage
+ * (minutes) next to the existing SMS trial meter, but only in a voice-enabled
+ * build. Wrapping the import in `voicePlatformEnabled ? lazy(...) : lazy(...)`
+ * here is what keeps `AppShell` — mounted in every build — from ever pulling
+ * in `useUsage` or the usage contract's copy when the flag is off; its
+ * disabled branch resolves to a component that renders nothing, not to the
+ * not-found page, since a rail slot is not a route.
  *
  * This module adds no behaviour of its own. The route table, its order, the
  * gate in `App.tsx`, and every page's own behaviour are unchanged.
@@ -48,9 +69,11 @@ export interface VoiceRoutePages {
   AssistantCreate: VoiceRoutePage;
   AssistantBuilderNew: VoiceRoutePage;
   AssistantBuilder: VoiceRoutePage;
-  CallLogs: VoiceRoutePage;
-  CallLogDetail: VoiceRoutePage;
-  Appointments: VoiceRoutePage;
+  Calls: VoiceRoutePage;
+  CallDetail: VoiceRoutePage;
+  PhoneNumber: VoiceRoutePage;
+  Usage: VoiceRoutePage;
+  Issues: VoiceRoutePage;
 }
 
 /** Already emitted by every build, gated or not — see the note above. */
@@ -62,16 +85,33 @@ export const voiceRoutePages: VoiceRoutePages = voicePlatformEnabled
       AssistantCreate: lazy(() => import("@/pages/AssistantCreate")),
       AssistantBuilderNew: lazy(() => import("@/pages/AssistantBuilderNew")),
       AssistantBuilder: lazy(() => import("@/pages/AssistantBuilder")),
-      CallLogs: lazy(() => import("@/pages/CallLogs")),
-      CallLogDetail: lazy(() => import("@/pages/CallLogDetail")),
-      Appointments: lazy(() => import("@/pages/Appointments")),
+      Calls: lazy(() => import("@/pages/Calls")),
+      CallDetail: lazy(() => import("@/pages/CallLogDetail")),
+      PhoneNumber: lazy(() => import("@/pages/PhoneNumber")),
+      Usage: lazy(() => import("@/pages/Usage")),
+      Issues: lazy(() => import("@/pages/Issues")),
     }
   : {
       Assistants: lazy(unavailable),
       AssistantCreate: lazy(unavailable),
       AssistantBuilderNew: lazy(unavailable),
       AssistantBuilder: lazy(unavailable),
-      CallLogs: lazy(unavailable),
-      CallLogDetail: lazy(unavailable),
-      Appointments: lazy(unavailable),
+      Calls: lazy(unavailable),
+      CallDetail: lazy(unavailable),
+      PhoneNumber: lazy(unavailable),
+      Usage: lazy(unavailable),
+      Issues: lazy(unavailable),
     };
+
+/** A rail-widget's disabled answer: nothing, not a full "not found" page. */
+function NullIndicator(): null {
+  return null;
+}
+
+/**
+ * `AppShell`'s voice-usage rail indicator. See the module doc for why this is
+ * gated the same way the routes above are, rather than imported directly.
+ */
+export const UsageRailIndicatorGate: VoiceRoutePage = voicePlatformEnabled
+  ? lazy(() => import("@/pages/usage/UsageRailIndicator"))
+  : lazy(async () => ({ default: NullIndicator }));

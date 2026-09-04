@@ -236,9 +236,9 @@ eq(
   [],
 );
 eq(
-  "every attention item names a real destination, in a stable order",
+  "every attention item names a real destination, in a stable order (2026-09 owner replan D-2 paths — Issues now has its own live route)",
   buildNeedsAttention({ overCapCount: 1, needsReviewCount: 1, openIssuesCount: 1, pendingAppointmentRequestsCount: 1 }).map((a) => a.href),
-  ["/logs", "/billing", "/conversations", "/appointments"],
+  ["/account/issues", "/account/billing", "/activity/conversations", "/scheduling/appointments"],
 );
 
 // ─── 4. Usage is the firm's own, from the session only ─────────────────────
@@ -384,14 +384,29 @@ check(
 );
 check("the skip link targets the one main landmark", shellSrc.includes('href="#sd-main"') && shellSrc.includes('id="sd-main"'));
 
-// ─── 9. Navigation inventory (unchanged; this session does not own nav.ts) ─
+// ─── 9. Navigation inventory (this session does not own nav.ts; updated by
+//        the nav/route owner for the 2026-09 owner replan, D-2) ────────────
 
 section("navigation");
 
 eq(
   "with the voice flag off, the visible destinations are exactly the built ones",
   visibleNavDestinations(false),
-  ["/", "/conversations", "/receptionist", "/contacts", "/billing", "/settings"],
+  [
+    "/",
+    "/setup",
+    "/scheduling/availability",
+    "/scheduling/appointment-types",
+    "/scheduling/calendar",
+    "/scheduling/appointments",
+    "/scheduling/test-booking",
+    "/activity/conversations",
+    "/activity/contacts",
+    "/channels/sms",
+    "/account/billing",
+    "/account/settings",
+    "/account/support",
+  ],
 );
 check(
   "every visible destination has a route registered in the router",
@@ -410,23 +425,23 @@ check(
   visibleNavDestinations(false).every((href) => visibleNavDestinations(true).includes(href)),
 );
 eq(
-  "the first group's heading is suppressed because it repeats its only item's name",
+  "the first group's heading is suppressed because it repeats its only item's name — D-2 replaced Operate/Manage with seven groups (Setup, Assistant, Scheduling, Activity, Channels, Account besides Overview); Assistant is empty and therefore absent with the flag off",
   visibleNavGroups(false).map((g) => `${g.label}:${g.showLabel}`),
-  ["Overview:false", "Operate:true", "Manage:true"],
+  ["Overview:false", "Setup:true", "Scheduling:true", "Activity:true", "Channels:true", "Account:true"],
 );
 eq(
   "the overview item matches only the overview route",
   [
     isNavItemActive(visibleNavGroups(false)[0]!.items[0]!, "/"),
-    isNavItemActive(visibleNavGroups(false)[0]!.items[0]!, "/contacts"),
+    isNavItemActive(visibleNavGroups(false)[0]!.items[0]!, "/activity/contacts"),
   ],
   [true, false],
 );
 eq(
-  "a section item matches its own subtree",
+  "a section item matches its own subtree — Contacts, under Activity (group index 3 with the flag off: Overview, Setup, Scheduling, Activity)",
   [
-    isNavItemActive(visibleNavGroups(false)[1]!.items[2]!, "/contacts/9"),
-    isNavItemActive(visibleNavGroups(false)[1]!.items[2]!, "/billing"),
+    isNavItemActive(visibleNavGroups(false)[3]!.items[1]!, "/activity/contacts/9"),
+    isNavItemActive(visibleNavGroups(false)[3]!.items[1]!, "/account/billing"),
   ],
   [true, false],
 );
@@ -435,8 +450,11 @@ check(
   navSrc.includes('from "../../lib/nav.js"') && !navSrc.includes("label: \"Conversations\""),
 );
 check(
-  "V5-BLUEPRINT.md §14 PR-5 registrations (Setup, Scheduling, Channels, Account) are not yet in nav.ts — reported to the nav owner, not added here",
-  !navSrc.includes('"/setup"') && !navSrc.includes('"/scheduling/'),
+  "D-2's Setup, Scheduling, Channels and Account registrations are in nav.ts (the nav owner has since wired them) — `navSrc` above is dashboardNav.ts, a pure re-export with no nav records of its own, so this reads the live catalogue through the same functions the shell renders from instead",
+  visibleNavDestinations(false).includes("/setup") &&
+    visibleNavDestinations(false).some((h) => h.startsWith("/scheduling/")) &&
+    visibleNavDestinations(false).some((h) => h.startsWith("/channels/")) &&
+    visibleNavDestinations(false).some((h) => h.startsWith("/account/")),
 );
 
 // ─── 10. Accessible current-page, drawer and focus behaviour (unchanged shell,

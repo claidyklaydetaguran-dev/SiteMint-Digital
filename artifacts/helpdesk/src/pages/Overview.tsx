@@ -280,7 +280,7 @@ export default function Overview() {
                   Recent calls
                 </h2>
                 {recentVoiceCalls.length > 0 && (
-                  <Link href="/logs" className="sd-link">
+                  <Link href="/activity/calls" className="sd-link">
                     View all
                     <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
                   </Link>
@@ -295,7 +295,7 @@ export default function Overview() {
                 <ul className="sd-list">
                   {recentVoiceCalls.map((call) => (
                     <li className="sd-list__item" key={call.callId}>
-                      <Link href="/logs" className="sd-row">
+                      <Link href="/activity/calls" className="sd-row">
                         <span className="sd-row__who">{call.callerNumberDisplay}</span>
                         <span className="sd-chip">{call.stateLabel}</span>
                         <span className="sd-row__when">{relativeTime(call.startedAt)}</span>
@@ -313,7 +313,7 @@ export default function Overview() {
                 Recent conversations
               </h2>
               {recent.length > 0 && (
-                <Link href="/conversations" className="sd-link">
+                <Link href="/activity/conversations" className="sd-link">
                   View all
                   <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
                 </Link>
@@ -333,7 +333,7 @@ export default function Overview() {
               <ul className="sd-list">
                 {recent.map((conversation) => (
                   <li className="sd-list__item" key={conversation.id}>
-                    <Link href="/conversations" className="sd-row">
+                    <Link href="/activity/conversations" className="sd-row">
                       <span className="sd-row__who">{conversation.callerPhone}</span>
                       {conversation.tier && (
                         <span className="sd-chip" data-tier={conversation.tier}>
@@ -357,7 +357,7 @@ export default function Overview() {
           <h2 className="sd-h2" id="sd-usage-title">
             Usage
           </h2>
-          <Link href="/billing" className="sd-link">
+          <Link href="/account/billing" className="sd-link">
             View billing
           </Link>
         </div>

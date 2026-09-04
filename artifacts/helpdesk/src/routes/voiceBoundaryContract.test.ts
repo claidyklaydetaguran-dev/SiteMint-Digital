@@ -88,7 +88,9 @@ import {
 } from "../lib/featureFlags.js";
 import { LIST as ASSISTANTS_LIST } from "../pages/assistants/assistantsContract.js";
 import { PAGE as CALL_LOGS_PAGE } from "../pages/call-logs/callLogsContract.js";
-import { PAGE as APPOINTMENTS_PAGE } from "../pages/appointments/appointmentsContract.js";
+import { PAGE as PHONE_NUMBER_PAGE } from "../pages/phone-number/phoneNumberContract.js";
+import { PAGE as USAGE_PAGE } from "../pages/usage/usageContract.js";
+import { PAGE as ISSUES_PAGE } from "../pages/issues/issuesContract.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/routes → src → helpdesk → artifacts → repo root
@@ -222,8 +224,9 @@ section("The gated set — derived from the contracts, never assumed");
 
 /**
  * Deliberately read out of the catalogue rather than written down here. The
- * gated set is not "Assistants": it is every `voiceGated: true` item, and the
- * three live ones among them are only part of it.
+ * gated set is not "Assistant": it is every `voiceGated: true` item, and the
+ * five live ones among them (Assistant, Calls, Phone Number, Usage, Issues)
+ * are only part of it.
  */
 const gatedNavItems = ALL_NAV_GROUPS.flatMap((g) => g.items).filter((i) => i.voiceGated);
 
@@ -232,27 +235,28 @@ eq(
   gatedNavItems.map((i) => i.key),
   [
     "assistants",
+    "calls",
+    "phone-number",
+    "usage",
+    "issues",
     "tools",
     "phone-numbers",
     "voice-library",
     "knowledge",
-    "squads",
-    "appointments",
-    "outbound",
-    "logs",
     "analytics",
     "testing",
     "structured-outputs",
-    "issues",
     "integrations",
     "api-keys",
+    "squads",
+    "outbound",
   ],
 );
 
 eq(
-  "the live voice-gated destinations are exactly Assistants, Appointments and Call Logs",
+  "the live voice-gated destinations are exactly Assistant, Calls, Phone Number, Usage and Issues (2026-09 owner replan — Appointments moved out of the voice gate, B-1)",
   gatedNavItems.filter((i) => i.state === "live").map((i) => i.href),
-  ["/assistants", "/appointments", "/logs"],
+  ["/assistants", "/activity/calls", "/channels/phone-number", "/account/usage", "/account/issues"],
 );
 
 eq(
@@ -280,15 +284,17 @@ check(
     .every((i) => i.voiceGated),
 );
 
-/** The seven page routes the flag governs, and the modules behind them. */
+/** The nine page routes the flag governs, and the modules behind them. */
 const GATED_ROUTE_KEYS = [
   "assistants",
   "assistantNew",
   "assistantNewTab",
   "assistantDetail",
-  "logs",
-  "logDetail",
-  "appointments",
+  "calls",
+  "callDetail",
+  "phoneNumber",
+  "usage",
+  "issues",
 ] as const;
 
 const GATED_PAGE_MODULES = [
@@ -296,22 +302,52 @@ const GATED_PAGE_MODULES = [
   "AssistantCreate",
   "AssistantBuilderNew",
   "AssistantBuilder",
-  "CallLogs",
-  "CallLogDetail",
-  "Appointments",
+  "Calls",
+  "CallDetail",
+  "PhoneNumber",
+  "Usage",
+  "Issues",
 ] as const;
 
+/**
+ * `CallDetail` is the one exported key whose file name did not follow: the
+ * 2026-09 owner replan renamed Call Logs' nav entry and export key (A-1), but
+ * `pages/CallLogDetail.tsx` itself was left alone — nothing about the page or
+ * its own contract changed, only what App.tsx and the boundary call it. Every
+ * other key matches its file one-for-one.
+ *
+ * This is also what a chunk is actually named: Rollup derives a lazy chunk's
+ * name from the source file it splits off, not from the local variable the
+ * importing code binds it to — so `chunksFor()` below has to be given
+ * `GATED_CHUNK_NAMES`, never `GATED_PAGE_MODULES` directly, or the CallDetail
+ * lookup silently finds nothing.
+ */
+const GATED_PAGE_FILES: Record<(typeof GATED_PAGE_MODULES)[number], string> = {
+  Assistants: "Assistants",
+  AssistantCreate: "AssistantCreate",
+  AssistantBuilderNew: "AssistantBuilderNew",
+  AssistantBuilder: "AssistantBuilder",
+  Calls: "Calls",
+  CallDetail: "CallLogDetail",
+  PhoneNumber: "PhoneNumber",
+  Usage: "Usage",
+  Issues: "Issues",
+};
+const GATED_CHUNK_NAMES = GATED_PAGE_MODULES.map((m) => GATED_PAGE_FILES[m]);
+
 eq(
-  "the gated route paths in lib/routes.ts are unchanged",
+  "the gated route paths in lib/routes.ts hold the 2026-09 owner replan's D-2 shape",
   GATED_ROUTE_KEYS.map((k) => new RegExp(`${k}: "([^"]+)"`).exec(routesSrc)?.[1] ?? null),
   [
     "/assistants",
     "/assistants/new",
     "/assistants/new/:tab",
     "/assistants/:id/:tab?",
-    "/logs",
-    "/logs/:id",
-    "/appointments",
+    "/activity/calls",
+    "/activity/calls/:id",
+    "/channels/phone-number",
+    "/account/usage",
+    "/account/issues",
   ],
 );
 
@@ -655,7 +691,21 @@ check(
 eq(
   "with the flag off the shell links to no voice destination",
   visibleNavDestinations(false, ALL_NAV_GROUPS),
-  ["/", "/conversations", "/receptionist", "/contacts", "/billing", "/settings"],
+  [
+    "/",
+    "/setup",
+    "/scheduling/availability",
+    "/scheduling/appointment-types",
+    "/scheduling/calendar",
+    "/scheduling/appointments",
+    "/scheduling/test-booking",
+    "/activity/conversations",
+    "/activity/contacts",
+    "/channels/sms",
+    "/account/billing",
+    "/account/settings",
+    "/account/support",
+  ],
 );
 
 eq(
@@ -663,27 +713,42 @@ eq(
   visibleNavDestinations(true, ALL_NAV_GROUPS),
   [
     "/",
+    "/setup",
     "/assistants",
-    "/appointments",
-    "/conversations",
-    "/receptionist",
-    "/contacts",
-    "/logs",
-    "/billing",
-    "/settings",
+    "/scheduling/availability",
+    "/scheduling/appointment-types",
+    "/scheduling/calendar",
+    "/scheduling/appointments",
+    "/scheduling/test-booking",
+    "/activity/calls",
+    "/activity/conversations",
+    "/activity/contacts",
+    "/channels/phone-number",
+    "/channels/sms",
+    "/account/usage",
+    "/account/billing",
+    "/account/settings",
+    "/account/support",
+    "/account/issues",
   ],
 );
 
 eq(
-  "group order and headings are the same either way, minus the emptied groups",
+  "group order and headings are the same either way, minus the emptied groups (2026-09 owner replan D-2 — Overview, Setup, Assistant, Scheduling, Activity, Channels, Account; `placeholders` never renders, see below)",
   visibleNavGroups(true, ALL_NAV_GROUPS).map((g) => g.key),
-  ["overview", "build", "operate", "observe", "manage"],
+  ["overview", "setup", "assistant", "scheduling", "activity", "channels", "account"],
 );
 
 eq(
-  "with the flag off the Build group disappears entirely rather than rendering empty",
+  "with the flag off the Assistant group disappears entirely rather than rendering empty — Scheduling stays, because it is not voice-gated (owner decision B-1)",
   visibleNavGroups(false, ALL_NAV_GROUPS).map((g) => g.key),
-  ["overview", "operate", "manage"],
+  ["overview", "setup", "scheduling", "activity", "channels", "account"],
+);
+
+check(
+  "the placeholders group never renders — none of its records are ever state \"live\" — whatever the flag says",
+  visibleNavGroups(true, ALL_NAV_GROUPS).every((g) => g.key !== "placeholders") &&
+    visibleNavGroups(false, ALL_NAV_GROUPS).every((g) => g.key !== "placeholders"),
 );
 
 /**
@@ -715,19 +780,22 @@ eq(
   NAV_GROUPS.map((g) => [g.key, g.items.map((i) => i.key)]),
   [
     ["overview", ["overview"]],
-    ["build", []],
-    ["operate", ["conversations", "receptionist", "contacts"]],
-    ["observe", []],
-    ["manage", ["billing", "settings"]],
+    ["setup", ["setup"]],
+    ["assistant", []],
+    ["scheduling", ["availability", "appointment-types", "calendar", "appointments", "test-booking"]],
+    ["activity", ["conversations", "contacts"]],
+    ["channels", ["sms"]],
+    ["account", ["billing", "settings", "support"]],
+    ["placeholders", []],
   ],
 );
 
 check(
-  "no navigation label, description or icon was changed by AR-001J",
+  "no navigation label, description or icon was changed by AR-001J, and the 2026-09 owner replan's renamed/relocated records carry their approved copy",
   navSrc.includes('description: "Build and manage AI voice assistants for your business."') &&
-    navSrc.includes('description: "Review stored call records and analysis."') &&
+    navSrc.includes('description: "Review call records and outcomes."') &&
     navSrc.includes(
-      'description: "Visual booking calendar, requests, and availability rules. Development preview — no real calendar is connected yet."',
+      'description: "Assign actions your assistant can take during a call, like booking or transferring."',
     ),
 );
 
@@ -738,21 +806,22 @@ section("Correction B — the catalogue is one copy, gated in or out whole");
 /** Every field of every gated record, exactly as the approved architecture has it. */
 const GATED_RECORDS: [string, string, string | null, string, boolean, string | null, string | null][] =
   [
-    ["build", "assistants", "/assistants", "live", true, "Assistants", "Build and manage AI voice assistants for your business."],
-    ["build", "tools", "/tools", "comingSoon", true, "Tools", "Assign actions your assistant can take during a call, like booking or transferring."],
-    ["build", "phone-numbers", "/phone-numbers", "comingSoon", true, "Phone Numbers", "Get a SiteMint number or connect one you already own."],
-    ["build", "voice-library", "/voice-library", "comingSoon", true, "Voice Library", "Browse and preview voices for your assistant."],
-    ["build", "knowledge", "/knowledge", "comingSoon", true, "Knowledge Base", "Give your assistant reference material to draw on during calls."],
-    ["build", "squads", null, "later", true, "Squads", null],
-    ["operate", "appointments", "/appointments", "live", true, "Appointments", "Visual booking calendar, requests, and availability rules. Development preview — no real calendar is connected yet."],
-    ["operate", "outbound", null, "later", true, "Outbound", null],
-    ["observe", "logs", "/logs", "live", true, "Call Logs", "Review stored call records and analysis."],
-    ["observe", "analytics", "/analytics", "comingSoon", true, "Analytics", "Business metrics — calls answered, appointments booked, hours saved."],
-    ["observe", "testing", "/testing", "comingSoon", true, "Testing", "Test your assistant with a browser call or a text conversation."],
-    ["observe", "structured-outputs", "/structured-outputs", "comingSoon", true, "Structured Outputs", "Data your assistant extracts and structures from each call."],
-    ["observe", "issues", null, "later", true, "Issues", null],
-    ["manage", "integrations", "/integrations", "comingSoon", true, "Integrations", "Connect Google Calendar, Google Sheets, and other accounts."],
-    ["manage", "api-keys", "/settings/api-keys", "advanced", true, "API Keys", "Manage API credentials for advanced integrations."],
+    ["assistant", "assistants", "/assistants", "live", true, "Assistant", "Build and manage AI voice assistants for your business."],
+    ["activity", "calls", "/activity/calls", "live", true, "Calls", "Review call records and outcomes."],
+    ["channels", "phone-number", "/channels/phone-number", "live", true, "Phone Number", "The number your assistant answers and makes calls from."],
+    ["account", "usage", "/account/usage", "live", true, "Usage", "Minutes used, minutes remaining, and your billing period."],
+    ["account", "issues", "/account/issues", "live", true, "Issues", "Problems SiteMint has flagged that may need your attention."],
+    ["placeholders", "tools", "/tools", "comingSoon", true, "Tools", "Assign actions your assistant can take during a call, like booking or transferring."],
+    ["placeholders", "phone-numbers", "/phone-numbers", "comingSoon", true, "Phone Numbers", "Get a SiteMint number or connect one you already own."],
+    ["placeholders", "voice-library", "/voice-library", "comingSoon", true, "Voice Library", "Browse and preview voices for your assistant."],
+    ["placeholders", "knowledge", "/knowledge", "comingSoon", true, "Knowledge Base", "Give your assistant reference material to draw on during calls."],
+    ["placeholders", "analytics", "/analytics", "comingSoon", true, "Analytics", "Business metrics — calls answered, appointments booked, hours saved."],
+    ["placeholders", "testing", "/testing", "comingSoon", true, "Testing", "Test your assistant with a browser call or a text conversation."],
+    ["placeholders", "structured-outputs", "/structured-outputs", "comingSoon", true, "Structured Outputs", "Data your assistant extracts and structures from each call."],
+    ["placeholders", "integrations", "/integrations", "comingSoon", true, "Integrations", "Connect Google Calendar, Google Sheets, and other accounts."],
+    ["placeholders", "api-keys", "/settings/api-keys", "advanced", true, "API Keys", "Manage API credentials for advanced integrations."],
+    ["placeholders", "squads", null, "later", true, "Squads", null],
+    ["placeholders", "outbound", null, "later", true, "Outbound", null],
   ];
 
 eq(
@@ -788,12 +857,11 @@ eq(
 );
 
 eq(
-  "the route-less records keep their behaviour — visibly disabled, never linked",
+  "the route-less records keep their behaviour — visibly disabled, never linked (Issues is promoted to a live route by the 2026-09 owner replan, so it is no longer among them)",
   gatedNavItems.filter((i) => !i.href).map((i) => [i.key, i.state]),
   [
     ["squads", "later"],
     ["outbound", "later"],
-    ["issues", "later"],
   ],
 );
 
@@ -802,14 +870,43 @@ eq(
   ALL_NAV_GROUPS.flatMap((g) => g.items)
     .filter((i) => !i.voiceGated)
     .map((i) => i.key),
-  ["overview", "conversations", "receptionist", "contacts", "billing", "settings"],
+  [
+    "overview",
+    "setup",
+    "availability",
+    "appointment-types",
+    "calendar",
+    "appointments",
+    "test-booking",
+    "conversations",
+    "contacts",
+    "sms",
+    "billing",
+    "settings",
+    "support",
+  ],
 );
 
 check(
+  // "overview" and "setup" are deliberately absent from this list: each
+  // names both its own group and its single item the same thing (as
+  // "overview" always has), so a literal `key: "${k}"` count would be 2 by
+  // design, not evidence of a duplicated record.
   "there is exactly one catalogue — the ungated records are written once",
-  ["conversations", "receptionist", "contacts", "billing", "settings"].every(
-    (k) => navSrc.split(`key: "${k}"`).length - 1 === 1,
-  ) && gatedNavItems.every((i) => navSrc.split(`key: "${i.key}"`).length - 1 === 1),
+  [
+    "availability",
+    "appointment-types",
+    "calendar",
+    "appointments",
+    "test-booking",
+    "conversations",
+    "contacts",
+    "sms",
+    "billing",
+    "settings",
+    "support",
+  ].every((k) => navSrc.split(`key: "${k}"`).length - 1 === 1) &&
+    gatedNavItems.every((i) => navSrc.split(`key: "${i.key}"`).length - 1 === 1),
 );
 
 check(
@@ -869,7 +966,7 @@ section("Source — where the imports live, and what still gates the routes");
 
 eq(
   "App.tsx contains no direct import of any gated page — this is the correction",
-  GATED_PAGE_MODULES.filter((m) => appCode.includes(`import("@/pages/${m}")`)),
+  GATED_CHUNK_NAMES.filter((m) => appCode.includes(`import("@/pages/${m}")`)),
   [],
 );
 
@@ -880,17 +977,25 @@ check(
 );
 
 eq(
-  "every non-voice page is still imported inline and lazily, so the split is unchanged",
+  "every non-voice page is still imported inline and lazily, so the split is unchanged — the 2026-09 owner replan adds Setup, the Scheduling pages (Availability, Calendar, Appointments, Test Booking — B-1 moved Appointments out of the voice gate), the two password-reset pages and Support to this list",
   [
     "Login",
     "PublicSchedule",
+    "PasswordReset",
+    "PasswordResetComplete",
     "Overview",
+    "Setup",
+    "Availability",
+    "Calendar",
+    "Appointments",
+    "TestBooking",
     "Inbox",
     "AgentConfig",
     "Contacts",
     "ContactDetail",
     "Settings",
     "Billing",
+    "Support",
     "not-found",
   ].filter((m) => !appCode.includes(`lazy(() => import("@/pages/${m}"))`)),
   [],
@@ -910,9 +1015,9 @@ eq(
 );
 
 eq(
-  "all seven gated pages are imported inside the enabled branch, and nowhere else",
+  "all nine gated pages are imported inside the enabled branch, and nowhere else",
   GATED_PAGE_MODULES.filter(
-    (m) => !boundaryCode.includes(`${m}: lazy(() => import("@/pages/${m}"))`),
+    (m) => !boundaryCode.includes(`${m}: lazy(() => import("@/pages/${GATED_PAGE_FILES[m]}"))`),
   ),
   [],
 );
@@ -934,7 +1039,7 @@ check(
 {
   const gate = /\{voicePlatformEnabled && \(\s*<>([\s\S]*?)<\/>\s*\)\}/.exec(appSrc)?.[1] ?? "";
   eq(
-    "all seven gated routes are still registered inside the voice-platform gate",
+    "all nine gated routes are still registered inside the voice-platform gate",
     GATED_ROUTE_KEYS.filter((k) => !gate.includes(`path={ROUTES.${k}}`)),
     [],
   );
@@ -1209,13 +1314,20 @@ const GATED_RENDERABLE = [
   ASSISTANTS_LIST.detail,
   ASSISTANTS_LIST.newAssistant,
   CALL_LOGS_PAGE.detail,
-  APPOINTMENTS_PAGE.detail,
+  PHONE_NUMBER_PAGE.detail,
+  USAGE_PAGE.detail,
+  ISSUES_PAGE.detail,
 ];
 
+/**
+ * `receptionist/availability/*` is deliberately absent as of the 2026-09
+ * owner replan: Availability, Appointment Types, Calendar, Appointments and
+ * Test Booking moved out of the voice gate (owner decision B-1), so those
+ * endpoints are reachable from every build, gated-out included.
+ */
 const GATED_MODULE_IDENTIFIERS = [
   "receptionist/voice/assistants",
   "receptionist/voice/calls",
-  "receptionist/availability/config",
 ];
 
 const PROVIDER_AND_MEDIA = [
@@ -1330,13 +1442,20 @@ const GATED_NAV_AVAILABILITY = [...new Set(
 )];
 
 /**
- * Hrefs that exist *only* as navigation. The three live ones are also route
+ * Hrefs that exist *only* as navigation. The five live ones are also route
  * table entries, so they are covered by the route-chunk assertions instead;
  * these nine appear nowhere but the catalogue.
  */
+const LIVE_GATED_HREFS = [
+  "/assistants",
+  "/activity/calls",
+  "/channels/phone-number",
+  "/account/usage",
+  "/account/issues",
+];
 const GATED_NAV_ONLY_HREFS = gatedNavItems
   .map((i) => i.href)
-  .filter((h): h is string => h !== undefined && !["/assistants", "/appointments", "/logs"].includes(h));
+  .filter((h): h is string => h !== undefined && !LIVE_GATED_HREFS.includes(h));
 
 /**
  * Icons only the gated records use. Lucide's export name and the name it bakes
@@ -1345,14 +1464,21 @@ const GATED_NAV_ONLY_HREFS = gatedNavItems
  * than transformed by guesswork. `AlertTriangle` is deliberately absent: the
  * Issues record uses it, but so do ungated modules, so its presence in a
  * default build proves nothing — which the check below states explicitly.
+ *
+ * `CalendarDays` moved off this list in the 2026-09 owner replan: it is now
+ * the ungated Scheduling → Calendar item's icon (B-1 moved Calendar out of
+ * the voice gate). `Bot` joined it in the other direction — the ungated SMS
+ * item used to share it with the gated Assistant record, so it proved
+ * nothing; SMS now uses its own icon (`Smartphone`), so `Bot` is gated-only.
+ * `Gauge` is new: the live Usage record's icon.
  */
 const GATED_ONLY_ICONS: [string, string][] = [
+  ["Bot", "bot"],
   ["Wrench", "wrench"],
   ["Phone", "phone"],
   ["AudioLines", "audio-lines"],
   ["BookOpen", "book-open"],
   ["Users", "users"],
-  ["CalendarDays", "calendar-days"],
   ["PhoneOutgoing", "phone-outgoing"],
   ["ScrollText", "scroll-text"],
   ["BarChart3", "chart-column"],
@@ -1360,6 +1486,7 @@ const GATED_ONLY_ICONS: [string, string][] = [
   ["Braces", "braces"],
   ["Plug", "plug"],
   ["KeyRound", "key-round"],
+  ["Gauge", "gauge"],
 ];
 
 {
@@ -1519,7 +1646,7 @@ if (!existsSync(distDir)) {
    * comparing it against a chunk census is not the circular inference the
    * detector above is written to avoid.
    */
-  const observedClass = GATED_PAGE_MODULES.some((m) => chunksFor(m).length > 0)
+  const observedClass = GATED_CHUNK_NAMES.some((m) => chunksFor(m).length > 0)
     ? "voice-enabled"
     : "gated-out";
   strictCheck("strict: the build class is determinate", buildClass !== "indeterminate");
@@ -1551,9 +1678,33 @@ if (!existsSync(distDir)) {
 
   eq(
     "every non-voice route is still emitted as its own lazy chunk",
-    ["Login", "PublicSchedule", "Overview", "Inbox", "AgentConfig", "Contacts", "Settings", "Billing"]
-      .filter((m) => chunksFor(m).filter((f) => f.endsWith(".js")).length !== 1),
+    [
+      "Login",
+      "PublicSchedule",
+      "Overview",
+      "Setup",
+      "Availability",
+      "Calendar",
+      "Appointments",
+      "TestBooking",
+      "Inbox",
+      "AgentConfig",
+      "Contacts",
+      "Settings",
+      "Billing",
+      "Support",
+    ].filter((m) => chunksFor(m).filter((f) => f.endsWith(".js")).length !== 1),
     [],
+  );
+
+  /**
+   * Appointments moved out of the voice gate (B-1, 2026-09 owner replan) and
+   * is imported inline like every other always-on page, so its own stylesheet
+   * is now a property of every build — not only a voice-enabled one.
+   */
+  check(
+    "the Appointments route keeps its own stylesheet, in every build",
+    chunksFor("Appointments").filter((f) => f.endsWith(".css")).length === 1,
   );
 
   check(
@@ -1636,7 +1787,7 @@ if (!existsSync(distDir)) {
     arm("gated-out");
     eq(
       "no gated route chunk or stylesheet is emitted at all",
-      GATED_PAGE_MODULES.flatMap((m) => chunksFor(m)),
+      GATED_CHUNK_NAMES.flatMap((m) => chunksFor(m)),
       [],
     );
 
@@ -1711,13 +1862,17 @@ if (!existsSync(distDir)) {
     );
 
     /**
-     * The gated routes are the only place these paths are written, so their
+     * The gated routes are the only place this path is written, so its
      * absence is what proves no route-specific request can be issued: there is
      * no code left to issue one, whatever a caller types in the address bar.
+     * `receptionist/availability/*` is deliberately not asserted here — the
+     * 2026-09 owner replan moved Availability, Calendar, Appointments and Test
+     * Booking out of the voice gate (B-1), so that endpoint is reachable from
+     * every build, gated-out included.
      */
     check(
-      "no voice or availability endpoint path is reachable from the default build",
-      !/receptionist\/voice\//.test(everyJs) && !/receptionist\/availability\//.test(everyJs),
+      "no voice endpoint path is reachable from the default build",
+      !/receptionist\/voice\//.test(everyJs),
     );
 
     check(
@@ -1745,13 +1900,8 @@ if (!existsSync(distDir)) {
     arm("voice-enabled");
     eq(
       "every gated page is emitted as exactly one lazy chunk of its own",
-      GATED_PAGE_MODULES.filter((m) => chunksFor(m).filter((f) => f.endsWith(".js")).length !== 1),
+      GATED_CHUNK_NAMES.filter((m) => chunksFor(m).filter((f) => f.endsWith(".js")).length !== 1),
       [],
-    );
-
-    check(
-      "the Appointments route keeps its own stylesheet",
-      chunksFor("Appointments").filter((f) => f.endsWith(".css")).length === 1,
     );
 
     const entrySrc = readAsset(entryChunks[0]!);
@@ -1763,7 +1913,7 @@ if (!existsSync(distDir)) {
 
     check(
       "the entry still reaches each gated chunk only through a dynamic import",
-      GATED_PAGE_MODULES.every((m) => {
+      GATED_CHUNK_NAMES.every((m) => {
         const chunk = chunksFor(m).find((f) => f.endsWith(".js"))!;
         return (
           entrySrc.includes(`"./${chunk}"`) && !new RegExp(`from\\s*"\\./${chunk}"`).test(entrySrc)
@@ -2042,24 +2192,40 @@ builtOutputChecks = passed + failures.length - assertionsBeforeBuiltOutput;
 section("The neighbouring contracts still describe this boundary");
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Appointments left this trio in the 2026-09 owner replan: B-1 moved it out
+ * of the voice gate entirely, so its own contract test correctly dropped the
+ * built-variant classification machinery below along with it — there is no
+ * "default-gated" vs "voice-enabled" distinction left to make for a page that
+ * is in every build. Assistants and Call Logs (now Calls) are still gated, so
+ * they keep it.
+ */
+const GATED_NEIGHBOUR_TEST_SOURCES = [assistantsTestSrc, callLogsTestSrc];
+
 eq(
-  "AR-001I, Phase 13 and Phase 14 all expect no gated chunk from a default build",
-  [assistantsTestSrc, appointmentsTestSrc, callLogsTestSrc].filter(
+  "AR-001I and Phase 14 still expect no gated chunk from a default build",
+  GATED_NEIGHBOUR_TEST_SOURCES.filter(
     (src) => !src.includes('buildVariant === "default-gated"'),
   ).length,
   0,
 );
 
+check(
+  "and Appointments' own contract no longer carries that machinery at all — B-1 moved it out of the voice gate",
+  !appointmentsTestSrc.includes('buildVariant === "default-gated"') &&
+    !appointmentsTestSrc.includes("AR001J_VITE_VOICE_PLATFORM_ENABLED"),
+);
+
 eq(
-  "and all three resolve the variant from the build's own declaration",
-  [assistantsTestSrc, appointmentsTestSrc, callLogsTestSrc].filter(
+  "and both resolve the variant from the build's own declaration",
+  GATED_NEIGHBOUR_TEST_SOURCES.filter(
     (src) => !src.includes("AR001J_VITE_VOICE_PLATFORM_ENABLED"),
   ).length,
   0,
 );
 
 check(
-  "and none of them still asserts the old always-emitted behaviour",
+  "and neither still asserts the old always-emitted behaviour",
   !assistantsTestSrc.includes(
     "page components are lazily imported outside the gate, so chunk emission is unaffected by it",
   ),
@@ -2067,16 +2233,15 @@ check(
 
 /**
  * Owner-review correction A. Canonicalisation made "the parser rejects it"
- * and "the bundler removed it" the same statement, but two of these three
- * suites still classified a rejected non-canonical spelling — `"1"`, `"yes"`,
- * whitespace — as voice-enabled, which was true before canonicalisation and
- * is not now. All three classify through the application's own parser: one
- * truth table, called rather than restated, so none of them can drift away
- * from it again.
+ * and "the bundler removed it" the same statement, but these suites used to
+ * classify a rejected non-canonical spelling — `"1"`, `"yes"`, whitespace —
+ * as voice-enabled, which was true before canonicalisation and is not now.
+ * Both classify through the application's own parser: one truth table,
+ * called rather than restated, so neither can drift away from it again.
  */
 eq(
-  "all three built-output suites classify the build through parseBooleanFlag itself",
-  [assistantsTestSrc, appointmentsTestSrc, callLogsTestSrc].filter(
+  "both remaining built-output suites classify the build through parseBooleanFlag itself",
+  GATED_NEIGHBOUR_TEST_SOURCES.filter(
     (src) =>
       !/import \{ parseBooleanFlag \} from "\.\.\/\.\.\/lib\/featureFlags\.js";/.test(src) ||
       !/return parseBooleanFlag\(raw\) \? "voice-enabled" : "default-gated";/.test(src),
@@ -2085,8 +2250,8 @@ eq(
 );
 
 eq(
-  "and none of them still treats a rejected spelling as a voice-enabled build",
-  [assistantsTestSrc, appointmentsTestSrc, callLogsTestSrc].filter((src) =>
+  "and neither still treats a rejected spelling as a voice-enabled build",
+  GATED_NEIGHBOUR_TEST_SOURCES.filter((src) =>
     /raw === undefined \|\| raw === "" \|\| raw === "false" \? "default-gated" : "voice-enabled"/.test(
       src,
     ),
@@ -2095,9 +2260,9 @@ eq(
 );
 
 check(
-  "AR-001I still pins the Assistants navigation record this file derives",
-  assistantsTestSrc.includes('key: "assistants", label: "Assistants", href: "\\/assistants"') &&
-    navSrc.includes('key: "assistants", label: "Assistants", href: "/assistants", icon: Bot,'),
+  "AR-001I still pins the Assistants navigation record this file derives (2026-09 owner replan D-2 renamed its label to \"Assistant\", singular)",
+  assistantsTestSrc.includes('key: "assistants", label: "Assistant", href: "\\/assistants"') &&
+    navSrc.includes('key: "assistants", label: "Assistant", href: "/assistants", icon: Bot,'),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2176,10 +2341,14 @@ section("Registration — this file runs in the standard aggregate command");
 //    the variant from the chunks under test would be circular. An undeclared
 //    run falls back to that echo where it still exists and reports
 //    indeterminate otherwise, rather than guessing.
-//  • Three gated hrefs — `/assistants`, `/appointments`, `/logs` — are also
+//  • Five gated hrefs — `/assistants`, `/activity/calls`,
+//    `/channels/phone-number`, `/account/usage`, `/account/issues` — are also
 //    route-table entries, so their absence from a default build is asserted
 //    through the route and chunk checks rather than as navigation strings.
-//    The nine navigation-only hrefs are asserted directly.
+//    The nine navigation-only hrefs are asserted directly. (Appointments left
+//    this set entirely in the 2026-09 owner replan — B-1 moved it out of the
+//    voice gate — and Call Logs' old `/logs` became a legacy redirect to
+//    `/activity/calls` rather than a second live gated href.)
 //  • Request counts — one session request, no route-specific request for an
 //    unavailable route — are runtime facts. What is asserted here is the
 //    stronger static precondition: the default build contains no voice

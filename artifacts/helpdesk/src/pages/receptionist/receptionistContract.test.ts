@@ -135,21 +135,22 @@ function draft(over: Partial<Draft> = {}): Draft {
 section("route and navigation contract");
 
 check(
-  "the route path is unchanged: /receptionist, base-relative",
-  routesSrc.includes('receptionist: "/receptionist"'),
+  "the route is at /channels/sms, base-relative (2026-09 owner replan D-2/D-3: SMS is a channel under Channels; the ROUTES token was renamed from `receptionist` to `sms`, and the old /receptionist path is now a legacy redirect — see below)",
+  routesSrc.includes('sms: "/channels/sms"'),
 );
 check(
   "the route still renders AgentConfig",
-  appSrc.includes("<Route path={ROUTES.receptionist} component={AgentConfig} />"),
+  appSrc.includes("<Route path={ROUTES.sms} component={AgentConfig} />"),
 );
 check(
-  "route registration order is unchanged — conversations, then receptionist, then contacts",
-  appSrc.indexOf("ROUTES.conversations") < appSrc.indexOf("ROUTES.receptionist") &&
-    appSrc.indexOf("ROUTES.receptionist") < appSrc.indexOf("ROUTES.contacts"),
+  "route registration order still keeps Conversations and Contacts together, with SMS positioned by the Channels group",
+  appSrc.indexOf("ROUTES.conversations") < appSrc.indexOf("ROUTES.contacts") &&
+    appSrc.indexOf("ROUTES.contacts") < appSrc.indexOf("ROUTES.sms"),
 );
 check(
-  "the /deploy redirect still targets this route",
-  appSrc.includes("<InSpaRedirect to={ROUTES.receptionist} />"),
+  "both the /deploy and /receptionist legacy redirects still target this route",
+  appSrc.includes('<Route path="/receptionist">{() => <InSpaRedirect to={ROUTES.sms} />}</Route>') &&
+    appSrc.includes('<Route path="/deploy">{() => <InSpaRedirect to={ROUTES.sms} />}</Route>'),
 );
 check(
   "the page is still lazy — the route keeps its own chunk",

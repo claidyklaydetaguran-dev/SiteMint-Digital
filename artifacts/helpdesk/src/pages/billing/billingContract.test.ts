@@ -934,15 +934,18 @@ check(
 
 section("Unchanged — routing, navigation, flags");
 
-check("the billing route path is unchanged", /billing:\s*"\/billing"/.test(routesSrc));
+check(
+  "the billing route moved to /account/billing (2026-09 owner replan D-2 — Account group); the ROUTES.billing token name itself is unchanged",
+  /billing:\s*"\/account\/billing"/.test(routesSrc),
+);
 check(
   "the route registration is unchanged",
   /<Route path=\{ROUTES\.billing\} component=\{Billing\} \/>/.test(appSrc),
 );
 check("Billing is still lazily loaded", /const Billing = lazy\(/.test(appSrc));
 check(
-  "the navigation entry is unchanged and remains ungated",
-  /key: "billing", label: "Billing", href: "\/billing"[\s\S]{0,80}voiceGated: false/.test(navSrc),
+  "the navigation entry keeps its label and stays ungated, at its new D-2 path",
+  /key: "billing", label: "Billing", href: "\/account\/billing"[\s\S]{0,80}voiceGated: false/.test(navSrc),
 );
 check(
   // D-6 adds exactly one flag, VITE_BILLING_CHECKOUT_ENABLED, read directly

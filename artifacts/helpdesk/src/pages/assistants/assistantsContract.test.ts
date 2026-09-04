@@ -435,8 +435,8 @@ section("Route registration — gated, unchanged, and base-relative");
 }
 
 check(
-  "the Assistants navigation entry is unchanged and still voice-gated",
-  /key: "assistants", label: "Assistants", href: "\/assistants"/.test(navSrc) &&
+  "the Assistants navigation entry is unchanged and still voice-gated (2026-09 owner replan D-2 renamed its label from \"Assistants\" to \"Assistant\", singular)",
+  /key: "assistants", label: "Assistant", href: "\/assistants"/.test(navSrc) &&
     /state: "live", voiceGated: true/.test(
       navSrc.slice(navSrc.indexOf('key: "assistants"'), navSrc.indexOf('key: "tools"')),
     ),

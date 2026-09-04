@@ -124,8 +124,8 @@ const msg = (over: Partial<ContractMessage> & { id: number }): ContractMessage =
 console.log("\nRoute and protection");
 
 check(
-  "the conversations route is declared once, base-relative, in the shared route table",
-  /conversations:\s*"\/conversations"/.test(routesSrc),
+  "the conversations route is declared once, base-relative, in the shared route table (2026-09 owner replan D-2 moved it to /activity/conversations, under the Activity group)",
+  /conversations:\s*"\/activity\/conversations"/.test(routesSrc),
 );
 check(
   "the route renders the Inbox page inside the authenticated DashboardShell switch",

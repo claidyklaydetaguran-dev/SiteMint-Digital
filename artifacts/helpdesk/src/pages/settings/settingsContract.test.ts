@@ -184,7 +184,7 @@ eq("the sign-out timeout is unchanged", SIGN_OUT_TIMEOUT_MS, 10_000);
 
 section("configuration destinations");
 
-eq("destinations include Receptionist, Assistant and Billing", destinations().map((d) => d.href), ["/receptionist", "/assistants", "/billing"]);
+eq("destinations include Receptionist, Assistant and Billing, at their 2026-09 owner replan D-2 paths", destinations().map((d) => d.href), ["/channels/sms", "/assistants", "/account/billing"]);
 check("every destination is a real Link, not a button standing in for one", pageSrc.includes("sg-place__action"));
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);

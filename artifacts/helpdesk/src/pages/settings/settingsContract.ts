@@ -205,9 +205,9 @@ export interface Destination {
 
 export function destinations(): Destination[] {
   return [
-    { href: "/receptionist", title: "Receptionist", detail: "Open the SMS Receptionist configuration.", action: "Open Receptionist" },
+    { href: "/channels/sms", title: "Receptionist", detail: "Open the SMS Receptionist configuration.", action: "Open Receptionist" },
     { href: "/assistants", title: "Assistant", detail: "Configure the voice assistant, prompt and voice.", action: "Open Assistant" },
-    { href: "/billing", title: "Billing", detail: "Review plan and usage information.", action: "View billing" },
+    { href: "/account/billing", title: "Billing", detail: "Review plan and usage information.", action: "View billing" },
   ];
 }
 

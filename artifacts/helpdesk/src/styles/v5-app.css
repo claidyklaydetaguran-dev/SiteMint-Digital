@@ -106,3 +106,28 @@
     "DM Sans Fallback", ui-sans-serif, system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
+
+/* ── C-01 — no nested rail scrollbar (owner replan D-2) ─────────────────────
+   The D-2 navigation adds three more groups (Setup, Scheduling, Channels)
+   than the previous four-group rail carried. `.sd-rail__nav`'s own
+   `overflow-y: auto` (v2-dashboard.css) turns a tall catalogue into a second,
+   narrow scrollbar sandwiched between the pinned brand header and the pinned
+   footer (usage meter, appearance control, sign out) — a scroll trap a
+   pointer has to sit exactly over the middle strip to use, with the sign-out
+   button sometimes scrolled out of reach entirely.
+   This override removes that inner scroll and lets the rail itself become
+   the single scroll unit when its content genuinely doesn't fit — the same
+   treatment v2-dashboard.css's own short-viewport fallback already gives a
+   landscape phone below, just at the opposite (tall/desktop) end. Scoped to
+   `AppShell`'s own permanent-rail breakpoint (`DESKTOP_QUERY`, 64rem) and a
+   768px/48rem minimum height, so the mobile drawer keeps its existing,
+   already-correct scroll behaviour untouched. */
+@media (min-width: 64rem) and (min-height: 48rem) {
+  .sd-app.sd-app .sd-rail__nav {
+    overflow-y: visible;
+    flex: 0 0 auto;
+  }
+  .sd-app.sd-app .sd-rail {
+    overflow-y: auto;
+  }
+}

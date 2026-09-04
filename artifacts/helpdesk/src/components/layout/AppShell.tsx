@@ -32,6 +32,7 @@
  */
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -44,6 +45,11 @@ import { useTheme } from "next-themes";
 import { useSession, useLogout } from "@/hooks/useSession";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboardNav";
+// AR-001J boundary: the voice-usage rail indicator is gated the same way the
+// voice routes are — see the note in routes/voiceRoutes.ts. Its disabled
+// branch resolves to a component that renders nothing, so this import is
+// always safe to mount, in every build.
+import { UsageRailIndicatorGate } from "@/routes/voiceRoutes";
 // Phase 12: the rail's plan name comes from the same helper Settings and
 // Billing use, so one account cannot be called three different things in three
 // places. It previously read "Pro plan" — a product this repository does not
@@ -384,13 +390,22 @@ export function AppShell({ children }: { children: ReactNode }) {
         <RailNav location={location} onNavigate={closeIfDrawer} />
 
         <div className="sd-rail__foot">
-          <UsageMeter
-            isPaid={isPaid}
-            planTier={me.firm.planTier}
-            used={me.conversationCount}
-            limit={me.firm.trialConversationsLimit}
-            onNavigate={closeIfDrawer}
-          />
+          {/* V5 PR-8 — a voice-enabled build shows the combined minutes/SMS
+              indicator (`UsageRailIndicatorGate`); every other build keeps the
+              existing SMS trial meter exactly as before. */}
+          {voicePlatformEnabled ? (
+            <Suspense fallback={null}>
+              <UsageRailIndicatorGate />
+            </Suspense>
+          ) : (
+            <UsageMeter
+              isPaid={isPaid}
+              planTier={me.firm.planTier}
+              used={me.conversationCount}
+              limit={me.firm.trialConversationsLimit}
+              onNavigate={closeIfDrawer}
+            />
+          )}
           <AppearanceControl />
           <button type="button" className="sd-railbtn" onClick={handleLogout}>
             <LogOut className="sd-railbtn__icon" aria-hidden="true" />
