@@ -58,8 +58,8 @@
      `var()`), so they need a direct entry — everything else in this block
      is unused by name and exists only for documentation/rollback clarity. */
   --v3-ice: var(--sm-mist-100); /* was literal #e7f4f8 */
-  --v3-glow-mint: 0 0 24px rgba(37, 208, 176, 0.28); /* was cyan rgba(34,211,238,…) */
-  --v3-shadow-3: 0 24px 64px -32px rgba(10, 42, 46, 0.4); /* ink-950-tinted, was navy-black */
+  --v3-glow-mint: 0 0 24px rgba(50, 197, 210, 0.28); /* mint-500 #32C5D2 — was cyan rgba(34,211,238,…), then briefly the REJECTED System-B green rgba(37,208,176 = #25D0B0) */
+  --v3-shadow-3: 0 24px 64px -32px rgba(21, 62, 82, 0.4); /* ink-950 #153E52 — was navy-black, then briefly the REJECTED System-B green rgba(10,42,46 = #0A2A2E) */
 }
 
 /* ── Tone roles: `--v3-line`/`--v3-line-strong` are computed by
@@ -96,7 +96,7 @@
 }
 
 .v4-shell .v4-btn--primary:hover {
-  box-shadow: 0 6px 24px -8px rgba(37, 208, 176, 0.45);
+  box-shadow: 0 6px 24px -8px rgba(50, 197, 210, 0.45); /* mint-500 #32C5D2 — was the REJECTED System-B green rgba(37,208,176 = #25D0B0) */
 }
 
 .v4-shell[data-tone="ink"] .v4-btn--primary,
@@ -112,8 +112,8 @@
    than `var(--v4-ink)`/`var(--v4-navy-line)`, so it does not follow the
    primitive remap either. Same colours, ink-950-tinted. ────────────────── */
 .v4-shell .v4-header[data-surface="dark"] {
-  background: rgba(10, 42, 46, 0.72);
-  border-bottom-color: rgba(233, 247, 243, 0.16);
+  background: rgba(21, 62, 82, 0.72); /* ink-950 #153E52 — was the REJECTED System-B green rgba(10,42,46 = #0A2A2E) */
+  border-bottom-color: rgba(232, 245, 247, 0.16); /* sm-dark-text #E8F5F7 — was the REJECTED System-B green rgba(233,247,243 = #E9F7F3) */
 }
 
 /* ── Focus ring: System B replaces the 2px solid outline with the soft mint

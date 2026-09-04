@@ -217,9 +217,9 @@
 
   /* CRM admin shell — fixed dark chrome, does not follow light/dark mode.
      Dedicated tokens because no existing light-mode token maps to this shade. */
-  --crm-sidebar: 222 34% 15%;
-  --crm-header: 222 47% 11%;
-  --crm-content: 210 17% 95%;
+  --crm-sidebar: 187 64% 11%; /* ink-950 #153E52 — was a fixed navy (222 34% 15%) never migrated to Glacier Mint */
+  --crm-header: 185 70% 14%; /* teal-900 #173642 — was a fixed navy (222 47% 11%) never migrated to Glacier Mint */
+  --crm-content: 150 33% 98%; /* porcelain #F8FCFC — was a fixed cool-grey (210 17% 95%) never migrated to Glacier Mint */
 
   /* Frontend V2 Phase 1: system stack, no remote font request. `--app-font-serif`
      keeps its name (many components reference it) but no longer pulls Playfair
@@ -303,9 +303,9 @@
   --chart-5: 220 10% 20%;
 
   /* CRM admin shell keeps the same fixed dark chrome in dark mode. */
-  --crm-sidebar: 222 34% 15%;
-  --crm-header: 222 47% 11%;
-  --crm-content: 210 17% 95%;
+  --crm-sidebar: 187 64% 11%; /* ink-950 #153E52 — was a fixed navy (222 34% 15%) never migrated to Glacier Mint */
+  --crm-header: 185 70% 14%; /* teal-900 #173642 — was a fixed navy (222 47% 11%) never migrated to Glacier Mint */
+  --crm-content: 150 33% 98%; /* porcelain #F8FCFC — was a fixed cool-grey (210 17% 95%) never migrated to Glacier Mint */
 
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);

@@ -27,6 +27,12 @@ import {
 import "@/styles/v2-signin.css";
 import "@/styles/v3-app.css";
 import "@/styles/v4-app.css";
+// SiteMint V5 "Signal, mint-led" retheme — token-value override one layer
+// above V4. This page shares Login.tsx's `.si-page` stylesheet but had
+// never picked up the V5 layer, so it was rendering the retired V4
+// navy/cyan palette. ROLLBACK: remove this import to restore the V4
+// appearance.
+import "@/styles/v5-app.css";
 
 type Outcome = "idle" | "done" | "error";
 

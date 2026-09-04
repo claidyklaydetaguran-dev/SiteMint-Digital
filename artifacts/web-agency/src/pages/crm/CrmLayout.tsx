@@ -1135,7 +1135,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <Link href="/admin/crm">
           <div className="cursor-pointer flex items-center shrink-0">
-            <SiteMintLogo variant="light" iconSize={18} />
+            <SiteMintLogo variant="ops" iconSize={18} />
           </div>
         </Link>
 
@@ -1256,7 +1256,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Navigation menu"
               className="relative w-72 max-w-[85vw] bg-crm-sidebar h-full flex flex-col z-10 shadow-2xl outline-none">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <SiteMintLogo variant="light" iconSize={18} />
+                <SiteMintLogo variant="ops" iconSize={18} />
                 <button onClick={() => setMobileMenuOpen(false)} className="text-white/50 hover:text-white transition-colors">
                   <X className="w-4 h-4" />
                 </button>
