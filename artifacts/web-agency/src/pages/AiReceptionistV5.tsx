@@ -15,7 +15,7 @@
  * worktree's `PublicShell.tsx` yet — see the typed cast below.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { PublicShell } from "@/shells/PublicShell";
 import { DASHBOARD_URLS } from "@/lib/routes";
 import {
@@ -28,6 +28,8 @@ import {
 import { CallTheaterV5 } from "@/components/receptionist-v5/CallTheaterV5";
 import { LiveDemoPanel } from "@/components/receptionist-v5/LiveDemoPanel";
 import { BetaRequestForm } from "@/components/receptionist-v5/BetaRequestForm";
+import { Reveal } from "@/components/v5/Reveal";
+import { useArmedReveal, usePausableAmbient } from "@/components/receptionist-v5/heroMotion";
 import "@/components/receptionist-v5/receptionist-v5.css";
 
 const SECTION_ID = Object.fromEntries(
@@ -85,6 +87,13 @@ function useHeroVideoEligible(): boolean {
  * visually to the product it's introducing. The caption lives once, in the
  * overlay label below (`smv5-hero__media-label`) — this graphic carries no
  * text of its own beyond the non-visual `<title>` for assistive tech.
+ *
+ * Cinematic motion (2026-09-05 owner directive) — "call ring" motif: two
+ * extra rings pulse outward ambiently (`.smv5-poster__pulse`), echoing the
+ * call theater's own voice-object animation. Ambient and non-essential —
+ * `stroke`/`transform`/`opacity` only, paused via `data-ambient-paused`
+ * (set by `usePausableAmbient` on the enclosing `.smv5-hero__media`) and
+ * removed entirely under `prefers-reduced-motion: reduce` in CSS.
  */
 function HeroPosterSvg() {
   const availabilityDots: Array<[number, number]> = [
@@ -108,6 +117,28 @@ function HeroPosterSvg() {
       {availabilityDots.map(([x, y]) => (
         <circle key={`${x}-${y}`} cx={x} cy={y} r="4" fill="#32C5D2" opacity="0.65" />
       ))}
+      <circle
+        className="smv5-poster__pulse"
+        cx="320"
+        cy="200"
+        r="92"
+        fill="none"
+        stroke="#32C5D2"
+        strokeWidth="2"
+        style={{ animationDelay: "0ms" }}
+        aria-hidden="true"
+      />
+      <circle
+        className="smv5-poster__pulse"
+        cx="320"
+        cy="200"
+        r="92"
+        fill="none"
+        stroke="#56D2CF"
+        strokeWidth="2"
+        style={{ animationDelay: "900ms" }}
+        aria-hidden="true"
+      />
       <circle cx="320" cy="200" r="92" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.85" />
       <circle cx="320" cy="200" r="56" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.6" />
       <circle cx="320" cy="200" r="6" fill="#32C5D2" />
@@ -118,8 +149,9 @@ function HeroPosterSvg() {
 function HeroMedia() {
   const eligible = useHeroVideoEligible();
   const showVideo = eligible && HERO_VIDEO_SRC.length > 0;
+  const ambientRef = usePausableAmbient<HTMLDivElement>();
   return (
-    <div className="smv5-hero__media">
+    <div className="smv5-hero__media" ref={ambientRef}>
       {showVideo ? (
         <video muted playsInline autoPlay loop aria-hidden="true">
           <source src={HERO_VIDEO_SRC} type="video/mp4" />
@@ -129,6 +161,119 @@ function HeroMedia() {
       )}
       <span className="smv5-hero__media-label">Development placeholder — final media pending</span>
     </div>
+  );
+}
+
+/**
+ * The hero headline's masked-line reveal (2026-09-05 owner directive).
+ *
+ * Deliberately NOT built on `components/v5/Reveal.tsx` — this heading is
+ * expected to be the page's LCP element (largest text block, first paint,
+ * above the fold with no image ahead of it), and Reveal's word-clip-rise
+ * animates each word's `opacity` from 0, which delays/forfeits LCP credit
+ * for a fade-from-invisible element. `clip-path` does not carry that
+ * penalty (Chrome's LCP algorithm only excludes `opacity: 0` content), so
+ * this component reveals the line with an `inset()` wipe instead — the
+ * glyphs themselves stay at `opacity: 1` for their entire lifetime,
+ * including the very first painted frame.
+ *
+ * Progressive by construction, same contract as `useRevealV5`: the heading
+ * renders unclipped (fully visible, no class) until `armed` flips true in a
+ * post-mount effect, so a reader with JavaScript disabled — or an observer
+ * that never fires — always sees the finished heading, never a stuck wipe.
+ */
+function HeroHeadlineReveal({ text }: { text: string }) {
+  const { ref, armed, revealed } = useArmedReveal<HTMLHeadingElement>(0.1);
+  const classes = [
+    "smv5-hero__title",
+    armed && "smv5-hero__title--armed",
+    revealed && "smv5-hero__title--in",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <h1 ref={ref} className={classes}>
+      {text}
+    </h1>
+  );
+}
+
+/**
+ * A quiet cue that content continues below the fold — required because the
+ * hero is now a full first viewport with the primary/secondary actions
+ * already in view, so nothing else hints there's more page beneath it.
+ * Ambient bounce, paused via `usePausableAmbient`; static (no animation) and
+ * still visibly present under reduced motion, so it keeps communicating
+ * "scroll for more" without motion. Hidden below 768px (§ mobile
+ * simplification) where vertical space is already tight.
+ */
+function HeroScrollCue() {
+  const ambientRef = usePausableAmbient<HTMLDivElement>();
+  return (
+    <div className="smv5-hero__scrollcue" ref={ambientRef} aria-hidden="true">
+      <span className="smv5-hero__scrollcue-glyph" />
+      <span className="smv5-hero__scrollcue-label">Scroll</span>
+    </div>
+  );
+}
+
+/**
+ * "Calendar availability" motif (§SCHEDULING_STEPS) — a small 3×2 slot grid
+ * where one slot lights up once the step scrolls into view, representing a
+ * checked, open slot. Reveal-once; `opacity`/`transform` only — the lit
+ * slot is mint from the start, it simply fades and scales in rather than
+ * changing color, so nothing here animates a `fill`.
+ */
+function AvailabilitySlotGlyph() {
+  const { ref, armed, revealed } = useArmedReveal<SVGSVGElement>(0.4);
+  const classes = [
+    "smv5-step__glyph",
+    armed && "smv5-step__glyph--armed",
+    revealed && "smv5-step__glyph--in",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const litIndex = 4;
+  return (
+    <svg ref={ref} className={classes} viewBox="0 0 66 44" aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const x = (i % 3) * 22 + 2;
+        const y = Math.floor(i / 3) * 20 + 2;
+        return (
+          <rect
+            key={i}
+            x={x}
+            y={y}
+            width="18"
+            height="16"
+            rx="3"
+            className={i === litIndex ? "smv5-step__slot smv5-step__slot--lit" : "smv5-step__slot"}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/**
+ * "Appointment result" motif (§SCHEDULING_STEPS) — a confirmation checkmark
+ * that draws in via `stroke-dashoffset` once the "Approve / book" step
+ * scrolls into view. Reveal-once; `stroke-dashoffset` only, no `opacity`.
+ */
+function ConfirmCheckGlyph() {
+  const { ref, armed, revealed } = useArmedReveal<SVGSVGElement>(0.4);
+  const classes = [
+    "smv5-step__glyph",
+    armed && "smv5-step__glyph--armed",
+    revealed && "smv5-step__glyph--in",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <svg ref={ref} className={classes} viewBox="0 0 44 44" aria-hidden="true">
+      <circle cx="22" cy="22" r="19" className="smv5-step__confirm-ring" />
+      <path d="M13 22.5 19 28.5 31 15" className="smv5-step__confirm-check" />
+    </svg>
   );
 }
 
@@ -165,16 +310,28 @@ function OutcomeCheckIcon() {
  * console (header bar, three stat tiles, four data rows) rather than a
  * dashed box holding only a caption. Purely illustrative, no real or
  * implied numbers.
+ *
+ * "Dashboard outcome" motif (2026-09-05): once the section scrolls into
+ * view, the three stat tiles and four rows populate in sequence instead of
+ * appearing all at once — `transform` + `opacity` only, staggered via
+ * `--sm-stagger-index`, scoped under `.sm-reveal`/`.sm-reveal--in` (added
+ * post-mount by the `<Reveal>` wrapper below) so the illustration is fully
+ * visible by default with no JavaScript.
  */
 function DashboardIllustration() {
   return (
-    <div className="smv5-illustration">
+    <Reveal as="div" className="smv5-illustration">
       <svg viewBox="0 0 320 220" aria-hidden="true" className="smv5-illustration__svg">
         <rect x="1" y="1" width="318" height="218" rx="14" fill="var(--smv5-white, #fff)" stroke="var(--smv5-line, #CFE7EA)" />
         <circle cx="30" cy="30" r="6" fill="var(--smv5-mint-500, #32C5D2)" />
         <rect x="44" y="26" width="120" height="8" rx="4" fill="var(--smv5-line-strong, #A9CFD6)" />
         {[0, 1, 2].map((i) => (
-          <g key={i} transform={`translate(${16 + i * 100}, 56)`}>
+          <g
+            key={i}
+            className="smv5-illustration__tile"
+            transform={`translate(${16 + i * 100}, 56)`}
+            style={{ "--sm-stagger-index": i } as CSSProperties}
+          >
             <rect width="88" height="46" rx="8" fill="var(--smv5-mint-100, #DFF7F7)" />
             <rect x="10" y="12" width="40" height="6" rx="3" fill="var(--smv5-mint-700, #0B7487)" opacity="0.5" />
             <rect x="10" y="24" width="28" height="10" rx="4" fill="var(--smv5-mint-700, #0B7487)" />
@@ -183,6 +340,7 @@ function DashboardIllustration() {
         {[0, 1, 2, 3].map((i) => (
           <rect
             key={i}
+            className="smv5-illustration__row"
             x="16"
             y={116 + i * 24}
             width="288"
@@ -190,13 +348,14 @@ function DashboardIllustration() {
             rx="4"
             fill={i % 2 === 0 ? "var(--smv5-mist-100, #EDF9FA)" : "var(--smv5-white, #fff)"}
             stroke="var(--smv5-line, #CFE7EA)"
+            style={{ "--sm-stagger-index": i + 3 } as CSSProperties}
           />
         ))}
       </svg>
       <span className="smv5-illustration__label">
         Illustration — dashboard overview, development placeholder
       </span>
-    </div>
+    </Reveal>
   );
 }
 
@@ -251,13 +410,37 @@ const WHAT_IT_DOES: { title: string; body: string; status: Readiness }[] = [
   },
 ];
 
-const SCHEDULING_STEPS = [
-  { title: "Availability check", body: "The receptionist checks real open slots against your calendar and rules." },
+/**
+ * `motif` drives the two scheduling-lifecycle cinematic beats (2026-09-05
+ * owner directive): "availability" renders `AvailabilitySlotGlyph` (calendar
+ * availability — a slot grid with one slot lighting) on the two steps that
+ * are literally about checking availability; "confirm" renders
+ * `ConfirmCheckGlyph` (appointment result — a confirmation state) on the
+ * step where a request becomes a booking.
+ */
+const SCHEDULING_STEPS: {
+  title: string;
+  body: string;
+  motif?: "availability" | "confirm";
+}[] = [
+  {
+    title: "Availability check",
+    body: "The receptionist checks real open slots against your calendar and rules.",
+    motif: "availability",
+  },
   { title: "Request", body: "A caller's preferred time is captured as a request, not an automatic booking." },
-  { title: "Approve / book", body: "A request is reviewed and confirmed, moving it onto the calendar." },
+  {
+    title: "Approve / book",
+    body: "A request is reviewed and confirmed, moving it onto the calendar.",
+    motif: "confirm",
+  },
   { title: "Reschedule", body: "A booked appointment can be moved to a new time with the change tracked." },
   { title: "Cancel", body: "A booking can be cancelled, freeing the slot and closing out the record." },
-  { title: "Google Calendar availability", body: "Availability reflects your connected Google Calendar, not a static schedule." },
+  {
+    title: "Google Calendar availability",
+    body: "Availability reflects your connected Google Calendar, not a static schedule.",
+    motif: "availability",
+  },
 ];
 
 const EXAMPLES: { label: string; lines: { who: string; text: string }[] }[] = [
@@ -410,25 +593,45 @@ export default function AiReceptionistV5() {
       headerMode="product"
     >
       <div className="smv5">
-        {/* ── 1 · Hero ──────────────────────────────────────────────── */}
+        {/*
+         * ── 1 · Hero ──────────────────────────────────────────────────
+         * Full first viewport (owner directive, 2026-09-05): min-height is
+         * 100svh, minus the fixed product header's `--v4-hdr-h` (read from
+         * v4-chrome.css, never edited here — see receptionist-v5.css).
+         * Entrance sequence — eyebrow → beta status → headline (masked line
+         * reveal, LCP-safe) → support → actions → theater visual
+         * (scale-settle) — each a `<Reveal>` beat except the headline,
+         * which uses `HeroHeadlineReveal` specifically to avoid animating
+         * the likely-LCP element via opacity (see that component's doc
+         * comment). `HeroScrollCue` signals there's more below the fold.
+         */}
         <section id={SECTION_ID.hero} className="smv5-hero">
           <div className="smv5__container smv5-hero__grid">
             <div>
-              <span className="smv5-hero__pill">{HERO_COPY.pill}</span>
-              <h1 className="smv5-hero__title">{HERO_COPY.title}</h1>
-              <p className="smv5-hero__sub">{HERO_COPY.supporting}</p>
-              <div className="smv5-hero__ctas">
-                <a href={`#${SECTION_ID.beta}`} className="smv5-btn smv5-btn--primary">
+              <Reveal as="span" className="smv5-hero__eyebrow" delay={0}>
+                {HERO_COPY.eyebrow}
+              </Reveal>
+              <Reveal as="span" className="smv5-hero__pill" delay={60}>
+                {HERO_COPY.betaStatus}
+              </Reveal>
+              <HeroHeadlineReveal text={HERO_COPY.title} />
+              <Reveal as="p" className="smv5-hero__sub" delay={420}>
+                {HERO_COPY.supporting}
+              </Reveal>
+              <Reveal as="div" className="smv5-hero__ctas" delay={520}>
+                {/* Filled/primary — Interactive Preview is the lowest-friction
+                    next step and gets the visual emphasis. */}
+                <a href={`#${SECTION_ID.preview}`} className="smv5-btn smv5-btn--primary">
                   {HERO_COPY.primaryCta}
                 </a>
-                <a href={`#${SECTION_ID.preview}`} className="smv5-btn smv5-btn--outline">
+                <a href={`#${SECTION_ID.beta}`} className="smv5-btn smv5-btn--outline">
                   {HERO_COPY.secondaryCta}
                 </a>
-              </div>
-              <p className="smv5-hero__signin">
+              </Reveal>
+              <Reveal as="p" className="smv5-hero__signin" delay={560}>
                 {HERO_COPY.signInPrompt}{" "}
                 <a href={DASHBOARD_URLS.login}>{HERO_COPY.signInCta}</a>
-              </p>
+              </Reveal>
               <ul className="smv5-hero__capabilities">
                 {HERO_CAPABILITY_HIGHLIGHTS.map((c) => (
                   <li key={c}>
@@ -438,8 +641,11 @@ export default function AiReceptionistV5() {
                 ))}
               </ul>
             </div>
-            <HeroMedia />
+            <Reveal as="div" className="smv5-hero__visual" delay={620}>
+              <HeroMedia />
+            </Reveal>
           </div>
+          <HeroScrollCue />
         </section>
 
         {/* ── 2 · Call theater / Interactive Preview ───────────────────── */}
@@ -451,7 +657,9 @@ export default function AiReceptionistV5() {
               Pick a topic and watch the same voice-object states a real conversation moves
               through — Ready, Listening, Thinking, Speaking. Nothing here places a call.
             </p>
-            <CallTheaterV5 />
+            <Reveal as="div">
+              <CallTheaterV5 />
+            </Reveal>
           </div>
         </section>
 
@@ -508,17 +716,28 @@ export default function AiReceptionistV5() {
             <p className="smv5__lede">
               Certified on staging; customer controls arriving in the private beta.
             </p>
-            <ol className="smv5-steps smv5-steps--horizontal">
+            {/* "Business-rule lookup" motif: the six stops themselves reveal
+                in order (transform + opacity, staggered) as this checklist
+                scrolls into view — see `.smv5-steps--horizontal.sm-reveal`
+                below. The two availability stops and the confirmation stop
+                additionally carry their own dedicated glyph motif. */}
+            <Reveal as="ol" className="smv5-steps smv5-steps--horizontal">
               {SCHEDULING_STEPS.map((step, i) => (
-                <li className="smv5-step" key={step.title}>
+                <li
+                  className="smv5-step"
+                  key={step.title}
+                  style={{ "--sm-stagger-index": i } as CSSProperties}
+                >
                   <span className="smv5-step__num">{String(i + 1).padStart(2, "0")}</span>
                   <div>
                     <h3>{step.title}</h3>
                     <p>{step.body}</p>
+                    {step.motif === "availability" && <AvailabilitySlotGlyph />}
+                    {step.motif === "confirm" && <ConfirmCheckGlyph />}
                   </div>
                 </li>
               ))}
-            </ol>
+            </Reveal>
           </div>
         </section>
 
@@ -531,19 +750,26 @@ export default function AiReceptionistV5() {
               Three short, simulated exchanges — illustrative, not recordings of real calls.
             </p>
             <div className="smv5-grid">
+              {/* "Progressive conversation" motif: each card's lines reveal
+                  in order (transform + opacity only) once the card scrolls
+                  into view — see the `.smv5-example.sm-reveal` rules in
+                  receptionist-v5.css. Default-visible with no class until
+                  `Reveal` arms it post-mount, so a stalled observer never
+                  leaves a line stuck invisible. */}
               {EXAMPLES.map((ex) => (
-                <div className="smv5-example" key={ex.label}>
+                <Reveal as="div" className="smv5-example" key={ex.label}>
                   <span className="smv5-example__label">{ex.label}</span>
                   {ex.lines.map((line, i) => (
                     <p
                       key={i}
                       className={`smv5-example__line smv5-example__line--${line.who.toLowerCase()}`}
+                      style={{ "--sm-stagger-index": i } as CSSProperties}
                     >
                       <span className="smv5-example__who">{line.who}</span>
                       {line.text}
                     </p>
                   ))}
-                </div>
+                </Reveal>
               ))}
             </div>
           </div>
@@ -678,7 +904,7 @@ export default function AiReceptionistV5() {
         {/* ── 14 · Private-beta posture ────────────────────────────────── */}
         <section id={SECTION_ID["beta-posture"]} className="smv5__section smv5__section--tight">
           <div className="smv5__container">
-            <span className="smv5-badge smv5-badge--beta">{HERO_COPY.pill}</span>
+            <span className="smv5-badge smv5-badge--beta">{HERO_COPY.betaStatus}</span>
             <p className="smv5__lede" style={{ marginBottom: 0 }}>
               {PRICING_POSTURE}
             </p>

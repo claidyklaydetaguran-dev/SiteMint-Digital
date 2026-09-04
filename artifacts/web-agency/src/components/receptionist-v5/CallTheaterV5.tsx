@@ -13,6 +13,16 @@
  *   makes a network call or a provider request.
  * - keyboard operable: chips are buttons, Escape ends an active preview.
  * - `prefers-reduced-motion: reduce` and hidden tabs stop the animation loop.
+ *
+ * Cinematic motion (2026-09-05 owner directive) — this is the page's "call
+ * ring" + "waveform" motif home: the idle "Ready" ring now breathes gently
+ * (`useVoiceObject` below) instead of sitting perfectly static, and
+ * `TheaterWaveform` adds a small ambient bar cluster next to the state
+ * label. Both loops are ambient (not reveal-once) so both are paused via
+ * `data-ambient-paused` — the ring loop through its own IntersectionObserver
+ * (added to the existing visibility gate rather than a second effect), the
+ * waveform via the shared `usePausableAmbient` hook — whenever the tab is
+ * hidden or the theater scrolls offscreen.
  */
 
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -23,6 +33,7 @@ import {
   type VoiceState,
 } from "./previewScript";
 import { PREVIEW_LABEL } from "@/pages/receptionist-v5/sections";
+import { usePausableAmbient } from "./heroMotion";
 
 const MAX_SECONDS = 90;
 
@@ -53,7 +64,29 @@ function useVoiceObject(state: VoiceState, canvasRef: RefObject<HTMLCanvasElemen
     const mint400 = readToken("--sm-mint-400", "#56D2CF");
     const ink950 = readToken("--sm-ink-950", "#153E52");
 
+    // "Call ring" ambient motif: the idle Ready ring breathes instead of
+    // sitting perfectly still, so the visual reads as alive before a caller
+    // (or, here, a visitor) does anything. Ended stays a static confirmation
+    // — it's a resting result, not an ambient loop. Offscreen pausing below
+    // matters specifically because this loop can now run indefinitely
+    // whenever the state is "ready", not only for a few seconds per call.
+    let onscreen = true;
     let raf = 0;
+    const observer =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) onscreen = entry.isIntersecting;
+              cancelAnimationFrame(raf);
+              if (onscreen && document.visibilityState === "visible") {
+                raf = requestAnimationFrame(draw);
+              }
+            },
+            { threshold: 0.05 },
+          )
+        : undefined;
+    observer?.observe(canvas);
+
     function draw(now: number) {
       if (!canvas || !ctx) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -66,18 +99,23 @@ function useVoiceObject(state: VoiceState, canvasRef: RefObject<HTMLCanvasElemen
       const c = s / 2;
       ctx.clearRect(0, 0, s, s);
 
-      if (state === "ready" || state === "ended") {
+      if (state === "ready") {
+        const breathe = reduced ? 1 : 1 + Math.sin(now / 1500) * 0.035;
         ctx.beginPath();
-        ctx.arc(c, c, c - 8, 0, 6.28);
-        ctx.strokeStyle = state === "ended" ? mint500 : ink950;
+        ctx.arc(c, c, (c - 8) * breathe, 0, 6.28);
+        ctx.strokeStyle = ink950;
         ctx.lineWidth = 1.5;
         ctx.stroke();
-        if (state === "ended") {
-          ctx.beginPath();
-          ctx.arc(c, c, 4, 0, 6.28);
-          ctx.fillStyle = mint500;
-          ctx.fill();
-        }
+      } else if (state === "ended") {
+        ctx.beginPath();
+        ctx.arc(c, c, c - 8, 0, 6.28);
+        ctx.strokeStyle = mint500;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(c, c, 4, 0, 6.28);
+        ctx.fillStyle = mint500;
+        ctx.fill();
       } else if (state === "listening" || state === "speaking") {
         const outward = state === "speaking";
         for (let i = 0; i < 3; i++) {
@@ -106,7 +144,8 @@ function useVoiceObject(state: VoiceState, canvasRef: RefObject<HTMLCanvasElemen
       }
 
       const active = state === "listening" || state === "thinking" || state === "speaking";
-      if (!reduced && active && document.visibilityState === "visible") {
+      const shouldLoop = active || state === "ready";
+      if (!reduced && shouldLoop && document.visibilityState === "visible" && onscreen) {
         raf = requestAnimationFrame(draw);
       }
     }
@@ -133,8 +172,28 @@ function useVoiceObject(state: VoiceState, canvasRef: RefObject<HTMLCanvasElemen
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", onVisibility);
+      observer?.disconnect();
     };
   }, [state, canvasRef]);
+}
+
+/**
+ * "Waveform" motif — a small ambient CSS bar cluster (`transform: scaleY`
+ * only), shown alongside the idle Ready state as a quiet audio-readiness
+ * accent. Paused via `usePausableAmbient` whenever the tab is hidden or the
+ * theater scrolls offscreen; `aria-hidden` since it carries no information
+ * beyond decoration (the state label above it is the accessible signal).
+ */
+function TheaterWaveform() {
+  const ambientRef = usePausableAmbient<HTMLDivElement>();
+  const bars = [0, 1, 2, 3, 4];
+  return (
+    <div className="smv5-theater__waveform" ref={ambientRef} aria-hidden="true">
+      {bars.map((i) => (
+        <span key={i} className="smv5-theater__wavebar" style={{ animationDelay: `${i * 110}ms` }} />
+      ))}
+    </div>
+  );
 }
 
 export function CallTheaterV5() {
@@ -239,6 +298,7 @@ export function CallTheaterV5() {
           <p className="smv5-theater__state" aria-live="polite">
             {PREVIEW_STATE_LABEL[state]}
           </p>
+          {state === "ready" && <TheaterWaveform />}
         </div>
 
         <div className="smv5-theater__interact">

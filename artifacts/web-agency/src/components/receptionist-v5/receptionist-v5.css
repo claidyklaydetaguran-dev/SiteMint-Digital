@@ -101,12 +101,39 @@
   margin: 0 0 32px;
 }
 
-/* ── Hero ─────────────────────────────────────────────────────────────── */
+/* ── Hero ─────────────────────────────────────────────────────────────────
+ * Full first viewport (owner directive, 2026-09-05): `min-height` is 100svh
+ * so the section always fills the screen the visitor lands on; the header
+ * is a fixed, transparent-over-ink bar (`--v4-hdr-h`, owned by
+ * v4-chrome.css and never edited here) so `padding-top` clears it rather
+ * than the shell's own `padding-top` (ink-tone pages intentionally run
+ * their hero underneath the bar — see `.v4-shell[data-hero-tone="light"]`
+ * in v4-chrome.css). `align-items: center` on the grid vertically centers
+ * whatever content height results, so there is no leftover blank band
+ * whether the viewport is short or tall. `overflow: hidden` contains the
+ * ambient ring/scroll-cue decoration within the section's own box. ───────── */
 
 .smv5-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
   background: var(--smv5-ink-950);
   color: var(--smv5-white);
-  padding: var(--sm-space-96, 96px) 0 var(--sm-space-48, 48px);
+  padding: calc(var(--v4-hdr-h, 64px) + var(--sm-space-48, 48px)) 0 96px;
+}
+
+.smv5-hero__eyebrow {
+  display: block;
+  font-family: var(--smv5-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--smv5-mint-400);
+  margin-bottom: 14px;
 }
 
 .smv5-hero__pill {
@@ -129,6 +156,7 @@
   grid-template-columns: 1.1fr 0.9fr;
   gap: 56px;
   align-items: stretch;
+  width: 100%;
 }
 
 .smv5-hero__grid > div:first-child {
@@ -142,6 +170,23 @@
   line-height: 1.08;
   margin: 0 0 20px;
   max-width: 18ch;
+}
+
+/* Masked line reveal (`HeroHeadlineReveal`) — clip-path only, never opacity,
+   because this heading is the page's expected LCP element. Nothing here
+   applies until JS arms it post-mount (`--armed`), so a reader with no
+   JavaScript — or an observer that never fires — always sees the finished
+   headline unclipped, exactly like `.sm-reveal`'s progressive-enhancement
+   contract in tokens-v5.css. `will-change` is scoped to the armed state
+   only, so it never lingers on the settled, most-common case. */
+.smv5-hero__title--armed {
+  clip-path: inset(0 0 100% 0);
+  transition: clip-path 640ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  will-change: clip-path;
+}
+
+.smv5-hero__title--armed.smv5-hero__title--in {
+  clip-path: inset(0 0 0% 0);
 }
 
 .smv5-hero__sub {
@@ -228,6 +273,108 @@
   background: rgb(10 42 46 / 0.72);
   border-radius: var(--smv5-radius-s);
   padding: 4px 8px;
+}
+
+/* Hero visual "scale-settle" entrance — overrides `.sm-reveal`'s default
+   translateY rise with a scale, for the one beat in the sequence that's a
+   product visual rather than text (§Reveal, components/v5/Reveal.tsx). Two
+   classes beat the single `.sm-reveal` selector on specificity, so no
+   `!important` is needed. */
+.smv5-hero__visual.sm-reveal {
+  transform: scale(0.94);
+}
+
+.smv5-hero__visual.sm-reveal--in {
+  transform: none;
+}
+
+/* "Call ring" motif — ambient concentric pulses on the hero poster,
+   echoing the Interactive Preview's own voice-object ring. `transform` +
+   `stroke-opacity` only; paused via `data-ambient-paused` (set by
+   `usePausableAmbient` on `.smv5-hero__media`) and removed under reduced
+   motion below. `transform-box: fill-box` keeps the scale centered on the
+   ring itself rather than the SVG's own (0,0) origin. */
+.smv5-poster__pulse {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  stroke-opacity: 0.7;
+  animation: smv5-ring-pulse 2.4s var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) infinite;
+}
+
+@keyframes smv5-ring-pulse {
+  0% {
+    transform: scale(0.82);
+    stroke-opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.28);
+    stroke-opacity: 0;
+  }
+  100% {
+    transform: scale(1.28);
+    stroke-opacity: 0;
+  }
+}
+
+.smv5-hero__media[data-ambient-paused] .smv5-poster__pulse {
+  animation-play-state: paused;
+}
+
+/* Scroll cue — signals there's more below the now full-viewport hero. Static
+   dot by default; the bounce is purely decorative motion layered on top. */
+.smv5-hero__scrollcue {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #9fc9c4;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.smv5-hero__scrollcue-glyph {
+  position: relative;
+  width: 18px;
+  height: 28px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--smv5-radius-pill);
+}
+
+.smv5-hero__scrollcue-glyph::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 3px;
+  height: 7px;
+  background: currentColor;
+  border-radius: var(--smv5-radius-pill);
+  transform: translateX(-50%);
+  animation: smv5-scrollcue-drift 1.8s ease-in-out infinite;
+}
+
+@keyframes smv5-scrollcue-drift {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, 8px);
+    opacity: 0.4;
+  }
+}
+
+.smv5-hero__scrollcue[data-ambient-paused] .smv5-hero__scrollcue-glyph::after {
+  animation-play-state: paused;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */
@@ -429,6 +576,41 @@
     justify-content: flex-start;
     text-align: left;
   }
+}
+
+/* "Waveform" motif (§CallTheaterV5 TheaterWaveform) — ambient bars beside the
+   idle Ready state. `transform: scaleY` only, paused via
+   `data-ambient-paused` and switched off under reduced motion below. */
+.smv5-theater__waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+
+.smv5-theater__wavebar {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--smv5-mint-500);
+  opacity: 0.75;
+  transform: scaleY(0.3);
+  transform-origin: bottom;
+  animation: smv5-wavebar 1.1s ease-in-out infinite;
+}
+
+@keyframes smv5-wavebar {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.smv5-theater__waveform[data-ambient-paused] .smv5-theater__wavebar {
+  animation-play-state: paused;
 }
 
 /* ── Live demo panel ──────────────────────────────────────────────────── */
@@ -635,6 +817,84 @@
   color: var(--smv5-slate-600);
 }
 
+/* "Business-rule lookup" motif — the six lifecycle stops reveal in order
+   (transform + opacity, staggered) as the checklist scrolls into view.
+   Scoped under `.sm-reveal` so the steps stay fully visible by default with
+   no JavaScript; reduced motion is handled globally in tokens-v5.css. */
+.smv5-steps--horizontal.sm-reveal .smv5-step {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 320ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform 320ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  transition-delay: calc(var(--sm-stagger-index, 0) * 70ms);
+}
+
+.smv5-steps--horizontal.sm-reveal--in .smv5-step {
+  opacity: 1;
+  transform: none;
+}
+
+/* Per-step glyph motifs (calendar availability / appointment result) —
+   `AvailabilitySlotGlyph` and `ConfirmCheckGlyph` in AiReceptionistV5.tsx.
+   Both are reveal-once via `useArmedReveal`, independent of the checklist's
+   own `Reveal` stagger above, and both stay fully visible by default (no
+   `--armed` class) until JS arms them post-mount. */
+.smv5-step__glyph {
+  display: block;
+  margin-top: 10px;
+  width: 52px;
+  height: auto;
+}
+
+.smv5-step__slot {
+  fill: var(--smv5-mist-100);
+  stroke: var(--smv5-line-strong);
+  stroke-width: 1;
+}
+
+.smv5-step__slot--lit {
+  fill: var(--smv5-mint-500);
+}
+
+.smv5-step__glyph--armed .smv5-step__slot--lit {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  transform: scale(0.55);
+  transition: opacity 340ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform 340ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.smv5-step__glyph--armed.smv5-step__glyph--in .smv5-step__slot--lit {
+  opacity: 1;
+  transform: none;
+}
+
+.smv5-step__confirm-ring {
+  fill: var(--smv5-mint-100);
+  stroke: var(--smv5-mint-500);
+  stroke-width: 2;
+}
+
+.smv5-step__confirm-check {
+  fill: none;
+  stroke: var(--smv5-mint-700);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 0;
+}
+
+.smv5-step__glyph--armed .smv5-step__confirm-check {
+  stroke-dashoffset: 30;
+  transition: stroke-dashoffset 420ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.smv5-step__glyph--armed.smv5-step__glyph--in .smv5-step__confirm-check {
+  stroke-dashoffset: 0;
+}
+
 @media (max-width: 900px) {
   .smv5-steps--horizontal {
     grid-template-columns: 1fr;
@@ -709,6 +969,24 @@
   color: var(--smv5-amber-600);
 }
 
+/* "Progressive conversation" motif — each card's lines reveal in the order
+   they're spoken once the card scrolls into view. Scoped under `.sm-reveal`
+   (added by `Reveal` only after mount) so the lines are fully visible by
+   default with no JavaScript — reduced motion is already handled globally
+   by tokens-v5.css's `.sm-reveal` override. */
+.smv5-example.sm-reveal .smv5-example__line {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 320ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform 320ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  transition-delay: calc(var(--sm-stagger-index, 0) * 90ms);
+}
+
+.smv5-example.sm-reveal--in .smv5-example__line {
+  opacity: 1;
+  transform: none;
+}
+
 /* ── Illustration placeholder ─────────────────────────────────────────── */
 
 .smv5-illustration {
@@ -734,6 +1012,37 @@
   font-size: 12px;
   color: var(--smv5-slate-600);
   text-align: center;
+}
+
+/* "Dashboard outcome" motif — the three stat tiles and four rows populate in
+   sequence once the illustration scrolls into view. `transform-box:
+   fill-box` scopes the transform to each shape's own box (SVG elements
+   otherwise transform relative to the document origin); scoped under
+   `.sm-reveal`/`.sm-reveal--in` so the illustration is fully visible by
+   default with no JavaScript. */
+.smv5-illustration.sm-reveal .smv5-illustration__tile,
+.smv5-illustration.sm-reveal .smv5-illustration__row {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  opacity: 0;
+  transition: opacity 360ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  transition-delay: calc(var(--sm-stagger-index, 0) * 80ms);
+}
+
+.smv5-illustration.sm-reveal .smv5-illustration__tile {
+  transform: translateY(8px) scale(0.92);
+  transition-property: opacity, transform;
+}
+
+.smv5-illustration.sm-reveal .smv5-illustration__row {
+  transform: scaleX(0.4);
+  transition-property: opacity, transform;
+}
+
+.smv5-illustration.sm-reveal--in .smv5-illustration__tile,
+.smv5-illustration.sm-reveal--in .smv5-illustration__row {
+  opacity: 1;
+  transform: none;
 }
 
 /* ── Privacy callout ───────────────────────────────────────────────────── */
@@ -948,8 +1257,70 @@
   }
 }
 
+/* Mobile motion simplification (owner directive §cinematic motion: "simplify
+   below 768px"). The scroll cue competes with the sign-in link and CTAs for
+   already-tight vertical space, so it drops entirely; the ambient ring pulse
+   stays but slower and lower-amplitude so it reads as a quiet accent rather
+   than a competing animation next to every other reveal firing on load. */
+@media (max-width: 768px) {
+  .smv5-hero__scrollcue {
+    display: none;
+  }
+
+  .smv5-poster__pulse {
+    animation-duration: 3.6s;
+  }
+
+  @keyframes smv5-ring-pulse {
+    0% {
+      transform: scale(0.9);
+      stroke-opacity: 0.5;
+    }
+    70% {
+      transform: scale(1.14);
+      stroke-opacity: 0;
+    }
+    100% {
+      transform: scale(1.14);
+      stroke-opacity: 0;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .smv5-btn {
+    transition: none;
+  }
+
+  /* Every ambient/entrance motif settles to its final, fully visible state
+     with no animation — the hero visual's scale-settle override, the ring
+     pulse, and the scroll cue's drifting dot. `.sm-reveal`/`.sm-reveal--in`
+     themselves are already handled globally in tokens-v5.css. */
+  .smv5-hero__visual.sm-reveal,
+  .smv5-hero__visual.sm-reveal--in {
+    transform: none;
+  }
+
+  .smv5-poster__pulse {
+    animation: none;
+    stroke-opacity: 0.85;
+  }
+
+  .smv5-hero__scrollcue-glyph::after {
+    animation: none;
+  }
+
+  .smv5-hero__title--armed {
+    transition: none;
+  }
+
+  .smv5-theater__wavebar {
+    animation: none;
+    transform: scaleY(0.65);
+  }
+
+  .smv5-step__glyph--armed .smv5-step__slot--lit,
+  .smv5-step__glyph--armed .smv5-step__confirm-check {
     transition: none;
   }
 }
