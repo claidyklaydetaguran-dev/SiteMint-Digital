@@ -635,10 +635,12 @@ const domainTables = [...voiceTables, ...discoveryTables, ...schedulingTables];
 
 check(
   // P4 raised this from ten: scheduling 0001 adds calendar_connections
-  // and calendar_oauth_states. Update this pin ONLY alongside a reviewed
-  // migration that changes the inventory.
-  "the committed migrations create exactly twenty-six domain tables",
-  domainTables.length === 26,
+  // and calendar_oauth_states. V5 0007 raised it from twenty-six:
+  // voice_onboarding_states, voice_beta_requests, voice_invites.
+  // Update this pin ONLY alongside a reviewed migration that changes
+  // the inventory.
+  "the committed migrations create exactly twenty-nine domain tables",
+  domainTables.length === 29,
   domainTables.join(","),
 );
 check(

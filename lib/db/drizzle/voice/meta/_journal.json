@@ -50,6 +50,13 @@
       "when": 1788100856392,
       "tag": "0006_dizzy_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788529944172,
+      "tag": "0007_same_changeling",
+      "breakpoints": true
     }
   ]
 }
