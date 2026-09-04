@@ -51,6 +51,61 @@
   color: var(--sm-dark-muted, #9FC2CC);
 }
 
+/* ── Hero field height + waypoint labels (owner review finding #1) ──────
+   `SignalHeroV4` (HomeV4.tsx, reused unmodified — see this page's file
+   banner) is not this workstream's file, so the fix has to happen entirely
+   from the outside: these selectors carry a class+id combination
+   (`.sm-home-v5 #hero …`) whose specificity beats the plain single-class
+   rules in `v4-home.css` regardless of stylesheet load order, so no
+   `!important` is needed.
+
+   1. The field (`.v4-hero__field`) is capped so the particle band reads as
+      a purposeful transition instead of a mostly-empty band between the
+      CTAs and the Capture→Organize→Connect→Resolve strip below it. It
+      keeps `flex: 1 1 auto` so it still *shrinks* to fit short viewports
+      (never overflows the fixed-height sticky stage and clips the phase
+      HUD) — the max-height only ever pulls it down from its old flex:1
+      size, never forces it taller.
+   2. The five system waypoints already drawn inside the field (Websites &
+      web apps → Discovery systems → Workflow automation → AI Receptionist
+      → Booked customer — the same connected-system story the six-step
+      journey chapter tells in prose) sit at opacity 0 until the scroll
+      thread reaches them, which is why a static view of the field reads as
+      empty dust with no legible information. Giving them a low resting
+      opacity means the waypoint labels carry information at rest, not only
+      once lit — the field's real content is visible immediately instead of
+      appearing only after scrolling starts. */
+.sm-home-v5 #hero .v4-hero__field {
+  flex: 1 1 auto;
+  max-height: 65vh;
+}
+.sm-home-v5 #hero .v4-hero__node {
+  opacity: 0.42;
+}
+.sm-home-v5 #hero .v4-hero__node.is-lit {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__field {
+    max-height: 46vh;
+    min-height: 220px;
+  }
+}
+
+/* ── Section rhythm (owner §6) — the shared `.v4-section` clamp() ran up to
+   7.5rem top+bottom between every chapter; scoped-tightened here (same
+   clamp() shape, so mobile still compresses via the vw term) rather than
+   touching `v4-home.css`, which other pages still read unmodified. ────── */
+.sm-home-v5 .v4-section {
+  padding-block: clamp(3rem, 4vw + 1rem, 5.5rem);
+}
+.sm-home-v5 .v4-chapter-head {
+  margin-bottom: 1.5rem;
+}
+.sm-home-v5 .v4-h2 {
+  margin-bottom: 0.6rem;
+}
+
 /* ── Section 2 — typographic ledger (no cards) ───────────────────────── */
 .sm-ledger__list {
   list-style: none;
@@ -118,13 +173,21 @@
 .sm-hero-media__badge {
   position: absolute;
   left: 0.75rem;
+  right: 0.75rem;
   bottom: 0.75rem;
+  max-width: max-content;
   padding: 0.3rem 0.6rem;
-  border-radius: var(--sm-radius-pill, 999px);
+  border-radius: var(--sm-radius-m, 10px);
   background: rgb(10 42 46 / 0.7);
   color: var(--sm-dark-text, #E8F5F7);
   font-size: 0.7rem;
   letter-spacing: 0.03em;
+  line-height: 1.4;
+}
+@media (max-width: 480px) {
+  .sm-hero-media__badge {
+    max-width: none;
+  }
 }
 
 /* ── Generic split layout (copy + visual) ────────────────────────────── */
@@ -147,6 +210,14 @@
 .sm-split__copy > .v4-kicker {
   display: block;
   margin-bottom: 0.5rem;
+}
+/* Consistent, intentional spacing between every stacked element in a split
+   column (kicker → h2 → one or two lede paragraphs → CTA) — several of
+   these sections now carry a second, shorter paragraph (connects-to /
+   available-now-vs-custom copy, owner §7), and `.v4-lede` itself carries no
+   margin, so without this the two paragraphs would sit flush. */
+.sm-split__copy > * + * {
+  margin-top: 0.85rem;
 }
 
 /* ── Section 4 — layered browser/device frames (CSS only) ────────────── */

@@ -22,6 +22,14 @@ export interface HeroMediaProps {
   className?: string;
 }
 
+/**
+ * The poster is a Glacier-composed illustration only — no baked-in caption.
+ * The single visible label lives in the `.sm-hero-media__badge` below,
+ * rendering the caller's actual `label` text; the SVG's own `aria-label`
+ * (also the caller's `label`) carries the same words to assistive tech.
+ * Two captions saying two different, hardcoded things here was the bug —
+ * one accurate label, described twice in two modalities, is correct.
+ */
 function DevPlaceholderPoster({ label }: { label: string }) {
   return (
     <svg
@@ -31,7 +39,7 @@ function DevPlaceholderPoster({ label }: { label: string }) {
       aria-label={label}
     >
       <rect width="640" height="360" fill="var(--sm-ink-950, #153E52)" />
-      <g opacity="0.55" stroke="var(--sm-mint-400, #56D2CF)" strokeWidth="1.4" fill="none">
+      <g opacity="0.6" stroke="var(--sm-mint-400, #56D2CF)" strokeWidth="1.4" fill="none">
         <circle cx="120" cy="260" r="5" />
         <circle cx="220" cy="200" r="5" />
         <circle cx="330" cy="215" r="5" />
@@ -39,17 +47,13 @@ function DevPlaceholderPoster({ label }: { label: string }) {
         <circle cx="530" cy="110" r="5" />
         <path d="M120 260 C 190 210, 260 250, 330 215 S 400 160, 440 150 S 500 120, 530 110" />
       </g>
-      <text
-        x="320"
-        y="335"
-        textAnchor="middle"
-        fill="var(--sm-dark-muted, #9FC2CC)"
-        fontSize="13"
-        fontFamily="var(--sm-font-mono, monospace)"
-        letterSpacing="0.04em"
-      >
-        DEVELOPMENT PLACEHOLDER — FINAL MEDIA PENDING
-      </text>
+      <g opacity="0.85" fill="var(--sm-mint-500, #32C5D2)">
+        <circle cx="120" cy="260" r="2.4" />
+        <circle cx="220" cy="200" r="2.4" />
+        <circle cx="330" cy="215" r="2.4" />
+        <circle cx="440" cy="150" r="2.4" />
+        <circle cx="530" cy="110" r="2.4" />
+      </g>
     </svg>
   );
 }
@@ -97,9 +101,7 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
           <source src={videoSrc} />
         </video>
       )}
-      <span className="sm-hero-media__badge">
-        Development placeholder — final media pending
-      </span>
+      <span className="sm-hero-media__badge">{label}</span>
     </div>
   );
 }

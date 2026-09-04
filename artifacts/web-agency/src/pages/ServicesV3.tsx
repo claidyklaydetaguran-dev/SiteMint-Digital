@@ -22,6 +22,7 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import "@/styles/v5-pages.css";
 
 type PillarId = "websites-apps" | "discovery-systems" | "ai-systems" | "crm-systems";
 
@@ -33,6 +34,10 @@ interface Pillar {
   desc: string;
   href: string;
   mapPos: { x: number; y: number };
+  /** Owner §7: how each system connects to the rest — shown as a small
+      labelled list under the summary so the page explains the connections
+      the systems map only draws. */
+  connectsTo: string[];
 }
 
 const pillars: Pillar[] = [
@@ -41,27 +46,30 @@ const pillars: Pillar[] = [
     icon: Globe,
     title: "Websites & Web Apps",
     headline: "A website that knows what happens next.",
-    desc: "Editorial-grade marketing sites and custom applications, designed backwards from the action a real customer should take.",
+    desc: "Editorial-grade marketing sites and custom applications, designed backwards from the action a real customer should take. Starter Site System covers the core pages most businesses need as-is; a custom application is scoped to your workflow.",
     href: ROUTES.websitesApps,
     mapPos: { x: 70, y: 140 },
+    connectsTo: ["Discovery Systems", "CRM & Internal Systems"],
   },
   {
     id: "discovery-systems",
     icon: Search,
     title: "Discovery Systems",
     headline: "Turn first contact into a useful brief.",
-    desc: "Structured, adaptive intake that hands your team something they can price, plan, and respond to the same day.",
+    desc: "Structured, adaptive intake that hands your team something they can price, plan, and respond to the same day — available now as the flow live on this site.",
     href: ROUTES.discoverySystems,
     mapPos: { x: 230, y: 60 },
+    connectsTo: ["Websites & Web Apps", "AI Systems & Automation"],
   },
   {
     id: "ai-systems",
     icon: Workflow,
     title: "AI Systems & Automation",
     headline: "Less handoff. Less busywork. More momentum.",
-    desc: "Follow-ups, routing, evaluation, and record-keeping handled automatically — with people kept in the loop and an audit trail on every step.",
+    desc: "Follow-ups, routing, evaluation, and record-keeping handled automatically — with people kept in the loop and an audit trail on every step. Included from the Growth tier up; scoped to your process during discovery.",
     href: ROUTES.aiSystems,
     mapPos: { x: 390, y: 140 },
+    connectsTo: ["Discovery Systems", "CRM & Internal Systems"],
   },
   {
     id: "crm-systems",
@@ -71,6 +79,7 @@ const pillars: Pillar[] = [
     desc: "Pipeline, tasks, and records the team actually looks at — connected to the rest of the system, not a fifth disconnected tool.",
     href: `${ROUTES.aiSystems}#crm-systems`,
     mapPos: { x: 390, y: 240 },
+    connectsTo: ["AI Systems & Automation", "Websites & Web Apps"],
   },
 ];
 
@@ -152,6 +161,9 @@ function SystemsMap() {
           );
         })}
       </svg>
+      <p className="v3-body sm-map-caption">
+        Click a system to jump to how it connects to the others.
+      </p>
     </div>
   );
 }
@@ -165,7 +177,7 @@ export default function ServicesV3() {
   });
 
   return (
-    <div className="v3-services-hub">
+    <div className="v3-services-hub sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">Services</span>
@@ -199,6 +211,12 @@ export default function ServicesV3() {
                 <div className="v3wk-item__body">
                   <h2 className="v3-h2">{service.headline}</h2>
                   <p className="v3-body">{service.desc}</p>
+                  <ul className="sm-connects">
+                    <li className="sm-connects__label">Connects to:</li>
+                    {service.connectsTo.map((name) => (
+                      <li className="sm-connects__item" key={name}>{name}</li>
+                    ))}
+                  </ul>
                   <div>
                     <Link href={service.href} className="v3-btn v3-btn--outline">
                       Explore {service.title}

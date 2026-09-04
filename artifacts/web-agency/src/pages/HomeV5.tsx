@@ -90,9 +90,17 @@ function WebsitesAppsSection() {
           <span className="v4-kicker">03 — Websites & Web Apps</span>
           <h2 className="v4-h2">A site that knows what happens after the click.</h2>
           <p className="v4-lede">
-            Marketing sites and custom applications built around the action a
+            For businesses whose current site is a brochure nobody acts on:
+            marketing sites and custom applications built around the action a
             real visitor should take next — a form that reaches an inbox, a
             tracked event, a clean hand-off to the next system.
+          </p>
+          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+            A Starter Site System ships with the pages and lead capture most
+            businesses need as-is; a custom application is scoped and built
+            around your specific workflow. Either way, every form and event
+            on the site feeds straight into the CRM below — nothing waits in
+            an inbox to be typed in twice.
           </p>
           <Link href={ROUTES.websitesApps} className="v3-btn v3-btn--outline">
             Explore Websites &amp; Web Apps →
@@ -132,9 +140,16 @@ function CrmSystemsSection() {
           <span className="v4-kicker">04 — CRM &amp; Internal Systems</span>
           <h2 className="v4-h2">Where the business runs, in one place.</h2>
           <p className="v4-lede">
-            Pipeline, tasks, and records the owner actually looks at — built
-            around how the business already works instead of forcing a
-            generic template onto it.
+            For teams whose leads live in a spreadsheet, an inbox, and
+            someone's memory: pipeline, tasks, and records the owner actually
+            looks at — built around how the business already works instead of
+            forcing a generic template onto it.
+          </p>
+          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+            A CRM connection is part of the Growth and Custom systems above,
+            configured to your pipeline during discovery — it's the record
+            every website form, automated follow-up, and receptionist call
+            below writes to, so nothing lives in two places.
           </p>
           <Link href={`${ROUTES.aiSystems}#crm-systems`} className="v3-btn v3-btn--outline">
             See CRM &amp; internal systems →
@@ -174,9 +189,16 @@ function AiSystemsSection() {
           <span className="v4-kicker">05 — AI Systems &amp; Automation</span>
           <h2 className="v4-h2">Evaluate, route, follow up, draft — where it's allowed to act.</h2>
           <p className="v4-lede">
-            Automation handles the mechanical steps; anything requiring
-            judgment lands as a task for a person, with context attached.
-            Every automated action is logged and stoppable.
+            For operators whose growth is capped by follow-through, not
+            demand: automation handles the mechanical steps; anything
+            requiring judgment lands as a task for a person, with context
+            attached. Every automated action is logged and stoppable.
+          </p>
+          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+            AI-assisted development is how we build every SiteMint system
+            faster, with the same human review and testing on everything that
+            ships; AI automation inside your own system — the kind pictured
+            here — is scoped and turned on only where it's actually in scope.
           </p>
           <Link href={ROUTES.aiSystems} className="v3-btn v3-btn--outline">
             Explore AI Systems &amp; Automation →
@@ -231,6 +253,11 @@ function ReceptionistSpotlight() {
             SiteMint AI Receptionist is built to answer incoming calls, handle
             routine questions, and help callers reach the right next step
             using the business's actual rules and availability.
+          </p>
+          <p className="v4-lede" style={{ fontSize: "1rem" }}>
+            Every call it handles becomes a CRM record and, where automation
+            is in scope, a follow-up — the same connected pipeline the rest
+            of this page describes, by phone instead of by form.
           </p>
           <Link href={ROUTES.aiReceptionist} className="v3-btn v3-btn--primary">
             See the AI Receptionist →

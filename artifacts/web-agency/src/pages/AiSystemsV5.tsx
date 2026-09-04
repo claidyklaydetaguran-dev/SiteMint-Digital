@@ -23,6 +23,7 @@ import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import "@/styles/v5-pages.css";
 
 const content: ServicePageContent = {
   eyebrow: "AI Systems & Automation",
@@ -35,7 +36,7 @@ const content: ServicePageContent = {
   },
   build: {
     title: "Automation for the steps people shouldn't have to remember.",
-    body: "We map the handoffs that actually happen in your business and automate the mechanical ones — acknowledgments, routing, record-keeping, scheduled follow-ups — while decisions stay human.",
+    body: "We map the handoffs that actually happen in your business and automate the mechanical ones — acknowledgments, routing, record-keeping, scheduled follow-ups — while decisions stay human. A Growth Digital System includes a starting workflow set; a Custom Connected System scopes automation around your specific process during discovery.",
     points: [
       "Follow-up sequences that stop the moment a person replies",
       "Records created and updated automatically as work moves",
@@ -189,6 +190,12 @@ function CrmSystemsSection() {
             output actually lives: the pipeline, the tasks, and the records
             your team looks at every day.
           </p>
+          <p className="v3-body">
+            It's the record every website form, AI Receptionist call, and
+            discovery brief writes to — so the CRM is honest by construction:
+            it only ever shows what actually happened, not what someone
+            remembered to log.
+          </p>
         </div>
         <div className="v3m-pillars v3m-pillars--3">
           <div className="v3-card v3m-pillar">
@@ -239,12 +246,21 @@ export default function AiSystemsV5() {
       "Automation, CRM & internal systems, and AI-assisted workflows — evaluation, routing, follow-up, and record-keeping handled automatically, with people kept in the loop.",
   });
   return (
-    <div id="integrations-scope">
+    <div id="integrations-scope" className="sm-v5page sm-v5page--ai-systems">
       <ServicePage
         content={content}
         extraSection={<CrmSystemsSection />}
         demo={
           <div className="v3-card v3h-demo" data-tone="ice" id="integrations">
+            <div className="sm-flow" role="img" aria-label="Workflow: evaluate, then route, then follow up, then draft">
+              <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Evaluate</span>
+              <span className="sm-flow__arrow" aria-hidden="true" />
+              <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Route</span>
+              <span className="sm-flow__arrow" aria-hidden="true" />
+              <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Follow up</span>
+              <span className="sm-flow__arrow" aria-hidden="true" />
+              <span className="sm-flow__node"><span className="sm-flow__dot" aria-hidden="true" />Draft</span>
+            </div>
             <div className="v3h-demo__head">
               <p className="v3h-demo__title">A week of invisible work, handled</p>
               <span className="v3m-example-note">Demonstration</span>

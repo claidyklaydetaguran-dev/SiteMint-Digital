@@ -12,6 +12,7 @@ import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import "@/styles/v5-pages.css";
 
 const productionWork = [
   {
@@ -76,7 +77,7 @@ export default function WorkV3() {
   });
 
   return (
-    <div className="v3-work-page">
+    <div className="v3-work-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">Work</span>
