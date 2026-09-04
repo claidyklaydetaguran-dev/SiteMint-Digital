@@ -10,20 +10,20 @@
  */
 
 .smv5 {
-  --smv5-mint-500: var(--sm-mint-500, #25d0b0);
-  --smv5-mint-400: var(--sm-mint-400, #4fd9cf);
-  --smv5-mint-600: var(--sm-mint-600, #16b597);
-  --smv5-mint-700: var(--sm-mint-700, #0e7f6b);
-  --smv5-mint-100: var(--sm-mint-100, #e6f9f3);
-  --smv5-mist-100: var(--sm-mist-100, #eefaf8);
-  --smv5-porcelain: var(--sm-porcelain, #f7fbf9);
+  --smv5-mint-500: var(--sm-mint-500, #32C5D2);
+  --smv5-mint-400: var(--sm-mint-400, #56D2CF);
+  --smv5-mint-600: var(--sm-mint-600, #1FA9BC);
+  --smv5-mint-700: var(--sm-mint-700, #0B7487);
+  --smv5-mint-100: var(--sm-mint-100, #DFF7F7);
+  --smv5-mist-100: var(--sm-mist-100, #EDF9FA);
+  --smv5-porcelain: var(--sm-porcelain, #F8FCFC);
   --smv5-white: var(--sm-white, #ffffff);
-  --smv5-teal-900: var(--sm-teal-900, #0b3a3e);
-  --smv5-ink-950: var(--sm-ink-950, #0a2a2e);
-  --smv5-slate-600: var(--sm-slate-600, #526b70);
+  --smv5-teal-900: var(--sm-teal-900, #173642);
+  --smv5-ink-950: var(--sm-ink-950, #153E52);
+  --smv5-slate-600: var(--sm-slate-600, #4A6472);
   --smv5-slate-300: var(--sm-slate-300, #b9cbce);
-  --smv5-line: var(--sm-line, #d7e7e3);
-  --smv5-line-strong: var(--sm-line-strong, #b5d2cb);
+  --smv5-line: var(--sm-line, #CFE7EA);
+  --smv5-line-strong: var(--sm-line-strong, #A9CFD6);
   --smv5-amber-600: var(--sm-amber-600, #b45309);
   --smv5-amber-100: var(--sm-amber-100, #fff4de);
   --smv5-red-600: var(--sm-red-600, #b42318);

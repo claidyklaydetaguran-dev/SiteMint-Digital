@@ -192,7 +192,7 @@ function AiSystemsSection() {
             <path
               d="M30 130 C 100 60, 150 150, 210 90 S 320 40, 390 60"
               fill="none"
-              stroke="var(--sm-mint-500, #25D0B0)"
+              stroke="var(--sm-mint-500, #32C5D2)"
               strokeWidth="2"
               opacity="0.7"
             />
@@ -202,9 +202,9 @@ function AiSystemsSection() {
               { x: 390, y: 60, label: "Follow up" },
             ].map((n) => (
               <g key={n.label} transform={`translate(${n.x} ${n.y})`}>
-                <circle r="20" fill="none" stroke="var(--sm-mint-400, #4FD9CF)" strokeWidth="1.6" />
-                <circle r="4" fill="var(--sm-mint-500, #25D0B0)" />
-                <text y="38" textAnchor="middle" fill="var(--sm-dark-text, #E9F7F3)" fontSize="12">
+                <circle r="20" fill="none" stroke="var(--sm-mint-400, #56D2CF)" strokeWidth="1.6" />
+                <circle r="4" fill="var(--sm-mint-500, #32C5D2)" />
+                <text y="38" textAnchor="middle" fill="var(--sm-dark-text, #E8F5F7)" fontSize="12">
                   {n.label}
                 </text>
               </g>

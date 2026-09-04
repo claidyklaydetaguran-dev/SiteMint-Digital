@@ -6,13 +6,13 @@
 
 | ID | WS | Route / capability | Pri | Status | Commit | Evidence | Preview | Remaining | Blocker |
 |---|---|---|---|---|---|---|---|---|---|
-| F-01 | Foundation | System B semantic tokens (`tokens-v5.css`, both apps) | P0 | VERIFIED COMPLETE | b37b70c | chain 2400 checks; mint previews live | sweeps + previews on 127.0.0.1:4170 | — | — |
-| F-02 | Foundation | Public chrome / auth / ops primitive remap to mint (override-only) | P0 | VERIFIED COMPLETE | b37b70c | previews + 240-combo sweep | sweeps + previews on 127.0.0.1:4170 | — | — |
-| F-03 | Foundation | Helpdesk palette remap (light + dark appearance) | P0 | VERIFIED COMPLETE | b37b70c | helpdesk previews light+dark | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-01 | Foundation | System B semantic tokens (`tokens-v5.css`, both apps) | P0 | IN PROGRESS | b37b70c | REOPENED 2026-09-05: System B rejected (too green) — Glacier Mint replaces it | sweeps + previews on 127.0.0.1:4170 | blue-mint values + verified swap | — |
+| F-02 | Foundation | Public chrome / auth / ops primitive remap to mint (override-only) | P0 | IN PROGRESS | b37b70c | REOPENED 2026-09-05: System B rejected (too green) — Glacier Mint replaces it | sweeps + previews on 127.0.0.1:4170 | blue-mint values + verified swap | — |
+| F-03 | Foundation | Helpdesk palette remap (light + dark appearance) | P0 | IN PROGRESS | b37b70c | REOPENED 2026-09-05: System B rejected (too green) — Glacier Mint replaces it | sweeps + previews on 127.0.0.1:4170 | blue-mint values + verified swap | — |
 | F-04 | Foundation | Motion foundation (`Reveal`, reduced motion, budgets) | P1 | VERIFIED COMPLETE | b37b70c | reduced-motion check 0 hidden | sweeps + previews on 127.0.0.1:4170 | — | — |
 | F-05 | Foundation | Route scroll-to-top + anchor + back/forward manager (both apps) | P0 | VERIFIED COMPLETE | 2d36c19 | scroll checks 6/6 | sweeps + previews on 127.0.0.1:4170 | — | — |
 | F-06 | Foundation | Foundation contract test in the scripts chain | P0 | VERIFIED COMPLETE | b37b70c | registered; chain green | sweeps + previews on 127.0.0.1:4170 | — | — |
-| F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | VERIFIED COMPLETE | b37b70c | contrast table blueprint §1; contract forbids navy/cyan | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | IN PROGRESS | b37b70c | REOPENED 2026-09-05: System B rejected (too green) — Glacier Mint replaces it | sweeps + previews on 127.0.0.1:4170 | blue-mint values + verified swap | — |
 | W-01 | Website | "Signal" removed from public copy/titles/metadata | P0 | VERIFIED COMPLETE | 5cc2ce6 | homeV5Contract: no Signal in public copy | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-02 | Website | Homepage hero copy + CTAs (amendment §6), particles + journey retained | P0 | VERIFIED COMPLETE | 5cc2ce6 | hero literals pinned + swept | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-03 | Website | Homepage 15-section content architecture (§8), signatures, no card walls | P0 | VERIFIED COMPLETE | 5cc2ce6 | 15 section ids pinned; full-page sweeps | sweeps + previews on 127.0.0.1:4170 | — | — |
@@ -83,6 +83,17 @@
 | V-06 | Verification | Performance vs R1 baseline (entry JS, LCP, CLS) | P1 | IN PROGRESS | — | entry sizes captured (wa 359.8KB, hd 359.3KB vs R1 ~same) | — | Lighthouse medians vs R1 | — |
 | V-07 | Verification | Secret scan + protected-file 0-diff + route-security contract | P0 | VERIFIED COMPLETE | dc601c3 | secret scan 0/1380; protected 0/16; routeSecurity vitest | sweeps + previews on 127.0.0.1:4170 | — | — |
 | V-08 | Verification | Unified owner preview index with synthetic-data labels, all states, mobile | P0 | VERIFIED COMPLETE | 2d36c19 | preview index 4170; 7 hd states + 4 crm states | sweeps + previews on 127.0.0.1:4170 | — | — |
+| A-01 | Visual accept | Palette approved by owner (Glacier Mint applied globally) | P0 | IN PROGRESS | — | — | — | owner sign-off | Owner |
+| A-02 | Visual accept | Visual hierarchy approved | P0 | IN PROGRESS | — | — | — | owner sign-off | Owner |
+| A-03 | Visual accept | Spacing and section rhythm approved | P0 | IN PROGRESS | — | — | — | audit + owner sign-off | Owner |
+| A-04 | Visual accept | Content density approved (no purposeless empty space) | P0 | IN PROGRESS | — | — | — | audit + owner sign-off | Owner |
+| A-05 | Visual accept | Page individuality approved (signatures integrated, not placeholders) | P0 | IN PROGRESS | — | — | — | audit + owner sign-off | Owner |
+| A-06 | Visual accept | Imagery implemented (generated, not containers) | P0 | BLOCKED — OWNER | — | manifest ready; generation needs budget approval | — | media budget | Owner |
+| A-07 | Visual accept | Required video/media implemented | P1 | BLOCKED — OWNER | — | storyboards ready; generation needs budget approval | — | media budget | Owner |
+| A-08 | Visual accept | Desktop visual review passed | P0 | IN PROGRESS | — | — | — | corrected preview | Owner |
+| A-09 | Visual accept | Tablet visual review passed | P0 | IN PROGRESS | — | — | — | corrected preview | Owner |
+| A-10 | Visual accept | Mobile visual review passed | P0 | IN PROGRESS | — | — | — | corrected preview | Owner |
+| A-11 | Visual accept | Final owner visual acceptance passed | P0 | BLOCKED — OWNER | — | — | — | owner review of corrected preview | Owner |
 | X-01 | External | Browser test call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 2 authorisation | Owner |
 | X-02 | External | Phone-number acquisition + assignment | P0 | BLOCKED — OWNER | — | — | — | number purchase | Owner |
 | X-03 | External | Inbound-call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 3 | Owner |

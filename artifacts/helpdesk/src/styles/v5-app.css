@@ -6,9 +6,9 @@
  * change — the committed contract tests keep reading the same source
  * literals, and control radii/typography stay exactly as V4 left them.
  *
- * System B palette (owner-approved, V5-BLUEPRINT §1): mint #25D0B0 is never
- * text on a light ground; deep mint #0E7F6B carries links/labels/focus on
- * light; ink-950 #0A2A2E is the dark rail/canvas, replacing the retired V4
+ * System B palette (owner-approved, V5-BLUEPRINT §1): mint #32C5D2 is never
+ * text on a light ground; deep mint #0B7487 carries links/labels/focus on
+ * light; ink-950 #153E52 is the dark rail/canvas, replacing the retired V4
  * navy; amber stays reserved for attention only.
  *
  * The `--sm-*` custom properties consumed below come from `tokens-v5.css`
@@ -25,14 +25,14 @@
 
 .sd-app.sd-app {
   /* ── V5 palette through the V2 token names the roles read ────────────── */
-  --v2-warm-white: var(--sm-porcelain); /* #F7FBF9 — app canvas */
-  --v2-offwhite: var(--sm-mist-100); /* #EEFAF8 */
-  --v2-mint-mist: var(--sm-mint-100); /* #E6F9F3 */
+  --v2-warm-white: var(--sm-porcelain); /* #F8FCFC — app canvas */
+  --v2-offwhite: var(--sm-mist-100); /* #EDF9FA */
+  --v2-mint-mist: var(--sm-mint-100); /* #DFF7F7 */
   --v2-mint-100: var(--sm-mint-100);
-  --v2-mint-500: var(--sm-mint-500); /* #25D0B0 — accent, never text-on-light */
-  --v2-navy-900: var(--sm-ink-950); /* #0A2A2E — darkest: the rail */
-  --v2-navy-700: var(--sm-teal-900); /* #0B3A3E — secondary dark surface */
-  --v2-slate-500: var(--sm-slate-600); /* #526B70 — muted text */
+  --v2-mint-500: var(--sm-mint-500); /* #32C5D2 — accent, never text-on-light */
+  --v2-navy-900: var(--sm-ink-950); /* #153E52 — darkest: the rail */
+  --v2-navy-700: var(--sm-teal-900); /* #173642 — secondary dark surface */
+  --v2-slate-500: var(--sm-slate-600); /* #4A6472 — muted text */
 
   /* ── Role refinements ─────────────────────────────────────────────────── */
   --sd-border: color-mix(in oklab, var(--sm-teal-900) 9%, transparent);

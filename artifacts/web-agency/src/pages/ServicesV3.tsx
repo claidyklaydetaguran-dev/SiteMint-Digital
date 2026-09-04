@@ -103,7 +103,7 @@ function SystemsMap() {
         <path
           d="M70 140 L230 60 L390 140 L390 240"
           fill="none"
-          stroke="var(--v3-line, #d7e7e3)"
+          stroke="var(--v3-line, #CFE7EA)"
           strokeWidth={2}
         />
         {pillars.map((p) => {
@@ -114,8 +114,8 @@ function SystemsMap() {
                 cx={p.mapPos.x}
                 cy={p.mapPos.y}
                 r={26}
-                fill={isActive ? "var(--v3-mint, #25D0B0)" : "var(--v3-surface, #fff)"}
-                stroke="var(--v3-mint, #25D0B0)"
+                fill={isActive ? "var(--v3-mint, #32C5D2)" : "var(--v3-surface, #fff)"}
+                stroke="var(--v3-mint, #32C5D2)"
                 strokeWidth={isActive ? 3 : 1.5}
                 style={{ cursor: "pointer", transition: "fill 160ms ease, stroke-width 160ms ease" }}
                 onMouseEnter={() => setActive(p.id)}
@@ -142,7 +142,7 @@ function SystemsMap() {
                 textAnchor="middle"
                 style={{
                   fontSize: 11,
-                  fill: isActive ? "var(--v3-ink, #0B3A3E)" : "var(--v3-text-muted, #526B70)",
+                  fill: isActive ? "var(--v3-ink, #173642)" : "var(--v3-text-muted, #4A6472)",
                   fontWeight: isActive ? 700 : 500,
                 }}
               >

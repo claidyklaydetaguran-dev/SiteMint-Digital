@@ -49,9 +49,9 @@ function useVoiceObject(state: VoiceState, canvasRef: RefObject<HTMLCanvasElemen
     if (!ctx) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const mint500 = readToken("--sm-mint-500", "#25D0B0");
-    const mint400 = readToken("--sm-mint-400", "#4FD9CF");
-    const ink950 = readToken("--sm-ink-950", "#0A2A2E");
+    const mint500 = readToken("--sm-mint-500", "#32C5D2");
+    const mint400 = readToken("--sm-mint-400", "#56D2CF");
+    const ink950 = readToken("--sm-ink-950", "#153E52");
 
     let raf = 0;
     function draw(now: number) {

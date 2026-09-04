@@ -50,10 +50,10 @@ const hdTokens = read(HD_TOKENS);
 check("the two tokens-v5.css copies are byte-identical", waTokens === hdTokens);
 
 for (const literal of [
-  "--sm-mint-500: #25D0B0",
-  "--sm-mint-700: #0E7F6B",
-  "--sm-teal-900: #0B3A3E",
-  "--sm-ink-950: #0A2A2E",
+  "--sm-mint-500: #32C5D2",
+  "--sm-mint-700: #0B7487",
+  "--sm-teal-900: #173642",
+  "--sm-ink-950: #153E52",
 ]) {
   check(`web-agency tokens-v5.css defines "${literal}"`, waTokens.includes(literal));
   check(`helpdesk tokens-v5.css defines "${literal}"`, hdTokens.includes(literal));

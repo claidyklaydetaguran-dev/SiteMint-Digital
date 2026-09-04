@@ -8,6 +8,22 @@
 > directory was reconciled to them on 2026-09-04; the consolidated creative and engineering
 > plan is `V5-BLUEPRINT.md`.
 
+## 0a. OWNER VISUAL REVIEW (2026-09-05) — palette REJECTED, completion pass directed
+
+The owner reviewed the unified V5 preview: functionality and direction approved to continue,
+**visual implementation NOT accepted as final**. Directives: (1) "Owner preview 100%" is
+review COVERAGE, not visual acceptance — a separate Owner Visual Acceptance measure now
+gates the preview and is NOT PASSED; (2) System B is too green — the new direction is
+**Glacier Mint / Blue Mint** (~60–65% blue influence, starting tokens #32C5D2 / #56D2CF /
+#0B7487 / #173642 / #153E52 / #DFF7F7 / #EDF9FA / #F8FCFC), validated then applied globally
+as ONE system; the green cast leaves all three surfaces (semantic success green stays);
+Ops anchors on blue-charcoal, not green-teal; (3) everything in §0 item 4 plus the approved
+V5 structures are preserved; (4) a page-by-page visual-completion, spacing and content pass
+is required (whitespace must earn its place; no filler); (5) media containers/storyboards do
+NOT count as media — MEDIA-GENERATION-MANIFEST.md lists every asset with simulated costs and
+one consolidated budget recommendation; no paid generation without approval; (6) pending
+form click-throughs and Lighthouse runs must be completed, with before/after evidence.
+
 ## 0. Core product direction (approved)
 
 1. SiteMint Digital is the master company brand; AI Receptionist is one SiteMint product, the highest-priority revenue product, and must not dominate the company identity.

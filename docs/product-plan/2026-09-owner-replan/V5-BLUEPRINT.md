@@ -6,7 +6,18 @@
 > datasets, and read-only Magnific cost simulations. Nothing here is implemented yet.
 > **Owner approval of this document starts the program.**
 
-## 1. Recommended mint palette
+## 1a. SUPERSEDED 2026-09-05 — GLACIER MINT replaces System B
+
+The owner rejected System B on visual review (too green across large surfaces). The applied
+system is **Glacier Mint** (~60–65% blue influence, hues 185–200°), one coherent swap with
+identical token names: mint-500 #32C5D2 · mint-400 #56D2CF · mint-600 #1FA9BC (decorative)
+· mint-700 #0B7487 (links, 5.44:1 on white) · mint-100 #DFF7F7 · mist #EDF9FA · porcelain
+#F8FCFC · text #173642 (12.8:1) · band/ops anchor #153E52 (blue-charcoal; mint on band
+5.46:1, white on band 11.4:1) · slate #4A6472 (6.26:1) · hairline #CFE7EA · dark text
+#E8F5F7 · dark muted #9FC2CC. Semantic amber/red/green unchanged. §1 below is kept as the
+historical record of the rejected system.
+
+## 1. Recommended mint palette (SUPERSEDED — historical)
 
 Three candidate systems were built and measured (WCAG 2.1 contrast, `contrast.mjs`). All
 three keep the hue between green and blue (mint ≈ 168°, aqua ≈ 176° on the colour wheel):

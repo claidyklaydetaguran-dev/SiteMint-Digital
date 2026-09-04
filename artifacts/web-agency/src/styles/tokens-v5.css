@@ -18,7 +18,7 @@
  * `hsl(var(--sm-mint-500))` by the chrome-less discovery/platform-preview
  * surfaces, and `--sm-font-body|display|mono` are full stacks aliased by the
  * helpdesk's shadcn `:root` layer. A `:root` definition of the §2 hex values
- * would turn those into `hsl(#25D0B0)` — invalid — on pages this program
+ * would turn those into `hsl(#32C5D2)` — invalid — on pages this program
  * does not own. So the V5 tokens are declared on the V5-themed shell scopes
  * instead (zero specificity via `:where()` so page owners can override):
  * every V4-chromed public route, the auth shell, the ops shell, the customer
@@ -38,20 +38,20 @@
     [data-shell="public"]:not(.v2-public-shell)
   ) {
   /* ── brand ─────────────────────────────────────────────────────────── */
-  --sm-mint-500: #25D0B0;
-  --sm-mint-400: #4FD9CF;
-  --sm-mint-600: #16B597;
-  --sm-mint-700: #0E7F6B; /* text-safe mint: links, labels, chips */
-  --sm-mint-100: #E6F9F3;
-  --sm-mist-100: #EEFAF8;
-  --sm-porcelain: #F7FBF9;
+  --sm-mint-500: #32C5D2;
+  --sm-mint-400: #56D2CF;
+  --sm-mint-600: #1FA9BC;
+  --sm-mint-700: #0B7487; /* text-safe mint: links, labels, chips */
+  --sm-mint-100: #DFF7F7;
+  --sm-mist-100: #EDF9FA;
+  --sm-porcelain: #F8FCFC;
   --sm-white: #FFFFFF;
-  --sm-teal-900: #0B3A3E; /* primary text */
-  --sm-ink-950: #0A2A2E; /* hero field, ops chrome */
-  --sm-slate-600: #526B70; /* secondary text */
+  --sm-teal-900: #173642; /* primary text */
+  --sm-ink-950: #153E52; /* hero field, ops chrome */
+  --sm-slate-600: #4A6472; /* secondary text */
   --sm-slate-300: #B9CBCE; /* hairlines on dark */
-  --sm-line: #D7E7E3;
-  --sm-line-strong: #B5D2CB;
+  --sm-line: #CFE7EA;
+  --sm-line-strong: #A9CFD6;
   --sm-amber-600: #B45309; /* human attention only */
   --sm-amber-100: #FFF4DE;
   --sm-red-600: #B42318; /* errors */
@@ -71,8 +71,8 @@
   --sm-accent-ink: var(--sm-teal-900);
   --sm-focus: 0 0 0 3px color-mix(in oklab, var(--sm-mint-500) 45%, transparent);
   --sm-dark-bg: var(--sm-ink-950);
-  --sm-dark-text: #E9F7F3;
-  --sm-dark-muted: #9FC3BC;
+  --sm-dark-text: #E8F5F7;
+  --sm-dark-muted: #9FC2CC;
   --sm-dark-accent: var(--sm-mint-500);
 
   /* ── §1: the one permitted gradient — the signal thread itself.

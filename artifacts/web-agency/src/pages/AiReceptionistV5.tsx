@@ -83,9 +83,9 @@ function HeroPosterSvg() {
     <svg viewBox="0 0 640 400" role="img" aria-labelledby="smv5-hero-poster-title">
       <title id="smv5-hero-poster-title">Development placeholder — final media pending</title>
       <rect width="640" height="400" fill="#072022" />
-      <circle cx="320" cy="180" r="86" fill="none" stroke="#25D0B0" strokeWidth="2" opacity="0.8" />
-      <circle cx="320" cy="180" r="52" fill="none" stroke="#4FD9CF" strokeWidth="2" opacity="0.55" />
-      <circle cx="320" cy="180" r="6" fill="#25D0B0" />
+      <circle cx="320" cy="180" r="86" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.8" />
+      <circle cx="320" cy="180" r="52" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.55" />
+      <circle cx="320" cy="180" r="6" fill="#32C5D2" />
       <text x="320" y="330" textAnchor="middle" fill="#cfe9e4" fontSize="15" fontFamily="sans-serif">
         Development placeholder — final media pending
       </text>

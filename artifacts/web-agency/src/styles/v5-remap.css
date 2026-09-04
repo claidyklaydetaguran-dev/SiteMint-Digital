@@ -34,20 +34,20 @@
      Every `.v4-shell` descendant that reads `var(--v4-*)` picks these up;
      every `--v3-*` alias tokens-v4.css declared as `var(--v4-*)` re-resolves
      through them for free. */
-  --v4-ink: var(--sm-ink-950); /* #0A2A2E — hero field, deepest dark */
-  --v4-navy: var(--sm-teal-900); /* #0B3A3E — raised dark surface */
+  --v4-ink: var(--sm-ink-950); /* #153E52 — hero field, deepest dark */
+  --v4-navy: var(--sm-teal-900); /* #173642 — raised dark surface */
   --v4-navy-2: color-mix(in oklab, var(--sm-teal-900) 86%, white); /* hover-on-dark */
   --v4-navy-line: color-mix(in oklab, var(--sm-dark-text) 16%, transparent);
-  --v4-cloud: var(--sm-porcelain); /* #F7FBF9 — page background */
+  --v4-cloud: var(--sm-porcelain); /* #F8FCFC — page background */
   --v4-paper: var(--sm-white); /* surfaces */
-  --v4-mist: var(--sm-line); /* #D7E7E3 — hairlines on light */
-  --v4-line-strong-l: var(--sm-line-strong); /* #B5D2CB */
-  --v4-text: var(--sm-teal-900); /* #0B3A3E — deep-teal primary text */
-  --v4-mute: var(--sm-slate-600); /* #526B70 — muted text on light */
-  --v4-mute-dark: var(--sm-dark-muted); /* #9FC3BC — muted text on dark */
-  --v4-cyan: var(--sm-mint-500); /* #25D0B0 — accent on dark / bright fills */
-  --v4-cyan-deep: var(--sm-mint-700); /* #0E7F6B — text-safe link/focus mint */
-  --v4-turquoise: var(--sm-mint-400); /* #4FD9CF — secondary accent */
+  --v4-mist: var(--sm-line); /* #CFE7EA — hairlines on light */
+  --v4-line-strong-l: var(--sm-line-strong); /* #A9CFD6 */
+  --v4-text: var(--sm-teal-900); /* #173642 — deep-teal primary text */
+  --v4-mute: var(--sm-slate-600); /* #4A6472 — muted text on light */
+  --v4-mute-dark: var(--sm-dark-muted); /* #9FC2CC — muted text on dark */
+  --v4-cyan: var(--sm-mint-500); /* #32C5D2 — accent on dark / bright fills */
+  --v4-cyan-deep: var(--sm-mint-700); /* #0B7487 — text-safe link/focus mint */
+  --v4-turquoise: var(--sm-mint-400); /* #56D2CF — secondary accent */
   --v4-mint: var(--sm-mint-500); /* completion accent stays in the mint family */
   /* --v4-amber / --v4-amber-deep / --v4-red / --v4-red-deep / --v4-green-ok:
      intentionally NOT overridden — amber stays reserved for human-attention
@@ -74,8 +74,8 @@
 .v4-shell [data-tone="white"],
 .v4-shell[data-tone="ice"],
 .v4-shell [data-tone="ice"] {
-  --v3-line: var(--sm-line); /* #D7E7E3 */
-  --v3-line-strong: var(--sm-line-strong); /* #B5D2CB */
+  --v3-line: var(--sm-line); /* #CFE7EA */
+  --v3-line-strong: var(--sm-line-strong); /* #A9CFD6 */
 }
 
 .v4-shell[data-tone="ink"],

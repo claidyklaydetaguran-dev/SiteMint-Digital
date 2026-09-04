@@ -30,8 +30,8 @@ function DevPlaceholderPoster({ label }: { label: string }) {
       role="img"
       aria-label={label}
     >
-      <rect width="640" height="360" fill="var(--sm-ink-950, #0A2A2E)" />
-      <g opacity="0.55" stroke="var(--sm-mint-400, #4FD9CF)" strokeWidth="1.4" fill="none">
+      <rect width="640" height="360" fill="var(--sm-ink-950, #153E52)" />
+      <g opacity="0.55" stroke="var(--sm-mint-400, #56D2CF)" strokeWidth="1.4" fill="none">
         <circle cx="120" cy="260" r="5" />
         <circle cx="220" cy="200" r="5" />
         <circle cx="330" cy="215" r="5" />
@@ -43,7 +43,7 @@ function DevPlaceholderPoster({ label }: { label: string }) {
         x="320"
         y="335"
         textAnchor="middle"
-        fill="var(--sm-dark-muted, #9FC3BC)"
+        fill="var(--sm-dark-muted, #9FC2CC)"
         fontSize="13"
         fontFamily="var(--sm-font-mono, monospace)"
         letterSpacing="0.04em"

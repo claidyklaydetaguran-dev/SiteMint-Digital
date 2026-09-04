@@ -32,16 +32,16 @@ function TierCard({ tier }: { tier: PricingTierV5 }) {
   return (
     <div className={`v3-card${tier.recommended ? " v3-card--hover" : ""}`} style={{ padding: "1.75rem", display: "grid", gap: "0.75rem" }}>
       {tier.recommended && (
-        <span className="v3-eyebrow" style={{ color: "var(--sm-mint-700, #0E7F6B)" }}>
+        <span className="v3-eyebrow" style={{ color: "var(--sm-mint-700, #0B7487)" }}>
           Most common starting point
         </span>
       )}
       <h2 className="v3-h2" style={{ fontSize: "1.3rem" }}>{tier.name}</h2>
-      <p style={{ fontFamily: "var(--sm-font-display, inherit)", fontSize: "1.6rem", color: "var(--sm-mint-700, #0E7F6B)", margin: 0 }}>
+      <p style={{ fontFamily: "var(--sm-font-display, inherit)", fontSize: "1.6rem", color: "var(--sm-mint-700, #0B7487)", margin: 0 }}>
         {tier.priceFrom}
       </p>
       <p className="v3-body">{tier.tagline}</p>
-      <p className="v3-body" style={{ fontSize: "0.9rem", color: "var(--sm-text-muted, #526B70)" }}>
+      <p className="v3-body" style={{ fontSize: "0.9rem", color: "var(--sm-text-muted, #4A6472)" }}>
         Best for: {tier.bestFor}
       </p>
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.4rem" }}>
@@ -53,7 +53,7 @@ function TierCard({ tier }: { tier: PricingTierV5 }) {
         ))}
       </ul>
       {tier.honestyNote && (
-        <p style={{ fontSize: "0.8rem", color: "var(--sm-text-muted, #526B70)" }}>{tier.honestyNote}</p>
+        <p style={{ fontSize: "0.8rem", color: "var(--sm-text-muted, #4A6472)" }}>{tier.honestyNote}</p>
       )}
     </div>
   );
@@ -140,7 +140,7 @@ function ScopeConfigurator() {
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           style={{
-            border: "1px solid var(--sm-line, #D7E7E3)",
+            border: "1px solid var(--sm-line, #CFE7EA)",
             borderRadius: "var(--sm-radius-m, 10px)",
             padding: "0.6rem 0.75rem",
             fontFamily: "inherit",
@@ -148,7 +148,7 @@ function ScopeConfigurator() {
         />
       </label>
 
-      <div style={{ border: "1px solid var(--sm-line, #D7E7E3)", borderRadius: "var(--sm-radius-m, 10px)", padding: "1rem", whiteSpace: "pre-wrap", fontSize: "0.9rem" }}>
+      <div style={{ border: "1px solid var(--sm-line, #CFE7EA)", borderRadius: "var(--sm-radius-m, 10px)", padding: "1rem", whiteSpace: "pre-wrap", fontSize: "0.9rem" }}>
         {summary}
       </div>
 
@@ -187,10 +187,10 @@ export default function PricingV5() {
               <TierCard tier={tier} key={tier.id} />
             ))}
           </div>
-          <p className="v3-body" style={{ marginTop: "1.5rem", fontSize: "0.85rem", color: "var(--sm-text-muted, #526B70)" }}>
+          <p className="v3-body" style={{ marginTop: "1.5rem", fontSize: "0.85rem", color: "var(--sm-text-muted, #4A6472)" }}>
             {PRICING_DISCLAIMER_V5}
           </p>
-          <p className="v3-body" style={{ fontSize: "0.85rem", color: "var(--sm-text-muted, #526B70)" }}>
+          <p className="v3-body" style={{ fontSize: "0.85rem", color: "var(--sm-text-muted, #4A6472)" }}>
             {AI_RECEPTIONIST_PRICING_NOTE_V5}
           </p>
         </div>
