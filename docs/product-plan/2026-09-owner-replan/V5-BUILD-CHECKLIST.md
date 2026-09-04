@@ -45,15 +45,15 @@
 | C-08 | Customer app | Structured prompt + full-prompt preview + "how callers hear this"; Advanced | P0 | IN PROGRESS | — | — | — | — | — |
 | C-09 | Customer app | Voice presets with sample player + provider-neutral asset adapter (no paid samples) | P0 | IN PROGRESS | — | — | — | — | — |
 | C-10 | Customer app | Test / Publish controls with prerequisite states; "Save changes"/"Publish update" | P0 | IN PROGRESS | — | — | — | — | — |
-| C-11 | Customer app | Availability + Appointment Types unbundled from voice flag; Advanced grouping | P0 | IN PROGRESS | — | — | — | — | — |
-| C-12 | Customer app | Scheduling → Calendar screen (connect/status/reconnect/disconnect/post-OAuth) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-13 | Customer app | Appointment lifecycle UI (approve/reschedule/cancel/reconcile) + drawer + confirmations | P0 | IN PROGRESS | — | — | — | — | — |
-| C-14 | Customer app | Test Booking safety (explicit create, labelled test) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-15 | Customer app | Calls (rename, statuses, retention explanation) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-16 | Customer app | Minimal Contacts page + detail | P0 | IN PROGRESS | — | — | — | — | — |
-| C-17 | Customer app | Phone Number page (assigned/none/paused states; assign/pause over existing routes) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-18 | Customer app | Usage page + rail indicator + paused copy (U-1…U-3) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-19 | Customer app | Customer Issues page (safe failures) | P0 | IN PROGRESS | — | — | — | — | — |
+| C-11 | Customer app | Availability + Appointment Types unbundled from voice flag; Advanced grouping | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-12 | Customer app | Scheduling → Calendar screen (connect/status/reconnect/disconnect/post-OAuth) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-13 | Customer app | Appointment lifecycle UI (approve/reschedule/cancel/reconcile) + drawer + confirmations | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-14 | Customer app | Test Booking safety (explicit create, labelled test) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-15 | Customer app | Calls (rename, statuses, retention explanation) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-16 | Customer app | Minimal Contacts page + detail | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-17 | Customer app | Phone Number page (assigned/none/paused states; assign/pause over existing routes) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-18 | Customer app | Usage page + rail indicator + paused copy (U-1…U-3) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
+| C-19 | Customer app | Customer Issues page (safe failures) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IN PROGRESS | — | — | — | — | — |
 | C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IN PROGRESS | — | — | — | — | — |
 | C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IN PROGRESS | — | — | — | — | — |
