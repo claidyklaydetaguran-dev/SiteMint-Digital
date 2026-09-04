@@ -244,3 +244,20 @@ CI, so this table cannot silently drift from the code.
   row).
 - No `drizzle-kit generate`, `push`, or `migrate:*` was run by this PR
   against any database, staging or otherwise.
+
+## Disposable-database test result (2026-09-04, lead-run)
+
+A throwaway PostgreSQL 16 cluster (unix socket only, /tmp, destroyed after the run) on the
+WSL build tree at the integrated branch head:
+
+| Step | Result |
+|---|---|
+| migrate:fresh on an empty database | exit 0 — 58 public base tables; voice journal 8 rows (0000–0007); discovery 1; scheduling 2 |
+| 0007 objects | voice_onboarding_states, voice_beta_requests, voice_invites present with CHECKs and indexes |
+| Push-mode admin tables | crm_admin_sessions, crm_admin_audit_log created by the barrel |
+| Rollback 0007 (committed SQL) | exit 0 — all three tables dropped, transaction committed |
+| Journal-row clear + migrate:voice | exit 0 — all three tables re-created (the ROLLBACK runbook journal-clear step verified) |
+| Existing product tables | intake_firms, voice_assistants, scheduling_appointment_requests, crm_leads intact throughout |
+
+No Development, staging, Production or Replit database was touched. Execution against any
+persistent database remains owner-gated (checklist B-09).

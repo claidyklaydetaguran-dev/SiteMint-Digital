@@ -365,7 +365,7 @@ function toDate(iso: string | null | undefined): Date | null {
    the app's base itself, so these are correct under both the configured
    prefix and a root-base build. */
 
-export const LIST_PATH = "/logs";
+export const LIST_PATH = "/activity/calls";
 
 export function callHref(callId: string): string {
   return `${LIST_PATH}/${encodeURIComponent(callId)}`;

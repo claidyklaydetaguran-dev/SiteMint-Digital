@@ -35,7 +35,7 @@
 | R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
-| C-01 | Customer app | Approved navigation (D-2), breadcrumbs, no nested rail scroll, capability states for every path | P0 | IN PROGRESS | — | — | — | — | — |
+| C-01 | Customer app | Approved navigation (D-2), breadcrumbs, no nested rail scroll, capability states for every path | P0 | IMPLEMENTED — UNVERIFIED | f32f4b2 | boundary contract 98/98; assistants 246/246 | — | Linux gates + sweeps | — |
 | C-02 | Customer app | Invite-only signup ("Set up your AI Receptionist", S-1 fields) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
 | C-03 | Customer app | Forgot password + reset UI | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
 | C-04 | Customer app | Persistent 10-step onboarding hub (Setup) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
@@ -55,7 +55,7 @@
 | C-18 | Customer app | Usage page + rail indicator + paused copy (U-1…U-3) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-19 | Customer app | Customer Issues page (safe failures) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
-| C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IN PROGRESS | — | — | — | — | — |
+| C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IMPLEMENTED — UNVERIFIED | f32f4b2 | cards <768px in new pages; rail overflow override | — | sweep evidence | — |
 | C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
 | O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
 | O-02 | Operations | Secure admin sessions UI (cookie login/logout/me) | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
@@ -73,7 +73,7 @@
 | B-05 | Backend | Public beta-request route + admin list (flag off) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
 | B-06 | Backend | Live-demo session seam, fail-closed, no provider | P1 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
 | B-07 | Backend | Admin voice issues / usage / numbers routes | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-08 | Backend | Migration packet (0007 voice + push-mode CRM) tested on a disposable DB | P0 | IN PROGRESS | — | — | — | — | — |
+| B-08 | Backend | Migration packet (0007 voice + push-mode CRM) tested on a disposable DB | P0 | IMPLEMENTED — UNVERIFIED | 57c86bd | disposable-DB: fresh 58 tables, rollback, re-apply all exit 0 | — | CI journal proofs on push | — |
 | B-09 | Backend | Migrations applied externally | P0 | BLOCKED — OWNER | — | — | — | execution authorisation | Owner |
 | V-01 | Verification | Typecheck + canonical suite + contract suites green on the integrated branch | P0 | NOT STARTED | — | — | — | — | — |
 | V-02 | Verification | Production builds + voice matrix + built-output scans (incl. web-agency allowlist) | P0 | NOT STARTED | — | — | — | — | — |

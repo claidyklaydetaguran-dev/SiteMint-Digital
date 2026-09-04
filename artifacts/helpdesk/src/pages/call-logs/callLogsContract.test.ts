@@ -98,7 +98,7 @@ const repoRoot = path.resolve(here, "../../../../..");
 const read = (rel: string) => readFileSync(path.join(repoRoot, rel), "utf8");
 const exists = (rel: string) => existsSync(path.join(repoRoot, rel));
 
-const listSrc = read("artifacts/helpdesk/src/pages/CallLogs.tsx");
+const listSrc = read("artifacts/helpdesk/src/pages/Calls.tsx");
 const detailSrc = read("artifacts/helpdesk/src/pages/CallLogDetail.tsx");
 const contractSrc = read("artifacts/helpdesk/src/pages/call-logs/callLogsContract.ts");
 const cssSrc = read("artifacts/helpdesk/src/styles/v2-call-logs.css");
@@ -265,37 +265,44 @@ check(
 );
 
 check(
-  "the Call Logs nav entry is still live and still voiceGated",
-  /key: "logs", label: "Call Logs", href: "\/logs", icon: ScrollText,\s*\n\s*state: "live", voiceGated: true,/
+  "the Calls nav entry is live and voiceGated",
+  /key: "calls", label: "Calls", href: "\/activity\/calls", icon: ScrollText,\s*\n\s*state: "live", voiceGated: true,/
     .test(navSrc),
 );
 
 check(
-  "a default build hides Call Logs from navigation",
-  !visibleNavDestinations(false).includes("/logs"),
+  "a default build hides Calls from navigation",
+  !visibleNavDestinations(false).includes("/activity/calls"),
 );
 
 check(
-  "a voice-enabled build shows Call Logs in navigation",
-  visibleNavDestinations(true, ALL_NAV_GROUPS).includes("/logs"),
+  "a voice-enabled build shows Calls in navigation",
+  visibleNavDestinations(true, ALL_NAV_GROUPS).includes("/activity/calls"),
 );
 
 check(
-  "Call Logs still belongs to the Observe group",
+  "Calls belongs to the Activity group",
   visibleNavGroups(true, ALL_NAV_GROUPS).some(
-    (g) => g.key === "observe" && g.items.some((i) => i.href === "/logs"),
+    (g) => g.key === "activity" && g.items.some((i) => i.href === "/activity/calls"),
   ),
 );
 
 eq(
-  "the default navigation contract is unchanged by this phase",
+  "the default (voice-off) navigation contract is the approved D-2 ungated set",
   visibleNavDestinations(false),
-  ["/", "/conversations", "/receptionist", "/contacts", "/billing", "/settings"],
+  [
+    "/", "/setup",
+    "/scheduling/availability", "/scheduling/appointment-types", "/scheduling/calendar",
+    "/scheduling/appointments", "/scheduling/test-booking",
+    "/activity/conversations", "/activity/contacts",
+    "/channels/sms",
+    "/account/billing", "/account/settings", "/account/support",
+  ],
 );
 
 check(
-  "both Call Logs routes are declared base-relative in the route table",
-  /logs: "\/logs",/.test(routesSrc) && /logDetail: "\/logs\/:id",/.test(routesSrc),
+  "both Calls routes are declared base-relative in the route table",
+  /calls: "\/activity\/calls",/.test(routesSrc) && /callDetail: "\/activity\/calls\/:id",/.test(routesSrc),
 );
 
 check(
@@ -306,9 +313,9 @@ check(
     const inside = gate[1]!;
     const outside = appSrc.replace(inside, "");
     return (
-      inside.includes("ROUTES.logs") &&
-      inside.includes("ROUTES.logDetail") &&
-      !/path=\{ROUTES\.(logs|logDetail)\}/.test(outside)
+      inside.includes("ROUTES.calls") &&
+      inside.includes("ROUTES.callDetail") &&
+      !/path=\{ROUTES\.(calls|callDetail)\}/.test(outside)
     );
   })(),
 );
@@ -328,9 +335,9 @@ check(
 section("Routing — base-aware, and only to a genuine record");
 // ═══════════════════════════════════════════════════════════════════════════
 
-eq("the list path is base-relative", LIST_PATH, "/logs");
-eq("a record links to its own detail route", callHref("abc123"), "/logs/abc123");
-eq("a record id is encoded, never interpolated raw", callHref("a/b?c=d"), "/logs/a%2Fb%3Fc%3Dd");
+eq("the list path is base-relative", LIST_PATH, "/activity/calls");
+eq("a record links to its own detail route", callHref("abc123"), "/activity/calls/abc123");
+eq("a record id is encoded, never interpolated raw", callHref("a/b?c=d"), "/activity/calls/a%2Fb%3Fc%3Dd");
 check("no href is absolute", !/^https?:|^\/\//.test(callHref("x")));
 
 check(
@@ -1160,7 +1167,7 @@ const OBSOLETE_NAV_SENTENCE =
 const CORRECTED_NAV_DESCRIPTION = "Review stored call records and analysis.";
 
 const ALL_NAV_ITEMS = ALL_NAV_GROUPS.flatMap((group) => group.items);
-const CALL_LOGS_NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => item.key === "logs");
+const CALL_LOGS_NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => item.key === "calls");
 
 eq("exactly one Call Logs navigation record exists", CALL_LOGS_NAV_ITEMS.length, 1);
 
@@ -1247,9 +1254,9 @@ eq(
     availability: callLogsNav.availability ?? null,
   },
   {
-    key: "logs",
-    label: "Call Logs",
-    href: "/logs",
+    key: "calls",
+    label: "Calls",
+    href: "/activity/calls",
     state: "live",
     voiceGated: true,
     availability: null,
@@ -1261,25 +1268,38 @@ eq(
   ALL_NAV_GROUPS.map((group) => [group.key, group.items.map((item) => item.key)]),
   [
     ["overview", ["overview"]],
-    ["build", ["assistants", "tools", "phone-numbers", "voice-library", "knowledge", "squads"]],
-    ["operate", ["appointments", "conversations", "receptionist", "contacts", "outbound"]],
-    ["observe", ["logs", "analytics", "testing", "structured-outputs", "issues"]],
-    ["manage", ["integrations", "billing", "settings", "api-keys"]],
+    ["setup", ["setup"]],
+    ["assistant", ["assistants"]],
+    ["scheduling", ["availability", "appointment-types", "calendar", "appointments", "test-booking"]],
+    ["activity", ["calls", "conversations", "contacts"]],
+    ["channels", ["phone-number", "sms"]],
+    ["account", ["usage", "billing", "settings", "support", "issues"]],
+    ["placeholders", ["tools", "phone-numbers", "voice-library", "knowledge", "analytics", "testing", "structured-outputs", "integrations", "api-keys", "squads", "outbound"]],
   ],
 );
 
 eq(
   "every other navigation description is byte-for-byte what it was",
   ALL_NAV_ITEMS
-    .filter((item) => item.key !== "logs" && item.description !== undefined)
+    .filter((item) => item.key !== "calls" && item.description !== undefined)
     .map((item) => [item.key, item.description]),
   [
+    ["setup", "Finish setting up your receptionist."],
     ["assistants", "Build and manage AI voice assistants for your business."],
+    ["availability", "Business hours and booking rules."],
+    ["appointment-types", "The services clients can request."],
+    ["calendar", "Connect and manage your calendar."],
+    ["appointments", "Requests, approvals, and reschedules."],
+    ["test-booking", "Try the booking flow without creating a real appointment."],
+    ["phone-number", "The number your assistant answers and makes calls from."],
+    ["sms", "The SMS channel that texts with your clients."],
+    ["usage", "Minutes used, minutes remaining, and your billing period."],
+    ["support", "Get help from SiteMint."],
+    ["issues", "Problems SiteMint has flagged that may need your attention."],
     ["tools", "Assign actions your assistant can take during a call, like booking or transferring."],
     ["phone-numbers", "Get a SiteMint number or connect one you already own."],
     ["voice-library", "Browse and preview voices for your assistant."],
     ["knowledge", "Give your assistant reference material to draw on during calls."],
-    ["appointments", "Visual booking calendar, requests, and availability rules. Development preview — no real calendar is connected yet."],
     ["analytics", "Business metrics — calls answered, appointments booked, hours saved."],
     ["testing", "Test your assistant with a browser call or a text conversation."],
     ["structured-outputs", "Data your assistant extracts and structures from each call."],
