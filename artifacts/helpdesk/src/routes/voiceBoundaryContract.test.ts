@@ -972,8 +972,11 @@ eq(
 
 check(
   "App.tsx takes the gated page components from the boundary instead",
-  appCode.includes('import { voiceRoutePages } from "@/routes/voiceRoutes";') &&
-    /=\s*voiceRoutePages;/.test(appCode),
+  // V5: the same import also carries the boundary-gated session guard, so
+  // App.tsx never touches hooks/useAssistants (AR-001M entry-chunk fix).
+  appCode.includes(
+    'import { voiceRoutePages, AssistantSessionGuardGate } from "@/routes/voiceRoutes";',
+  ) && /=\s*voiceRoutePages;/.test(appCode),
 );
 
 eq(
@@ -1466,7 +1469,11 @@ const LIVE_GATED_HREFS = [
 const routesSrcForHrefs = read("artifacts/helpdesk/src/lib/routes.ts");
 const GATED_NAV_ONLY_HREFS = gatedNavItems
   .map((i) => i.href)
-  .filter((h): h is string => h !== undefined && !LIVE_GATED_HREFS.includes(h));
+  .filter((h): h is string => h !== undefined && !LIVE_GATED_HREFS.includes(h))
+  // V5 C-01: the placeholder paths moved into the always-bundled route table
+  // (VOICE_CAPABILITY_PATHS) so no build 404s them — a path the route layer
+  // itself carries is no longer navigation-only, in any build.
+  .filter((h) => !routesSrcForHrefs.includes(`"${h}"`));
 
 /**
  * Icons only the gated records use. Lucide's export name and the name it bakes
@@ -1517,15 +1524,24 @@ const GATED_ONLY_ICONS: [string, string][] = [
       new RegExp(`icon: ${name},`).test(catalogue) &&
       !new RegExp(`icon: ${name}[,\\s]`).test(navSrc.replace(catalogue, "")),
   );
+  // Icons the catalogue treats as gated-only but ungated modules import
+  // independently, so their presence in a default build proves nothing.
+  // Each exclusion is verified against a real ungated importer below.
+  const PROVES_NOTHING_ICONS = ["AlertTriangle", "Bot"];
   eq(
     "the gated-only icon list is derived from the catalogue, not guessed",
-    onlyInCatalogue.filter((n) => n !== "AlertTriangle").sort(),
+    onlyInCatalogue.filter((n) => !PROVES_NOTHING_ICONS.includes(n)).sort(),
     GATED_ONLY_ICONS.map(([n]) => n).sort(),
   );
   check(
     "AlertTriangle is excluded because ungated modules import it independently",
     onlyInCatalogue.includes("AlertTriangle") &&
       /AlertTriangle/.test(read("artifacts/helpdesk/src/components/ErrorBoundary.tsx")),
+  );
+  check(
+    "Bot is excluded because ungated modules import it independently (V5 Setup marks)",
+    onlyInCatalogue.includes("Bot") &&
+      /\bBot\b/.test(read("artifacts/helpdesk/src/components/common/ProgressSteps.tsx")),
   );
 }
 
