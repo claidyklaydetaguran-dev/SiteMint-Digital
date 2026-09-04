@@ -137,25 +137,17 @@ export function DiscoveryReview({
       {errorMessage && (
         <div
           role="alert"
-          className="mb-6 rounded-lg border p-4 text-sm"
-          style={{
-            borderColor: "hsl(var(--sm-color-border-default))",
-            backgroundColor: "hsl(var(--sm-color-bg-subtle))",
-            color: "hsl(var(--sm-color-text-primary))",
-          }}
+          className="dv5-alert-in mb-6 rounded-md border border-[hsl(var(--sm-color-status-danger))]/30 bg-[hsl(var(--sm-color-status-danger))]/5 p-4 text-sm font-medium text-[hsl(var(--sm-color-status-danger))]"
         >
           {errorMessage}
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {sections.map((section) => (
-          <div
-            key={section.title}
-            className="rounded-lg border border-[hsl(var(--sm-card-border))] bg-[hsl(var(--sm-card-background))] p-5"
-          >
+          <div key={section.title} className="dv5-review-section">
             <div className="mb-3 flex items-center justify-between gap-4">
-              <h3 className="font-serif text-lg font-bold text-[hsl(var(--sm-color-text-primary))]">
+              <h3 className="pp-font-display text-lg font-semibold text-[hsl(var(--sm-color-text-primary))]">
                 {section.title}
               </h3>
               <button

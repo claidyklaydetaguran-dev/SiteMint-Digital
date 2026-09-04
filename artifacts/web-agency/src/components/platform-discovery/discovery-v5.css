@@ -1,0 +1,461 @@
+/**
+ * Discovery form visual redesign (owner review: "it works, but I do not
+ * approve its appearance"). Scoped entirely to `.discovery-v5`, an
+ * additional class applied alongside `.platform-preview` on DiscoveryPage's
+ * root element only — nothing here can affect any other page that shares
+ * platform-preview.css (Products/Services/Pricing/Portfolio/About/Contact/
+ * Footer all stay exactly as they render today).
+ *
+ * Motion durations/easings are the shared @workspace/design-tokens
+ * primitives (--sm-duration-*, --sm-easing-*). That package already
+ * collapses every --sm-duration-* to 0.01ms under
+ * `prefers-reduced-motion: reduce` (lib/design-tokens/src/primitives.css),
+ * so every transition/animation below is reduced-motion-safe for free —
+ * no separate override block needed.
+ */
+
+/* ── Glacier Mint accent palette (real values, converted from the hex the
+   V5 design system defines in styles/tokens-v5.css --sm-mint-* — sRGB→HSL,
+   since every consumer in this tree calls hsl(var(--sm-mint-*)), not the
+   raw hex tokens-v5.css uses under its own [data-shell] scopes). Overrides
+   ONLY the raw palette swatches, scoped to .discovery-v5 — every semantic
+   token this page depends on for contrast (--sm-color-text-*,
+   --sm-color-border-focus, --sm-color-border-default, --sm-color-action-*)
+   is left exactly as platform-preview.css already defines it, so nothing
+   already-verified for contrast regresses. mint-700 is the palette's own
+   documented "text-safe" step (tokens-v5.css: "text-safe mint: links,
+   labels, chips") and is the only swatch used here for a border/icon that
+   has to clear the 3:1 non-text minimum on white — mint-500/400 read
+   ~2:1 on white and are used for tints/glows only, never as a lone
+   indicator of state. */
+.discovery-v5 {
+  --sm-mint-500: 185 64% 51%; /* #32C5D2 */
+  --sm-mint-400: 179 58% 58%; /* #56D2CF */
+  --sm-mint-600: 187 72% 43%; /* #1FA9BC */
+  --sm-mint-700: 189 85% 29%; /* #0B7487 — text-safe, ≥5:1 on white */
+  --sm-mint-100: 180 60% 92%; /* #DFF7F7 */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Layout — split-screen ≥768px, single column below it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-shell {
+  width: 100%;
+  max-width: 76rem; /* 1216px — wide enough for a real editorial split */
+  margin-inline: auto;
+}
+
+.dv5-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .dv5-grid {
+    grid-template-columns: 272px minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dv5-grid {
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 3.5rem;
+  }
+}
+
+.dv5-rail {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .dv5-rail {
+    display: block;
+    position: sticky;
+    top: 1.5rem;
+  }
+}
+
+.dv5-workspace {
+  min-width: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Left rail (desktop, ≥768px) — narrative context for the current step.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-rail-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: hsl(var(--sm-mint-700));
+}
+
+.dv5-rail-title {
+  margin-top: 0.5rem;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  color: hsl(var(--sm-color-text-primary));
+}
+
+.dv5-rail-why {
+  margin-top: 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: hsl(var(--sm-color-text-secondary));
+}
+
+.dv5-rail-steps {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  border-left: 2px solid hsl(var(--sm-color-border-default));
+}
+
+.dv5-rail-step {
+  position: relative;
+  padding: 0.5rem 0 0.5rem 1.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: hsl(var(--sm-color-text-muted));
+  transition: color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.dv5-rail-step::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 0.75rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: hsl(var(--sm-color-bg-canvas));
+  border: 2px solid hsl(var(--sm-color-border-default));
+  transition: background-color var(--sm-duration-fast) var(--sm-easing-standard),
+    border-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.dv5-rail-step--done {
+  color: hsl(var(--sm-color-text-secondary));
+}
+
+.dv5-rail-step--done::before {
+  background: hsl(var(--sm-mint-700));
+  border-color: hsl(var(--sm-mint-700));
+}
+
+.dv5-rail-step--current {
+  color: hsl(var(--sm-color-text-primary));
+  font-weight: 600;
+}
+
+.dv5-rail-step--current::before {
+  background: hsl(var(--sm-color-bg-canvas));
+  border-color: hsl(var(--sm-mint-700));
+  box-shadow: 0 0 0 3px hsl(var(--sm-mint-500) / 0.25);
+}
+
+.dv5-rail-save-status {
+  margin-top: 2rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: hsl(var(--sm-color-text-muted));
+  padding-top: 1.25rem;
+  border-top: 1px solid hsl(var(--sm-color-border-subtle));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile compact progress (<768px) — "Step N of 8" + thin bar.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-mobile-progress {
+  margin-bottom: 1.5rem;
+}
+
+/* >=768px: the visual job of this bar is taken over by DiscoveryStepRail,
+   but the underlying <nav> (aria-current="step", per-item "(completed)"/
+   "(current step)" text) stays mounted for screen reader users — visually
+   hidden the standard accessible way (clipped, not display:none, which
+   would remove it from the accessibility tree too). */
+@media (min-width: 768px) {
+  .dv5-mobile-progress {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Step transition — old panel is already unmounted (React `key` swap);
+   this animates the incoming one in. 200ms, opacity + transform only.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-step-panel {
+  animation: dv5-panel-in var(--sm-duration-normal) var(--sm-easing-enter) both;
+}
+
+@keyframes dv5-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Validation summary reveal — fade/slide, no bounce. */
+.dv5-alert-in {
+  animation: dv5-alert-in var(--sm-duration-normal) var(--sm-easing-standard) both;
+}
+
+@keyframes dv5-alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Selectable option cards — checkbox/feature grids. Strong Glacier Mint
+   selected state (border + tint fill), comfortable touch target (the
+   whole label is clickable — <button> is a labelable element per the
+   HTML spec, so wrapping the Radix/native checkbox in a <label> already
+   forwards clicks from anywhere in the row).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-option-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .dv5-option-grid--2col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dv5-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  min-height: 44px;
+  border-radius: var(--sm-radius-md, 0.75rem);
+  border: 1.5px solid hsl(var(--sm-color-border-default));
+  background: hsl(var(--sm-color-surface-default));
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: hsl(var(--sm-color-text-primary));
+  cursor: pointer;
+  transition: border-color var(--sm-duration-fast) var(--sm-easing-standard),
+    background-color var(--sm-duration-fast) var(--sm-easing-standard),
+    box-shadow var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.dv5-option-card:hover {
+  border-color: hsl(var(--sm-mint-600));
+}
+
+.dv5-option-card--selected {
+  border-color: hsl(var(--sm-mint-700));
+  background: hsl(var(--sm-mint-100) / 0.55);
+  box-shadow: 0 0 0 1px hsl(var(--sm-mint-700) / 0.15);
+}
+
+.dv5-option-card:focus-within {
+  border-color: hsl(var(--sm-mint-700));
+}
+
+/* Feature row (Project Scope step) — same card language, but a row that
+   also carries a priority <select> once checked. */
+.dv5-feature-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--sm-radius-md, 0.75rem);
+  border: 1.5px solid hsl(var(--sm-color-border-default));
+  background: hsl(var(--sm-color-surface-default));
+  transition: border-color var(--sm-duration-fast) var(--sm-easing-standard),
+    background-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+@media (min-width: 640px) {
+  .dv5-feature-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.dv5-feature-row--selected {
+  border-color: hsl(var(--sm-mint-700));
+  background: hsl(var(--sm-mint-100) / 0.5);
+}
+
+.dv5-feature-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Pill toggle groups — small closed-set choices (Yes/No, Firm/Flexible,
+   contact method). Same selected language as the option cards, laid out
+   as a compact segmented row instead of a stacked grid.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dv5-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  min-height: 44px;
+  border-radius: var(--sm-radius-pill, 9999px);
+  border: 1.5px solid hsl(var(--sm-color-border-default));
+  background: hsl(var(--sm-color-surface-default));
+  font-size: 0.875rem;
+  color: hsl(var(--sm-color-text-primary));
+  cursor: pointer;
+  transition: border-color var(--sm-duration-fast) var(--sm-easing-standard),
+    background-color var(--sm-duration-fast) var(--sm-easing-standard);
+}
+
+.dv5-pill:hover {
+  border-color: hsl(var(--sm-mint-600));
+}
+
+.dv5-pill--selected {
+  border-color: hsl(var(--sm-mint-700));
+  background: hsl(var(--sm-mint-100) / 0.55);
+  font-weight: 600;
+}
+
+/* Radix RadioGroupItem's own visible circle is redundant once the pill
+   itself carries the selected state — shrink it to a minimal, still-
+   visible-on-focus indicator rather than removing it (keeps the same
+   button[role="radio"] element and keyboard/AT behavior intact). */
+.dv5-pill [role="radio"] {
+  width: 14px;
+  height: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile touch targets (<768px) — Input/SelectTrigger ship at h-9 (36px),
+   comfortable for a mouse but under the 44px minimum for a touch target.
+   Compound selectors (ancestor class + attribute/role) so this wins on
+   specificity over the shadcn utility classes regardless of stylesheet
+   load order, without editing the shared ui/input.tsx or ui/select.tsx.
+   Desktop is untouched — h-9 stays exactly as every other page renders it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  .discovery-v5 input[type],
+  .discovery-v5 button[role="combobox"] {
+    min-height: 44px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile sticky footer nav (<768px). Desktop keeps Back/Continue in the
+   normal document flow at the end of the step content.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-nav {
+  margin-top: 2rem;
+}
+
+@media (max-width: 767px) {
+  .dv5-nav {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    /* Cancels .dv5-shell's own px-4 (below 640px) so the bar reads
+       edge-to-edge instead of floating inset from the viewport. */
+    margin: 2rem -1rem 0;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    background: hsl(var(--sm-color-bg-canvas) / 0.96);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid hsl(var(--sm-color-border-subtle));
+    z-index: 20;
+  }
+}
+
+/* 640-767px: .dv5-shell switches to Tailwind's sm:px-6 (1.5rem), so the
+   cancelling margin/padding needs to match or a thin gap shows on each side. */
+@media (min-width: 640px) and (max-width: 767px) {
+  .dv5-nav {
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Review step — reuses the rail's eyebrow/title language for its own
+   section headers instead of the generic card look everywhere.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-review-section {
+  border: 1px solid hsl(var(--sm-color-border-default));
+  border-radius: var(--sm-radius-lg, 1rem);
+  background: hsl(var(--sm-color-surface-default));
+  padding: 1.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Success screen — celebratory but restrained; the submission reference
+   gets its own clearly-labelled, copyable-looking block.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dv5-reference-block {
+  margin-top: 1.5rem;
+  border-radius: var(--sm-radius-lg, 1rem);
+  border: 1.5px solid hsl(var(--sm-mint-700) / 0.35);
+  background: hsl(var(--sm-mint-100) / 0.45);
+  padding: 1rem 1.25rem;
+}
+
+.dv5-reference-value {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: hsl(var(--sm-mint-700));
+  word-break: break-all;
+}

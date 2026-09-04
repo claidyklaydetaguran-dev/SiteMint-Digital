@@ -1,5 +1,6 @@
 import { useFormContext, useWatch } from "react-hook-form";
 import { FEATURE_PRIORITIES } from "@workspace/discovery-contract";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +45,7 @@ export function ProjectScopeStep() {
     <div className="space-y-6">
       <div>
         <Label>Which features are you interested in?</Label>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 space-y-2.5">
           {catalog.map((item) => {
             const entryIndex = findEntryIndex(item.key);
             const isSelected = entryIndex >= 0;
@@ -52,14 +53,12 @@ export function ProjectScopeStep() {
             return (
               <div
                 key={item.key}
-                className="flex flex-col gap-2 rounded-md border border-[hsl(var(--sm-color-border-default))] p-3 sm:flex-row sm:items-center sm:justify-between"
+                className={"dv5-feature-row" + (isSelected ? " dv5-feature-row--selected" : "")}
               >
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
+                <label>
+                  <Checkbox
                     checked={isSelected}
-                    onChange={(event) => toggleFeature(item.key, event.target.checked)}
+                    onCheckedChange={(checked) => toggleFeature(item.key, checked === true)}
                   />
                   {item.label}
                 </label>

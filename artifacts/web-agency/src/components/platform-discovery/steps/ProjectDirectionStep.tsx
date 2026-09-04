@@ -57,12 +57,15 @@ export function ProjectDirectionStep() {
           control={control}
           name="projectDirection.secondaryInterests"
           render={({ field }) => (
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="dv5-option-grid dv5-option-grid--2col mt-2">
               {PROJECT_PRIMARY_TYPES.map((type) => {
                 const current = field.value ?? [];
                 const checked = current.includes(type);
                 return (
-                  <label key={type} className="flex items-center gap-2 text-sm">
+                  <label
+                    key={type}
+                    className={"dv5-option-card" + (checked ? " dv5-option-card--selected" : "")}
+                  >
                     <Checkbox
                       checked={checked}
                       onCheckedChange={(isChecked) => {

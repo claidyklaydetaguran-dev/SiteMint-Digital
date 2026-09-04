@@ -63,9 +63,12 @@ export function ContactStep() {
           <FormItem>
             <FormLabel>Preferred contact method</FormLabel>
             <FormControl>
-              <RadioGroup value={field.value ?? undefined} onValueChange={field.onChange} className="flex flex-row gap-6">
+              <RadioGroup value={field.value ?? undefined} onValueChange={field.onChange} className="dv5-pill-group">
                 {PREFERRED_CONTACT_METHODS.map((method) => (
-                  <label key={method} className="flex items-center gap-2 text-sm">
+                  <label
+                    key={method}
+                    className={"dv5-pill" + (field.value === method ? " dv5-pill--selected" : "")}
+                  >
                     <RadioGroupItem value={method} /> {CONTACT_METHOD_LABELS[method]}
                   </label>
                 ))}
@@ -91,7 +94,7 @@ export function ContactStep() {
         <Input {...register("contact.referralSource", { setValueAs: toOptionalText })} />
       </div>
 
-      <div className="space-y-4 rounded-md border border-[hsl(var(--sm-color-border-default))] p-4">
+      <div className="dv5-review-section space-y-4">
         <p className="text-sm text-[hsl(var(--sm-color-text-secondary))]">
           Our formal Privacy Policy and Terms of Service will be published before this form goes live — for now,
           you're previewing the experience only.

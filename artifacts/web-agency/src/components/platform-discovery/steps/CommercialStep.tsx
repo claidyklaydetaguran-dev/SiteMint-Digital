@@ -49,12 +49,12 @@ function YesNoField({
           <RadioGroup
             value={field.value === true ? "yes" : field.value === false ? "no" : undefined}
             onValueChange={(value) => field.onChange(value === "yes")}
-            className="flex flex-row gap-6"
+            className="dv5-pill-group"
           >
-            <label className="flex items-center gap-2 text-sm">
+            <label className={"dv5-pill" + (field.value === true ? " dv5-pill--selected" : "")}>
               <RadioGroupItem value="yes" /> Yes
             </label>
-            <label className="flex items-center gap-2 text-sm">
+            <label className={"dv5-pill" + (field.value === false ? " dv5-pill--selected" : "")}>
               <RadioGroupItem value="no" /> No
             </label>
           </RadioGroup>
@@ -124,11 +124,11 @@ export function CommercialStep() {
         render={({ field }) => (
           <div className="space-y-2">
             <Label>How firm is that date? (optional)</Label>
-            <RadioGroup value={field.value ?? undefined} onValueChange={field.onChange} className="flex flex-row gap-6">
-              <label className="flex items-center gap-2 text-sm">
+            <RadioGroup value={field.value ?? undefined} onValueChange={field.onChange} className="dv5-pill-group">
+              <label className={"dv5-pill" + (field.value === "firm" ? " dv5-pill--selected" : "")}>
                 <RadioGroupItem value="firm" /> Firm
               </label>
-              <label className="flex items-center gap-2 text-sm">
+              <label className={"dv5-pill" + (field.value === "flexible" ? " dv5-pill--selected" : "")}>
                 <RadioGroupItem value="flexible" /> Flexible
               </label>
             </RadioGroup>

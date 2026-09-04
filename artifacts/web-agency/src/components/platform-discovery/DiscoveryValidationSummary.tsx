@@ -64,7 +64,7 @@ export function DiscoveryValidationSummary({ stepKey, errors, onFocusField }: Di
   return (
     <div
       role="alert"
-      className="mb-6 rounded-md border border-[hsl(var(--sm-color-status-danger))]/30 bg-[hsl(var(--sm-color-status-danger))]/5 p-4"
+      className="dv5-alert-in mb-6 rounded-md border border-[hsl(var(--sm-color-status-danger))]/30 bg-[hsl(var(--sm-color-status-danger))]/5 p-4"
     >
       <p className="mb-2 text-sm font-medium text-[hsl(var(--sm-color-status-danger))]">
         {flat.length === 1 ? "1 field needs attention" : `${flat.length} fields need attention`}
