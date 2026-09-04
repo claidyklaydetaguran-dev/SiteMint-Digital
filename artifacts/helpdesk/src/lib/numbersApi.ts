@@ -42,8 +42,37 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function fetchNumbers(): Promise<{ items: PhoneNumberSummary[]; count: number }> {
-  return apiFetch("/receptionist/voice/numbers");
+/** Raw row as the committed route's numberDto actually serialises it. */
+interface NumberDtoWire {
+  id: number;
+  phoneE164?: string | null;
+  phoneNumberDisplay?: string | null;
+  state: PhoneNumberState;
+  assignedAssistantId?: number | null;
+  assistantId?: number | null;
+  assignedAt?: string | null;
+}
+
+/** Human-friendly rendering of an E.164 number: +14155550190 → +1 (415) 555-0190. */
+function formatE164(e164: string): string {
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return m ? `+1 (${m[1]}) ${m[2]}-${m[3]}` : e164;
+}
+
+function normalizeNumber(row: NumberDtoWire): PhoneNumberSummary {
+  const raw = row.phoneNumberDisplay ?? row.phoneE164 ?? "";
+  return {
+    id: row.id,
+    phoneNumberDisplay: row.phoneNumberDisplay ?? (raw ? formatE164(raw) : "Unknown number"),
+    state: row.state,
+    assistantId: row.assistantId ?? row.assignedAssistantId ?? null,
+    assignedAt: row.assignedAt ?? null,
+  };
+}
+
+export async function fetchNumbers(): Promise<{ items: PhoneNumberSummary[]; count: number }> {
+  const res = await apiFetch<{ items: NumberDtoWire[]; count: number }>("/receptionist/voice/numbers");
+  return { items: res.items.map(normalizeNumber), count: res.count };
 }
 
 export function assignNumber(id: number, assistantId: number): Promise<{ number: PhoneNumberSummary }> {
