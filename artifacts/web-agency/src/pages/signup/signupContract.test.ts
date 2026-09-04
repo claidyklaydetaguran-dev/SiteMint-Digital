@@ -256,8 +256,12 @@ console.log("\n--- route helpers ---");
   check(
     "signup is registered before the landing route",
     (() => {
-      const signupAt = appSrc.indexOf("ROUTES.aiReceptionistSignup");
-      const landingAt = appSrc.indexOf("ROUTES.aiReceptionist}");
+      // Match the actual <Route path={...}> registrations. A bare
+      // `ROUTES.aiReceptionist}` needle also matches the retired-vertical
+      // redirect template literals (`${ROUTES.aiReceptionist}#use-cases`),
+      // which sit above the signup route and are not route registrations.
+      const signupAt = appSrc.indexOf("path={ROUTES.aiReceptionistSignup}");
+      const landingAt = appSrc.indexOf("path={ROUTES.aiReceptionist}");
       return signupAt !== -1 && landingAt !== -1 && signupAt < landingAt;
     })(),
   );
