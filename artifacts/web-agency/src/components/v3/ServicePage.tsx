@@ -14,6 +14,7 @@ import { Link } from "wouter";
 import { ArrowRight, CheckCircle2, type LucideIcon } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import "@/styles/v5-pages.css";
 
 export interface ServiceCapability {
   icon: LucideIcon;
@@ -73,19 +74,19 @@ export function ServicePage({
   const Icon = content.eyebrowIcon;
 
   return (
-    <div className="v3-service-page">
+    <div className="v3-service-page sm-v5page">
       {/* Hero — editorial, porcelain. */}
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner">
-          <span className="v3-eyebrow">
+        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow reveal-fade-up">
             <Icon aria-hidden="true" size={14} />
             {content.eyebrow}
           </span>
           <h1 className="v3-display">{content.headline}</h1>
-          <p className="v3-lede">{content.lede}</p>
-          <div className="v3m-hero__actions">
+          <p className="v3-lede reveal-fade-up">{content.lede}</p>
+          <div className="v3m-hero__actions reveal-scale-settle">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+              Build Your SiteMint System
             </Link>
           </div>
         </div>
@@ -259,7 +260,7 @@ export function ServicePage({
           <p className="v3-lede">{content.cta.body}</p>
           <div className="v3m-cta__actions">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Start with SiteMint
+              Build Your SiteMint System
             </Link>
             <Link href={ROUTES.workV3} className="v3-btn v3-btn--outline">
               See our work
