@@ -66,13 +66,13 @@
 | O-07 | Operations | Canonical lead statuses + null-safety (O-3) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
 | O-08 | Operations | Lead detail simplification (O-4) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
 | O-09 | Operations | Essential responsive Ops views (M-3) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| B-01 | Backend | Admin cookie sessions + logout + me + audit (schema push-mode) | P0 | IN PROGRESS | — | — | — | — | — |
-| B-02 | Backend | Onboarding state routes + `voice_onboarding_states` schema | P0 | IN PROGRESS | — | — | — | — | — |
-| B-03 | Backend | Contacts read routes | P0 | IN PROGRESS | — | — | — | — | — |
-| B-04 | Backend | Invite-only signup route + invites admin (flag off) | P0 | IN PROGRESS | — | — | — | — | — |
-| B-05 | Backend | Public beta-request route + admin list (flag off) | P0 | IN PROGRESS | — | — | — | — | — |
-| B-06 | Backend | Live-demo session seam, fail-closed, no provider | P1 | IN PROGRESS | — | — | — | — | — |
-| B-07 | Backend | Admin voice issues / usage / numbers routes | P0 | IN PROGRESS | — | — | — | — | — |
+| B-01 | Backend | Admin cookie sessions + logout + me + audit (schema push-mode) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
+| B-02 | Backend | Onboarding state routes + `voice_onboarding_states` schema | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
+| B-03 | Backend | Contacts read routes | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
+| B-04 | Backend | Invite-only signup route + invites admin (flag off) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
+| B-05 | Backend | Public beta-request route + admin list (flag off) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
+| B-06 | Backend | Live-demo session seam, fail-closed, no provider | P1 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
+| B-07 | Backend | Admin voice issues / usage / numbers routes | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
 | B-08 | Backend | Migration packet (0007 voice + push-mode CRM) tested on a disposable DB | P0 | IN PROGRESS | — | — | — | — | — |
 | B-09 | Backend | Migrations applied externally | P0 | BLOCKED — OWNER | — | — | — | execution authorisation | Owner |
 | V-01 | Verification | Typecheck + canonical suite + contract suites green on the integrated branch | P0 | NOT STARTED | — | — | — | — | — |
