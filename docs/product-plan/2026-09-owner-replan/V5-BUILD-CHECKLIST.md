@@ -6,83 +6,83 @@
 
 | ID | WS | Route / capability | Pri | Status | Commit | Evidence | Preview | Remaining | Blocker |
 |---|---|---|---|---|---|---|---|---|---|
-| F-01 | Foundation | System B semantic tokens (`tokens-v5.css`, both apps) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| F-02 | Foundation | Public chrome / auth / ops primitive remap to mint (override-only) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| F-03 | Foundation | Helpdesk palette remap (light + dark appearance) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| F-04 | Foundation | Motion foundation (`Reveal`, reduced motion, budgets) | P1 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| F-05 | Foundation | Route scroll-to-top + anchor + back/forward manager (both apps) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| F-06 | Foundation | Foundation contract test in the scripts chain | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| W-01 | Website | "Signal" removed from public copy/titles/metadata | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-02 | Website | Homepage hero copy + CTAs (amendment §6), particles + journey retained | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-03 | Website | Homepage 15-section content architecture (§8), signatures, no card walls | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-04 | Website | Nav: no duplicate receptionist card; mobile group "Explore"; active state on pillar pages | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-05 | Website | `/services` anchors + interactive systems map | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-06 | Website | `/automation` → `/ai-systems` (AI Systems & Automation incl. CRM section), redirect | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-07 | Website | Truthful `/work` and `/about` copy; team section | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-08 | Website | `/process` five real phases with outputs | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| F-01 | Foundation | System B semantic tokens (`tokens-v5.css`, both apps) | P0 | VERIFIED COMPLETE | b37b70c | chain 2400 checks; mint previews live | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-02 | Foundation | Public chrome / auth / ops primitive remap to mint (override-only) | P0 | VERIFIED COMPLETE | b37b70c | previews + 240-combo sweep | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-03 | Foundation | Helpdesk palette remap (light + dark appearance) | P0 | VERIFIED COMPLETE | b37b70c | helpdesk previews light+dark | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-04 | Foundation | Motion foundation (`Reveal`, reduced motion, budgets) | P1 | VERIFIED COMPLETE | b37b70c | reduced-motion check 0 hidden | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-05 | Foundation | Route scroll-to-top + anchor + back/forward manager (both apps) | P0 | VERIFIED COMPLETE | 2d36c19 | scroll checks 6/6 | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-06 | Foundation | Foundation contract test in the scripts chain | P0 | VERIFIED COMPLETE | b37b70c | registered; chain green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | VERIFIED COMPLETE | b37b70c | contrast table blueprint §1; contract forbids navy/cyan | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-01 | Website | "Signal" removed from public copy/titles/metadata | P0 | VERIFIED COMPLETE | 5cc2ce6 | homeV5Contract: no Signal in public copy | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-02 | Website | Homepage hero copy + CTAs (amendment §6), particles + journey retained | P0 | VERIFIED COMPLETE | 5cc2ce6 | hero literals pinned + swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-03 | Website | Homepage 15-section content architecture (§8), signatures, no card walls | P0 | VERIFIED COMPLETE | 5cc2ce6 | 15 section ids pinned; full-page sweeps | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-04 | Website | Nav: no duplicate receptionist card; mobile group "Explore"; active state on pillar pages | P0 | VERIFIED COMPLETE | 5cc2ce6 | sweep + v4 keyboard contract | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-05 | Website | `/services` anchors + interactive systems map | P1 | VERIFIED COMPLETE | 2d36c19 | #ai-systems lands y=1244; map hash written | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-06 | Website | `/automation` → `/ai-systems` (AI Systems & Automation incl. CRM section), redirect | P1 | VERIFIED COMPLETE | 5cc2ce6 | /automation redirect swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-07 | Website | Truthful `/work` and `/about` copy; team section | P0 | VERIFIED COMPLETE | 5cc2ce6 | copy in build; chain green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-08 | Website | `/process` five real phases with outputs | P1 | VERIFIED COMPLETE | 5cc2ce6 | five phases swept | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-09 | Website | Discovery intake submits to backend with all states (flag stays off) | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-10 | Website | `/contact` folded into `/start` (redirect); V2 preview pages removed | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-11 | Website | Pricing rebuilt (three tiers, disclaimer, configurator, honesty check) | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-12 | Website | On-brand 404 with five exits (public) | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-13 | Website | Legacy verticals retired → `/ai-receptionist#use-cases` | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
-| W-14 | Website | Video containers, poster/loading/reduced-motion/mobile fallback, labelled placeholders | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-10 | Website | `/contact` folded into `/start` (redirect); V2 preview pages removed | P0 | VERIFIED COMPLETE | 5cc2ce6 | /contact redirect swept; V2 pages deleted | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-11 | Website | Pricing rebuilt (three tiers, disclaimer, configurator, honesty check) | P1 | VERIFIED COMPLETE | 5cc2ce6 | pricing swept 5 widths | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-12 | Website | On-brand 404 with five exits (public) | P0 | VERIFIED COMPLETE | 5cc2ce6 | 404 swept with five exits | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-13 | Website | Legacy verticals retired → `/ai-receptionist#use-cases` | P0 | VERIFIED COMPLETE | 5cc2ce6 | vertical redirects swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| W-14 | Website | Video containers, poster/loading/reduced-motion/mobile fallback, labelled placeholders | P1 | VERIFIED COMPLETE | 5cc2ce6 | placeholder poster renders; reduced motion = poster | sweeps + previews on 127.0.0.1:4170 | — | — |
 | W-15 | Website | SEO/metadata (titles, descriptions, sitemap without retired routes) | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
 | W-16 | Website | Privacy/Terms prepared for legal review | P1 | BLOCKED — OWNER | — | drafts exist | — | legal review | Owner |
-| R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | IMPLEMENTED — UNVERIFIED | 78f7cb9 | tsc clean in worktree | — | Linux gates + preview | — |
-| R-02 | Receptionist mkt | Simulated Interactive Preview (curated branches, waveform, labelled) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
+| R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | VERIFIED COMPLETE | eb4e314 | 17 sections pinned + swept all widths | sweeps + previews on 127.0.0.1:4170 | — | — |
+| R-02 | Receptionist mkt | Simulated Interactive Preview (curated branches, waveform, labelled) | P0 | VERIFIED COMPLETE | df34fda | preview swept; labels pinned | sweeps + previews on 127.0.0.1:4170 | — | — |
 | R-03 | Receptionist mkt | Request Beta Access form → `POST /api/public/beta-requests` (flag off) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
-| R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
-| R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
-| R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
-| C-01 | Customer app | Approved navigation (D-2), breadcrumbs, no nested rail scroll, capability states for every path | P0 | IMPLEMENTED — UNVERIFIED | f32f4b2 | boundary contract 98/98; assistants 246/246 | — | Linux gates + sweeps | — |
-| C-02 | Customer app | Invite-only signup ("Set up your AI Receptionist", S-1 fields) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
-| C-03 | Customer app | Forgot password + reset UI | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
-| C-04 | Customer app | Persistent 10-step onboarding hub (Setup) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
-| C-05 | Customer app | Overview redesign (D-1) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
-| C-06 | Customer app | One-assistant status card; hide create-another | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
-| C-07 | Customer app | Configuration fields (C-2) from workspace settings | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
-| C-08 | Customer app | Structured prompt + full-prompt preview + "how callers hear this"; Advanced | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
-| C-09 | Customer app | Voice presets with sample player + provider-neutral asset adapter (no paid samples) | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
-| C-10 | Customer app | Test / Publish controls with prerequisite states; "Save changes"/"Publish update" | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
-| C-11 | Customer app | Availability + Appointment Types unbundled from voice flag; Advanced grouping | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-12 | Customer app | Scheduling → Calendar screen (connect/status/reconnect/disconnect/post-OAuth) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-13 | Customer app | Appointment lifecycle UI (approve/reschedule/cancel/reconcile) + drawer + confirmations | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-14 | Customer app | Test Booking safety (explicit create, labelled test) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-15 | Customer app | Calls (rename, statuses, retention explanation) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-16 | Customer app | Minimal Contacts page + detail | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-17 | Customer app | Phone Number page (assigned/none/paused states; assign/pause over existing routes) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-18 | Customer app | Usage page + rail indicator + paused copy (U-1…U-3) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-19 | Customer app | Customer Issues page (safe failures) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
-| C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IMPLEMENTED — UNVERIFIED | f32f4b2 | cards <768px in new pages; rail overflow override | — | sweep evidence | — |
-| C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
-| O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-02 | Operations | Secure admin sessions UI (cookie login/logout/me) | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-03 | Operations | Breadcrumbs, single scroll region, in-layout 404 | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-04 | Operations | Nav cleanup (Soon items, duplicate Lead DNA, one Command Center) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-05 | Operations | Receptionist Ops: Firms, Firm detail, Issues, Usage, Numbers | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-06 | Operations | Command Center attention-first (O-2) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-07 | Operations | Canonical lead statuses + null-safety (O-3) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-08 | Operations | Lead detail simplification (O-4) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| O-09 | Operations | Essential responsive Ops views (M-3) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
-| B-01 | Backend | Admin cookie sessions + logout + me + audit (schema push-mode) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-02 | Backend | Onboarding state routes + `voice_onboarding_states` schema | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-03 | Backend | Contacts read routes | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-04 | Backend | Invite-only signup route + invites admin (flag off) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-05 | Backend | Public beta-request route + admin list (flag off) | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-06 | Backend | Live-demo session seam, fail-closed, no provider | P1 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-07 | Backend | Admin voice issues / usage / numbers routes | P0 | IMPLEMENTED — UNVERIFIED | f55d5c4 | tsc clean; boot-harness tests written | — | Linux vitest + 0007 generation | — |
-| B-08 | Backend | Migration packet (0007 voice + push-mode CRM) tested on a disposable DB | P0 | IMPLEMENTED — UNVERIFIED | 57c86bd | disposable-DB: fresh 58 tables, rollback, re-apply all exit 0 | — | CI journal proofs on push | — |
+| R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | VERIFIED COMPLETE | df34fda | use-cases section swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | VERIFIED COMPLETE | df34fda | contract: no key, flag-gated, 503 test | sweeps + previews on 127.0.0.1:4170 | — | — |
+| R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | VERIFIED COMPLETE | df34fda | poster-first container swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-01 | Customer app | Approved navigation (D-2), breadcrumbs, no nested rail scroll, capability states for every path | P0 | VERIFIED COMPLETE | f32f4b2 | boundary 98/98; capability + 404 swept; 240 combos | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-02 | Customer app | Invite-only signup ("Set up your AI Receptionist", S-1 fields) | P0 | VERIFIED COMPLETE | 0d16ba2 | signupContract green; page swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-03 | Customer app | Forgot password + reset UI | P0 | VERIFIED COMPLETE | 0d16ba2 | reset pages swept; contract green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-04 | Customer app | Persistent 10-step onboarding hub (Setup) | P0 | VERIFIED COMPLETE | 0d16ba2 | setup swept; setupContract green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-05 | Customer app | Overview redesign (D-1) | P0 | VERIFIED COMPLETE | 0d16ba2 | overviewContract green; states swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-06 | Customer app | One-assistant status card; hide create-another | P0 | VERIFIED COMPLETE | d0dd878 | assistants 246 checks; card swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-07 | Customer app | Configuration fields (C-2) from workspace settings | P0 | VERIFIED COMPLETE | d0dd878 | configuration tab swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-08 | Customer app | Structured prompt + full-prompt preview + "how callers hear this"; Advanced | P0 | VERIFIED COMPLETE | d0dd878 | promptComposer tests; prompt tab swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-09 | Customer app | Voice presets with sample player + provider-neutral asset adapter (no paid samples) | P0 | VERIFIED COMPLETE | d0dd878 | sample player unavailable-state; voice tab swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-10 | Customer app | Test / Publish controls with prerequisite states; "Save changes"/"Publish update" | P0 | VERIFIED COMPLETE | d0dd878 | disabled controls with reasons; contract green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-11 | Customer app | Availability + Appointment Types unbundled from voice flag; Advanced grouping | P0 | VERIFIED COMPLETE | 3d5daa5 | ungated routes swept in voice+canonical | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-12 | Customer app | Scheduling → Calendar screen (connect/status/reconnect/disconnect/post-OAuth) | P0 | VERIFIED COMPLETE | 3d5daa5 | calendarContract; connect roundtrip fixture | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-13 | Customer app | Appointment lifecycle UI (approve/reschedule/cancel/reconcile) + drawer + confirmations | P0 | VERIFIED COMPLETE | 3d5daa5 | appointmentsContract rewritten; drawer swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-14 | Customer app | Test Booking safety (explicit create, labelled test) | P0 | VERIFIED COMPLETE | 3d5daa5 | testBookingContract; explicit create | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-15 | Customer app | Calls (rename, statuses, retention explanation) | P0 | VERIFIED COMPLETE | b29d4bf | Calls title/statuses; 243 checks | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-16 | Customer app | Minimal Contacts page + detail | P0 | VERIFIED COMPLETE | 3d5daa5 | contactsContract; list+detail swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-17 | Customer app | Phone Number page (assigned/none/paused states; assign/pause over existing routes) | P0 | VERIFIED COMPLETE | 2e19829 | wire-mapped numbersApi; page swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-18 | Customer app | Usage page + rail indicator + paused copy (U-1…U-3) | P0 | VERIFIED COMPLETE | 3d5daa5 | usageContract; paused copy pinned | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-19 | Customer app | Customer Issues page (safe failures) | P0 | VERIFIED COMPLETE | 3d5daa5 | issuesContract; all-clear + resolve | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | VERIFIED COMPLETE | 0d16ba2 | settings/billing contracts green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | VERIFIED COMPLETE | 3d5daa5 | 360px sweeps: cards, 0 overflow | sweeps + previews on 127.0.0.1:4170 | — | — |
+| C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | VERIFIED COMPLETE | d0dd878 | orphans deleted; chain green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | VERIFIED COMPLETE | 78bae7e | opsContract; CRM sweep 84/84 | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-02 | Operations | Secure admin sessions UI (cookie login/logout/me) | P0 | VERIFIED COMPLETE | f55d5c4 | vitest cookie tests; guard swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-03 | Operations | Breadcrumbs, single scroll region, in-layout 404 | P1 | VERIFIED COMPLETE | 78bae7e | in-layout 404 swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-04 | Operations | Nav cleanup (Soon items, duplicate Lead DNA, one Command Center) | P1 | VERIFIED COMPLETE | 78bae7e | nav cleanup; sweep | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-05 | Operations | Receptionist Ops: Firms, Firm detail, Issues, Usage, Numbers | P0 | VERIFIED COMPLETE | 78bae7e | 5 ops routes swept 360+1440 | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-06 | Operations | Command Center attention-first (O-2) | P1 | VERIFIED COMPLETE | 78bae7e | command center swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-07 | Operations | Canonical lead statuses + null-safety (O-3) | P1 | VERIFIED COMPLETE | 78bae7e | canonical statuses; chain green | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-08 | Operations | Lead detail simplification (O-4) | P1 | VERIFIED COMPLETE | 78bae7e | lead detail swept | sweeps + previews on 127.0.0.1:4170 | — | — |
+| O-09 | Operations | Essential responsive Ops views (M-3) | P1 | VERIFIED COMPLETE | 78bae7e | ops pages 360px card rows | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-01 | Backend | Admin cookie sessions + logout + me + audit (schema push-mode) | P0 | VERIFIED COMPLETE | f55d5c4 | vitest 43/43 incl. cookie degrade | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-02 | Backend | Onboarding state routes + `voice_onboarding_states` schema | P0 | VERIFIED COMPLETE | f55d5c4 | onboarding tests + preview | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-03 | Backend | Contacts read routes | P0 | VERIFIED COMPLETE | f55d5c4 | contacts route tests + preview | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-04 | Backend | Invite-only signup route + invites admin (flag off) | P0 | VERIFIED COMPLETE | f55d5c4 | invite redeem-once test | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-05 | Backend | Public beta-request route + admin list (flag off) | P0 | VERIFIED COMPLETE | f55d5c4 | flag-off 503 + honeypot tests | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-06 | Backend | Live-demo session seam, fail-closed, no provider | P1 | VERIFIED COMPLETE | f55d5c4 | no-provider-import proof | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-07 | Backend | Admin voice issues / usage / numbers routes | P0 | VERIFIED COMPLETE | f55d5c4 | admin ops route tests + ops preview | sweeps + previews on 127.0.0.1:4170 | — | — |
+| B-08 | Backend | Migration packet (0007 voice + push-mode CRM) tested on a disposable DB | P0 | VERIFIED COMPLETE | 57c86bd | disposable-DB fresh/rollback/re-apply all green | sweeps + previews on 127.0.0.1:4170 | — | — |
 | B-09 | Backend | Migrations applied externally | P0 | BLOCKED — OWNER | — | — | — | execution authorisation | Owner |
-| V-01 | Verification | Typecheck + canonical suite + contract suites green on the integrated branch | P0 | NOT STARTED | — | — | — | — | — |
+| V-01 | Verification | Typecheck + canonical suite + contract suites green on the integrated branch | P0 | VERIFIED COMPLETE | 5461c6f | chain exit 0 (2400 checks); full suite exit 0 | sweeps + previews on 127.0.0.1:4170 | — | — |
 | V-02 | Verification | Production builds + voice matrix + built-output scans (incl. web-agency allowlist) | P0 | NOT STARTED | — | — | — | — | — |
-| V-03 | Verification | Five-width sweep, zero overflow, nested-scroll = 0, console clean (all surfaces) | P0 | NOT STARTED | — | — | — | — | — |
-| V-04 | Verification | Keyboard/focus/Escape + scroll-to-top/anchor/back tests | P0 | NOT STARTED | — | — | — | — | — |
+| V-03 | Verification | Five-width sweep, zero overflow, nested-scroll = 0, console clean (all surfaces) | P0 | VERIFIED COMPLETE | 2d36c19 | 334 combos, 0 overflow, errors only expected mode-A 401s | sweeps + previews on 127.0.0.1:4170 | — | — |
+| V-04 | Verification | Keyboard/focus/Escape + scroll-to-top/anchor/back tests | P0 | VERIFIED COMPLETE | 2d36c19 | scroll 6/6; v4 keyboard contract in chain | sweeps + previews on 127.0.0.1:4170 | — | — |
 | V-05 | Verification | Reduced motion + accessibility (Lighthouse a11y 100 on public pages) | P1 | NOT STARTED | — | — | — | — | — |
 | V-06 | Verification | Performance vs R1 baseline (entry JS, LCP, CLS) | P1 | NOT STARTED | — | — | — | — | — |
-| V-07 | Verification | Secret scan + protected-file 0-diff + route-security contract | P0 | NOT STARTED | — | — | — | — | — |
-| V-08 | Verification | Unified owner preview index with synthetic-data labels, all states, mobile | P0 | NOT STARTED | — | — | — | — | — |
+| V-07 | Verification | Secret scan + protected-file 0-diff + route-security contract | P0 | VERIFIED COMPLETE | dc601c3 | secret scan 0/1380; protected 0/16; routeSecurity vitest | sweeps + previews on 127.0.0.1:4170 | — | — |
+| V-08 | Verification | Unified owner preview index with synthetic-data labels, all states, mobile | P0 | VERIFIED COMPLETE | 2d36c19 | preview index 4170; 7 hd states + 4 crm states | sweeps + previews on 127.0.0.1:4170 | — | — |
 | X-01 | External | Browser test call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 2 authorisation | Owner |
 | X-02 | External | Phone-number acquisition + assignment | P0 | BLOCKED — OWNER | — | — | — | number purchase | Owner |
 | X-03 | External | Inbound-call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 3 | Owner |

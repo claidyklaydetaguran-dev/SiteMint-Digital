@@ -17,72 +17,72 @@ owner-authorised migrations (B-09) and external certification (X-01…X-07).
 ## Scores
 
 <!-- scores:start -->
-_Computed 2026-09-04 13:27 UTC from V5-BUILD-CHECKLIST.md._
+_Computed 2026-09-04 15:24 UTC from V5-BUILD-CHECKLIST.md._
 
-Program-wide: **P0 items remaining 62** · owner blockers 15 · external blockers 1.
+Program-wide: **P0 items remaining 12** · owner blockers 15 · external blockers 1.
 
 ### A. Company website
 
-**Readiness 0%** = 0 ÷ 94 applicable weight · P0 remaining 14 · blockers 3 (owner 2, external 1)
+**Readiness 81.9%** = 77 ÷ 94 applicable weight · P0 remaining 1 · blockers 3 (owner 2, external 1)
 
 | Category | Items (status) |
 |---|---|
-| Brand and visual consistency | F-01:IN PROGRESS, F-02:IN PROGRESS, F-04:IN PROGRESS, F-07:IN PROGRESS |
-| Content and truthful claims | W-01:IN PROGRESS, W-02:IN PROGRESS, W-03:IN PROGRESS, W-07:IN PROGRESS, W-08:IN PROGRESS, W-13:IN PROGRESS |
-| Responsive navigation | W-04:IN PROGRESS, W-05:IN PROGRESS, W-06:IN PROGRESS, W-12:IN PROGRESS, F-05:IN PROGRESS |
-| Discovery conversion | W-09:IN PROGRESS, W-10:IN PROGRESS |
-| Pricing | W-11:IN PROGRESS |
-| Accessibility | V-04:NOT STARTED, V-05:NOT STARTED |
-| Performance | V-06:NOT STARTED, W-14:IN PROGRESS |
-| SEO and metadata | W-15:IN PROGRESS |
+| Brand and visual consistency | F-01:VERIFIED COMPLETE, F-02:VERIFIED COMPLETE, F-04:VERIFIED COMPLETE, F-07:VERIFIED COMPLETE |
+| Content and truthful claims | W-01:VERIFIED COMPLETE, W-02:VERIFIED COMPLETE, W-03:VERIFIED COMPLETE, W-07:VERIFIED COMPLETE, W-08:VERIFIED COMPLETE, W-13:VERIFIED COMPLETE |
+| Responsive navigation | W-04:VERIFIED COMPLETE, W-05:VERIFIED COMPLETE, W-06:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE, F-05:VERIFIED COMPLETE |
+| Discovery conversion | W-09:IMPLEMENTED—UNVERIFIED, W-10:VERIFIED COMPLETE |
+| Pricing | W-11:VERIFIED COMPLETE |
+| Accessibility | V-04:VERIFIED COMPLETE, V-05:NOT STARTED |
+| Performance | V-06:NOT STARTED, W-14:VERIFIED COMPLETE |
+| SEO and metadata | W-15:IMPLEMENTED—UNVERIFIED |
 | Legal approval | W-16:BLOCKED—OWNER |
 | Production-domain verification | X-10:BLOCKED—OWNER, X-14:BLOCKED—EXTERNAL |
 
 ### B. AI Receptionist owner-preview readiness
 
-**Readiness 0%** = 0 ÷ 107 applicable weight · P0 remaining 21 · blockers 0 (owner 0, external 0)
+**Readiness 95.3%** = 102 ÷ 107 applicable weight · P0 remaining 1 · blockers 0 (owner 0, external 0)
 
 | Category | Items (status) |
 |---|---|
-| Complete navigable product UI | C-01:IN PROGRESS, C-04:IN PROGRESS, C-05:IN PROGRESS, C-06:IN PROGRESS, C-08:IN PROGRESS, C-11:IN PROGRESS, C-12:IN PROGRESS, C-13:IN PROGRESS, C-15:IN PROGRESS, C-16:IN PROGRESS, C-17:IN PROGRESS, C-18:IN PROGRESS, C-19:IN PROGRESS |
-| Synthetic preview states | V-08:NOT STARTED |
-| Responsive behaviour | C-21:IN PROGRESS, V-03:NOT STARTED |
-| No dead routes | C-01:IN PROGRESS, W-12:IN PROGRESS |
-| No misleading live claims | R-01:IN PROGRESS, R-02:IN PROGRESS, W-01:IN PROGRESS |
-| Owner-review evidence | V-01:NOT STARTED, V-02:NOT STARTED, V-08:NOT STARTED |
+| Complete navigable product UI | C-01:VERIFIED COMPLETE, C-04:VERIFIED COMPLETE, C-05:VERIFIED COMPLETE, C-06:VERIFIED COMPLETE, C-08:VERIFIED COMPLETE, C-11:VERIFIED COMPLETE, C-12:VERIFIED COMPLETE, C-13:VERIFIED COMPLETE, C-15:VERIFIED COMPLETE, C-16:VERIFIED COMPLETE, C-17:VERIFIED COMPLETE, C-18:VERIFIED COMPLETE, C-19:VERIFIED COMPLETE |
+| Synthetic preview states | V-08:VERIFIED COMPLETE |
+| Responsive behaviour | C-21:VERIFIED COMPLETE, V-03:VERIFIED COMPLETE |
+| No dead routes | C-01:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE |
+| No misleading live claims | R-01:VERIFIED COMPLETE, R-02:VERIFIED COMPLETE, W-01:VERIFIED COMPLETE |
+| Owner-review evidence | V-01:VERIFIED COMPLETE, V-02:NOT STARTED, V-08:VERIFIED COMPLETE |
 
 ### C. AI Receptionist private-beta readiness
 
-**Readiness 0%** = 0 ÷ 170 applicable weight · P0 remaining 34 · blockers 9 (owner 9, external 0)
+**Readiness 73.5%** = 125 ÷ 170 applicable weight · P0 remaining 9 · blockers 9 (owner 9, external 0)
 
 | Category | Items (status) |
 |---|---|
-| Invitation signup | C-02:IN PROGRESS, B-04:IN PROGRESS |
-| Login and password reset | C-03:IN PROGRESS |
-| Persistent onboarding | C-04:IN PROGRESS, B-02:IN PROGRESS, B-09:BLOCKED—OWNER |
-| One assistant | C-06:IN PROGRESS, C-07:IN PROGRESS |
-| Prompt and voice configuration | C-08:IN PROGRESS, C-09:IN PROGRESS, C-10:IN PROGRESS, X-08:BLOCKED—OWNER |
-| Google Calendar | C-12:IN PROGRESS, X-04:BLOCKED—OWNER |
-| Availability and appointment types | C-11:IN PROGRESS |
+| Invitation signup | C-02:VERIFIED COMPLETE, B-04:VERIFIED COMPLETE |
+| Login and password reset | C-03:VERIFIED COMPLETE |
+| Persistent onboarding | C-04:VERIFIED COMPLETE, B-02:VERIFIED COMPLETE, B-09:BLOCKED—OWNER |
+| One assistant | C-06:VERIFIED COMPLETE, C-07:VERIFIED COMPLETE |
+| Prompt and voice configuration | C-08:VERIFIED COMPLETE, C-09:VERIFIED COMPLETE, C-10:VERIFIED COMPLETE, X-08:BLOCKED—OWNER |
+| Google Calendar | C-12:VERIFIED COMPLETE, X-04:BLOCKED—OWNER |
+| Availability and appointment types | C-11:VERIFIED COMPLETE |
 | Browser test certification | X-01:BLOCKED—OWNER |
-| Phone-number assignment | C-17:IN PROGRESS, X-02:BLOCKED—OWNER |
+| Phone-number assignment | C-17:VERIFIED COMPLETE, X-02:BLOCKED—OWNER |
 | Inbound-call certification | X-03:BLOCKED—OWNER |
-| Appointment lifecycle | C-13:IN PROGRESS, C-14:IN PROGRESS |
-| Calls | C-15:IN PROGRESS |
-| Minimal Contacts | C-16:IN PROGRESS, B-03:IN PROGRESS |
-| Usage and limits | C-18:IN PROGRESS |
-| Safe failures | C-19:IN PROGRESS, B-07:IN PROGRESS, X-05:BLOCKED—OWNER |
-| Receptionist Ops | O-01:IN PROGRESS, O-02:IN PROGRESS, O-05:IN PROGRESS, B-01:IN PROGRESS, B-07:IN PROGRESS |
+| Appointment lifecycle | C-13:VERIFIED COMPLETE, C-14:VERIFIED COMPLETE |
+| Calls | C-15:VERIFIED COMPLETE |
+| Minimal Contacts | C-16:VERIFIED COMPLETE, B-03:VERIFIED COMPLETE |
+| Usage and limits | C-18:VERIFIED COMPLETE |
+| Safe failures | C-19:VERIFIED COMPLETE, B-07:VERIFIED COMPLETE, X-05:BLOCKED—OWNER |
+| Receptionist Ops | O-01:VERIFIED COMPLETE, O-02:VERIFIED COMPLETE, O-05:VERIFIED COMPLETE, B-01:VERIFIED COMPLETE, B-07:VERIFIED COMPLETE |
 | Private-beta legal documents | X-06:BLOCKED—OWNER |
 | Rollback and support procedures | X-07:BLOCKED—OWNER |
 
 ### D. SiteMint public-launch readiness
 
-**Readiness 0%** = 0 ÷ 93 applicable weight · P0 remaining 15 · blockers 11 (owner 10, external 1)
+**Readiness 50.5%** = 47 ÷ 93 applicable weight · P0 remaining 6 · blockers 11 (owner 10, external 1)
 
 | Category | Items (status) |
 |---|---|
-| Company website production-ready | W-01:IN PROGRESS, W-02:IN PROGRESS, W-03:IN PROGRESS, W-04:IN PROGRESS, W-07:IN PROGRESS, W-09:IN PROGRESS, W-10:IN PROGRESS, W-11:IN PROGRESS, W-12:IN PROGRESS, W-13:IN PROGRESS, W-15:IN PROGRESS |
+| Company website production-ready | W-01:VERIFIED COMPLETE, W-02:VERIFIED COMPLETE, W-03:VERIFIED COMPLETE, W-04:VERIFIED COMPLETE, W-07:VERIFIED COMPLETE, W-09:IMPLEMENTED—UNVERIFIED, W-10:VERIFIED COMPLETE, W-11:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE, W-13:VERIFIED COMPLETE, W-15:IMPLEMENTED—UNVERIFIED |
 | Private-beta evidence complete | X-01:BLOCKED—OWNER, X-03:BLOCKED—OWNER, X-04:BLOCKED—OWNER, X-06:BLOCKED—OWNER |
 | Public pricing decisions | X-11:BLOCKED—OWNER |
 | Production OAuth and domains | X-10:BLOCKED—OWNER |
@@ -90,7 +90,7 @@ Program-wide: **P0 items remaining 62** · owner blockers 15 · external blocker
 | Billing posture | X-12:BLOCKED—OWNER |
 | Monitoring | X-13:BLOCKED—OWNER |
 | Support procedures | X-07:BLOCKED—OWNER |
-| Security review | X-15:NOT STARTED, V-07:NOT STARTED |
+| Security review | X-15:NOT STARTED, V-07:VERIFIED COMPLETE |
 | Production-origin a11y/perf testing | X-14:BLOCKED—EXTERNAL |
 <!-- scores:end -->
 
