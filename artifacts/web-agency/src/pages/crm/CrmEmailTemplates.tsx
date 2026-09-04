@@ -1,10 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2, Trash2, Mail, X } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface Template { id:number; name:string; type:string; subject:string; body:string; }
 
@@ -20,7 +18,6 @@ const DEFAULT_TEMPLATES = [
 const emptyForm = { name:"", type:"Other", subject:"", body:"" };
 
 export default function CrmEmailTemplates() {
-  const [, navigate] = useLocation();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -30,13 +27,12 @@ export default function CrmEmailTemplates() {
   const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const r = await fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    const r = await adminFetch("/api/crm/email-templates");
+    if (r.status === 401) return;
     const d = await r.json() as { templates: Template[] };
     setTemplates(d.templates || []);
     setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -47,15 +43,13 @@ export default function CrmEmailTemplates() {
     if (!form.name || !form.subject || !form.body) return;
     setSaving(true);
     if (editing) {
-      await fetch(`/api/crm/email-templates/${editing.id}`, {
+      await adminFetch(`/api/crm/email-templates/${editing.id}`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
     } else {
-      await fetch("/api/crm/email-templates", {
+      await adminFetch("/api/crm/email-templates", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
     }
@@ -64,16 +58,15 @@ export default function CrmEmailTemplates() {
 
   const deleteTemplate = async (id: number) => {
     if (!confirm("Delete this template?")) return;
-    await fetch(`/api/crm/email-templates/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
+    await adminFetch(`/api/crm/email-templates/${id}`, { method: "DELETE" });
     load();
   };
 
   const seedDefaults = async () => {
     setSeeding(true);
     for (const t of DEFAULT_TEMPLATES) {
-      await fetch("/api/crm/email-templates", {
+      await adminFetch("/api/crm/email-templates", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify(t),
       });
     }

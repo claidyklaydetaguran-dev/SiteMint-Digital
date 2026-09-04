@@ -8,15 +8,16 @@ import {
   AlertCircle, ChevronRight, Check, Plus, Clock, AlertTriangle, UserCheck,
   Home, Users, Megaphone, Share2, FolderOpen, BarChart2, Settings,
   Menu, LayoutGrid, CheckSquare, Inbox, CalendarDays, Globe,
-  GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon, FileText,
-  Image, Layers, Facebook, Instagram, Activity, Download,
-  ClipboardList, Briefcase, ListTodo, TrendingUp, Dna, Brain,
+  GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon,
+  Layers, Activity, Download,
+  ClipboardList, Briefcase, ListTodo, TrendingUp,
   BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft,
   ExternalLink, Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const tok = () => localStorage.getItem("adminToken") || "";
+import { adminFetch, adminLogout, getAdminToken } from "@/lib/adminFetch";
+import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CrmLead {
@@ -71,7 +72,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Command Center",     href: "/admin/crm/dashboard",        icon: LayoutGrid },
       { label: "My Day / Tasks",     href: "/admin/crm/tasks",            icon: CheckSquare },
       { label: "Calendar",           href: "/admin/crm/calendar",         icon: CalendarDays },
-      { label: "Discovery Portal",   href: "/admin/dashboard",            icon: Globe, exact: true },
     ],
   },
   {
@@ -104,8 +104,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Campaign Builder", href: "/admin/crm/campaign-builder", icon: Layers },
       { label: "Campaign Queue",   href: "/admin/crm/campaign-queue",   icon: Activity },
       { label: "Email Templates",  href: "/admin/crm/email-templates", icon: MailIcon },
-      { label: "Content Hub",      icon: FileText, comingSoon: true },
-      { label: "Landing Pages",    icon: Image,    comingSoon: true },
     ],
   },
   {
@@ -113,9 +111,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Social",
     icon: Share2,
     items: [
-      { label: "Facebook Leads",    icon: Facebook,  comingSoon: true },
-      { label: "Instagram Leads",   icon: Instagram, comingSoon: true },
-      { label: "Meta Diagnostics",  icon: Brain,     comingSoon: true },
       { label: "Import Contacts",   href: "/admin/crm/import", icon: Download },
     ],
   },
@@ -125,9 +120,21 @@ const NAV_GROUPS: NavGroup[] = [
     icon: FolderOpen,
     items: [
       { label: "Discovery CRM",  href: "/admin/crm/discovery",    icon: ClipboardList },
+      { label: "Discovery Portal", href: "/admin/dashboard",      icon: Globe, exact: true },
       { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
       { label: "AI Intake Scoring",      href: "/admin/crm/intake-cases",          icon: BotMessageSquare },
       { label: "Receptionist Accounts",  href: "/admin/crm/receptionist-accounts", icon: Building2 },
+    ],
+  },
+  {
+    id: "receptionist-ops",
+    label: "Receptionist Ops",
+    icon: PhoneCall,
+    items: [
+      { label: "Firms",   href: "/admin/ops/firms",   icon: Building2 },
+      { label: "Issues",  href: "/admin/ops/issues",  icon: AlertTriangle },
+      { label: "Usage",   href: "/admin/ops/usage",   icon: Activity },
+      { label: "Numbers", href: "/admin/ops/numbers", icon: PhoneCall },
     ],
   },
   {
@@ -136,8 +143,6 @@ const NAV_GROUPS: NavGroup[] = [
     icon: BarChart2,
     items: [
       { label: "Reporting",                href: "/admin/crm/reporting", icon: TrendingUp },
-      { label: "Lead DNA",                 href: "/admin/crm/leads", icon: Dna },
-      { label: "Relationship Intelligence",icon: Users,          comingSoon: true },
       { label: "Behavioral Intelligence",  href: "/admin/crm/intelligence/behavioral", icon: BotMessageSquare },
       { label: "Automation Queue",         href: "/admin/crm/intelligence/automation-queue", icon: Cpu },
     ],
@@ -168,6 +173,73 @@ function detectGroup(location: string): string {
   return match?.groupId ?? "home";
 }
 
+// ── Breadcrumbs ─────────────────────────────────────────────────────────────
+// Derived from NAV_GROUPS (group → item) plus any route segments beyond the
+// matched nav item's href (e.g. a dynamic :id) — no separately maintained
+// breadcrumb map to drift out of sync with the nav.
+function humanizeSegment(seg: string): string {
+  const decoded = decodeURIComponent(seg);
+  if (/^\d+$/.test(decoded)) return `#${decoded}`;
+  return decoded.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function CrmBreadcrumbs({ location }: { location: string }) {
+  const match = GROUP_LOOKUP.find(({ href, exact }) =>
+    exact ? location === href : location.startsWith(href));
+  if (!match) return null;
+  const group = NAV_GROUPS.find(g => g.id === match.groupId);
+  const item = group?.items.find(i => i.href === match.href);
+  if (!group || !item) return null;
+
+  const rest = location.slice(match.href.length).split("/").filter(Boolean);
+  const crumbs: { label: string; href?: string }[] = [
+    { label: group.label },
+    { label: item.label, href: item.href },
+    ...rest.map(seg => ({ label: humanizeSegment(seg) })),
+  ];
+
+  return (
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 px-4 md:px-6 pt-3 pb-1 text-xs text-muted-foreground overflow-x-auto">
+      {crumbs.map((c, i) => (
+        <span key={i} className="flex items-center gap-1.5 shrink-0">
+          {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />}
+          {c.href ? (
+            <Link href={c.href}>
+              <span className="hover:text-foreground transition-colors cursor-pointer">{c.label}</span>
+            </Link>
+          ) : (
+            <span className={i === crumbs.length - 1 ? "text-foreground font-medium" : ""}>{c.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+// ── 404 within the CRM chrome ────────────────────────────────────────────────
+// Used by the `/admin*` catch-all route so an unmatched deep link still shows
+// the sidebar/breadcrumbs instead of the bare public 404 card.
+export function CrmNotFound() {
+  return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
+        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+          <AlertCircle className="w-6 h-6 text-gray-400" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground">Page not found</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          That page doesn't exist or may have moved.
+        </p>
+        <Link href="/admin/crm/dashboard">
+          <span className="mt-2 inline-block text-sm font-medium text-primary hover:underline cursor-pointer">
+            Back to Command Center
+          </span>
+        </Link>
+      </div>
+    </CrmLayout>
+  );
+}
+
 // ── Email Compose Modal ────────────────────────────────────────────────────────
 function EmailComposeModal({ leads, templates, onClose }: {
   leads: CrmLead[]; templates: Template[]; onClose: () => void;
@@ -187,8 +259,8 @@ function EmailComposeModal({ leads, templates, onClose }: {
 
   const toResults = toSearch.length > 0 && !toLead
     ? leads.filter(l =>
-        l.name.toLowerCase().includes(toSearch.toLowerCase()) ||
-        l.email.toLowerCase().includes(toSearch.toLowerCase()) ||
+        (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) ||
+        (l.email ?? "").toLowerCase().includes(toSearch.toLowerCase()) ||
         (l.phone || "").includes(toSearch)
       ).slice(0, 6)
     : [];
@@ -205,9 +277,8 @@ function EmailComposeModal({ leads, templates, onClose }: {
     if (!body.trim()) { setError("Body is required."); return; }
     setError("");
     setSending(true);
-    const r = await fetch(`/api/crm/leads/${toLead.id}/email`, {
+    const r = await adminFetch(`/api/crm/leads/${toLead.id}/email`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ subject, body, cc, bcc }),
     });
     setSending(false);
@@ -343,7 +414,7 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
   }, [onClose]);
 
   const results = q.length > 0
-    ? leads.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
+    ? leads.filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
     : leads.filter(l => l.phone).slice(0, 6);
 
   return (
@@ -389,14 +460,14 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/crm/phone/status", { headers: { Authorization: `Bearer ${tok()}` } })
+    adminFetch("/api/crm/phone/status")
       .then(r => r.json())
       .then(d => setConfigured((d as { configured: boolean }).configured))
       .catch(() => setConfigured(false));
   }, []);
 
   const toResults = toSearch.length > 0 && !toLead
-    ? leads.filter(l => l.name.toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
+    ? leads.filter(l => (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
     : [];
 
   const send = async () => {
@@ -404,9 +475,8 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
     if (!body.trim()) { setError("Message body is required."); return; }
     setError("");
     setSending(true);
-    const r = await fetch(`/api/crm/leads/${toLead.id}/sms`, {
+    const r = await adminFetch(`/api/crm/leads/${toLead.id}/sms`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ body: body.trim() }),
     });
     setSending(false);
@@ -519,16 +589,16 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
 function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClose: () => void; onCreated: () => void }) {
   const [step, setStep] = useState<"search" | "form">("search");
   const [q, setQ] = useState("");
-  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New", priority:"Medium", assignedTo:"", notes:"" });
+  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedTo:"", notes:"" });
   const [saving, setSaving] = useState(false);
   const [dupWarning, setDupWarning] = useState("");
 
   const searchResults = q.length > 1
-    ? leads.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || l.email.toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
+    ? leads.filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.email ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
     : [];
 
   const checkDup = (email: string, phone: string) => {
-    const byEmail = email && leads.find(l => l.email.toLowerCase() === email.toLowerCase());
+    const byEmail = email && leads.find(l => (l.email ?? "").toLowerCase() === email.toLowerCase());
     const byPhone = phone && leads.find(l => l.phone === phone);
     if (byEmail) setDupWarning(`Duplicate: ${byEmail.name} has this email.`);
     else if (byPhone) setDupWarning(`Duplicate: ${byPhone.name} has this phone.`);
@@ -538,9 +608,8 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
   const save = async () => {
     if (!form.name || !form.email) return;
     setSaving(true);
-    const r = await fetch("/api/crm/leads", {
+    const r = await adminFetch("/api/crm/leads", {
       method: "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     setSaving(false);
@@ -616,7 +685,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
                 <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
                   value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-                  {["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"].map(s => <option key={s}>{s}</option>)}
+                  {LEAD_STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div>
@@ -715,12 +784,6 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
 }
 
 // ── Global Search ──────────────────────────────────────────────────────────────
-const STATUS_BADGE: Record<string, string> = {
-  New:"bg-blue-100 text-blue-700", Contacted:"bg-sky-100 text-sky-700",
-  "Follow-up":"bg-yellow-100 text-yellow-700", "Proposal Sent":"bg-orange-100 text-orange-700",
-  Negotiating:"bg-purple-100 text-purple-700", Won:"bg-green-100 text-green-700",
-  Lost:"bg-red-100 text-red-700", Nurture:"bg-gray-100 text-gray-600",
-};
 const PRIORITY_BADGE: Record<string, string> = { High:"bg-red-50 text-red-600", Low:"bg-gray-100 text-gray-500" };
 
 function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: () => void; onNavigate: (href: string) => void }) {
@@ -740,7 +803,7 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
     if (q.length < 2) { setResults([]); setLoading(false); setFetchError(false); return; }
     setLoading(true); setFetchError(false); setSelIdx(0);
     const ctrl = new AbortController();
-    fetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${tok()}` }, signal: ctrl.signal })
+    adminFetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, { signal: ctrl.signal })
       .then(r => { if (!r.ok) throw new Error("api"); return r.json() as Promise<{ leads: CrmLead[] }>; })
       .then(d => { setResults((d.leads || []).slice(0, 8)); setLoading(false); })
       .catch(err => { if ((err as Error).name !== "AbortError") { setFetchError(true); setLoading(false); } });
@@ -783,7 +846,7 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
                 <p className="text-xs text-muted-foreground truncate">{l.company ? `${l.company} · ` : ""}{l.email || l.phone || ""}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {l.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_BADGE[l.status] ?? "bg-gray-100 text-gray-600"}`}>{l.status}</span>}
+                {l.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${LEAD_STATUS_STYLES[normalizeLeadStatus(l.status)]?.pill ?? "bg-gray-100 text-gray-600"}`}>{normalizeLeadStatus(l.status)}</span>}
                 {l.priority && l.priority !== "Medium" && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[l.priority] ?? "bg-gray-100 text-gray-500"}`}>{l.priority}</span>}
               </div>
             </button>
@@ -844,7 +907,7 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden py-3 space-y-0.5">
+    <div data-testid="crm-sidebar-nav" className="flex flex-col h-full overflow-x-hidden py-3 space-y-0.5">
       {/* Workspace label */}
       <div className="px-4 pb-3 mb-1 border-b border-white/8">
         <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider">SiteMint Digital</p>
@@ -905,6 +968,8 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   const profileRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   // Auto-detect and expand the active group, plus remember collapsed groups
   const activeGroupId = detectGroup(location);
@@ -967,7 +1032,7 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             href: `/admin/crm/leads/${l.id}`, urgent: false });
         }
       }
-      if (l.status === "New" && l.createdAt && new Date(l.createdAt) > yesterday) {
+      if (normalizeLeadStatus(l.status) === "New Inquiry" && l.createdAt && new Date(l.createdAt) > yesterday) {
         notifs.push({ id: `new-lead-${l.id}`, type: "new_lead", title: `New lead: ${l.name}`,
           sub: `${l.source || "Uncontacted"}${l.company ? ` · ${l.company}` : ""}`,
           href: `/admin/crm/leads/${l.id}`, urgent: false });
@@ -978,12 +1043,11 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadLeads = useCallback(() => {
-    const t = tok();
-    if (!t) return;
+    if (!getAdminToken()) return;
     Promise.all([
-      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
-      fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
-      fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
+      adminFetch("/api/crm/leads").then(r => r.json()),
+      adminFetch("/api/crm/tasks").then(r => r.json()),
+      adminFetch("/api/crm/email-templates").then(r => r.json()),
     ]).then(([ld, td, tmpl]) => {
       const leads: CrmLead[] = ld.leads || [];
       const tasks: NavTask[] = td.tasks || [];
@@ -1011,18 +1075,46 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [modal]);
 
-  // Close mobile menu on ESC
+  // Mobile drawer: close on Escape, and trap Tab focus inside it while open
+  // (M-3) — restore focus to the hamburger trigger on close.
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileMenuOpen(false); };
+    const h = (e: KeyboardEvent) => {
+      if (!mobileMenuOpen) return;
+      if (e.key === "Escape") { setMobileMenuOpen(false); return; }
+      if (e.key !== "Tab" || !drawerRef.current) return;
+      const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
-  }, []);
+  }, [mobileMenuOpen]);
 
-  const logout = () => { localStorage.removeItem("adminToken"); navigate("/admin"); };
+  const drawerWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      drawerRef.current?.focus();
+      drawerWasOpenRef.current = true;
+    } else if (drawerWasOpenRef.current) {
+      drawerWasOpenRef.current = false;
+      menuBtnRef.current?.focus();
+    }
+  }, [mobileMenuOpen]);
+
+  const logout = () => { adminLogout().finally(() => navigate("/admin")); };
 
   const SIDEBAR_W = sidebarExpanded ? "w-60" : "w-0";
 
   return (
+    <AdminRouteGuard>
     <div className="h-screen flex flex-col overflow-hidden bg-crm-content">
 
       {/* ── Modals ── */}
@@ -1034,7 +1126,8 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
       <header className="h-11 bg-crm-header flex items-center gap-2 px-3 shrink-0 z-50 relative">
 
         {/* Mobile hamburger */}
-        <button onClick={() => setMobileMenuOpen(o => !o)}
+        <button ref={menuBtnRef} onClick={() => setMobileMenuOpen(o => !o)}
+          aria-expanded={mobileMenuOpen} aria-label="Open menu"
           className="lg:hidden w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition-colors shrink-0">
           <Menu className="w-4 h-4" />
         </button>
@@ -1160,7 +1253,8 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
             {/* Drawer */}
-            <div className="relative w-72 max-w-[85vw] bg-crm-sidebar h-full flex flex-col z-10 shadow-2xl">
+            <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Navigation menu"
+              className="relative w-72 max-w-[85vw] bg-crm-sidebar h-full flex flex-col z-10 shadow-2xl outline-none">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                 <SiteMintLogo variant="light" iconSize={18} />
                 <button onClick={() => setMobileMenuOpen(false)} className="text-white/50 hover:text-white transition-colors">
@@ -1181,11 +1275,13 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main content ── */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
+          <CrmBreadcrumbs location={location} />
           <CrmErrorBoundary>
             {children}
           </CrmErrorBoundary>
         </main>
       </div>
     </div>
+    </AdminRouteGuard>
   );
 }

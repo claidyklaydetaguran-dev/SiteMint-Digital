@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,8 +6,7 @@ import {
   TestTube, Phone, CheckCircle, XCircle, Copy, RefreshCw,
   Search, Sparkles, Activity,
 } from "lucide-react";
-
-const tok = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface AuditRow {
   id: number;
@@ -48,7 +46,6 @@ interface PhoneStatus {
 type HStatus = "healthy" | "warning" | "action";
 
 export default function CrmSettings() {
-  const [, navigate] = useLocation();
   const [testMode, setTestMode] = useState(true);
   const [saved, setSaved] = useState(false);
   const [phoneStatus, setPhoneStatus] = useState<PhoneStatus | null>(null);
@@ -72,15 +69,11 @@ export default function CrmSettings() {
   const loadPhoneStatus = useCallback(async () => {
     setLoadingPhone(true);
     try {
-      const r = await fetch("/api/crm/phone/status", { headers: { Authorization: `Bearer ${tok()}` } });
+      const r = await adminFetch("/api/crm/phone/status");
       if (r.ok) setPhoneStatus(await r.json() as PhoneStatus);
     } catch { /* ignore */ }
     setLoadingPhone(false);
   }, []);
-
-  useEffect(() => {
-    if (!tok()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-  }, [navigate]);
 
   useEffect(() => { loadPhoneStatus(); runAudit(); }, [loadPhoneStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -89,9 +82,8 @@ export default function CrmSettings() {
     setTestSmsSending(true);
     setTestSmsResult(null);
     try {
-      const r = await fetch("/api/crm/phone/test-sms", {
+      const r = await adminFetch("/api/crm/phone/test-sms", {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ to: testSmsTo.trim() }),
       });
       const d = await r.json() as { success?: boolean; error?: string; sid?: string };
@@ -112,9 +104,7 @@ export default function CrmSettings() {
     setNormalizeResult(null);
     setSelectedIds(new Set());
     try {
-      const r = await fetch("/api/crm/phone/audit", {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch("/api/crm/phone/audit");
       if (!r.ok) throw new Error(await r.text());
       const d = await r.json() as { leads: AuditRow[] };
       setAuditRows(d.leads);
@@ -132,9 +122,8 @@ export default function CrmSettings() {
     if (!ids.length) return;
     setNormalizing(true);
     try {
-      const r = await fetch("/api/crm/phone/normalize", {
+      const r = await adminFetch("/api/crm/phone/normalize", {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ leadIds: ids }),
       });
       const d = await r.json() as NormalizeResult;

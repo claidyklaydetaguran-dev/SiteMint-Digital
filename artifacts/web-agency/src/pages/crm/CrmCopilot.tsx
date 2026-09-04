@@ -11,6 +11,7 @@ import {
   type SitemintPersona,
 } from "../../lib/campaignTaxonomy";
 import type { CampaignStep } from "./CrmCampaignSequence";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -45,9 +46,6 @@ export interface ParsedStep {
     topicId: string;
   };
 }
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 
 // ── Tone / channel / temperature options ──────────────────────────────────────
 
@@ -310,9 +308,8 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
         channels,
       });
 
-      const res = await fetch("/api/crm/campaigns/copilot/generate", {
-        method:  "POST",
-        headers: authH(),
+      const res = await adminFetch("/api/crm/campaigns/copilot/generate", {
+        method: "POST",
         body,
       });
 

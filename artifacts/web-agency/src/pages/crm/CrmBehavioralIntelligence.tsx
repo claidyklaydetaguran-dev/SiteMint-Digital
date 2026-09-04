@@ -10,7 +10,7 @@ import {
   BotMessageSquare, TrendingUp, TrendingDown, Flame, RefreshCw, ChevronRight,
 } from "lucide-react";
 
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface LeadLite {
   id: number;
@@ -112,9 +112,7 @@ export default function CrmBehavioralIntelligence() {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch("/api/crm/behavioral-events?limit=2000", {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const r = await adminFetch("/api/crm/behavioral-events?limit=2000");
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json() as { events: BehavioralEvent[]; leads: LeadLite[] };
 

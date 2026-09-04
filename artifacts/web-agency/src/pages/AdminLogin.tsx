@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
+import { setAdminToken } from "@/lib/adminFetch";
 
 export default function AdminLogin() {
   const [, navigate] = useLocation();
@@ -20,6 +21,7 @@ export default function AdminLogin() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ password }),
       });
       if (!res.ok) {
@@ -27,9 +29,12 @@ export default function AdminLogin() {
         return;
       }
       const { token } = await res.json() as { token: string };
-      localStorage.setItem("adminToken", token);
+      setAdminToken(token);
+      // O-7: Command Center is the single home — the Discovery Portal
+      // (/admin/dashboard) is now reachable from within the CRM instead of
+      // being the default post-login destination.
       const redirect = new URLSearchParams(window.location.search).get("redirect");
-      navigate(redirect && redirect.startsWith("/admin") ? redirect : "/admin/dashboard");
+      navigate(redirect && redirect.startsWith("/admin") ? redirect : "/admin/crm/dashboard");
     } catch {
       setError("Connection error. Make sure the server is running.");
     } finally {

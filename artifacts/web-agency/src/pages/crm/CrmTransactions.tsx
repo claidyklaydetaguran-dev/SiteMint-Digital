@@ -2,8 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { RefreshCw, AlertCircle, Receipt, Filter } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface Transaction {
   id: number;
@@ -55,18 +54,17 @@ export default function CrmTransactionsPage() {
   const [toDate, setToDate] = useState("");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
     setError("");
     try {
-      const dealsRes = await fetch("/api/crm/deals", { headers: { Authorization: `Bearer ${token()}` } });
-      if (dealsRes.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+      const dealsRes = await adminFetch("/api/crm/deals");
+      if (dealsRes.status === 401) return;
       const dealsData = await dealsRes.json() as { deals: Deal[] };
       const dealList = dealsData.deals || [];
       setDeals(dealList);
 
       const all = await Promise.all(dealList.map(async d => {
-        const r = await fetch(`/api/crm/deals/${d.id}/transactions`, { headers: { Authorization: `Bearer ${token()}` } });
+        const r = await adminFetch(`/api/crm/deals/${d.id}/transactions`);
         if (!r.ok) return [] as Transaction[];
         const data = await r.json() as { transactions: Transaction[] };
         return data.transactions || [];
@@ -78,7 +76,7 @@ export default function CrmTransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 

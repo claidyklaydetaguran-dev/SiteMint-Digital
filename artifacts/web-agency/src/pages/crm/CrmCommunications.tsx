@@ -6,8 +6,9 @@ import {
   MessageSquare, Mail, Phone, Send, RefreshCw, AlertCircle, CheckCircle2,
   Plus, Edit2, Trash2, FileText, X, Search, ExternalLink, Clock, Inbox,
 } from "lucide-react";
+import { adminFetch } from "@/lib/adminFetch";
+import { normalizeLeadStatus } from "@/lib/crmTaxonomy";
 
-const tok = () => localStorage.getItem("adminToken") || "";
 const POLL_MS = 30_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -147,9 +148,7 @@ export default function CrmCommunications() {
   const loadMessages = useCallback(async (leadId: number) => {
     setLoadingMsgs(true);
     try {
-      const r = await fetch(`/api/crm/leads/${leadId}/messages`, {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch(`/api/crm/leads/${leadId}/messages`);
       if (r.ok) {
         const d = await r.json() as { messages: Msg[] };
         setMessages((d.messages || []).slice().reverse());
@@ -159,9 +158,7 @@ export default function CrmCommunications() {
   }, [scrollToBottom]);
 
   const loadFullLead = useCallback(async (leadId: number) => {
-    const r = await fetch(`/api/crm/leads/${leadId}`, {
-      headers: { Authorization: `Bearer ${tok()}` },
-    });
+    const r = await adminFetch(`/api/crm/leads/${leadId}`);
     if (r.ok) {
       const d = await r.json() as { lead: FullLead };
       setSelectedLead(d.lead ?? null);
@@ -169,11 +166,10 @@ export default function CrmCommunications() {
   }, []);
 
   const loadThreads = useCallback(async (initial = false) => {
-    if (!tok()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     if (initial) setConvLoading(true);
     try {
-      const r = await fetch("/api/crm/conversations", { headers: { Authorization: `Bearer ${tok()}` } });
-      if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+      const r = await adminFetch("/api/crm/conversations");
+      if (r.status === 401) return;
       if (!r.ok) return;
       const d = await r.json() as { conversations: Thread[] };
       const convs = d.conversations || [];
@@ -195,13 +191,13 @@ export default function CrmCommunications() {
         }
       }
     } finally { if (initial) setConvLoading(false); }
-  }, [navigate, scrollToBottom, loadMessages, loadFullLead]);
+  }, [scrollToBottom, loadMessages, loadFullLead]);
 
   const silentRefresh = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true);
     setPollError("");
     try {
-      const r = await fetch("/api/crm/conversations", { headers: { Authorization: `Bearer ${tok()}` } });
+      const r = await adminFetch("/api/crm/conversations");
       if (!r.ok) throw new Error("fetch failed");
       const d = await r.json() as { conversations: Thread[] };
       const convs = d.conversations || [];
@@ -216,7 +212,7 @@ export default function CrmCommunications() {
       setLastUpdated(new Date());
       const selId = selectedRef.current?.leadId;
       if (selId != null && updatedIds.includes(selId)) {
-        const r2 = await fetch(`/api/crm/leads/${selId}/messages`, { headers: { Authorization: `Bearer ${tok()}` } });
+        const r2 = await adminFetch(`/api/crm/leads/${selId}/messages`);
         if (r2.ok) {
           const d2 = await r2.json() as { messages: Msg[] };
           setMessages((d2.messages || []).slice().reverse());
@@ -258,9 +254,8 @@ export default function CrmCommunications() {
     if (!selected?.leadId || !smsBody.trim()) return;
     setSending(true); setSmsError("");
     try {
-      const r = await fetch(`/api/crm/leads/${selected.leadId}/sms`, {
+      const r = await adminFetch(`/api/crm/leads/${selected.leadId}/sms`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body: smsBody.trim() }),
       });
       const data = await r.json() as { error?: string };
@@ -280,9 +275,7 @@ export default function CrmCommunications() {
   const loadEmails = useCallback(async () => {
     setEmailLoading(true);
     try {
-      const r = await fetch("/api/crm/communications/email-activity", {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch("/api/crm/communications/email-activity");
       if (r.ok) {
         const d = await r.json() as { emails: EmailActivity[] };
         setEmails(d.emails || []);
@@ -294,9 +287,9 @@ export default function CrmCommunications() {
 
   const filteredEmails = emails.filter(e =>
     !emailSearch ||
-    e.leadName.toLowerCase().includes(emailSearch.toLowerCase()) ||
-    e.leadEmail.toLowerCase().includes(emailSearch.toLowerCase()) ||
-    e.subject.toLowerCase().includes(emailSearch.toLowerCase())
+    (e.leadName ?? "").toLowerCase().includes(emailSearch.toLowerCase()) ||
+    (e.leadEmail ?? "").toLowerCase().includes(emailSearch.toLowerCase()) ||
+    (e.subject ?? "").toLowerCase().includes(emailSearch.toLowerCase())
   );
 
   // ── Templates logic ───────────────────────────────────────────────────────
@@ -304,7 +297,7 @@ export default function CrmCommunications() {
   const loadTemplates = useCallback(async () => {
     setTemplatesLoading(true);
     try {
-      const r = await fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${tok()}` } });
+      const r = await adminFetch("/api/crm/email-templates");
       if (r.ok) { const d = await r.json() as { templates: Template[] }; setTemplates(d.templates || []); }
     } finally { setTemplatesLoading(false); }
   }, []);
@@ -318,9 +311,8 @@ export default function CrmCommunications() {
     if (!tplForm.name || !tplForm.subject || !tplForm.body) return;
     setSavingTpl(true);
     const url = editingTpl ? `/api/crm/email-templates/${editingTpl.id}` : "/api/crm/email-templates";
-    await fetch(url, {
+    await adminFetch(url, {
       method: editingTpl ? "PUT" : "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
       body: JSON.stringify(tplForm),
     });
     setSavingTpl(false); setShowForm(false); setEditingTpl(null); setTplForm(EMPTY_FORM);
@@ -329,16 +321,15 @@ export default function CrmCommunications() {
 
   const deleteTemplate = async (id: number) => {
     if (!confirm("Delete this template?")) return;
-    await fetch(`/api/crm/email-templates/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${tok()}` } });
+    await adminFetch(`/api/crm/email-templates/${id}`, { method: "DELETE" });
     loadTemplates();
   };
 
   const seedTemplates = async () => {
     setSeeding(true);
     for (const t of DEFAULT_TEMPLATES) {
-      await fetch("/api/crm/email-templates", {
+      await adminFetch("/api/crm/email-templates", {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify(t),
       });
     }
@@ -636,10 +627,10 @@ export default function CrmCommunications() {
                       <p className="text-xs text-muted-foreground">{selectedLead.company}</p>
                     )}
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      selectedLead.status === "Won" ? "bg-green-100 text-green-700"
-                      : selectedLead.status === "Lost" ? "bg-red-100 text-red-700"
+                      normalizeLeadStatus(selectedLead.status) === "Won" ? "bg-green-100 text-green-700"
+                      : normalizeLeadStatus(selectedLead.status) === "Lost" ? "bg-red-100 text-red-700"
                       : "bg-blue-100 text-blue-700"
-                    }`}>{selectedLead.status}</span>
+                    }`}>{normalizeLeadStatus(selectedLead.status)}</span>
                   </div>
                   <div className="space-y-2">
                     {selectedLead.email && (
@@ -661,9 +652,9 @@ export default function CrmCommunications() {
                       </div>
                     )}
                   </div>
-                  {selectedLead.tags.length > 0 && (
+                  {(selectedLead.tags ?? []).length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {selectedLead.tags.map((tag, i) => (
+                      {(selectedLead.tags ?? []).map((tag, i) => (
                         <span key={`${tag}-${i}`} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full">{tag}</span>
                       ))}
                     </div>

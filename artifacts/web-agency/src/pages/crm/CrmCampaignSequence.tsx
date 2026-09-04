@@ -14,9 +14,7 @@ import {
   type SitemintCampaignBlueprint,
 } from "../../lib/campaignTaxonomy";
 import { CrmCopilot, type ParsedStep } from "./CrmCopilot";
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Step Intelligence (embedded metadata) ─────────────────────────────────────
 // crm_campaign_steps has no metadata column, so per-step strategy metadata is
@@ -433,9 +431,8 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
       const method = existing ? "PATCH" : "POST";
       // Step Intelligence is embedded back into the body (no metadata column).
       const mergedBody = serializeStepBody(body, intel);
-      const r = await fetch(url, {
+      const r = await adminFetch(url, {
         method,
-        headers: authH(),
         body: JSON.stringify({
           stepNumber, dayOffset, channel, subject: subject || null,
           body: mergedBody || null,
@@ -730,7 +727,7 @@ function LeadPicker({
   const [result,   setResult]   = useState<{ enrolled: number; scheduled: number } | null>(null);
 
   useEffect(() => {
-    fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${tok()}` } })
+    adminFetch("/api/crm/leads")
       .then(r => r.json())
       .then(d => setLeads((d.leads ?? []).filter((l: Lead) => l.email && !l.email.includes("@imported.local"))))
       .catch(() => setError("Failed to load leads"))
@@ -747,9 +744,8 @@ function LeadPicker({
     setError("");
     setEnrolling(true);
     try {
-      const r = await fetch(`/api/crm/campaigns/${campaignId}/enroll`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/enroll`, {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({ leadIds: Array.from(selected) }),
       });
       const d = await r.json();
@@ -1010,10 +1006,9 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const load = useCallback(async () => {
     setError("");
     try {
-      const h = { Authorization: `Bearer ${tok()}` };
       const [sr, cr] = await Promise.all([
-        fetch(`/api/crm/campaigns/${campaignId}/steps`, { headers: h }).then(r => r.json()),
-        fetch(`/api/crm/campaigns/${campaignId}`,       { headers: h }).then(r => r.json()).catch(() => null),
+        adminFetch(`/api/crm/campaigns/${campaignId}/steps`).then(r => r.json()),
+        adminFetch(`/api/crm/campaigns/${campaignId}`).then(r => r.json()).catch(() => null),
       ]);
       const camp = cr?.campaign ?? cr ?? null;
       if (camp) {
@@ -1054,9 +1049,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   };
 
   const deleteStep = async (id: number) => {
-    await fetch(`/api/crm/campaigns/${campaignId}/steps/${id}`, {
+    await adminFetch(`/api/crm/campaigns/${campaignId}/steps/${id}`, {
       method: "DELETE",
-      headers: authH(),
     });
     setSteps(prev => prev.filter(s => s.id !== id));
   };
@@ -1076,9 +1070,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
       // Clear existing steps first when safely replacing.
       if (doReplace && steps.length > 0) {
         for (const s of steps) {
-          await fetch(`/api/crm/campaigns/${campaignId}/steps/${s.id}`, {
+          await adminFetch(`/api/crm/campaigns/${campaignId}/steps/${s.id}`, {
             method: "DELETE",
-            headers: authH(),
           });
         }
         setSteps([]);
@@ -1088,9 +1081,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
       const created: CampaignStep[] = [];
       let failed = false;
       for (const p of payloads) {
-        const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+        const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps`, {
           method: "POST",
-          headers: authH(),
           body: JSON.stringify(p),
         });
         const d = await r.json();
@@ -1129,9 +1121,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     try {
       const blueprint = getBlueprintById(selectedBlueprintId);
       const persona = blueprint ? getPersonaById(blueprint.personaId) : null;
-      const res = await fetch("/api/crm/campaigns/ai-generate", {
+      const res = await adminFetch("/api/crm/campaigns/ai-generate", {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({
           mode: "sequence",
           personaId: persona?.id,
@@ -1167,9 +1158,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
       for (let i = 0; i < aiPreview.length; i++) {
         const s = aiPreview[i];
         const bodyWithIntel = s.intentLabel ? `${s.body}\n\n${INTEL_MARKER}\nObjective: ${s.intentLabel}` : s.body;
-        const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+        const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps`, {
           method: "POST",
-          headers: authH(),
           body: JSON.stringify({
             stepNumber: startNum + i,
             dayOffset: s.dayOffset,
@@ -1220,9 +1210,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     let failed = false;
     for (const p of parsed) {
       const mergedBody = serializeIntel(p.body, p.intel);
-      const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps`, {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({
           stepNumber:      p.stepNumber,
           dayOffset:       p.dayOffset,
@@ -1250,9 +1239,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const updateEnrollmentStatus = async (rid: number, enrollmentStatus: string) => {
     setUpdatingRid(rid);
     try {
-      await fetch(`/api/crm/campaigns/${campaignId}/recipients/${rid}/status`, {
+      await adminFetch(`/api/crm/campaigns/${campaignId}/recipients/${rid}/status`, {
         method: "PATCH",
-        headers: authH(),
         body: JSON.stringify({ enrollmentStatus }),
       });
       setRecipients(prev =>

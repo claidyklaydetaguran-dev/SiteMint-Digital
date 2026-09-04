@@ -1,10 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Plus, X, Trash2, Edit2, Check, DollarSign, Calendar, User, CreditCard, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 const TXN_METHODS = [
   { value: "manual_cash", label: "Cash" },
@@ -113,7 +111,6 @@ function DealCard({ deal, onDragStart, onDelete, onEdit }: {
 }
 
 export default function CrmDealsPage() {
-  const [, navigate] = useLocation();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +139,7 @@ export default function CrmDealsPage() {
   const loadTxns = useCallback(async (dealId: number) => {
     setTxnsLoading(true);
     try {
-      const r = await fetch(`/api/crm/deals/${dealId}/transactions`, { headers: { Authorization: `Bearer ${token()}` } });
+      const r = await adminFetch(`/api/crm/deals/${dealId}/transactions`);
       const d = await r.json() as { transactions: Transaction[] };
       setTxns(d.transactions || []);
     } finally {
@@ -158,9 +155,8 @@ export default function CrmDealsPage() {
     setPaySaving(true);
     setPayError("");
     try {
-      const res = await fetch(`/api/crm/deals/${editDeal.id}/transactions/manual`, {
+      const res = await adminFetch(`/api/crm/deals/${editDeal.id}/transactions/manual`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: payAmount, method: payMethod,
           receivedAt: payReceivedAt || undefined,
@@ -182,9 +178,8 @@ export default function CrmDealsPage() {
     setStripeLoading(true);
     setPayError("");
     try {
-      const res = await fetch(`/api/crm/deals/${editDeal.id}/transactions/stripe-checkout`, {
+      const res = await adminFetch(`/api/crm/deals/${editDeal.id}/transactions/stripe-checkout`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
       const d = await res.json().catch(() => ({})) as { error?: string; url?: string; transaction?: Transaction };
@@ -205,19 +200,18 @@ export default function CrmDealsPage() {
   };
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
     const [dealsRes, leadsRes] = await Promise.all([
-      fetch("/api/crm/deals", { headers: { Authorization: `Bearer ${token()}` } }),
-      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }),
+      adminFetch("/api/crm/deals"),
+      adminFetch("/api/crm/leads"),
     ]);
-    if (dealsRes.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    if (dealsRes.status === 401) return;
     const dealsData = await dealsRes.json() as { deals: Deal[] };
     const leadsData = await leadsRes.json() as { leads: Lead[] };
     setDeals(dealsData.deals || []);
     setLeads(leadsData.leads || []);
     setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -263,14 +257,12 @@ export default function CrmDealsPage() {
         leadId: form.leadId ? Number(form.leadId) : null,
       };
       const res = editDeal
-        ? await fetch(`/api/crm/deals/${editDeal.id}`, {
+        ? await adminFetch(`/api/crm/deals/${editDeal.id}`, {
             method: "PATCH",
-            headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
             body: JSON.stringify(body),
           })
-        : await fetch("/api/crm/deals", {
+        : await adminFetch("/api/crm/deals", {
             method: "POST",
-            headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
       if (!res.ok) {
@@ -290,9 +282,8 @@ export default function CrmDealsPage() {
 
   const deleteDeal = async (id: number) => {
     if (!confirm("Delete this deal?")) return;
-    await fetch(`/api/crm/deals/${id}`, {
+    await adminFetch(`/api/crm/deals/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token()}` },
     });
     setDeals(d => d.filter(x => x.id !== id));
   };
@@ -304,9 +295,8 @@ export default function CrmDealsPage() {
     setDeals(prev => prev.map(d => d.id === dragId ? { ...d, stage: targetStage } : d));
     setDragId(null);
     setDragOverStage(null);
-    await fetch(`/api/crm/deals/${dragId}`, {
+    await adminFetch(`/api/crm/deals/${dragId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ stage: targetStage }),
     }).catch(() => load());
   };

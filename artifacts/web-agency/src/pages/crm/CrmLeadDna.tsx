@@ -12,7 +12,7 @@ import {
   ArrowLeft, Dna, Heart, MessageCircle, TrendingUp, TrendingDown, Flame,
 } from "lucide-react";
 
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 // Same threshold used by the org-wide Behavioral Intelligence dashboard —
 // do not redefine a second "hot spike" concept here.
@@ -53,10 +53,9 @@ export default function CrmLeadDna() {
       setLoading(true);
       setError(null);
       try {
-        const h = { Authorization: `Bearer ${token()}` };
         const [leadRes, evRes] = await Promise.all([
-          fetch(`/api/crm/leads/${params.id}`, { headers: h }),
-          fetch(`/api/crm/leads/${params.id}/behavioral-events`, { headers: h }),
+          adminFetch(`/api/crm/leads/${params.id}`),
+          adminFetch(`/api/crm/leads/${params.id}/behavioral-events`),
         ]);
         if (!leadRes.ok) throw new Error(`HTTP ${leadRes.status}`);
         const leadData = await leadRes.json() as { lead: Lead; activities: Activity[] };

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface Task {
   id: number; leadId: number; type: string; title: string;
@@ -27,7 +26,6 @@ const TYPE_COLORS: Record<string, string> = {
 interface CalEvent { id: string; date: string; title: string; type: string; leadId?: number; leadName?: string; }
 
 export default function CrmCalendar() {
-  const [, navigate] = useLocation();
   const [today] = useState(new Date());
   const [current, setCurrent] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
@@ -36,10 +34,9 @@ export default function CrmCalendar() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     Promise.all([
-      fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),
-      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),
+      adminFetch("/api/crm/tasks").then(r => r.json()),
+      adminFetch("/api/crm/leads").then(r => r.json()),
     ]).then(([td, ld]) => {
       const evts: CalEvent[] = [];
       (td.tasks || []).forEach((t: Task) => {
@@ -68,7 +65,7 @@ export default function CrmCalendar() {
       });
       setEvents(evts);
     }).finally(() => setLoading(false));
-  }, [navigate]);
+  }, []);
 
   const year = current.getFullYear();
   const month = current.getMonth();

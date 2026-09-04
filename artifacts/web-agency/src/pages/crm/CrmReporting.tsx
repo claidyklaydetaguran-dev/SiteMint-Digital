@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,8 +8,8 @@ import {
   Users, DollarSign, TrendingUp, Target, Zap, MessageSquare, Phone,
   CheckSquare, Award, Lightbulb, AlertTriangle, BarChart2, RefreshCw,
 } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -163,7 +162,6 @@ const RANGE_OPTIONS = [
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CrmReporting() {
-  const [, navigate] = useLocation();
   const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
   const [dealStats, setDealStats] = useState<DealStats | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -175,21 +173,16 @@ export default function CrmReporting() {
   const [range, setRange] = useState<"7d" | "30d" | "90d" | "all">("all");
 
   const load = useCallback(async () => {
-    if (!token()) {
-      navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`);
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const h = { Authorization: `Bearer ${token()}` };
       const [statsRes, dealRes, leadsRes, pipeRes, tasksRes, convsRes] = await Promise.allSettled([
-        fetch("/api/crm/stats", { headers: h }),
-        fetch("/api/crm/deals/stats", { headers: h }),
-        fetch("/api/crm/leads", { headers: h }),
-        fetch("/api/crm/pipeline", { headers: h }),
-        fetch("/api/crm/tasks", { headers: h }),
-        fetch("/api/crm/conversations", { headers: h }),
+        adminFetch("/api/crm/stats"),
+        adminFetch("/api/crm/deals/stats"),
+        adminFetch("/api/crm/leads"),
+        adminFetch("/api/crm/pipeline"),
+        adminFetch("/api/crm/tasks"),
+        adminFetch("/api/crm/conversations"),
       ]);
 
       if (statsRes.status === "fulfilled" && statsRes.value.ok) {
@@ -206,9 +199,13 @@ export default function CrmReporting() {
       }
       if (pipeRes.status === "fulfilled" && pipeRes.value.ok) {
         const d = await pipeRes.value.json() as { pipeline: Record<string, unknown[]> };
+        // The API buckets by raw stored status; fold legacy keys into the
+        // canonical taxonomy so every lead is counted under exactly one stage.
         const map: Record<string, number> = {};
-        for (const [stage, items] of Object.entries(d.pipeline ?? {})) {
-          map[stage] = Array.isArray(items) ? items.length : 0;
+        for (const [rawStage, items] of Object.entries(d.pipeline ?? {})) {
+          const key = normalizeLeadStatus(rawStage);
+          const count = Array.isArray(items) ? items.length : 0;
+          map[key] = (map[key] ?? 0) + count;
         }
         setPipelineMap(map);
       }
@@ -225,7 +222,7 @@ export default function CrmReporting() {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 

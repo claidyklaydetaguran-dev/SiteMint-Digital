@@ -33,8 +33,7 @@ import {
   computeRelationshipProfile,
   type RiLead, type RiActivity,
 } from "@/lib/relationshipIntelligence";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -275,7 +274,8 @@ export default function CrmLeadDetail() {
     );
   }, [lead, activities, health, ciStats, discProfile, momentum]);
 
-  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"calls"|"sms"|"email">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"communications"|"opportunity">("timeline");
+  const [commSubTab, setCommSubTab] = useState<"sms"|"calls"|"email">("sms");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
   // Modals & toasts
@@ -364,10 +364,9 @@ export default function CrmLeadDetail() {
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
-    const r = await fetch(`/api/crm/leads/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    const r = await adminFetch(`/api/crm/leads/${params.id}`);
+    if (r.status === 401) return;
     if (!r.ok) { navigate("/admin/crm/leads"); return; }
     const d = await r.json() as { lead:Lead; activities:Activity[]; tasks:Task[] };
     setLead(d.lead);
@@ -385,15 +384,14 @@ export default function CrmLeadDetail() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!token()) return;
-    fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${token()}` } })
+    adminFetch("/api/crm/email-templates")
       .then(r => r.json()).then(d => setTemplates((d as {templates?: typeof templates}).templates || []));
   }, []);
 
   const loadMessages = useCallback(async () => {
     if (!params.id) return;
     setLoadingMessages(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/messages`, { headers: { Authorization: `Bearer ${token()}` } });
+    const r = await adminFetch(`/api/crm/leads/${params.id}/messages`);
     if (r.ok) {
       const d = await r.json() as { messages: CrmMessage[] };
       setMessages((d.messages || []).slice().reverse());
@@ -403,17 +401,14 @@ export default function CrmLeadDetail() {
   }, [params.id]);
 
   useEffect(() => {
-    if (activeTab === "sms" || activeTab === "calls") loadMessages();
+    if (activeTab === "communications") loadMessages();
   }, [activeTab, loadMessages]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const callLead = async () => {
     setCallingLead(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/call`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-    });
+    const r = await adminFetch(`/api/crm/leads/${params.id}/call`, { method: "POST" });
     const d = await r.json() as { error?: string; sid?: string };
     if (r.ok) {
       showToast("Bridge call initiated — your phone will ring shortly.", "info");
@@ -432,9 +427,8 @@ export default function CrmLeadDetail() {
     if (!lead || savingCallLog) return;
     setSavingCallLog(true);
     try {
-      const r = await fetch(`/api/crm/leads/${params.id}/activities`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/activities`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "call_outcome",
           title: `Call outcome: ${callLogDisposition}`,
@@ -468,9 +462,8 @@ export default function CrmLeadDetail() {
       if (logActType === "call_outcome") {
         body.metadata = { disposition: logActDisposition, source: "manual_log" };
       }
-      const r = await fetch(`/api/crm/leads/${params.id}/activities`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/activities`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (r.ok) {
@@ -499,9 +492,8 @@ export default function CrmLeadDetail() {
     try {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const r = await fetch(`/api/crm/leads/${params.id}/tasks`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/tasks`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ type: "Follow Up", title: "Follow up after call", dueDate: tomorrow.toISOString().split("T")[0] }),
       });
       if (r.ok) { showToast("Follow-up task created"); load(); }
@@ -517,9 +509,8 @@ export default function CrmLeadDetail() {
     if (!lead) return;
     setSendingSms(true);
     try {
-      const r = await fetch(`/api/crm/leads/${params.id}/sms`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/sms`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
       if (r.ok) {
@@ -539,9 +530,8 @@ export default function CrmLeadDetail() {
   const sendSms = async () => {
     if (!smsBody.trim() || !lead) return;
     setSendingSms(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/sms`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/sms`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ body: smsBody.trim() }),
     });
     const d = await r.json() as { error?: string };
@@ -559,9 +549,8 @@ export default function CrmLeadDetail() {
   const addNote = async () => {
     if (!noteText.trim()) return;
     setAddingNote(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/notes`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/notes`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ note: noteText }),
     });
     if (r.ok) {
@@ -578,9 +567,8 @@ export default function CrmLeadDetail() {
   const addTask = async () => {
     if (!taskForm.title) return;
     setAddingTask(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/tasks`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/tasks`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify(taskForm),
     });
     if (r.ok) {
@@ -598,9 +586,8 @@ export default function CrmLeadDetail() {
   const sendEmail = async () => {
     if (!emailSubject || !emailBody) return;
     setSendingEmail(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/email`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/email`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ subject: emailSubject, body: emailBody, testMode: emailTestMode }),
     });
     if (r.ok) {
@@ -619,9 +606,8 @@ export default function CrmLeadDetail() {
   const quickUpdateStatus = async (newStatus: string) => {
     if (!lead || newStatus === lead.status) { setOpenModal(null); return; }
     setUpdatingStatus(true);
-    const r = await fetch(`/api/crm/leads/${params.id}`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
     if (r.ok) {
@@ -636,9 +622,8 @@ export default function CrmLeadDetail() {
 
   const saveField = async (updates: Record<string,unknown>) => {
     setSaving(true);
-    await fetch(`/api/crm/leads/${params.id}`, {
+    await adminFetch(`/api/crm/leads/${params.id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
     setSaving(false);
@@ -649,9 +634,8 @@ export default function CrmLeadDetail() {
     setSavingPhone(true);
     setPhoneError("");
     try {
-      const r = await fetch(`/api/crm/leads/${params.id}`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ phone: editPhone.trim() || null }),
       });
       if (!r.ok) {
@@ -670,16 +654,15 @@ export default function CrmLeadDetail() {
   };
 
   const completeTask = async (taskId: number) => {
-    await fetch(`/api/crm/tasks/${taskId}`, {
+    await adminFetch(`/api/crm/tasks/${taskId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
     });
     load();
   };
 
   const deleteTask = async (taskId: number) => {
-    await fetch(`/api/crm/tasks/${taskId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
+    await adminFetch(`/api/crm/tasks/${taskId}`, { method: "DELETE" });
     load();
   };
 
@@ -722,7 +705,177 @@ export default function CrmLeadDetail() {
           </button>
         </Link>
 
-        {/* ── Contact Command Bar ───────────────────────────────────────────── */}
+        {/* ── Summary + recommended next action ───────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-foreground/5 border border-gray-200 flex items-center justify-center shrink-0 font-serif font-bold text-sm text-foreground">
+                {lead.name.split(" ").filter(Boolean).slice(0, 2).map(n => n[0]).join("").toUpperCase() || "?"}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-serif font-bold text-foreground truncate">{lead.name}</h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  {[lead.company, lead.source, lead.priority ? `${lead.priority} priority` : null].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href={`/admin/crm/leads/${lead.id}/dna`}>
+                <button className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1">
+                  View Lead DNA
+                </button>
+              </Link>
+              <button
+                onClick={() => navigate(`/admin/crm/campaigns?view=builder&leadId=${lead.id}`)}
+                className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1"
+              >
+                Generate for this lead
+              </button>
+            </div>
+          </div>
+
+          {/* Recommended next action — derived from the already-loaded sales signals */}
+          <div className="mt-3 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 flex items-start gap-2">
+            <span className="text-sm shrink-0 mt-0.5">👉</span>
+            {salesNBA ? (
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground">{salesNBA.action}</p>
+                <p className="text-[11px] text-muted-foreground leading-snug">{salesNBA.reason}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No urgent action needed.</p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Contact information ──────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-3">
+          <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Contact Information</h2>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
+              <Mail className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.email}</span>
+            </a>
+            {/* ── Phone field with inline edit ── */}
+            <div className="flex flex-col gap-1">
+              {editingPhone ? (
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") { setEditingPhone(false); setPhoneError(""); } }}
+                      className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
+                      placeholder="+19498806515"
+                      autoFocus
+                    />
+                    <button
+                      onClick={savePhone}
+                      disabled={savingPhone}
+                      className="text-xs px-2.5 py-1.5 bg-foreground text-white rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {savingPhone ? "…" : "Save"}
+                    </button>
+                    <button
+                      onClick={() => { setEditingPhone(false); setEditPhone(lead.phone || ""); setPhoneError(""); }}
+                      className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Use E.164 format when possible.{" "}
+                    US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
+                    · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
+                  </p>
+                  {phoneError && (
+                    <p className="text-[10px] text-red-600 font-medium">{phoneError}</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {lead.phone ? (
+                      <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                        <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2 text-sm text-muted-foreground/50">
+                        <Phone className="w-3.5 h-3.5 shrink-0" /> No phone on record
+                      </span>
+                    )}
+                    <button
+                      onClick={() => { setEditPhone(lead.phone || ""); setEditingPhone(true); setPhoneError(""); }}
+                      className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded text-muted-foreground hover:bg-gray-100 hover:text-foreground transition-colors"
+                    >
+                      Edit
+                    </button>
+                    {lead.smsOptOut && (
+                      <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
+                    )}
+                  </div>
+                  {lead.phone && (() => {
+                    const digits = lead.phone.replace(/\D/g, "");
+                    const isE164 = lead.phone.startsWith("+");
+                    if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
+                      const suggested = `+63${digits.slice(1)}`;
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                            <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                            Suggested format: {suggested}
+                          </span>
+                          <button
+                            onClick={() => { setEditPhone(suggested); setEditingPhone(true); setPhoneError(""); }}
+                            className="text-[10px] px-1.5 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors self-start font-medium"
+                          >
+                            Use suggested format
+                          </button>
+                        </div>
+                      );
+                    }
+                    if (!isE164 && digits.length !== 10 && digits.length !== 11) {
+                      return (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                          Phone number may need country code formatting
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </>
+              )}
+            </div>
+            {lead.company && (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                <Building className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-words">{lead.company}</span>
+              </p>
+            )}
+            {lead.website && (
+              <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
+                <Globe className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.website}</span>
+              </a>
+            )}
+            {lead.nextFollowUpAt && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-3.5 h-3.5 shrink-0" /> Follow-up: {new Date(lead.nextFollowUpAt).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+
+          {lead.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {lead.tags.map(t => (
+                <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-foreground/5 rounded-full text-muted-foreground border border-gray-200">
+                  <Tag className="w-2.5 h-2.5" />{t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Stage / status & quick actions ──────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-5">
           <div className="flex items-stretch divide-x divide-gray-100">
             {/* Call */}
@@ -730,7 +883,7 @@ export default function CrmLeadDetail() {
               onClick={() => setOpenModal("call")}
               disabled={!lead.phone}
               title={!lead.phone ? "No phone number on record" : "Initiate bridge call"}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
             >
               <PhoneCall className="w-4 h-4 text-green-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Call</span>
@@ -740,7 +893,7 @@ export default function CrmLeadDetail() {
               onClick={() => { setOpenModal("text"); loadMessages(); }}
               disabled={!lead.phone}
               title={!lead.phone ? "No phone number on record" : lead.smsOptOut ? "SMS opted out" : "Send SMS"}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
             >
               <MessageSquare className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Text</span>
@@ -749,7 +902,7 @@ export default function CrmLeadDetail() {
             {/* Email */}
             <button
               onClick={() => setOpenModal("email")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-indigo-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-indigo-50 transition-colors group"
             >
               <Mail className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Email</span>
@@ -757,7 +910,7 @@ export default function CrmLeadDetail() {
             {/* Note */}
             <button
               onClick={() => setOpenModal("note")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-yellow-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-yellow-50 transition-colors group"
             >
               <FileText className="w-4 h-4 text-yellow-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Note</span>
@@ -765,7 +918,7 @@ export default function CrmLeadDetail() {
             {/* Task */}
             <button
               onClick={() => setOpenModal("task")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-purple-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-purple-50 transition-colors group"
             >
               <Plus className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Task</span>
@@ -773,10 +926,10 @@ export default function CrmLeadDetail() {
             {/* Status */}
             <button
               onClick={() => setOpenModal("status")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-orange-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-orange-50 transition-colors group"
             >
               <RefreshCw className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Status</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Stage / Status</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium leading-tight max-w-full truncate ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
                 {lead.status}
               </span>
@@ -788,172 +941,10 @@ export default function CrmLeadDetail() {
         <div className="grid lg:grid-cols-[1fr_300px] gap-5">
           {/* Main panel */}
           <div className="space-y-5">
-            {/* Lead header / contact card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <h1 className="text-xl font-serif font-bold text-foreground">{lead.name}</h1>
-                  {lead.company && (
-                    <p className="text-muted-foreground text-sm flex items-center gap-1 mt-0.5">
-                      <Building className="w-3.5 h-3.5" />{lead.company}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link href={`/admin/crm/leads/${lead.id}/dna`}>
-                    <button className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1">
-                      View Lead DNA
-                    </button>
-                  </Link>
-                  <button
-                    onClick={() => navigate(`/admin/crm/campaigns?view=builder&leadId=${lead.id}`)}
-                    className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1"
-                  >
-                    Generate for this lead
-                  </button>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
-                    {lead.status}
-                  </span>
-                  <button
-                    onClick={() => setOpenModal("status")}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-gray-200 rounded-full px-2.5 py-1 hover:border-gray-300"
-                  >
-                    Change ↓
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-2 mt-4">
-                <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
-                  <Mail className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.email}</span>
-                </a>
-                {/* ── Phone field with inline edit ── */}
-                <div className="flex flex-col gap-1">
-                  {editingPhone ? (
-                    <div className="space-y-1.5">
-                      <div className="flex gap-1.5">
-                        <input
-                          type="tel"
-                          value={editPhone}
-                          onChange={e => setEditPhone(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") { setEditingPhone(false); setPhoneError(""); } }}
-                          className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
-                          placeholder="+19498806515"
-                          autoFocus
-                        />
-                        <button
-                          onClick={savePhone}
-                          disabled={savingPhone}
-                          className="text-xs px-2.5 py-1.5 bg-foreground text-white rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0"
-                        >
-                          {savingPhone ? "…" : "Save"}
-                        </button>
-                        <button
-                          onClick={() => { setEditingPhone(false); setEditPhone(lead.phone || ""); setPhoneError(""); }}
-                          className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Use E.164 format when possible.{" "}
-                        US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
-                        · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
-                      </p>
-                      {phoneError && (
-                        <p className="text-[10px] text-red-600 font-medium">{phoneError}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {lead.phone ? (
-                          <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                            <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
-                          </a>
-                        ) : (
-                          <span className="flex items-center gap-2 text-sm text-muted-foreground/50">
-                            <Phone className="w-3.5 h-3.5 shrink-0" /> No phone on record
-                          </span>
-                        )}
-                        <button
-                          onClick={() => { setEditPhone(lead.phone || ""); setEditingPhone(true); setPhoneError(""); }}
-                          className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded text-muted-foreground hover:bg-gray-100 hover:text-foreground transition-colors"
-                        >
-                          Edit
-                        </button>
-                        {lead.smsOptOut && (
-                          <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
-                        )}
-                      </div>
-                      {lead.phone && (() => {
-                        const digits = lead.phone.replace(/\D/g, "");
-                        const isE164 = lead.phone.startsWith("+");
-                        if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
-                          const suggested = `+63${digits.slice(1)}`;
-                          return (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
-                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                Suggested format: {suggested}
-                              </span>
-                              <button
-                                onClick={() => { setEditPhone(suggested); setEditingPhone(true); setPhoneError(""); }}
-                                className="text-[10px] px-1.5 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors self-start font-medium"
-                              >
-                                Use suggested format
-                              </button>
-                            </div>
-                          );
-                        }
-                        if (!isE164 && digits.length !== 10 && digits.length !== 11) {
-                          return (
-                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
-                              <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                              Phone number may need country code formatting
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </>
-                  )}
-                </div>
-                {lead.website && (
-                  <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
-                    <Globe className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.website}</span>
-                  </a>
-                )}
-                {lead.nextFollowUpAt && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-3.5 h-3.5 shrink-0" /> Follow-up: {new Date(lead.nextFollowUpAt).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-
-              {lead.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {lead.tags.map(t => (
-                    <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-foreground/5 rounded-full text-muted-foreground border border-gray-200">
-                      <Tag className="w-2.5 h-2.5" />{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sales Workspace */}
-            <SalesWorkspace
-              lead={lead}
-              activities={activities}
-              tasks={tasks}
-              onReload={load}
-            />
-
             {/* Tab panel */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
               <div className="flex border-b border-gray-200 px-4 overflow-x-auto">
-                {(["timeline","tasks","calls","sms","email"] as const).map(tab => (
+                {(["timeline","tasks","communications","opportunity"] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -963,11 +954,10 @@ export default function CrmLeadDetail() {
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "timeline" ? "Activity"
+                    {tab === "timeline" ? "Timeline"
                       : tab === "tasks" ? `Tasks${pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}`
-                      : tab === "calls" ? "📞 Calls"
-                      : tab === "sms" ? "💬 SMS"
-                      : "Email"}
+                      : tab === "communications" ? "Communications"
+                      : "Opportunity / Project"}
                   </button>
                 ))}
               </div>
@@ -1097,8 +1087,25 @@ export default function CrmLeadDetail() {
                 </div>
               )}
 
-              {/* ── SMS & Calls tab ─── */}
-              {activeTab === "sms" && (
+              {/* ── Communications tab ─── */}
+              {activeTab === "communications" && (
+                <div>
+                  <div className="flex flex-wrap gap-1.5 px-5 pt-4">
+                    {(["sms","calls","email"] as const).map(sub => (
+                      <button
+                        key={sub}
+                        onClick={() => setCommSubTab(sub)}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                          commSubTab === sub
+                            ? "bg-foreground text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {sub === "sms" ? "💬 SMS" : sub === "calls" ? "📞 Calls" : "✉️ Email"}
+                      </button>
+                    ))}
+                  </div>
+              {commSubTab === "sms" && (
                 <div className="flex flex-col h-[520px]">
                   {lead.smsOptOut && (
                     <div className="mx-5 mt-4 flex items-center gap-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
@@ -1205,7 +1212,7 @@ export default function CrmLeadDetail() {
               )}
 
               {/* ── Calls tab ─── */}
-              {activeTab === "calls" && (() => {
+              {commSubTab === "calls" && (() => {
                 const callMsgs = messages.filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
                 const callActs = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type)).map(a => ({ key:`act-${a.id}`, kind:"activity" as const, ts: new Date(a.createdAt).getTime(), data: a }));
                 const all = [...callMsgs, ...callActs].sort((a,b) => b.ts - a.ts);
@@ -1328,7 +1335,7 @@ export default function CrmLeadDetail() {
               })()}
 
               {/* ── Email tab ─── */}
-              {activeTab === "email" && (
+              {commSubTab === "email" && (
                 <div className="p-5 space-y-4">
                   {emailTestMode && (
                     <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
@@ -1373,6 +1380,20 @@ export default function CrmLeadDetail() {
                       <Send className="w-3.5 h-3.5"/>{sendingEmail?"Sending…":emailTestMode?"Log Email (Test)":"Send Email"}
                     </Button>
                   </div>
+                </div>
+              )}
+                </div>
+              )}
+
+              {/* ── Opportunity / Project tab ─── */}
+              {activeTab === "opportunity" && (
+                <div className="p-4">
+                  <SalesWorkspace
+                    lead={lead}
+                    activities={activities}
+                    tasks={tasks}
+                    onReload={load}
+                  />
                 </div>
               )}
             </div>

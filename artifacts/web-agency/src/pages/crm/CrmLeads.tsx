@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal, List, Mail } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
-import { LEAD_STATUSES, PROJECT_TYPES } from "@/lib/crmTaxonomy";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { LEAD_STATUSES, PROJECT_TYPES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { adminFetch } from "@/lib/adminFetch";
 
 const STATUSES = [...LEAD_STATUSES];
 const SERVICE_TYPES = [...PROJECT_TYPES];
@@ -73,16 +72,19 @@ interface SmartList {
   section?: "stage" | "priority" | "intelligence";
 }
 
+// Note: filterStatus values are canonical LeadStatus strings (crmTaxonomy). Every
+// lead is bucketed via normalizeLeadStatus(lead.status) so legacy raw status
+// strings (e.g. "New", "Contacted") still group into the right smart list.
 const STAGE_LISTS: SmartList[] = [
   { label: "All People",                emoji: "👥",  section: "stage" },
-  { label: "New Lead - Needs Contact",  emoji: "🟢", filterStatus: "New",           section: "stage" },
-  { label: "Contacted",                 emoji: "📞", filterStatus: "Contacted",     section: "stage" },
-  { label: "Follow-up",                 emoji: "🔔", filterStatus: "Follow-up",     section: "stage" },
-  { label: "Proposal Sent",             emoji: "📄", filterStatus: "Proposal Sent", section: "stage" },
-  { label: "Active / Negotiating",      emoji: "🤝", filterStatus: "Negotiating",   section: "stage" },
-  { label: "Won Clients",               emoji: "🏆", filterStatus: "Won",           section: "stage" },
-  { label: "Nurture",                   emoji: "🌱", filterStatus: "Nurture",       section: "stage" },
-  { label: "Lost",                      emoji: "❌", filterStatus: "Lost",          section: "stage" },
+  { label: "New Lead - Needs Contact",  emoji: "🟢", filterStatus: "New Inquiry",       section: "stage" },
+  { label: "Contacted",                 emoji: "📞", filterStatus: "Follow-Up Needed",  section: "stage" },
+  { label: "Follow-up",                 emoji: "🔔", filterStatus: "Follow-Up Needed",  section: "stage" },
+  { label: "Proposal Sent",             emoji: "📄", filterStatus: "Proposal Sent",     section: "stage" },
+  { label: "Active / Negotiating",      emoji: "🤝", filterStatus: "Qualified",         section: "stage" },
+  { label: "Won Clients",               emoji: "🏆", filterStatus: "Won",               section: "stage" },
+  { label: "Nurture",                   emoji: "🌱", filterStatus: "On Hold",           section: "stage" },
+  { label: "Lost",                      emoji: "❌", filterStatus: "Lost",              section: "stage" },
 ];
 
 const INTELLIGENCE_LISTS: SmartList[] = [
@@ -99,14 +101,14 @@ const INTELLIGENCE_LISTS: SmartList[] = [
     filterFn: (l) =>
       !!l.nextFollowUpAt &&
       new Date(l.nextFollowUpAt) < new Date() &&
-      !["Won","Lost"].includes(l.status),
+      !["Won","Lost"].includes(normalizeLeadStatus(l.status)),
   },
   {
     label: "No Contact 14 Days",
     emoji: "📞",
     section: "intelligence",
     filterFn: (l) =>
-      !["Won","Lost"].includes(l.status) &&
+      !["Won","Lost"].includes(normalizeLeadStatus(l.status)) &&
       (!l.lastContactedAt || Date.now() - new Date(l.lastContactedAt).getTime() > 14 * DAY),
   },
   {
@@ -119,13 +121,13 @@ const INTELLIGENCE_LISTS: SmartList[] = [
     label: "Waiting for Reply",
     emoji: "📩",
     section: "intelligence",
-    filterFn: (l) => l.status === "Proposal Sent",
+    filterFn: (l) => normalizeLeadStatus(l.status) === "Proposal Sent",
   },
   {
     label: "Cold Leads",
     emoji: "🧊",
     section: "intelligence",
-    filterFn: (_l, score) => score < 40 && !["Won","Lost"].includes(_l.status),
+    filterFn: (_l, score) => score < 40 && !["Won","Lost"].includes(normalizeLeadStatus(_l.status)),
   },
 ];
 
@@ -138,7 +140,6 @@ const PRIORITY_LISTS: SmartList[] = [
 const ALL_LISTS = [...STAGE_LISTS, ...INTELLIGENCE_LISTS, ...PRIORITY_LISTS];
 
 export default function CrmLeads() {
-  const [, navigate] = useLocation();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,14 +156,13 @@ export default function CrmLeads() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
-    const r = await fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    const r = await adminFetch("/api/crm/leads");
+    if (r.status === 401) return;
     const d = await r.json() as { leads: Lead[] };
     setAllLeads(d.leads || []);
     setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -178,7 +178,7 @@ export default function CrmLeads() {
     let filtered = allLeads;
     const fs = activeList.filterStatus || filterStatus;
     const fp = activeList.filterPriority || filterPriority;
-    if (fs) filtered = filtered.filter(l => l.status === fs);
+    if (fs) filtered = filtered.filter(l => normalizeLeadStatus(l.status) === fs);
     if (fp) filtered = filtered.filter(l => l.priority === fp);
     if (activeList.filterFn) {
       filtered = filtered.filter(l => {
@@ -189,8 +189,8 @@ export default function CrmLeads() {
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(l =>
-        l.name.toLowerCase().includes(q) ||
-        l.email.toLowerCase().includes(q) ||
+        (l.name ?? "").toLowerCase().includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q) ||
         (l.company || "").toLowerCase().includes(q) ||
         (l.phone || "").includes(q)
       );
@@ -200,7 +200,7 @@ export default function CrmLeads() {
 
   const countFor = (list: SmartList) => {
     return allLeads.filter(l => {
-      if (list.filterStatus  && l.status   !== list.filterStatus)  return false;
+      if (list.filterStatus  && normalizeLeadStatus(l.status) !== list.filterStatus)  return false;
       if (list.filterPriority && l.priority !== list.filterPriority) return false;
       if (list.filterFn) {
         const score = scoreMap.get(l.id)?.score ?? 50;
@@ -224,9 +224,8 @@ export default function CrmLeads() {
     if (Object.keys(errors).length) { setFormErrors(errors); return; }
     setFormErrors({});
     setSaving(true);
-    const r = await fetch("/api/crm/leads", {
+    const r = await adminFetch("/api/crm/leads", {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     setSaving(false);
@@ -239,10 +238,7 @@ export default function CrmLeads() {
 
   const importDiscovery = async () => {
     setImportingDiscovery(true);
-    const r = await fetch("/api/crm/import-discovery", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token()}` },
-    });
+    const r = await adminFetch("/api/crm/import-discovery", { method: "POST" });
     const d = await r.json() as { imported: number; skipped: number };
     setImportMsg(`Imported ${d.imported}, skipped ${d.skipped} duplicates`);
     setImportingDiscovery(false);
@@ -424,33 +420,47 @@ export default function CrmLeads() {
           {/* Table */}
           <div className="flex-1 overflow-auto bg-white">
             {loading ? (
-              <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
-                  <tr>
-                    {["Name","Health","Last Communication","Updated","Stage","Assigned","Phone"].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
-                          <div className="space-y-1">
-                            <div className="h-3 w-24 bg-gray-200 rounded" />
-                            <div className="h-2 w-16 bg-gray-100 rounded" />
-                          </div>
-                        </div>
-                      </td>
-                      {Array.from({ length: 6 }).map((_, j) => (
-                        <td key={j} className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-16" /></td>
+              <>
+                {/* M-3: below md, the table gives way to stacked card rows. */}
+                <div className="md:hidden divide-y divide-gray-50">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-4 flex items-center gap-2.5 animate-pulse">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-3 w-32 bg-gray-200 rounded" />
+                        <div className="h-2 w-20 bg-gray-100 rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <table className="hidden md:table w-full text-sm border-collapse">
+                  <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
+                    <tr>
+                      {["Name","Health","Last Communication","Updated","Stage","Assigned","Phone"].map(h => (
+                        <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
+                            <div className="space-y-1">
+                              <div className="h-3 w-24 bg-gray-200 rounded" />
+                              <div className="h-2 w-16 bg-gray-100 rounded" />
+                            </div>
+                          </div>
+                        </td>
+                        {Array.from({ length: 6 }).map((_, j) => (
+                          <td key={j} className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-16" /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             ) : leads.length === 0 ? (
               <div className="py-16 text-center">
                 <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -465,7 +475,48 @@ export default function CrmLeads() {
                 </button>
               </div>
             ) : (
-              <table className="w-full text-sm border-collapse">
+              <>
+                {/* M-3: mobile card rows — the same `leads` array, key fields only. */}
+                <div className="md:hidden divide-y divide-gray-50">
+                  {leads.map(lead => {
+                    const health = scoreMap.get(lead.id);
+                    return (
+                      <Link key={lead.id} href={`/admin/crm/leads/${lead.id}`}>
+                        <div className="p-4 flex items-start gap-3 active:bg-gray-50 cursor-pointer">
+                          <div className={`w-9 h-9 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
+                            <span className="text-white text-xs font-bold">{initials(lead.name)}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-medium text-sm text-foreground truncate">{lead.name}</p>
+                              {health && (
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${health.bgColor} ${health.color} ${health.borderColor}`}>
+                                  {health.score}
+                                </span>
+                              )}
+                            </div>
+                            {lead.company && <p className="text-xs text-muted-foreground truncate">{lead.company}</p>}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>
+                                {normalizeLeadStatus(lead.status)}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {lead.lastContactedAt ? `Last contact ${timeAgo(lead.lastContactedAt)}` : "Never contacted"}
+                              </span>
+                            </div>
+                          </div>
+                          {lead.phone && (
+                            <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} title="Call"
+                               className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                              <Phone className="w-3.5 h-3.5 text-white" />
+                            </a>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+                <table className="hidden md:table w-full text-sm border-collapse">
                 <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
                   <tr>
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-48">Name</th>
@@ -515,7 +566,7 @@ export default function CrmLeads() {
                             {lead.lastContactedAt ? (
                               <div>
                                 <p className="text-muted-foreground">{timeAgo(lead.lastContactedAt)}</p>
-                                <p className="text-[10px] text-muted-foreground/60">{lead.status === "Contacted" ? "Outgoing call" : "Email"}</p>
+                                <p className="text-[10px] text-muted-foreground/60">{normalizeLeadStatus(lead.status) === "Follow-Up Needed" ? "Outgoing call" : "Email"}</p>
                               </div>
                             ) : (
                               <span className="text-gray-300 text-xs">Never</span>
@@ -528,16 +579,7 @@ export default function CrmLeads() {
                         </td>
                         {/* Stage */}
                         <td className="px-4 py-2.5">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                            lead.status === "Won"           ? "bg-green-100 text-green-700" :
-                            lead.status === "Lost"          ? "bg-red-100 text-red-600" :
-                            lead.status === "Proposal Sent" ? "bg-purple-100 text-purple-700" :
-                            lead.status === "Negotiating"   ? "bg-orange-100 text-orange-700" :
-                            lead.status === "New"           ? "bg-blue-100 text-blue-700" :
-                            lead.status === "Contacted"     ? "bg-indigo-100 text-indigo-700" :
-                            lead.status === "Follow-up"     ? "bg-yellow-100 text-yellow-700" :
-                            "bg-gray-100 text-gray-600"
-                          }`}>{lead.status}</span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>{normalizeLeadStatus(lead.status)}</span>
                         </td>
                         {/* Assigned */}
                         <td className="px-4 py-2.5">
@@ -575,6 +617,7 @@ export default function CrmLeads() {
                   })}
                 </tbody>
               </table>
+              </>
             )}
           </div>
         </div>

@@ -6,7 +6,8 @@ import {
   RefreshCw, UserCheck, Star,
 } from "lucide-react";
 
-const tok = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
+
 const LAST_LEAD_KEY = "lastCrmLeadId";
 
 interface Lead {
@@ -95,9 +96,7 @@ export default function CrmWorkspaceLanding() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/crm/leads?limit=50&sort=createdAt:desc", {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch("/api/crm/leads?limit=50&sort=createdAt:desc");
       if (r.ok) {
         const data = await r.json() as { leads: Lead[] };
         setLeads(data.leads ?? []);

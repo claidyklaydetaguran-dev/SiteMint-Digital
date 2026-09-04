@@ -7,6 +7,8 @@ import {
   Zap, Trophy, CheckCircle2, Loader2,
 } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
+import { adminFetch, adminLogout } from "@/lib/adminFetch";
+import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
 interface Submission {
   id: number;
@@ -74,7 +76,7 @@ interface CrmImportResult {
   message: string;
 }
 
-export default function AdminDashboard() {
+function AdminDashboardInner() {
   const [, navigate] = useLocation();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,23 +89,20 @@ export default function AdminDashboard() {
   const [importingId, setImportingId] = useState<number | null>(null);
   const [importToast, setImportToast] = useState("");
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : "";
-
   const showImportToast = (msg: string) => {
     setImportToast(msg);
     setTimeout(() => setImportToast(""), 4000);
   };
 
   const load = useCallback(async () => {
-    if (!token) { navigate("/admin"); return; }
     setLoading(true);
     try {
       const [res, statsRes, leadsRes] = await Promise.all([
-        fetch("/api/admin/submissions", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/crm/stats", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token}` } }),
+        adminFetch("/api/admin/submissions"),
+        adminFetch("/api/crm/stats"),
+        adminFetch("/api/crm/leads"),
       ]);
-      if (res.status === 401) { localStorage.removeItem("adminToken"); navigate("/admin"); return; }
+      if (res.status === 401) return;
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json() as { submissions: Submission[] };
       setSubmissions(data.submissions);
@@ -127,15 +126,13 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [token, navigate]);
+  }, []);
 
   const sendToCrm = async (submissionId: number) => {
-    if (!token) return;
     setImportingId(submissionId);
     try {
-      const res = await fetch(`/api/crm/import-discovery/${submissionId}`, {
+      const res = await adminFetch(`/api/crm/import-discovery/${submissionId}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json() as CrmImportResult;
       if (res.ok) {
@@ -153,7 +150,7 @@ export default function AdminDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  const logout = () => { localStorage.removeItem("adminToken"); navigate("/admin"); };
+  const logout = async () => { await adminLogout(); navigate("/admin"); };
 
   const filtered = submissions.filter(s => {
     const matchSearch = !search ||
@@ -385,5 +382,13 @@ export default function AdminDashboard() {
       </main>
     </div>
     </>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <AdminRouteGuard>
+      <AdminDashboardInner />
+    </AdminRouteGuard>
   );
 }
