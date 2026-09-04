@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Check, Clock, AlertTriangle, ChevronRight, RefreshCw } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
@@ -28,27 +27,24 @@ const taskTypeIcon: Record<string,string> = {
 };
 
 export default function CrmTasks() {
-  const [, navigate] = useLocation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabFilter>("due-today");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
-    const r = await fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    const r = await adminFetch("/api/crm/tasks");
+    if (r.status === 401) return;
     const d = await r.json() as { tasks: Task[] };
     setTasks(d.tasks || []);
     setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const completeTask = async (id: number) => {
-    await fetch(`/api/crm/tasks/${id}`, {
+    await adminFetch(`/api/crm/tasks/${id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
     });
     load();

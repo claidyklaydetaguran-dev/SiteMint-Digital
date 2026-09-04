@@ -31,9 +31,7 @@ import {
   getBlueprintById,
   getCampaignStrategyHints,
 } from "@/lib/campaignTaxonomy";
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -479,12 +477,10 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
   // ── Load initial data ──
   useEffect(() => {
-    if (!tok()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const h = { Authorization: `Bearer ${tok()}` };
     Promise.all([
-      fetch("/api/crm/leads",            { headers: h }).then(r => r.json()),
-      fetch("/api/crm/email-templates",  { headers: h }).then(r => r.json()),
-      fetch("/api/crm/campaigns",        { headers: h }).then(r => r.json()),
+      adminFetch("/api/crm/leads").then(r => r.json()),
+      adminFetch("/api/crm/email-templates").then(r => r.json()),
+      adminFetch("/api/crm/campaigns").then(r => r.json()),
     ])
       .then(([ld, td, cd]) => {
         setAllLeads((ld.leads ?? []).slice().sort((a: Lead, b: Lead) => a.name.localeCompare(b.name)));
@@ -493,10 +489,10 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [navigate]);
+  }, []);
 
   const refreshCampaigns = useCallback(async () => {
-    const r = await fetch("/api/crm/campaigns", { headers: { Authorization: `Bearer ${tok()}` } });
+    const r = await adminFetch("/api/crm/campaigns");
     const d = await r.json();
     setCampaigns(d.campaigns ?? []);
   }, []);
@@ -511,7 +507,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         const next = new Map(prev);
         next.set(c.id, "loading");
         // kick off fetch as a side-effect
-        void fetch(`/api/crm/campaigns/${c.id}/analytics`, { headers: { Authorization: `Bearer ${tok()}` } })
+        void adminFetch(`/api/crm/campaigns/${c.id}/analytics`)
           .then(r => r.json().then(d => ({ ok: r.ok, d })))
           .then(({ ok, d }) => setRowAnalytics(p => new Map(p).set(c.id, ok ? (d as CampaignAnalytics) : "error")))
           .catch(()      => setRowAnalytics(p => new Map(p).set(c.id, "error")));
@@ -546,7 +542,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     if (rowAnalytics.has(id)) return; // already fetched
     setRowAnalytics(prev => new Map(prev).set(id, "loading"));
     try {
-      const r = await fetch(`/api/crm/campaigns/${id}/analytics`, { headers: { Authorization: `Bearer ${tok()}` } });
+      const r = await adminFetch(`/api/crm/campaigns/${id}/analytics`);
       const d = await r.json();
       setRowAnalytics(prev => new Map(prev).set(id, d));
     } catch {
@@ -622,9 +618,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
       const persona = selectedPersonaId ? SITEMINT_PERSONAS.find(p => p.id === selectedPersonaId) : undefined;
       const topic   = getTopicById(selectedTopicId || null);
       const contextLead = contextLeadId ? allLeads.find(l => l.id === contextLeadId) : undefined;
-      const res = await fetch("/api/crm/campaigns/ai-generate", {
+      const res = await adminFetch("/api/crm/campaigns/ai-generate", {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({
           mode: "single",
           personaId: persona?.id,
@@ -701,7 +696,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   // ── Open a saved campaign ──
   const openCampaign = async (c: Campaign) => {
     setSaveError("");
-    const r = await fetch(`/api/crm/campaigns/${c.id}`, { headers: { Authorization: `Bearer ${tok()}` } });
+    const r = await adminFetch(`/api/crm/campaigns/${c.id}`);
     const d = await r.json();
     if (!r.ok) return;
     const { campaign, recipients } = d as { campaign: Campaign; recipients: Array<{ leadId: number; discStyleUsed?: string }> };
@@ -739,8 +734,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     setView("analytics");
     try {
       const [ar, fr] = await Promise.all([
-        fetch(`/api/crm/campaigns/${c.id}/analytics`, { headers: { Authorization: `Bearer ${tok()}` } }),
-        fetch(`/api/crm/campaigns/${c.id}/funnel`,    { headers: { Authorization: `Bearer ${tok()}` } }),
+        adminFetch(`/api/crm/campaigns/${c.id}/analytics`),
+        adminFetch(`/api/crm/campaigns/${c.id}/funnel`),
       ]);
       const ad = await ar.json();
       const fd = fr.ok ? await fr.json() : null;
@@ -808,9 +803,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
       let id = campaignId;
       if (!id) {
         // Create
-        const r = await fetch("/api/crm/campaigns", {
+        const r = await adminFetch("/api/crm/campaigns", {
           method: "POST",
-          headers: authH(),
           body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType, objective, toneProfile, description: strategyNote, stopOnReply }),
         });
         const d = await r.json();
@@ -819,9 +813,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         setCampaignId(id);
       } else {
         // Update
-        const r = await fetch(`/api/crm/campaigns/${id}`, {
+        const r = await adminFetch(`/api/crm/campaigns/${id}`, {
           method: "PATCH",
-          headers: authH(),
           body: JSON.stringify({ name: campaignName, subject: baseSubject, body: baseBody, status: campaignStatus, type: campaignType, objective, toneProfile, description: strategyNote, stopOnReply }),
         });
         const d = await r.json();
@@ -841,9 +834,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           personalizedBody:    personalized?.body,
         };
       });
-      await fetch(`/api/crm/campaigns/${id}/recipients`, {
+      await adminFetch(`/api/crm/campaigns/${id}/recipients`, {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({ recipients }),
       });
       setSavedAt(new Date());
@@ -863,9 +855,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     setSendConfirmChecked(false);
     setSaveError("");
     try {
-      const r = await fetch(`/api/crm/campaigns/${campaignId}/send`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/send`, {
         method: "POST",
-        headers: authH(),
       });
       const d = await r.json();
       if (r.ok) {
@@ -887,9 +878,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     if (!campaignId || !sendResult) return;
     setResendingId(recipientId);
     try {
-      const r = await fetch(`/api/crm/campaigns/${campaignId}/recipients/${recipientId}/resend`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/recipients/${recipientId}/resend`, {
         method: "POST",
-        headers: authH(),
       });
       const d = await r.json();
       if (r.ok) {
@@ -917,7 +907,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     if (!campaignId) { setView("history"); setShowDeleteConfirm(false); return; }
     setDeleting(true);
     try {
-      await fetch(`/api/crm/campaigns/${campaignId}`, { method: "DELETE", headers: authH() });
+      await adminFetch(`/api/crm/campaigns/${campaignId}`, { method: "DELETE" });
       await refreshCampaigns();
       setView("history");
       setShowDeleteConfirm(false);
@@ -947,7 +937,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             return JSON.stringify({ to: testEmail, subject: personalized.subject, body: personalized.body });
           })();
 
-      const r = await fetch(url, { method: "POST", headers: authH(), body });
+      const r = await adminFetch(url, { method: "POST", body });
       const d = await r.json();
       setTestResult({
         ok: r.ok,
@@ -2067,7 +2057,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                           {c.status === "draft" && (
                             <DeleteCampaignBtn
                               onConfirm={async () => {
-                                await fetch(`/api/crm/campaigns/${c.id}`, { method: "DELETE", headers: authH() });
+                                await adminFetch(`/api/crm/campaigns/${c.id}`, { method: "DELETE" });
                                 setCampaigns(prev => prev.filter(x => x.id !== c.id));
                                 if (expandedId === c.id) setExpandedId(null);
                               }}

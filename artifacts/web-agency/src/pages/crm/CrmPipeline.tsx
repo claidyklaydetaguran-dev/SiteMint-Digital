@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
-import { LEAD_STATUSES, LEAD_STATUS_STYLES, type LeadStatus } from "@/lib/crmTaxonomy";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus, type LeadStatus } from "@/lib/crmTaxonomy";
+import { adminFetch } from "@/lib/adminFetch";
 
 const STAGES: readonly LeadStatus[] = LEAD_STATUSES;
 
@@ -26,27 +25,31 @@ interface Lead {
 }
 
 export default function CrmPipeline() {
-  const [, navigate] = useLocation();
   const [pipeline, setPipeline] = useState<Record<string,Lead[]>>({});
   const [loading, setLoading] = useState(true);
   const [movingId, setMovingId] = useState<number|null>(null);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const r = await fetch("/api/crm/pipeline", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    const r = await adminFetch("/api/crm/pipeline");
+    if (r.status === 401) return;
     const d = await r.json() as { pipeline: Record<string,Lead[]> };
-    setPipeline(d.pipeline || {});
+    // O-3: the API buckets by raw stored status; fold legacy keys into the
+    // canonical taxonomy so every lead lands in exactly one visible column.
+    const merged: Record<string, Lead[]> = {};
+    for (const [rawStatus, leads] of Object.entries(d.pipeline || {})) {
+      const key = normalizeLeadStatus(rawStatus);
+      merged[key] = [...(merged[key] ?? []), ...(Array.isArray(leads) ? leads : [])];
+    }
+    setPipeline(merged);
     setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const moveLead = async (leadId: number, newStatus: string) => {
     setMovingId(leadId);
-    await fetch(`/api/crm/leads/${leadId}`, {
+    await adminFetch(`/api/crm/leads/${leadId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
     setMovingId(null);

@@ -1,12 +1,11 @@
 import { useRef, useState, useCallback } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
   Upload, CheckCircle2, XCircle, AlertTriangle, ChevronRight,
   FileText, Users, GitBranch, RefreshCw, Download, X,
 } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -130,7 +129,6 @@ function downloadSample() {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CrmImport() {
-  const [, navigate] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [dragOver, setDragOver] = useState(false);
@@ -182,15 +180,14 @@ export default function CrmImport() {
   const displayRows = showAll ? rows : rows.slice(0, 15);
 
   const runImport = async () => {
-    if (!token()) { navigate("/admin?redirect=/admin/crm/import"); return; }
     if (sendable.length === 0) return;
     setImporting(true); setImportError(null);
     try {
-      const res = await fetch("/api/crm/import", {
+      const res = await adminFetch("/api/crm/import", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ rows: sendable.map(r => r.raw) }),
       });
+      if (res.status === 401) { setImporting(false); return; }
       if (!res.ok) { const d = await res.json() as { error?: string }; throw new Error(d.error ?? "Server error"); }
       setImportResult(await res.json() as ImportResult);
     } catch (e) {
@@ -200,13 +197,10 @@ export default function CrmImport() {
   };
 
   const runDiscovery = async () => {
-    if (!token()) { navigate("/admin?redirect=/admin/crm/import"); return; }
     setDiscLoading(true); setDiscError(null); setDiscResult(null);
     try {
-      const res = await fetch("/api/crm/import-discovery", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const res = await adminFetch("/api/crm/import-discovery", { method: "POST" });
+      if (res.status === 401) { setDiscLoading(false); return; }
       if (!res.ok) { const d = await res.json() as { error?: string }; throw new Error(d.error ?? "Server error"); }
       setDiscResult(await res.json() as { imported: number; skipped: number });
     } catch (e) {

@@ -112,6 +112,14 @@ const CrmBehavioralIntelligence = lazy(() => import("@/pages/crm/CrmBehavioralIn
 const CrmAutomationQueue = lazy(() => import("@/pages/crm/CrmAutomationQueue"));
 const CrmIntakeCases = lazy(() => import("@/pages/crm/CrmIntakeCases"));
 const CrmReceptionistAccounts = lazy(() => import("@/pages/crm/CrmReceptionistAccounts"));
+const CrmNotFound = lazy(() => import("@/pages/crm/CrmLayout").then(m => ({ default: m.CrmNotFound })));
+
+// ── Receptionist Ops (Operations owner, wp/operations) ──────────────────────
+const CrmOpsFirms = lazy(() => import("@/pages/ops/CrmOpsFirms"));
+const CrmOpsFirmDetail = lazy(() => import("@/pages/ops/CrmOpsFirmDetail"));
+const CrmOpsIssues = lazy(() => import("@/pages/ops/CrmOpsIssues"));
+const CrmOpsUsage = lazy(() => import("@/pages/ops/CrmOpsUsage"));
+const CrmOpsNumbers = lazy(() => import("@/pages/ops/CrmOpsNumbers"));
 
 const queryClient = new QueryClient();
 
@@ -170,7 +178,19 @@ function AdminRoutes() {
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
 
-      <Route component={NotFound} />
+      {/* Receptionist Ops (Operations owner) — firm detail registered before
+          the firms list is irrelevant here since these are distinct paths,
+          but the dynamic :id route must still be a separate, more specific
+          entry than the bare list route. */}
+      <Route path="/admin/ops/firms/:id" component={CrmOpsFirmDetail} />
+      <Route path="/admin/ops/firms" component={CrmOpsFirms} />
+      <Route path="/admin/ops/issues" component={CrmOpsIssues} />
+      <Route path="/admin/ops/usage" component={CrmOpsUsage} />
+      <Route path="/admin/ops/numbers" component={CrmOpsNumbers} />
+
+      {/* 404 inside the CRM chrome (sidebar + breadcrumbs) rather than the
+          bare public 404 card, for any unmatched /admin* deep link. */}
+      <Route component={CrmNotFound} />
     </Switch>
   );
 }

@@ -5,9 +5,7 @@ import {
   Calendar, Edit3, Save,
 } from "lucide-react";
 import { CrmLayout } from "./CrmLayout";
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,9 +84,8 @@ function InlineEdit({
     setSaving(true);
     setError("");
     try {
-      const r = await fetch(`/api/crm/campaigns/queue/${msg.id}`, {
+      const r = await adminFetch(`/api/crm/campaigns/queue/${msg.id}`, {
         method: "PATCH",
-        headers: authH(),
         body: JSON.stringify({ subject: subject || null, body: body || null }),
       });
       const d = await r.json();
@@ -303,9 +300,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
       const params = new URLSearchParams();
       if (statusFilter) params.set("status", statusFilter);
       if (campaignId)   params.set("campaignId", String(campaignId));
-      const r = await fetch(`/api/crm/campaigns/queue?${params}`, {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch(`/api/crm/campaigns/queue?${params}`);
       const d = await r.json();
       if (!r.ok) { setError(d.error ?? "Failed to load queue"); return; }
       setMessages(d.messages ?? []);
@@ -318,9 +313,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
 
   const loadScheduler = useCallback(async () => {
     try {
-      const r = await fetch("/api/crm/campaigns/scheduler/status", {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch("/api/crm/campaigns/scheduler/status");
       if (r.ok) setScheduler(await r.json());
     } catch { /* ignore */ }
   }, []);
@@ -331,9 +324,8 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
     setRunningNow(true);
     setFeedback(null);
     try {
-      const r = await fetch("/api/crm/campaigns/scheduler/run", {
+      const r = await adminFetch("/api/crm/campaigns/scheduler/run", {
         method: "POST",
-        headers: authH(),
       });
       const d = await r.json();
       if (r.ok) {
@@ -354,9 +346,8 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
     setBusyId(id);
     setFeedback(null);
     try {
-      const r = await fetch(`/api/crm/campaigns/queue/${id}/send-now`, {
+      const r = await adminFetch(`/api/crm/campaigns/queue/${id}/send-now`, {
         method: "POST",
-        headers: authH(),
       });
       const d = await r.json();
       if (r.ok) {
@@ -374,9 +365,8 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
 
   const cancelMsg = async (id: number) => {
     try {
-      await fetch(`/api/crm/campaigns/queue/${id}`, {
+      await adminFetch(`/api/crm/campaigns/queue/${id}`, {
         method: "DELETE",
-        headers: authH(),
       });
       setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "canceled" } : m));
     } catch { /* ignore */ }
@@ -394,9 +384,8 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
     }
     setRescheduling(true);
     try {
-      const r = await fetch(`/api/crm/campaigns/leads/${rescheduleTarget.leadId}/reschedule`, {
+      const r = await adminFetch(`/api/crm/campaigns/leads/${rescheduleTarget.leadId}/reschedule`, {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({ shiftDays: days }),
       });
       const d = await r.json();

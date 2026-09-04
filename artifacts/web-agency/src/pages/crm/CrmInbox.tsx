@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,8 +7,8 @@ import {
   Building, Globe, Tag, Calendar, ChevronRight, RefreshCw,
 } from "lucide-react";
 import { getSmsStatusInfo } from "@/lib/smsStatus";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
+import { normalizeLeadStatus } from "@/lib/crmTaxonomy";
 
 // FUTURE ENHANCEMENT: Browser Notification API could surface inbound messages
 // as desktop notifications when the tab is in the background. Requires user
@@ -74,8 +74,6 @@ interface FullLead {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CrmInbox() {
-  const [, navigate] = useLocation();
-
   // Core data
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [selected, setSelected] = useState<ConversationThread | null>(null);
@@ -156,9 +154,7 @@ export default function CrmInbox() {
   // ── Data fetch helpers ───────────────────────────────────────────────────────
 
   const loadFullLead = useCallback(async (leadId: number) => {
-    const r = await fetch(`/api/crm/leads/${leadId}`, {
-      headers: { Authorization: `Bearer ${token()}` },
-    });
+    const r = await adminFetch(`/api/crm/leads/${leadId}`);
     if (r.ok) {
       const d = await r.json() as { lead: FullLead };
       setSelectedLead(d.lead ?? null);
@@ -168,9 +164,7 @@ export default function CrmInbox() {
   const loadMessages = useCallback(async (leadId: number) => {
     setLoadingMsgs(true);
     try {
-      const r = await fetch(`/api/crm/leads/${leadId}/messages`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const r = await adminFetch(`/api/crm/leads/${leadId}/messages`);
       if (r.ok) {
         const d = await r.json() as { messages: CrmMessage[] };
         setMessages((d.messages || []).slice().reverse());
@@ -184,20 +178,11 @@ export default function CrmInbox() {
   // ── Initial full load ────────────────────────────────────────────────────────
 
   const loadThreads = useCallback(async () => {
-    if (!token()) {
-      navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`);
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const r = await fetch("/api/crm/conversations", {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
-      if (r.status === 401) {
-        navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`);
-        return;
-      }
+      const r = await adminFetch("/api/crm/conversations");
+      if (r.status === 401) return;
       if (!r.ok) throw new Error("fetch failed");
       const d = await r.json() as { conversations: ConversationThread[] };
       const convs = d.conversations || [];
@@ -227,7 +212,7 @@ export default function CrmInbox() {
     } finally {
       setLoading(false);
     }
-  }, [navigate, scrollToBottom, loadMessages, loadFullLead]);
+  }, [scrollToBottom, loadMessages, loadFullLead]);
 
   useEffect(() => { loadThreads(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -240,9 +225,7 @@ export default function CrmInbox() {
     if (manual) setIsRefreshing(true);
     setPollError("");
     try {
-      const r = await fetch("/api/crm/conversations", {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const r = await adminFetch("/api/crm/conversations");
       if (r.status === 401) return; // session expired — don't crash
       if (!r.ok) throw new Error("fetch failed");
       const d = await r.json() as { conversations: ConversationThread[] };
@@ -267,9 +250,7 @@ export default function CrmInbox() {
       // If selected thread has new messages, silently fetch them
       const selId = selectedRef.current?.leadId;
       if (selId != null && updatedLeadIds.includes(selId)) {
-        const r2 = await fetch(`/api/crm/leads/${selId}/messages`, {
-          headers: { Authorization: `Bearer ${token()}` },
-        });
+        const r2 = await adminFetch(`/api/crm/leads/${selId}/messages`);
         if (r2.ok) {
           const d2 = await r2.json() as { messages: CrmMessage[] };
           const msgs = (d2.messages || []).slice().reverse();
@@ -352,9 +333,8 @@ export default function CrmInbox() {
   const retrySms = async (leadId: number, body: string) => {
     setSending(true);
     try {
-      const r = await fetch(`/api/crm/leads/${leadId}/sms`, {
+      const r = await adminFetch(`/api/crm/leads/${leadId}/sms`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
       const data = await r.json() as { error?: string };
@@ -376,9 +356,8 @@ export default function CrmInbox() {
     setSending(true);
     setSmsError("");
     try {
-      const r = await fetch(`/api/crm/leads/${selected.leadId}/sms`, {
+      const r = await adminFetch(`/api/crm/leads/${selected.leadId}/sms`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body: smsBody.trim() }),
       });
       const data = await r.json() as { error?: string; success?: boolean };
@@ -418,8 +397,11 @@ export default function CrmInbox() {
 
       <div className="flex h-[calc(100vh-48px)]">
 
-        {/* ══ LEFT — Thread list ══════════════════════════════════════════════ */}
-        <div className="w-72 bg-white border-r border-gray-200 flex flex-col shrink-0">
+        {/* ══ LEFT — Thread list ══════════════════════════════════════════════
+            M-3: below md this is a single master/detail pane — the list fills
+            the screen until a thread is selected, then the center pane takes
+            over (with a back control) instead of a squeezed 3-column layout. */}
+        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-72 bg-white border-r border-gray-200 flex-col shrink-0`}>
 
           {/* Header */}
           <div className="px-4 py-3 border-b border-gray-100 space-y-1.5">
@@ -572,11 +554,19 @@ export default function CrmInbox() {
         </div>
 
         {/* ══ CENTER — Message thread ══════════════════════════════════════════ */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`flex-1 flex-col min-w-0 ${selected ? "flex" : "hidden md:flex"}`}>
           {selected ? (
             <>
               {/* Thread header */}
               <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => setSelected(null)}
+                  className="md:hidden w-7 h-7 -ml-1 flex items-center justify-center rounded-md hover:bg-gray-100 text-muted-foreground shrink-0"
+                  title="Back to inbox"
+                  aria-label="Back to inbox"
+                >
+                  <ChevronRight className="w-4 h-4 rotate-180" />
+                </button>
                 <div className={`w-9 h-9 rounded-full ${avatarColor(displayName(selected))} flex items-center justify-center shrink-0`}>
                   <span className="text-white text-sm font-bold">{initials(displayName(selected))}</span>
                 </div>
@@ -804,7 +794,7 @@ export default function CrmInbox() {
 
         {/* ══ RIGHT — Contact profile ══════════════════════════════════════════ */}
         {selected?.lead && (
-          <div className="w-64 bg-white border-l border-gray-200 overflow-y-auto shrink-0">
+          <div className="hidden lg:block w-64 bg-white border-l border-gray-200 overflow-y-auto shrink-0">
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center gap-3 mb-3">
                 <div className={`w-10 h-10 rounded-full ${avatarColor(displayName(selected))} flex items-center justify-center shrink-0`}>
@@ -886,7 +876,7 @@ export default function CrmInbox() {
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">CRM Details</h3>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Stage</span>
-                  <span className="font-medium">{selectedLead.status}</span>
+                  <span className="font-medium">{normalizeLeadStatus(selectedLead.status)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Agent</span>

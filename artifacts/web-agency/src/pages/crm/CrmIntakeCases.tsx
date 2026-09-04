@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CrmLayout } from "./CrmLayout";
 import { BotMessageSquare, RefreshCw } from "lucide-react";
 
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface IntakeCaseRow {
   id: number;
@@ -73,9 +73,7 @@ export default function CrmIntakeCases() {
     setLoading(true);
     setError("");
     try {
-      const r = await fetch("/api/intake/cases", {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const r = await adminFetch("/api/intake/cases");
       if (!r.ok) throw new Error(`${r.status}`);
       const data = await r.json() as { cases: IntakeCaseRow[] };
       setCases(data.cases);

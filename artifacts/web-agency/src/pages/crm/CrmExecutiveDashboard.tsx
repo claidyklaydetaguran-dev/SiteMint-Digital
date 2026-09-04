@@ -9,9 +9,9 @@ import {
   TrendingUp, Users, Trophy, DollarSign, Target, XCircle, Plus, ArrowRight,
   UserPlus, MessageSquare, CheckSquare, Upload, Phone, AlertTriangle,
   CheckCircle2, RefreshCw, Flame, ChevronRight, GitBranch, LayoutGrid,
+  UserCheck, Headphones, AlertOctagon, Briefcase,
 } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch, adminGet } from "@/lib/adminFetch";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,6 +63,13 @@ interface PriorityItem {
   type: "task" | "followup" | "hot-lead" | "inbox";
   title: string; reason: string; href: string; urgent: boolean;
 }
+interface ReceptionistAccount {
+  id: string | number; name?: string;
+  conversationCount?: number; trialConversationsLimit?: number;
+}
+interface VoiceIssue {
+  id: string | number; level?: string; message?: string; firmName?: string;
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -70,17 +77,12 @@ const STAGE_COLORS: Record<string, string> = {
   Lead: "#6366f1", Qualified: "#0ea5e9", Proposal: "#f97316",
   Won: "#10b981", Lost: "#ef4444",
 };
-const STATUS_BADGE: Record<string, string> = {
-  New: "bg-blue-100 text-blue-700", Contacted: "bg-sky-100 text-sky-700",
-  "Follow-up": "bg-yellow-100 text-yellow-700", "Proposal Sent": "bg-orange-100 text-orange-700",
-  Negotiating: "bg-purple-100 text-purple-700", Won: "bg-green-100 text-green-700",
-  Lost: "bg-red-100 text-red-700", Nurture: "bg-gray-100 text-gray-600",
-};
 const PRIORITY_BADGE: Record<string, string> = {
   High: "bg-red-100 text-red-600", Medium: "bg-yellow-50 text-yellow-700",
   Low: "bg-gray-100 text-gray-500",
 };
 const PRIORITY_ORDER: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
+const CLIENT_STATUSES = new Set(["Client", "Maintenance Client"]);
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -100,6 +102,54 @@ function StatCard({ label, value, sub, icon: Icon, color, loading }: {
         )}
         <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
       </div>
+    </div>
+  );
+}
+
+/** Smaller, de-emphasized stat tile — used for the demoted vanity-metrics strip. */
+function MiniStatCard({ label, value, icon: Icon, color, loading }: {
+  label: string; value: string; icon: React.ElementType; color: string; loading: boolean;
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3">
+      <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ background: color + "20" }}>
+        <Icon className="w-3.5 h-3.5" style={{ color }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+        {loading ? <div className="h-4 w-12 bg-gray-200 rounded animate-pulse mt-0.5" /> : (
+          <p className="text-sm font-bold text-foreground leading-tight">{value}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Lightweight, best-effort summary card for the additive O-2 sections. */
+function SummaryCard({ icon: Icon, color, title, body, href, hrefLabel, loading }: {
+  icon: React.ElementType; color: string; title: string; body: string;
+  href?: string; hrefLabel?: string; loading?: boolean;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: color + "20" }}>
+        <Icon className="w-4 h-4" style={{ color }} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">{title}</p>
+        {loading ? (
+          <div className="h-4 w-28 bg-gray-200 rounded animate-pulse mt-1" />
+        ) : (
+          <p className="text-sm font-medium text-foreground mt-0.5">{body}</p>
+        )}
+      </div>
+      {href && (
+        <Link href={href}>
+          <button className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0">
+            {hrefLabel ?? "View"} <ArrowRight className="w-3 h-3" />
+          </button>
+        </Link>
+      )}
     </div>
   );
 }
@@ -136,23 +186,22 @@ export default function CrmExecutiveDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // O-2 additive sections — best-effort, never block the main dashboard.
+  const [receptionistAccounts, setReceptionistAccounts] = useState<ReceptionistAccount[] | null>(null);
+  const [issuesCount, setIssuesCount] = useState<number | null>(null);
+
   const load = useCallback(async (silent = false) => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     if (silent) setRefreshing(true); else setLoading(true);
     try {
-      const h = { Authorization: `Bearer ${token()}` };
       const [statsRes, dealsRes, leadsRes, tasksRes, convsRes] = await Promise.allSettled([
-        fetch("/api/crm/deals/stats", { headers: h }),
-        fetch("/api/crm/deals", { headers: h }),
-        fetch("/api/crm/leads", { headers: h }),
-        fetch("/api/crm/tasks", { headers: h }),
-        fetch("/api/crm/conversations", { headers: h }),
+        adminFetch("/api/crm/deals/stats"),
+        adminFetch("/api/crm/deals"),
+        adminFetch("/api/crm/leads"),
+        adminFetch("/api/crm/tasks"),
+        adminFetch("/api/crm/conversations"),
       ]);
 
-      if (statsRes.status === "fulfilled") {
-        if (statsRes.value.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-        if (statsRes.value.ok) setStats(await statsRes.value.json() as DealStats);
-      }
+      if (statsRes.status === "fulfilled" && statsRes.value.ok) setStats(await statsRes.value.json() as DealStats);
       if (dealsRes.status === "fulfilled" && dealsRes.value.ok) {
         const d = await dealsRes.value.json() as { deals: RecentDeal[] };
         setRecentDeals((d.deals || []).slice(0, 8));
@@ -170,20 +219,44 @@ export default function CrmExecutiveDashboard() {
         setConversations(d.conversations || []);
       }
     } catch { /* ignore */ }
+
+    // Receptionist health — additive, best-effort. A missing/older backend
+    // route (404) or any other failure simply omits the section.
+    try {
+      const r = await adminGet<{ accounts: ReceptionistAccount[] }>("/api/admin/receptionist-accounts");
+      setReceptionistAccounts(r.accounts ?? []);
+    } catch {
+      setReceptionistAccounts(null);
+    }
+
+    // Unresolved issues — additive, best-effort. This backend route may not
+    // exist yet; never surface an error on the home dashboard for that.
+    try {
+      const r = await adminGet<{ items?: VoiceIssue[]; count?: number }>("/api/admin/voice/issues");
+      setIssuesCount(r.count ?? r.items?.length ?? 0);
+    } catch {
+      setIssuesCount(null);
+    }
+
     if (silent) setRefreshing(false); else setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   // ── Computed values ─────────────────────────────────────────────────────────
 
   const statCards = stats ? [
-    { label: "Total Revenue", value: fmt(stats.totalRevenue), sub: "From won deals", icon: DollarSign, color: "#10b981" },
     { label: "Active Leads", value: String(stats.activeLeads), sub: "In pipeline", icon: Users, color: "#6366f1" },
-    { label: "Win Rate", value: `${stats.winRate}%`, sub: "Won / (Won + Lost)", icon: Target, color: "#0ea5e9" },
     { label: "Open Deals", value: String(stats.openDeals), sub: "Lead · Qualified · Proposal", icon: TrendingUp, color: "#f97316" },
     { label: "Won Deals", value: String(stats.wonDeals), sub: "Closed successfully", icon: Trophy, color: "#10b981" },
     { label: "Lost Deals", value: String(stats.lostDeals), sub: "Did not close", icon: XCircle, color: "#ef4444" },
+  ] : [];
+
+  // Demoted per O-2: vanity totals, kept but moved to a small strip at the
+  // bottom of the page instead of the top KPI row.
+  const vanityCards = stats ? [
+    { label: "Total Revenue", value: fmt(stats.totalRevenue), icon: DollarSign, color: "#10b981" },
+    { label: "Win Rate", value: `${stats.winRate}%`, icon: Target, color: "#0ea5e9" },
   ] : [];
 
   const hasAnyRevenue = stats?.monthly.some(m => m.revenue > 0);
@@ -196,6 +269,35 @@ export default function CrmExecutiveDashboard() {
     () => tasks.filter(t => t.status === "overdue").length,
     [tasks],
   );
+
+  // O-2 §1 — Leads needing follow-up (overdue or due today), soonest first.
+  const followUpLeads = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86_400_000);
+    return leads
+      .filter(l => l.nextFollowUpAt && new Date(l.nextFollowUpAt) < todayEnd)
+      .sort((a, b) => new Date(a.nextFollowUpAt!).getTime() - new Date(b.nextFollowUpAt!).getTime())
+      .slice(0, 6)
+      .map(l => ({ ...l, overdue: new Date(l.nextFollowUpAt!) < todayStart }));
+  }, [leads]);
+
+  // O-2 §2 — Active clients (canonical "Client" / "Maintenance Client" leads).
+  const activeClientsCount = useMemo(
+    () => leads.filter(l => CLIENT_STATUSES.has(l.status)).length,
+    [leads],
+  );
+
+  // O-2 §3 — Receptionist health summary.
+  const receptionistSummary = useMemo(() => {
+    if (!receptionistAccounts) return null;
+    const nearLimit = receptionistAccounts.filter(a => {
+      const used = a.conversationCount ?? 0;
+      const limit = a.trialConversationsLimit ?? 0;
+      return limit > 0 && used / limit >= 0.8;
+    }).length;
+    return { total: receptionistAccounts.length, nearLimit };
+  }, [receptionistAccounts]);
 
   const priorities = useMemo((): PriorityItem[] => {
     const items: PriorityItem[] = [];
@@ -352,6 +454,12 @@ export default function CrmExecutiveDashboard() {
             <p className="text-sm text-muted-foreground mt-0.5">Your daily sales overview and priorities</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/admin/dashboard">
+              <button title="Discovery Portal"
+                className="text-xs text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                Discovery Portal
+              </button>
+            </Link>
             <button
               onClick={() => load(true)}
               disabled={refreshing || loading}
@@ -366,21 +474,6 @@ export default function CrmExecutiveDashboard() {
               </button>
             </Link>
           </div>
-        </div>
-
-        {/* ── KPI Stat Cards ──────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-          {loading
-            ? Array.from<unknown>({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 animate-pulse">
-                  <div className="w-10 h-10 rounded-lg bg-gray-200 mb-3" />
-                  <div className="h-2 w-16 bg-gray-200 rounded mb-2" />
-                  <div className="h-7 w-14 bg-gray-200 rounded mb-1" />
-                  <div className="h-2 w-20 bg-gray-100 rounded" />
-                </div>
-              ))
-            : statCards.map(card => <StatCard key={card.label} {...card} loading={false} />)
-          }
         </div>
 
         {/* ── Quick Actions ───────────────────────────────────────────────────── */}
@@ -406,89 +499,94 @@ export default function CrmExecutiveDashboard() {
           </div>
         </div>
 
-        {/* ── Charts Row ──────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* ── 1. Leads Needing Follow-Up ──────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Leads Needing Follow-Up</h2>
+            </div>
+            <Link href="/admin/crm/leads">
+              <button className="text-xs text-primary hover:underline flex items-center gap-1">
+                All leads <ArrowRight className="w-3 h-3" />
+              </button>
+            </Link>
+          </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-semibold text-foreground">Pipeline Distribution</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Deal count by stage</p>
-              </div>
-              <Link href="/admin/crm/deals">
-                <button className="text-xs text-primary hover:underline flex items-center gap-1">
-                  View board <ArrowRight className="w-3 h-3" />
+          {loading ? (
+            <div className="divide-y divide-gray-50">
+              {Array.from<unknown>({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
+                  <div className="h-4 w-20 bg-gray-200 rounded-full shrink-0" />
+                  <div className="flex-1"><div className="h-3 w-36 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-24 bg-gray-100 rounded" /></div>
+                </div>
+              ))}
+            </div>
+          ) : followUpLeads.length === 0 ? (
+            <div className="py-12 text-center">
+              <CheckCircle2 className="w-10 h-10 text-green-300 mx-auto mb-3" />
+              <p className="text-sm font-medium text-foreground">No follow-ups due.</p>
+              <p className="text-xs text-muted-foreground mt-1">Nothing overdue or due today.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {followUpLeads.map(l => (
+                <button
+                  key={l.id}
+                  onClick={() => navigate(`/admin/crm/leads/${l.id}`)}
+                  className={`w-full flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left ${l.overdue ? "border-l-2 border-red-400" : ""}`}
+                >
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${l.overdue ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                    {l.overdue ? "Overdue" : "Due Today"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium leading-snug truncate ${l.overdue ? "text-red-700" : "text-foreground"}`}>{l.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{[l.status, l.company].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
                 </button>
-              </Link>
+              ))}
             </div>
-            {loading ? (
-              <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
-            ) : !stats?.pipeline.some(p => p.count > 0) ? (
-              <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
-                <TrendingUp className="w-8 h-8 text-gray-200 mb-2" />
-                <p className="text-sm">No deals yet</p>
-                <Link href="/admin/crm/deals">
-                  <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700">+ Create your first deal</button>
-                </Link>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stats!.pipeline} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="stage" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#f9fafb" }} />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#6366f1"
-                    label={{ position: "top", fontSize: 10, fill: "#6b7280" }} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-semibold text-foreground">Monthly Revenue</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Won deal value over 6 months</p>
-              </div>
-              {stats && <span className="text-xs text-muted-foreground">Last 6 months</span>}
-            </div>
-            {loading ? (
-              <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
-            ) : !stats || !hasAnyRevenue ? (
-              <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
-                <DollarSign className="w-8 h-8 text-gray-200 mb-2" />
-                <p className="text-sm">No revenue data yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Close deals to see monthly trends</p>
-                <Link href="/admin/crm/deals">
-                  <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700">View pipeline</button>
-                </Link>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={stats.monthly} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false}
-                    tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`} />
-                  <Tooltip content={<CustomLineTooltip />} />
-                  <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5}
-                    dot={{ fill: "#10b981", r: 4 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* ── Today's Priorities + Hot Leads Row ─────────────────────────────── */}
+        {/* ── 2. Active Clients + 3. Receptionist Health ──────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <SummaryCard
+            icon={UserCheck} color="#10b981" title="Active Clients"
+            body={`${activeClientsCount} client${activeClientsCount !== 1 ? "s" : ""} (Client + Maintenance Client)`}
+            href="/admin/crm/leads" hrefLabel="View"
+            loading={loading}
+          />
+          {receptionistSummary ? (
+            <SummaryCard
+              icon={Headphones} color="#6366f1" title="Receptionist Health"
+              body={`${receptionistSummary.total} receptionist firm${receptionistSummary.total !== 1 ? "s" : ""}${receptionistSummary.nearLimit > 0 ? ` · ${receptionistSummary.nearLimit} near their trial limit` : ""}`}
+              href="/admin/ops/firms" hrefLabel="View all"
+              loading={loading}
+            />
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
+                <Headphones className="w-4 h-4 text-gray-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Receptionist Health</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{loading ? "Loading…" : "Not available"}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── 4. Today's Tasks (+ Hot Leads) ──────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-          {/* Today's Priorities */}
+          {/* Today's Priorities / Tasks */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-500" />
-                <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Today's Priorities</h2>
+                <CheckSquare className="w-4 h-4 text-orange-500" />
+                <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Today's Tasks</h2>
               </div>
               <Link href="/admin/crm/tasks">
                 <button className="text-xs text-primary hover:underline flex items-center gap-1">
@@ -600,84 +698,108 @@ export default function CrmExecutiveDashboard() {
           </div>
         </div>
 
-        {/* ── Recent Communications + Recent Deals Row ────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* ── 5. Unresolved Issues (best-effort, omitted if unavailable) ──────── */}
+        {issuesCount !== null && (
+          <SummaryCard
+            icon={AlertOctagon} color="#ef4444" title="Unresolved Issues"
+            body={`${issuesCount} unresolved issue${issuesCount !== 1 ? "s" : ""}`}
+            href="/admin/ops/issues" hrefLabel="View all"
+            loading={loading}
+          />
+        )}
 
-          {/* Recent Communications */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-sky-500" />
-                <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Recent Communications</h2>
-              </div>
-              <Link href="/admin/crm/inbox">
-                <button className="text-xs text-primary hover:underline flex items-center gap-1">
-                  Open Inbox <ArrowRight className="w-3 h-3" />
-                </button>
-              </Link>
-            </div>
+        {/* ── 7. Active Projects (deal pipeline + revenue) ────────────────────── */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase flex items-center gap-2">
+            <Briefcase className="w-3.5 h-3.5 text-emerald-500" /> Active Projects
+          </h2>
 
-            {loading ? (
-              <div className="divide-y divide-gray-50">
-                {Array.from<unknown>({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
-                    <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
-                    <div className="flex-1"><div className="h-3 w-32 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-20 bg-gray-100 rounded" /></div>
-                    <div className="h-3 w-10 bg-gray-100 rounded" />
+          {/* Deal-count stat strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {loading
+              ? Array.from<unknown>({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 animate-pulse">
+                    <div className="w-10 h-10 rounded-lg bg-gray-200 mb-3" />
+                    <div className="h-2 w-16 bg-gray-200 rounded mb-2" />
+                    <div className="h-7 w-14 bg-gray-200 rounded mb-1" />
+                    <div className="h-2 w-20 bg-gray-100 rounded" />
                   </div>
-                ))}
-              </div>
-            ) : recentConvs.length === 0 ? (
-              <div className="py-12 text-center px-5">
-                <MessageSquare className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-                <p className="text-xs text-muted-foreground mt-1">SMS and calls will appear here once Twilio is connected.</p>
-                <Link href="/admin/crm/inbox">
-                  <button className="mt-3 text-sm bg-emerald-600 text-white px-4 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
-                    Open Inbox
+                ))
+              : statCards.map(card => <StatCard key={card.label} {...card} loading={false} />)
+            }
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold text-foreground">Pipeline Distribution</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Deal count by stage</p>
+                </div>
+                <Link href="/admin/crm/deals">
+                  <button className="text-xs text-primary hover:underline flex items-center gap-1">
+                    View board <ArrowRight className="w-3 h-3" />
                   </button>
                 </Link>
               </div>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {recentConvs.map((conv, i) => {
-                  const lastMsg = conv.messages[conv.messages.length - 1];
-                  const isCall = lastMsg?.channel === "call";
-                  const isInbound = lastMsg?.direction === "inbound";
-                  const contactName = conv.lead?.name ?? "Unknown";
-                  return (
-                    <Link key={i} href="/admin/crm/inbox">
-                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                          {isCall
-                            ? <Phone className="w-3.5 h-3.5 text-green-600" />
-                            : <MessageSquare className="w-3.5 h-3.5 text-sky-500" />
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <p className="text-sm font-medium text-foreground truncate">{contactName}</p>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0 rounded-full shrink-0 ${isCall ? "bg-green-100 text-green-700" : "bg-sky-100 text-sky-700"}`}>
-                              {isCall ? "Call" : "SMS"}
-                            </span>
-                            {conv.unread > 0 && (
-                              <span className="text-[10px] font-bold px-1 py-0 rounded-full bg-red-500 text-white shrink-0">
-                                {conv.unread}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {isInbound ? "↓ Inbound" : "↑ Outbound"}
-                            {lastMsg?.body ? ` · ${lastMsg.body.slice(0, 40)}${lastMsg.body.length > 40 ? "…" : ""}` : ""}
-                          </p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground shrink-0">{timeAgo(conv.lastAt)}</p>
-                      </div>
-                    </Link>
-                  );
-                })}
+              {loading ? (
+                <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+              ) : !stats?.pipeline.some(p => p.count > 0) ? (
+                <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
+                  <TrendingUp className="w-8 h-8 text-gray-200 mb-2" />
+                  <p className="text-sm">No deals yet</p>
+                  <Link href="/admin/crm/deals">
+                    <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700">+ Create your first deal</button>
+                  </Link>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={stats!.pipeline} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <XAxis dataKey="stage" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#f9fafb" }} />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#6366f1"
+                      label={{ position: "top", fontSize: 10, fill: "#6b7280" }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold text-foreground">Monthly Revenue</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Won deal value over 6 months</p>
+                </div>
+                {stats && <span className="text-xs text-muted-foreground">Last 6 months</span>}
               </div>
-            )}
+              {loading ? (
+                <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+              ) : !stats || !hasAnyRevenue ? (
+                <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
+                  <DollarSign className="w-8 h-8 text-gray-200 mb-2" />
+                  <p className="text-sm">No revenue data yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Close deals to see monthly trends</p>
+                  <Link href="/admin/crm/deals">
+                    <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700">View pipeline</button>
+                  </Link>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={stats.monthly} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false}
+                      tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`} />
+                    <Tooltip content={<CustomLineTooltip />} />
+                    <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5}
+                      dot={{ fill: "#10b981", r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
 
           {/* Recent Deals */}
@@ -733,6 +855,99 @@ export default function CrmExecutiveDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ── Recent Communications ────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-sky-500" />
+              <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Recent Communications</h2>
+            </div>
+            <Link href="/admin/crm/inbox">
+              <button className="text-xs text-primary hover:underline flex items-center gap-1">
+                Open Inbox <ArrowRight className="w-3 h-3" />
+              </button>
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="divide-y divide-gray-50">
+              {Array.from<unknown>({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
+                  <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
+                  <div className="flex-1"><div className="h-3 w-32 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-20 bg-gray-100 rounded" /></div>
+                  <div className="h-3 w-10 bg-gray-100 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : recentConvs.length === 0 ? (
+            <div className="py-12 text-center px-5">
+              <MessageSquare className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
+              <p className="text-xs text-muted-foreground mt-1">SMS and calls will appear here once Twilio is connected.</p>
+              <Link href="/admin/crm/inbox">
+                <button className="mt-3 text-sm bg-emerald-600 text-white px-4 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                  Open Inbox
+                </button>
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {recentConvs.map((conv, i) => {
+                const lastMsg = conv.messages[conv.messages.length - 1];
+                const isCall = lastMsg?.channel === "call";
+                const isInbound = lastMsg?.direction === "inbound";
+                const contactName = conv.lead?.name ?? "Unknown";
+                return (
+                  <Link key={i} href="/admin/crm/inbox">
+                    <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+                        {isCall
+                          ? <Phone className="w-3.5 h-3.5 text-green-600" />
+                          : <MessageSquare className="w-3.5 h-3.5 text-sky-500" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <p className="text-sm font-medium text-foreground truncate">{contactName}</p>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0 rounded-full shrink-0 ${isCall ? "bg-green-100 text-green-700" : "bg-sky-100 text-sky-700"}`}>
+                            {isCall ? "Call" : "SMS"}
+                          </span>
+                          {conv.unread > 0 && (
+                            <span className="text-[10px] font-bold px-1 py-0 rounded-full bg-red-500 text-white shrink-0">
+                              {conv.unread}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {isInbound ? "↓ Inbound" : "↑ Outbound"}
+                          {lastMsg?.body ? ` · ${lastMsg.body.slice(0, 40)}${lastMsg.body.length > 40 ? "…" : ""}` : ""}
+                        </p>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground shrink-0">{timeAgo(conv.lastAt)}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Demoted vanity metrics (win rate / total revenue) ───────────────── */}
+        <div>
+          <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">Totals</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {loading
+              ? Array.from<unknown>({ length: 2 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm px-4 py-3 animate-pulse">
+                    <div className="w-7 h-7 rounded-md bg-gray-200 mb-2" />
+                    <div className="h-4 w-12 bg-gray-200 rounded" />
+                  </div>
+                ))
+              : vanityCards.map(card => <MiniStatCard key={card.label} {...card} loading={false} />)
+            }
           </div>
         </div>
 

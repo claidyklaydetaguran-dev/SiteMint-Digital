@@ -7,6 +7,8 @@ import {
   Star, Tag, Package, Clock, DollarSign, User, Building, Mail, Phone,
   CheckCircle2, AlertCircle, ExternalLink, Loader2,
 } from "lucide-react";
+import { adminFetch, adminLogout } from "@/lib/adminFetch";
+import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
 interface Submission {
   id: number;
@@ -139,7 +141,7 @@ function DocModal({ html, title, company, onClose }: { html: string; title: stri
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function AdminSubmissionDetail() {
+function AdminSubmissionDetailInner() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -156,20 +158,15 @@ export default function AdminSubmissionDetail() {
   const [crmLeadId, setCrmLeadId] = useState<number | null>(null);
   const [sendingToCrm, setSendingToCrm] = useState(false);
 
-  const token = localStorage.getItem("adminToken") || "";
-
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
   };
 
   const load = useCallback(async () => {
-    if (!token) { navigate("/admin"); return; }
     try {
-      const res = await fetch(`/api/admin/submissions/${params.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) { localStorage.removeItem("adminToken"); navigate("/admin"); return; }
+      const res = await adminFetch(`/api/admin/submissions/${params.id}`);
+      if (res.status === 401) return;
       if (!res.ok) { setError("Submission not found."); return; }
       const data = await res.json() as { submission: Submission };
       setSubmission(data.submission);
@@ -177,9 +174,8 @@ export default function AdminSubmissionDetail() {
       setNotes(data.submission.internalNotes || "");
       // Check if this submission is already in CRM
       try {
-        const crmRes = await fetch(
+        const crmRes = await adminFetch(
           `/api/crm/leads?search=${encodeURIComponent(data.submission.email)}`,
-          { headers: { Authorization: `Bearer ${token}` } },
         );
         if (crmRes.ok) {
           const crmData = await crmRes.json() as { leads: { id: number; email: string; discoverySubmissionId: number | null }[] };
@@ -197,7 +193,7 @@ export default function AdminSubmissionDetail() {
     } finally {
       setLoading(false);
     }
-  }, [token, params.id, navigate]);
+  }, [params.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -205,9 +201,8 @@ export default function AdminSubmissionDetail() {
     setSaving(true);
     setSaveMsg("");
     try {
-      const res = await fetch(`/api/admin/submissions/${params.id}`, {
+      const res = await adminFetch(`/api/admin/submissions/${params.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ status, internalNotes: notes }),
       });
       if (!res.ok) throw new Error();
@@ -224,9 +219,8 @@ export default function AdminSubmissionDetail() {
   const generateProposal = async () => {
     setGeneratingProp(true);
     try {
-      const res = await fetch(`/api/admin/submissions/${params.id}/proposal`, {
+      const res = await adminFetch(`/api/admin/submissions/${params.id}/proposal`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error();
       const data = await res.json() as { proposal: string };
@@ -244,9 +238,8 @@ export default function AdminSubmissionDetail() {
   const generateSOW = async () => {
     setGeneratingSOW(true);
     try {
-      const res = await fetch(`/api/admin/submissions/${params.id}/sow`, {
+      const res = await adminFetch(`/api/admin/submissions/${params.id}/sow`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error();
       const data = await res.json() as { sow: string };
@@ -263,9 +256,8 @@ export default function AdminSubmissionDetail() {
   const sendToCrmLead = async () => {
     setSendingToCrm(true);
     try {
-      const res = await fetch(`/api/crm/import-discovery/${params.id}`, {
+      const res = await adminFetch(`/api/crm/import-discovery/${params.id}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json() as { imported: boolean; existing: boolean; leadId: number; message: string };
       if (res.ok) {
@@ -281,7 +273,7 @@ export default function AdminSubmissionDetail() {
     }
   };
 
-  const logout = () => { localStorage.removeItem("adminToken"); navigate("/admin"); };
+  const logout = async () => { await adminLogout(); navigate("/admin"); };
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center text-muted-foreground">Loading...</div>
@@ -593,5 +585,13 @@ export default function AdminSubmissionDetail() {
         </main>
       </div>
     </>
+  );
+}
+
+export default function AdminSubmissionDetail() {
+  return (
+    <AdminRouteGuard>
+      <AdminSubmissionDetailInner />
+    </AdminRouteGuard>
   );
 }

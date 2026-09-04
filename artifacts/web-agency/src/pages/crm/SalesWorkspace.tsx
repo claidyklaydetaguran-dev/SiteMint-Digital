@@ -36,6 +36,7 @@ import {
   type BehavioralEvent,
   INTENT_STAGE_COLOR, EVENT_TYPE_LABELS,
 } from "@/lib/behavioralIntelligence";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,8 +89,6 @@ export interface SalesWorkspaceProps {
 }
 
 type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation" | "relationship" | "behavior";
-
-const tk = () => localStorage.getItem("adminToken") || "";
 
 // ── Sales Stage Tracker ───────────────────────────────────────────────────────
 
@@ -279,9 +278,8 @@ function DocPanel({
   const generate = useCallback(async () => {
     setGenerating(true);
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/${kind}/generate`, {
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/${kind}/generate`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tk()}` },
       });
       if (!r.ok) throw new Error();
       showToast(`${label} generated!`);
@@ -296,9 +294,8 @@ function DocPanel({
   const saveHtml = useCallback(async (newHtml: string) => {
     setSavingHtml(true);
     try {
-      await fetch(`/api/crm/leads/${lead.id}/${kind}`, {
+      await adminFetch(`/api/crm/leads/${lead.id}/${kind}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ html: newHtml }),
       });
       showToast("Saved!");
@@ -315,9 +312,8 @@ function DocPanel({
     setSavingStatus(true);
     try {
       const field = kind === "proposal" ? "proposalStatus" : "sowStatus";
-      await fetch(`/api/crm/leads/${lead.id}`, {
+      await adminFetch(`/api/crm/leads/${lead.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: newStatus }),
       });
       showToast(`Status updated to ${newStatus}`);
@@ -464,9 +460,8 @@ function NotesTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Pro
     if (!newNote.trim()) return;
     setAdding(true);
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/notes`, {
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/notes`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ note: newNote }),
       });
       if (!r.ok) throw new Error();
@@ -929,10 +924,7 @@ function CommunicationsTab({ lead, activities }: {
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
-    const t = tk();
-    fetch(`/api/crm/leads/${lead.id}/messages`, {
-      headers: { Authorization: `Bearer ${t}` },
-    })
+    adminFetch(`/api/crm/leads/${lead.id}/messages`)
       .then(r => r.ok ? r.json() : { messages: [] })
       .then((d: { messages?: CiMessage[] }) => setMsgs(d.messages ?? []))
       .catch(() => {})
@@ -1889,9 +1881,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
     setLoading(true);
     setError("");
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/behavioral-events`, {
-        headers: { Authorization: `Bearer ${tk()}` },
-      });
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/behavioral-events`);
       if (!r.ok) throw new Error("bad response");
       const data = await r.json() as { events: BehavioralEvent[] };
       setEvents(data.events ?? []);
@@ -1910,9 +1900,8 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
   const deleteEvent = async (eventId: number) => {
     setDeletingId(eventId);
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/behavioral-events/${eventId}`, {
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/behavioral-events/${eventId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${tk()}` },
       });
       if (!r.ok) throw new Error();
       showToast("Event removed.");

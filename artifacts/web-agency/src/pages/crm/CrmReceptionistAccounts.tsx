@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { CrmLayout } from "./CrmLayout";
 import { Building2, ArrowUpDown, ArrowUp, ArrowDown, Users, Zap } from "lucide-react";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -53,10 +54,7 @@ export default function CrmReceptionistAccounts() {
   const [sortDir,  setSortDir]  = useState<SortDir>("desc");
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken") ?? "";
-    fetch("/api/admin/receptionist-accounts", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    adminFetch("/api/admin/receptionist-accounts")
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{ accounts: Account[] }>;

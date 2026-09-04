@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Plus, X, Trash2, Edit2, Check, Calendar, User, ClipboardList, ExternalLink, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PROJECT_STAGES, PROJECT_STAGE_STYLES, PROJECT_TYPES, type ProjectStage } from "@/lib/crmTaxonomy";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 function fmt(n: number | string | null | undefined) {
   if (n == null || n === "") return null;
@@ -120,7 +118,6 @@ function ProjectCard({ project, onDragStart, onOpen }: {
 }
 
 export default function CrmProjectsPage() {
-  const [, navigate] = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,19 +131,18 @@ export default function CrmProjectsPage() {
   const savingRef = useRef(false);
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
     const [pRes, lRes] = await Promise.all([
-      fetch("/api/crm/projects", { headers: { Authorization: `Bearer ${token()}` } }),
-      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }),
+      adminFetch("/api/crm/projects"),
+      adminFetch("/api/crm/leads"),
     ]);
-    if (pRes.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+    if (pRes.status === 401) return;
     const pData = await pRes.json() as { projects: Project[] };
     const lData = await lRes.json() as { leads: Lead[] };
     setProjects(pData.projects || []);
     setLeads(lData.leads || []);
     setLoading(false);
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -175,9 +171,8 @@ export default function CrmProjectsPage() {
         notes: form.notes || null,
         generateTasks: form.generateTasks,
       };
-      const res = await fetch("/api/crm/projects", {
+      const res = await adminFetch("/api/crm/projects", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -202,9 +197,8 @@ export default function CrmProjectsPage() {
     const id = dragId;
     setDragId(null);
     setDragOverStage(null);
-    await fetch(`/api/crm/projects/${id}`, {
+    await adminFetch(`/api/crm/projects/${id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ stage: targetStage }),
     }).catch(() => load());
   };
@@ -427,7 +421,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/crm/projects/${projectId}`, { headers: { Authorization: `Bearer ${token()}` } });
+    const res = await adminFetch(`/api/crm/projects/${projectId}`);
     const data = await res.json() as { project: Project; tasks: Task[] };
     setProject(data.project);
     setTasks(data.tasks || []);
@@ -438,9 +432,8 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
   useEffect(() => { load(); }, [load]);
 
   const patchProject = async (body: Record<string, unknown>) => {
-    await fetch(`/api/crm/projects/${projectId}`, {
+    await adminFetch(`/api/crm/projects/${projectId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     onChanged();
@@ -449,9 +442,8 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
   const toggleTask = async (t: Task) => {
     const status = t.status === "completed" ? "pending" : "completed";
     setTasks(prev => prev.map(x => x.id === t.id ? { ...x, status } : x));
-    await fetch(`/api/crm/projects/${projectId}/tasks/${t.id}`, {
+    await adminFetch(`/api/crm/projects/${projectId}/tasks/${t.id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
     onChanged();
@@ -459,9 +451,8 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
 
   const addTask = async () => {
     if (!newTask.trim()) return;
-    const res = await fetch(`/api/crm/projects/${projectId}/tasks`, {
+    const res = await adminFetch(`/api/crm/projects/${projectId}/tasks`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ title: newTask.trim() }),
     });
     const data = await res.json() as { task: Task };
@@ -472,7 +463,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
 
   const deleteTask = async (id: number) => {
     setTasks(prev => prev.filter(t => t.id !== id));
-    await fetch(`/api/crm/projects/${projectId}/tasks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
+    await adminFetch(`/api/crm/projects/${projectId}/tasks/${id}`, { method: "DELETE" });
     onChanged();
   };
 
@@ -485,7 +476,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
 
   const deleteProject = async () => {
     if (!confirm("Delete this project and its tasks?")) return;
-    await fetch(`/api/crm/projects/${projectId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
+    await adminFetch(`/api/crm/projects/${projectId}`, { method: "DELETE" });
     onChanged();
     onClose();
   };

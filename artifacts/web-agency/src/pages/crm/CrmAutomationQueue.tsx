@@ -10,7 +10,7 @@ import {
   CheckCircle2, ChevronRight,
 } from "lucide-react";
 
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -125,9 +125,7 @@ export default function CrmAutomationQueue() {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch("/api/crm/intelligence/automation-queue", {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const r = await adminFetch("/api/crm/intelligence/automation-queue");
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json() as {
         leads: LeadRow[]; activities: (WeActivity & { leadId: number })[];
