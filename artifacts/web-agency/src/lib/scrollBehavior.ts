@@ -41,7 +41,13 @@ export function scrollToTop(): void {
  *  this runs, e.g. before layout settles — `preventScroll` keeps the focus
  *  move itself inert either way). */
 export function focusMainContent(): void {
-  document.getElementById(MAIN_CONTENT_ID)?.focus({ preventScroll: true });
+  const target =
+    document.getElementById(MAIN_CONTENT_ID) ??
+    document.querySelector<HTMLElement>("main") ??
+    document.querySelector<HTMLElement>("h1");
+  if (!target) return;
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
 }
 
 /** Idempotent: hands scroll ownership on history traversal from the browser

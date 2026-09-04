@@ -1,4 +1,5 @@
 import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
+import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import { useEffect, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -437,6 +438,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={ROUTER_BASE}>
+          {/* Persistent instance: the per-shell mounts remount with their route
+              (each Route renders its own shell), so their mount-skip swallows
+              the transition itself; this one survives every route change and
+              is the instance that actually resets scroll + focus. */}
+          <RouteScrollManager />
           <Router />
         </WouterRouter>
         <Toaster />
