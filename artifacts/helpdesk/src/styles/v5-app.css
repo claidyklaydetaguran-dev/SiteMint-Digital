@@ -131,3 +131,53 @@
     overflow-y: auto;
   }
 }
+
+/* ── Dashboard-embedded `.si-form` (Settings — business profile, change
+   password) — visual-completion fix, not a token change ──────────────────
+   `.si-form`/`.si-field`/`.si-input`/`.si-alert`/`.si-submit` (v2-signin.css)
+   read `--v2-*` custom properties that are only ever defined on `.si-page`,
+   the standalone light-forward auth route. Settings.tsx renders this same
+   form markup one level inside the dark `.sd-app` dashboard shell (root
+   class `.sg-page`, never `.si-page`), so every one of those properties was
+   unset there: `border`, `background`, and the label/badge `gap` all read an
+   invalid var() and dropped out entirely — text inputs rendered with no
+   visible box (border/background gone) and the "Required"/"Optional" badge
+   ran into the label with no space ("Business nameREQUIRED"). This block
+   supplies the same `--v2-*` names, scoped to `.sd-app .si-form` only (the
+   real `.si-page` sign-in route is untouched), pointing them at the
+   dashboard's own dark-surface tokens so the fields read as part of the V5
+   dark theme rather than flipping to the light auth palette. */
+.sd-app .si-form {
+  --v2-space-1: var(--sd-space-1, 0.25rem);
+  --v2-space-2: var(--sd-space-2, 0.5rem);
+  --v2-space-3: var(--sd-space-3, 0.75rem);
+  --v2-space-4: var(--sd-space-4, 1rem);
+  --v2-space-6: var(--sd-space-6, 1.5rem);
+
+  --v2-color-surface: var(--sd-surface, var(--sm-teal-900, #173642));
+  --v2-color-text: var(--sd-text, var(--sm-dark-text, #e8f5f7));
+  --v2-color-text-muted: var(--sd-text-muted, var(--sm-dark-muted, #9fc2cc));
+  --v2-color-border-strong: var(--sd-border-strong, color-mix(in oklab, var(--sm-dark-text, #e8f5f7) 24%, transparent));
+
+  --v2-color-action: var(--sd-accent, var(--sm-mint-500, #32c5d2));
+  --v2-color-text-on-action: var(--sd-accent-ink, var(--sm-ink-950, #153e52));
+  --v2-mint-100: var(--sm-mint-100, #dff7f7);
+
+  --v2-color-danger: var(--sm-red-600, #b42318);
+  --v2-color-danger-surface: color-mix(in oklab, var(--sm-red-600, #b42318) 14%, var(--sd-surface, var(--sm-teal-900, #173642)));
+
+  --v2-radius-control: var(--sd-radius-control, 8px);
+  --v2-focus-ring-width: 2px;
+  --v2-focus-ring-offset: 2px;
+  --v2-focus-ring-color: var(--sd-focus-color, var(--sm-mint-500, #32c5d2));
+
+  --v2-text-micro: 0.75rem;
+  --v2-text-small: 0.875rem;
+  --v2-text-body: 1rem;
+  --v2-weight-medium: 500;
+  --v2-weight-semibold: 600;
+  --v2-tracking-micro: 0.06em;
+  --v2-leading-body: 1.6;
+  --v2-duration-control: 150ms;
+  --v2-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
