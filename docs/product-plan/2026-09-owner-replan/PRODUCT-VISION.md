@@ -1,86 +1,62 @@
-# SiteMint — Product Vision (September 2026 replan)
+# SiteMint — Product Vision (reconciled 2026-09-04)
 
-> Planning document. Nothing here is implemented by virtue of being written down.
-> Status labels follow CURRENT-STATE.md. Owner decisions are collected in
-> OWNER-REVIEW-WORKBOOK.md.
+> Reconciled to the owner's final decisions and the Brand/Homepage/AI Receptionist amendment.
+> Superseded statements from the 2026-09-03 draft are marked. Owner decisions live in
+> OWNER-REVIEW-WORKBOOK.md; the executable plan is V5-BLUEPRINT.md.
 
 ## 1. What SiteMint is
 
-SiteMint Digital is a small agency that builds connected digital systems for service
-businesses (websites, web applications, CRM and workflow automation) and now sells one
-software product of its own: the **SiteMint AI Receptionist**, a voice-and-SMS
-receptionist that answers, qualifies and routes callers, and books time against the
-business's real calendar.
+SiteMint Digital builds connected digital systems for service businesses: websites, web
+applications, CRM and internal business systems, AI systems and automation, custom software
+engineering, connected workflows, and ongoing improvement using AI-assisted development.
+It also sells one product of its own, the **SiteMint AI Receptionist** — the highest-priority
+revenue product, but one part of the broader SiteMint system, never the whole identity.
 
 Three surfaces, one codebase:
 
 | Surface | Audience | Job |
 |---|---|---|
-| Company website | prospects for agency work | explain what SiteMint builds, prove it honestly, start a project |
-| AI Receptionist application | paying business customers | configure, run and monitor the receptionist |
+| Company website | prospects for agency work | explain everything SiteMint builds on the homepage alone, prove it honestly, start a project |
+| AI Receptionist application | invited business customers | set up, run and monitor the receptionist |
 | Operations CRM | SiteMint staff | run the agency pipeline and support every receptionist customer |
 
-## 2. The revenue priority
+## 2. Brand (amended)
 
-The AI Receptionist is the highest-priority revenue product. The agency website exists to
-sell projects and to carry the product landing page; the CRM exists to run the business and
-to support product customers. Every planning trade-off in this replan resolves in favour of
-getting an invite-only private beta of the receptionist live, honestly, as soon as possible.
+**SUPERSEDED (2026-09-03):** "ink navy, warm porcelain, mint, controlled electric cyan" with
+navy-led surfaces. **NOW:** a mint-centred identity — aqua-mint between green and blue as the
+lead colour, light-forward surfaces, deep teal for text, ink reserved for contrast and selected
+dramatic moments. Feeling: fresh, intelligent, premium, creative, calm, welcoming, technically
+sophisticated, unisex, recognisably SiteMint. Palette, tokens and contrast evidence:
+V5-BLUEPRINT §1–2. "Signal" is an internal codename and leaves public copy.
 
-## 3. Product principles (carried from V4 decisions D1–D10 and the backend program)
+Design consistency with page individuality: one token set, type system, spacing, buttons,
+focus, radii, shadows, icons, motion and accessibility everywhere — but every major page has
+one distinctive interaction signature (V5-BLUEPRINT §5) rather than repeated cards.
 
-1. **Honest by construction.** No invented clients, metrics, testimonials or "24/7" claims. A
-   capability is described as live only after it is certified on the customer's own account.
-2. **Safe by default.** Every provider capability is behind an exact-`"true"` flag, off by
-   default; recordings and transcripts are never retained (`VOICE_ARTIFACT_POLICY=none`);
-   the intake SMS number never touches Vapi.
-3. **One product story per surface.** Marketing has no app chrome, the app has no marketing,
-   the CRM is visibly internal. The user always knows which surface they are on.
-4. **Contract-pinned frontend.** Every screen has a committed contract test; retheming is
-   override-only; protected backend files are never edited.
-5. **Certify, then expose.** Backend milestones (M2–M4, AR-002B) are proven on staging before
-   the UI for them ships to customers.
+## 3. The revenue priority
 
-## 4. Vision by surface
+The AI Receptionist private beta (invite-only) is the immediate launch target. The website
+carries a strong product spotlight and a dedicated, product-only landing page; the CRM gains
+Receptionist Ops. Company positioning never reads "SiteMint is an AI receptionist company".
 
-### Company website
-An editorial, signal-themed site whose only conversion is "Start a Project" into a working
-discovery intake, plus a canonical AI Receptionist landing page with a labelled simulated
-demo until a live demo path is certified. Case studies appear only when real and consented.
+## 4. Product principles
 
-### AI Receptionist application
-A calm operations console for a business owner who is not technical:
-"Is my receptionist healthy, what needs me, what did it do today." Guided onboarding to a
-first successful browser test call; a single assistant per firm for the beta; availability,
-appointment types and Google Calendar as first-class setup steps; appointments with the full
-create / reschedule / cancel lifecycle; conversations and contacts in one place; usage and
-limits visible before they bite; issues surfaced in plain language. SMS and human transfer
-are "coming later" tiles until certified.
+1. Honest by construction — no invented clients, metrics, testimonials, "24/7" or "every call"; capabilities labelled Available now · Private beta · In development · Planned.
+2. Safe by default — exact-`"true"` flags, `VOICE_ARTIFACT_POLICY=none`, intake SMS number never near Vapi, staging paused until activation is authorised.
+3. One product story per surface; the user always knows which surface and page they are on, and routes open at the top.
+4. Contract-pinned frontend; protected backend files untouched; migrations versioned and additive.
+5. Certify, then expose — backend milestones (M2–M4, AR-002B) are proven before their UI ships; the browser call and inbound call are certified before any "Try the AI" or "live" wording.
 
-### Operations CRM
-The existing agency CRM stays (it is stable and in daily use) and gains a **Receptionist
-Operations** area: per-firm status, usage, open issues and support actions, backed by the
-admin diagnostics routes that already exist. Dead "Soon" nav items go; breadcrumbs and one
-scroll region come in.
+## 5. Recommended domain model (approved P-3, not implemented)
 
-## 5. Recommended domain model (not implemented)
+`sitemintdigital.com` (company) · `/ai-receptionist` (canonical product page) ·
+`ai-receptionist.sitemintdigital.com` (optional redirect only) · `app.sitemintdigital.com`
+(customer app) · `ops.sitemintdigital.com` (Operations CRM) · `api.sitemintdigital.com` (API).
+No DNS or domain work during local development.
 
-| Host | Surface | Notes |
-|---|---|---|
-| `sitemintdigital.com` | company website | canonical |
-| `sitemintdigital.com/ai-receptionist` | canonical product landing page | already the route |
-| `ai-receptionist.sitemintdigital.com` | optional marketing redirect → the path above | DNS only |
-| `app.sitemintdigital.com` | customer application (today `/ai-receptionist/dashboard`) | needs `BASE_PATH`, cookie scope, CORS allowlist changes (DESIGN-SPEC §9) |
-| `ops.sitemintdigital.com` | Operations CRM (today `/admin/*`) | edge gating recommended |
-| `api.sitemintdigital.com` | backend API | `CORS_ALLOWED_ORIGINS` must list the three web origins |
+## 6. Milestones
 
-Cutover is a separate program after the private beta proves the product; the current
-path-based layout is acceptable for invite-only customers.
-
-## 6. What "done" means for the next two milestones
-
-- **Owner preview accepted** — the owner has reviewed every surface in OWNER-REVIEW-WORKBOOK.md
-  and returned KEEP / CHANGE / REMOVE / ADD decisions.
-- **Invite-only private beta live** — AI-RECEPTIONIST-PRIVATE-BETA.md "required for private
-  beta" column fully green on a deployed origin with one real paying firm.
+- **Blueprint approved** — V5-BLUEPRINT.md accepted by the owner.
+- **Program executing** — the three workstreams run as one program with preview checkpoints.
+- **Invite-only private beta live** — AI-RECEPTIONIST-PRIVATE-BETA.md "required" column green on a deployed origin with one real firm.
 - **Public launch** — PUBLIC-LAUNCH-CHECKLIST.md closed, legal approved, domains cut over.

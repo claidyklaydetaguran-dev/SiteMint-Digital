@@ -1,87 +1,35 @@
-# Roadmap — Current State to Live
+# Roadmap — Current State to Live (reconciled 2026-09-04)
 
-> Planning document. Sequenced so that each step is independently reversible and each
-> phase ends with the standard verification gates. Dates are deliberately absent; order and
-> gates are the commitment.
+> Supersedes the R0–R9 sequence of 2026-09-03. PR #30 is merged (main `57ea6c8`). The work
+> is one integrated **SiteMint V5 Brand and Product Program** with three concurrent
+> workstreams and eight owner-visible phases (A–H). Engineering gates, migrations,
+> certifications and release boundaries remain mandatory; "one program" never means
+> all-at-once deployment.
 
-## Phase R0 — Owner review (now)
+## Workstreams
 
-Deliverable: this package. Exit: owner returns KEEP / CHANGE / REMOVE / ADD / UNCERTAIN per
-page in OWNER-REVIEW-WORKBOOK.md and a visual/product direction. **No merge, deploy or flag
-change until the review is complete.**
+| Workstream | Scope | Owner surface |
+|---|---|---|
+| A — Master brand + public website | mint design system, homepage expansion, page signatures, motion system, scroll-to-top, pricing, truthful copy, responsive performance | `artifacts/web-agency` public pages, tokens |
+| B — AI Receptionist revenue product | product landing page, call theater, Try-the-AI architecture, onboarding, configuration, calendar + booking, phone number, calls/contacts/usage/safe failure, private-beta activation | `artifacts/helpdesk`, `api-server` additive routes, `/ai-receptionist` page |
+| C — Customer application + operations | unified customer shell, navigation/orientation, receptionist health, Receptionist Ops, support visibility, secure Ops access | `artifacts/helpdesk` shell, `artifacts/web-agency` CRM |
 
-## Phase R1 — Merge the V4 frontend
+## Phases (owner-visible checkpoints)
 
-- Merge PR #30 (`17a7056` → `7d84bcb`) on explicit owner authorisation. If main has moved,
-  re-sync and re-run gates first (stop rule).
-- Deploy nothing yet; production Replit keeps serving its older snapshot.
+| Phase | Content | Preview checkpoint | Gate |
+|---|---|---|---|
+| **0 Blueprint** | V5-BLUEPRINT.md approved | this document set | owner approval |
+| **A Launch integrity** | truthful copy; Discovery submission repaired; V2 pricing/contact/verticals retired (pricing rebuilt); 404s; nav/orientation; mint tokens applied site-wide; scroll-to-top; motion system | mode-A preview of the website | sweep 5 widths, keyboard, reduced motion, LCP budget |
+| **B Customer foundation** | invite signup; password reset; persistent onboarding; redesigned Overview; approved sidebar + breadcrumbs; capability/error states | mode-B dashboard | contract suites, voice matrix |
+| **C Receptionist setup** | one-assistant experience; structured prompt; voice samples; prerequisite-aware Test/Activate | mode-B builder | contract suites |
+| **D Scheduling** | unbundle availability; Calendar screen; appointment lifecycle UI; Test Booking safety | mode-B + staging re-run (flags temporarily on, then off) | M4 UI evidence |
+| **E Calls and control** | Calls; minimal Contacts; Phone Number UI + provisioning path; Usage + limits; customer Issues | mode-B | contract suites |
+| **F Operations readiness** | secure admin auth; canonical statuses; Receptionist Ops; shared fetch/auth; essential responsive Ops views | mode-B CRM | route-security contract |
+| **G Certification** | browser test call; number assignment; real inbound call; live availability/booking tool loop; safe failure + alerts; zero-retention verification | staging (resume authorised by owner) | PILOT_ACTIVATION Stages 0–4 |
+| **H Invite-only launch** | production config review; private-beta legal docs; controlled flags; first customer; monitored activation + rollback | production | release checklist |
 
-## Phase R2 — Honesty and orientation fixes (website + both shells)
+Phases A, B/C and F can run concurrently (different file owners); D depends on B's shell; E on D; G on B–F; H on G.
 
-- `/discovery` submits; `/about`, `/work` copy corrected; 404 pages; mobile nav group label;
-  duplicate receptionist entry; `/services` anchors; V2-chrome pages retired or re-skinned.
-- Helpdesk: capability-state for every gated path; rail scroll; breadcrumbs.
-- CRM: `adminFetch` + guard + breadcrumbs + single scroll; nav cleanup.
-- Gates: full verification + R1-style sweep. Exit: zero bare 404s for known features.
+## Blockers only the owner can clear
 
-## Phase R3 — Calendar journey in the dashboard
-
-1. Unbundle availability / types / calendar status from the voice build flag.
-2. Calendar connection screen (start OAuth, status, disconnect, `?calendar=` handling).
-3. Appointments lifecycle controls over the calendar router (approve, reschedule, cancel booked).
-Exit: on staging with `CALENDAR_*` temporarily on, the owner connects the Sitemint Staging
-calendar, books, reschedules, cancels from the UI; flags back off; DB parity restored.
-
-## Phase R4 — Onboarding, overview, usage, issues, contacts, number
-
-4. Onboarding hub + Overview status header.
-5. Usage (voice minutes) + Issues page.
-6. Contacts minimal read route + page.
-7. Phone number page + guarded inventory insert (admin).
-Exit: a new firm can go from signup to "assistant ready" using only the product.
-
-## Phase R5 — Receptionist Ops in the CRM
-
-Firms, Firm detail (diagnostics), Issues (new admin route), Usage (per-firm).
-Exit: staff can see and support every beta firm without database access.
-
-## Phase R6 — Staging activation for the beta (PILOT_ACTIVATION Stages 0–4)
-
-Provider config → publish → browser test call → number + inbound call → alerts/reconciliation.
-Each stage owner-executed with evidence; every flag independently reversible.
-Exit: one scripted real inbound call books and then cancels into a test calendar with the
-expected rows and no transcript.
-
-## Phase R7 — Production promotion and first invited customer
-
-Release checklist, preflight, backup, restore drill; production flags mirrored from staging;
-first firm onboarded personally; manual invoicing. Exit: the firm takes real calls for a week
-with daily issue review and a weekly restore drill.
-
-## Phase R8 — Public launch preparation
-
-Legal approval; password reset; billing catalog + Stripe test clocks; pricing posture;
-integrations page; domain program; performance on the deployed origin.
-
-## Phase R9 — Public launch
-
-Registration open; forms open; marketing site cut over; monitoring and digest on.
-
-## Post-launch
-
-SMS for the voice product (policy), human transfer, team members, saved views, cost roll-up,
-hero film, case studies, Insights.
-
-## Recommended implementation order (single list)
-
-1. Owner review → 2. Merge PR #30 → 3. R2 honesty/orientation → 4. Calendar unbundle →
-5. Calendar connection screen → 6. Appointments lifecycle → 7. Onboarding + Overview →
-8. Usage + Issues → 9. Contacts → 10. Phone number → 11. CRM Receptionist Ops →
-12. Staging activation Stages 0–4 → 13. Production promotion → 14. First customer →
-15. Legal + billing + domains → 16. Public launch.
-
-## Blockers that only the owner can clear
-
-Merge authorisation · Vapi production credentials · a voice-only phone number · Google
-production OAuth client · Resend key · the plan catalog and pricing · legal approval of
-privacy/terms · the retention decision · DNS for the domain program · any paid generation.
+Blueprint approval · Vapi production credentials · a voice-only phone number · Google production OAuth client · Resend key · two additive migrations (onboarding state, admin sessions) · voice-sample source · legal review · any paid generation (hero video 650–7,000 credits per take; see V5-BLUEPRINT §8) · DNS.

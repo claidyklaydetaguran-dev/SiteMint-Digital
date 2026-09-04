@@ -1,4 +1,11 @@
-# Customer Dashboard Plan (AI Receptionist application)
+# Customer Dashboard Plan (AI Receptionist application) — reconciled 2026-09-04
+
+> **Owner decisions applied (D-1…D-9, C-1…C-6, B-1…B-6, A-1…A-4, U-1…U-4, S-1…S-3).** Where a
+> row below conflicts with OWNER-REVIEW-WORKBOOK.md, the workbook wins. Superseded items:
+> the 2026-09-03 nav proposal (replaced by the D-2 nav), bottom mobile nav (D-9 keeps the
+> drawer), "Integrations page with a calendar card" (Calendar lives under Scheduling, D-8/B-4),
+> "Sync" wording (C-5: Save changes / Publish update), "Booking preview" (B-5: Test Booking).
+> Persistent onboarding needs an additive migration (owner approval).
 
 > Planning document. Each item maps to a row in CURRENT-STATE.md §4 and a requirement in
 > AI-RECEPTIONIST-PRIVATE-BETA.md. Implementation phases are contract-aware: every listed
@@ -63,6 +70,10 @@ the flag off (the 16/20-variant voice matrix stays in CI).
 7. Phone number page over existing routes + guarded inventory insert (admin).
 8. Nav regroup, breadcrumbs, capability-state for every path, 404.
 9. Test-call certification run (owner-authorised paid call).
+
+## 4a. Approved navigation (D-2)
+
+Overview · Setup · Assistant (Configuration, Prompt, Voice) · Scheduling (Availability, Appointment Types, Calendar, Appointments) · Activity (Calls, Conversations, Contacts) · Channels (Phone Number, SMS, Transfers when implemented) · Account (Usage, Billing, Settings, Support). Removed from nav until functional: Tools, Voice Library, Knowledge, Analytics, Testing, Structured Outputs, Integrations, API Keys.
 
 ## 5. Out of scope for the beta dashboard
 

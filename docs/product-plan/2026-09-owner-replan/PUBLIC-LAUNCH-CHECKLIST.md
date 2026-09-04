@@ -1,69 +1,56 @@
-# Public Launch Checklist
+# Public Launch Checklist (reconciled 2026-09-04)
 
-> Owner-facing. Every line names who closes it. Items marked [OWNER] are hard stops that
-> only the owner executes or authorises. Supersedes nothing: docs/frontend-v3/LAUNCH-CHECKLIST.md
-> and docs/backend-program/PILOT_ACTIVATION.md remain the detailed sources.
+> [OWNER] items are hard stops only the owner executes or authorises.
 
-## A. Required for owner preview (this package) — DONE 2026-09-03
+## A. Done
 
-- [x] Source identities verified (main `7d84bcb`, PR #30 `17a7056`, checks green, build hash-equivalent to R1)
-- [x] Staging cost contained (deployment paused; App, DB, secrets, number, assistants intact)
-- [x] Mode A (current product) and mode B (certified-capability, synthetic) preview servers
-- [x] Route inventory, current-state ledger, dependency map, defects, deferred list
-- [x] Screenshots at 360 / 768 / 1024 / 1440 / 1920
-- [x] Owner decision sheet (OWNER-REVIEW-WORKBOOK.md)
+- [x] Owner preview package, decisions and amendment recorded (OWNER-REVIEW-WORKBOOK.md)
+- [x] PR #30 merged at the exact reviewed identity → main `57ea6c8` (2026-09-04); nothing deployed
+- [x] Branch `feature/ai-receptionist-private-beta-readiness` created from `57ea6c8` (local; push on authorisation)
+- [x] Staging deployment paused; App, DB, secrets, number, assistants intact
 
-## B. Required for invite-only private beta
+## B. Blueprint gate
 
-Frontend (each a contract-aware PR on top of PR #30):
-- [ ] Merge PR #30 after owner review [OWNER authorises]
-- [ ] Unbundle availability / types / calendar status from the voice build flag
-- [ ] Calendar connection screen; Settings honours `?calendar=`
-- [ ] Appointments: approve / reschedule / cancel booked (calendar router)
-- [ ] Onboarding hub + Overview status header
-- [ ] Usage (voice minutes) + Issues page
-- [ ] Contacts minimal route + page
-- [ ] Phone number page + guarded inventory insert
-- [ ] Nav regroup, breadcrumbs, capability states, 404s (both apps)
-- [ ] Receptionist Ops → Firms / Firm detail in the CRM
-- [ ] Website honesty copy: `/about`, `/work` (discovery + "answers real calls" claims); `/discovery` wired to submit
+- [ ] [OWNER] Approve V5-BLUEPRINT.md (palette, tokens, wireframes, storyboards, motion, pricing, demo architecture, agent map, PR boundaries)
 
-Backend activation (PILOT_ACTIVATION Stages 0–4, staging first then production):
+## C. Required for the invite-only private beta
+
+Program PRs (V5-BLUEPRINT §14): PR-1 tokens + motion + routing · PR-2 website integrity + homepage · PR-3 pricing + services · PR-4 AI Receptionist page + preview · PR-5 customer shell + onboarding + auth · PR-6 assistant setup · PR-7 scheduling · PR-8 calls/contacts/number/usage/issues · PR-9 Receptionist Ops + secure admin auth · PR-10 responsive Ops + cleanup.
+
+- [ ] [OWNER] Approve the two additive migrations (onboarding state; admin sessions)
+- [ ] [OWNER] Voice-sample source for the two presets
 - [ ] [OWNER] Vapi production key + webhook credential; `VOICE_SERVER_URL`; `VOICE_ARTIFACT_POLICY=none`; runtime catalog
-- [ ] [OWNER] `VOICE_PUBLISH_ENABLED`, `VOICE_WEBHOOK_ATTACH_ENABLED`, `VOICE_TOOLS_ATTACH_ENABLED` → publish pilot assistant
-- [ ] [OWNER] One browser test call (SiteMint path) — certify rows, no transcript
-- [ ] [OWNER] Voice-only number acquired (never the intake SMS number); inventory row; assign; scripted real inbound call
-- [ ] [OWNER] Google OAuth client for production; `CALENDAR_CONNECT_ENABLED`, `CALENDAR_WRITE_ENABLED`; pilot firm connects its own calendar
-- [ ] [OWNER] `PUBLIC_REGISTRATION_ENABLED` (or invite tokens); `PUBLIC_FORM_SUBMISSIONS_ENABLED` for the website forms
-- [ ] [OWNER] Resend key; `VOICE_ALERTS_ENABLED`, `VOICE_DIGEST_ENABLED`, `VOICE_METRICS_TOKEN`; `VOICE_RECONCILIATION_ENABLED`
+- [ ] [OWNER] Flip publish/webhook-attach/tools-attach; publish the pilot assistant; one browser test call
+- [ ] [OWNER] Voice-only number (never the intake SMS number); inventory row; assign; scripted inbound call
+- [ ] [OWNER] Google production OAuth client; calendar flags; pilot firm connects its calendar
+- [ ] [OWNER] Invite mechanism live (`PUBLIC_REGISTRATION_ENABLED` stays off for the public); `PUBLIC_FORM_SUBMISSIONS_ENABLED` after the discovery journey passes testing
+- [ ] [OWNER] Resend key; alerts, digest, metrics token, reconciliation flags
+- [ ] Private-beta legal documents reviewed
 - [ ] Release checklist + preflight + backup + restore drill on the deployed SHA
 
-Verification gates (every PR): typecheck, full tests, contract suites, both builds,
-voice matrix, protected-file 0-diff, secret scan, built-output boundary scan, route sweep
-at five widths with zero overflow / zero console errors, keyboard contract, reduced motion.
+Verification gates on every PR: typecheck, full tests, contract suites, both builds, voice
+matrix, protected-file 0-diff, secret scan, built-output boundary scan (extended to
+web-agency if a Vapi public key ever enters that bundle), route sweep at five widths with
+zero overflow / zero console errors, keyboard contract, reduced motion, scroll-to-top tests,
+LCP budget on the realistic server.
 
-## C. Required before public launch
+## D. Required before public launch
 
-- [ ] [OWNER/LEGAL] Privacy Policy and Terms approved by counsel
-- [ ] [OWNER] Recording/transcript retention decision documented (default stays `none`)
-- [ ] Password reset UI (`PASSWORD_RESET_REQUESTS_ENABLED`)
-- [ ] Billing: plan catalog + pricing [OWNER]; `VOICE_PLAN_CATALOG_JSON`; Stripe voice webhook; test-clock run for grace → suspended
-- [ ] Integrations page (calendar card)
-- [ ] Pricing posture on `/ai-receptionist`; `/pricing` V2 page retired or rebuilt
-- [ ] `/contact` on V4 chrome; legacy vertical landers retired or sourced
-- [ ] Domain program: `app.` / `ops.` / `api.` hosts, `BASE_PATH`, cookie scope, CORS allowlist, edge gating for ops [OWNER DNS]
-- [ ] Performance: mobile LCP ≤ 2.5 s on the deployed origin (prerender needs hosting rewrite config)
-- [ ] Google OAuth app verification (consent screen) if scopes require it [OWNER]
-- [ ] Support runbooks read by whoever answers customers (INCIDENT, NUMBER_PAUSE, ROLLBACK)
+- [ ] [OWNER/LEGAL] Privacy Policy and Terms approved; retention statement confirmed
+- [ ] [OWNER] AI Receptionist pricing from measured costs; self-serve plans; Stripe voice webhook + test clocks
+- [ ] "Try the AI" live demo advertised only after end-to-end browser-call certification and cost controls (V5-BLUEPRINT §10)
+- [ ] Domain program (`app.` / `ops.` / `api.`), CORS, cookie scope, edge gating for ops [OWNER DNS]
+- [ ] Hero videos (homepage, AI Receptionist) generated only after storyboard approval and credit authorisation [OWNER]
+- [ ] Performance: mobile LCP ≤ 2.5 s on the deployed origin with poster-first media
+- [ ] Google OAuth app verification if scopes require it [OWNER]
 
-## D. Post-launch
+## E. Post-launch
 
-- SMS from the voice product (Stage 6, consent policy) · human transfer UI + live certification ·
-  team members · saved views · cross-firm usage/cost roll-up · hero film · case studies ·
-  Insights · Vapi tools/knowledge/analytics surfaces · entitlement enforcement semantics.
+SMS from the voice product (policy) · human transfer · team members · shared saved views ·
+cross-firm usage/cost roll-up · case studies · Insights · Vapi tools/knowledge/analytics.
 
-## E. Standing prohibitions (unchanged)
+## F. Standing prohibitions
 
-Never import the intake SMS number into Vapi; never enable Vapi SMS on it; never edit
-protected files; never run push/migrate against production; never merge, deploy, publish or
-change production data without explicit owner approval.
+Never import the intake SMS number into Vapi; never edit protected files; never run push or
+migrate against production; never merge, deploy, publish, resume staging, activate providers or
+spend credits without explicit owner approval.

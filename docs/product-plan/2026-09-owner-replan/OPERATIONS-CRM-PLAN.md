@@ -1,4 +1,11 @@
-# Operations CRM Plan
+# Operations CRM Plan — reconciled 2026-09-04
+
+> **Owner decisions applied (O-1…O-10, M-3).** O-1 adds a security requirement not in the
+> 2026-09-03 draft: before real customer data enters the beta, replace the restart-dependent
+> password + localStorage bearer with a persistent httpOnly-cookie session, proper logout,
+> rate limiting and an audit trail (additive `crm_admin_sessions` table, push mode, owner
+> approval). O-2 replaces the KPI-led Command Center with an attention-led one. O-7 merges the
+> two dashboards. Everything else in this file stands.
 
 > Planning document. The CRM is a stable, daily-use internal tool with locked engines
 > (`discEngine`, `leadScore`, `communicationIntelligence`, `workflowEngine`) and a protected

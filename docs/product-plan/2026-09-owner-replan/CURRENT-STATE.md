@@ -6,6 +6,10 @@
 > not against memory or earlier reports. Where a claim rests on a staging certification
 > rather than on code, the certification document is named.
 
+## 0a. Update 2026-09-04
+
+PR #30 was merged at the exact reviewed identity (head `17a7056`, base `7d84bcb`, both checks green) → protected main **`57ea6c8d1902b1520fff9697379109edaaa84f04`**. Nothing was deployed or activated; staging stays paused. The ledger rows below still describe the code, which is unchanged by the merge. Owner decisions that change a row's target state are in OWNER-REVIEW-WORKBOOK.md and V5-BLUEPRINT.md.
+
 ## 0. Source identities (verified 2026-09-03)
 
 | Item | Value |
