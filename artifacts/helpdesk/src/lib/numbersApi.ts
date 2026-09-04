@@ -75,14 +75,22 @@ export async function fetchNumbers(): Promise<{ items: PhoneNumberSummary[]; cou
   return { items: res.items.map(normalizeNumber), count: res.count };
 }
 
+async function mutateNumber(path: string, body?: unknown): Promise<{ number: PhoneNumberSummary }> {
+  const res = await apiFetch<{ number: NumberDtoWire }>(path, {
+    method: "POST",
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  return { number: normalizeNumber(res.number) };
+}
+
 export function assignNumber(id: number, assistantId: number): Promise<{ number: PhoneNumberSummary }> {
-  return apiFetch(`/receptionist/voice/numbers/${id}/assign`, { method: "POST", body: JSON.stringify({ assistantId }) });
+  return mutateNumber(`/receptionist/voice/numbers/${id}/assign`, { assistantId });
 }
 
 export function pauseNumber(id: number): Promise<{ number: PhoneNumberSummary }> {
-  return apiFetch(`/receptionist/voice/numbers/${id}/pause`, { method: "POST" });
+  return mutateNumber(`/receptionist/voice/numbers/${id}/pause`);
 }
 
 export function unpauseNumber(id: number): Promise<{ number: PhoneNumberSummary }> {
-  return apiFetch(`/receptionist/voice/numbers/${id}/unpause`, { method: "POST" });
+  return mutateNumber(`/receptionist/voice/numbers/${id}/unpause`);
 }
