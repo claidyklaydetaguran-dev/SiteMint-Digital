@@ -33,6 +33,7 @@ import { SiteFooterV3 } from "@/components/v3/SiteFooterV3";
 import { SiteHeaderV4 } from "@/components/v4/SiteHeaderV4";
 import { SiteFooterV4 } from "@/components/v4/SiteFooterV4";
 import { useHashScrollV4 } from "@/components/v4/useHashScrollV4";
+import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import { HOME_SECTIONS } from "@/lib/routes";
 
 interface PublicShellProps {
@@ -80,6 +81,7 @@ export function PublicShell({
         data-hero-tone={heroTone}
         data-tone={heroTone === "ink" ? "ink" : "porcelain"}
       >
+        <RouteScrollManager />
         <a className="v4-skip" href={`#${HOME_SECTIONS.main}`}>
           Skip to main content
         </a>
@@ -101,6 +103,7 @@ export function PublicShell({
         data-hero-tone={heroTone}
         data-tone={heroTone === "ink" ? "ink" : "porcelain"}
       >
+        <RouteScrollManager />
         <a className="v3-skip" href={`#${HOME_SECTIONS.main}`}>
           Skip to main content
         </a>
@@ -116,6 +119,7 @@ export function PublicShell({
   if (chrome !== "v2") {
     return (
       <div className="v2-public-shell" data-shell="public">
+        <RouteScrollManager />
         {boundary}
       </div>
     );
@@ -123,6 +127,7 @@ export function PublicShell({
 
   return (
     <div className="v2-public-shell v2-shell" data-shell="public" data-chrome="v2">
+      <RouteScrollManager />
       <a className="v2-skip" href={`#${HOME_SECTIONS.main}`}>
         Skip to main content
       </a>

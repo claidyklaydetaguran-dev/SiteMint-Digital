@@ -1,0 +1,201 @@
+/**
+ * SiteMint V5 "Signal, mint-led" — override-only remap (V5-BLUEPRINT §1, §2,
+ * §14 PR-1). Retheme-not-rewrite, exactly the mechanism tokens-v4.css itself
+ * introduced: nothing here rewrites a pinned file (v4-chrome.css,
+ * v4-home.css, v4-air.css, v4-auth.css, v4-ops.css, v3-*.css) — it only
+ * redefines the CSS custom properties those files already read, and a small
+ * number of rules whose pinned declarations are literal (hex/rgba) rather
+ * than `var()`, restated here at matching or higher specificity so the
+ * cascade resolves to System B without editing the file that owns them.
+ *
+ * Loaded last in index.css (after tokens-v5.css and every V2–V4 layer), so
+ * `.v4-shell { ... }` wins the V4 palette block on source order at equal
+ * specificity, and the few doubled/compound selectors below win on
+ * specificity regardless of order — the same two techniques v4-auth.css and
+ * v4-ops.css already use.
+ *
+ * Because a V4 rule that reads `var(--v3-mint)` was itself defined (by
+ * tokens-v4.css) as `--v3-mint: var(--v4-cyan)`, redefining `--v4-cyan` here
+ * is enough — the `--v3-*` alias re-resolves against the new value
+ * automatically without this file redeclaring it. Only the handful of V4
+ * primitives that were literal hex/rgba (not `var()`) need a direct entry
+ * below (`--v3-ice`, `--v3-glow-mint`, the header's dark-surface tint, the
+ * primary button's hardcoded white text).
+ *
+ * ROLLBACK: remove this file's import from index.css to restore the V4 cyan
+ * appearance byte-for-byte — nothing it touches is deleted, only shadowed.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Public chrome + homepage + AI Receptionist landing (`.v4-shell`).
+   ───────────────────────────────────────────────────────────────────────── */
+.v4-shell {
+  /* ── V4 root primitives, re-pointed to System B (V5-BLUEPRINT §2) ──────
+     Every `.v4-shell` descendant that reads `var(--v4-*)` picks these up;
+     every `--v3-*` alias tokens-v4.css declared as `var(--v4-*)` re-resolves
+     through them for free. */
+  --v4-ink: var(--sm-ink-950); /* #0A2A2E — hero field, deepest dark */
+  --v4-navy: var(--sm-teal-900); /* #0B3A3E — raised dark surface */
+  --v4-navy-2: color-mix(in oklab, var(--sm-teal-900) 86%, white); /* hover-on-dark */
+  --v4-navy-line: color-mix(in oklab, var(--sm-dark-text) 16%, transparent);
+  --v4-cloud: var(--sm-porcelain); /* #F7FBF9 — page background */
+  --v4-paper: var(--sm-white); /* surfaces */
+  --v4-mist: var(--sm-line); /* #D7E7E3 — hairlines on light */
+  --v4-line-strong-l: var(--sm-line-strong); /* #B5D2CB */
+  --v4-text: var(--sm-teal-900); /* #0B3A3E — deep-teal primary text */
+  --v4-mute: var(--sm-slate-600); /* #526B70 — muted text on light */
+  --v4-mute-dark: var(--sm-dark-muted); /* #9FC3BC — muted text on dark */
+  --v4-cyan: var(--sm-mint-500); /* #25D0B0 — accent on dark / bright fills */
+  --v4-cyan-deep: var(--sm-mint-700); /* #0E7F6B — text-safe link/focus mint */
+  --v4-turquoise: var(--sm-mint-400); /* #4FD9CF — secondary accent */
+  --v4-mint: var(--sm-mint-500); /* completion accent stays in the mint family */
+  /* --v4-amber / --v4-amber-deep / --v4-red / --v4-red-deep / --v4-green-ok:
+     intentionally NOT overridden — amber stays reserved for human-attention
+     states and red/green stay semantic-only (V5-BLUEPRINT §1), unrelated to
+     the navy/cyan retirement this file exists to do. */
+
+  /* Two `--v3-*` primitives tokens-v4.css declared as literal values (not
+     `var()`), so they need a direct entry — everything else in this block
+     is unused by name and exists only for documentation/rollback clarity. */
+  --v3-ice: var(--sm-mist-100); /* was literal #e7f4f8 */
+  --v3-glow-mint: 0 0 24px rgba(37, 208, 176, 0.28); /* was cyan rgba(34,211,238,…) */
+  --v3-shadow-3: 0 24px 64px -32px rgba(10, 42, 46, 0.4); /* ink-950-tinted, was navy-black */
+}
+
+/* ── Tone roles: `--v3-line`/`--v3-line-strong` are computed by
+   tokens-v3.css as fixed rgba mixes (not `var(--v3-ink)`), so they do not
+   follow the primitive remap above. Restated at higher specificity
+   (class + attribute vs. attribute alone) for both the shell root itself
+   (heroTone sets `data-tone` directly on `.v4-shell`) and any nested
+   section that opts into a tone. ───────────────────────────────────────── */
+.v4-shell[data-tone="porcelain"],
+.v4-shell [data-tone="porcelain"],
+.v4-shell[data-tone="white"],
+.v4-shell [data-tone="white"],
+.v4-shell[data-tone="ice"],
+.v4-shell [data-tone="ice"] {
+  --v3-line: var(--sm-line); /* #D7E7E3 */
+  --v3-line-strong: var(--sm-line-strong); /* #B5D2CB */
+}
+
+.v4-shell[data-tone="ink"],
+.v4-shell [data-tone="ink"],
+.v4-shell[data-tone="charcoal"],
+.v4-shell [data-tone="charcoal"] {
+  --v3-line: color-mix(in oklab, var(--sm-dark-text) 10%, transparent);
+  --v3-line-strong: color-mix(in oklab, var(--sm-dark-text) 22%, transparent);
+}
+
+/* ── Primary button: mint fill, deep-teal text, on every tone (V5-BLUEPRINT
+   §1 — white text on the primary mint fails contrast; deep text passes at
+   6.35:1). The pinned rule hardcodes `color: #ffffff` and a cyan-deep fill,
+   so both need a direct restatement rather than a primitive remap. ────── */
+.v4-shell .v4-btn--primary {
+  background: var(--sm-accent);
+  color: var(--sm-accent-ink);
+}
+
+.v4-shell .v4-btn--primary:hover {
+  box-shadow: 0 6px 24px -8px rgba(37, 208, 176, 0.45);
+}
+
+.v4-shell[data-tone="ink"] .v4-btn--primary,
+.v4-shell [data-tone="ink"] .v4-btn--primary,
+.v4-shell[data-tone="charcoal"] .v4-btn--primary,
+.v4-shell [data-tone="charcoal"] .v4-btn--primary,
+.v4-shell .v4-on-dark .v4-btn--primary {
+  background: var(--sm-accent);
+  color: var(--sm-accent-ink);
+}
+
+/* ── Header dark-surface tint: the pinned rule hardcodes navy rgba rather
+   than `var(--v4-ink)`/`var(--v4-navy-line)`, so it does not follow the
+   primitive remap either. Same colours, ink-950-tinted. ────────────────── */
+.v4-shell .v4-header[data-surface="dark"] {
+  background: rgba(10, 42, 46, 0.72);
+  border-bottom-color: rgba(233, 247, 243, 0.16);
+}
+
+/* ── Focus ring: System B replaces the 2px solid outline with the soft mint
+   ring token (V5-BLUEPRINT §2 `--sm-focus`) on every V4 surface. ───────── */
+.v4-shell :focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus);
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Auth shell — the retained AI Receptionist signup surface
+   (`.v2-auth-shell .sg-page`). Mirrors v4-auth.css's own selector and
+   doubled-class technique one layer later.
+   ───────────────────────────────────────────────────────────────────────── */
+.v2-auth-shell .sg-page.sg-page {
+  --v3-porcelain: var(--sm-porcelain);
+  --v3-white: var(--sm-white);
+  --v3-ice: var(--sm-mist-100);
+  --v3-mint: var(--sm-accent); /* fill accent */
+  --v3-mint-deep: var(--sm-mint-700); /* text-safe link/label mint */
+  --v3-ink: var(--sm-ink-950);
+  --v3-charcoal: var(--sm-teal-900);
+  --v3-slate: var(--sm-slate-600);
+  --v3-radius-control: 6px;
+  --v3-radius-card: 10px;
+  --v3-font-sans: var(--sm-font-body);
+}
+
+.v2-auth-shell .sg-page :focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus);
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ops shell — the internal CRM (`.v2-dashboard-shell`). Mirrors v4-ops.css's
+   own doubled-class technique one layer later; re-points the shadcn HSL
+   variables to System B with a dark teal-ink sidebar in place of navy.
+   ───────────────────────────────────────────────────────────────────────── */
+.v2-dashboard-shell.v2-dashboard-shell {
+  /* System B as HSL triplets (shadcn format) — see tokens-v5.css header
+     comment for why this file, not `:root`, is where they get declared. */
+  --background: 150 33% 98%; /* porcelain */
+  --foreground: 185 70% 14%; /* teal-900 */
+  --border: 165 25% 87%; /* line */
+  --card: 0 0% 100%;
+  --card-foreground: 185 70% 14%;
+  --card-border: 166 24% 77%; /* line-strong */
+
+  --sidebar: 187 64% 11%; /* ink-950 — dark teal-ink sidebar, not navy */
+  --sidebar-foreground: 163 47% 94%; /* dark-text */
+  --sidebar-border: color-mix(in oklab, var(--sm-dark-text) 14%, transparent);
+  --sidebar-primary: 169 70% 48%; /* mint-500 */
+  --sidebar-primary-foreground: 185 70% 14%; /* teal-900 */
+  --sidebar-accent: 161 61% 94%; /* mint-100 */
+  --sidebar-accent-foreground: 185 70% 14%;
+  --sidebar-ring: 169 80% 28%; /* mint-700 — AA focus on light */
+
+  --primary: 169 70% 48%; /* mint-500 fill */
+  --primary-foreground: 185 70% 14%; /* deep-teal text on mint */
+  --ring: 169 80% 28%; /* mint-700 */
+
+  --accent: 161 61% 94%; /* mint-100 */
+  --accent-foreground: 185 70% 14%;
+}
+
+/* ── Internal-environment bar — ink-950 + mint voice, amber stays reserved. */
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar {
+  background: var(--sm-ink-950);
+  color: var(--sm-dark-text);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__brand-dot {
+  background: var(--sm-mint-500);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__scope {
+  color: var(--sm-dark-muted);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__badge {
+  border-color: color-mix(in oklab, var(--sm-amber-600) 45%, transparent);
+  color: var(--sm-amber-600);
+}

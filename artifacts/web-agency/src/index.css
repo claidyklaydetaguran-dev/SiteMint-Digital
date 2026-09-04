@@ -57,6 +57,16 @@
 @import "./styles/v4-auth.css";
 /* Frontend V4 Phase 5: SiteMint Operations (internal /admin*) Signal skin. */
 @import "./styles/v4-ops.css";
+/* SiteMint V5 "Signal, mint-led" — System B semantic tokens (V5-BLUEPRINT §2)
+   and the global motion system (§11). Defines `--sm-*` only; changes no
+   pixel on its own. */
+@import "./styles/tokens-v5.css";
+/* SiteMint V5 Phase 1: override-only remap of the V4/V3 primitive layers to
+   the `--sm-*` System B palette inside the V4 public chrome, the auth shell,
+   and the CRM ops shell. Loaded last so it wins on source order at equal
+   specificity. ROLLBACK: remove this file's import to restore the V4 cyan
+   appearance byte-for-byte. */
+@import "./styles/v5-remap.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";

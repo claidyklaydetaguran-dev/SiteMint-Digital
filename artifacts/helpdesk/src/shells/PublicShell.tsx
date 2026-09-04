@@ -12,6 +12,7 @@ import { Suspense, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
+import { RouteScrollManager } from "@/components/layout/RouteScrollManager";
 
 interface PublicShellProps {
   children: ReactNode;
@@ -23,6 +24,7 @@ export function PublicShell({ children, routeLabel = "This page" }: PublicShellP
 
   return (
     <div data-shell="public">
+      <RouteScrollManager />
       <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
         <Suspense fallback={<RouteFallback label="Loading" />}>{children}</Suspense>
       </RouteErrorBoundary>

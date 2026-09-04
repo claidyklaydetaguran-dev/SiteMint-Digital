@@ -27,6 +27,7 @@ import { Suspense, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
+import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 
 interface DashboardShellProps {
   children: ReactNode;
@@ -38,6 +39,7 @@ export function DashboardShell({ children, routeLabel }: DashboardShellProps) {
 
   return (
     <div className="v2-dashboard-shell" data-shell="dashboard">
+      <RouteScrollManager />
       {/* V3 Phase 5: honest internal-environment labelling. Server-side
           Bearer auth remains the actual access boundary. */}
       <div className="v3o-bar">
