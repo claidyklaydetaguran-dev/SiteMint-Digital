@@ -181,7 +181,7 @@ function AdminDashboardInner() {
       {/* Navbar */}
       <header className="bg-foreground text-background px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <SiteMintLogo variant="light" iconSize={30} />
+          <SiteMintLogo variant="ops" iconSize={30} />
           <span className="text-background/50 text-xs ml-1 hidden sm:inline border-l border-background/20 pl-3">Discovery Portal</span>
         </div>
         <div className="flex items-center gap-2">

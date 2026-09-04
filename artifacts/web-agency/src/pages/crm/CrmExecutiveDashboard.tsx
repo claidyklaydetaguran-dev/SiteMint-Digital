@@ -756,12 +756,12 @@ export default function CrmExecutiveDashboard() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={stats!.pipeline} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="stage" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#f9fafb" }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#CFE7EA" />
+                    <XAxis dataKey="stage" tick={{ fontSize: 11, fill: "#4A6472" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#4A6472" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#EDF9FA" }} />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#6366f1"
-                      label={{ position: "top", fontSize: 10, fill: "#6b7280" }} />
+                      label={{ position: "top", fontSize: 10, fill: "#4A6472" }} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -789,9 +789,9 @@ export default function CrmExecutiveDashboard() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={stats.monthly} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false}
+                    <CartesianGrid strokeDasharray="3 3" stroke="#CFE7EA" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#4A6472" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#4A6472" }} axisLine={false} tickLine={false}
                       tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`} />
                     <Tooltip content={<CustomLineTooltip />} />
                     <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5}

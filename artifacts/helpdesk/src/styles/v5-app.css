@@ -57,6 +57,12 @@
   --sd-radius-card: 12px;
   --sd-font: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
     system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* These two never got a v3/v4/v5 override in the retheme chain and were
+     still resolving to the v2-dashboard.css V2 baseline (navy-tinted card
+     shadow, unbranded grey muted text) on every page that reads them. */
+  --sd-shadow-1: var(--sm-shadow-1);
+  --sd-muted-text: var(--sm-slate-600);
 }
 
 /* Dark counterpart moves from navy to ink-950 + mint. */
@@ -95,6 +101,15 @@
   --v2-radius-card: 12px;
   --v2-font-sans: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
     system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Border and shadow were literal V2 navy/slate values in v2-signin.css
+     (never routed through --v2-slate-500/--v2-navy-900), so overriding
+     those two tokens above left the sign-in card border and shadow stuck
+     on the pre-V5 palette. Route them through the same tokens the rest of
+     this scope now uses. */
+  --v2-color-border: color-mix(in oklab, var(--sm-teal-900) 12%, transparent);
+  --v2-color-border-strong: color-mix(in oklab, var(--sm-teal-900) 24%, transparent);
+  --v2-shadow-1: var(--sm-shadow-1);
 }
 
 /* Display voice for app headings — unchanged from V4, restated so this file

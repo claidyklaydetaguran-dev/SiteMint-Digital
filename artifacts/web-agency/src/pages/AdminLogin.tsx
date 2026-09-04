@@ -47,7 +47,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex justify-center mb-10">
-          <SiteMintLogo variant="light" iconSize={36} />
+          <SiteMintLogo variant="ops" iconSize={36} />
         </div>
 
         <div className="bg-background rounded-xl p-8 shadow-2xl border border-white/10">
@@ -81,7 +81,12 @@ export default function AdminLogin() {
               </p>
             )}
 
-            <Button type="submit" className="w-full h-12 text-base bg-emerald-600 hover:bg-emerald-700 text-white border-0" disabled={loading || !password}>
+            {/* This route mounts inside DashboardShell's `.v2-dashboard-shell`
+                scope (AdminRoutes, App.tsx), so the Button's own default
+                variant already resolves --primary/--primary-foreground to
+                the CRM's mint-500/teal-900 pairing. The className here was
+                overriding that with an unrelated hardcoded emerald green. */}
+            <Button type="submit" className="w-full h-12 text-base" disabled={loading || !password}>
               {loading ? "Signing in…" : "Sign In"}
             </Button>
           </form>

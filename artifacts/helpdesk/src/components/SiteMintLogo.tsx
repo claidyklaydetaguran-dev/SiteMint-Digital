@@ -29,9 +29,13 @@ export function SiteMintLogo({
       >
         <rect width="40" height="40" rx="9" className="fill-primary" />
         <path d="M20 8L32 20L20 32L8 20Z" className="fill-primary-foreground" opacity="0.14" />
-        <path d="M20 11L29 20L20 29L11 20Z" fill="#34D399" opacity="0.92" />
+        <path
+          d="M20 11L29 20L20 29L11 20Z"
+          fill="var(--sm-mint-500, #32C5D2)"
+          opacity="0.92"
+        />
         <path d="M20 16L24 20L20 24L16 20Z" className="fill-primary" />
-        <circle cx="20" cy="13" r="2.5" fill="#34D399" />
+        <circle cx="20" cy="13" r="2.5" fill="var(--sm-mint-500, #32C5D2)" />
       </svg>
 
       {showWordmark && (

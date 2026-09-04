@@ -461,7 +461,7 @@
   margin-top: var(--sd-space-2);
   height: 4px;
   border-radius: 2px;
-  background: rgba(145, 255, 255, 0.16);
+  background: color-mix(in oklab, var(--sm-dark-text) 16%, transparent);
   overflow: hidden;
 }
 .sd-usage__fill {
@@ -615,7 +615,7 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(5, 24, 36, 0.5);
+  background: color-mix(in oklab, var(--sm-ink-950, #153E52) 50%, transparent);
   opacity: 0;
   transition: opacity var(--sd-dur-drawer) var(--sd-ease);
 }
@@ -750,7 +750,7 @@
 .sd-status[data-state="answering"],
 .sd-status[data-state="configured"] {
   background: var(--sd-surface-accent);
-  border-color: rgba(39, 233, 181, 0.3);
+  border-color: color-mix(in oklab, var(--sm-mint-500) 30%, transparent);
 }
 .sd-status[data-state="incomplete"] {
   background: var(--sd-warn-surface);
@@ -877,7 +877,7 @@
 @media (hover: hover) and (pointer: fine) {
   .sd-step__action:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(5, 24, 36, 0.14);
+    box-shadow: 0 2px 6px color-mix(in oklab, var(--sm-ink-950, #153E52) 14%, transparent);
   }
 }
 .sd-step__action:active {
