@@ -6,13 +6,13 @@
 
 | ID | WS | Route / capability | Pri | Status | Commit | Evidence | Preview | Remaining | Blocker |
 |---|---|---|---|---|---|---|---|---|---|
-| F-01 | Foundation | System B semantic tokens (`tokens-v5.css`, both apps) | P0 | IN PROGRESS | — | — | — | — | — |
-| F-02 | Foundation | Public chrome / auth / ops primitive remap to mint (override-only) | P0 | IN PROGRESS | — | — | — | — | — |
-| F-03 | Foundation | Helpdesk palette remap (light + dark appearance) | P0 | IN PROGRESS | — | — | — | — | — |
-| F-04 | Foundation | Motion foundation (`Reveal`, reduced motion, budgets) | P1 | IN PROGRESS | — | — | — | — | — |
-| F-05 | Foundation | Route scroll-to-top + anchor + back/forward manager (both apps) | P0 | IN PROGRESS | — | — | — | — | — |
-| F-06 | Foundation | Foundation contract test in the scripts chain | P0 | IN PROGRESS | — | — | — | — | — |
-| F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | IN PROGRESS | — | — | — | — | — |
+| F-01 | Foundation | System B semantic tokens (`tokens-v5.css`, both apps) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
+| F-02 | Foundation | Public chrome / auth / ops primitive remap to mint (override-only) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
+| F-03 | Foundation | Helpdesk palette remap (light + dark appearance) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
+| F-04 | Foundation | Motion foundation (`Reveal`, reduced motion, budgets) | P1 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
+| F-05 | Foundation | Route scroll-to-top + anchor + back/forward manager (both apps) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
+| F-06 | Foundation | Foundation contract test in the scripts chain | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
+| F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
 | W-01 | Website | "Signal" removed from public copy/titles/metadata | P0 | IN PROGRESS | — | — | — | — | — |
 | W-02 | Website | Homepage hero copy + CTAs (amendment §6), particles + journey retained | P0 | IN PROGRESS | — | — | — | — | — |
 | W-03 | Website | Homepage 15-section content architecture (§8), signatures, no card walls | P0 | IN PROGRESS | — | — | — | — | — |
