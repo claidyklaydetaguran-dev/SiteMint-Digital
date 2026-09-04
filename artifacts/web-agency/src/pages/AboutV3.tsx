@@ -7,9 +7,15 @@ import { Link } from "wouter";
 import { ShieldCheck, Wrench, Compass, HandMetal } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import { teamV5 } from "@/components/v5/teamV5";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function AboutV3() {
   const reveal = useReveal();
+  usePageMeta({
+    title: "Company — SiteMint Digital",
+    description: "A small studio that builds like an operator — what we believe, how we're organized, and the people doing the work.",
+  });
 
   return (
     <div className="v3-about-page">
@@ -21,11 +27,29 @@ export default function AboutV3() {
           </h1>
           <p className="v3-lede">
             SiteMint Digital designs, builds, and runs business systems —
-            including our own. The AI receptionist we sell answers real calls.
-            The discovery flow on this site is our actual intake. The
-            automation engine we recommend runs our own pipeline. We use what
-            we build, which keeps us honest about what works.
+            including our own. The discovery flow on this site is the same
+            structured intake we build for clients. The automation and CRM
+            we recommend runs our own pipeline. Our AI Receptionist product is
+            in private, invite-only beta. We use what we build, which keeps
+            us honest about what works and what's still in progress.
           </p>
+        </div>
+      </section>
+
+      <section className="v3-section" data-tone="porcelain">
+        <div className="v3-container v3-reveal" ref={reveal}>
+          <div className="v3m-sechead">
+            <span className="v3m-sechead__no">00</span>
+            <h2 className="v3-h2">The people doing the work.</h2>
+          </div>
+          <div className="v3m-pillars v3m-pillars--3">
+            {teamV5.map((member) => (
+              <div className="v3-card v3m-pillar" key={member.name}>
+                <h3 className="v3m-pillar__title">{member.name}</h3>
+                <p className="v3m-pillar__desc">{member.role}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

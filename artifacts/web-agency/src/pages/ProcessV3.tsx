@@ -6,42 +6,47 @@ import { Link } from "wouter";
 import { ShieldCheck, Eye, PauseCircle, MessagesSquare } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
+/**
+ * V5 (W-8): the five real phases — Discover · Design · Build · Validate ·
+ * Launch & Improve — each with the concrete client output, matching the
+ * "how SiteMint works" homepage section (`HomeV5`'s `PROCESS_STEPS`).
+ */
 const steps = [
   {
-    title: "Discovery",
+    title: "Discover",
     body: "You complete a short structured brief — what you do, what keeps falling through, what a win looks like. We read it properly before we ever get on a call, so the first conversation starts in the middle, not at the beginning.",
-    outcome: "A brief we both work from.",
+    outcome: "a structured brief we both work from, plus a plain recommendation on what to build and what to skip.",
   },
   {
-    title: "The straight answer",
-    body: "We come back with a plain recommendation: what to build, what to skip, what order to do it in, and what it takes. If we're not the right fit, we say so and point you somewhere better.",
-    outcome: "A scoped recommendation you can say no to.",
-  },
-  {
-    title: "Design in the open",
+    title: "Design",
     body: "You see the system taking shape early — real pages, real flows, real words — not a surprise unveiling at the end. Feedback lands while it's still cheap to act on.",
-    outcome: "A design you've already used before it ships.",
+    outcome: "real pages and flows you review and approve before anything is built.",
   },
   {
-    title: "Build in stages",
-    body: "We ship in focused stages you can use, connected to your calendar, phone, and records from the start. Each stage is verified — typechecked, tested, and reviewed — before the next begins.",
-    outcome: "Working software at every checkpoint.",
+    title: "Build",
+    body: "We ship in focused stages you can use, connected to your calendar, phone, and records from the start.",
+    outcome: "working software at every checkpoint — not a single reveal at the end.",
   },
   {
-    title: "Launch with a person in the loop",
-    body: "Every automated path launches with a human handoff and an audit trail. We watch the first weeks of real traffic together and tune what it teaches us.",
-    outcome: "A system that earns trust before it earns autonomy.",
+    title: "Validate",
+    body: "Every stage is verified before the next begins — typechecked, tested, and reviewed, with the standing rules below applied throughout.",
+    outcome: "a verified stage — typechecked, tested, and reviewed — before it ships.",
   },
   {
-    title: "Run and improve",
-    body: "Systems drift as businesses grow. We stay available for the adjustments that keep yours matched to reality — and you own everything either way.",
-    outcome: "A system that keeps up with you.",
+    title: "Launch & Improve",
+    body: "Every automated path launches with a human handoff and an audit trail. We watch the first weeks of real traffic together and tune what it teaches us. Systems drift as businesses grow — we stay available for the adjustments that keep yours matched to reality.",
+    outcome: "a live system with a human handoff, plus ongoing tuning as your business changes.",
   },
 ];
 
 export default function ProcessV3() {
   const reveal = useReveal();
+  usePageMeta({
+    title: "Process — SiteMint Digital",
+    description: "How a SiteMint project runs: Discover, Design, Build, Validate, Launch & Improve — each with a concrete output.",
+  });
 
   return (
     <div className="v3-process-page">
@@ -51,8 +56,8 @@ export default function ProcessV3() {
           <p className="v3-serif-note">No mystery, no big reveal.</p>
           <h1 className="v3-display">How a SiteMint project runs.</h1>
           <p className="v3-lede">
-            Six stages, each with a visible outcome. You always know where the
-            project is, what happens next, and what you can already use.
+            Five stages, each with a concrete output. You always know where
+            the project is, what happens next, and what you can already use.
           </p>
         </div>
       </section>

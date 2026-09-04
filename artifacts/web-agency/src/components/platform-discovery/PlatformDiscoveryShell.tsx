@@ -30,6 +30,17 @@ import {
   clearDraft,
   useDiscoveryDraftPersistence,
 } from "@/hooks/useDiscoveryDraft";
+import {
+  buildDiscoverySubmitBody,
+  submitDiscoveryBrief,
+  getOrCreateSubmissionSession,
+  isSessionAlreadySubmitted,
+  markSessionSubmitted,
+  clearSubmissionSession,
+  type DiscoverySubmitOutcome,
+} from "./discoverySubmit";
+
+const SUPPORT_EMAIL = "info.sitemint@gmail.com";
 
 const REVIEW_STEP_INDEX = TOTAL_STEPS - 1;
 
@@ -59,6 +70,14 @@ export function PlatformDiscoveryShell() {
   const [currentStep, setCurrentStep] = useState(0);
   const [announcement, setAnnouncement] = useState("");
   const [validatedSubmission, setValidatedSubmission] = useState<DiscoverySubmissionContract | null>(null);
+  // W-9/W-11: real submission states, distinct from the client-side
+  // validation state above.
+  const [submitState, setSubmitState] = useState<
+    | { kind: "idle" }
+    | { kind: "submitting" }
+    | { kind: "done"; outcome: Extract<DiscoverySubmitOutcome, { kind: "success" | "duplicate" }> }
+    | { kind: "error"; outcome: Exclude<DiscoverySubmitOutcome, { kind: "success" | "duplicate" }> }
+  >({ kind: "idle" });
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   // Auto-save + beforeunload only while filling in the form (not on welcome screen).
@@ -115,17 +134,21 @@ export function PlatformDiscoveryShell() {
     const confirmed = window.confirm("Start over? This will clear all your answers and return to the beginning.");
     if (!confirmed) return;
     clearDraft();
+    clearSubmissionSession();
     form.reset(defaultDiscoveryDraft);
     setValidatedSubmission(null);
+    setSubmitState({ kind: "idle" });
     setCurrentStep(0);
     setPhase("welcome");
   }
 
-  // ── Final completion (preview mode) ─────────────────────────────────────
-  // Path 2 — validates the whole draft directly via the shared
+  // ── Final completion — validates the whole draft, then submits it to the
+  // real backend (W-9/W-11). Path 2: validates directly via the shared
   // validateDiscoverySubmission helper (never goes through discoveryResolver).
 
-  function handleCompletePreview() {
+  async function handleCompletePreview() {
+    if (submitState.kind === "submitting") return; // duplicate-prevention: ignore re-clicks mid-flight
+
     const result = validateDiscoverySubmission(form.getValues());
     if (!result.success) {
       const fieldErrors = mapZodIssuesToFieldErrors(result.error.issues);
@@ -134,9 +157,45 @@ export function PlatformDiscoveryShell() {
       setAnnouncement("Some required fields still need attention. You've been moved to the first one.");
       return;
     }
-    clearDraft();
+
     setValidatedSubmission(result.data);
-    setAnnouncement("Review experience complete. Nothing was submitted or saved.");
+
+    const { idempotencyKey, formStartedAt } = getOrCreateSubmissionSession();
+
+    // Duplicate-prevention: this session's key already succeeded — show the
+    // same completion state again without a second network call.
+    if (isSessionAlreadySubmitted(idempotencyKey)) {
+      setSubmitState({ kind: "done", outcome: { kind: "duplicate", reference: idempotencyKey } });
+      clearDraft();
+      setAnnouncement("This brief was already submitted.");
+      return;
+    }
+
+    setSubmitState({ kind: "submitting" });
+    setAnnouncement("Submitting your brief…");
+
+    const body = buildDiscoverySubmitBody(result.data, idempotencyKey, formStartedAt);
+    const outcome = await submitDiscoveryBrief(body);
+
+    if (outcome.kind === "success" || outcome.kind === "duplicate") {
+      markSessionSubmitted(idempotencyKey);
+      clearDraft();
+      setSubmitState({ kind: "done", outcome });
+      setAnnouncement("Your brief was submitted. We'll be in touch soon.");
+      return;
+    }
+
+    // An idempotency conflict means this session's cached key now belongs to
+    // a *different* payload (e.g. the visitor edited an answer after a
+    // partial earlier attempt) — clear it so "Try again" gets a fresh key
+    // instead of colliding again. Every other outcome keeps the filled-in
+    // draft (already validated above) so the visitor can retry without
+    // re-entering anything.
+    if (outcome.kind === "idempotency_conflict") {
+      clearSubmissionSession();
+    }
+    setSubmitState({ kind: "error", outcome });
+    setAnnouncement(outcome.message);
   }
 
   function handleFocusField(path: string) {
@@ -156,9 +215,10 @@ export function PlatformDiscoveryShell() {
     );
   }
 
-  // ── Completion screen ────────────────────────────────────────────────────
+  // ── Completion screen (success / duplicate) ─────────────────────────────
 
-  if (validatedSubmission) {
+  if (submitState.kind === "done") {
+    const isDuplicate = submitState.outcome.kind === "duplicate";
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6" aria-live="polite">
         <span
@@ -171,8 +231,9 @@ export function PlatformDiscoveryShell() {
           You're all set — we'll be in touch soon
         </h1>
         <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))] leading-relaxed">
-          Thank you for taking the time to walk us through your project. Our team will review your answers and
-          reach out within 24–48 hours with a personalized scope of work and proposal.
+          {isDuplicate
+            ? "This brief was already received — no need to resubmit. Our team will review your answers and reach out within 24–48 hours with a personalized scope of work and proposal."
+            : "Thank you for taking the time to walk us through your project. Our team will review your answers and reach out within 24–48 hours with a personalized scope of work and proposal."}
         </p>
         <div
           className="mt-8 rounded-lg border p-5 text-left"
@@ -220,6 +281,42 @@ export function PlatformDiscoveryShell() {
     );
   }
 
+  // ── Service unavailable (flag off) — 503, distinct from a network/server
+  // error: submissions genuinely are not open yet, so retrying won't help. ──
+
+  if (submitState.kind === "error" && submitState.outcome.kind === "service_unavailable") {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6" aria-live="polite">
+        <h1 className="text-2xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))]">
+          Submissions are not open yet
+        </h1>
+        <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))] leading-relaxed">
+          We're not able to accept new project briefs through this form right now. Email us directly and we'll pick
+          up where this form left off.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className="inline-flex h-10 items-center rounded-md px-5 text-sm font-medium text-white transition-colors"
+            style={{ backgroundColor: "hsl(var(--sm-mint-500))" }}
+          >
+            Email {SUPPORT_EMAIL}
+          </a>
+          <a
+            href="/"
+            className="inline-flex h-10 items-center rounded-md border px-5 text-sm font-medium transition-colors"
+            style={{
+              borderColor: "hsl(var(--sm-color-border-default))",
+              color: "hsl(var(--sm-color-text-primary))",
+            }}
+          >
+            Back to home
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // ── Multi-step form ──────────────────────────────────────────────────────
 
   const StepComponent = STEP_COMPONENTS[currentStep];
@@ -262,6 +359,8 @@ export function PlatformDiscoveryShell() {
                 values={form.getValues()}
                 onEditStep={handleEditStep}
                 onCompletePreview={handleCompletePreview}
+                submitting={submitState.kind === "submitting"}
+                errorMessage={submitState.kind === "error" ? submitState.outcome.message : undefined}
               />
             )}
           </div>

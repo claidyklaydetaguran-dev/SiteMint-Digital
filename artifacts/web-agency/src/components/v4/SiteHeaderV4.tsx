@@ -35,6 +35,11 @@ import {
   startHrefV4,
   startLabelV4,
   whatWeBuildV4,
+  requestBetaHrefV4,
+  requestBetaLabelV4,
+  explorePreviewHrefV4,
+  explorePreviewLabelV4,
+  productSignInLabelV4,
 } from "./publicNavV4";
 
 function isActive(location: string, href?: string): boolean {
@@ -42,11 +47,24 @@ function isActive(location: string, href?: string): boolean {
   return location === href;
 }
 
-export interface SiteHeaderV4Props {
-  tone?: "ink" | "light";
+/** True when the current route is one of the "What We Build" pillar pages. */
+function isPillarActive(location: string): boolean {
+  return whatWeBuildV4.some((item) => isActive(location, item.href));
 }
 
-export function SiteHeaderV4({ tone = "light" }: SiteHeaderV4Props) {
+export interface SiteHeaderV4Props {
+  tone?: "ink" | "light";
+  /**
+   * IA §3 / L-7: `"product"` swaps the company CTA (Client Sign In + Start a
+   * Project) for the AI Receptionist product actions (Request Beta Access,
+   * Explore the Interactive Preview, Already a client? Sign in) — no
+   * "Start a Project" on a product-mode page. The AI Receptionist route
+   * passes this; every other public route stays `"company"` (default).
+   */
+  headerMode?: "company" | "product";
+}
+
+export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHeaderV4Props) {
   const [location] = useLocation();
   const [panelOpen, setPanelOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -215,6 +233,7 @@ export function SiteHeaderV4({ tone = "light" }: SiteHeaderV4Props) {
                 className="v4-nav__link"
                 aria-expanded={panelOpen}
                 aria-controls={panelId}
+                aria-current={isPillarActive(location) ? "page" : undefined}
                 onClick={() => setPanelOpen((v) => !v)}
               >
                 What We Build
@@ -291,20 +310,49 @@ export function SiteHeaderV4({ tone = "light" }: SiteHeaderV4Props) {
 
             <li className="v4-header__sep" role="presentation" aria-hidden="true" />
 
-            <li>
-              {/* Cross-application document navigation — never a <Link>. */}
-              <a href={signInHrefV4} className="v4-header__signin">
-                {signInLabelV4}
-              </a>
-            </li>
-            <li>
-              <Link
-                href={startHrefV4}
-                className="v4-btn v4-btn--primary v4-header__cta"
-              >
-                {startLabelV4}
-              </Link>
-            </li>
+            {headerMode === "product" ? (
+              <>
+                <li>
+                  {/* Cross-application document navigation — never a <Link>. */}
+                  <a href={signInHrefV4} className="v4-header__signin">
+                    {productSignInLabelV4}
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href={explorePreviewHrefV4}
+                    className="v4-btn v4-btn--outline v4-header__cta"
+                  >
+                    {explorePreviewLabelV4}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={requestBetaHrefV4}
+                    className="v4-btn v4-btn--primary v4-header__cta"
+                  >
+                    {requestBetaLabelV4}
+                  </Link>
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  {/* Cross-application document navigation — never a <Link>. */}
+                  <a href={signInHrefV4} className="v4-header__signin">
+                    {signInLabelV4}
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href={startHrefV4}
+                    className="v4-btn v4-btn--primary v4-header__cta"
+                  >
+                    {startLabelV4}
+                  </Link>
+                </li>
+              </>
+            )}
           </ul>
         </nav>
 
@@ -351,7 +399,8 @@ export function SiteHeaderV4({ tone = "light" }: SiteHeaderV4Props) {
                     href: item.href,
                   }))}
                 </MobileGroup>
-                <MobileGroup title="Company" location={location}>
+                {/* W-17: mobile group renamed "Company" → "Explore". */}
+                <MobileGroup title="Explore" location={location}>
                   {primaryNavV4}
                 </MobileGroup>
                 <li>
@@ -368,15 +417,37 @@ export function SiteHeaderV4({ tone = "light" }: SiteHeaderV4Props) {
               </ul>
             </nav>
 
-            <a href={signInHrefV4} className="v4-sheet__quiet">
-              {signInLabelV4}
-            </a>
-            <Link
-              href={startHrefV4}
-              className="v4-btn v4-btn--primary v4-sheet__cta"
-            >
-              {startLabelV4}
-            </Link>
+            {headerMode === "product" ? (
+              <>
+                <a href={signInHrefV4} className="v4-sheet__quiet">
+                  {productSignInLabelV4}
+                </a>
+                <Link
+                  href={explorePreviewHrefV4}
+                  className="v4-btn v4-btn--outline v4-sheet__cta"
+                >
+                  {explorePreviewLabelV4}
+                </Link>
+                <Link
+                  href={requestBetaHrefV4}
+                  className="v4-btn v4-btn--primary v4-sheet__cta"
+                >
+                  {requestBetaLabelV4}
+                </Link>
+              </>
+            ) : (
+              <>
+                <a href={signInHrefV4} className="v4-sheet__quiet">
+                  {signInLabelV4}
+                </a>
+                <Link
+                  href={startHrefV4}
+                  className="v4-btn v4-btn--primary v4-sheet__cta"
+                >
+                  {startLabelV4}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

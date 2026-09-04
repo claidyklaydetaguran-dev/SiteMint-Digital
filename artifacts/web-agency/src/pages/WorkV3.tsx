@@ -10,13 +10,15 @@ import { Link } from "wouter";
 import { ArrowRight, AudioLines, Search, Workflow, Globe } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const productionWork = [
   {
     icon: AudioLines,
-    kicker: "Product · operated in production",
+    kicker: capabilityLabelsV5["private-beta"],
     title: "SiteMint AI Receptionist platform",
-    body: "Our own voice and SMS receptionist product: answering, qualifying, booking, and handing off to people — with consent handling, opt-out enforcement, and firm-scoped data isolation built into the platform itself.",
+    body: "Our own voice and SMS receptionist product: answering, qualifying, and handing off to people — with consent handling, opt-out enforcement, and firm-scoped data isolation built into the platform itself. Currently in private, invite-only beta.",
     detail:
       "Runs on the same discipline we sell: explicit recording policy, human handoff on every path, and an audit trail behind every automated action.",
     href: ROUTES.aiReceptionist,
@@ -24,9 +26,9 @@ const productionWork = [
   },
   {
     icon: Search,
-    kicker: "System · live on this site",
+    kicker: capabilityLabelsV5.available,
     title: "SiteMint discovery intake",
-    body: "The structured project-intake flow on this website — guided steps, branching questions, save-and-resume drafts, and a structured brief delivered to our team the moment it's submitted.",
+    body: "The structured project-intake flow on this website — guided steps, branching questions, save-and-resume drafts, and a structured brief that reaches our team once you submit it.",
     detail:
       "You can evaluate this one yourself right now: it's how projects start here.",
     href: ROUTES.discovery,
@@ -34,32 +36,32 @@ const productionWork = [
   },
   {
     icon: Workflow,
-    kicker: "Internal system · used daily",
+    kicker: capabilityLabelsV5["in-development"],
     title: "SiteMint operations engine",
     body: "The internal CRM and automation system that runs SiteMint's own pipeline: lead scoring, campaign sequences with stop-on-reply, task routing, and delivery tracking — the working proof behind our automation service.",
     detail:
       "Internal by design; we demonstrate the patterns, not customer data.",
-    href: ROUTES.automation,
-    linkLabel: "The automation service",
+    href: ROUTES.aiSystems,
+    linkLabel: "AI Systems & Automation",
   },
 ];
 
 const capabilityWork = [
   {
     icon: Globe,
-    kicker: "Capability composition",
+    kicker: capabilityLabelsV5.planned,
     title: "Booking-led clinic site",
     body: "A representative composition: a service site whose every page routes to scheduling, connected to an existing calendar, with automated confirmations and reminders replacing phone-tag.",
   },
   {
     icon: Search,
-    kicker: "Capability composition",
+    kicker: capabilityLabelsV5.planned,
     title: "Trade-services quoting intake",
     body: "A representative composition: photo-and-detail intake for quote requests, branching by job type, producing priced-ready briefs and a follow-up queue the owner works through in minutes.",
   },
   {
     icon: Workflow,
-    kicker: "Capability composition",
+    kicker: capabilityLabelsV5.planned,
     title: "Practice intake & follow-through",
     body: "A representative composition: structured client intake feeding a case record, with document requests, reminders, and status updates handled automatically between human touchpoints.",
   },
@@ -67,6 +69,11 @@ const capabilityWork = [
 
 export default function WorkV3() {
   const reveal = useReveal();
+  usePageMeta({
+    title: "Work — SiteMint Digital",
+    description:
+      "What SiteMint has actually built and run, labelled honestly: available now, private beta, in development, or planned.",
+  });
 
   return (
     <div className="v3-work-page">

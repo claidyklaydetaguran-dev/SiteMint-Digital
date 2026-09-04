@@ -1,0 +1,568 @@
+/**
+ * Frontend V5 — HomeV5 page styles.
+ *
+ * Owned by the Public Website workstream (per V5-BLUEPRINT.md §2/§15, the
+ * foundation owner defines `--sm-*` tokens in `styles/tokens-v5.css`; this
+ * file only *consumes* those custom properties by name — every `var(--sm-*)`
+ * below carries a light-mode fallback so the page still renders sanely
+ * before that file lands). Imported directly from `HomeV5.tsx` only — no
+ * other file should import this stylesheet, and this file must not touch
+ * `index.css`, `tokens-v4.css`, or any other page's stylesheet.
+ *
+ * Layout/typography reuses the existing `.v4-*`/`.v3-*` utility classes
+ * (container, section, h2, lede, btn, kicker, reveal) already loaded
+ * globally via index.css — this file adds only what those don't cover:
+ * the typographic ledger, split layout, device frames, record illustration,
+ * node diagram, receptionist ring, work grid, timeline, pricing cards,
+ * why-grid, team grid, FAQ accordion, and the Reveal stub's default motion.
+ */
+
+/* ── Reveal (components/v5/Reveal.tsx stub) — matches the existing
+   `.v3-reveal`/`[data-v4-reveal]` opacity+rise pattern already used across
+   the public site, so it composes visually with `useReveal()` sections. ── */
+.sm-reveal {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sm-reveal[data-reveal-ready] {
+    opacity: 0;
+    transform: translateY(var(--sm-rise, 16px));
+    transition:
+      opacity var(--sm-dur-slow, 420ms) var(--sm-ease, ease),
+      transform var(--sm-dur-slow, 420ms) var(--sm-ease, ease);
+  }
+  .sm-reveal[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+  .sm-reveal--words .sm-reveal__word {
+    display: inline-block;
+  }
+}
+
+/* ── Hero brand line (new class, styled here only — HomeV4's own file/CSS
+   stay untouched; this class simply had no stylesheet owner until now). ── */
+.v4-hero__brand-line {
+  margin-top: 0.5em;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--sm-dark-muted, #9fc3bc);
+}
+
+/* ── Section 2 — typographic ledger (no cards) ───────────────────────── */
+.sm-ledger__list {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--sm-line, #d7e7e3);
+}
+.sm-ledger__row {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0.25rem 1.5rem;
+  align-items: baseline;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--sm-line, #d7e7e3);
+}
+.sm-ledger__no {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--sm-text-muted, #526b70);
+}
+.sm-ledger__label {
+  grid-column: 2;
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--sm-text, #0b3a3e);
+}
+.sm-ledger__outcome {
+  grid-column: 2;
+  color: var(--sm-text-muted, #526b70);
+}
+@media (min-width: 720px) {
+  .sm-ledger__row {
+    grid-template-columns: 3rem 1fr 1fr;
+  }
+  .sm-ledger__outcome {
+    grid-column: 3;
+    text-align: right;
+  }
+}
+
+/* ── Poster-first media break ────────────────────────────────────────── */
+.sm-media-break .sm-hero-media {
+  max-width: 960px;
+  margin: 0 auto;
+}
+.sm-hero-media {
+  position: relative;
+  border-radius: var(--sm-radius-l, 16px);
+  overflow: hidden;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-hero-media__poster {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.sm-hero-media__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sm-hero-media__badge {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  background: rgb(10 42 46 / 0.7);
+  color: var(--sm-dark-text, #e9f7f3);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+}
+
+/* ── Generic split layout (copy + visual) ────────────────────────────── */
+.sm-split {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .sm-split {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sm-split--reverse {
+    direction: rtl;
+  }
+  .sm-split--reverse > * {
+    direction: ltr;
+  }
+}
+.sm-split__copy > .v4-kicker {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Section 4 — layered browser/device frames (CSS only) ────────────── */
+.sm-devices {
+  position: relative;
+  min-height: 280px;
+}
+.sm-devices__browser {
+  position: relative;
+  width: 88%;
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  padding: 0.6rem 0.75rem 1.25rem;
+  border: 1px solid var(--sm-line, #d7e7e3);
+}
+.sm-devices__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #b5d2cb);
+  margin-right: 5px;
+}
+.sm-devices__browser-body {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.sm-devices__line {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--sm-surface-alt, #eefaf8);
+  width: 60%;
+}
+.sm-devices__line--wide {
+  width: 92%;
+  height: 16px;
+}
+.sm-devices__line--short {
+  width: 35%;
+}
+.sm-devices__phone {
+  position: absolute;
+  right: -4%;
+  bottom: -10%;
+  width: 34%;
+  aspect-ratio: 9 / 18;
+  border-radius: 20px;
+  background: var(--sm-ink-950, #0a2a2e);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  padding: 0.9rem 0.6rem;
+}
+.sm-devices__phone-body {
+  display: grid;
+  gap: 0.5rem;
+}
+.sm-devices__phone .sm-devices__line {
+  background: rgb(233 247 243 / 0.18);
+}
+
+/* ── Section 5 — CRM record illustration ─────────────────────────────── */
+.sm-record {
+  position: relative;
+  border-radius: var(--sm-radius-l, 16px);
+  border: 1px solid var(--sm-line, #d7e7e3);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-1, 0 6px 20px rgb(11 58 62 / 0.06));
+  padding: 1.5rem;
+  display: grid;
+  gap: 0.9rem;
+}
+.sm-record__badge {
+  justify-self: start;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sm-text-muted, #526b70);
+  border: 1px solid var(--sm-line, #d7e7e3);
+  border-radius: var(--sm-radius-pill, 999px);
+  padding: 0.15rem 0.6rem;
+}
+.sm-record__row {
+  display: grid;
+  grid-template-columns: auto 5rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--sm-line, #d7e7e3);
+}
+.sm-record__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-text-muted, #526b70);
+}
+.sm-record__dot--amber {
+  background: var(--sm-amber-600, #b45309);
+}
+.sm-record__dot--mint {
+  background: var(--sm-mint-500, #25d0b0);
+}
+.sm-record__k {
+  font-size: 0.8rem;
+  color: var(--sm-text-muted, #526b70);
+}
+.sm-record__v {
+  color: var(--sm-text, #0b3a3e);
+}
+
+/* ── Section 6 — AI Systems node diagram ─────────────────────────────── */
+.sm-nodes-wrap {
+  display: flex;
+  justify-content: center;
+}
+.sm-nodes {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+}
+
+/* ── Section 7 — AI Receptionist waveform ring ───────────────────────── */
+.sm-ring {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sm-ring__core {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sm-mint-500, #25d0b0);
+}
+.sm-ring__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--sm-mint-400, #4fd9cf);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sm-ring__pulse {
+    animation: sm-ring-pulse 3.2s var(--sm-ease, ease) infinite;
+  }
+  .sm-ring__pulse--2 {
+    animation-delay: 1.05s;
+  }
+  .sm-ring__pulse--3 {
+    animation-delay: 2.1s;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-ring__pulse {
+    opacity: 0.35;
+  }
+}
+@keyframes sm-ring-pulse {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.sm-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  border: 1px solid var(--sm-line, #d7e7e3);
+  color: var(--sm-text, #0b3a3e);
+  margin-bottom: 0.5rem;
+}
+.sm-badge--beta,
+.sm-badge--private-beta {
+  border-color: var(--sm-mint-500, #25d0b0);
+  color: var(--sm-mint-700, #0e7f6b);
+}
+.sm-badge--available {
+  border-color: var(--sm-green-700, #15803d);
+  color: var(--sm-green-700, #15803d);
+}
+.sm-badge--in-development {
+  color: var(--sm-text-muted, #526b70);
+}
+.sm-badge--planned {
+  color: var(--sm-amber-600, #b45309);
+  border-color: var(--sm-amber-600, #b45309);
+}
+
+/* ── Section 8 — discovery steps ─────────────────────────────────────── */
+.sm-steps-inline {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  color: var(--sm-text-muted, #526b70);
+}
+.sm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* ── Section 9 — selected work grid ──────────────────────────────────── */
+.sm-work-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+@media (min-width: 780px) {
+  .sm-work-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-work-card {
+  border: 1px solid var(--sm-line, #d7e7e3);
+  border-radius: var(--sm-radius-l, 16px);
+  padding: 1.5rem;
+  background: var(--sm-surface, #fff);
+}
+.sm-work-card__title {
+  font-size: 1.1rem;
+  margin: 0.25rem 0 0.5rem;
+  color: var(--sm-text, #0b3a3e);
+}
+.sm-work-card__desc {
+  color: var(--sm-text-muted, #526b70);
+  font-size: 0.95rem;
+}
+
+/* ── Section 10 — how-it-works timeline ──────────────────────────────── */
+.sm-timeline {
+  list-style: none;
+  margin: 2rem 0;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+@media (min-width: 900px) {
+  .sm-timeline {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+  }
+}
+.sm-timeline__step {
+  border-top: 2px solid var(--sm-mint-500, #25d0b0);
+  padding-top: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.sm-timeline__no {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  color: var(--sm-dark-muted, #9fc3bc);
+}
+.sm-timeline__title {
+  font-weight: 600;
+  color: var(--sm-dark-text, #e9f7f3);
+}
+.sm-timeline__output {
+  color: var(--sm-dark-muted, #9fc3bc);
+  font-size: 0.9rem;
+}
+
+/* ── Section 11 — pricing estimate cards ─────────────────────────────── */
+.sm-pricing-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin: 2rem 0 1.5rem;
+}
+@media (min-width: 780px) {
+  .sm-pricing-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-pricing-card {
+  border: 1px solid var(--sm-line, #d7e7e3);
+  border-radius: var(--sm-radius-l, 16px);
+  padding: 1.5rem;
+}
+.sm-pricing-card.is-recommended {
+  border-color: var(--sm-mint-500, #25d0b0);
+}
+.sm-pricing-card__name {
+  font-size: 1.05rem;
+  margin: 0.4rem 0 0.15rem;
+}
+.sm-pricing-card__price {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.4rem;
+  color: var(--sm-mint-700, #0e7f6b);
+  margin: 0 0 0.4rem;
+}
+.sm-pricing-card__tagline {
+  color: var(--sm-text-muted, #526b70);
+  font-size: 0.92rem;
+}
+.sm-disclaimer {
+  font-size: 0.82rem;
+  color: var(--sm-text-muted, #526b70);
+  max-width: 60ch;
+}
+
+/* ── Section 12 — why grid ────────────────────────────────────────────── */
+.sm-why-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 780px) {
+  .sm-why-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.sm-why-item__title {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+  color: var(--sm-text, #0b3a3e);
+}
+.sm-why-item__body {
+  color: var(--sm-text-muted, #526b70);
+}
+
+/* ── Section 13 — team ────────────────────────────────────────────────── */
+.sm-team-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 700px) {
+  .sm-team-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-team-card {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+  padding: 1.25rem;
+  border: 1px solid var(--sm-line, #d7e7e3);
+  border-radius: var(--sm-radius-l, 16px);
+}
+.sm-team-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--sm-mint-100, #e6f9f3);
+  color: var(--sm-mint-700, #0e7f6b);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+.sm-team-card__name {
+  font-weight: 600;
+  color: var(--sm-text, #0b3a3e);
+}
+.sm-team-card__role {
+  color: var(--sm-text-muted, #526b70);
+  font-size: 0.9rem;
+}
+
+/* ── Section 14 — FAQ accordion ───────────────────────────────────────── */
+.sm-faq {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--sm-slate-300, #b9cbce);
+}
+.sm-faq__item {
+  border-bottom: 1px solid var(--sm-slate-300, #b9cbce);
+}
+.sm-faq__question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sm-dark-text, #e9f7f3);
+  cursor: pointer;
+}
+.sm-faq__question:focus-visible {
+  outline: 2px solid var(--sm-mint-400, #4fd9cf);
+  outline-offset: 2px;
+}
+.sm-faq__chevron {
+  font-size: 1.2rem;
+  color: var(--sm-mint-400, #4fd9cf);
+}
+.sm-faq__answer {
+  margin: 0 0 1rem;
+  color: var(--sm-dark-muted, #9fc3bc);
+  max-width: 68ch;
+}
+
+/* ── Section 15 — final CTA sign-in line ─────────────────────────────── */
+.sm-final-cta__signin {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--sm-dark-muted, #9fc3bc);
+}
+.sm-final-cta__signin a {
+  color: var(--sm-mint-400, #4fd9cf);
+}

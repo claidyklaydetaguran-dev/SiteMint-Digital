@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import { useEffect, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,17 +26,26 @@ import { DashboardShell } from "@/shells/DashboardShell";
  */
 
 // ── Public marketing ────────────────────────────────────────────────────────
-// Frontend V4 "Signal" (owner-approved implementation): the homepage renders
-// HomeV4 under chrome="v4". V3 pages remain routed under the V4 chrome (the
-// .v4-shell token remap re-skins their vocabulary); V3 components stay
-// untouched as the rollback layer — ROLLBACK: swap HomeV4 back to HomeV3 and
-// chrome="v4" back to "v3" to revert instantly.
-const HomeV4 = lazy(() => import("@/pages/HomeV4"));
-const HomeV3 = lazy(() => import("@/pages/HomeV3"));
+// Frontend V5 (owner amendment, workbook W-1): the homepage renders HomeV5
+// under chrome="v4" — the V4 chrome, tokens, and Reveal-adjacent primitives
+// carry forward unchanged. HomeV4 stays in the repository, unrouted, as the
+// rollback reference (reused directly by HomeV5 for its hero mechanics) —
+// ROLLBACK: swap HomeV5 back to HomeV4 to revert instantly. V3 pages remain
+// routed under the V4 chrome (the .v4-shell token remap re-skins their
+// vocabulary); V3 components stay untouched as the rollback layer.
+const HomeV5 = lazy(() => import("@/pages/HomeV5"));
+// `HomeV4` is not imported here — it is no longer routed, and its only
+// remaining consumer is `HomeV5.tsx` (`import { SignalHeroV4 } from
+// "@/pages/HomeV4"`), which is enough to keep it in the bundle and keep it
+// as a rollback reference. Re-add a lazy import + Route here to roll back.
 const ServicesV3 = lazy(() => import("@/pages/ServicesV3"));
 const WebsitesAppsV3 = lazy(() => import("@/pages/WebsitesAppsV3"));
 const DiscoverySystemsV3 = lazy(() => import("@/pages/DiscoverySystemsV3"));
-const AutomationV3 = lazy(() => import("@/pages/AutomationV3"));
+// V5 (W-6): "AI Systems & Automation" replaces "Workflow Automation" and
+// folds in a substantial CRM & internal systems section. `AutomationV3`
+// stays in the repository, unrouted, as a rollback reference — the old
+// `/automation` path 301s to `aiSystems` below instead of rendering it.
+const AiSystemsV5 = lazy(() => import("@/pages/AiSystemsV5"));
 const WorkV3 = lazy(() => import("@/pages/WorkV3"));
 const ProcessV3 = lazy(() => import("@/pages/ProcessV3"));
 const AboutV3 = lazy(() => import("@/pages/AboutV3"));
@@ -44,16 +53,14 @@ const InsightsV3 = lazy(() => import("@/pages/InsightsV3"));
 const StartV3 = lazy(() => import("@/pages/StartV3"));
 const LegalPrivacyV3 = lazy(() => import("@/pages/LegalPrivacyV3"));
 const LegalTermsV3 = lazy(() => import("@/pages/LegalTermsV3"));
-// Frontend V2 rollback references (unrouted or route-preserved):
-const HomeV2 = lazy(() => import("@/pages/HomeV2"));
-const PlatformPreview = lazy(() => import("@/pages/PlatformPreview"));
-const PlatformServicesPreview = lazy(() => import("@/pages/PlatformServicesPreview"));
-const PlatformPricingPreview = lazy(() => import("@/pages/PlatformPricingPreview"));
-const PlatformPortfolioPreview = lazy(() => import("@/pages/PlatformPortfolioPreview"));
-const PlatformAboutPreview = lazy(() => import("@/pages/PlatformAboutPreview"));
-const PlatformContactPreview = lazy(() => import("@/pages/PlatformContactPreview"));
+// V5 rebuilt pricing (amendment §10, supersedes the retired V2 pricing preview).
+const PricingV5 = lazy(() => import("@/pages/PricingV5"));
 const ThankYou = lazy(() => import("@/pages/ThankYou"));
+// `NotFound` (V2) stays imported — AdminRoutes' own catch-all below still
+// uses it and that subtree is not this workstream's to change. The public
+// catch-all now uses `NotFoundV5` instead (W-12/W-16).
 const NotFound = lazy(() => import("@/pages/not-found"));
+const NotFoundV5 = lazy(() => import("@/pages/NotFoundV5"));
 
 // ── Discovery ───────────────────────────────────────────────────────────────
 // The active /discovery route is the guided structured form (DiscoveryPage).
@@ -63,21 +70,17 @@ const DiscoveryPage = lazy(() => import("@/pages/DiscoveryPage"));
 const Discovery = lazy(() => import("@/pages/Discovery"));
 
 // ── AI Receptionist public journey ──────────────────────────────────────────
-// Frontend V4: the capability-honest Signal landing. V3 Voice Theater and the
-// V2 page stay imported as rollback references — ROLLBACK: swap
-// AiReceptionistV4 back to AiReceptionistV3 (chrome="v3") to revert instantly.
+// Frontend V4: the capability-honest Signal landing (receptionist owner's
+// file — not edited by this workstream). `AiReceptionistV3` and
+// `AiReceptionist` (V2) are left exactly as the receptionist owner has them;
+// this workstream does not delete or otherwise touch `AiReceptionist*.tsx`.
 const AiReceptionistV4 = lazy(() => import("@/pages/AiReceptionistV4"));
-const AiReceptionistV3 = lazy(() => import("@/pages/AiReceptionistV3"));
-const AiReceptionist = lazy(() => import("@/pages/AiReceptionist"));
-const LandingReceptionist = lazy(() => import("@/pages/LandingReceptionist"));
 const LandingReceptionistSignup = lazy(() => import("@/pages/LandingReceptionistSignup"));
 
-// ── Deferred verticals (owner decision 4) ───────────────────────────────────
-// Removed from navigation and from the approved information architecture, but
-// still routed so existing inbound links do not break. Source files are
-// retained as rollback references and are NOT deleted in Phase 1.
-const LandingLawyers = lazy(() => import("@/pages/LandingLawyers"));
-const LandingRealtors = lazy(() => import("@/pages/LandingRealtors"));
+// ── Retired verticals (W-18 / amendment §11) ────────────────────────────────
+// `/ai-for-lawyers` and `/ai-for-realtors` now redirect to the AI
+// Receptionist "Built for different businesses" use-cases section instead of
+// rendering their own pages — see the Redirect routes below.
 
 // ── Internal admin / CRM ────────────────────────────────────────────────────
 // Everything below is reachable only from a matched `/admin*` route, behind
@@ -235,20 +238,15 @@ function Router() {
         )}
       </Route>
 
-      {/* ── Deferred vertical landings — unlinked, retained for rollback ─── */}
+      {/* ── Retired vertical landings (W-18/amendment §11) — redirect to the
+          AI Receptionist use-cases section instead of rendering their own
+          pages. Their verified ideas moved into that section's "Built for
+          different businesses" content (receptionist owner). */}
       <Route path={ROUTES.aiForLawyers}>
-        {() => (
-          <PublicShell routeLabel="This page">
-            <LandingLawyers />
-          </PublicShell>
-        )}
+        {() => <Redirect to={`${ROUTES.aiReceptionist}#use-cases`} />}
       </Route>
       <Route path={ROUTES.aiForRealtors}>
-        {() => (
-          <PublicShell routeLabel="This page">
-            <LandingRealtors />
-          </PublicShell>
-        )}
+        {() => <Redirect to={`${ROUTES.aiReceptionist}#use-cases`} />}
       </Route>
 
       {/* ── AI Receptionist ──────────────────────────────────────────────────
@@ -264,7 +262,12 @@ function Router() {
       </Route>
       <Route path={ROUTES.aiReceptionist}>
         {() => (
-          <PublicShell routeLabel="AI Receptionist" chrome="v4" heroTone="ink">
+          <PublicShell
+            routeLabel="AI Receptionist"
+            chrome="v4"
+            heroTone="ink"
+            headerMode="product"
+          >
             <AiReceptionistV4 />
           </PublicShell>
         )}
@@ -297,7 +300,7 @@ function Router() {
       <Route path={ROUTES.home}>
         {() => (
           <PublicShell routeLabel="The homepage" chrome="v4" heroTone="ink">
-            <HomeV4 />
+            <HomeV5 />
           </PublicShell>
         )}
       </Route>
@@ -322,12 +325,16 @@ function Router() {
           </PublicShell>
         )}
       </Route>
-      <Route path={ROUTES.automation}>
+      <Route path={ROUTES.aiSystems}>
         {() => (
-          <PublicShell routeLabel="Workflow Automation" chrome="v4">
-            <AutomationV3 />
+          <PublicShell routeLabel="AI Systems & Automation" chrome="v4">
+            <AiSystemsV5 />
           </PublicShell>
         )}
+      </Route>
+      {/* Retired path (W-6/IA §2): 301-equivalent redirect, not a page. */}
+      <Route path={ROUTES.automation}>
+        {() => <Redirect to={ROUTES.aiSystems} />}
       </Route>
       <Route path={ROUTES.workV3}>
         {() => (
@@ -380,11 +387,11 @@ function Router() {
           </PublicShell>
         )}
       </Route>
-      {/* Deferred (owner decision 4): out of navigation and IA, still routed. */}
+      {/* V5 rebuilt pricing (amendment §10, W-13 superseded). */}
       <Route path={ROUTES.pricing}>
         {() => (
-          <PublicShell routeLabel="This page">
-            <PlatformPricingPreview />
+          <PublicShell routeLabel="Pricing" chrome="v4">
+            <PricingV5 />
           </PublicShell>
         )}
       </Route>
@@ -395,19 +402,18 @@ function Router() {
           </PublicShell>
         )}
       </Route>
+      {/* Retired as a separate experience (W-12): folded into /start#contact. */}
       <Route path={ROUTES.contact}>
-        {() => (
-          <PublicShell routeLabel="Contact">
-            <PlatformContactPreview />
-          </PublicShell>
-        )}
+        {() => <Redirect to={`${ROUTES.start}#contact`} />}
       </Route>
 
-      {/* 404 — V3 chrome. CONTENT-SPECIFICATION.md §7: never a blank screen. */}
+      {/* 404 (W-12/W-16) — on-brand recovery page, V4 chrome. Never a blank
+          screen. The admin catch-all inside AdminRoutes keeps its own
+          NotFound (V2) unchanged — that subtree belongs to the ops owner. */}
       <Route>
         {() => (
           <PublicShell routeLabel="This page" chrome="v4">
-            <NotFound />
+            <NotFoundV5 />
           </PublicShell>
         )}
       </Route>

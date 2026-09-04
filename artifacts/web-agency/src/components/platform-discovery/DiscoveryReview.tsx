@@ -6,6 +6,10 @@ interface DiscoveryReviewProps {
   values: DiscoveryDraft;
   onEditStep: (stepIndex: number) => void;
   onCompletePreview: () => void;
+  /** True while the submission request is in flight — disables the button and prevents duplicate submits. */
+  submitting?: boolean;
+  /** Present when the last submit attempt failed (validation, network, rate limit, server, idempotency conflict). */
+  errorMessage?: string;
 }
 
 function formatValue(value: unknown): string {
@@ -114,15 +118,35 @@ function buildSections(values: DiscoveryDraft): ReviewSection[] {
   ];
 }
 
-export function DiscoveryReview({ values, onEditStep, onCompletePreview }: DiscoveryReviewProps) {
+export function DiscoveryReview({
+  values,
+  onEditStep,
+  onCompletePreview,
+  submitting = false,
+  errorMessage,
+}: DiscoveryReviewProps) {
   const sections = buildSections(values);
 
   return (
     <div>
       <p className="mb-6 text-[hsl(var(--sm-color-text-secondary))]">
-        Review everything below before completing this preview. You can edit any section — nothing is submitted or
-        saved until you choose to complete the preview.
+        Review everything below before submitting. You can edit any section — nothing is sent to SiteMint until you
+        submit the brief.
       </p>
+
+      {errorMessage && (
+        <div
+          role="alert"
+          className="mb-6 rounded-lg border p-4 text-sm"
+          style={{
+            borderColor: "hsl(var(--sm-color-border-default))",
+            backgroundColor: "hsl(var(--sm-color-bg-subtle))",
+            color: "hsl(var(--sm-color-text-primary))",
+          }}
+        >
+          {errorMessage}
+        </div>
+      )}
 
       <div className="space-y-6">
         {sections.map((section) => (
@@ -155,12 +179,18 @@ export function DiscoveryReview({ values, onEditStep, onCompletePreview }: Disco
       </div>
 
       <p className="mt-8 text-sm text-[hsl(var(--sm-color-text-secondary))]">
-        Complete Preview validates every answer above. Nothing is submitted, emailed, or saved — this is a preview
-        only.
+        Submitting sends this brief to SiteMint. Our team reviews every submission and replies within 24–48 hours.
       </p>
 
-      <Button type="button" size="lg" className="pp-btn pp-btn-primary mt-4" onClick={onCompletePreview}>
-        Complete Preview
+      <Button
+        type="button"
+        size="lg"
+        className="pp-btn pp-btn-primary mt-4"
+        onClick={onCompletePreview}
+        disabled={submitting}
+        aria-busy={submitting}
+      >
+        {submitting ? "Submitting…" : errorMessage ? "Try again" : "Submit Discovery Brief"}
       </Button>
     </div>
   );

@@ -1,53 +1,164 @@
 /**
- * Frontend V3 — Services hub. Orients, then routes to the four service pages.
+ * Frontend V3/V5 — Services hub ("What We Build"). Orients, then routes to
+ * the service pages.
+ *
+ * V5 changes (W-2): working section anchors that match the header's mega
+ * panel and an interactive systems map (hover/focus/tap highlights a
+ * pillar and jumps to its anchor). "AI Systems & Automation" replaced
+ * "Workflow Automation" and now includes CRM & internal systems as a
+ * distinct, anchored section rather than a separate route (W-6).
  */
 
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowRight,
   Globe,
-  AudioLines,
   Search,
   Workflow,
+  Database,
   Plug,
 } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
-const services = [
+type PillarId = "websites-apps" | "discovery-systems" | "ai-systems" | "crm-systems";
+
+interface Pillar {
+  id: PillarId;
+  icon: typeof Globe;
+  title: string;
+  headline: string;
+  desc: string;
+  href: string;
+  mapPos: { x: number; y: number };
+}
+
+const pillars: Pillar[] = [
   {
+    id: "websites-apps",
     icon: Globe,
     title: "Websites & Web Apps",
     headline: "A website that knows what happens next.",
     desc: "Editorial-grade marketing sites and custom applications, designed backwards from the action a real customer should take.",
     href: ROUTES.websitesApps,
+    mapPos: { x: 70, y: 140 },
   },
   {
-    icon: AudioLines,
-    title: "AI Receptionist",
-    headline: "The call you miss shouldn't be the customer you lose.",
-    desc: "A business receptionist that answers, understands, books, follows up, and knows when to bring in a person.",
-    href: ROUTES.aiReceptionist,
-  },
-  {
+    id: "discovery-systems",
     icon: Search,
     title: "Discovery Systems",
     headline: "Turn first contact into a useful brief.",
     desc: "Structured, adaptive intake that hands your team something they can price, plan, and respond to the same day.",
     href: ROUTES.discoverySystems,
+    mapPos: { x: 230, y: 60 },
   },
   {
+    id: "ai-systems",
     icon: Workflow,
-    title: "Workflow Automation",
+    title: "AI Systems & Automation",
     headline: "Less handoff. Less busywork. More momentum.",
-    desc: "Follow-ups, routing, and record-keeping handled automatically — with people kept in the loop and an audit trail on every step.",
-    href: ROUTES.automation,
+    desc: "Follow-ups, routing, evaluation, and record-keeping handled automatically — with people kept in the loop and an audit trail on every step.",
+    href: ROUTES.aiSystems,
+    mapPos: { x: 390, y: 140 },
+  },
+  {
+    id: "crm-systems",
+    icon: Database,
+    title: "CRM & Internal Systems",
+    headline: "Where the business runs, in one place.",
+    desc: "Pipeline, tasks, and records the team actually looks at — connected to the rest of the system, not a fifth disconnected tool.",
+    href: `${ROUTES.aiSystems}#crm-systems`,
+    mapPos: { x: 390, y: 240 },
   },
 ];
 
+/**
+ * The interactive systems map (W-2). Styled entirely with inline styles and
+ * SVG presentation attributes — this page's stylesheets (`v3-marketing.css`,
+ * `v3-pages.css`) are protected files this workstream may not edit, and
+ * `v5-home.css` is scoped to `HomeV5` only, so no new class-based stylesheet
+ * is introduced here.
+ */
+function SystemsMap() {
+  const [active, setActive] = useState<PillarId | null>(null);
+
+  function jumpTo(id: PillarId) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  return (
+    <div style={{ maxWidth: 460, margin: "2rem auto 0" }}>
+      <svg
+        viewBox="0 0 460 300"
+        role="group"
+        aria-label="Interactive map of the four connected SiteMint systems"
+        style={{ width: "100%", height: "auto" }}
+      >
+        <path
+          d="M70 140 L230 60 L390 140 L390 240"
+          fill="none"
+          stroke="var(--v3-line, #d7e7e3)"
+          strokeWidth={2}
+        />
+        {pillars.map((p) => {
+          const isActive = active === p.id;
+          return (
+            <a key={p.id} href={`#${p.id}`} tabIndex={-1}>
+              <circle
+                cx={p.mapPos.x}
+                cy={p.mapPos.y}
+                r={26}
+                fill={isActive ? "var(--v3-mint, #25D0B0)" : "var(--v3-surface, #fff)"}
+                stroke="var(--v3-mint, #25D0B0)"
+                strokeWidth={isActive ? 3 : 1.5}
+                style={{ cursor: "pointer", transition: "fill 160ms ease, stroke-width 160ms ease" }}
+                onMouseEnter={() => setActive(p.id)}
+                onMouseLeave={() => setActive(null)}
+                onFocus={() => setActive(p.id)}
+                onBlur={() => setActive(null)}
+                tabIndex={0}
+                role="link"
+                aria-label={p.title}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    jumpTo(p.id);
+                  }
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  jumpTo(p.id);
+                }}
+              />
+              <text
+                x={p.mapPos.x}
+                y={p.mapPos.y + 44}
+                textAnchor="middle"
+                style={{
+                  fontSize: 11,
+                  fill: isActive ? "var(--v3-ink, #0B3A3E)" : "var(--v3-text-muted, #526B70)",
+                  fontWeight: isActive ? 700 : 500,
+                }}
+              >
+                {p.title}
+              </text>
+            </a>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 export default function ServicesV3() {
   const reveal = useReveal();
+  usePageMeta({
+    title: "What We Build — SiteMint Digital",
+    description:
+      "Websites & web apps, discovery systems, AI systems & automation, and CRM & internal systems — four connected SiteMint pillars, plus pricing estimates.",
+  });
 
   return (
     <div className="v3-services-hub">
@@ -55,22 +166,23 @@ export default function ServicesV3() {
         <div className="v3-container v3m-page-hero__inner">
           <span className="v3-eyebrow">Services</span>
           <h1 className="v3-display">
-            Four ways in. One connected system.
+            Four connected systems. One SiteMint build.
           </h1>
           <p className="v3-lede">
-            Each service stands on its own. Together they form the SiteMint
-            system: attention arrives at the website, discovery turns it into a
-            brief, automation and the receptionist carry the work, and your
-            team finishes it.
+            Each system stands on its own. Together they form the SiteMint
+            system: attention arrives at the website, discovery turns it into
+            a brief, AI systems and automation carry the work, and the CRM is
+            where your team sees it all.
           </p>
+          <SystemsMap />
         </div>
       </section>
 
       <section className="v3-section" data-tone="porcelain">
         <div className="v3-container v3-reveal" ref={reveal}>
-          {services.map((service, i) => (
+          {pillars.map((service, i) => (
             <Fragment key={service.title}>
-              <article className="v3wk-item">
+              <article className="v3wk-item" id={service.id} style={{ scrollMarginTop: "5rem" }}>
                 <div className="v3wk-item__meta">
                   <span className="v3m-sechead__no">
                     {String(i + 1).padStart(2, "0")}
@@ -94,7 +206,7 @@ export default function ServicesV3() {
             </Fragment>
           ))}
 
-          <article className="v3wk-item">
+          <article className="v3wk-item" id="integrations" style={{ scrollMarginTop: "5rem" }}>
             <div className="v3wk-item__meta">
               <span className="v3m-sechead__no">05</span>
               <span className="v3-eyebrow">
@@ -112,10 +224,31 @@ export default function ServicesV3() {
               </p>
               <div>
                 <Link
-                  href={`${ROUTES.automation}#integrations`}
+                  href={`${ROUTES.aiSystems}#integrations`}
                   className="v3-btn v3-btn--outline"
                 >
                   See how systems connect
+                  <ArrowRight aria-hidden="true" size={16} />
+                </Link>
+              </div>
+            </div>
+          </article>
+
+          <article className="v3wk-item" id="pricing-estimates" style={{ scrollMarginTop: "5rem" }}>
+            <div className="v3wk-item__meta">
+              <span className="v3m-sechead__no">06</span>
+              <span className="v3-eyebrow">Pricing estimates</span>
+            </div>
+            <div className="v3wk-item__body">
+              <h2 className="v3-h2">Three starting points, honestly scoped.</h2>
+              <p className="v3-body">
+                Starter Site System, Growth Digital System, and Custom
+                Connected System — with a scope configurator that composes a
+                summary you can bring straight into a project brief.
+              </p>
+              <div>
+                <Link href={ROUTES.pricing} className="v3-btn v3-btn--outline">
+                  See pricing &amp; configure your scope
                   <ArrowRight aria-hidden="true" size={16} />
                 </Link>
               </div>
