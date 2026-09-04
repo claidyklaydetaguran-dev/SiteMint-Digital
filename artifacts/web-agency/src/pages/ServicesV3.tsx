@@ -85,6 +85,10 @@ function SystemsMap() {
   const [active, setActive] = useState<PillarId | null>(null);
 
   function jumpTo(id: PillarId) {
+    // Keep the URL deep-linkable: the map is an anchor navigation, so the
+    // fragment must land in the address bar (replace, not push — overlay-free
+    // in-page moves never add history entries).
+    history.replaceState(history.state, "", `#${id}`);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
