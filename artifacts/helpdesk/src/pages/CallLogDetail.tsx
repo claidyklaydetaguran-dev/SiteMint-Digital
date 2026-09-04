@@ -38,6 +38,8 @@ import {
   NOT_PROVIDED,
   PAGE,
   analysisIsAvailable,
+  callCategory,
+  callCategoryLabel,
   consent,
   dispositionLabel,
   formatDuration,
@@ -156,6 +158,7 @@ function Record({ call }: { call: RealCallDetail }) {
             <span className="sd-sr">{stateAccessibleName(label)}</span>
           </span>
         </div>
+        <span className="sd-chip">{callCategoryLabel(callCategory(call))}</span>
 
         <dl className="sc-facts sc-facts--record">
           <Fact label={DETAIL.started}>
@@ -181,6 +184,13 @@ function Record({ call }: { call: RealCallDetail }) {
           </Fact>
         </dl>
       </header>
+
+      <section className="sc-doc" aria-labelledby="sc-retention">
+        <h2 className="sc-doc__heading" id="sc-retention">
+          {DETAIL.retentionHeading}
+        </h2>
+        <p className="sc-note">{DETAIL.retentionDetail}</p>
+      </section>
 
       <section className="sc-doc" aria-labelledby="sc-transcript">
         <h2 className="sc-doc__heading" id="sc-transcript">

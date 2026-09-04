@@ -1,117 +1,150 @@
 /**
- * Frontend V2 Phase 10 — the Contacts workspace.
+ * V5 PR-8 — the Contacts workspace: a real, searchable list.
  *
- * Mounted at `ROUTES.contacts` (`/contacts`, base-relative) inside the Phase 7
- * `DashboardShell`. It inherits that shell's navigation rail, `<main>`
- * landmark, skip link, palette, focus ring and motion system, and adds no
- * second design system and no chrome of its own.
- *
- * ── Requests: none ────────────────────────────────────────────────────────
- * This page issues no request, because no endpoint exists for it to call. No
- * query, no query key, no cache entry, no retry, no refetch, no polling. The
- * reasoning — and the schema and router evidence behind it — is documented in
- * `contacts/contactsContract.ts`, which owns every claim and every string on
- * this route.
- *
- * Authentication, the loading gate and the redirect on an expired session are
- * the shell's, unchanged: `AppShell` runs `GET /api/receptionist/auth/me`,
- * renders its own boot state while that is in flight, and navigates to
- * `/login` on error. Nothing here duplicates or weakens that, and no
- * authenticated content renders before it resolves.
- *
- * ── What this replaces ────────────────────────────────────────────────────
- * An empty state advertising a directory with a call log, per-contact tiers and
- * scoring of people, none of which exist in this product. Nothing on this page
- * now describes a capability the repository cannot evidence, and nothing claims
- * completeness of the conversation set — see `contactsContract.ts`.
+ * Reads `GET /receptionist/contacts?query=&limit=` (`useContactsList`). The
+ * search box updates the query key after a short debounce, so typing issues
+ * one request per pause rather than one per keystroke. A table renders at
+ * desktop widths; a stacked card list renders below 768px (see
+ * `.sd-hide-mobile` / `.sd-hide-desktop` — plain Tailwind responsive classes,
+ * no new stylesheet).
  */
 
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { ArrowRight } from "lucide-react";
+import { useSession } from "@/hooks/useSession";
+import { useContactsList } from "@/hooks/useContacts";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { InlineError } from "@/components/common/InlineError";
+import { PageSkeleton } from "@/components/common/PageSkeleton";
+import { relativeTime } from "@/lib/conversationUi";
+import type { ContactSummary } from "@/lib/contactsApi";
 import {
-  availabilityCopy,
-  conversationsDestination,
-  recordedFields,
+  LIST,
+  PAGE,
+  contactDisplayName,
+  dispositionLabel,
+  sourceLabel,
 } from "@/pages/contacts/contactsContract";
 import "@/styles/v2-dashboard.css";
-import "@/styles/v2-contacts.css";
+
+function useDebounced(value: string, delayMs: number): string {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+function ContactRow({ contact }: { contact: ContactSummary }) {
+  return (
+    <Link href={`/contacts/${encodeURIComponent(contact.id)}`} className="block rounded-lg border border-card-border bg-card p-4 md:hidden">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-foreground">{contactDisplayName(contact)}</span>
+        {contact.optedOut && <Badge variant="outline">{LIST.optedOutChip}</Badge>}
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{contact.phone}</p>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>{sourceLabel(contact.source)}</span>
+        <span>{contact.lastInteractionAt ? relativeTime(contact.lastInteractionAt) : LIST.never}</span>
+        <span>{dispositionLabel(contact.disposition)}</span>
+      </div>
+    </Link>
+  );
+}
 
 export default function Contacts() {
-  const availability = availabilityCopy();
-  const fields = recordedFields();
-  const destination = conversationsDestination();
+  const { data: me, isLoading: sessionLoading } = useSession();
+  const [rawQuery, setRawQuery] = useState("");
+  const query = useDebounced(rawQuery, 300);
+  const contactsQuery = useContactsList(query);
+
+  if (sessionLoading) {
+    return <PageSkeleton label={PAGE.loading} list />;
+  }
+  if (!me) return null;
+
+  const items = contactsQuery.data?.items ?? [];
+  const searching = rawQuery.trim() !== "";
 
   return (
-    <div className="sk-page sd-enter">
+    <div className="sd-page sd-enter">
       <div className="sd-page__head">
         <div>
-          <span className="sd-eyebrow">Operate</span>
-          <h1 className="sd-page__title">Contacts</h1>
+          <span className="sd-eyebrow">{PAGE.eyebrow}</span>
+          <h1 className="sd-page__title">{PAGE.title}</h1>
+          <p className="sd-page__meta">{PAGE.detail}</p>
         </div>
       </div>
 
-      {/* The one thing an operator needs in the first five seconds: why this
-          screen has no directory on it. Neutral tone — nothing is broken and
-          nothing is waiting on the operator, so this is not amber. */}
-      <section className="sd-status sk-status" data-state="neutral" aria-labelledby="sk-status-title">
-        <div className="sd-status__head">
-          <span className="sd-status__dot" aria-hidden="true" />
-          <div className="sd-status__body">
-            <h2 className="sd-status__title" id="sk-status-title">
-              {availability.title}
-            </h2>
-            <p className="sd-status__detail">{availability.detail}</p>
+      <div className="max-w-sm">
+        <label className="sr-only" htmlFor="contacts-search">{LIST.searchLabel}</label>
+        <Input
+          id="contacts-search"
+          type="search"
+          placeholder={LIST.searchPlaceholder}
+          value={rawQuery}
+          onChange={(e) => setRawQuery(e.target.value)}
+        />
+      </div>
+
+      {contactsQuery.isLoading && (
+        <p className="sd-sr" role="status" aria-live="polite">{LIST.loading}</p>
+      )}
+
+      {contactsQuery.isError && (
+        <InlineError title={LIST.failed} description="" onRetry={() => contactsQuery.refetch()} />
+      )}
+
+      {!contactsQuery.isLoading && !contactsQuery.isError && items.length === 0 && (
+        <div className="sd-empty">
+          <h3 className="sd-empty__title">{searching ? LIST.noResultsTitle : LIST.emptyTitle}</h3>
+          <p className="sd-empty__detail">{searching ? LIST.noResultsDetail : LIST.emptyDetail}</p>
+        </div>
+      )}
+
+      {!contactsQuery.isLoading && !contactsQuery.isError && items.length > 0 && (
+        <>
+          <p className="text-sm text-muted-foreground">{LIST.countSuffix(items.length)}</p>
+
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{LIST.columnName}</TableHead>
+                  <TableHead>{LIST.columnSource}</TableHead>
+                  <TableHead>{LIST.columnLastInteraction}</TableHead>
+                  <TableHead>{LIST.columnStatus}</TableHead>
+                  <TableHead>{LIST.columnNextAppointment}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((contact) => (
+                  <TableRow key={contact.id} className="cursor-pointer">
+                    <TableCell>
+                      <Link href={`/contacts/${encodeURIComponent(contact.id)}`} className="font-medium text-foreground hover:underline">
+                        {contactDisplayName(contact)}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">{contact.phone}</div>
+                      {contact.optedOut && <Badge variant="outline" className="mt-1">{LIST.optedOutChip}</Badge>}
+                    </TableCell>
+                    <TableCell>{sourceLabel(contact.source)}</TableCell>
+                    <TableCell>{contact.lastInteractionAt ? relativeTime(contact.lastInteractionAt) : LIST.never}</TableCell>
+                    <TableCell>{dispositionLabel(contact.disposition)}</TableCell>
+                    <TableCell>{contact.nextAppointmentAt ? relativeTime(contact.nextAppointmentAt) : LIST.noNextAppointment}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </section>
 
-      {/* The concrete answer to "so what is kept about these people?".
-          A description list, not a table: four fields is not tabular data, and
-          `dt`/`dd` carries the label-to-value relationship natively. */}
-      <section className="sd-section" aria-labelledby="sk-fields-title">
-        <div className="sd-section__head">
-          <h2 className="sd-h2" id="sk-fields-title">
-            What is stored with a conversation
-          </h2>
-        </div>
-        <dl className="sk-fields">
-          {fields.map((field) => (
-            <div
-              className="sk-fields__row"
-              key={field.label}
-              data-recorded={field.recorded ? "true" : "false"}
-            >
-              <dt className="sk-fields__label">
-                {/* Carries the stored/not-stored distinction to assistive
-                    technology and to anyone who cannot separate the two by
-                    colour. Never colour alone. */}
-                <span className="sk-fields__mark" aria-hidden="true" />
-                {field.label}
-                <span className="sd-sr">
-                  {field.recorded ? " — stored" : " — not stored"}
-                </span>
-              </dt>
-              <dd className="sk-fields__detail">{field.detail}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {/* The only real action on the route. */}
-      <section className="sd-section" aria-labelledby="sk-next-title">
-        <div className="sd-section__head">
-          <h2 className="sd-h2" id="sk-next-title">
-            Where to find this information
-          </h2>
-        </div>
-        <p className="sk-prose">{destination.detail}</p>
-        <p>
-          <Link href={destination.href} className="sd-link sk-link">
-            {destination.label}
-            <ArrowRight className="sk-link__icon" aria-hidden="true" />
-          </Link>
-        </p>
-      </section>
+          <div className="grid gap-3 md:hidden">
+            {items.map((contact) => <ContactRow key={contact.id} contact={contact} />)}
+          </div>
+        </>
+      )}
     </div>
   );
 }

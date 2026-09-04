@@ -87,6 +87,9 @@ export function recordCount(n: number): string {
 /* ── Detail ────────────────────────────────────────────────────────────── */
 
 export const DETAIL = {
+  retentionHeading: "What SiteMint keeps",
+  retentionDetail:
+    "SiteMint does not retain call audio or full transcripts. The dashboard stores only the operational call details and outcomes needed to manage the receptionist.",
   back: "Back to Call Logs",
   loading: "Loading call record…",
   notFoundTitle: "That call record isn't here",
@@ -213,6 +216,41 @@ export function stateLabel(call: Pick<RealCallSummary, "state" | "stateLabel">):
 
 export function stateTone(state: string): StateTone {
   return STATE_TONE[state as InternalCallState] ?? "settled";
+}
+
+/* ── Call category (V5 PR-8) ───────────────────────────────────────────────
+   A coarser grouping layered on top of the ten internal states above, for
+   the Calls list and detail chip. `endedReason` and `analysisAvailability`
+   are only present on `RealCallDetail`, never on the list's `RealCallSummary`
+   — so a list row can resolve to "in_progress"/"completed"/"failed" from
+   `state`/`isFinal` alone, and only the detail page (which has both extra
+   fields) can additionally resolve "needs_attention". Neither field is
+   invented when absent; the function simply degrades to the coarser answer
+   it can support with what it was given. */
+
+export const CALL_CATEGORY_LABEL = {
+  in_progress: "In progress",
+  completed: "Completed",
+  failed: "Failed",
+  needs_attention: "Needs attention",
+} as const;
+
+export type CallCategory = keyof typeof CALL_CATEGORY_LABEL;
+
+export function callCategory(call: {
+  state: string;
+  isFinal: boolean;
+  endedReason?: string | null;
+  analysisAvailability?: StructuredOutcomeAvailability | string | null;
+}): CallCategory {
+  if (!call.isFinal) return "in_progress";
+  const endedReasonIndicatesError = typeof call.endedReason === "string" && /error|fail/i.test(call.endedReason);
+  if (call.analysisAvailability === "unavailable" || endedReasonIndicatesError) return "needs_attention";
+  return call.state === "completed" ? "completed" : "failed";
+}
+
+export function callCategoryLabel(category: CallCategory): string {
+  return CALL_CATEGORY_LABEL[category];
 }
 
 /** The mark beside a row carries colour only; the state is always spelled out in text as well. */
@@ -380,6 +418,7 @@ export function everyRenderableString(): string[] {
     ...Object.values(PAGE),
     ...Object.values(LIST),
     ...Object.values(DETAIL),
+    ...Object.values(CALL_CATEGORY_LABEL),
     NOT_PROVIDED,
     NOT_AVAILABLE,
     ANALYSIS_UNAVAILABLE,

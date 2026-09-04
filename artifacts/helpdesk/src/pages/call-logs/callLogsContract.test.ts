@@ -62,6 +62,9 @@ import {
   textOrMissing,
   urgencyLabel,
   yesNo,
+  CALL_CATEGORY_LABEL,
+  callCategory,
+  callCategoryLabel,
 } from "./callLogsContract.js";
 
 import {
@@ -1526,6 +1529,56 @@ if (!existsSync(distDir)) {
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V5 PR-8 — the coarse call category layered on top of the ten internal
+// states, and the retention block's exact wording.
+// ═══════════════════════════════════════════════════════════════════════════
+
+check(
+  "a non-final call is always in_progress regardless of its granular state",
+  ["queued", "ringing", "connecting", "in_progress"].every(
+    (state) => callCategory({ state, isFinal: false }) === "in_progress",
+  ),
+);
+
+check(
+  "a final call with analysis unavailable is needs_attention even when the state is completed",
+  callCategory({ state: "completed", isFinal: true, analysisAvailability: "unavailable" }) === "needs_attention",
+);
+
+check(
+  "a final call whose endedReason names an error is needs_attention even when the state is completed",
+  callCategory({ state: "completed", isFinal: true, endedReason: "assistant-error", analysisAvailability: "available" }) === "needs_attention",
+);
+
+check(
+  "a final, analysed, cleanly-ended completed call is completed, not needs_attention",
+  callCategory({ state: "completed", isFinal: true, endedReason: "customer-ended-call", analysisAvailability: "available" }) === "completed",
+);
+
+check(
+  "a final non-completed call with no error signal falls back to failed",
+  callCategory({ state: "no_answer", isFinal: true, analysisAvailability: "available" }) === "failed",
+);
+
+check(
+  "a list row with no endedReason/analysisAvailability at all still resolves without throwing",
+  callCategory({ state: "failed", isFinal: true }) === "failed",
+);
+
+eq("every category has a label", Object.keys(CALL_CATEGORY_LABEL).map((k) => callCategoryLabel(k as keyof typeof CALL_CATEGORY_LABEL)).every((l) => typeof l === "string" && l.length > 0), true);
+
+check(
+  "the retention sentence matches the approved copy exactly",
+  DETAIL.retentionDetail ===
+    "SiteMint does not retain call audio or full transcripts. The dashboard stores only the operational call details and outcomes needed to manage the receptionist.",
+);
+
+check(
+  "the retention sentence is part of the exhaustive string surface",
+  everyRenderableString().includes(DETAIL.retentionDetail),
+);
 
 // ─── Result ────────────────────────────────────────────────────────────────
 
