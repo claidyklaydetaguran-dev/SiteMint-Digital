@@ -850,7 +850,7 @@ check(
 eq(
   "the approved workspace wording is exactly what the owner approved",
   [PAGE.title, PAGE.detail],
-  ["Call Logs", "Review stored call records, transcripts, and analysis received by SiteMint."],
+  ["Calls", "Review stored call records and outcomes received by SiteMint."],
 );
 
 check(

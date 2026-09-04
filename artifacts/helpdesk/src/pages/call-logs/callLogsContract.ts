@@ -39,11 +39,13 @@ import type {
 
 export const PAGE = {
   eyebrow: "RECORDS",
-  title: "Call Logs",
+  // V5 A-1: the page is "Calls"; A-2/L-6: no transcript is retained, so the
+  // subtitle names records and outcomes, not transcripts.
+  title: "Calls",
   /* Owner-approved wording. The line it replaces — "Calls your voice
      assistant answers, with transcripts and outcomes." — asserted an
      answering service that is not connected. */
-  detail: "Review stored call records, transcripts, and analysis received by SiteMint.",
+  detail: "Review stored call records and outcomes received by SiteMint.",
   sessionLoading: "Checking your session…",
 } as const;
 
