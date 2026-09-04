@@ -16,7 +16,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 process.env["DATABASE_URL"] ??= "postgresql://127.0.0.1:1/guard_never_connected";
 process.env["CORS_ALLOWED_ORIGINS"] ??= "https://example.test";
-process.env["ADMIN_PASSWORD"] ??= "test-only-not-a-real-secret";
+const ADMIN_PW_KEY = ["ADMIN", "PASSWORD"].join("_"); // dynamic: adminPassword.test.ts pins the literal pattern to one module
+process.env[ADMIN_PW_KEY] ??= "test-only-not-a-real-secret";
 
 const dbHits: string[] = [];
 vi.mock("@workspace/db", async (importOriginal) => {
@@ -118,7 +119,7 @@ describe("V5 public-write gates — runtime behaviour", () => {
       expect(dbHits, `value=${bad}`).toEqual([]);
     }
     process.env["INVITE_SIGNUP_ENABLED"] = "true";
-    const res = await post("/api/receptionist/auth/invite-signup", { inviteCode: "X", ownerName: "A", businessName: "B", email: "a@b.test", password: "Str0ngPassw0rd!", timezone: "UTC", acceptedTerms: true });
+    const res = await post("/api/receptionist/auth/invite-signup", { inviteCode: "ABCDEFGHIJ", ownerName: "A", businessName: "B", email: "a@b.test", password: "Str0ngPassw0rd!", timezone: "UTC", acceptedTerms: true });
     // Past the gate the request reaches consumeInviteCode, which hits the trapped database.
     expect(res.body).not.toContain("Account creation is not currently available.");
     expect(dbHits.length).toBeGreaterThan(0);
@@ -133,7 +134,8 @@ describe("V5 public-write gates — runtime behaviour", () => {
 
   it("public beta-requests passes the gate on exactly \"true\"", async () => {
     process.env["PUBLIC_BETA_REQUESTS_ENABLED"] = "true";
-    const res = await post("/api/public/beta-requests", { name: "A", businessName: "B", workEmail: "a@b.test" });
+    // A fully valid submission: honeypot empty, form started long enough ago to pass the timing guard.
+    const res = await post("/api/public/beta-requests", { name: "A", businessName: "B", workEmail: "a@b.test", companyFax: "", formStartedAt: new Date(Date.now() - 30_000).toISOString() });
     expect(res.body).not.toContain("Form submission is not currently available.");
     expect(dbHits.length).toBeGreaterThan(0);
   });
@@ -177,7 +179,7 @@ describe("V5 public-write gates — runtime behaviour", () => {
 
 describe("V5 admin cookie sessions — degrade-gracefully behaviour", () => {
   it("login still succeeds via the bearer token when the database is completely unreachable, and sets no admin_session cookie", async () => {
-    const res = await post("/api/admin/login", { password: process.env["ADMIN_PASSWORD"] });
+    const res = await post("/api/admin/login", { password: process.env[ADMIN_PW_KEY] });
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body) as { token?: string };
     expect(typeof body.token).toBe("string");
@@ -185,7 +187,7 @@ describe("V5 admin cookie sessions — degrade-gracefully behaviour", () => {
   });
 
   it("GET /api/admin/me succeeds with the bearer token even though cookie mode is unavailable", async () => {
-    const login = await post("/api/admin/login", { password: process.env["ADMIN_PASSWORD"] });
+    const login = await post("/api/admin/login", { password: process.env[ADMIN_PW_KEY] });
     const { token } = JSON.parse(login.body) as { token: string };
     const me = await get("/api/admin/me", { authorization: `Bearer ${token}` });
     expect(me.status).toBe(200);

@@ -23,6 +23,8 @@ import { describe, expect, it } from "vitest";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), ".");
 const read = (p: string) => readFileSync(join(SRC, p), "utf8");
+// Comments may legitimately NAME Vapi to document its absence; only code counts.
+const stripComments = (src: string) => src.replace(//*[sS]*?*//g, "").replace(/^s*//.*$/gm, "");
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -40,7 +42,7 @@ describe("controlled demo seam — no provider import", () => {
     expect(demoFiles.length, "the demo seam files must exist").toBeGreaterThan(0);
     for (const file of demoFiles) {
       const src = readFileSync(file, "utf8");
-      expect(src, file).not.toMatch(/vapi/i);
+      expect(stripComments(src), file).not.toMatch(/vapi/i);
       expect(src, file).not.toMatch(/from\s+["'].*lib\/voice\//);
       expect(src, file).not.toMatch(/VAPI_API_KEY|VAPI_WEBHOOK/);
     }
@@ -48,7 +50,7 @@ describe("controlled demo seam — no provider import", () => {
 
   it("routes/publicDemo.ts imports only the demo seam, never a provider or lib/voice/", () => {
     const src = read("routes/publicDemo.ts");
-    expect(src).not.toMatch(/vapi/i);
+    expect(stripComments(src)).not.toMatch(/vapi/i);
     expect(src).not.toMatch(/from\s+["'].*lib\/voice\//);
     expect(src).toMatch(/publicDemo\/demoConfig\.js/);
     expect(src).toMatch(/publicDemo\/demoSessionService\.js/);
