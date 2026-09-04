@@ -29,12 +29,12 @@
 | W-14 | Website | Video containers, poster/loading/reduced-motion/mobile fallback, labelled placeholders | P1 | IN PROGRESS | — | — | — | — | — |
 | W-15 | Website | SEO/metadata (titles, descriptions, sitemap without retired routes) | P1 | IN PROGRESS | — | — | — | — | — |
 | W-16 | Website | Privacy/Terms prepared for legal review | P1 | BLOCKED — OWNER | — | drafts exist | — | legal review | Owner |
-| R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | IN PROGRESS | — | — | — | — | — |
-| R-02 | Receptionist mkt | Simulated Interactive Preview (curated branches, waveform, labelled) | P0 | IN PROGRESS | — | — | — | — | — |
-| R-03 | Receptionist mkt | Request Beta Access form → `POST /api/public/beta-requests` (flag off) | P0 | IN PROGRESS | — | — | — | — | — |
-| R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | IN PROGRESS | — | — | — | — | — |
-| R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | IN PROGRESS | — | — | — | — | — |
-| R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | IN PROGRESS | — | — | — | — | — |
+| R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | IN PROGRESS | — | — | — | App.tsx route wiring after WP website lands | — |
+| R-02 | Receptionist mkt | Simulated Interactive Preview (curated branches, waveform, labelled) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
+| R-03 | Receptionist mkt | Request Beta Access form → `POST /api/public/beta-requests` (flag off) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
+| R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
+| R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
+| R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | C-01 | Customer app | Approved navigation (D-2), breadcrumbs, no nested rail scroll, capability states for every path | P0 | IN PROGRESS | — | — | — | — | — |
 | C-02 | Customer app | Invite-only signup ("Set up your AI Receptionist", S-1 fields) | P0 | IN PROGRESS | — | — | — | — | — |
 | C-03 | Customer app | Forgot password + reset UI | P0 | IN PROGRESS | — | — | — | — | — |
