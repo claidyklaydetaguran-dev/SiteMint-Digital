@@ -57,15 +57,15 @@
 | C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IN PROGRESS | — | — | — | — | — |
 | C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IN PROGRESS | — | — | — | — | — |
 | C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IN PROGRESS | — | — | — | — | — |
-| O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | IN PROGRESS | — | — | — | — | — |
-| O-02 | Operations | Secure admin sessions UI (cookie login/logout/me) | P0 | IN PROGRESS | — | — | — | — | — |
-| O-03 | Operations | Breadcrumbs, single scroll region, in-layout 404 | P1 | IN PROGRESS | — | — | — | — | — |
-| O-04 | Operations | Nav cleanup (Soon items, duplicate Lead DNA, one Command Center) | P1 | IN PROGRESS | — | — | — | — | — |
-| O-05 | Operations | Receptionist Ops: Firms, Firm detail, Issues, Usage, Numbers | P0 | IN PROGRESS | — | — | — | — | — |
-| O-06 | Operations | Command Center attention-first (O-2) | P1 | IN PROGRESS | — | — | — | — | — |
-| O-07 | Operations | Canonical lead statuses + null-safety (O-3) | P1 | IN PROGRESS | — | — | — | — | — |
-| O-08 | Operations | Lead detail simplification (O-4) | P1 | IN PROGRESS | — | — | — | — | — |
-| O-09 | Operations | Essential responsive Ops views (M-3) | P1 | IN PROGRESS | — | — | — | — | — |
+| O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-02 | Operations | Secure admin sessions UI (cookie login/logout/me) | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-03 | Operations | Breadcrumbs, single scroll region, in-layout 404 | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-04 | Operations | Nav cleanup (Soon items, duplicate Lead DNA, one Command Center) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-05 | Operations | Receptionist Ops: Firms, Firm detail, Issues, Usage, Numbers | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-06 | Operations | Command Center attention-first (O-2) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-07 | Operations | Canonical lead statuses + null-safety (O-3) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-08 | Operations | Lead detail simplification (O-4) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
+| O-09 | Operations | Essential responsive Ops views (M-3) | P1 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
 | B-01 | Backend | Admin cookie sessions + logout + me + audit (schema push-mode) | P0 | IN PROGRESS | — | — | — | — | — |
 | B-02 | Backend | Onboarding state routes + `voice_onboarding_states` schema | P0 | IN PROGRESS | — | — | — | — | — |
 | B-03 | Backend | Contacts read routes | P0 | IN PROGRESS | — | — | — | — | — |
