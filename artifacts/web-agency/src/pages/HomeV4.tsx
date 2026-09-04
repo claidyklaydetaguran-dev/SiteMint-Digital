@@ -27,6 +27,9 @@ import { useReveal } from "@/components/v3/useReveal";
 import { SignalGlyphV4 } from "@/components/v4/SignalGlyphsV4";
 import { whatWeBuildV4, startHrefV4, startLabelV4 } from "@/components/v4/publicNavV4";
 import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
+// Owner routing directive (2026-09-05): re-clicking the wordmark/nav item
+// while already on Home replays this hero's entrance — see useIntroReplay.ts.
+import { useIntroReplayKey } from "@/components/v5/useIntroReplay";
 
 /* ── Hero field geometry — single source for nodes, canvas, and HUD ────── */
 
@@ -194,6 +197,10 @@ export function SignalHeroV4({
   const rootRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Bumped by a replay request; adding it to the effect below's dependency
+  // array restarts the whole entrance (particles, rAF loop, node lighting)
+  // from scratch without unmounting this component or any page state.
+  const introReplayKey = useIntroReplayKey();
 
   useEffect(() => {
     const rootMaybe = rootRef.current;
@@ -438,7 +445,7 @@ export function SignalHeroV4({
       window.removeEventListener("resize", onResize);
       if (finePointer) root.removeEventListener("pointermove", onPointer);
     };
-  }, []);
+  }, [introReplayKey]);
 
   return (
     <div className="v4-hero" ref={rootRef} data-tone="ink">

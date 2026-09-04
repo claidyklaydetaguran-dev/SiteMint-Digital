@@ -1,5 +1,6 @@
 /**
- * SiteMint V5 — scroll-to-top routing (V5-BLUEPRINT §12).
+ * SiteMint V5 — scroll-to-top routing (V5-BLUEPRINT §12; corrected under the
+ * 2026-09-05 owner routing directive).
  *
  * wouter has no scroll restoration of its own. This component is mounted
  * once inside each of the three shells (`PublicShell`, `AuthShell`,
@@ -11,95 +12,66 @@
  * - a hash is present → does nothing at all; `useHashScrollV4` (mounted
  *   separately in `PublicShell`) already owns anchor navigation, retried
  *   until the lazy route mounts. Fighting it here would race it.
- * - the navigation was a browser back/forward (POP) → restores the scroll
- *   position this component itself recorded for that pathname the last time
- *   the visitor was there, instead of scrolling to top or touching focus.
  * - the very first render (a fresh load or a hard refresh) → does nothing,
  *   so the browser's own reload scroll position is never overridden.
  *
- * `history.scrollRestoration = "manual"` is set once (module-level guard),
- * handing scroll ownership on traversal to this component instead of the
- * browser's default auto-restore, which would otherwise fight the POP
- * handling above.
+ * Correction (owner directive): a browser back/forward (POP) navigation
+ * used to restore whatever scroll position this component had last
+ * recorded for that pathname — the exact "returning to /ai-receptionist
+ * keeps the old scroll position" defect the owner called out. Every path
+ * change, POP included, now gets the *same* top-of-page + focus treatment
+ * as a forward navigation; there is no longer a POP branch, and nothing
+ * records or restores a per-pathname scroll position. (The public site,
+ * the CRM, and the auth shell all want "new route starts at top" — none of
+ * the three wants back/forward to feel different from a link click.)
+ *
+ * `history.scrollRestoration = "manual"` (module-level guard,
+ * `enableManualScrollRestoration()`) is still the right tool even though
+ * this component no longer restores anything itself: without it, the
+ * *browser's own* native restore fires on POP before this effect runs,
+ * so a same-tick `scrollToTop()` either loses the race against it or
+ * paints one frame of the old position first. "manual" tells the browser
+ * to leave scroll exactly where it is on traversal, so this effect is the
+ * only thing that ever moves it.
  */
 
 import { useLayoutEffect, useRef } from "react";
 import { useLocation } from "wouter";
-
-/** Pathname → last recorded scrollY, kept across the whole session so a POP
- *  navigation back to a route restores where the visitor left it. Module
- *  scope on purpose: the three shells mount/unmount this component as the
- *  route family changes, but the visitor's scroll history should not reset
- *  each time. */
-const scrollPositions = new Map<string, number>();
+import { enableManualScrollRestoration, focusMainContent, scrollToTop } from "@/lib/scrollBehavior";
 
 let scrollRestorationSet = false;
 
-/** The landmark `RouteScrollManager` moves focus to on a plain (non-hash,
- *  non-POP) navigation. Matches `HOME_SECTIONS.main` (`lib/routes.ts`) and
- *  the `id` every V2/V3/V4 `PublicShell` `<main>` renders. */
-const MAIN_CONTENT_ID = "main-content";
-
 export function RouteScrollManager(): null {
   const [location] = useLocation();
-  const isPopRef = useRef(false);
   const hasMountedRef = useRef(false);
 
-  // One-time setup: take over scroll restoration and start tracking POP vs.
-  // PUSH navigations. Runs once regardless of how many shells mount this
-  // component over the session (module-level guard for the history API
-  // call; the popstate listener itself is a normal effect subscription).
+  // One-time setup: take over scroll restoration from the browser. Runs
+  // once regardless of how many shells mount this component over the
+  // session (module-level guard).
   useLayoutEffect(() => {
-    if (!scrollRestorationSet && "scrollRestoration" in window.history) {
-      window.history.scrollRestoration = "manual";
+    if (!scrollRestorationSet) {
+      enableManualScrollRestoration();
       scrollRestorationSet = true;
     }
-    const onPopState = () => {
-      isPopRef.current = true;
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  // Passive recorder: every scroll on the current route updates its saved
-  // position, so a later POP back to it restores from here. No state, no
-  // re-render — a direct write into the module map.
-  useLayoutEffect(() => {
-    const onScroll = () => {
-      scrollPositions.set(location, window.scrollY);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [location]);
-
-  // The actual scroll-to-top / restore-on-POP decision, before paint.
+  // The scroll-to-top / focus decision, before paint, on every route change
+  // — PUSH or POP alike.
   useLayoutEffect(() => {
     // A fresh document load (including a hard refresh) fires this effect on
     // mount too; leave the browser's own restored position alone.
     if (!hasMountedRef.current) {
       hasMountedRef.current = true;
-      isPopRef.current = false;
       return;
     }
-
-    const wasPop = isPopRef.current;
-    isPopRef.current = false;
 
     if (window.location.hash) {
       // Anchor navigation — useHashScrollV4 owns this.
       return;
     }
 
-    if (wasPop) {
-      const saved = scrollPositions.get(location);
-      window.scrollTo({ top: saved ?? 0, left: 0, behavior: "auto" });
-      return;
-    }
-
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    const main = document.getElementById(MAIN_CONTENT_ID);
-    main?.focus({ preventScroll: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    scrollToTop();
+    focusMainContent();
   }, [location]);
 
   return null;
