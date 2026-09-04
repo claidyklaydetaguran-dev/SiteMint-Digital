@@ -10,6 +10,17 @@
 
 ## 0a. OWNER VISUAL REVIEW (2026-09-05) — palette REJECTED, completion pass directed
 
+### 0a-supplement — second directive (2026-09-05, mid-pass voice note)
+
+Received while the completion pass was underway. Verbatim intent, recorded as binding scope:
+
+1. **More interactivity everywhere** — more interactives, more text transitions, container transitions, transitions while scrolling, and hovers.
+2. **AI Receptionist nav bar is too messy — fix it.**
+3. **Deliver suggestions and recommendations**: what to add or fix, transitions, unique UI ideas, and candidate features.
+
+Tracked as checklist rows A-12 (motion pass), A-13 (product header), A-14 (recommendations). Palette, approved functionality, truthful-content, and reduced-motion constraints from §0a continue to apply.
+
+
 The owner reviewed the unified V5 preview: functionality and direction approved to continue,
 **visual implementation NOT accepted as final**. Directives: (1) "Owner preview 100%" is
 review COVERAGE, not visual acceptance — a separate Owner Visual Acceptance measure now

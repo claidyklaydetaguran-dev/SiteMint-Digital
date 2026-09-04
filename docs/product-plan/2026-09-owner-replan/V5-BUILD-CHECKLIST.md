@@ -94,6 +94,9 @@
 | A-09 | Visual accept | Tablet visual review passed | P0 | IN PROGRESS | — | — | — | corrected preview | Owner |
 | A-10 | Visual accept | Mobile visual review passed | P0 | IN PROGRESS | — | — | — | corrected preview | Owner |
 | A-11 | Visual accept | Final owner visual acceptance passed | P0 | BLOCKED — OWNER | — | — | — | owner review of corrected preview | Owner |
+| A-12 | Visual accept | Interaction/motion pass — staggered scroll reveals, container + hover transitions, link/button micro-interactions across all public pages (reduced-motion safe) | P0 | IN PROGRESS | — | owner directive 2026-09-05 (voice note 2): more interactives, text/container/scroll transitions, hovers | — | motion pass merged + captures | — |
+| A-13 | Visual accept | AI Receptionist product-page header decluttered (no wrap 360–1920, one primary CTA, calm hierarchy) | P0 | IN PROGRESS | — | owner directive 2026-09-05 (voice note 2): nav bar too messy | — | header redesign merged + captures | — |
+| A-14 | Visual accept | UI/feature recommendations delivered to owner (transitions, unique UI, features) | P1 | IN PROGRESS | — | owner directive 2026-09-05 (voice note 2) | — | recommendations section in outcome report | — |
 | X-01 | External | Browser test call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 2 authorisation | Owner |
 | X-02 | External | Phone-number acquisition + assignment | P0 | BLOCKED — OWNER | — | — | — | number purchase | Owner |
 | X-03 | External | Inbound-call certification | P0 | BLOCKED — OWNER | — | — | — | Stage 3 | Owner |
