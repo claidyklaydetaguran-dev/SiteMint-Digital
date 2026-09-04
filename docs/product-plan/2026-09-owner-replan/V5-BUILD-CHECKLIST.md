@@ -13,33 +13,33 @@
 | F-05 | Foundation | Route scroll-to-top + anchor + back/forward manager (both apps) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
 | F-06 | Foundation | Foundation contract test in the scripts chain | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
 | F-07 | Foundation | Accessibility foundations (focus ring token, no mint small text, amber/red reserved) | P0 | IMPLEMENTED — UNVERIFIED | b37b70c | tsc both apps + scripts chain in wp-foundation | — | — | — |
-| W-01 | Website | "Signal" removed from public copy/titles/metadata | P0 | IN PROGRESS | — | — | — | — | — |
-| W-02 | Website | Homepage hero copy + CTAs (amendment §6), particles + journey retained | P0 | IN PROGRESS | — | — | — | — | — |
-| W-03 | Website | Homepage 15-section content architecture (§8), signatures, no card walls | P0 | IN PROGRESS | — | — | — | — | — |
-| W-04 | Website | Nav: no duplicate receptionist card; mobile group "Explore"; active state on pillar pages | P0 | IN PROGRESS | — | — | — | — | — |
-| W-05 | Website | `/services` anchors + interactive systems map | P1 | IN PROGRESS | — | — | — | — | — |
-| W-06 | Website | `/automation` → `/ai-systems` (AI Systems & Automation incl. CRM section), redirect | P1 | IN PROGRESS | — | — | — | — | — |
-| W-07 | Website | Truthful `/work` and `/about` copy; team section | P0 | IN PROGRESS | — | — | — | — | — |
-| W-08 | Website | `/process` five real phases with outputs | P1 | IN PROGRESS | — | — | — | — | — |
-| W-09 | Website | Discovery intake submits to backend with all states (flag stays off) | P0 | IN PROGRESS | — | — | — | — | — |
-| W-10 | Website | `/contact` folded into `/start` (redirect); V2 preview pages removed | P0 | IN PROGRESS | — | — | — | — | — |
-| W-11 | Website | Pricing rebuilt (three tiers, disclaimer, configurator, honesty check) | P1 | IN PROGRESS | — | — | — | — | — |
-| W-12 | Website | On-brand 404 with five exits (public) | P0 | IN PROGRESS | — | — | — | — | — |
-| W-13 | Website | Legacy verticals retired → `/ai-receptionist#use-cases` | P0 | IN PROGRESS | — | — | — | — | — |
-| W-14 | Website | Video containers, poster/loading/reduced-motion/mobile fallback, labelled placeholders | P1 | IN PROGRESS | — | — | — | — | — |
-| W-15 | Website | SEO/metadata (titles, descriptions, sitemap without retired routes) | P1 | IN PROGRESS | — | — | — | — | — |
+| W-01 | Website | "Signal" removed from public copy/titles/metadata | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-02 | Website | Homepage hero copy + CTAs (amendment §6), particles + journey retained | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-03 | Website | Homepage 15-section content architecture (§8), signatures, no card walls | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-04 | Website | Nav: no duplicate receptionist card; mobile group "Explore"; active state on pillar pages | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-05 | Website | `/services` anchors + interactive systems map | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-06 | Website | `/automation` → `/ai-systems` (AI Systems & Automation incl. CRM section), redirect | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-07 | Website | Truthful `/work` and `/about` copy; team section | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-08 | Website | `/process` five real phases with outputs | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-09 | Website | Discovery intake submits to backend with all states (flag stays off) | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-10 | Website | `/contact` folded into `/start` (redirect); V2 preview pages removed | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-11 | Website | Pricing rebuilt (three tiers, disclaimer, configurator, honesty check) | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-12 | Website | On-brand 404 with five exits (public) | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-13 | Website | Legacy verticals retired → `/ai-receptionist#use-cases` | P0 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-14 | Website | Video containers, poster/loading/reduced-motion/mobile fallback, labelled placeholders | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
+| W-15 | Website | SEO/metadata (titles, descriptions, sitemap without retired routes) | P1 | IMPLEMENTED — UNVERIFIED | 5cc2ce6 | tsc clean in worktree | — | Linux gates + preview | — |
 | W-16 | Website | Privacy/Terms prepared for legal review | P1 | BLOCKED — OWNER | — | drafts exist | — | legal review | Owner |
-| R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | IN PROGRESS | — | — | — | App.tsx route wiring after WP website lands | — |
+| R-01 | Receptionist mkt | Product-only landing page, 17 sections, route-aware header (no Start a Project) | P0 | IMPLEMENTED — UNVERIFIED | 78f7cb9 | tsc clean in worktree | — | Linux gates + preview | — |
 | R-02 | Receptionist mkt | Simulated Interactive Preview (curated branches, waveform, labelled) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | R-03 | Receptionist mkt | Request Beta Access form → `POST /api/public/beta-requests` (flag off) | P0 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | R-04 | Receptionist mkt | Use-cases section (verified ideas from retired verticals) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | R-05 | Receptionist mkt | Live-demo client path behind fail-closed flag; no key, no activation | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | R-06 | Receptionist mkt | Hero video container + poster strategy (no paid media) | P1 | IMPLEMENTED — UNVERIFIED | df34fda | tsc clean; contract test smoke-passed | — | route wiring + Linux gates | — |
 | C-01 | Customer app | Approved navigation (D-2), breadcrumbs, no nested rail scroll, capability states for every path | P0 | IN PROGRESS | — | — | — | — | — |
-| C-02 | Customer app | Invite-only signup ("Set up your AI Receptionist", S-1 fields) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-03 | Customer app | Forgot password + reset UI | P0 | IN PROGRESS | — | — | — | — | — |
-| C-04 | Customer app | Persistent 10-step onboarding hub (Setup) | P0 | IN PROGRESS | — | — | — | — | — |
-| C-05 | Customer app | Overview redesign (D-1) | P0 | IN PROGRESS | — | — | — | — | — |
+| C-02 | Customer app | Invite-only signup ("Set up your AI Receptionist", S-1 fields) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
+| C-03 | Customer app | Forgot password + reset UI | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
+| C-04 | Customer app | Persistent 10-step onboarding hub (Setup) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
+| C-05 | Customer app | Overview redesign (D-1) | P0 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
 | C-06 | Customer app | One-assistant status card; hide create-another | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
 | C-07 | Customer app | Configuration fields (C-2) from workspace settings | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
 | C-08 | Customer app | Structured prompt + full-prompt preview + "how callers hear this"; Advanced | P0 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
@@ -54,7 +54,7 @@
 | C-17 | Customer app | Phone Number page (assigned/none/paused states; assign/pause over existing routes) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-18 | Customer app | Usage page + rail indicator + paused copy (U-1…U-3) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
 | C-19 | Customer app | Customer Issues page (safe failures) | P0 | IMPLEMENTED — UNVERIFIED | 3d5daa5 | tsc clean in worktree | — | route wiring + Linux gates | — |
-| C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IN PROGRESS | — | — | — | — | — |
+| C-20 | Customer app | Settings editable fields (D-7); billing hides dead controls (D-6) | P1 | IMPLEMENTED — UNVERIFIED | 0d16ba2 | tsc clean in worktree | — | Linux gates + preview | — |
 | C-21 | Customer app | Mobile drawer + tables→cards below 768 px | P1 | IN PROGRESS | — | — | — | — | — |
 | C-22 | Customer app | Dead code removed (orphaned tabs/components) | P1 | IMPLEMENTED — UNVERIFIED | d0dd878 | tsc + full scripts chain in worktree | — | Linux gates + preview | — |
 | O-01 | Operations | Shared `adminFetch`, one 401 path, client-side guard, standard states | P0 | IMPLEMENTED — UNVERIFIED | 78bae7e | tsc clean on merged branch | — | Linux gates + preview evidence | — |
