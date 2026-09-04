@@ -1,4 +1,4 @@
-import { useEffect, lazy } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation, useParams } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,9 +9,8 @@ import { ComingSoon } from "@/components/common/ComingSoon";
 import { VoiceUnavailable } from "@/components/common/VoiceUnavailable";
 import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
-import { useAssistantSessionGuard } from "@/hooks/useAssistants";
 import { ROUTER_BASE, ROUTES, VOICE_CAPABILITY_PATHS } from "@/lib/routes";
-import { voiceRoutePages } from "@/routes/voiceRoutes";
+import { voiceRoutePages, AssistantSessionGuardGate } from "@/routes/voiceRoutes";
 import { DashboardShell } from "@/shells/DashboardShell";
 import { AuthShell } from "@/shells/AuthShell";
 import { PublicShell } from "@/shells/PublicShell";
@@ -91,12 +90,9 @@ function InSpaRedirectToId({ base }: { base: string }) {
 }
 
 // Mounted at the app root, independent of route, so it observes every
-// session transition (login, logout, expiry, firm switch) — see
-// useAssistantSessionGuard for why this can't live inside AppShell alone.
-function AssistantSessionGuard() {
-  useAssistantSessionGuard();
-  return null;
-}
+// session transition (login, logout, expiry, firm switch). Loaded through
+// the voice build boundary so the assistants API graph stays out of a
+// gated-out entry chunk — see routes/voiceRoutes.ts.
 
 // Voice-platform destinations only get a route when the flag is on; when
 // off, direct navigation falls through to NotFound instead of exposing a
@@ -239,7 +235,11 @@ function App() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            {voicePlatformEnabled && <AssistantSessionGuard />}
+            {voicePlatformEnabled && (
+              <Suspense fallback={null}>
+                <AssistantSessionGuardGate />
+              </Suspense>
+            )}
             <WouterRouter base={ROUTER_BASE}>
               <Router />
             </WouterRouter>

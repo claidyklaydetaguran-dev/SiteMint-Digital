@@ -12,6 +12,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { apiFetch } from "@/lib/api";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { useAvailabilityConfig, useCalendarStatus } from "@/hooks/useAvailability";
@@ -39,6 +40,10 @@ export interface VoiceNumberSummary {
 }
 
 export function fetchVoiceNumbers(): Promise<{ items: VoiceNumberSummary[]; count: number }> {
+  if (!voicePlatformEnabled) {
+    // AR-001M: the endpoint literal must not survive into a gated-out build.
+    return Promise.resolve(null as never);
+  }
   return apiFetch("/receptionist/voice/numbers");
 }
 

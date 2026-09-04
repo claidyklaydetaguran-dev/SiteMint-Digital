@@ -1433,7 +1433,17 @@ const PROVIDER_STATUS_COPY = [
  * `voiceGated: true` record, and every one of them was in the entry chunk of
  * a default-gated AR-001J build.
  */
-const GATED_NAV_LABELS = gatedNavItems.map((i) => i.label);
+/**
+ * Labels ungated modules legitimately emit, so their presence in a default
+ * build proves nothing (the AlertTriangle rule, applied to words): the V5
+ * D-2 labels are ordinary product words — "Assistant" opens Setup step two,
+ * "Calls"/"Usage" appear in Overview activity and the usage copy, "Issues"
+ * in the Support page link. The distinctive multi-word labels stay probed.
+ */
+const UNGATED_EMITTED_LABELS = ["Assistant", "Calls", "Usage", "Issues"];
+const GATED_NAV_LABELS = gatedNavItems
+  .map((i) => i.label)
+  .filter((l) => !UNGATED_EMITTED_LABELS.includes(l));
 const GATED_NAV_DESCRIPTIONS = gatedNavItems
   .map((i) => i.description)
   .filter((d): d is string => d !== undefined);
@@ -1453,6 +1463,7 @@ const LIVE_GATED_HREFS = [
   "/account/usage",
   "/account/issues",
 ];
+const routesSrcForHrefs = read("artifacts/helpdesk/src/lib/routes.ts");
 const GATED_NAV_ONLY_HREFS = gatedNavItems
   .map((i) => i.href)
   .filter((h): h is string => h !== undefined && !LIVE_GATED_HREFS.includes(h));
@@ -1473,7 +1484,9 @@ const GATED_NAV_ONLY_HREFS = gatedNavItems
  * `Gauge` is new: the live Usage record's icon.
  */
 const GATED_ONLY_ICONS: [string, string][] = [
-  ["Bot", "bot"],
+  // "Bot" removed 2026-09 (V5): ungated components/common/PageHeader.tsx and
+  // ProgressSteps.tsx import it for the Setup/assistant step marks, so its
+  // presence in a default build proves nothing — the AlertTriangle rule.
   ["Wrench", "wrench"],
   ["Phone", "phone"],
   ["AudioLines", "audio-lines"],

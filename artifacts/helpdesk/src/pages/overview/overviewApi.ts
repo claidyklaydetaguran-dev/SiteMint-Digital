@@ -13,7 +13,7 @@
  * re-deriving the other's signals.
  *
  * Every voice-platform query here is gated on `voicePlatformEnabled`
- * (`lib/featureFlags.ts`) the same way `useAssistantsList` already gates
+ * (`lib/featureFlags.ts`) with fold-guarded endpoint literals, so a gated-out
  * itself — so Overview degrades to its non-voice sections in the canonical
  * (voice-off) build, per the task brief.
  */
@@ -22,7 +22,6 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
-import { useAssistantsList } from "@/hooks/useAssistants";
 import { useAppointmentRequests } from "@/hooks/useAvailability";
 import { fetchOnboardingState } from "@/lib/onboardingApi";
 import { SETUP_STEPS } from "@/pages/setup/setupContract";
@@ -58,8 +57,20 @@ export function useOnboardingProgress() {
 // ─── Assistant status ────────────────────────────────────────────────────
 
 export function useAssistantPublished(): boolean {
-  const { data } = useAssistantsList();
-  return (data ?? []).some((a) => a.status === "published");
+  const firmId = useAuthenticatedFirmId();
+  const query = useQuery<{ items: Array<{ status?: string }>; count: number } | null>({
+    queryKey: firmId !== undefined ? [ROOT, "assistants-lite", firmId] : [ROOT, "assistants-lite", "unresolved"],
+    queryFn: () => {
+      if (!voicePlatformEnabled) {
+        // AR-001M: the endpoint literal must not survive into a gated-out build.
+        return Promise.resolve(null);
+      }
+      return apiFetch<{ items: Array<{ status?: string }>; count: number }>("/receptionist/voice/assistants");
+    },
+    enabled: firmId !== undefined && voicePlatformEnabled,
+    retry: 1,
+  });
+  return (query.data?.items ?? []).some((a) => a.status === "published");
 }
 
 // ─── Phone numbers ──────────────────────────────────────────────────────
@@ -71,6 +82,10 @@ export interface VoiceNumberSummary {
 }
 
 function fetchVoiceNumbers(): Promise<{ items: VoiceNumberSummary[]; count: number }> {
+  if (!voicePlatformEnabled) {
+    // AR-001M: the endpoint literal must not survive into a gated-out build.
+    return Promise.resolve(null as never);
+  }
   return apiFetch("/receptionist/voice/numbers");
 }
 
@@ -104,7 +119,7 @@ export function useOpenIssuesCount(): number | null {
   const firmId = useAuthenticatedFirmId();
   const query = useQuery({
     queryKey: firmId !== undefined ? [ROOT, "issues", firmId] : [ROOT, "issues", "unresolved"],
-    queryFn: () => apiFetch<{ items: unknown[]; count: number }>("/receptionist/voice/issues"),
+    queryFn: () => { if (!voicePlatformEnabled) return Promise.resolve(null as never); return apiFetch<{ items: unknown[]; count: number }>("/receptionist/voice/issues"); },
     enabled: firmId !== undefined && voicePlatformEnabled,
     retry: 1,
   });
@@ -125,7 +140,7 @@ export function useRecentCalls(): { items: RealCallLite[]; isError: boolean; isL
   const firmId = useAuthenticatedFirmId();
   const query = useQuery({
     queryKey: firmId !== undefined ? [ROOT, "calls", firmId] : [ROOT, "calls", "unresolved"],
-    queryFn: () => apiFetch<{ items: RealCallLite[]; count: number }>("/receptionist/voice/calls"),
+    queryFn: () => { if (!voicePlatformEnabled) return Promise.resolve(null as never); return apiFetch<{ items: RealCallLite[]; count: number }>("/receptionist/voice/calls"); },
     enabled: firmId !== undefined && voicePlatformEnabled,
     retry: 1,
   });

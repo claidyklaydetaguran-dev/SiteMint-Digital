@@ -115,3 +115,14 @@ function NullIndicator(): null {
 export const UsageRailIndicatorGate: VoiceRoutePage = voicePlatformEnabled
   ? lazy(() => import("@/pages/usage/UsageRailIndicator"))
   : lazy(async () => ({ default: NullIndicator }));
+
+/**
+ * The assistant session guard, behind the same boundary. `App.tsx` used to
+ * import `useAssistantSessionGuard` statically, which pulled
+ * `lib/assistantsApi` — and its `/receptionist/voice/*` endpoint literals —
+ * into the entry chunk of every build (AR-001M leak, caught by the m01–m07
+ * matrix variants in the V5 integration run).
+ */
+export const AssistantSessionGuardGate: VoiceRoutePage = voicePlatformEnabled
+  ? lazy(() => import("@/components/voice/AssistantSessionGuardHost"))
+  : lazy(async () => ({ default: NullIndicator }));
