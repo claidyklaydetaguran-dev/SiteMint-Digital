@@ -8,7 +8,7 @@
  * (every `*.test.ts` path), and it performs no network request and places
  * no call.
  *
- * Five checks, each mapped to a binding rule from the assignment brief:
+ * Six checks, each mapped to a binding rule from the assignment brief:
  *
  * 1. The 17 anchored sections render, in the owner-approved order, on the
  *    actual page source — not just declared in `sections.ts`.
@@ -22,13 +22,19 @@
  *    applies here even though this page never places a real call.
  * 5. The live-demo button is gated on `VITE_PUBLIC_DEMO_ENABLED`, so a
  *    committed build can never show a live-call action.
+ * 6. The hero's exact owner-specified copy hierarchy (2026-09-05 full-screen
+ *    hero redesign) — eyebrow, private-beta status, headline, supporting
+ *    line, primary/secondary actions, sign-in link — matches verbatim and
+ *    is rendered from `HERO_COPY` (not a paraphrase), with the primary
+ *    action wired to the Interactive Preview section and the secondary
+ *    action wired to Request Beta Access.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PRIVACY_STATEMENT, RECEPTIONIST_V5_SECTIONS } from "./sections.js";
+import { HERO_COPY, PRIVACY_STATEMENT, RECEPTIONIST_V5_SECTIONS } from "./sections.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/pages/receptionist-v5 → src/pages → src → web-agency → artifacts → repo root
@@ -160,6 +166,62 @@ console.log("\n--- live-demo button is gated on VITE_PUBLIC_DEMO_ENABLED ---");
   check(
     "the live-call entry point is conditioned on the flag, not always rendered",
     /if\s*\(!publicDemoEnabled/.test(panelSrc) || /publicDemoEnabled\s*\?/.test(panelSrc),
+  );
+}
+
+console.log("\n--- hero copy matches the owner-specified exact copy hierarchy (2026-09-05) ---");
+{
+  check("HERO_COPY.eyebrow matches the approved wording", HERO_COPY.eyebrow === "SiteMint AI Receptionist");
+  check(
+    "HERO_COPY.betaStatus matches the approved wording",
+    HERO_COPY.betaStatus === "Private beta — invite only",
+  );
+  check(
+    "HERO_COPY.title matches the approved wording",
+    HERO_COPY.title === "Missed calls shouldn't mean missed opportunities.",
+  );
+  check(
+    "HERO_COPY.supporting matches the approved wording",
+    HERO_COPY.supporting ===
+      "Give callers a helpful next step—even when your team cannot answer—using your business information, availability, and appointment rules.",
+  );
+  check(
+    "HERO_COPY.primaryCta matches the approved wording",
+    HERO_COPY.primaryCta === "Explore the Interactive Preview",
+  );
+  check(
+    "HERO_COPY.secondaryCta matches the approved wording",
+    HERO_COPY.secondaryCta === "Request Beta Access",
+  );
+  check(
+    "HERO_COPY.signInPrompt + signInCta read \"Already a client? Sign in\"",
+    `${HERO_COPY.signInPrompt} ${HERO_COPY.signInCta}` === "Already a client? Sign in",
+  );
+
+  check("the page renders HERO_COPY.eyebrow (not a paraphrase)", pageSrc.includes("{HERO_COPY.eyebrow}"));
+  check("the page renders HERO_COPY.betaStatus (not a paraphrase)", pageSrc.includes("{HERO_COPY.betaStatus}"));
+  check(
+    "the page renders HERO_COPY.title (not a paraphrase)",
+    pageSrc.includes("text={HERO_COPY.title}"),
+  );
+  check("the page renders HERO_COPY.supporting (not a paraphrase)", pageSrc.includes("{HERO_COPY.supporting}"));
+  check("the page renders HERO_COPY.primaryCta (not a paraphrase)", pageSrc.includes("{HERO_COPY.primaryCta}"));
+  check("the page renders HERO_COPY.secondaryCta (not a paraphrase)", pageSrc.includes("{HERO_COPY.secondaryCta}"));
+  check("the page renders HERO_COPY.signInPrompt (not a paraphrase)", pageSrc.includes("{HERO_COPY.signInPrompt}"));
+  check("the page renders HERO_COPY.signInCta (not a paraphrase)", pageSrc.includes("{HERO_COPY.signInCta}"));
+
+  const primaryWiring =
+    /href=\{`#\$\{SECTION_ID\.preview\}`\}\s+className="smv5-btn smv5-btn--primary">\s*\{HERO_COPY\.primaryCta\}/;
+  check(
+    'primary hero action ("Explore the Interactive Preview") is the filled button, anchored to the Interactive Preview section',
+    primaryWiring.test(pageSrc),
+  );
+
+  const secondaryWiring =
+    /href=\{`#\$\{SECTION_ID\.beta\}`\}\s+className="smv5-btn smv5-btn--outline">\s*\{HERO_COPY\.secondaryCta\}/;
+  check(
+    'secondary hero action ("Request Beta Access") is the outline button, anchored to the Request Beta Access section',
+    secondaryWiring.test(pageSrc),
   );
 }
 

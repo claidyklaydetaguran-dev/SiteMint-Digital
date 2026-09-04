@@ -39,14 +39,28 @@ export const PRIVACY_STATEMENT =
 export const PREVIEW_LABEL =
   "Interactive product preview — simulated. No live call is taking place.";
 
-/** The hero copy set (L-1), kept as literals so the test can pin them. */
+/**
+ * The hero copy set, kept as literals so the contract test can pin them
+ * verbatim. Superseded 2026-09-05 (owner directive: full-screen hero
+ * redesign) — `eyebrow`/`betaStatus`/`primaryCta`/`secondaryCta` replace the
+ * retired `pill` field; `primaryCta` and `secondaryCta` also SWAPPED which
+ * action is visually primary (filled) vs. secondary (outline): the
+ * Interactive Preview is now the filled, primary action and Request Beta
+ * Access is the outline, secondary one. See `AiReceptionistV5.tsx`'s hero
+ * section for the anchor wiring.
+ */
 export const HERO_COPY = {
-  pill: "Private beta — invite only",
-  title: "Never let a good opportunity end at a missed call.",
+  /** Small caps label opening the hero's reveal sequence. */
+  eyebrow: "SiteMint AI Receptionist",
+  /** Private-beta status indicator, shown as its own badge (not the eyebrow). */
+  betaStatus: "Private beta — invite only",
+  title: "Missed calls shouldn't mean missed opportunities.",
   supporting:
-    "SiteMint AI Receptionist is built to answer incoming calls, handle routine questions, and help callers reach the right next step using your actual business rules and availability.",
-  primaryCta: "Request Beta Access",
-  secondaryCta: "Explore the Interactive Preview",
+    "Give callers a helpful next step—even when your team cannot answer—using your business information, availability, and appointment rules.",
+  /** Filled/primary action — anchors to the Interactive Preview section. */
+  primaryCta: "Explore the Interactive Preview",
+  /** Outline/secondary action — anchors to Request Beta Access. */
+  secondaryCta: "Request Beta Access",
   signInPrompt: "Already a client?",
   signInCta: "Sign in",
 } as const;
