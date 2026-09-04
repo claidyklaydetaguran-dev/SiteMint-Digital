@@ -222,64 +222,74 @@ export function CallTheaterV5() {
 
   return (
     <div className="smv5-theater" data-state={state}>
-      <span className="smv5-theater__label">{PREVIEW_LABEL}</span>
-
-      <div className="smv5-theater__voice" aria-hidden="true">
-        <canvas ref={canvasRef} className="smv5-theater__canvas" />
+      <div className="smv5-theater__top">
+        <span className="smv5-theater__label">{PREVIEW_LABEL}</span>
+        {active && (
+          <p className="smv5-theater__timer">
+            {formatClock(seconds)} / {formatClock(MAX_SECONDS)}
+          </p>
+        )}
       </div>
 
-      <p className="smv5-theater__state" aria-live="polite">
-        {PREVIEW_STATE_LABEL[state]}
-      </p>
-
-      {active && (
-        <p className="smv5-theater__timer">
-          {formatClock(seconds)} / {formatClock(MAX_SECONDS)}
-        </p>
-      )}
-
-      {state === "ready" && (
-        <div className="smv5-theater__chips" role="group" aria-label="Preview topics">
-          {PREVIEW_BRANCHES.map((branch, i) => (
-            <button
-              key={branch.id}
-              type="button"
-              className="smv5-theater__chip"
-              aria-pressed={i === branchIdx}
-              onClick={() => setBranchIdx(i)}
-            >
-              {branch.chipLabel}
-            </button>
-          ))}
+      <div className="smv5-theater__body">
+        <div className="smv5-theater__voice-col">
+          <div className="smv5-theater__voice" aria-hidden="true">
+            <canvas ref={canvasRef} className="smv5-theater__canvas" />
+          </div>
+          <p className="smv5-theater__state" aria-live="polite">
+            {PREVIEW_STATE_LABEL[state]}
+          </p>
         </div>
-      )}
 
-      {lines.length > 0 && (
-        <div className="smv5-theater__convo" aria-live="polite" ref={convoRef}>
-          {lines.map((line, i) => (
-            <p key={`${i}-${line.text.slice(0, 12)}`} className="smv5-theater__line">
-              <b>{line.who}:</b> {line.text}
-            </p>
-          ))}
+        <div className="smv5-theater__interact">
+          {state === "ready" && (
+            <div className="smv5-theater__chips" role="group" aria-label="Preview topics">
+              {PREVIEW_BRANCHES.map((branch, i) => (
+                <button
+                  key={branch.id}
+                  type="button"
+                  className="smv5-theater__chip"
+                  aria-pressed={i === branchIdx}
+                  onClick={() => setBranchIdx(i)}
+                >
+                  {branch.chipLabel}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {lines.length > 0 && (
+            <div className="smv5-theater__convo" aria-live="polite" ref={convoRef}>
+              {lines.map((line, i) => (
+                <p key={`${i}-${line.text.slice(0, 12)}`} className="smv5-theater__line">
+                  <b>{line.who}:</b> {line.text}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="smv5-theater__actions">
+            {state === "ready" && (
+              <button type="button" className="smv5-btn smv5-btn--primary" onClick={start}>
+                Start the interactive preview
+              </button>
+            )}
+            {active && (
+              <button
+                type="button"
+                className="smv5-btn smv5-btn--ghost"
+                onClick={() => end("Preview ended by you.")}
+              >
+                End preview
+              </button>
+            )}
+            {state === "ended" && (
+              <button type="button" className="smv5-btn smv5-btn--outline" onClick={reset}>
+                Choose another topic
+              </button>
+            )}
+          </div>
         </div>
-      )}
-
-      <div className="smv5-theater__actions">
-        {state === "ready" && (
-          <button type="button" className="smv5-btn smv5-btn--primary" onClick={start}>
-            Start the interactive preview
-          </button>
-        )}
-        {active && (
-          <button type="button" className="smv5-btn smv5-btn--ghost" onClick={() => end("Preview ended by you.")}>
-            End preview
-          </button>
-        )}
-        {state === "ended" && (
-          <button type="button" className="smv5-btn smv5-btn--outline" onClick={reset}>
-            Choose another topic
-          </button>
-        )}
       </div>
 
       <p className="smv5-theater__disclose">

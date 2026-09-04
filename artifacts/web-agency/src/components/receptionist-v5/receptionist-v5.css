@@ -60,12 +60,12 @@
 }
 
 .smv5__section {
-  padding: 80px 0;
+  padding: var(--sm-space-64, 64px) 0;
   border-top: 1px solid var(--smv5-line);
 }
 
 .smv5__section--tight {
-  padding: 56px 0;
+  padding: var(--sm-space-48, 48px) 0;
 }
 
 .smv5__eyebrow {
@@ -90,7 +90,7 @@
   font-size: 17px;
   line-height: 1.6;
   color: var(--smv5-slate-600);
-  max-width: 68ch;
+  max-width: 64ch;
   margin: 0 0 32px;
 }
 
@@ -99,7 +99,7 @@
 .smv5-hero {
   background: var(--smv5-ink-950);
   color: var(--smv5-white);
-  padding: 96px 0 72px;
+  padding: var(--sm-space-96, 96px) 0 var(--sm-space-48, 48px);
 }
 
 .smv5-hero__pill {
@@ -121,7 +121,12 @@
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 56px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.smv5-hero__grid > div:first-child {
+  display: flex;
+  flex-direction: column;
 }
 
 .smv5-hero__title {
@@ -158,21 +163,52 @@
   font-weight: 600;
 }
 
+.smv5-hero__capabilities {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 20px 0 0;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+
+.smv5-hero__capabilities li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cfe9e4;
+}
+
+.smv5-hero__capabilities svg {
+  flex: 0 0 auto;
+}
+
 .smv5-hero__media {
   position: relative;
   border-radius: var(--smv5-radius-l);
   overflow: hidden;
   background: #072022;
   aspect-ratio: 16 / 10;
+  min-height: 320px;
   box-shadow: var(--smv5-shadow-2);
 }
 
 .smv5-hero__media video,
-.smv5-hero__media img {
+.smv5-hero__media img,
+.smv5-hero__media svg {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+@media (min-width: 861px) {
+  .smv5-hero__media {
+    aspect-ratio: auto;
+    height: 100%;
+  }
 }
 
 .smv5-hero__media-label {
@@ -241,34 +277,69 @@
   outline-offset: 2px;
 }
 
-/* ── Call theater ─────────────────────────────────────────────────────── */
+/* ── Call theater ─────────────────────────────────────────────────────────
+ * A single composed console: a header bar, a voice-identity rail, and an
+ * interaction column (chips / transcript / actions) sharing one frame —
+ * not separate elements dropped on a blank band.
+ */
 
 .smv5-theater {
   background: var(--smv5-white);
   border: 1px solid var(--smv5-line);
   border-radius: var(--smv5-radius-l);
   box-shadow: var(--smv5-shadow-1);
-  padding: 28px;
+  max-width: 860px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.smv5-theater__top {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  text-align: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--smv5-ink-950);
 }
 
 .smv5-theater__label {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.03em;
-  color: var(--smv5-mint-700);
-  background: var(--smv5-mint-100);
-  border-radius: var(--smv5-radius-pill);
-  padding: 6px 12px;
+  color: #cfe9e4;
+}
+
+.smv5-theater__timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--smv5-mint-400);
+  font-size: 13px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.smv5-theater__body {
+  display: grid;
+  grid-template-columns: 172px 1fr;
+  gap: 24px;
+  padding: 24px;
+  text-align: left;
+}
+
+.smv5-theater__voice-col {
+  background: var(--smv5-mist-100);
+  border-radius: var(--smv5-radius-m);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
 }
 
 .smv5-theater__voice {
-  width: 132px;
-  height: 132px;
+  width: 104px;
+  height: 104px;
 }
 
 .smv5-theater__canvas {
@@ -279,22 +350,21 @@
 .smv5-theater__state {
   font-family: var(--smv5-font-display);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   margin: 0;
 }
 
-.smv5-theater__timer {
-  font-variant-numeric: tabular-nums;
-  color: var(--smv5-slate-600);
-  font-size: 13px;
-  margin: 0;
+.smv5-theater__interact {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
 }
 
 .smv5-theater__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: center;
 }
 
 .smv5-theater__chip {
@@ -318,7 +388,6 @@
   width: 100%;
   max-height: 220px;
   overflow-y: auto;
-  text-align: left;
   background: var(--smv5-mist-100);
   border-radius: var(--smv5-radius-m);
   padding: 14px;
@@ -339,6 +408,20 @@
   font-size: 12px;
   color: var(--smv5-slate-600);
   margin: 0;
+  padding: 0 24px 20px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .smv5-theater__body {
+    grid-template-columns: 1fr;
+  }
+
+  .smv5-theater__voice-col {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+  }
 }
 
 /* ── Live demo panel ──────────────────────────────────────────────────── */
@@ -403,6 +486,43 @@
   margin: 0;
 }
 
+/* ── Detail tag rows — the compact companion to a lede paragraph, used to
+   ground a thin section (voice/prompt, calls/outcomes, safe-failure) in
+   concrete specifics without repeating the white-card-grid rhythm used
+   elsewhere on the page. ───────────────────────────────────────────────── */
+
+.smv5-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.smv5-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--smv5-teal-900);
+  background: var(--smv5-mist-100);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-pill);
+  padding: 8px 14px;
+}
+
+.smv5-tag--rule {
+  font-weight: 400;
+  color: var(--smv5-slate-600);
+}
+
+.smv5-tag__arrow {
+  color: var(--smv5-mint-700);
+  font-weight: 700;
+}
+
 /* ── Readiness badges ─────────────────────────────────────────────────── */
 
 .smv5-badge {
@@ -439,7 +559,12 @@
   border: 1px solid var(--smv5-line-strong);
 }
 
-/* ── Journey / setup steps ────────────────────────────────────────────── */
+/* ── Journey / setup steps ────────────────────────────────────────────────
+ * A connected timeline (numbered rail + a line running behind it) rather
+ * than a grid of six identical boxes. The rail only draws when all six
+ * stops fit on one row (desktop); below that the list stacks and reads
+ * top-to-bottom instead. Both `scheduling` and `setup` render exactly six
+ * stops, so the fixed six-column track is safe. ─────────────────────────── */
 
 .smv5-steps {
   list-style: none;
@@ -450,27 +575,78 @@
 }
 
 .smv5-steps--horizontal {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
+  position: relative;
+  gap: 20px 16px;
+}
+
+.smv5-steps--horizontal::before {
+  content: "";
+  position: absolute;
+  top: 19px;
+  left: 4%;
+  right: 4%;
+  height: 2px;
+  background: var(--smv5-line-strong);
+  z-index: 0;
 }
 
 .smv5-step {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
   align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .smv5-step__num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--smv5-white);
+  border: 2px solid var(--smv5-mint-500);
   font-family: var(--smv5-font-display);
   font-weight: 700;
   color: var(--smv5-mint-700);
+  font-size: 13px;
+}
+
+.smv5-step h3 {
+  font-family: var(--smv5-font-display);
   font-size: 14px;
+  margin: 0;
 }
 
 .smv5-step p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--smv5-slate-600);
+}
+
+@media (max-width: 900px) {
+  .smv5-steps--horizontal {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .smv5-steps--horizontal::before {
+    display: none;
+  }
+
+  .smv5-steps--horizontal .smv5-step {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .smv5-steps--horizontal .smv5-step__num {
+    flex: 0 0 auto;
+  }
 }
 
 /* ── Examples (simulated exchanges) ───────────────────────────────────── */
@@ -492,26 +668,65 @@
   margin-bottom: 10px;
 }
 
-.smv5-example p {
+.smv5-example__line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
   font-size: 14px;
   line-height: 1.55;
   margin: 0 0 8px;
 }
 
+.smv5-example__who {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--smv5-radius-pill);
+  padding: 3px 8px;
+}
+
+.smv5-example__line--caller .smv5-example__who {
+  background: var(--smv5-mist-100);
+  color: var(--smv5-slate-600);
+}
+
+.smv5-example__line--assistant .smv5-example__who {
+  background: var(--smv5-mint-100);
+  color: var(--smv5-mint-700);
+}
+
+.smv5-example__line--system .smv5-example__who {
+  background: var(--smv5-amber-100);
+  color: var(--smv5-amber-600);
+}
+
 /* ── Illustration placeholder ─────────────────────────────────────────── */
 
 .smv5-illustration {
-  border: 1px dashed var(--smv5-line-strong);
+  border: 1px solid var(--smv5-line);
   border-radius: var(--smv5-radius-m);
   background: var(--smv5-mist-100);
-  color: var(--smv5-slate-600);
-  font-size: 13px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   min-height: 220px;
-  text-align: center;
   padding: 24px;
+}
+
+.smv5-illustration__svg {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+}
+
+.smv5-illustration__label {
+  font-size: 12px;
+  color: var(--smv5-slate-600);
+  text-align: center;
 }
 
 /* ── Privacy callout ───────────────────────────────────────────────────── */
@@ -523,7 +738,7 @@
   font-size: 15px;
   line-height: 1.6;
   color: var(--smv5-teal-900);
-  max-width: 68ch;
+  max-width: 64ch;
 }
 
 /* ── FAQ ───────────────────────────────────────────────────────────────── */
@@ -531,6 +746,7 @@
 .smv5-faq {
   display: grid;
   gap: 12px;
+  max-width: 720px;
 }
 
 .smv5-faq details {
@@ -640,6 +856,10 @@
 
 /* ── Use-case grid ─────────────────────────────────────────────────────── */
 
+.smv5-usecase {
+  border-top: 3px solid var(--smv5-mint-400);
+}
+
 .smv5-usecase h3 {
   font-family: var(--smv5-font-display);
   font-size: 16px;
@@ -651,6 +871,37 @@
   color: var(--smv5-slate-600);
   margin: 0;
   line-height: 1.55;
+}
+
+/* ── Outcomes checklist ───────────────────────────────────────────────────
+ * A wrapped row of check chips — deliberately not another white-card grid,
+ * so this strip reads differently from the capability/use-case grids above
+ * it. ─────────────────────────────────────────────────────────────────── */
+
+.smv5-outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.smv5-outcomes li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--smv5-teal-900);
+  background: var(--smv5-mint-100);
+  border-radius: var(--smv5-radius-pill);
+  padding: 10px 18px;
+}
+
+.smv5-outcomes svg {
+  flex: 0 0 auto;
+  color: var(--smv5-mint-700);
 }
 
 /* ── Final CTA band ───────────────────────────────────────────────────── */
@@ -669,10 +920,19 @@
 @media (max-width: 860px) {
   .smv5-hero__grid {
     grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .smv5-hero__grid > div:first-child {
+    display: block;
+  }
+
+  .smv5-hero__capabilities {
+    margin-top: 0;
   }
 
   .smv5__section {
-    padding: 56px 0;
+    padding: var(--sm-space-48, 48px) 0;
   }
 }
 
