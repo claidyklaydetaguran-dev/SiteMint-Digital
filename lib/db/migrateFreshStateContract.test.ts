@@ -131,11 +131,11 @@ const INITIALIZED_DATABASE = {
 
 // ── 0. The derived inventory is the one staging is expected to hold ──────────
 
-check("the shared barrel derives 27 base tables", BARREL.length === 27, `${BARREL.length}`);
-check("the committed migrations derive 26 domain tables", DOMAIN.length === 26, `${DOMAIN.length}`); // P8: +5 account/billing tables
+check("the shared barrel derives 29 base tables", BARREL.length === 29, `${BARREL.length}`); // V5: +crm_admin_sessions, +crm_admin_audit_log
+check("the committed migrations derive 29 domain tables", DOMAIN.length === 29, `${DOMAIN.length}`); // V5 0007: +onboarding/beta/invites
 check(
-  "the application owns exactly 53 public tables", // P8: +5 account/billing tables
-  APPLICATION.length === 53,
+  "the application owns exactly 58 public tables", // V5: 29 domain + 29 barrel
+  APPLICATION.length === 58,
   `${APPLICATION.length}`,
 );
 check(
@@ -420,7 +420,7 @@ check(
     }
   }
   check(
-    "every one of the 27 barrel-owned tables is a required sentinel",
+    "every one of the 29 barrel-owned tables is a required sentinel",
     allFailClosed,
     survivors.join(","),
   );

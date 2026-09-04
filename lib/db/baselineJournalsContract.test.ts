@@ -94,7 +94,7 @@ check(
 // ── 3. Expected pairs derive from the committed folders ──────────────────────
 
 const expectedAll = readAllExpectedMigrations();
-check("the committed folders describe ten migrations", expectedAll.length === 10, String(expectedAll.length)); // P7 voice 0005, P8 voice 0006
+check("the committed folders describe eleven migrations", expectedAll.length === 11, String(expectedAll.length)); // V5 voice 0007
 check(
   "expected migrations are unique by created_at",
   new Set(expectedAll.map((e) => e.createdAt)).size === expectedAll.length,
