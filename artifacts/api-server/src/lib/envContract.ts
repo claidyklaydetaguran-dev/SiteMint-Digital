@@ -49,6 +49,9 @@ const FLAGS: Array<[string, string, string]> = [
   ["AI_TOOLKIT_CHECKOUT_ENABLED", "R6", "Unauthenticated Stripe Checkout Session creation (POST /ai-toolkit/checkout)"],
   ["PUBLIC_SCHEDULING_REQUESTS_ENABLED", "R7", "Unauthenticated public booking requests (POST /public/schedule/:slug/requests)"],
   ["PASSWORD_RESET_REQUESTS_ENABLED", "R8", "Unauthenticated password-reset initiation (POST /receptionist/account/password-reset/request)"],
+  ["INVITE_SIGNUP_ENABLED", "V5/S-1", "Invite-gated self-service signup (POST /receptionist/auth/invite-signup)"],
+  ["PUBLIC_BETA_REQUESTS_ENABLED", "V5/PR-4", "Unauthenticated public beta-access request form (POST /public/beta-requests)"],
+  ["PUBLIC_DEMO_ENABLED", "V5/§10", "Controlled live voice demo session issuance (POST /public/demo/session) — also requires a configured DemoSessionProvider"],
 ];
 
 const SECRETS: Array<[string, string, string]> = [
@@ -81,6 +84,8 @@ const CONFIGS: Array<[string, string, string]> = [
   ["GOOGLE_OAUTH_REDIRECT_URI", "P4", "OAuth redirect (must be this API's /callback)"],
   ["CORS_ALLOWED_ORIGINS", "core", "Credentialed-origin allowlist — REQUIRED in production; startup fails without it"],
   ["VOICE_TWILIO_FROM_NUMBER", "P5", "Voice SMS from-number (structurally refused if equal to the intake number)"],
+  ["PUBLIC_DEMO_MAX_CONCURRENT", "V5/§10", "Controlled live demo: max concurrent demo sessions (unset = demo cannot start even when enabled)"],
+  ["PUBLIC_DEMO_DAILY_CAP_CENTS", "V5/§10", "Controlled live demo: daily provider-cost budget in cents (unset = demo cannot start even when enabled)"],
 ];
 
 const IDENTIFIERS: Array<[string, string, string]> = [
@@ -174,6 +179,12 @@ export async function validateEnvContract(
       const { loadVoiceToolsConfigFromEnv } = await import("./voicePublishing/toolsConfig.js");
       // Both loaders read the PROVIDED env — the flag default is process.env.
       loadVoiceToolsConfigFromEnv(loadVoiceServerConfigFromEnv(env), env);
+    });
+  }
+  if (env["PUBLIC_DEMO_ENABLED"] === "true") {
+    await probe(findings, "PUBLIC_DEMO_MAX_CONCURRENT", async () => {
+      const { loadDemoCapsFromEnv } = await import("./publicDemo/demoConfig.js");
+      loadDemoCapsFromEnv(env);
     });
   }
 

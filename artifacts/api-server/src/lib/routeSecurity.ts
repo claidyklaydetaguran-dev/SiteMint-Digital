@@ -73,9 +73,10 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\bvalidateToken\s*\(/, "credential"],
   [/\bverifyPassword\b|\bbcrypt\.compare\b/, "credential"],
   [/\bcompletePasswordReset\b|\bacceptInvitation\b|\bconfirmEmailVerification\b|\bconsumeAccountToken\b/, "token-proven"],
-  [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites|SchedulingRequests)Enabled\b/, "feature-flag"],
+  [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites|SchedulingRequests|BetaRequests|Demo)Enabled\b/, "feature-flag"],
   [/\bisAiToolkitCheckoutEnabled\b/, "feature-flag"],
   [/\bisPasswordResetRequestsEnabled\b/, "feature-flag"],
+  [/\bisInviteSignupEnabled\b/, "feature-flag"],
 ];
 
 /**

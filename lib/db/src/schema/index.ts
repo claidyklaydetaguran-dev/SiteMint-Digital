@@ -10,6 +10,7 @@ export * from "./crmTransactions";
 export * from "./crmProjects";
 export * from "./crmCampaigns";
 export * from "./crmBehavioralEvents";
+export * from "./crmAdminSessions";
 export * from "./aiToolkitPurchases";
 export * from "./landingPageViews";
 export * from "./intakeAgent";

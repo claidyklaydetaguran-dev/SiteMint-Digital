@@ -1,27 +1,34 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db, discoverySubmissions, formSubmissions } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { getSessionToken, validateToken } from "../lib/admin-session.js";
+import {
+  getSessionToken,
+  requireAdmin,
+  resolveAdminAuthMode,
+  createAdminSession,
+  revokeAdminSession,
+  recordAdminAudit,
+  adminLoginIpLimiter,
+  getClientIp,
+  ADMIN_COOKIE_NAME,
+  ADMIN_COOKIE_OPTIONS,
+} from "../lib/admin-session.js";
 import { verifyAdminPassword } from "../lib/adminPassword.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const token = auth.substring(7);
-  if (!validateToken(token)) {
-    res.status(401).json({ error: "Invalid token" });
-    return;
-  }
-  next();
-}
+//
+// V5 O-1: `requireAdmin` now comes from lib/admin-session.ts and accepts
+// EITHER the existing in-memory bearer token OR a valid `admin_session`
+// cookie — every route below that used the old bearer-only local copy keeps
+// working unchanged for bearer callers (same validateToken check, first),
+// and additionally accepts the cookie. Every OTHER admin route file in this
+// codebase (crm.ts, receptionistAdmin.ts, adminVoiceDiagnostics.ts, ...)
+// still defines its own local, bearer-only requireAdmin — migrating those is
+// out of scope here; this file is the one the O-1 brief names directly
+// because POST /admin/login lives here.
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
@@ -32,21 +39,63 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 // a failed sign-in, and a client is not invited to keep retrying against a
 // server that can never accept any password. The submitted password is never
 // logged and never echoed back.
-router.post("/admin/login", (req: Request, res: Response) => {
+//
+// O-1: per-IP rate limiting (10/15min, ADMIN_LOGIN_IP_LIMIT in
+// lib/admin-session.ts) precedes the password check, and a successful login
+// ALSO issues a cookie session (best-effort — see admin-session.ts's
+// degrade-gracefully contract) and writes an audit row, alongside the
+// unchanged bearer token response.
+router.post("/admin/login", async (req: Request, res: Response) => {
+  const ip = getClientIp(req);
+  if (adminLoginIpLimiter.isOverLimit(ip)) {
+    res.status(429).json({ error: "Too many attempts. Try again later." });
+    return;
+  }
   const { password } = req.body as { password?: unknown };
 
   switch (verifyAdminPassword(password, process.env)) {
     case "unconfigured":
+      adminLoginIpLimiter.record(ip);
       req.log.error("Admin login attempted but ADMIN_PASSWORD is not configured");
       res.status(503).json({ error: "Admin authentication is not configured" });
       return;
     case "mismatch":
+      adminLoginIpLimiter.record(ip);
       res.status(401).json({ error: "Invalid password" });
       return;
-    case "match":
+    case "match": {
+      const uaHeader = req.headers["user-agent"];
+      const userAgent = Array.isArray(uaHeader) ? uaHeader[0] : uaHeader;
+      const session = await createAdminSession(ip, userAgent);
+      if (session) {
+        res.cookie(ADMIN_COOKIE_NAME, session.token, ADMIN_COOKIE_OPTIONS);
+      }
+      recordAdminAudit("admin", "admin.login", null, ip).catch(() => {});
       res.json({ token: getSessionToken() });
       return;
+    }
   }
+});
+
+// ── Logout / whoami ───────────────────────────────────────────────────────────
+
+router.post("/admin/logout", requireAdmin, async (req: Request, res: Response) => {
+  const cookieToken = (req.cookies as Record<string, string | undefined> | undefined)?.[ADMIN_COOKIE_NAME];
+  if (typeof cookieToken === "string" && cookieToken.length > 0) {
+    await revokeAdminSession(cookieToken);
+  }
+  res.clearCookie(ADMIN_COOKIE_NAME, { path: "/" });
+  recordAdminAudit("admin", "admin.logout", null, getClientIp(req)).catch(() => {});
+  res.json({ ok: true });
+});
+
+router.get("/admin/me", async (req: Request, res: Response) => {
+  const mode = await resolveAdminAuthMode(req);
+  if (!mode) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  res.json({ ok: true, mode });
 });
 
 // ── Submissions list ──────────────────────────────────────────────────────────
