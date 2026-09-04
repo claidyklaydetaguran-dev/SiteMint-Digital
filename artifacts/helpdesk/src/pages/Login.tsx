@@ -23,10 +23,13 @@
  * dashboard yet. Nothing on the page claims a voice, booking, CRM, response-time
  * or outcome capability.
  *
- * **No authentication method was added.** The repository has no password-reset
- * route, no federated provider, and no remember-me field, so the page shows
- * none of them — a decorative "Forgot password?" link would be a dead end, and
- * a social button would be a control wired to nothing.
+ * **No authentication method beyond email/password and reset was added.**
+ * V5 S-2 added a real password-reset flow (`pages/PasswordReset.tsx` +
+ * `pages/PasswordResetComplete.tsx`, contract in
+ * `password-reset/passwordResetContract.ts`), so this page now carries a
+ * "Forgot password?" link into it. Nothing else was added: no federated
+ * provider, no remember-me field — a social button would still be a control
+ * wired to nothing.
  *
  * Accessibility. One `h1`; persistent visible labels with explicit "Required"
  * text; `autocomplete="email"` / `"current-password"` so password managers
@@ -37,7 +40,7 @@
  */
 
 import { useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import { publicSiteUrl } from "@/lib/routes";
 import { useRefreshSessionAfterLogin } from "@/hooks/useSession";
@@ -274,6 +277,16 @@ export default function Login() {
                 </button>
 
                 <p className="si-hint">Signing in opens your receptionist dashboard.</p>
+
+                {/* S-2. Base-relative in-app navigation, so it goes through
+                    wouter's <Link> and picks up the router base — unlike the
+                    landing/signup links above, which cross into the other
+                    application and use a document navigation instead. */}
+                <p className="si-alt">
+                  <Link href="/password-reset" className="si-alt__link">
+                    Forgot password?
+                  </Link>
+                </p>
               </form>
 
               <p className="si-alt">

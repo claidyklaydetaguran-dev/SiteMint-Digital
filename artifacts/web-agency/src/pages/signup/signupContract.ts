@@ -1,187 +1,199 @@
 /**
- * Frontend V2 Phase 5 — the AI Receptionist signup contract, as pure functions.
+ * V5 customer-shell foundation — the invite-only AI Receptionist signup
+ * contract, as pure functions (S-1).
  *
- * Everything on this page that has to stay *exactly* the same lives here:
- * the submitted payload shape, the client-side validation rules, and the
- * mapping from an HTTP status to the message the user reads. Extracting them
- * from the component is what makes them testable without a DOM, a test
- * renderer, or any new dependency — `scripts/src/frontendSignupContract.test.ts`
- * imports this module directly.
+ * S-1 replaces the previous open trial signup (name, business name, email,
+ * phone, industry, password — Phase 5) with an invite-gated account-creation
+ * flow: invite code, owner name, business name, work email, password,
+ * timezone, and a required Terms/Privacy acknowledgement. Industry and every
+ * other configuration decision moves to the guided onboarding hub (S-3,
+ * `pages/setup/setupContract.ts` in helpdesk) — this page's only job is to
+ * create the account.
  *
- * **Nothing here changes behaviour.** The payload keys, the two validation
- * rules, and their order and wording are carried over unmodified from the
- * page that shipped before Phase 5. The backend
- * (`artifacts/api-server/src/routes/receptionistAuth.ts`, a protected file that
- * was read and not touched) requires `fullName`, `email`, and `password`,
- * enforces `password.length >= 8`, and answers 400 / 409 / 429 with
- * `{ error }`. This module mirrors that contract; it does not extend it.
+ * Endpoint, per the task brief:
  *
- * This module deliberately has **no imports**, so it stays trivially portable
- * into a plain `tsx` test process with no path-alias resolution.
+ *   POST /api/receptionist/auth/invite-signup
+ *   { inviteCode, ownerName, businessName, email, password, timezone, acceptedTerms: true }
+ *     → 201 (session cookie set)
+ *     → 400 { error }   invalid/expired code, validation
+ *     → 409 { error }   duplicate email
+ *     → 503 { error }   INVITE_SIGNUP_ENABLED is off
+ *
+ * No imports, so this stays portable into the plain `tsx` test runner with
+ * no path-alias resolution — matching every other contract module in this
+ * app.
  */
 
-/** The form's client-side state. Field names are the page's, not the API's. */
 export interface SignupFormValues {
-  name: string;
+  inviteCode: string;
+  ownerName: string;
   businessName: string;
   email: string;
-  phone: string;
-  businessType: string;
   password: string;
+  timezone: string;
+  acceptedTerms: boolean;
 }
 
-export const EMPTY_SIGNUP_FORM: SignupFormValues = {
-  name: "",
-  businessName: "",
-  email: "",
-  phone: "",
-  businessType: "",
-  password: "",
-};
+export function emptySignupForm(defaultTimezone = ""): SignupFormValues {
+  return {
+    inviteCode: "",
+    ownerName: "",
+    businessName: "",
+    email: "",
+    password: "",
+    timezone: defaultTimezone,
+    acceptedTerms: false,
+  };
+}
 
-/** The request body, exactly as the API has always received it. */
+/** A stable, importable empty form for tests — timezone left blank, exactly as `emptySignupForm()` with no argument. */
+export const EMPTY_SIGNUP_FORM: SignupFormValues = emptySignupForm();
+
 export interface SignupPayload {
-  fullName: string;
+  inviteCode: string;
+  ownerName: string;
   businessName: string;
   email: string;
-  phone: string;
-  industry: string;
   password: string;
+  timezone: string;
+  acceptedTerms: true;
 }
 
-/** Endpoint and method are part of the frozen contract. */
-export const SIGNUP_ENDPOINT = "/api/receptionist/auth/signup";
+export const SIGNUP_ENDPOINT = "/api/receptionist/auth/invite-signup";
 export const SIGNUP_METHOD = "POST";
 
 /**
- * Build the request body. Values are passed through untrimmed, exactly as the
- * previous implementation did — the server trims. Changing that here would
- * silently alter what gets stored.
+ * Build the request body. `acceptedTerms` is sent as the literal `true` —
+ * `validateSignup` refuses to pass an unchecked form through, so by the time
+ * this runs the box is known to be checked.
  */
 export function buildSignupPayload(form: SignupFormValues): SignupPayload {
   return {
-    fullName: form.name,
+    inviteCode: form.inviteCode,
+    ownerName: form.ownerName,
     businessName: form.businessName,
     email: form.email,
-    phone: form.phone,
-    industry: form.businessType,
     password: form.password,
+    timezone: form.timezone,
+    acceptedTerms: true,
   };
 }
 
 export interface SignupValidation {
   ok: boolean;
-  /** The form-level message, unchanged from the previous implementation. */
   formError: string;
-  /** Which fields the failing rule implicates, for inline display. */
-  fieldErrors: { name?: string; email?: string; password?: string };
-  /** The field that should receive focus when validation fails. */
+  fieldErrors: {
+    inviteCode?: string;
+    ownerName?: string;
+    businessName?: string;
+    email?: string;
+    password?: string;
+    acceptedTerms?: string;
+  };
   focusField: keyof SignupFormValues | null;
 }
 
 const OK: SignupValidation = { ok: true, formError: "", fieldErrors: {}, focusField: null };
 
+export const MIN_PASSWORD_LENGTH = 8;
+
 /**
- * The two client-side rules, in their original order.
- *
- * Rule 1: full name and email must be non-blank.
- * Rule 2: password must be at least 8 characters.
- *
- * No third rule is added — in particular there is no client-side email-format
- * rule, because adding one would reject inputs the server currently accepts.
- * The inline `fieldErrors` are a presentation of these same rules, not new ones.
+ * Client-side rules, evaluated in field order so the first problem in the
+ * form is always the one reported: invite code → owner name → business name
+ * → email → password length → the Terms/Privacy checkbox. No email-format
+ * rule is added — the server decides that, exactly as every other auth
+ * contract in this app leaves it.
  */
 export function validateSignup(form: SignupFormValues): SignupValidation {
-  const nameBlank = !form.name.trim();
-  const emailBlank = !form.email.trim();
-
-  if (nameBlank || emailBlank) {
-    return {
-      ok: false,
-      formError: "Name and email are required.",
-      fieldErrors: {
-        ...(nameBlank ? { name: "Enter your full name." } : {}),
-        ...(emailBlank ? { email: "Enter your email address." } : {}),
-      },
-      focusField: nameBlank ? "name" : "email",
-    };
+  if (!form.inviteCode.trim()) {
+    return { ok: false, formError: "Enter your invite code.", fieldErrors: { inviteCode: "Required." }, focusField: "inviteCode" };
   }
-
-  if (!form.password.trim() || form.password.length < 8) {
+  if (!form.ownerName.trim()) {
+    return { ok: false, formError: "Enter your name.", fieldErrors: { ownerName: "Required." }, focusField: "ownerName" };
+  }
+  if (!form.businessName.trim()) {
+    return { ok: false, formError: "Enter your business name.", fieldErrors: { businessName: "Required." }, focusField: "businessName" };
+  }
+  if (!form.email.trim()) {
+    return { ok: false, formError: "Enter your work email.", fieldErrors: { email: "Required." }, focusField: "email" };
+  }
+  if (form.password.length < MIN_PASSWORD_LENGTH) {
     return {
       ok: false,
-      formError: "Password must be at least 8 characters.",
-      fieldErrors: { password: "Use at least 8 characters." },
+      formError: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      fieldErrors: { password: `Use at least ${MIN_PASSWORD_LENGTH} characters.` },
       focusField: "password",
     };
   }
-
+  if (!form.acceptedTerms) {
+    return {
+      ok: false,
+      formError: "You must agree to the Terms and Privacy Policy to continue.",
+      fieldErrors: { acceptedTerms: "Required." },
+      focusField: "acceptedTerms",
+    };
+  }
   return OK;
 }
 
-/** Shown when `fetch` itself fails. Wording from CONTENT-SPECIFICATION.md §5. */
 export const SIGNUP_NETWORK_ERROR =
   "We couldn't reach the server. Your details are still here — try again.";
-
-/** The fallback the previous implementation used for an unmapped failure. */
 export const SIGNUP_GENERIC_ERROR = "Signup failed — please try again.";
 
+export const BETA_UNAVAILABLE_MESSAGE = "Signup is by invitation during the private beta.";
+/** Base-relative in-app anchor into the AI Receptionist page's beta section. */
+export const BETA_REQUEST_HREF = "/ai-receptionist#beta";
+
+export type SignupOutcome = "success" | "invalid" | "duplicate" | "unavailable" | "error";
+
 export interface MappedSignupError {
+  outcome: SignupOutcome;
   message: string;
-  /** 409 only: the recovery is to sign in, so the message carries that link. */
   offerSignIn: boolean;
 }
 
 /**
- * Map an API failure to the message the user reads.
+ * Map an API failure to the message and recovery this page offers.
  *
- * The two statuses the backend defines precisely — 409 duplicate email and 429
- * rate limit — get the approved wording from CONTENT-SPECIFICATION.md §5, which
- * tells the user what to actually do next. Every other status keeps the
- * previous behaviour of showing the server's own `error` string, falling back
- * to the generic message. No status is swallowed or re-interpreted.
+ * 400 covers both an invalid/expired invite code and ordinary field
+ * validation — the server's own message distinguishes them, so it is shown
+ * verbatim rather than re-interpreted. 409 is a duplicate account and offers
+ * sign-in. 503 means invite signup is off entirely and points at the beta
+ * request path instead of a dead form.
  */
 export function mapSignupError(status: number, serverError?: string): MappedSignupError {
   if (status === 409) {
-    return {
-      message: "An account already exists for that email.",
-      offerSignIn: true,
-    };
+    return { outcome: "duplicate", message: serverError?.trim() ? serverError : "An account already exists for that email.", offerSignIn: true };
   }
-  if (status === 429) {
-    return {
-      message: "Too many signup attempts from this network. Try again in an hour.",
-      offerSignIn: false,
-    };
+  if (status === 503) {
+    return { outcome: "unavailable", message: BETA_UNAVAILABLE_MESSAGE, offerSignIn: false };
   }
-  return { message: serverError || SIGNUP_GENERIC_ERROR, offerSignIn: false };
+  if (status === 400) {
+    return { outcome: "invalid", message: serverError?.trim() ? serverError : "That invite code is invalid or has expired.", offerSignIn: false };
+  }
+  return { outcome: "error", message: serverError?.trim() ? serverError : SIGNUP_GENERIC_ERROR, offerSignIn: false };
 }
 
-/**
- * The industry options, unchanged. Optional field: an empty value is valid and
- * is sent as an empty string, exactly as before.
- */
-export const INDUSTRY_OPTIONS = [
-  "Real Estate",
-  "Law Firm",
-  "Home Services (HVAC, Plumbing, Electrical…)",
-  "Med Spa / Aesthetics",
-  "Restaurant",
-  "Retail",
-  "Other",
+// ─── Timezone select — browser default preselected ─────────────────────────
+
+export const TIMEZONE_OPTIONS = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "America/Toronto",
+  "America/Vancouver",
+  "UTC",
 ] as const;
 
-/**
- * The stored value differs from the visible label for two options — this is the
- * mapping the previous implementation used, preserved verbatim so what lands in
- * `intake_firms.industry` does not change.
- */
-export const INDUSTRY_VALUES: Record<string, string> = {
-  "Real Estate": "Real Estate",
-  "Law Firm": "Law Firm",
-  "Home Services (HVAC, Plumbing, Electrical…)": "Home Services",
-  "Med Spa / Aesthetics": "Med Spa",
-  Restaurant: "Restaurant",
-  Retail: "Retail",
-  Other: "Other",
-};
+/** The browser's own IANA zone, or "" if it cannot be read (never guessed further than that). */
+export function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
+}

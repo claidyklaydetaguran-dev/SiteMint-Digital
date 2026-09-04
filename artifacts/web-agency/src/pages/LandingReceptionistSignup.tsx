@@ -1,38 +1,33 @@
 /**
- * Frontend V2 Phase 5 — the AI Receptionist account-creation page.
+ * V5 customer-shell foundation — invite-only AI Receptionist signup (S-1).
  *
- * The filename is unchanged on purpose: `App.tsx` still lazy-loads this module
- * at `ROUTES.aiReceptionistSignup`, so the route, its registration order ahead
- * of `/ai-receptionist`, and the base-path handling are preserved by
- * construction rather than by re-derivation.
+ * The filename, route registration order and base-path handling are
+ * unchanged: `App.tsx` still lazy-loads this module at
+ * `ROUTES.aiReceptionistSignup`, ahead of `ROUTES.aiReceptionist`.
  *
- * **Frozen contract.** Every field, its required/optional status, the submitted
- * payload keys, the endpoint and method, `credentials: "include"`, the
- * fire-and-forget lead capture, and the post-signup redirect into the dashboard
- * SPA are exactly what shipped before. The payload and the two validation rules
- * now live in `signup/signupContract.ts` so they can be asserted by a committed
- * test; extracting them changed no value.
+ * **What changed.** S-1 replaces the previous open trial signup (name,
+ * business name, email, phone, industry, password) with an invite-gated
+ * account-creation flow: invite code, owner name, business name, work
+ * email, password, timezone, and a required Terms/Privacy acknowledgement.
+ * Industry and every configuration decision now belong to the guided
+ * onboarding hub the account lands in after signup (S-3). The fire-and-forget
+ * `/api/landing-test/submit` lead capture from the previous page is removed —
+ * this page creates a real account now, so a parallel unauthenticated lead
+ * record duplicates what the account itself already is.
  *
- * **Product truth.** This page creates an account for the capability that is
- * available today: the SMS receptionist. The Phase 4 page opposite the form
- * claimed "running 24/7", "Answers in seconds", "Qualifies every caller" and
- * "24 hours a day" — none of which is supported, and all of which are removed.
- * The three readiness tiers are stated above the form, from the same shared
- * source the landing page uses, so signup can never describe the product
- * differently from the page the user just read.
+ * **States**, per the task brief: submitting; per-field validation errors;
+ * an invalid/expired invite code (400); a duplicate account (409, with a
+ * "Sign in instead" recovery); the private beta not accepting signups right
+ * now (503, with a "Request Beta Access" link into the AI Receptionist
+ * page's beta section); and success, which — unchanged from before —
+ * hard-navigates into the dashboard SPA once the server has set the session
+ * cookie.
  *
- * **What happens next** is limited to verified behaviour: the server sets a
- * session cookie and this page navigates to the dashboard; the firm is created
- * on `planTier: "trial"` with `trialConversationsLimit: 20`, which
- * `intakeAgent.ts` enforces; and no number is provisioned at signup, so the
- * page says plainly that creating the account does not finish setup.
- *
- * Accessibility. Persistent visible labels, explicit Required/Optional text
- * (never colour alone), `autocomplete` on every field so password managers
- * work, an accessible password-visibility toggle (the previous one was
- * `tabIndex={-1}` and unreachable by keyboard), inline errors tied to inputs by
- * `aria-describedby`, a form-level alert that takes focus on failure, and 44px
- * minimum control heights (the previous inputs were 36px).
+ * Accessibility carries over the Phase 5 baseline: persistent visible
+ * labels, explicit Required text, `autocomplete` on every field, an
+ * accessible password-visibility toggle, inline errors tied to inputs by
+ * `aria-describedby`, a form-level alert that takes focus on failure, and
+ * 44px minimum control heights.
  */
 
 import { useRef, useState } from "react";
@@ -41,120 +36,101 @@ import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import {
-  EMPTY_SIGNUP_FORM,
-  INDUSTRY_OPTIONS,
-  INDUSTRY_VALUES,
+  BETA_REQUEST_HREF,
+  detectTimezone,
+  emptySignupForm,
   SIGNUP_ENDPOINT,
   SIGNUP_METHOD,
   SIGNUP_NETWORK_ERROR,
+  TIMEZONE_OPTIONS,
   buildSignupPayload,
   mapSignupError,
   validateSignup,
   type SignupFormValues,
+  type SignupOutcome,
 } from "./signup/signupContract";
 
 /** Verified consequences of creating an account. Nothing speculative. */
 const NEXT_STEPS = [
   {
     title: "You're signed in straight away",
-    body: "Creating the account signs you in and opens your receptionist dashboard.",
+    body: "Creating the account signs you in and opens your guided setup.",
   },
   {
-    title: "You start on a trial plan",
-    body: "New accounts begin on a trial with 20 conversations included.",
+    title: "Setup happens after signup",
+    body: "Business details, your assistant's prompt and voice, availability, and your phone number are all configured in the setup hub — not on this form.",
   },
   {
-    title: "Setup is not finished at signup",
-    body: "Connecting the number your receptionist answers on, and choosing the questions it asks, are steps that still have to happen after the account exists.",
+    title: "Activation is handled with SiteMint",
+    body: "During the private beta, going live happens together with SiteMint once setup is complete.",
   },
 ];
 
 export default function LandingReceptionistSignup() {
-  const [form, setForm] = useState<SignupFormValues>(EMPTY_SIGNUP_FORM);
+  const [form, setForm] = useState<SignupFormValues>(() => emptySignupForm(detectTimezone()));
   const [submitting, setSubmitting] = useState(false);
+  const [outcome, setOutcome] = useState<SignupOutcome | null>(null);
   const [error, setError] = useState("");
-  const [offerSignIn, setOfferSignIn] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-  }>({});
+  const [fieldErrors, setFieldErrors] = useState<SignupFormValuesErrors>({});
+
   const [showPw, setShowPw] = useState(false);
 
   const alertRef = useRef<HTMLDivElement | null>(null);
   const fieldRefs = {
-    name: useRef<HTMLInputElement | null>(null),
+    inviteCode: useRef<HTMLInputElement | null>(null),
+    ownerName: useRef<HTMLInputElement | null>(null),
+    businessName: useRef<HTMLInputElement | null>(null),
     email: useRef<HTMLInputElement | null>(null),
     password: useRef<HTMLInputElement | null>(null),
+    acceptedTerms: useRef<HTMLInputElement | null>(null),
   };
 
   const set =
-    (k: keyof SignupFormValues) =>
+    (k: "inviteCode" | "ownerName" | "businessName" | "email" | "password" | "timezone") =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setOfferSignIn(false);
+    setOutcome(null);
     setFieldErrors({});
 
-    // Identical rules, identical order, identical messages.
     const result = validateSignup(form);
     if (!result.ok) {
       setError(result.formError);
       setFieldErrors(result.fieldErrors);
-      // Send focus to the first field the rule implicates so a keyboard or
-      // screen-reader user is put where the problem is.
       const target = result.focusField;
-      if (target === "name" || target === "email" || target === "password") {
-        fieldRefs[target].current?.focus();
+      if (target && target in fieldRefs) {
+        (fieldRefs as Record<string, React.RefObject<HTMLInputElement | null>>)[target]?.current?.focus();
       }
       return;
     }
 
     setSubmitting(true);
     try {
-      // ── Real account creation — endpoint, method, credentials, and body
-      //    unchanged. ────────────────────────────────────────────────────────
       const r = await fetch(SIGNUP_ENDPOINT, {
         method: SIGNUP_METHOD,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(buildSignupPayload(form)),
       });
-      const d = (await r.json()) as { error?: string };
       if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string };
         const mapped = mapSignupError(r.status, d.error);
+        setOutcome(mapped.outcome);
         setError(mapped.message);
-        setOfferSignIn(mapped.offerSignIn);
-        // The alert is focusable and receives focus so the failure is
-        // announced rather than silently rendered above the fold.
         window.requestAnimationFrame(() => alertRef.current?.focus());
         return;
       }
 
-      // ── Fire-and-forget lead capture (non-blocking) — unchanged. ─────────
-      void fetch("/api/landing-test/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vertical: "receptionist",
-          name: form.name,
-          businessName: form.businessName,
-          email: form.email,
-          phone: form.phone,
-          extra: { source: "get-early-access", businessType: form.businessType },
-          utmSource: new URLSearchParams(window.location.search).get("utm_source") ?? "direct",
-          utmMedium: new URLSearchParams(window.location.search).get("utm_medium") ?? "direct",
-          utmCampaign: new URLSearchParams(window.location.search).get("utm_campaign") ?? null,
-        }),
-      }).catch(() => {});
-
-      // Cross-application navigation into the dashboard SPA, resolved through
-      // the centralised path layer. Redirect target unchanged.
+      // Real account creation succeeded — the server set the session cookie.
+      // Cross-application navigation into the dashboard SPA, resolved
+      // through the centralised path layer. Redirect target unchanged from
+      // the previous implementation.
       window.location.href = DASHBOARD_URLS.root;
     } catch {
+      setOutcome("error");
       setError(SIGNUP_NETWORK_ERROR);
       window.requestAnimationFrame(() => alertRef.current?.focus());
     } finally {
@@ -162,7 +138,10 @@ export default function LandingReceptionistSignup() {
     }
   };
 
-  const describedBy = (field: "name" | "email" | "password", ...extra: string[]) => {
+  const describedBy = (
+    field: "inviteCode" | "ownerName" | "businessName" | "email" | "password" | "acceptedTerms",
+    ...extra: string[]
+  ) => {
     const ids = [...extra];
     if (fieldErrors[field]) ids.unshift(`${field}-error`);
     return ids.length ? ids.join(" ") : undefined;
@@ -170,11 +149,6 @@ export default function LandingReceptionistSignup() {
 
   return (
     <div className="sg-page">
-      {/* Minimal auth chrome. The previous page rendered the marketing
-          `ReceptionistNav`, whose links still point at homepage anchors
-          (`/#features`, `/#pricing`) that the approved information
-          architecture removed. A wordmark that returns to the landing page and
-          a sign-in link are what this surface actually needs. */}
       <header className="sg-bar">
         <div className="sg-bar__inner">
           <Link href={ROUTES.aiReceptionist} className="sg-bar__brand">
@@ -188,59 +162,41 @@ export default function LandingReceptionistSignup() {
 
       <main className="sg-main" id="signup-main">
         <div className="sg-grid">
-          {/* ── Context. First in the DOM, so mobile reads it before the
-                 fields — and it is kept short so it never becomes a marketing
-                 section standing between the user and the form. ──────────── */}
           <div className="sg-intro">
             <Link href={ROUTES.aiReceptionist} className="sg-back">
               <ArrowLeft aria-hidden="true" className="sg-back__icon" />
               Back to AI Receptionist
             </Link>
 
-            <p className="v2-eyebrow">AI Receptionist</p>
-            <h1 className="sg-title">Create your SMS Receptionist</h1>
+            <p className="v2-eyebrow">AI Receptionist — Private beta</p>
+            <h1 className="sg-title">Set up your AI Receptionist</h1>
             <p className="sg-lede">
-              This account is for the SMS receptionist — the part of the product
-              that is available today. It replies to inbound texts, asks the
-              questions you choose, and hands the conversation to a person.
+              Accounts are created by invitation during the private beta. Enter the invite code
+              from your invitation to create your account.
             </p>
 
-            {/* Readiness, above the form and never below it. Same three tiers,
-                same wording, from the same shared source as the landing page. */}
             <ul className="sg-readiness">
               {CAPABILITY_STATUS.map((item) => (
                 <li key={item.capability} className={`sg-readiness__item sg-readiness__item--${item.tier}`}>
-                  {/* Capability first, then its tier, so the row reads as the
-                      sentence a person would say: "SMS Receptionist —
-                      available now". */}
                   <span className="sg-readiness__name">{item.capability}</span>
-                  <span className={`v2-tier v2-tier--${item.tier}`}>
-                    {READINESS[item.tier].label}
-                  </span>
+                  <span className={`v2-tier v2-tier--${item.tier}`}>{READINESS[item.tier].label}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* ── The form. One surface, not a stack of cards. ──────────────── */}
           <div className="sg-form-col">
-            <form className="sg-form" onSubmit={submit} noValidate={false}>
+            <form className="sg-form" onSubmit={submit} noValidate>
               <h2 className="sg-form__title">Your account</h2>
 
               {error && (
-                <div
-                  ref={alertRef}
-                  className="sg-alert"
-                  role="alert"
-                  tabIndex={-1}
-                  aria-live="assertive"
-                >
-                  {/* The word "Error" carries the state, so it never depends on
-                      colour or on the icon alone. */}
-                  <span className="sg-alert__label">Error</span>
+                <div ref={alertRef} className="sg-alert" role="alert" tabIndex={-1} aria-live="assertive">
+                  <span className="sg-alert__label">
+                    {outcome === "unavailable" ? "Not available" : "Error"}
+                  </span>
                   <span className="sg-alert__text">
                     {error}
-                    {offerSignIn && (
+                    {outcome === "duplicate" && (
                       <>
                         {" "}
                         <a href={DASHBOARD_URLS.login} className="sg-alert__link">
@@ -249,58 +205,96 @@ export default function LandingReceptionistSignup() {
                         .
                       </>
                     )}
+                    {outcome === "unavailable" && (
+                      <>
+                        {" "}
+                        <Link href={BETA_REQUEST_HREF} className="sg-alert__link">
+                          Request Beta Access
+                        </Link>
+                        .
+                      </>
+                    )}
                   </span>
                 </div>
               )}
 
+              <div className="sg-field">
+                <label htmlFor="s-invite-code" className="sg-label">
+                  Invite code <span className="sg-req">Required</span>
+                </label>
+                <input
+                  id="s-invite-code"
+                  ref={fieldRefs.inviteCode}
+                  className={`sg-input${fieldErrors.inviteCode ? " sg-input--invalid" : ""}`}
+                  type="text"
+                  value={form.inviteCode}
+                  onChange={set("inviteCode")}
+                  autoComplete="off"
+                  required
+                  aria-required="true"
+                  aria-invalid={fieldErrors.inviteCode ? true : undefined}
+                  aria-describedby={describedBy("inviteCode")}
+                />
+                {fieldErrors.inviteCode && (
+                  <p className="sg-error" id="inviteCode-error">
+                    {fieldErrors.inviteCode}
+                  </p>
+                )}
+              </div>
+
               <div className="sg-row">
                 <div className="sg-field">
-                  <label htmlFor="s-name" className="sg-label">
-                    Full name <span className="sg-req">Required</span>
+                  <label htmlFor="s-owner-name" className="sg-label">
+                    Your name <span className="sg-req">Required</span>
                   </label>
                   <input
-                    id="s-name"
-                    ref={fieldRefs.name}
-                    className={`sg-input${fieldErrors.name ? " sg-input--invalid" : ""}`}
+                    id="s-owner-name"
+                    ref={fieldRefs.ownerName}
+                    className={`sg-input${fieldErrors.ownerName ? " sg-input--invalid" : ""}`}
                     type="text"
-                    value={form.name}
-                    onChange={set("name")}
+                    value={form.ownerName}
+                    onChange={set("ownerName")}
                     autoComplete="name"
                     required
                     aria-required="true"
-                    aria-invalid={fieldErrors.name ? true : undefined}
-                    aria-describedby={describedBy("name")}
+                    aria-invalid={fieldErrors.ownerName ? true : undefined}
+                    aria-describedby={describedBy("ownerName")}
                   />
-                  {fieldErrors.name && (
-                    <p className="sg-error" id="name-error">
-                      {fieldErrors.name}
+                  {fieldErrors.ownerName && (
+                    <p className="sg-error" id="ownerName-error">
+                      {fieldErrors.ownerName}
                     </p>
                   )}
                 </div>
 
                 <div className="sg-field">
-                  <label htmlFor="s-biz" className="sg-label">
-                    Business name <span className="sg-opt">Optional</span>
+                  <label htmlFor="s-business-name" className="sg-label">
+                    Business name <span className="sg-req">Required</span>
                   </label>
                   <input
-                    id="s-biz"
-                    className="sg-input"
+                    id="s-business-name"
+                    ref={fieldRefs.businessName}
+                    className={`sg-input${fieldErrors.businessName ? " sg-input--invalid" : ""}`}
                     type="text"
                     value={form.businessName}
                     onChange={set("businessName")}
                     autoComplete="organization"
-                    aria-describedby="biz-help"
+                    required
+                    aria-required="true"
+                    aria-invalid={fieldErrors.businessName ? true : undefined}
+                    aria-describedby={describedBy("businessName")}
                   />
-                  <p className="sg-help" id="biz-help">
-                    Used as your account name. Your own name is used if you leave
-                    this empty.
-                  </p>
+                  {fieldErrors.businessName && (
+                    <p className="sg-error" id="businessName-error">
+                      {fieldErrors.businessName}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="sg-field">
                 <label htmlFor="s-email" className="sg-label">
-                  Email <span className="sg-req">Required</span>
+                  Work email <span className="sg-req">Required</span>
                 </label>
                 <input
                   id="s-email"
@@ -322,48 +316,25 @@ export default function LandingReceptionistSignup() {
                   </p>
                 )}
                 <p className="sg-help" id="email-help">
-                  You sign in with this address, and conversation summaries are
-                  sent to it.
+                  You sign in with this address.
                 </p>
               </div>
 
-              <div className="sg-row">
-                <div className="sg-field">
-                  <label htmlFor="s-phone" className="sg-label">
-                    Phone <span className="sg-opt">Optional</span>
-                  </label>
-                  <input
-                    id="s-phone"
-                    className="sg-input"
-                    type="tel"
-                    value={form.phone}
-                    onChange={set("phone")}
-                    autoComplete="tel"
-                    inputMode="tel"
-                  />
-                </div>
-
-                <div className="sg-field">
-                  <label htmlFor="s-industry" className="sg-label">
-                    Industry <span className="sg-opt">Optional</span>
-                  </label>
-                  {/* A native select: it is keyboard- and screen-reader-native,
-                      works with autofill, and needs no JavaScript to open. The
-                      stored values are unchanged. */}
-                  <select
-                    id="s-industry"
-                    className="sg-input sg-select"
-                    value={form.businessType}
-                    onChange={set("businessType")}
-                  >
-                    <option value="">Select your industry</option>
-                    {INDUSTRY_OPTIONS.map((label) => (
-                      <option key={label} value={INDUSTRY_VALUES[label]}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="sg-field">
+                <label htmlFor="s-timezone" className="sg-label">
+                  Timezone <span className="sg-opt">Optional</span>
+                </label>
+                <select id="s-timezone" className="sg-input sg-select" value={form.timezone} onChange={set("timezone")}>
+                  <option value="">Select your timezone</option>
+                  {!TIMEZONE_OPTIONS.includes(form.timezone as (typeof TIMEZONE_OPTIONS)[number]) && form.timezone && (
+                    <option value={form.timezone}>{form.timezone}</option>
+                  )}
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="sg-field">
@@ -374,9 +345,7 @@ export default function LandingReceptionistSignup() {
                   <input
                     id="s-password"
                     ref={fieldRefs.password}
-                    className={`sg-input sg-input--password${
-                      fieldErrors.password ? " sg-input--invalid" : ""
-                    }`}
+                    className={`sg-input sg-input--password${fieldErrors.password ? " sg-input--invalid" : ""}`}
                     type={showPw ? "text" : "password"}
                     value={form.password}
                     onChange={set("password")}
@@ -386,8 +355,6 @@ export default function LandingReceptionistSignup() {
                     aria-invalid={fieldErrors.password ? true : undefined}
                     aria-describedby={describedBy("password", "password-help")}
                   />
-                  {/* Reachable by keyboard, and its state is announced. The
-                      previous control was tabIndex={-1} with no label. */}
                   <button
                     type="button"
                     className="sg-password__toggle"
@@ -400,9 +367,7 @@ export default function LandingReceptionistSignup() {
                     ) : (
                       <Eye aria-hidden="true" className="sg-password__icon" />
                     )}
-                    <span className="v2-visually-hidden">
-                      {showPw ? "Hide password" : "Show password"}
-                    </span>
+                    <span className="v2-visually-hidden">{showPw ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
                 {fieldErrors.password && (
@@ -414,6 +379,37 @@ export default function LandingReceptionistSignup() {
                   At least 8 characters.
                 </p>
               </div>
+
+              <div className="sg-field" style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: "0.6rem" }}>
+                <input
+                  id="s-accept-terms"
+                  ref={fieldRefs.acceptedTerms}
+                  type="checkbox"
+                  checked={form.acceptedTerms}
+                  onChange={(e) => setForm((f) => ({ ...f, acceptedTerms: e.target.checked }))}
+                  required
+                  aria-required="true"
+                  aria-invalid={fieldErrors.acceptedTerms ? true : undefined}
+                  aria-describedby={describedBy("acceptedTerms")}
+                  style={{ width: 20, height: 20, minWidth: 20, marginTop: 2 }}
+                />
+                <label htmlFor="s-accept-terms" className="sg-label" style={{ fontWeight: 400 }}>
+                  I agree to the{" "}
+                  <Link href={ROUTES.terms} className="sg-alt__link">
+                    Terms
+                  </Link>{" "}
+                  and{" "}
+                  <Link href={ROUTES.privacy} className="sg-alt__link">
+                    Privacy Policy
+                  </Link>
+                  . <span className="sg-req">Required</span>
+                </label>
+              </div>
+              {fieldErrors.acceptedTerms && (
+                <p className="sg-error" id="acceptedTerms-error">
+                  {fieldErrors.acceptedTerms}
+                </p>
+              )}
 
               <button type="submit" className="sg-submit" disabled={submitting}>
                 {submitting ? (
@@ -435,9 +431,6 @@ export default function LandingReceptionistSignup() {
             </form>
           </div>
 
-          {/* ── What happens next. After the form in the DOM, so mobile users
-                 reach the fields first; placed under the context column on
-                 desktop. ─────────────────────────────────────────────────── */}
           <aside className="sg-next" aria-labelledby="sg-next-heading">
             <h2 className="sg-next__title" id="sg-next-heading">
               What happens after you create it
@@ -455,4 +448,13 @@ export default function LandingReceptionistSignup() {
       </main>
     </div>
   );
+}
+
+interface SignupFormValuesErrors {
+  inviteCode?: string;
+  ownerName?: string;
+  businessName?: string;
+  email?: string;
+  password?: string;
+  acceptedTerms?: string;
 }

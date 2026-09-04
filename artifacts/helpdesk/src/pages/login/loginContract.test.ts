@@ -201,26 +201,23 @@ console.log("\n--- required fields and the primary action ---");
   check("the submitting state is announced in the button text", pageText.includes("Signing in…"));
 }
 
-console.log("\n--- no authentication method that does not exist ---");
+console.log("\n--- S-2: a real password-recovery link, and nothing invented beside it ---");
 {
+  // V5 S-2 added the reset flow (`pages/PasswordReset.tsx`,
+  // `pages/PasswordResetComplete.tsx`), so the previous absence check is
+  // inverted: the link must now be present, and it must point at the new
+  // in-app route rather than a hand-composed path.
+  check("a password-recovery link is shown", /Forgot password/i.test(pageText));
   check(
-    "no password-recovery link is shown (no route implements one)",
-    !/forgot|reset your password|password reset/i.test(pageText),
+    "it navigates in-app through wouter's Link, not a document navigation",
+    /<Link href="\/password-reset"/.test(pageText),
   );
   check("no remember-me control", !/remember\s?me/i.test(pageText));
   check(
     "no federated or magic-link control",
     !/(Google|Facebook|Apple|Microsoft|GitHub|SSO|magic link)/i.test(pageText),
   );
-  check("no password-strength meter on sign-in", !/strength/i.test(pageText));
-  // The repository is the authority: if a recovery route ever lands, this
-  // check fails and the page must offer it.
-  check(
-    "the backend still has no password-recovery endpoint",
-    !/forgot|password-reset|resetPassword/i.test(
-      read("artifacts/api-server/src/routes/receptionistAuth.ts"),
-    ),
-  );
+  check("no password-strength meter on sign-in itself (that belongs to the reset-complete page)", !/strength/i.test(pageText));
 }
 
 console.log("\n--- accessibility structure ---");
@@ -319,8 +316,17 @@ console.log("\n--- navigation destinations ---");
   );
   check("the return link is labelled", pageProse.includes("Back to AI Receptionist"));
   check(
-    "cross-application links use document navigation, never <Link>",
-    !/<Link\b/.test(pageText),
+    // S-2 added one genuine in-app destination (the password-reset request
+    // page), which correctly uses wouter's <Link> so the router base is
+    // applied. The two cross-application destinations (landing, signup)
+    // must still never use it — only a document navigation crosses into the
+    // other Vite application without doubling its base.
+    "cross-application links (landing, signup) still use document navigation, never <Link>",
+    !new RegExp(`<Link\\b[^>]*href=\\{?${"(LANDING_URL|SIGNUP_URL)"}`).test(pageText),
+  );
+  check(
+    "exactly one in-app <Link> exists, and it is the password-reset destination",
+    (pageText.match(/<Link\b/g) ?? []).length === 1 && pageText.includes('<Link href="/password-reset"'),
   );
 }
 

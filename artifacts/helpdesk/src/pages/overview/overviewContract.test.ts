@@ -1,26 +1,20 @@
 /**
- * Frontend V2 Phase 7 — committed contract tests for the authenticated
- * dashboard shell and its default overview.
+ * V5 customer-shell foundation — committed contract tests for the
+ * authenticated dashboard shell and its redesigned overview (D-1).
  *
  * Run via: pnpm --filter @workspace/scripts run test
  *
- * Same arrangement as the Phase 5 signup and Phase 6 sign-in suites: the file
- * lives beside the module it tests, `scripts` owns the runner because it is the
- * workspace package that already has `tsx`, and helpdesk's tsconfig excludes
- * `**\/*.test.ts` by glob so nothing here is type-built into the app or bundled
- * by Vite.
- *
- * Two kinds of assertion, both dependency-free:
- *
- *  1. **Behavioural.** `overviewContract.ts` and `dashboardNav.ts` are pure and
- *     imported directly, so readiness derivation, the figures, the attention
- *     list, the agent-config read and the visible navigation are executed
- *     rather than pattern-matched.
- *  2. **Structural.** The shell, the page, the router and the route module are
- *     read as source and checked for what a renderer would otherwise be needed
- *     to prove: the landmarks, the skip link, the drawer's keyboard contract,
- *     the preserved authentication and logout calls, the readiness wording, and
- *     the absence of any fabricated metric.
+ * This file still tests two things together, as it always has: the
+ * Overview-specific contract in `overviewContract.ts` (this session's scope)
+ * and the shared `AppShell` / `dashboardNav` chrome (not this session's
+ * scope — `lib/nav.ts`, `dashboardNav.ts` and `AppShell.tsx` belong to the
+ * nav/shell owner and are read here, not edited). The shell/nav/accessibility
+ * sections below are carried over verbatim from the Phase 7 suite; only the
+ * Overview-contract sections (agent-config/readiness/attention/readiness
+ * ladder) were rewritten for the D-1 redesign, since `readAgentConfig`,
+ * `buildSetupSteps` and `deriveReadiness` no longer exist — the Setup hub
+ * (`pages/setup/setupContract.ts`, S-3) now owns that narrower question, and
+ * this file's own `setupContract.test.ts` covers it.
  *
  * No test framework, no DOM, no new dependency, and no frozen configuration
  * changed. It never performs a network request, never signs in, and never
@@ -33,12 +27,15 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildActivityFigures,
-  buildAttention,
-  buildSetupSteps,
+  buildNeedsAttention,
+  buildNextBestAction,
+  buildTodayFigures,
   buildUsage,
-  deriveReadiness,
-  readAgentConfig,
+  countToday,
+  deriveReceptionistState,
+  recentCalls,
   recentConversations,
+  RECEPTIONIST_STATE_LABEL,
   type OverviewConversation,
   type OverviewSession,
 } from "./overviewContract.js";
@@ -56,6 +53,8 @@ const read = (rel: string) => readFileSync(path.join(repoRoot, rel), "utf8");
 const shellSrc = read("artifacts/helpdesk/src/components/layout/AppShell.tsx");
 const navSrc = read("artifacts/helpdesk/src/components/layout/dashboardNav.ts");
 const pageSrc = read("artifacts/helpdesk/src/pages/Overview.tsx");
+const overviewApiSrc = read("artifacts/helpdesk/src/pages/overview/overviewApi.ts");
+const pageHeaderSrc = read("artifacts/helpdesk/src/components/common/PageHeader.tsx");
 const appSrc = read("artifacts/helpdesk/src/App.tsx");
 const routesSrc = read("artifacts/helpdesk/src/lib/routes.ts");
 const sessionSrc = read("artifacts/helpdesk/src/hooks/useSession.ts");
@@ -102,23 +101,6 @@ function section(name: string): void {
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
 const HOUR = 3600_000;
-/**
- * One reference instant for every timestamp in this file.
- *
- * `iso` used to read `Date.now()` on each call, so an assertion that built a
- * fixture with `iso(1)` and its expected value with `iso(1)` was comparing two
- * separately sampled clocks. Whenever the millisecond ticked between those two
- * calls the ISO strings differed and
- * "lastActivityAt is the most recent lastMessageAt, not the first row" failed —
- * against production behaviour that was correct every time, since
- * `latestActivity` returns the winning row's own string unmodified.
- *
- * Capturing the instant once makes fixture and expectation equal by
- * construction, so the equality below stays exact: no tolerance, no retry, no
- * mocked global clock. The only production window these feed is the seven-day
- * cutoff in `buildActivityFigures`, which the fixtures straddle by hours and
- * days, so pinning the reference changes nothing any assertion measures.
- */
 const NOW = Date.now();
 const iso = (hoursAgo: number) => new Date(NOW - hoursAgo * HOUR).toISOString();
 
@@ -136,13 +118,6 @@ function conversation(over: Partial<OverviewConversation> = {}): OverviewConvers
   };
 }
 
-const CONFIGURED = {
-  greetingMessage: "Thanks for texting — what can we help with?",
-  businessDescription: "Licensed residential plumbing.",
-  qualifyingQuestions: ["What is the address?"],
-};
-const BLANK = { greetingMessage: null, businessDescription: null, qualifyingQuestions: [] };
-
 const session = (over: Partial<OverviewSession["firm"]> = {}, count = 7): OverviewSession => ({
   firm: {
     id: 41,
@@ -156,91 +131,24 @@ const session = (over: Partial<OverviewSession["firm"]> = {}, count = 7): Overvi
   conversationCount: count,
 });
 
-// ─── 1. Agent config is read from the shape the server actually sends ──────
+// ─── 1. Receptionist state is derived from real signals only ──────────────
 
-section("agent-config response shape");
+section("receptionist state (D-1 status chip)");
 
-check(
-  "the server wraps agent-config in `firm` — the route this page reads is unchanged",
-  /res\.json\(\{\s*firm:/.test(read("artifacts/api-server/src/routes/receptionistAgentConfig.ts")),
-);
-eq(
-  "readAgentConfig reads the documented { firm: … } wrapper",
-  readAgentConfig({ firm: CONFIGURED }),
-  CONFIGURED,
-);
-eq("readAgentConfig also tolerates a flat body", readAgentConfig(CONFIGURED), CONFIGURED);
-eq("readAgentConfig returns null for an unrecognised body", readAgentConfig({ nope: 1 }), null);
-eq("readAgentConfig returns null for a non-object", readAgentConfig(null), null);
-eq(
-  "a missing qualifyingQuestions array becomes [], never undefined",
-  readAgentConfig({ firm: { greetingMessage: "hi" } })?.qualifyingQuestions,
-  [],
-);
+eq("a brand-new firm is not set up", deriveReceptionistState({ setupComplete: false, anyStepDone: false, numberAssigned: false, assistantPublished: false }), "not_set_up");
+eq("progress with an unfinished checklist is in progress", deriveReceptionistState({ setupComplete: false, anyStepDone: true, numberAssigned: false, assistantPublished: false }), "setup_in_progress");
+eq("a complete checklist without a live number/assistant is ready for activation", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: false, assistantPublished: false }), "ready_for_activation");
+eq("a number alone, without a published assistant, is not live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: false }), "ready_for_activation");
+eq("a published assistant alone, without a number, is not live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: false, assistantPublished: true }), "ready_for_activation");
+eq("only both a number and a published assistant read as live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: true }), "live");
+check("every state has a plain-text label — status is never colour-only", Object.values(RECEPTIONIST_STATE_LABEL).every((l) => l.length > 0));
 
-// ─── 2. Readiness is derived, never asserted ───────────────────────────────
-
-section("readiness derivation");
-
-eq(
-  "a fully configured firm with activity reads as answering",
-  deriveReadiness(CONFIGURED, [conversation()]).state,
-  "answering",
-);
-eq(
-  "a fully configured firm with no conversations is 'configured', not 'answering'",
-  deriveReadiness(CONFIGURED, []).state,
-  "configured",
-);
-eq(
-  "a firm missing one step is incomplete",
-  deriveReadiness({ ...CONFIGURED, greetingMessage: null }, [conversation()]).state,
-  "incomplete",
-);
-eq(
-  "a brand-new firm is incomplete with 0 of 3 done",
-  [deriveReadiness(BLANK, []).state, deriveReadiness(BLANK, []).completed],
-  ["incomplete", 0],
-);
-eq(
-  "an unreadable agent-config is 'unknown' — never 'nothing is set up'",
-  deriveReadiness(null, [conversation()]).state,
-  "unknown",
-);
-eq(
-  "whitespace-only configuration does not count as done",
-  deriveReadiness({ greetingMessage: "   ", businessDescription: "  ", qualifyingQuestions: ["  "] }, [])
-    .completed,
-  0,
-);
-eq(
-  "when conversations failed to load, activity is not claimed either way",
-  [
-    deriveReadiness(CONFIGURED, [], false).state,
-    deriveReadiness(CONFIGURED, [], false).lastActivityAt,
-    deriveReadiness(CONFIGURED, [], false).activityKnown,
-  ],
-  ["configured", null, false],
-);
-eq(
-  "lastActivityAt is the most recent lastMessageAt, not the first row",
-  deriveReadiness(CONFIGURED, [
-    conversation({ id: 1, lastMessageAt: iso(9) }),
-    conversation({ id: 2, lastMessageAt: iso(1) }),
-    conversation({ id: 3, lastMessageAt: iso(5) }),
-  ]).lastActivityAt,
-  iso(1),
-);
-eq("every setup step routes to the receptionist page", [...new Set(buildSetupSteps(BLANK).map((s) => s.href))], [
-  "/receptionist",
-]);
-
-// ─── 3. No fabricated metric ever renders ──────────────────────────────────
+// ─── 2. No fabricated metric ever renders ──────────────────────────────────
 
 section("no fabricated metric");
 
 eq(
-  "with no conversations every figure is null — never a zero presented as a measurement",
+  "with no conversations every activity figure is null — never a zero presented as a measurement",
   buildActivityFigures([]).map((f) => f.value),
   [null, null, null],
 );
@@ -253,10 +161,11 @@ eq(
   ]).map((f) => f.value),
   [2, 2, 1],
 );
-check(
-  "only the hot-lead figure carries emphasis",
-  buildActivityFigures([]).filter((f) => f.emphasis).length === 1,
-);
+check("only the hot-lead figure carries emphasis", buildActivityFigures([]).filter((f) => f.emphasis).length === 1);
+eq("an unknown today's-activity count is null, not zero", buildTodayFigures({ callsToday: null, conversationsToday: null, pendingAppointmentRequests: null }).map((f) => f.value), [null, null, null]);
+eq("a zero real count is shown as zero, distinct from unknown", buildTodayFigures({ callsToday: 0, conversationsToday: 2, pendingAppointmentRequests: 0 }).map((f) => f.value), [0, 2, 0]);
+eq("countToday returns null for an empty conversation list", countToday([]), null);
+eq("countToday counts only rows created in the last 24 hours", countToday([conversation({ createdAt: iso(2) }), conversation({ createdAt: iso(30) })]), 1);
 check(
   "the page renders 'None yet' for a null figure rather than a number",
   pageSrc.includes('figure.value === null ? "None yet" : figure.value'),
@@ -291,34 +200,48 @@ check(
     "effortless",
   ].some((phrase) => pageCode.toLowerCase().includes(phrase.toLowerCase())),
 );
+check(
+  "a voice-platform query that resolves to null (off/unavailable) is never coerced to a zero-problem count",
+  overviewApiSrc.includes("return null") && overviewApiSrc.includes("!voicePlatformEnabled"),
+);
 
-// ─── 4. Attention items are real problems only ─────────────────────────────
+// ─── 3. Needs-attention: real problems only, degrading on unknown data ─────
 
-section("attention list");
+section("needs-attention list");
 
-eq("a healthy trial account has nothing needing attention", buildAttention([conversation()], false), []);
+eq("a healthy trial account with everything known has nothing needing attention", buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0 }), []);
 eq(
-  "conversations past the trial cap are surfaced for a trial firm",
-  buildAttention([conversation({ isOverCap: true })], false).map((a) => a.key),
+  "conversations past the trial cap are surfaced",
+  buildNeedsAttention({ overCapCount: 2, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0 }).map((a) => a.key),
   ["over-cap"],
 );
 eq(
-  "the trial-cap warning never shows for a paid plan",
-  buildAttention([conversation({ isOverCap: true })], true),
-  [],
-);
-eq(
   "unscored conversations are surfaced",
-  buildAttention([conversation({ tier: "Needs Review" })], true).map((a) => a.key),
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 1, openIssuesCount: 0, pendingAppointmentRequestsCount: 0 }).map((a) => a.key),
   ["needs-review"],
 );
 eq(
-  "each attention item names a real destination",
-  buildAttention([conversation({ isOverCap: true, tier: "Needs Review" })], false).map((a) => a.href),
-  ["/billing", "/conversations"],
+  "open issues are surfaced",
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 3, pendingAppointmentRequestsCount: 0 }).map((a) => a.key),
+  ["open-issues"],
+);
+eq(
+  "pending appointment requests are surfaced",
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 4 }).map((a) => a.key),
+  ["pending-requests"],
+);
+eq(
+  "a null (unknown) count never contributes an item — unknown is not shown as zero problems",
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: null, pendingAppointmentRequestsCount: null }),
+  [],
+);
+eq(
+  "every attention item names a real destination, in a stable order",
+  buildNeedsAttention({ overCapCount: 1, needsReviewCount: 1, openIssuesCount: 1, pendingAppointmentRequestsCount: 1 }).map((a) => a.href),
+  ["/logs", "/billing", "/conversations", "/appointments"],
 );
 
-// ─── 5. Usage is the firm's own, from the session only ─────────────────────
+// ─── 4. Usage is the firm's own, from the session only ─────────────────────
 
 section("usage and tenancy");
 
@@ -345,8 +268,26 @@ eq("recent conversations are ordered newest-first and capped at five", recentCon
   conversation({ id: 5, lastMessageAt: iso(9) }),
   conversation({ id: 6, lastMessageAt: iso(11) }),
 ]).map((c) => c.id), [2, 3, 1, 4, 5]);
+eq("recent calls are ordered newest-first and capped at five", recentCalls([
+  { callId: "a", stateLabel: "Completed", callerNumberDisplay: "+1", startedAt: iso(5) },
+  { callId: "b", stateLabel: "Completed", callerNumberDisplay: "+1", startedAt: iso(1) },
+  { callId: "c", stateLabel: "Completed", callerNumberDisplay: "+1", startedAt: iso(9) },
+]).map((c) => c.callId), ["b", "a", "c"]);
 
-// ─── 6. Authentication, session and logout contracts ───────────────────────
+// ─── 5. One next-best action ────────────────────────────────────────────────
+
+section("next-best action");
+
+eq("setup incomplete points to /setup", buildNextBestAction({ receptionistState: "not_set_up", attentionCount: 0 }).href, "/setup");
+eq("setup complete but not live still points to /setup for final review", buildNextBestAction({ receptionistState: "ready_for_activation", attentionCount: 0 }).href, "/setup");
+eq("live with something needing attention points at it", buildNextBestAction({ receptionistState: "live", attentionCount: 2 }).actionLabel, "Review what needs attention");
+eq("live and healthy still offers a single action, not none", buildNextBestAction({ receptionistState: "live", attentionCount: 0 }).actionLabel.length > 0, true);
+check(
+  "the page renders exactly one next-action card",
+  (pageCode.match(/<NextActionCard/g) ?? []).length === 1,
+);
+
+// ─── 6. Authentication, session and logout contracts (unchanged shell) ─────
 
 section("authentication contracts");
 
@@ -383,27 +324,23 @@ check(
   shellSrc.includes(">\n            Sign out") || shellSrc.includes("Sign out"),
 );
 
-// ─── 7. API surface is untouched ───────────────────────────────────────────
+// ─── 7. API surface — new sources are additive, existing ones untouched ───
 
 section("API surface");
 
-eq(
-  "every endpoint the overview calls, unchanged",
-  [
-    pageSrc.includes('"/receptionist/agent-config"'),
-    conversationsSrc.includes('"/receptionist/conversations"'),
-    sessionSrc.includes('"/receptionist/auth/me"'),
-  ],
-  [true, true, true],
+check(
+  "the conversations, session and voice-numbers/onboarding/calendar-status/issues/calls sources this page reads are all real, documented endpoints",
+  conversationsSrc.includes('"/receptionist/conversations"') &&
+    sessionSrc.includes('"/receptionist/auth/me"') &&
+    overviewApiSrc.includes('"/receptionist/voice/numbers"') &&
+    overviewApiSrc.includes('"/receptionist/availability/calendar-status"') &&
+    overviewApiSrc.includes('"/receptionist/voice/issues"') &&
+    overviewApiSrc.includes('"/receptionist/voice/calls"'),
 );
 check("the API base and credentials mode are unchanged", apiSrc.includes('const API_BASE = "/api"') && apiSrc.includes('credentials: "include"'));
 check(
   "the conversations query key and refetch interval are unchanged",
   conversationsSrc.includes('queryKey: ["conversations"]') && conversationsSrc.includes("refetchInterval: 30_000"),
-);
-check(
-  "the agent-config query key is unchanged",
-  pageSrc.includes('queryKey: ["agent-config"]'),
 );
 check(
   "the session query key and staleTime are unchanged",
@@ -412,14 +349,18 @@ check(
 );
 check(
   "the overview issues no write of any kind",
-  !/useMutation|method:\s*"(POST|PATCH|PUT|DELETE)"/.test(pageSrc),
+  !/useMutation|method:\s*"(POST|PATCH|PUT|DELETE)"/.test(pageSrc) && !/useMutation|method:\s*"(POST|PATCH|PUT|DELETE)"/.test(overviewApiSrc),
 );
 check(
-  "no polling was added by this phase",
-  (pageSrc.match(/refetchInterval/g) ?? []).length === 0,
+  "no polling interval was added by the redesign",
+  (pageSrc.match(/refetchInterval/g) ?? []).length === 0 && (overviewApiSrc.match(/refetchInterval/g) ?? []).length === 0,
+);
+check(
+  "every new voice-platform query is gated on the same voicePlatformEnabled flag other pages use",
+  overviewApiSrc.includes('from "@/lib/featureFlags"') && (overviewApiSrc.match(/voicePlatformEnabled/g) ?? []).length >= 3,
 );
 
-// ─── 8. Routing and base-path helpers ──────────────────────────────────────
+// ─── 8. Routing and base-path helpers (unchanged shell) ────────────────────
 
 section("routing and base paths");
 
@@ -443,7 +384,7 @@ check(
 );
 check("the skip link targets the one main landmark", shellSrc.includes('href="#sd-main"') && shellSrc.includes('id="sd-main"'));
 
-// ─── 9. Navigation inventory ───────────────────────────────────────────────
+// ─── 9. Navigation inventory (unchanged; this session does not own nav.ts) ─
 
 section("navigation");
 
@@ -493,8 +434,13 @@ check(
   "the approved navigation architecture in lib/nav.ts is read, not redefined",
   navSrc.includes('from "../../lib/nav.js"') && !navSrc.includes("label: \"Conversations\""),
 );
+check(
+  "V5-BLUEPRINT.md §14 PR-5 registrations (Setup, Scheduling, Channels, Account) are not yet in nav.ts — reported to the nav owner, not added here",
+  !navSrc.includes('"/setup"') && !navSrc.includes('"/scheduling/'),
+);
 
-// ─── 10. Accessible current-page, drawer and focus behaviour ───────────────
+// ─── 10. Accessible current-page, drawer and focus behaviour (unchanged shell,
+//         two edits for the D-1 page structure) ────────────────────────────
 
 section("accessibility contracts");
 
@@ -524,13 +470,6 @@ check("Tab is confined to the open drawer", shellSrc.includes('if (event.key !==
 check("focus moves into the drawer on open", shellCode.includes("target?.focus()"));
 check("focus returns to the trigger on close", shellSrc.includes("triggerRef.current?.focus()"));
 check("a closed drawer is removed from the tab order", shellSrc.includes("rail.inert = !isDesktop && !drawerOpen"));
-
-// ── The drawer's own close control ─────────────────────────────────────────
-//
-// The top bar's open control cannot double as the close control: the drawer is
-// `position: fixed` over the top bar, so that button is painted behind an open
-// drawer, and it sits outside `railRef`, so the focus trap excludes it. The
-// way out has to live inside the drawer.
 
 const closeButton = /<button\s+ref=\{closeRef\}[\s\S]*?<\/button>/.exec(shellCode)?.[0] ?? "";
 
@@ -605,8 +544,12 @@ check(
 );
 check("the retry control re-runs the same query, adding no new request", pageSrc.includes("onClick={() => refetchConversations()}"));
 check(
-  "step completion is conveyed in text, not only by strike-through",
-  pageSrc.includes('{step.done ? " — done" : " — not done yet"}'),
+  // D-1: the setup checklist itself moved to the Setup hub (S-3), which
+  // conveys each step's status in text via <StatusChip> — see
+  // setupContract.test.ts. Overview's status is now the single receptionist
+  // state chip, and StatusChip always renders its label as visible text.
+  "the receptionist state is conveyed in text via StatusChip, not colour alone",
+  pageSrc.includes("<StatusChip") && read("artifacts/helpdesk/src/components/common/StatusChip.tsx").includes("{label}"),
 );
 check(
   "every interactive target in the shell CSS reserves at least 44px",
@@ -620,32 +563,34 @@ check(
     cssSrc.includes("transition-duration: 0.01ms !important"),
 );
 check(
-  "the heading order is h1 then h2 with no level skipped",
-  /<h1 className="sd-page__title">/.test(pageSrc) &&
-    !pageSrc.includes("<h4") &&
-    (pageSrc.match(/<h1/g) ?? []).length === 1,
+  // Overview.tsx now composes its title through the shared <PageHeader>
+  // (components/common/PageHeader.tsx) rather than writing the h1 itself, so
+  // the heading-order check reads that component's source instead.
+  "the heading order is h1 then h2 with no level skipped, via the shared PageHeader",
+  pageHeaderSrc.includes('<h1 className="sd-page__title">') &&
+    !pageCode.includes("<h1") &&
+    (pageCode.match(/<PageHeader/g) ?? []).length === 1 &&
+    !pageSrc.includes("<h4"),
 );
 
-// ─── 11. Product readiness is stated honestly and only once ────────────────
+// ─── 11. Product readiness — no stale claim on Overview itself ─────────────
 
 section("product readiness");
 
 check(
-  "the overview reads the shared readiness wording rather than restating it",
-  pageSrc.includes('from "@/pages/login/readiness"') &&
-    !pageSrc.includes('"Available now"') &&
-    !pageSrc.includes('"In development"') &&
-    !pageSrc.includes('"Planned"'),
+  // The three-tier capability ladder ("SMS Receptionist: Available now",
+  // "Voice experience: In development", …) is accurate on the public site and
+  // on sign-in, which describe the product in general. It stopped being
+  // accurate *here*: this build genuinely has a live voice platform behind
+  // `voicePlatformEnabled`, so telling a firm with a live receptionist that
+  // voice is "in development" would be the exact fabricated claim this
+  // product forbids. The ladder was removed from Overview for that reason —
+  // real, firm-specific status (the state chip, the assigned number, the
+  // calendar connection) replaces it. Sign-in and the public site are
+  // unaffected and still carry the shared wording, checked below.
+  "the capability ladder is no longer duplicated on Overview",
+  !pageCode.includes("CAPABILITY_STATUS") && !pageCode.includes("sd-ladder"),
 );
-for (const tier of [
-  '{ capability: "SMS Receptionist", tier: "available" }',
-  '{ capability: "Voice experience", tier: "in-development" }',
-  '{ capability: "Connected CRM and automated follow-up", tier: "planned" }',
-]) {
-  check(`the capability ladder still declares ${tier}`, readinessSrc.includes(tier));
-}
-// The public module carries an extra `note` field, so the two files are
-// compared on the labels themselves rather than on their surrounding syntax.
 for (const [tier, label] of [
   ["available", "Available now"],
   ["in-development", "In development"],
@@ -653,20 +598,10 @@ for (const [tier, label] of [
 ] as const) {
   const declaration = new RegExp(`"?${tier}"?:\\s*\\{[^}]*label:\\s*"${label}"`);
   check(
-    `the "${tier}" tier reads "${label}" in both the dashboard and the public site`,
+    `the "${tier}" tier still reads "${label}" wherever it is shown (sign-in and the public site)`,
     declaration.test(readinessSrc) && declaration.test(publicReadinessSrc),
   );
 }
-check(
-  "an unfinished capability is never presented as operable — its chip is not a control",
-  !/<(button|a)[^>]*className="sd-tier"/.test(pageSrc),
-);
-check(
-  "planned and in-development capabilities are styled muted, never mint",
-  cssSrc.includes('.sd-tier[data-tier="available"]') &&
-    cssSrc.includes("--sd-muted-text") &&
-    !cssSrc.includes('.sd-tier[data-tier="planned"] {\n  background: var(--sd-accent)'),
-);
 check(
   "the empty state names what happens next and where to change it",
   pageCode.includes("No conversations yet") &&
@@ -674,7 +609,7 @@ check(
     /Current SMS\s+Receptionist/.test(pageCode),
 );
 
-// ─── 12. Design tokens have not drifted from the approved system ───────────
+// ─── 12. Design tokens have not drifted from the approved system ──────────
 
 section("design tokens");
 
@@ -714,4 +649,4 @@ if (failures.length > 0) {
   for (const f of failures) console.log(`  - ${f}`);
   process.exit(1);
 }
-console.log("All Phase 7 dashboard contract tests passed.");
+console.log("All Overview (D-1) dashboard contract tests passed.");

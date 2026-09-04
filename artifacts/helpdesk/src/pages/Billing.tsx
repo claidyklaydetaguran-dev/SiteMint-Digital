@@ -58,10 +58,12 @@ import {
   CHECKOUT_TIMEOUT_MS,
   canUpgrade,
   checkoutCopy,
+  checkoutEnabled,
   checkoutLabel,
   checkoutUrl,
   isNotConfigured,
   LOADING_MESSAGE,
+  manualInvoicingCopy,
   METER_LABEL,
   nextView,
   pageCopy,
@@ -290,7 +292,24 @@ function PlanView({
         )}
       </section>
 
-      {eligible && (
+      {/* D-6: the private beta is billed manually by SiteMint. The Stripe
+          checkout control below stays fully built — CHECKOUT_PATH, its
+          mutation, its response handling and its copy are all unchanged —
+          but it is dead unless VITE_BILLING_CHECKOUT_ENABLED is explicitly
+          "true". An eligible trial account sees the manual-invoicing notice
+          instead, never a button wired to a disabled Stripe integration. */}
+      {eligible && !checkoutEnabled() && (
+        <section className="sd-section" aria-labelledby="sb-manual-title">
+          <div className="sd-section__head">
+            <h2 className="sd-h2" id="sb-manual-title">
+              {manualInvoicingCopy().title}
+            </h2>
+          </div>
+          <p className="sb-note">{manualInvoicingCopy().detail}</p>
+        </section>
+      )}
+
+      {eligible && checkoutEnabled() && (
         <section className="sd-section" aria-labelledby="sb-upgrade-title">
           <div className="sd-section__head">
             <h2 className="sd-h2" id="sb-upgrade-title">{copy.heading}</h2>
