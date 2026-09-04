@@ -1,0 +1,683 @@
+/**
+ * AI Receptionist V5 — page styles (§AiReceptionistV5.tsx).
+ *
+ * Scoped entirely under `.smv5`. References the `--sm-*` semantic tokens
+ * from V5-BLUEPRINT.md §2 (owned by the Brand & Design-System Lead in a
+ * parallel worktree); every use carries the documented literal as a CSS
+ * fallback so this page still renders correctly before `tokens-v5.css`
+ * lands. Mint is never used as small text on a light surface — links and
+ * labels use `--sm-mint-700`; amber is reserved for attention states only.
+ */
+
+.smv5 {
+  --smv5-mint-500: var(--sm-mint-500, #25d0b0);
+  --smv5-mint-400: var(--sm-mint-400, #4fd9cf);
+  --smv5-mint-600: var(--sm-mint-600, #16b597);
+  --smv5-mint-700: var(--sm-mint-700, #0e7f6b);
+  --smv5-mint-100: var(--sm-mint-100, #e6f9f3);
+  --smv5-mist-100: var(--sm-mist-100, #eefaf8);
+  --smv5-porcelain: var(--sm-porcelain, #f7fbf9);
+  --smv5-white: var(--sm-white, #ffffff);
+  --smv5-teal-900: var(--sm-teal-900, #0b3a3e);
+  --smv5-ink-950: var(--sm-ink-950, #0a2a2e);
+  --smv5-slate-600: var(--sm-slate-600, #526b70);
+  --smv5-slate-300: var(--sm-slate-300, #b9cbce);
+  --smv5-line: var(--sm-line, #d7e7e3);
+  --smv5-line-strong: var(--sm-line-strong, #b5d2cb);
+  --smv5-amber-600: var(--sm-amber-600, #b45309);
+  --smv5-amber-100: var(--sm-amber-100, #fff4de);
+  --smv5-red-600: var(--sm-red-600, #b42318);
+  --smv5-red-100: var(--sm-red-100, #fee4e2);
+  --smv5-green-700: var(--sm-green-700, #15803d);
+  --smv5-green-100: var(--sm-green-100, #dcfce7);
+  --smv5-radius-s: var(--sm-radius-s, 6px);
+  --smv5-radius-m: var(--sm-radius-m, 10px);
+  --smv5-radius-l: var(--sm-radius-l, 16px);
+  --smv5-radius-pill: var(--sm-radius-pill, 999px);
+  --smv5-shadow-1: var(--sm-shadow-1, 0 1px 2px rgb(11 58 62 / 0.06), 0 6px 20px rgb(11 58 62 / 0.06));
+  --smv5-shadow-2: var(--sm-shadow-2, 0 2px 6px rgb(11 58 62 / 0.08), 0 16px 40px rgb(11 58 62 / 0.1));
+  --smv5-font-display: var(--sm-font-display, "Space Grotesk", sans-serif);
+  --smv5-font-body: var(--sm-font-body, "DM Sans", sans-serif);
+  --smv5-ease-out: var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+
+  font-family: var(--smv5-font-body);
+  color: var(--smv5-teal-900);
+  background: var(--smv5-porcelain);
+}
+
+.smv5 * {
+  box-sizing: border-box;
+}
+
+.smv5 a {
+  color: var(--smv5-mint-700);
+}
+
+.smv5__container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.smv5__section {
+  padding: 80px 0;
+  border-top: 1px solid var(--smv5-line);
+}
+
+.smv5__section--tight {
+  padding: 56px 0;
+}
+
+.smv5__eyebrow {
+  display: inline-block;
+  font-family: var(--smv5-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--smv5-mint-700);
+  margin-bottom: 12px;
+}
+
+.smv5__h2 {
+  font-family: var(--smv5-font-display);
+  font-size: clamp(24px, 3vw, 32px);
+  line-height: 1.15;
+  margin: 0 0 16px;
+}
+
+.smv5__lede {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--smv5-slate-600);
+  max-width: 68ch;
+  margin: 0 0 32px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+
+.smv5-hero {
+  background: var(--smv5-ink-950);
+  color: var(--smv5-white);
+  padding: 96px 0 72px;
+}
+
+.smv5-hero__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--smv5-ink-950);
+  background: var(--smv5-mint-500);
+  border-radius: var(--smv5-radius-pill);
+  padding: 6px 14px;
+  margin-bottom: 24px;
+}
+
+.smv5-hero__grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 56px;
+  align-items: start;
+}
+
+.smv5-hero__title {
+  font-family: var(--smv5-font-display);
+  font-size: clamp(32px, 4.4vw, 52px);
+  line-height: 1.08;
+  margin: 0 0 20px;
+  max-width: 18ch;
+}
+
+.smv5-hero__sub {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #cfe9e4;
+  max-width: 56ch;
+  margin: 0 0 32px;
+}
+
+.smv5-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.smv5-hero__signin {
+  font-size: 14px;
+  color: #b6d9d3;
+}
+
+.smv5-hero__signin a {
+  color: var(--smv5-mint-400);
+  font-weight: 600;
+}
+
+.smv5-hero__media {
+  position: relative;
+  border-radius: var(--smv5-radius-l);
+  overflow: hidden;
+  background: #072022;
+  aspect-ratio: 16 / 10;
+  box-shadow: var(--smv5-shadow-2);
+}
+
+.smv5-hero__media video,
+.smv5-hero__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.smv5-hero__media-label {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: #cfe9e4;
+  background: rgb(10 42 46 / 0.72);
+  border-radius: var(--smv5-radius-s);
+  padding: 4px 8px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.smv5-btn {
+  font-family: var(--smv5-font-body);
+  font-weight: 600;
+  font-size: 15px;
+  border-radius: var(--smv5-radius-pill);
+  padding: 12px 22px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 160ms var(--smv5-ease-out), background 160ms var(--smv5-ease-out);
+  text-decoration: none;
+}
+
+.smv5-btn--primary {
+  background: var(--smv5-mint-500);
+  color: var(--smv5-ink-950);
+}
+
+.smv5-btn--primary:hover {
+  background: var(--smv5-mint-400);
+}
+
+.smv5-btn--outline {
+  background: transparent;
+  border-color: var(--smv5-slate-300);
+  color: inherit;
+}
+
+.smv5-hero .smv5-btn--outline {
+  border-color: #3a5f5c;
+  color: var(--smv5-white);
+}
+
+.smv5-btn--ghost {
+  background: transparent;
+  color: var(--smv5-mint-700);
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.smv5-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.smv5-btn:focus-visible {
+  outline: 3px solid color-mix(in oklab, var(--smv5-mint-500) 45%, transparent);
+  outline-offset: 2px;
+}
+
+/* ── Call theater ─────────────────────────────────────────────────────── */
+
+.smv5-theater {
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-l);
+  box-shadow: var(--smv5-shadow-1);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.smv5-theater__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--smv5-mint-700);
+  background: var(--smv5-mint-100);
+  border-radius: var(--smv5-radius-pill);
+  padding: 6px 12px;
+}
+
+.smv5-theater__voice {
+  width: 132px;
+  height: 132px;
+}
+
+.smv5-theater__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.smv5-theater__state {
+  font-family: var(--smv5-font-display);
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0;
+}
+
+.smv5-theater__timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--smv5-slate-600);
+  font-size: 13px;
+  margin: 0;
+}
+
+.smv5-theater__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.smv5-theater__chip {
+  font-size: 13px;
+  border: 1px solid var(--smv5-line-strong);
+  background: var(--smv5-porcelain);
+  color: var(--smv5-teal-900);
+  border-radius: var(--smv5-radius-pill);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.smv5-theater__chip[aria-pressed="true"] {
+  background: var(--smv5-mint-100);
+  border-color: var(--smv5-mint-500);
+  color: var(--smv5-mint-700);
+  font-weight: 600;
+}
+
+.smv5-theater__convo {
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  text-align: left;
+  background: var(--smv5-mist-100);
+  border-radius: var(--smv5-radius-m);
+  padding: 14px;
+}
+
+.smv5-theater__line {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+.smv5-theater__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.smv5-theater__disclose {
+  font-size: 12px;
+  color: var(--smv5-slate-600);
+  margin: 0;
+}
+
+/* ── Live demo panel ──────────────────────────────────────────────────── */
+
+.smv5-live {
+  background: var(--smv5-mist-100);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-m);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.smv5-live__badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--smv5-slate-600);
+  margin: 0;
+}
+
+.smv5-live__body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--smv5-slate-600);
+  margin: 0;
+}
+
+.smv5-live__countdown {
+  font-family: var(--smv5-font-display);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+/* ── Grids / cards ─────────────────────────────────────────────────────── */
+
+.smv5-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.smv5-card {
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-m);
+  padding: 22px;
+}
+
+.smv5-card h3 {
+  font-family: var(--smv5-font-display);
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+
+.smv5-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--smv5-slate-600);
+  margin: 0;
+}
+
+/* ── Readiness badges ─────────────────────────────────────────────────── */
+
+.smv5-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--smv5-radius-pill);
+  padding: 4px 10px;
+  margin-bottom: 10px;
+}
+
+.smv5-badge--available {
+  background: var(--smv5-green-100);
+  color: var(--smv5-green-700);
+}
+
+.smv5-badge--beta {
+  background: var(--smv5-mint-100);
+  color: var(--smv5-mint-700);
+}
+
+.smv5-badge--development {
+  background: var(--smv5-amber-100);
+  color: var(--smv5-amber-600);
+}
+
+.smv5-badge--planned {
+  background: var(--smv5-mist-100);
+  color: var(--smv5-slate-600);
+  border: 1px solid var(--smv5-line-strong);
+}
+
+/* ── Journey / setup steps ────────────────────────────────────────────── */
+
+.smv5-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.smv5-steps--horizontal {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.smv5-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.smv5-step__num {
+  font-family: var(--smv5-font-display);
+  font-weight: 700;
+  color: var(--smv5-mint-700);
+  font-size: 14px;
+}
+
+.smv5-step p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--smv5-slate-600);
+}
+
+/* ── Examples (simulated exchanges) ───────────────────────────────────── */
+
+.smv5-example {
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-m);
+  padding: 20px;
+}
+
+.smv5-example__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--smv5-slate-600);
+  margin-bottom: 10px;
+}
+
+.smv5-example p {
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 8px;
+}
+
+/* ── Illustration placeholder ─────────────────────────────────────────── */
+
+.smv5-illustration {
+  border: 1px dashed var(--smv5-line-strong);
+  border-radius: var(--smv5-radius-m);
+  background: var(--smv5-mist-100);
+  color: var(--smv5-slate-600);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  text-align: center;
+  padding: 24px;
+}
+
+/* ── Privacy callout ───────────────────────────────────────────────────── */
+
+.smv5-privacy {
+  background: var(--smv5-mint-100);
+  border-radius: var(--smv5-radius-m);
+  padding: 24px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--smv5-teal-900);
+  max-width: 68ch;
+}
+
+/* ── FAQ ───────────────────────────────────────────────────────────────── */
+
+.smv5-faq {
+  display: grid;
+  gap: 12px;
+}
+
+.smv5-faq details {
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-m);
+  padding: 16px 20px;
+}
+
+.smv5-faq summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--smv5-font-display);
+}
+
+.smv5-faq p {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--smv5-slate-600);
+}
+
+/* ── Beta request form ─────────────────────────────────────────────────── */
+
+.smv5-beta__form {
+  display: grid;
+  gap: 16px;
+  max-width: 480px;
+}
+
+.smv5-field {
+  display: grid;
+  gap: 6px;
+}
+
+.smv5-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.smv5-field__optional {
+  font-weight: 400;
+  color: var(--smv5-slate-600);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.smv5-field input,
+.smv5-field textarea {
+  font-family: var(--smv5-font-body);
+  font-size: 15px;
+  border: 1px solid var(--smv5-line-strong);
+  border-radius: var(--smv5-radius-s);
+  padding: 10px 12px;
+  background: var(--smv5-white);
+  color: var(--smv5-teal-900);
+}
+
+.smv5-field input:focus-visible,
+.smv5-field textarea:focus-visible {
+  outline: 3px solid color-mix(in oklab, var(--smv5-mint-500) 45%, transparent);
+  outline-offset: 1px;
+  border-color: var(--smv5-mint-500);
+}
+
+.smv5-field__error {
+  font-size: 12px;
+  color: var(--smv5-red-600);
+  margin: 0;
+}
+
+.smv5-beta__error {
+  background: var(--smv5-red-100);
+  color: var(--smv5-red-600);
+  border-radius: var(--smv5-radius-s);
+  padding: 10px 14px;
+  font-size: 14px;
+  margin: 0;
+}
+
+.smv5-beta__success {
+  background: var(--smv5-mint-100);
+  border-radius: var(--smv5-radius-m);
+  padding: 24px;
+  max-width: 480px;
+}
+
+.smv5-beta__success h3 {
+  font-family: var(--smv5-font-display);
+  margin: 0 0 8px;
+}
+
+.smv5-beta__success p {
+  margin: 0;
+  color: var(--smv5-teal-900);
+}
+
+/* Honeypot: visually hidden, off the tab order (tabIndex=-1 on the input), never shown to a sighted or screen-reader user. */
+.smv5-honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── Use-case grid ─────────────────────────────────────────────────────── */
+
+.smv5-usecase h3 {
+  font-family: var(--smv5-font-display);
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.smv5-usecase p {
+  font-size: 13px;
+  color: var(--smv5-slate-600);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ── Final CTA band ───────────────────────────────────────────────────── */
+
+.smv5-cta-band {
+  background: var(--smv5-ink-950);
+  color: var(--smv5-white);
+}
+
+.smv5-cta-band .smv5__lede {
+  color: #cfe9e4;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  .smv5-hero__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .smv5__section {
+    padding: 56px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smv5-btn {
+    transition: none;
+  }
+}
