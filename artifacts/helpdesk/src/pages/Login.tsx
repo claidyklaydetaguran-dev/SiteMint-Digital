@@ -56,6 +56,9 @@ import {
 import { CAPABILITY_STATUS, READINESS } from "./login/readiness";
 import "@/styles/v2-signin.css";
 import "@/styles/v3-app.css";
+// Frontend V4 Signal retheme — token-value override one layer above V3.
+// ROLLBACK: remove this import to restore the V3 appearance.
+import "@/styles/v4-app.css";
 
 /**
  * The public marketing surfaces this page links back out to. Both are in the

@@ -30,6 +30,33 @@
 @import "./styles/v3-pages.css";
 /* Frontend V3 Phase 5: SiteMint Operations (internal /admin*) chrome. */
 @import "./styles/v3-ops.css";
+/* Frontend V4 "Signal" Phase 1: the four self-hosted type voices (approved
+   system, owner decision D5). Static woff2 subsets via @fontsource,
+   font-display: swap — same-origin only, no remote font host. */
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/400-italic.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/newsreader/400-italic.css";
+/* Frontend V4 Phase 1: Signal tokens + the .v4-shell remap of the V3 role
+   system. Loaded after V3; changes no V2/V3 pixel until a route opts into
+   chrome="v4". */
+@import "./styles/tokens-v4.css";
+/* Frontend V4 Phase 1: Signal public chrome (header, panel, sheet, footer). */
+@import "./styles/v4-chrome.css";
+/* Frontend V4 Phase 2: homepage presentation + shared V4 marketing
+   vocabulary (sections, reveal, journey, pillars, CTA band). */
+@import "./styles/v4-home.css";
+/* Frontend V4 Phase 3: AI Receptionist landing + staging-preview theater. */
+@import "./styles/v4-air.css";
+/* Frontend V4 Phase 4: Signal skin for the retained signup auth surface. */
+@import "./styles/v4-auth.css";
+/* Frontend V4 Phase 5: SiteMint Operations (internal /admin*) Signal skin. */
+@import "./styles/v4-ops.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";

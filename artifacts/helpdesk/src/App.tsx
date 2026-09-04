@@ -6,10 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComingSoon } from "@/components/common/ComingSoon";
+import { VoiceUnavailable } from "@/components/common/VoiceUnavailable";
 import { NAV_GROUPS } from "@/lib/nav";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAssistantSessionGuard } from "@/hooks/useAssistants";
-import { ROUTER_BASE, ROUTES } from "@/lib/routes";
+import { ROUTER_BASE, ROUTES, VOICE_CAPABILITY_PATHS } from "@/lib/routes";
 import { voiceRoutePages } from "@/routes/voiceRoutes";
 import { DashboardShell } from "@/shells/DashboardShell";
 import { AuthShell } from "@/shells/AuthShell";
@@ -77,6 +78,14 @@ const comingSoonRoutes = voicePlatformEnabled
     )
   : [];
 
+// R1: when the voice platform flag is off, the three live voice paths get an
+// intentional capability state instead of the 404. The paths come from the
+// always-bundled route table — deliberately NOT from the voice nav metadata,
+// which the AR-001M content boundary forbids a disabled build from emitting.
+const voiceUnavailablePaths = voicePlatformEnabled
+  ? []
+  : VOICE_CAPABILITY_PATHS;
+
 function Router() {
   return (
     <Switch>
@@ -120,6 +129,19 @@ function Router() {
                 <Route path={ROUTES.appointments} component={Appointments} />
               </>
             )}
+            {/* R1 capability states: when the voice platform is NOT enabled, the
+                three live voice paths render a neutral capability state
+                instead of the 404. Navigation visibility still follows the
+                committed policy (nothing appears in the rail), no action is
+                exposed, no backend enablement is implied — and the page stays
+                inside the AR-001M content boundary: no voice-gated labels,
+                descriptions, nav-only hrefs, or gated-only icons enter the
+                disabled bundle. */}
+            {voiceUnavailablePaths.map((path) => (
+              <Route key={path} path={path}>
+                <VoiceUnavailable />
+              </Route>
+            ))}
             {comingSoonRoutes.map((item) => (
               <Route key={item.key} path={item.href!}>
                 <ComingSoon

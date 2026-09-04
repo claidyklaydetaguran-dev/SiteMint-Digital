@@ -51,6 +51,9 @@ import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboard
 import { planLabel } from "@/pages/settings/settingsContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v3-app.css";
+// Frontend V4 Signal retheme — token-value override one layer above V3.
+// ROLLBACK: remove this import to restore the V3 appearance.
+import "@/styles/v4-app.css";
 
 const DESKTOP_QUERY = "(min-width: 64rem)";
 

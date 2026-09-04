@@ -1,0 +1,130 @@
+/**
+ * Frontend V4 — the Signal retheme of the customer dashboard and sign-in.
+ *
+ * Same mechanism as the committed V3 layer (v3-app.css), one layer later:
+ * a pure token-value override inside the existing `.sd-app` / `.si-page`
+ * scopes. The V2 files keep their markup hooks and literal declarations —
+ * the committed contract tests keep asserting those literals — and this
+ * file re-points the palette, type, and geometry to the approved V4 Signal
+ * system (reference design/sitemint-v4-signal-experience @ 086d52f).
+ *
+ * Accent discipline: cyan #22D3EE is the accent; #0E7490 carries focus and
+ * accents on light surfaces (5.36:1 on white); amber stays warnings-only.
+ *
+ * Doubled class selectors keep the override order-proof. This file is
+ * imported AFTER v3-app.css by the same modules (AppShell.tsx, Login.tsx).
+ * ROLLBACK: remove the v4-app.css imports to restore the V3 appearance
+ * byte-for-byte.
+ */
+
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/* Metric-matched fallback faces (R1 font-CLS fix) — values derived from
+   @capsizecss/metrics; same definitions as web-agency tokens-v4.css. */
+@font-face {
+  font-family: "DM Sans Fallback";
+  src: local("Arial");
+  size-adjust: 104.53%;
+  ascent-override: 94.9%;
+  descent-override: 29.66%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial");
+  size-adjust: 109.69%;
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+}
+
+.sd-app.sd-app {
+  /* ── V4 palette through the V2 token names the roles read ────────────── */
+  --v2-warm-white: #f4f8fb; /* cloud canvas */
+  --v2-offwhite: #edf3f8;
+  --v2-mint-mist: #e7f4f8;
+  --v2-mint-100: #d9eef4;
+  --v2-mint-500: #22d3ee;
+  --v2-navy-900: #071324;
+  --v2-navy-700: #0d2440;
+  --v2-slate-500: #46617a;
+
+  /* ── Role refinements ────────────────────────────────────────────────── */
+  --sd-border: rgba(7, 19, 36, 0.09);
+  --sd-border-strong: rgba(7, 19, 36, 0.2);
+
+  /* The ink rail and everything printed on it. */
+  --sd-rail: #071324;
+  --sd-rail-text: #e7f4f8;
+  --sd-rail-muted: #93aec4;
+  --sd-rail-border: rgba(231, 244, 248, 0.12);
+  --sd-rail-hover: rgba(231, 244, 248, 0.07);
+  --sd-rail-active: rgba(34, 211, 238, 0.14);
+  --sd-rail-accent: #22d3ee;
+
+  /* Focus ring needs the deep cyan for contrast on light surfaces. */
+  --sd-focus-color: #0e7490;
+
+  /* V4 geometry: 8px controls, 12px cards inside the dense app. */
+  --sd-radius-control: 8px;
+  --sd-radius-card: 12px;
+
+  /* V4 operational voice. */
+  --sd-font: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark counterpart stays in the ink family, V4 hues. */
+:where(.dark) .sd-app.sd-app {
+  --sd-canvas: #081627;
+  --sd-surface: #0d2440;
+  --sd-surface-alt: #0b1f38;
+  --sd-surface-accent: #143354;
+  --sd-text: #e7f4f8;
+  --sd-text-muted: #93aec4;
+  --sd-border: rgba(231, 244, 248, 0.12);
+  --sd-border-strong: rgba(231, 244, 248, 0.24);
+
+  --sd-accent: #22d3ee;
+  --sd-accent-soft: rgba(34, 211, 238, 0.14);
+
+  --sd-rail: #050e1c;
+
+  --sd-muted-surface: rgba(231, 244, 248, 0.05);
+  --sd-muted-text: #8fa9c0;
+
+  --sd-focus-color: #22d3ee;
+}
+
+/* ── Sign-in page (its own scope, its own token copies) ─────────────────── */
+.si-page.si-page {
+  --v2-warm-white: #f4f8fb;
+  --v2-offwhite: #ffffff;
+  --v2-mint-mist: #e7f4f8;
+  --v2-mint-100: #d9eef4;
+  --v2-mint-500: #22d3ee;
+  --v2-navy-900: #071324;
+  --v2-navy-700: #0d2440;
+  --v2-slate-500: #46617a;
+  --v2-radius-control: 8px;
+  --v2-radius-card: 12px;
+  --v2-font-sans: "DM Sans", "DM Sans Fallback", "Geist", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Display voice for app headings — scoped, additive, no literal changes to
+   the V2 sheets. */
+.sd-app.sd-app h1,
+.sd-app.sd-app h2,
+.si-page.si-page h1 {
+  font-family: "Space Grotesk", "Space Grotesk Fallback", "DM Sans",
+    "DM Sans Fallback", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}

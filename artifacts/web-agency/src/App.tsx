@@ -26,9 +26,12 @@ import { DashboardShell } from "@/shells/DashboardShell";
  */
 
 // ── Public marketing ────────────────────────────────────────────────────────
-// Frontend V3 Phase 2: the Operational Editorial public site. V2 pages are
-// retained as rollback references — ROLLBACK: swap HomeV3 back to HomeV2 (and
-// chrome="v3" back to chrome="v2") to revert instantly.
+// Frontend V4 "Signal" (owner-approved implementation): the homepage renders
+// HomeV4 under chrome="v4". V3 pages remain routed under the V4 chrome (the
+// .v4-shell token remap re-skins their vocabulary); V3 components stay
+// untouched as the rollback layer — ROLLBACK: swap HomeV4 back to HomeV3 and
+// chrome="v4" back to "v3" to revert instantly.
+const HomeV4 = lazy(() => import("@/pages/HomeV4"));
 const HomeV3 = lazy(() => import("@/pages/HomeV3"));
 const ServicesV3 = lazy(() => import("@/pages/ServicesV3"));
 const WebsitesAppsV3 = lazy(() => import("@/pages/WebsitesAppsV3"));
@@ -60,9 +63,10 @@ const DiscoveryPage = lazy(() => import("@/pages/DiscoveryPage"));
 const Discovery = lazy(() => import("@/pages/Discovery"));
 
 // ── AI Receptionist public journey ──────────────────────────────────────────
-// Frontend V3 Phase 3: the Voice Theater landing. The V2 page stays imported
-// as a rollback reference — ROLLBACK: swap AiReceptionistV3 back to
-// AiReceptionist (and chrome="v3" back to "v2") to revert instantly.
+// Frontend V4: the capability-honest Signal landing. V3 Voice Theater and the
+// V2 page stay imported as rollback references — ROLLBACK: swap
+// AiReceptionistV4 back to AiReceptionistV3 (chrome="v3") to revert instantly.
+const AiReceptionistV4 = lazy(() => import("@/pages/AiReceptionistV4"));
 const AiReceptionistV3 = lazy(() => import("@/pages/AiReceptionistV3"));
 const AiReceptionist = lazy(() => import("@/pages/AiReceptionist"));
 const LandingReceptionist = lazy(() => import("@/pages/LandingReceptionist"));
@@ -225,7 +229,7 @@ function Router() {
           that a later phase still owns. */}
       <Route path={ROUTES.thankYou}>
         {() => (
-          <PublicShell routeLabel="Thank you" chrome="v3">
+          <PublicShell routeLabel="Thank you" chrome="v4">
             <ThankYou />
           </PublicShell>
         )}
@@ -260,8 +264,8 @@ function Router() {
       </Route>
       <Route path={ROUTES.aiReceptionist}>
         {() => (
-          <PublicShell routeLabel="AI Receptionist" chrome="v3" heroTone="ink">
-            <AiReceptionistV3 />
+          <PublicShell routeLabel="AI Receptionist" chrome="v4" heroTone="ink">
+            <AiReceptionistV4 />
           </PublicShell>
         )}
       </Route>
@@ -292,77 +296,77 @@ function Router() {
           that V3 replaced stay imported above as rollback references. */}
       <Route path={ROUTES.home}>
         {() => (
-          <PublicShell routeLabel="The homepage" chrome="v3" heroTone="ink">
-            <HomeV3 />
+          <PublicShell routeLabel="The homepage" chrome="v4" heroTone="ink">
+            <HomeV4 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.services}>
         {() => (
-          <PublicShell routeLabel="Services" chrome="v3">
+          <PublicShell routeLabel="Services" chrome="v4">
             <ServicesV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.websitesApps}>
         {() => (
-          <PublicShell routeLabel="Websites & Web Apps" chrome="v3">
+          <PublicShell routeLabel="Websites & Web Apps" chrome="v4">
             <WebsitesAppsV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.discoverySystems}>
         {() => (
-          <PublicShell routeLabel="Discovery Systems" chrome="v3">
+          <PublicShell routeLabel="Discovery Systems" chrome="v4">
             <DiscoverySystemsV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.automation}>
         {() => (
-          <PublicShell routeLabel="Workflow Automation" chrome="v3">
+          <PublicShell routeLabel="Workflow Automation" chrome="v4">
             <AutomationV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.workV3}>
         {() => (
-          <PublicShell routeLabel="Our work" chrome="v3">
+          <PublicShell routeLabel="Our work" chrome="v4">
             <WorkV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.process}>
         {() => (
-          <PublicShell routeLabel="Process" chrome="v3">
+          <PublicShell routeLabel="Process" chrome="v4">
             <ProcessV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.insights}>
         {() => (
-          <PublicShell routeLabel="Insights" chrome="v3">
+          <PublicShell routeLabel="Insights" chrome="v4">
             <InsightsV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.start}>
         {() => (
-          <PublicShell routeLabel="Start with SiteMint" chrome="v3">
+          <PublicShell routeLabel="Start with SiteMint" chrome="v4">
             <StartV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.privacy}>
         {() => (
-          <PublicShell routeLabel="Privacy" chrome="v3">
+          <PublicShell routeLabel="Privacy" chrome="v4">
             <LegalPrivacyV3 />
           </PublicShell>
         )}
       </Route>
       <Route path={ROUTES.terms}>
         {() => (
-          <PublicShell routeLabel="Terms" chrome="v3">
+          <PublicShell routeLabel="Terms" chrome="v4">
             <LegalTermsV3 />
           </PublicShell>
         )}
@@ -371,7 +375,7 @@ function Router() {
           working. */}
       <Route path={ROUTES.work}>
         {() => (
-          <PublicShell routeLabel="Our work" chrome="v3">
+          <PublicShell routeLabel="Our work" chrome="v4">
             <WorkV3 />
           </PublicShell>
         )}
@@ -386,8 +390,8 @@ function Router() {
       </Route>
       <Route path={ROUTES.about}>
         {() => (
-          <PublicShell routeLabel="About">
-            <PlatformAboutPreview />
+          <PublicShell routeLabel="Company" chrome="v4">
+            <AboutV3 />
           </PublicShell>
         )}
       </Route>
@@ -402,7 +406,7 @@ function Router() {
       {/* 404 — V3 chrome. CONTENT-SPECIFICATION.md §7: never a blank screen. */}
       <Route>
         {() => (
-          <PublicShell routeLabel="This page" chrome="v3">
+          <PublicShell routeLabel="This page" chrome="v4">
             <NotFound />
           </PublicShell>
         )}
