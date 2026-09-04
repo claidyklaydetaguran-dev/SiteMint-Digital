@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DiscoveryStepNavigationProps {
   currentStep: number;
@@ -7,6 +8,8 @@ interface DiscoveryStepNavigationProps {
   onBack: () => void;
   onContinue: () => void;
   onStartOver: () => void;
+  /** Extra classes on the outer row — the shell uses this to apply the mobile sticky-footer treatment. */
+  className?: string;
 }
 
 export function DiscoveryStepNavigation({
@@ -15,16 +18,17 @@ export function DiscoveryStepNavigation({
   onBack,
   onContinue,
   onStartOver,
+  className,
 }: DiscoveryStepNavigationProps) {
   const isFirstStep = currentStep === 0;
   const isReviewStep = currentStep === totalSteps - 1;
 
   return (
-    <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <Button type="button" variant="ghost" onClick={onStartOver}>
+    <div className={cn("flex items-center justify-between gap-2 sm:gap-3", className)}>
+      <Button type="button" variant="ghost" size="sm" onClick={onStartOver} className="shrink-0 text-sm">
         Start Over
       </Button>
-      <div className="flex gap-3">
+      <div className="flex shrink-0 gap-2 sm:gap-3">
         {!isFirstStep && (
           <Button type="button" variant="outline" onClick={onBack}>
             <ArrowLeft />

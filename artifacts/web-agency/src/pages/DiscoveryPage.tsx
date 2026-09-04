@@ -17,6 +17,7 @@
  * /discovery/__legacy).
  */
 import "@/styles/platform-preview.css";
+import "@/components/platform-discovery/discovery-v5.css";
 import { useEffect } from "react";
 import { PlatformDiscoveryShell } from "@/components/platform-discovery/PlatformDiscoveryShell";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
@@ -39,7 +40,7 @@ export default function DiscoveryPage() {
   }, []);
 
   return (
-    <div className="platform-preview flex min-h-[100dvh] flex-col bg-[hsl(var(--sm-color-bg-canvas))] text-[hsl(var(--sm-color-text-primary))]">
+    <div className="platform-preview discovery-v5 flex min-h-[100dvh] flex-col bg-[hsl(var(--sm-color-bg-canvas))] text-[hsl(var(--sm-color-text-primary))]">
       <a href="#discovery-main-content" className="pp-skip-link">
         Skip to content
       </a>
@@ -52,7 +53,7 @@ export default function DiscoveryPage() {
           backgroundColor: "hsl(var(--sm-color-bg-canvas))",
         }}
       >
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[76rem] items-center justify-between px-4 py-3 sm:px-6">
           <a href="/" aria-label="SiteMint Digital — back to home" className="flex items-center gap-2.5">
             <SiteMintLogo className="h-7 w-auto" />
           </a>

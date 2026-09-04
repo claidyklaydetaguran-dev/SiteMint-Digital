@@ -178,12 +178,15 @@ export function DecisionContextStep() {
           control={control}
           name="decisionContext.secondaryGoals"
           render={({ field }) => (
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="dv5-option-grid dv5-option-grid--2col mt-2">
               {PROJECT_GOALS.map((goal) => {
                 const current = field.value ?? [];
                 const checked = current.includes(goal);
                 return (
-                  <label key={goal} className="flex items-center gap-2 text-sm">
+                  <label
+                    key={goal}
+                    className={"dv5-option-card" + (checked ? " dv5-option-card--selected" : "")}
+                  >
                     <Checkbox
                       checked={checked}
                       onCheckedChange={(isChecked) => {

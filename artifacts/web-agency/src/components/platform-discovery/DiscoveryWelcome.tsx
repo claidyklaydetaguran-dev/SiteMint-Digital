@@ -29,7 +29,7 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path
             d="M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"
-            stroke="hsl(var(--sm-mint-500))"
+            stroke="hsl(var(--sm-mint-700))"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -38,7 +38,7 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
       </div>
 
       {/* Headline */}
-      <h1 className="text-3xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))] leading-tight">
+      <h1 className="pp-font-display text-3xl font-semibold text-[hsl(var(--sm-color-text-primary))] leading-tight">
         Tell us what you're building
       </h1>
       <p className="mt-3 text-base leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">
@@ -54,7 +54,7 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
           backgroundColor: "hsl(var(--sm-color-bg-subtle))",
         }}
       >
-        <Clock size={15} aria-hidden="true" className="shrink-0 text-[hsl(var(--sm-mint-500))]" />
+        <Clock size={15} aria-hidden="true" className="shrink-0 text-[hsl(var(--sm-mint-700))]" />
         <span className="text-[hsl(var(--sm-color-text-secondary))]">
           <strong className="font-semibold text-[hsl(var(--sm-color-text-primary))]">About 10–15 minutes.</strong>{" "}
           Your progress is saved automatically so you can come back anytime.
@@ -70,7 +70,7 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
               <CheckCircle
                 size={15}
                 aria-hidden="true"
-                className="mt-0.5 shrink-0 text-[hsl(var(--sm-mint-500))]"
+                className="mt-0.5 shrink-0 text-[hsl(var(--sm-mint-700))]"
               />
               {item}
             </li>

@@ -14,6 +14,7 @@ import {
 } from "./discoveryFormModel";
 import type { DiscoverySubmissionContract } from "@workspace/discovery-contract";
 import { DiscoveryProgress, STEP_LABELS, TOTAL_STEPS } from "./DiscoveryProgress";
+import { DiscoveryStepRail } from "./DiscoveryStepRail";
 import { DiscoveryStepNavigation } from "./DiscoveryStepNavigation";
 import { DiscoveryValidationSummary } from "./DiscoveryValidationSummary";
 import { DiscoveryReview } from "./DiscoveryReview";
@@ -219,15 +220,16 @@ export function PlatformDiscoveryShell() {
 
   if (submitState.kind === "done") {
     const isDuplicate = submitState.outcome.kind === "duplicate";
+    const reference = submitState.outcome.reference;
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6" aria-live="polite">
         <span
           className="pp-check-pop mx-auto flex h-14 w-14 items-center justify-center rounded-full"
           style={{ backgroundColor: "hsl(var(--sm-mint-100))" }}
         >
-          <CheckCircle2 size={28} aria-hidden="true" className="text-[hsl(var(--sm-mint-500))]" />
+          <CheckCircle2 size={28} aria-hidden="true" className="text-[hsl(var(--sm-mint-700))]" />
         </span>
-        <h1 className="mt-5 text-2xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))]">
+        <h1 className="pp-font-display mt-5 text-2xl font-semibold text-[hsl(var(--sm-color-text-primary))]">
           You're all set — we'll be in touch soon
         </h1>
         <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))] leading-relaxed">
@@ -235,6 +237,19 @@ export function PlatformDiscoveryShell() {
             ? "This brief was already received — no need to resubmit. Our team will review your answers and reach out within 24–48 hours with a personalized scope of work and proposal."
             : "Thank you for taking the time to walk us through your project. Our team will review your answers and reach out within 24–48 hours with a personalized scope of work and proposal."}
         </p>
+
+        {reference && (
+          <div className="dv5-reference-block text-left sm:text-center">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--sm-color-text-secondary))]">
+              Your submission reference
+            </p>
+            <p className="dv5-reference-value mt-1">{reference}</p>
+            <p className="mt-1 text-xs text-[hsl(var(--sm-color-text-muted))]">
+              Save this in case you need to reference your brief when we talk.
+            </p>
+          </div>
+        )}
+
         <div
           className="mt-8 rounded-lg border p-5 text-left"
           style={{
@@ -251,7 +266,7 @@ export function PlatformDiscoveryShell() {
             ].map((step, i) => (
               <li key={step} className="flex items-start gap-2.5 text-sm text-[hsl(var(--sm-color-text-secondary))]">
                 <span
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[hsl(var(--sm-mint-500))]"
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[hsl(var(--sm-mint-700))]"
                   style={{ backgroundColor: "hsl(var(--sm-mint-100))" }}
                   aria-hidden="true"
                 >
@@ -287,7 +302,7 @@ export function PlatformDiscoveryShell() {
   if (submitState.kind === "error" && submitState.outcome.kind === "service_unavailable") {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6" aria-live="polite">
-        <h1 className="text-2xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))]">
+        <h1 className="pp-font-display text-2xl font-semibold text-[hsl(var(--sm-color-text-primary))]">
           Submissions are not open yet
         </h1>
         <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))] leading-relaxed">
@@ -298,7 +313,7 @@ export function PlatformDiscoveryShell() {
           <a
             href={`mailto:${SUPPORT_EMAIL}`}
             className="inline-flex h-10 items-center rounded-md px-5 text-sm font-medium text-white transition-colors"
-            style={{ backgroundColor: "hsl(var(--sm-mint-500))" }}
+            style={{ backgroundColor: "hsl(var(--sm-mint-700))" }}
           >
             Email {SUPPORT_EMAIL}
           </a>
@@ -323,56 +338,65 @@ export function PlatformDiscoveryShell() {
 
   return (
     <FormProvider {...form}>
-      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+      <div className="dv5-shell px-4 py-8 sm:px-6 md:py-12">
         <div aria-live="polite" className="sr-only">
           {announcement}
         </div>
 
-        <DiscoveryProgress currentStep={currentStep} />
+        <div className="dv5-grid">
+          <DiscoveryStepRail currentStep={currentStep} />
 
-        <h2
-          ref={headingRef}
-          tabIndex={-1}
-          className="mb-6 text-2xl font-serif font-bold text-[hsl(var(--sm-color-text-primary))] outline-none"
-        >
-          {STEP_LABELS[currentStep]}
-        </h2>
+          <div className="dv5-workspace">
+            <div className="dv5-mobile-progress">
+              <DiscoveryProgress currentStep={currentStep} />
+            </div>
 
-        {currentStep < REVIEW_STEP_INDEX && (
-          <DiscoveryValidationSummary
-            stepKey={STEP_FIELD_PATHS[currentStep]}
-            errors={form.formState.errors}
-            onFocusField={handleFocusField}
-          />
-        )}
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="pp-font-display mb-6 text-2xl font-semibold text-[hsl(var(--sm-color-text-primary))] outline-none md:mb-4 md:text-xs md:font-semibold md:uppercase md:tracking-wide md:text-[hsl(var(--sm-color-text-secondary))]"
+            >
+              {STEP_LABELS[currentStep]}
+            </h2>
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-          }}
-        >
-          <div key={currentStep} className="pp-reveal">
-            {currentStep < REVIEW_STEP_INDEX ? (
-              <StepComponent />
-            ) : (
-              <DiscoveryReview
-                values={form.getValues()}
-                onEditStep={handleEditStep}
-                onCompletePreview={handleCompletePreview}
-                submitting={submitState.kind === "submitting"}
-                errorMessage={submitState.kind === "error" ? submitState.outcome.message : undefined}
+            {currentStep < REVIEW_STEP_INDEX && (
+              <DiscoveryValidationSummary
+                stepKey={STEP_FIELD_PATHS[currentStep]}
+                errors={form.formState.errors}
+                onFocusField={handleFocusField}
               />
             )}
-          </div>
 
-          <DiscoveryStepNavigation
-            currentStep={currentStep}
-            totalSteps={TOTAL_STEPS}
-            onBack={handleBack}
-            onContinue={handleContinue}
-            onStartOver={handleStartOver}
-          />
-        </form>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+              }}
+            >
+              <div key={currentStep} className="dv5-step-panel">
+                {currentStep < REVIEW_STEP_INDEX ? (
+                  <StepComponent />
+                ) : (
+                  <DiscoveryReview
+                    values={form.getValues()}
+                    onEditStep={handleEditStep}
+                    onCompletePreview={handleCompletePreview}
+                    submitting={submitState.kind === "submitting"}
+                    errorMessage={submitState.kind === "error" ? submitState.outcome.message : undefined}
+                  />
+                )}
+              </div>
+
+              <DiscoveryStepNavigation
+                currentStep={currentStep}
+                totalSteps={TOTAL_STEPS}
+                onBack={handleBack}
+                onContinue={handleContinue}
+                onStartOver={handleStartOver}
+                className="dv5-nav"
+              />
+            </form>
+          </div>
+        </div>
       </div>
     </FormProvider>
   );
