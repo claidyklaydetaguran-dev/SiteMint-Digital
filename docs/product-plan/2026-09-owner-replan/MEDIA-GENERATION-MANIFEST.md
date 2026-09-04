@@ -46,6 +46,31 @@ Subtotal B: max ask **3,900 credits** (Kling path). Seedance-Pro escalation woul
 | OPT-04 | Receptionist use-cases — six small industry vignettes | image ×6 | Seedream auto | 600 | No |
 | OPT-05 | Seedance Mini 720p variant of VID-01 for tablet | video | Seedance Mini | 1,400 | No |
 
+## A2. People, context, and interface imagery (added per 2026-09-05 directive §12)
+
+> The owner asked for “people actively doing the work”, product/interface imagery,
+> contextual backgrounds, and team imagery. Honesty constraints: generated people are
+> **illustrative workplace scenes**, never captioned as SiteMint staff or clients; real
+> team imagery must be actual photographs supplied by the owner — we will not generate
+> fake “team” photos. Interface imagery costs zero credits: we capture the real product.
+
+| ID | Purpose | Type | Size / AR | Use | Prompt direction | Model | Tries | Max ask | Fallback | Blocks? |
+|---|---|---|---|---|---|---|---|---|---|---|
+| IMG-08 | Work-in-motion editorial set — 3 scenes (front-desk answering a call, owner reviewing a project brief on screen, tradesperson confirming an appointment on mobile) | image ×3 | 1600×1067 | Home, Services, Work | “candid over-shoulder workplace scene, cool natural light, blue-mint accent tones, shallow depth, faces soft/averted, no readable text” | Seedream (auto) | 5 | 500 | current CSS compositions | Publication-nice, not preview-blocking |
+| IMG-09 | Contextual background set — 4 quiet ambient surfaces (desk texture, glass reflection, soft architecture, cool gradient atmosphere) | image ×4 | 2400×1200 | section backdrops site-wide | “minimal ambient background, porcelain-to-mint gradient light, out-of-focus, no subjects, no text” | Seedream (auto) | 5 | 500 | flat token backgrounds | No |
+| IMG-10 | Product/interface imagery — real dashboard, scheduling, calls and ops screens framed in device/browser chrome | capture ×6+ | native | Home, Receptionist, Services | **0 credits** — captured from the owner preview (synthetic data labeled), composed in CSS device frames | — | — | 0 | already partly live | No |
+| IMG-11 | Team imagery | photo | — | Company | **not generated** — requires real photographs from the owner; page ships with the workspace texture (IMG-07) until supplied | — | — | 0 | IMG-07 band | Company-page polish only |
+
+Subtotal A2: max ask **1,000 credits** (all images; interface + team cost nothing).
+
 ## Consolidated recommendation (one option)
 
-**Approve 5,800 credits total: Tranche 1 = 1,900 (all of section A, images only) now; Tranche 2 = 3,900 (both hero loops on Kling 2.5) after you approve the Tranche-1 look.** Why this is the best value: images unblock every "empty section" finding at ~100 credits each with retries included; Kling 2.5 at 650/take is 10.8× cheaper than Seedance Pro for a first hero, and both loops sit behind poster-first loading so a Kling-quality result is sufficient at the render size; the Pro escalation stays a separate, explicit decision. Everything renders with fallbacks today, so nothing breaks if you defer Tranche 2.
+**Approve 6,800 credits total, spent in three gated tranches:**
+
+1. **Tranche 1 — 1,900 credits (section A images)**: the seven core visuals that stop sections looking empty. Generate first, install, verify in the preview.
+2. **Tranche 1b — 1,000 credits (section A2 people + backgrounds)**: the work-in-motion set and ambient backdrops. Approve together with Tranche 1 or after seeing it — they share the same look decision. Interface captures (IMG-10) and team imagery (IMG-11) cost nothing and are handled in-build.
+3. **Tranche 2 — 3,900 credits (both hero loops on Kling 2.5)**: the homepage connected-system loop (VID-01) and the receptionist call-journey loop (VID-02), 2 drafts + 1 final each. Only after you approve the Tranche-1 look; Seedance-Pro escalation (+7,000/take) stays a separate explicit ask.
+
+Why this is the best value: images run ~100 credits/try with retries priced in; Kling 2.5 at 650/take is 10.8× cheaper than Seedance Pro and both loops sit behind poster-first loading, so Kling quality is sufficient at render size. Everything ships with fallbacks today — deferring any tranche breaks nothing. Licensing: Magnific/Freepik plan licence (verify plan tier in the account UI; the API balance call cannot read it). Performance treatment: webp ≤200KB posters, H.264+AV1 ≤1.2MB loops, loaded after LCP, poster-first on mobile, `prefers-reduced-motion` shows posters only.
+
+**Media is complete only when generated assets are installed in the real pages and verified in the preview (G-15), not when files exist.**
