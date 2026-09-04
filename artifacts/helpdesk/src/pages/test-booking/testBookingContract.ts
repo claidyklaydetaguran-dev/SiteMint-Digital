@@ -17,7 +17,7 @@
  */
 
 import type { AvailabilityConfig } from "@/lib/availabilityApi";
-import { TEST_REQUEST_PREFIX } from "@/pages/appointments/appointmentsContract";
+import { TEST_REQUEST_PREFIX } from "../appointments/appointmentsContract";
 
 export const PAGE = {
   eyebrow: "SCHEDULING",

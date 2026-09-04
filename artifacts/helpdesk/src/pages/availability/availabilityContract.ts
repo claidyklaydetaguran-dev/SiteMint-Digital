@@ -191,7 +191,7 @@ export function isAdvancedField(field: ConfigField): boolean {
   return ADVANCED_FIELDS.has(field);
 }
 
-export { WEEKDAY_NAMES } from "@/lib/schedulingDates";
+export { WEEKDAY_NAMES } from "../../lib/schedulingDates";
 
 /* ── Exhaustive string surface ─────────────────────────────────────────── */
 

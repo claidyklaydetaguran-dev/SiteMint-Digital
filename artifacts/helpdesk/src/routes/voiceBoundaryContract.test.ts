@@ -793,7 +793,7 @@ eq(
 check(
   "no navigation label, description or icon was changed by AR-001J, and the 2026-09 owner replan's renamed/relocated records carry their approved copy",
   navSrc.includes('description: "Build and manage AI voice assistants for your business."') &&
-    navSrc.includes('description: "Review call records and outcomes."') &&
+    navSrc.includes('description: "Review stored call records and analysis."') &&
     navSrc.includes(
       'description: "Assign actions your assistant can take during a call, like booking or transferring."',
     ),
@@ -807,7 +807,7 @@ section("Correction B — the catalogue is one copy, gated in or out whole");
 const GATED_RECORDS: [string, string, string | null, string, boolean, string | null, string | null][] =
   [
     ["assistant", "assistants", "/assistants", "live", true, "Assistant", "Build and manage AI voice assistants for your business."],
-    ["activity", "calls", "/activity/calls", "live", true, "Calls", "Review call records and outcomes."],
+    ["activity", "calls", "/activity/calls", "live", true, "Calls", "Review stored call records and analysis."],
     ["channels", "phone-number", "/channels/phone-number", "live", true, "Phone Number", "The number your assistant answers and makes calls from."],
     ["account", "usage", "/account/usage", "live", true, "Usage", "Minutes used, minutes remaining, and your billing period."],
     ["account", "issues", "/account/issues", "live", true, "Issues", "Problems SiteMint has flagged that may need your attention."],

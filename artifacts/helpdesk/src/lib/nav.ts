@@ -134,7 +134,7 @@ export const VOICE_NAV: VoiceNavSlots = {
     {
       key: "calls", label: "Calls", href: "/activity/calls", icon: ScrollText,
       state: "live", voiceGated: true,
-      description: "Review call records and outcomes.",
+      description: "Review stored call records and analysis.",
     },
   ],
   channels: [

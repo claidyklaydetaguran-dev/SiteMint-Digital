@@ -152,7 +152,10 @@ check(
   /const voiceUnavailablePaths = voicePlatformEnabled\s*\?\s*\[\]\s*:\s*VOICE_CAPABILITY_PATHS;/.test(
     hdApp,
   ) &&
-    /export const VOICE_CAPABILITY_PATHS[\s\S]*ROUTES\.assistants,\s*ROUTES\.appointments,\s*ROUTES\.logs,/.test(
+    // V5 (owner decision B-1 + D-8): appointments left the voice gate; the
+    // gated live set is now assistants/calls/phoneNumber/usage/issues, and
+    // the D-8 placeholder paths ride the same list so no build 404s them.
+    /export const VOICE_CAPABILITY_PATHS[\s\S]*ROUTES\.assistants,\s*ROUTES\.calls,\s*ROUTES\.phoneNumber,\s*ROUTES\.usage,\s*ROUTES\.issues,/.test(
       read("artifacts/helpdesk/src/lib/routes.ts"),
     ),
 );
