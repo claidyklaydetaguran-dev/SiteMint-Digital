@@ -10,6 +10,20 @@
 
 ## 0a. OWNER VISUAL REVIEW (2026-09-05) — palette REJECTED, completion pass directed
 
+### 0b. THIRD DIRECTIVE (2026-09-05) — complete motion, theme, routing, discovery and marketing pass
+
+Owner reviewed the preview again. Binding scope (tracked as G-01..G-15):
+
+1. Motion is incomplete — only one visible text transition (“Six capabilities. One connected system.”). Full scroll-motion coverage required on every public + major product route, with hero/section choreography, a varied-but-uniform vocabulary, intensity tiers per surface (public richest → receptionist cinematic → discovery purposeful → app restrained → CRM most restrained), and a route-by-route motion matrix verified in the real preview.
+2. Rendered-theme audit across all ~37 surfaces; kill legacy V2/V3/V4 values; add an anti-regression theme test. Same palette/typography/button/focus/border/shadow/radius/icon/status/motion family everywhere; layouts stay surface-appropriate.
+3. Discovery intake visual redesign (split editorial layout, progress, strong selected states, polished success with reference) — 8-step contract, validation, 201 contract, a11y all preserved.
+4. Scroll/route correctness: every public path change (including Back/Forward and nav re-click) starts at top; hash links excepted; focus moves to main. App/CRM: primary nav starts at top; list-position preservation only where intentional and documented.
+5. SiteMint wordmark: from elsewhere → Home at top + hero entrance; on Home → top + replay hero entrance only (no hard refresh, no state loss). Same idea for active top-level nav items.
+6. AI Receptionist hero = full first viewport (100svh-aware), preview/theater visible on desktop, primary CTA + private-beta status in view, specified copy hierarchy (“Missed calls shouldn’t mean missed opportunities.” etc.), no LCP regression, no mobile autoplay.
+7. Marketing/conversion strategy pass: five-questions-per-viewport rule, SiteMint narrative (problem/solution/outcome/differentiation), CTA map (Build Your SiteMint System / Explore the Interactive Preview / Request Beta Access / Sign In / Configure Your Scope). No “Book a Call” default. Nothing invented.
+8. Media stays after this pass; expanded consolidated proposal to include people actively doing the work, product/interface imagery, contextual backgrounds, team imagery, desktop+mobile variants.
+9. Verification through the actual preview with a route-by-route evidence matrix and screenshots; report per the mandated §15 structure. Stop at the corrected owner-review checkpoint.
+
 ### 0a-supplement — second directive (2026-09-05, mid-pass voice note)
 
 Received while the completion pass was underway. Verbatim intent, recorded as binding scope:
