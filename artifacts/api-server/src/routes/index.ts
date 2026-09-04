@@ -32,6 +32,12 @@ import adminVoiceDiagnosticsRouter from "./adminVoiceDiagnostics";
 import voiceBillingWebhookRouter from "./voiceBillingWebhook";
 import publicSchedulingRouter from "./publicScheduling";
 import helpdeskRouter from "./helpdesk";
+import receptionistOnboardingRouter from "./receptionistOnboarding";
+import receptionistContactsRouter from "./receptionistContacts";
+import receptionistInvitesRouter from "./receptionistInvites";
+import publicBetaRequestsRouter from "./publicBetaRequests";
+import publicDemoRouter from "./publicDemo";
+import adminVoiceIssuesRouter from "./adminVoiceIssues";
 
 const router: IRouter = Router();
 
@@ -68,5 +74,11 @@ router.use(adminVoiceDiagnosticsRouter);
 router.use(voiceBillingWebhookRouter);
 router.use(publicSchedulingRouter);
 router.use(helpdeskRouter);
+router.use(receptionistOnboardingRouter);
+router.use(receptionistContactsRouter);
+router.use(receptionistInvitesRouter);
+router.use(publicBetaRequestsRouter);
+router.use(publicDemoRouter);
+router.use(adminVoiceIssuesRouter);
 
 export default router;

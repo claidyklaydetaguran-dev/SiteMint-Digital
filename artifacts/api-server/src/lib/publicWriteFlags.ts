@@ -22,6 +22,17 @@ export const PUBLIC_ANALYTICS_WRITES_ENABLED_ENV_VAR = "PUBLIC_ANALYTICS_WRITES_
 export const AI_TOOLKIT_CHECKOUT_ENABLED_ENV_VAR = "AI_TOOLKIT_CHECKOUT_ENABLED";
 export const PUBLIC_SCHEDULING_REQUESTS_ENABLED_ENV_VAR = "PUBLIC_SCHEDULING_REQUESTS_ENABLED";
 export const PASSWORD_RESET_REQUESTS_ENABLED_ENV_VAR = "PASSWORD_RESET_REQUESTS_ENABLED";
+// V5 S-1: invite-only self-service signup — a NARROWER capability than
+// PUBLIC_REGISTRATION_ENABLED (open signup). The two are deliberately
+// independent: a private-beta deployment may want invite-gated signup on
+// while open registration stays off, and must never get open registration
+// for free by enabling this one.
+export const INVITE_SIGNUP_ENABLED_ENV_VAR = "INVITE_SIGNUP_ENABLED";
+// V5 PR-4: unauthenticated public beta-access request form
+// (POST /api/public/beta-requests). Its own flag — enabling lead capture
+// elsewhere (PUBLIC_FORM_SUBMISSIONS_ENABLED) must not also open this one,
+// and vice versa.
+export const PUBLIC_BETA_REQUESTS_ENABLED_ENV_VAR = "PUBLIC_BETA_REQUESTS_ENABLED";
 
 /** True only for the exact string "true". */
 export function isPublicRegistrationEnabled(
@@ -107,6 +118,33 @@ export function isPasswordResetRequestsEnabled(
 }
 
 /**
+ * True only for the exact string "true".
+ *
+ * S-1: gates `POST /api/receptionist/auth/invite-signup`. Independent of
+ * PUBLIC_REGISTRATION_ENABLED — invite-gated signup is a narrower surface
+ * (a caller must present a valid, unredeemed, unexpired invite code) and
+ * must be controllable on its own.
+ */
+export function isInviteSignupEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[INVITE_SIGNUP_ENABLED_ENV_VAR] === "true";
+}
+
+/**
+ * True only for the exact string "true".
+ *
+ * PR-4: gates `POST /api/public/beta-requests`. Independent of every other
+ * public-write flag — it persists a voice_beta_requests row and is a lead
+ * form for a specific product surface, not general lead capture.
+ */
+export function isPublicBetaRequestsEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[PUBLIC_BETA_REQUESTS_ENABLED_ENV_VAR] === "true";
+}
+
+/**
  * The repository's established feature-disabled reply (see
  * receptionistCalendar.ts and voiceSmsWebhook.ts): HTTP 503 with a short,
  * generic sentence. It names no flag, environment, or internal state, so a
@@ -118,3 +156,5 @@ export const PUBLIC_ANALYTICS_WRITES_DISABLED_MESSAGE = "Analytics recording is 
 export const AI_TOOLKIT_CHECKOUT_DISABLED_MESSAGE = "Checkout is not currently available.";
 export const PUBLIC_SCHEDULING_REQUESTS_DISABLED_MESSAGE = "Online booking is not currently available.";
 export const PASSWORD_RESET_REQUESTS_DISABLED_MESSAGE = "Password reset is not currently available.";
+export const INVITE_SIGNUP_DISABLED_MESSAGE = "Account creation is not currently available.";
+export const PUBLIC_BETA_REQUESTS_DISABLED_MESSAGE = "Form submission is not currently available.";
