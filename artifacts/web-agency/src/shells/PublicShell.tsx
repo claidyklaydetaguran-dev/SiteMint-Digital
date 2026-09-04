@@ -47,6 +47,11 @@ interface PublicShellProps {
    * floating header ("ink"); light pages pad below it ("light").
    */
   heroTone?: "ink" | "light";
+  /**
+   * V4 chrome only (IA §3 / L-7): `"product"` swaps the header's company CTA
+   * for the AI Receptionist product actions. See `SiteHeaderV4Props`.
+   */
+  headerMode?: "company" | "product";
 }
 
 export function PublicShell({
@@ -54,6 +59,7 @@ export function PublicShell({
   routeLabel,
   chrome = "none",
   heroTone = "light",
+  headerMode = "company",
 }: PublicShellProps) {
   const [location] = useLocation();
   // Route-aware anchors (R1): resolves /#section navigations after lazy
@@ -85,7 +91,7 @@ export function PublicShell({
         <a className="v4-skip" href={`#${HOME_SECTIONS.main}`}>
           Skip to main content
         </a>
-        <SiteHeaderV4 tone={heroTone} />
+        <SiteHeaderV4 tone={heroTone} headerMode={headerMode} />
         <main id={HOME_SECTIONS.main} className="v4-shell__main" tabIndex={-1}>
           {boundary}
         </main>

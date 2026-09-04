@@ -107,9 +107,9 @@ const content: ServicePageContent = {
       },
       {
         kicker: "Behind the scenes",
-        title: "Workflow Automation",
+        title: "AI Systems & Automation",
         desc: "Everything that should happen after the click, handled.",
-        href: ROUTES.automation,
+        href: ROUTES.aiSystems,
       },
     ],
   },

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Frontend V3 information architecture (R1). Deliberately absent:
-     /insights (returns after the first verified article is approved),
-     /pricing and vertical landers (deferred, out of IA), /admin (internal). -->
+<!-- Frontend V5 information architecture (owner amendment, workbook + IA
+     doc §2). Deliberately absent: /insights (returns after the first
+     verified article is approved), vertical landers (retired — W-18, they
+     redirect to /ai-receptionist#use-cases), /contact (retired — W-12,
+     redirects to /start#contact), /automation (retired — W-6, redirects to
+     /ai-systems), /admin (internal). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://sitemintdigital.com/</loc>
@@ -29,7 +32,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://sitemintdigital.com/automation</loc>
+    <loc>https://sitemintdigital.com/ai-systems</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -59,9 +62,9 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://sitemintdigital.com/contact</loc>
+    <loc>https://sitemintdigital.com/pricing</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://sitemintdigital.com/privacy</loc>

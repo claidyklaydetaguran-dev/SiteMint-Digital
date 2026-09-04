@@ -1,12 +1,12 @@
 /**
- * Frontend V4 — the approved Signal navigation model (owner decision, V4.1
- * correction pass): What We Build · Work · Process · Company ·
- * AI Receptionist (product entry) · Client Sign In (quiet utility) ·
- * Start a Project (single CTA).
+ * Frontend V4/V5 — the approved public navigation model. V5 correction
+ * (W-3, owner decision): the "What We Build" mega panel describes service
+ * *categories* only — three cards, no AI Receptionist card — because AI
+ * Receptionist already has its own outlined nav pill as a distinct product
+ * entry. Duplicating it in the panel is what W-3 removes.
  *
- * Every path comes from the centralised route layer. The four What We Build
- * destinations are the four committed service pages — no invented services.
- * Sign-in stays a cross-application document navigation.
+ * Every path comes from the centralised route layer. Sign-in stays a
+ * cross-application document navigation.
  */
 
 import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
@@ -22,6 +22,12 @@ export interface V4PanelItem {
   glyph: V4Glyph;
 }
 
+/**
+ * The three service categories in the mega panel (W-3). AI Systems &
+ * Automation (renamed from "Workflow Automation", W-6) folds CRM & internal
+ * systems in as a section of that page rather than a fourth card — there is
+ * no separate CRM route yet.
+ */
 export const whatWeBuildV4: V4PanelItem[] = [
   {
     label: "Websites & Web Apps",
@@ -39,19 +45,12 @@ export const whatWeBuildV4: V4PanelItem[] = [
     glyph: "discovery",
   },
   {
-    label: "Workflow Automation",
+    label: "AI Systems & Automation",
     outcome: "Never lose a follow-up",
-    description: "Less handoff, less busywork — follow-up handled on time.",
-    href: ROUTES.automation,
-    glyph: "automation",
-  },
-  {
-    label: "AI Receptionist",
-    outcome: "Help every caller",
     description:
-      "Designed to answer, qualify, and guide callers to the next right step.",
-    href: ROUTES.aiReceptionist,
-    glyph: "voice",
+      "Automation, CRM and internal systems, and AI-assisted workflows — connected.",
+    href: ROUTES.aiSystems,
+    glyph: "automation",
   },
 ];
 
@@ -78,3 +77,15 @@ export const signInLabelV4 = "Client Sign In";
 
 export const startHrefV4 = ROUTES.start;
 export const startLabelV4 = "Start a Project";
+
+/**
+ * Product-mode header actions (IA §3, L-7): on `/ai-receptionist` the shared
+ * header swaps the company CTA for these three product actions. No
+ * "Start a Project" on this route — the general project journey leaves the
+ * page entirely, per the approved IA.
+ */
+export const requestBetaHrefV4 = `${ROUTES.aiReceptionist}#beta`;
+export const requestBetaLabelV4 = "Request Beta Access";
+export const explorePreviewHrefV4 = `${ROUTES.aiReceptionist}#preview`;
+export const explorePreviewLabelV4 = "Explore the Interactive Preview";
+export const productSignInLabelV4 = "Already a client? Sign in";

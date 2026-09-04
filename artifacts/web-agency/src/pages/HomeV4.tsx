@@ -20,7 +20,7 @@
  * runway entirely.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link } from "wouter";
 import { HOME_SECTIONS, ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
@@ -147,7 +147,50 @@ function HeroCheckGlyph() {
   );
 }
 
-function SignalHeroV4() {
+/**
+ * V5 note: props were added (with defaults reproducing the original literal
+ * copy exactly) so `HomeV5.tsx` can reuse this component's particle-canvas
+ * mechanics — the rAF loop, node lighting, and phase HUD below are otherwise
+ * byte-for-byte unchanged — while supplying the amended hero copy (W-1) and
+ * omitting the kicker. `<SignalHeroV4 />` with no props (this file's own
+ * call site) renders exactly what it always has.
+ */
+export interface SignalHeroV4Props {
+  kicker?: string;
+  hideKicker?: boolean;
+  title?: string;
+  sub1?: string;
+  hideSub1?: boolean;
+  sub?: ReactNode;
+  brandLine?: string;
+  primaryHref?: string;
+  primaryLabel?: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
+  /** True when `secondaryHref` is an app route (Link) rather than a same-page hash (plain anchor). */
+  secondaryIsRoute?: boolean;
+}
+
+export function SignalHeroV4({
+  kicker = "SiteMint Digital · Signal",
+  hideKicker = false,
+  title = "From first click to booked customer.",
+  sub1 = "SiteMint designs the connected digital system in between.",
+  hideSub1 = false,
+  sub = (
+    <>
+      Websites, web applications, <b>CRM workflows, and AI reception
+      systems</b> that work together — so inquiries don't disappear
+      between tools.
+    </>
+  ),
+  brandLine,
+  primaryHref = startHrefV4,
+  primaryLabel = startLabelV4,
+  secondaryHref = "#signal-journey",
+  secondaryLabel = "See How It Works",
+  secondaryIsRoute = false,
+}: SignalHeroV4Props = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -402,23 +445,24 @@ function SignalHeroV4() {
       <div className="v4-hero__stage">
         {/* Region 1 — the readable layer. Static through every phase. */}
         <div className="v4-hero__copy" data-v4-hero-copy>
-          <p className="v4-kicker">SiteMint Digital · Signal</p>
-          <h1 className="v4-hero__title">From first click to booked customer.</h1>
-          <p className="v4-hero__sub1">
-            SiteMint designs the connected digital system in between.
-          </p>
-          <p className="v4-hero__sub">
-            Websites, web applications, <b>CRM workflows, and AI reception
-            systems</b> that work together — so inquiries don't disappear
-            between tools.
-          </p>
+          {!hideKicker && <p className="v4-kicker">{kicker}</p>}
+          <h1 className="v4-hero__title">{title}</h1>
+          {!hideSub1 && <p className="v4-hero__sub1">{sub1}</p>}
+          <p className="v4-hero__sub">{sub}</p>
+          {brandLine && <p className="v4-hero__brand-line">{brandLine}</p>}
           <div className="v4-hero__ctas">
-            <Link href={startHrefV4} className="v4-btn v4-btn--primary">
-              {startLabelV4}
+            <Link href={primaryHref} className="v4-btn v4-btn--primary">
+              {primaryLabel}
             </Link>
-            <a href="#signal-journey" className="v4-btn v4-btn--outline">
-              See How It Works
-            </a>
+            {secondaryIsRoute ? (
+              <Link href={secondaryHref} className="v4-btn v4-btn--outline">
+                {secondaryLabel}
+              </Link>
+            ) : (
+              <a href={secondaryHref} className="v4-btn v4-btn--outline">
+                {secondaryLabel}
+              </a>
+            )}
           </div>
         </div>
 

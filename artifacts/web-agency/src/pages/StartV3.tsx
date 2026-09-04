@@ -7,12 +7,23 @@
  */
 
 import { Link } from "wouter";
-import { ArrowRight, Clock, FileText, MessagesSquare, ShieldCheck } from "lucide-react";
+import { ArrowRight, Clock, FileText, MessagesSquare, Phone, Mail, ShieldCheck } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
+
+/** Real contact details (W-12) — same values as `ThankYou.tsx`. */
+const SUPPORT_PHONE = "949-880-6515";
+const SUPPORT_PHONE_HREF = "tel:9498806515";
+const SUPPORT_EMAIL = "info.sitemint@gmail.com";
+const SUPPORT_RESPONSE_TIME = "within 1 business day";
 
 export default function StartV3() {
   const reveal = useReveal();
+  usePageMeta({
+    title: "Start with SiteMint — SiteMint Digital",
+    description: "Every SiteMint project starts with a short, structured discovery brief. See what to expect, or contact us directly.",
+  });
 
   return (
     <div className="v3-start-page">
@@ -112,7 +123,9 @@ export default function StartV3() {
         </div>
       </section>
 
-      <section className="v3-section" data-tone="porcelain">
+      {/* Contact — folded in from the retired standalone /contact page
+          (W-12). `/contact` redirects here (`${ROUTES.start}#contact`). */}
+      <section className="v3-section" data-tone="porcelain" id="contact" style={{ scrollMarginTop: "5rem" }}>
         <div className="v3-container v3sp-two v3-reveal" ref={reveal}>
           <span className="v3m-sechead__no">Prefer to talk first?</span>
           <div className="v3sp-two__body">
@@ -122,12 +135,24 @@ export default function StartV3() {
               the same conversation by message or call. The brief can come
               later — or we'll fill it in together.
             </p>
-            <div>
-              <Link href={ROUTES.contact} className="v3-btn v3-btn--outline">
-                Contact SiteMint
-                <ArrowRight aria-hidden="true" size={16} />
-              </Link>
-            </div>
+            <ul className="v3m-checks">
+              <li>
+                <Phone aria-hidden="true" />
+                <span>
+                  <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a>
+                </span>
+              </li>
+              <li>
+                <Mail aria-hidden="true" />
+                <span>
+                  <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+                </span>
+              </li>
+              <li>
+                <Clock aria-hidden="true" />
+                <span>Expected response time: {SUPPORT_RESPONSE_TIME}</span>
+              </li>
+            </ul>
           </div>
         </div>
       </section>

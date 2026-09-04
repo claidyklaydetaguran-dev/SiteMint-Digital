@@ -66,6 +66,13 @@ export const ROUTES = {
   // V3 canonical Work path.
   websitesApps: "/websites-apps",
   discoverySystems: "/discovery-systems",
+  /**
+   * V5 (W-6): renamed "AI Systems & Automation" — includes CRM & internal
+   * systems as a substantial section rather than a separate route. The old
+   * `/automation` path 301s here (see App.tsx) so no inbound link breaks.
+   */
+  aiSystems: "/ai-systems",
+  /** Retired path (W-6/IA §2): redirects to `aiSystems`. Not linked from nav. */
   automation: "/automation",
   workV3: "/work",
   process: "/process",
@@ -74,11 +81,12 @@ export const ROUTES = {
   privacy: "/privacy",
   terms: "/terms",
 
-  // ── Deferred / deprecated (owner decision 4) ────────────────────────────
-  // Still routed so existing inbound links do not break, but removed from all
-  // navigation and from the approved information architecture. Source files
-  // are retained as rollback references; they are NOT deleted in Phase 1.
+  // ── V5 rebuilt pricing (amendment §10, supersedes W-13 removal) ─────────
   pricing: "/pricing",
+
+  // ── Retired verticals (W-18/amendment §11) ──────────────────────────────
+  // No longer routed to content — both redirect to the AI Receptionist
+  // "Built for different businesses" use-cases section. Source files retired.
   aiForLawyers: "/ai-for-lawyers",
   aiForRealtors: "/ai-for-realtors",
 

@@ -29,8 +29,8 @@ export function SiteFooterV4() {
             SiteMint
           </Link>
           <p className="v4-footer__tag">
-            Websites, web apps, discovery systems, workflow automation, and AI
-            reception — designed as one connected signal.
+            Websites, web apps, CRM systems, AI automation, and custom
+            software — designed as one connected system.
           </p>
         </div>
 
@@ -46,8 +46,10 @@ export function SiteFooterV4() {
           <div className="v4-footer__col">
             <span className="v4-footer__col-title">Company</span>
             {/* Route-aware section anchor: navigates to the homepage and then
-                scrolls to the journey chapter (useHashScrollV4). */}
-            <Link href="/#signal-journey">The Signal journey</Link>
+                scrolls to the journey chapter (useHashScrollV4). The anchor
+                id itself (#signal-journey) is an internal contract name and
+                stays — only the visible brand-hygiene copy changes (W-1). */}
+            <Link href="/#signal-journey">How the system connects</Link>
             {primaryNavV4.map((item) => (
               <Link key={item.label} href={item.href}>
                 {item.label}
@@ -65,7 +67,9 @@ export function SiteFooterV4() {
 
         <div className="v4-footer__legal">
           <span>© {new Date().getFullYear()} SiteMint Digital</span>
-          <span>From first click to booked customer.</span>
+          {/* W-1 amended brand line — "From first click to booked customer"
+              is reserved for lead-generation / AI Receptionist contexts. */}
+          <span>Capture. Organize. Connect. Resolve.</span>
         </div>
       </div>
     </footer>

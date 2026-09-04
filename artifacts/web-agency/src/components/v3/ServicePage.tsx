@@ -56,10 +56,18 @@ export interface ServicePageContent {
 export function ServicePage({
   content,
   demo,
+  extraSection,
 }: {
   content: ServicePageContent;
   /** Bespoke demonstration pane rendered beside "what we build". */
   demo?: ReactNode;
+  /**
+   * An additional full-width section rendered after Capabilities and before
+   * "Connects with the rest of SiteMint" — e.g. `AiSystemsV5`'s substantial
+   * CRM & internal systems section (W-6). Optional; every other caller is
+   * unaffected.
+   */
+  extraSection?: ReactNode;
 }) {
   const reveal = useReveal();
   const Icon = content.eyebrowIcon;
@@ -155,6 +163,8 @@ export function ServicePage({
           </div>
         </div>
       </section>
+
+      {extraSection}
 
       {/* 5 · Connects with the rest of SiteMint */}
       <section className="v3-section" data-tone="ink">

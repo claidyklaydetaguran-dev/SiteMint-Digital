@@ -107,9 +107,9 @@ const content: ServicePageContent = {
       },
       {
         kicker: "Downstream",
-        title: "Workflow Automation",
+        title: "AI Systems & Automation",
         desc: "Briefs routed, acknowledged, and followed up automatically.",
-        href: ROUTES.automation,
+        href: ROUTES.aiSystems,
       },
     ],
   },

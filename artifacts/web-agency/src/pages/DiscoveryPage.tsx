@@ -5,9 +5,12 @@
  * guided form (PlatformDiscoveryShell) in the SiteMint design system,
  * with its own minimal branded header.
  *
- * The form is a preview-only flow: no submission is sent and no data is
- * stored server-side. Answers are saved to localStorage only (draft
- * persistence, auto-cleared on completion or explicit start-over).
+ * W-9/W-11: on completion the brief is submitted to the real backend
+ * (`POST /api/v1/discovery-submissions`, see
+ * `components/platform-discovery/discoverySubmit.ts`), gated behind
+ * `PUBLIC_FORM_SUBMISSIONS_ENABLED` server-side. Until then — and while
+ * filling it in — answers are saved to localStorage only (draft persistence,
+ * auto-cleared on a successful/duplicate submission or explicit start-over).
  *
  * ROLLBACK: to revert to the legacy form, change the /discovery route in
  * App.tsx back to `component={Discovery}` (the legacy component is kept at
