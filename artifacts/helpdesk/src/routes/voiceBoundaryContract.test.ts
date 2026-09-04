@@ -1560,7 +1560,14 @@ if (!existsSync(distDir)) {
   const chunksFor = (m: string) =>
     files.filter((f) => new RegExp(`^${m}-[A-Za-z0-9_-]{8}\\.(js|css)$`).test(f));
 
-  const entryChunks = files.filter((f) => /^index-.*\.js$/.test(f));
+  // V5: a filename test (`^index-.*\.js$`) stopped identifying the entry —
+  // Rollup auto-names shared dependency chunks after their source module, and
+  // a radix/lucide helper module named `index` now emits `index-<hash>.js`
+  // beside the real entry. The entry is whatever index.html actually loads.
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const entryChunks = [...indexHtml.matchAll(/<script[^>]+src="[^"]*\/(index-[^"]+\.js)"/g)].map(
+    (m) => m[1]!,
+  );
 
   /**
    * Which build produced these assets — never read from the presence of the
@@ -1703,8 +1710,11 @@ if (!existsSync(distDir)) {
    * is now a property of every build — not only a voice-enabled one.
    */
   check(
-    "the Appointments route keeps its own stylesheet, in every build",
-    chunksFor("Appointments").filter((f) => f.endsWith(".css")).length === 1,
+    // V5: Availability and Test Booking split out of the Appointments page and
+    // import the same stylesheet, so Rollup names the shared CSS chunk after
+    // the stylesheet module (`v2-appointments-<hash>.css`) instead of the page.
+    "the appointments stylesheet is emitted in every build",
+    files.filter((f) => /^(Appointments|v2-appointments)-[A-Za-z0-9_-]{8}\.css$/.test(f)).length === 1,
   );
 
   check(
