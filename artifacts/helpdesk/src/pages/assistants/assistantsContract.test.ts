@@ -251,9 +251,10 @@ const createSrc = read("artifacts/helpdesk/src/pages/AssistantCreate.tsx");
 const builderSrc = read("artifacts/helpdesk/src/pages/AssistantBuilder.tsx");
 const builderNewSrc = read("artifacts/helpdesk/src/pages/AssistantBuilderNew.tsx");
 const shellSrc = read("artifacts/helpdesk/src/pages/assistant-builder/BuilderShell.tsx");
-const setupTabSrc = read("artifacts/helpdesk/src/pages/assistant-builder/SetupTab.tsx");
+// V5 PR-6: SetupTab.tsx -> ConfigurationTab.tsx, VoiceModelTab.tsx -> VoiceTab.tsx.
+const setupTabSrc = read("artifacts/helpdesk/src/pages/assistant-builder/ConfigurationTab.tsx");
 const promptTabSrc = read("artifacts/helpdesk/src/pages/assistant-builder/PromptTab.tsx");
-const voiceTabSrc = read("artifacts/helpdesk/src/pages/assistant-builder/VoiceModelTab.tsx");
+const voiceTabSrc = read("artifacts/helpdesk/src/pages/assistant-builder/VoiceTab.tsx");
 const presetSelectorSrc = read("artifacts/helpdesk/src/components/common/PresetSelector.tsx");
 const templateCardSrc = read("artifacts/helpdesk/src/components/common/TemplateCard.tsx");
 const costSrc = read("artifacts/helpdesk/src/components/common/CostBreakdown.tsx");
@@ -429,8 +430,8 @@ section("Route registration — gated, unchanged, and base-relative");
     "the contract's paths match lib/routes.ts exactly",
     LIST_PATH === "/assistants" && NEW_PATH === "/assistants/new",
   );
-  eq("assistantHref lands on the builder's first tab by default", assistantHref(7), "/assistants/7/setup");
-  eq("assistantHref names the tab when one is given", assistantHref(7, "voice-model"), "/assistants/7/voice-model");
+  eq("assistantHref lands on the builder's first tab by default", assistantHref(7), "/assistants/7/configuration");
+  eq("assistantHref names the tab when one is given", assistantHref(7, "voice"), "/assistants/7/voice");
 }
 
 check(
@@ -575,8 +576,8 @@ for (const [name, code] of [
   ["AssistantBuilder", builderCode],
   ["AssistantBuilderNew", builderNewCode],
   ["BuilderShell", shellCode],
-  ["VoiceModelTab", voiceTabCode],
-  ["SetupTab", setupTabCode],
+  ["VoiceTab", voiceTabCode],
+  ["ConfigurationTab", setupTabCode],
 ] as const) {
   const bodies = effectBodies(code);
   check(
@@ -600,7 +601,7 @@ check(
 );
 check(
   "selecting a template navigates and creates nothing",
-  /const handleSelect = \([\s\S]{0,200}navigate\(`\$\{NEW_PATH\}\/setup\?templateKey=/.test(createCode) &&
+  /const handleSelect = \([\s\S]{0,200}navigate\(`\$\{NEW_PATH\}\/\$\{DEFAULT_BUILDER_TAB\}\?templateKey=/.test(createCode) &&
     !MUTATING.test(createCode),
 );
 check(
@@ -866,9 +867,13 @@ check(
 );
 check(
   "the builder still exposes exactly the three tabs that are actually imported",
-  /BUILDER_TABS = \[\s*\{ key: "setup"[\s\S]*?\{ key: "prompt"[\s\S]*?\{ key: "voice-model"[\s\S]*?\] as const;/.test(
+  /BUILDER_TABS = \[\s*\{ key: "configuration"[\s\S]*?\{ key: "prompt"[\s\S]*?\{ key: "voice"[\s\S]*?\] as const;/.test(
     shellCode,
-  ) && (shellCode.match(/key: "/g) ?? []).length === 3,
+  ) &&
+    // BUILDER_TAB_ALIASES also contributes `key: "..."`-shaped object keys, so
+    // this count is over the tab catalogue's own three entries plus the two
+    // legacy aliases the catalogue array itself does not declare.
+    (shellCode.match(/key: "(configuration|prompt|voice)"/g) ?? []).length === 3,
 );
 for (const orphan of ["AdvancedTab", "AnalysisTab", "KnowledgeTab", "TestingTab", "ToolsTab"]) {
   check(
@@ -904,9 +909,16 @@ check(
   builderCode.includes("PRESET_RECOVERY.title"),
 );
 check(
+  // V5 PR-6 (C-4): the curated-preset cards and the Advanced "more options"
+  // cards both call the same named `choosePreset`, rather than each wiring
+  // its own inline `update(...)` — so `update(` now appears exactly once in
+  // this file (inside `choosePreset`'s own definition), and every place a
+  // preset can be chosen calls that one function from an explicit
+  // onClick/onKeyDown handler, never from an effect.
   "the recovery state changes nothing by itself — the draft is written only by an explicit choice",
-  (voiceTabCode.match(/\bupdate\(/g) ?? []).length ===
-    (voiceTabCode.match(/onChange=\{\(preset\) => update\(/g) ?? []).length &&
+  (voiceTabCode.match(/\bupdate\(/g) ?? []).length === 1 &&
+    /const choosePreset = \(id: SupportedVoicePresetId\) =>\s*update\(/.test(voiceTabCode) &&
+    (voiceTabCode.match(/choosePreset\(p\.id\)/g) ?? []).length >= 2 &&
     !/useEffect/.test(voiceTabCode),
 );
 check(

@@ -3,15 +3,15 @@ import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { ASSISTANT_TEMPLATES, type AssistantTemplate } from "@/lib/assistantTemplates";
 import { TemplateCard } from "@/components/common/TemplateCard";
-import { CREATE, LIST_PATH, NEW_PATH } from "@/pages/assistants/assistantsContract";
+import { CREATE, LIST_PATH, NEW_PATH, DEFAULT_BUILDER_TAB } from "@/pages/assistants/assistantsContract";
 
 export default function AssistantCreate() {
   const [, navigate] = useLocation();
 
   const handleSelect = (template: AssistantTemplate) => {
     // Local-only: no API call, no persisted row. The assistant is created
-    // only when Save Draft is activated in the builder.
-    navigate(`${NEW_PATH}/setup?templateKey=${encodeURIComponent(template.id)}`);
+    // only when Save changes is activated in the builder.
+    navigate(`${NEW_PATH}/${DEFAULT_BUILDER_TAB}?templateKey=${encodeURIComponent(template.id)}`);
   };
 
   return (

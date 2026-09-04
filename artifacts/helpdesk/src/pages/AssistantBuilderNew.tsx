@@ -7,10 +7,12 @@ import { BuilderNotice } from "@/components/common/BuilderNotice";
 import { PublishButton } from "@/components/common/PublishButton";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateAssistant } from "@/hooks/useAssistants";
+import { useWorkspaceBusinessInfo } from "@/hooks/useWorkspaceBusinessInfo";
 import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, findTemplateByKey, isValidTemplateKey } from "@/lib/assistantConfig";
 import { useLocalAssistantDraft } from "@/hooks/useAssistantDrafts";
-import { BuilderShell, isBuilderTabKey, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
+import { BuilderShell, resolveBuilderTab, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
+import { DEFAULT_BUILDER_TAB } from "@/pages/assistants/assistantsContract";
 import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
 
 /**
@@ -61,10 +63,11 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
   const createMutation = useCreateAssistant();
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const tab: BuilderTabKey = isBuilderTabKey(tabParam) ? tabParam : "setup";
+  const tab: BuilderTabKey = resolveBuilderTab(tabParam) ?? DEFAULT_BUILDER_TAB;
   const goToTab = (t: BuilderTabKey) => navigate(`/assistants/new/${t}?templateKey=${encodeURIComponent(templateKey)}`);
 
   const isNameValid = draft.setup.assistantName.trim().length > 0 && draft.setup.assistantName.trim().length <= 100;
+  const businessInfo = useWorkspaceBusinessInfo();
 
   const handleSave = () => {
     if (!isNameValid || createMutation.isPending) return;
@@ -73,7 +76,7 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
       {
         name: draft.setup.assistantName.trim(),
         templateKey,
-        config: serializeDraftToConfig(draft),
+        config: serializeDraftToConfig(draft, businessInfo.data ?? undefined),
       },
       {
         onSuccess: (assistant) => {
@@ -132,7 +135,7 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
             ) : (
               <Save className="h-4 w-4" aria-hidden="true" />
             )}
-            {createMutation.isPending ? "Saving…" : "Save Draft"}
+            {createMutation.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
       }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, PlayCircle, Rocket } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -11,29 +11,28 @@ import { findVoicePreset } from "@/lib/assistantEstimates";
 import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
+import { useWorkspaceBusinessInfo, type WorkspaceBusinessInfo } from "@/hooks/useWorkspaceBusinessInfo";
 
-import SetupTab from "@/pages/assistant-builder/SetupTab";
+import ConfigurationTab from "@/pages/assistant-builder/ConfigurationTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
-import VoiceModelTab from "@/pages/assistant-builder/VoiceModelTab";
+import VoiceTab from "@/pages/assistant-builder/VoiceTab";
 
 /**
- * ── AR-001J final refinement, owner decision B ───────────────────────────
+ * ── V5 PR-6 (C-5) ─────────────────────────────────────────────────────────
  *
- * A build that cannot publish, or cannot run a browser test, shows no control
- * for it — not a disabled one, not a tooltip explaining a future capability,
- * and not an empty slot where one used to be. The customer sees the
- * functionality this build actually offers.
+ * Within a voice-enabled build, the Test call and Publish controls are now
+ * always rendered — as a real control when their own sub-flag is on, and as
+ * a disabled placeholder naming the reason when it is off. A build with
+ * `voicePlatformEnabled` false still shows neither: this is "always visible
+ * in the voice build", not "always visible everywhere", so a default build
+ * still ships no voice-builder chrome at all.
  *
- * Both constants are compositions of the foldable flag constants in
- * `lib/featureFlags.ts`, so each is a literal by the time Rollup sees it. The
- * whole action row, the standing placeholders, their icons and the browser-test
- * panel slot therefore leave the build entirely when their flag is off, rather
- * than being rendered and hidden. When a flag is on, nothing about the control
- * changes — the same component, the same props, the same placement.
- *
- * The row itself is conditional, not just its children: an empty flex
- * container would still consume the header's `justify-between` slot and leave
- * a visible gap where the actions were.
+ * The disabled placeholder is `UnavailableActionButton` — already imported
+ * unconditionally above and carrying no publish/browser-test/provider
+ * dependency of its own — so a build with a sub-flag off still never pulls
+ * in `PublishButton`, `BrowserTestButton`, or anything past them; only the
+ * caller (`AssistantBuilder.tsx`/`AssistantBuilderNew.tsx`) still supplies
+ * the real control, and only from its own flag-on branch, exactly as before.
  */
 const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
@@ -45,12 +44,18 @@ const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
  * provider on its own.
  */
 const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;
-const anyBuilderActionInBuild = publishInBuild || browserTestInBuild || syncInBuild;
 
+const NOT_ENABLED_REASON = "Not enabled on this workspace yet.";
+
+/**
+ * V5 PR-6 (C-2/C-4): "Setup" -> "Configuration", "Voice & Model" -> "Voice".
+ * `BUILDER_TAB_ALIASES` below maps the old keys so a previously-shared or
+ * bookmarked URL still resolves — see `resolveBuilderTab`.
+ */
 export const BUILDER_TABS = [
-  { key: "setup", label: "Setup" },
+  { key: "configuration", label: "Configuration" },
   { key: "prompt", label: "Prompt" },
-  { key: "voice-model", label: "Voice & Model" },
+  { key: "voice", label: "Voice" },
 ] as const;
 
 export type BuilderTabKey = (typeof BUILDER_TABS)[number]["key"];
@@ -61,29 +66,50 @@ export function isBuilderTabKey(
   return BUILDER_TABS.some((t) => t.key === value);
 }
 
+/** Legacy tab keys, mapped to their current replacement. */
+export const BUILDER_TAB_ALIASES: Record<string, BuilderTabKey> = {
+  setup: "configuration",
+  "voice-model": "voice",
+};
+
+/**
+ * Resolves a raw route param to a tab key: the value itself when already
+ * canonical, its alias when it's a known legacy key, or `undefined` when
+ * it's neither (an unrecognized tab, or no tab at all) — the caller decides
+ * the default and whether to redirect.
+ */
+export function resolveBuilderTab(value: string | undefined): BuilderTabKey | undefined {
+  if (value === undefined) return undefined;
+  if (isBuilderTabKey(value)) return value;
+  return BUILDER_TAB_ALIASES[value];
+}
+
 export interface BuilderTabProps {
   draft: AssistantDraft;
   update: (updater: (draft: AssistantDraft) => AssistantDraft) => void;
+  /** V5 PR-6 (C-2): the firm's business name/industry from Workspace Settings, or `null` until it loads. Read-only. */
+  businessInfo: WorkspaceBusinessInfo | null;
 }
 
 function TabPanel({
   tab,
   draft,
   update,
+  businessInfo,
 }: { tab: BuilderTabKey } & BuilderTabProps) {
   switch (tab) {
-    case "setup":
-      return <SetupTab draft={draft} update={update} />;
+    case "configuration":
+      return <ConfigurationTab draft={draft} update={update} businessInfo={businessInfo} />;
     case "prompt":
-      return <PromptTab draft={draft} update={update} />;
-    case "voice-model":
-      return <VoiceModelTab draft={draft} update={update} />;
+      return <PromptTab draft={draft} update={update} businessInfo={businessInfo} />;
+    case "voice":
+      return <VoiceTab draft={draft} update={update} businessInfo={businessInfo} />;
     default:
       return null;
   }
 }
 
-interface BuilderShellProps extends BuilderTabProps {
+interface BuilderShellProps extends Pick<BuilderTabProps, "draft" | "update"> {
   tab: BuilderTabKey;
   onTabChange: (tab: BuilderTabKey) => void;
   backHref: string;
@@ -152,6 +178,36 @@ export function BuilderShell({
   // belonging to a preset the customer never chose.
   const preset = findVoicePreset(draft.voiceModel.preset);
 
+  // V5 PR-6 (C-2): fetched once here so every tab sees the same read-only
+  // workspace business name/industry, then one-way synced into
+  // `draft.setup` so a save (which runs synchronously — see
+  // `serializeDraftToConfig`) always has a value even before this fetch
+  // resolves. Never synced back the other way, and never itself a source of
+  // an "unsaved changes" state: the effect only fires when the fetched value
+  // actually differs from what the draft already holds.
+  const businessInfo = useWorkspaceBusinessInfo();
+  const updateRef = useRef(update);
+  updateRef.current = update;
+  const syncedBusinessInfoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!businessInfo.data) return;
+    const key = `${businessInfo.data.name} ${businessInfo.data.industry}`;
+    if (syncedBusinessInfoRef.current === key) return;
+    syncedBusinessInfoRef.current = key;
+    if (draft.setup.businessName === businessInfo.data.name && draft.setup.industry === businessInfo.data.industry) {
+      return;
+    }
+    updateRef.current((d) => ({
+      ...d,
+      setup: { ...d.setup, businessName: businessInfo.data!.name, industry: businessInfo.data!.industry },
+    }));
+    // Only the fetched value should re-trigger this — reading draft.setup
+    // here would fight with the customer's own edits to unrelated fields.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessInfo.data]);
+
+  const activeTabLabel = BUILDER_TABS.find((t) => t.key === tab)?.label ?? "";
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
       <div aria-live="polite" className="sr-only">
@@ -170,6 +226,17 @@ export function BuilderShell({
         <h1 className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Assistant Builder
         </h1>
+        {/* V5 PR-6 (C-6): local breadcrumb — the lead swaps this for the shared
+            component once one exists. `Assistant / {name} / {Tab}`. */}
+        <nav aria-label="Breadcrumb" className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span>Assistant</span>
+          <span aria-hidden="true">/</span>
+          <span className="max-w-[10rem] truncate font-medium text-foreground">
+            {draft.setup.assistantName || "Untitled assistant"}
+          </span>
+          <span aria-hidden="true">/</span>
+          <span>{activeTabLabel}</span>
+        </nav>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Input
@@ -193,24 +260,30 @@ export function BuilderShell({
               {statusBadge}
             </Badge>
           </div>
-          {anyBuilderActionInBuild && (
+          {voicePlatformEnabled && (
             <div className="flex flex-shrink-0 items-center gap-2">
-              {browserTestInBuild &&
-                (testControl ?? (
+              {browserTestInBuild ? (
+                testControl ?? (
                   <UnavailableActionButton
                     icon={PlayCircle}
-                    label="Test"
+                    label="Test call"
                     availability="Save and publish this assistant before testing."
                   />
-                ))}
-              {publishInBuild &&
-                (publishControl ?? (
+                )
+              ) : (
+                <UnavailableActionButton icon={PlayCircle} label="Test call" availability={NOT_ENABLED_REASON} />
+              )}
+              {publishInBuild ? (
+                publishControl ?? (
                   <UnavailableActionButton
                     icon={Rocket}
                     label="Publish"
                     availability="Save this assistant as a draft before publishing."
                   />
-                ))}
+                )
+              ) : (
+                <UnavailableActionButton icon={Rocket} label="Publish" availability={NOT_ENABLED_REASON} />
+              )}
               {syncInBuild && syncControl}
             </div>
           )}
@@ -248,7 +321,7 @@ export function BuilderShell({
 
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
           <fieldset disabled={contentDisabled} className="min-w-0">
-            <TabPanel tab={tab} draft={draft} update={update} />
+            <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
           </fieldset>
         </div>
       </Tabs>

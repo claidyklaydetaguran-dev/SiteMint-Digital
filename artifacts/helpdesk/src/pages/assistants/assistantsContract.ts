@@ -60,6 +60,23 @@ export const SUPPORTED_VOICE_PRESET_IDS = [
 
 export type SupportedVoicePresetId = (typeof SUPPORTED_VOICE_PRESET_IDS)[number];
 
+/**
+ * V5 PR-6 (C-4): the two presets the Voice tab offers as primary choices. A
+ * subset of `SUPPORTED_VOICE_PRESET_IDS`, not a replacement for it — every
+ * value in `SUPPORTED_VOICE_PRESET_IDS` stays publishable and stays
+ * recognised by hydration; the other two just move under the tab's Advanced
+ * disclosure instead of disappearing.
+ */
+export const CURATED_VOICE_PRESET_IDS = ["natural-balanced", "fast-response"] as const;
+
+export type CuratedVoicePresetId = (typeof CURATED_VOICE_PRESET_IDS)[number];
+
+const CURATED_VOICE_PRESET_SET: ReadonlySet<string> = new Set(CURATED_VOICE_PRESET_IDS);
+
+export function isCuratedVoicePreset(value: unknown): value is CuratedVoicePresetId {
+  return typeof value === "string" && CURATED_VOICE_PRESET_SET.has(value);
+}
+
 /** Values a previously saved config may still carry that are no longer selectable. */
 export const RETIRED_VOICE_PRESET_IDS = ["custom"] as const;
 
@@ -129,6 +146,24 @@ export const LIST = {
 
   draft: "Draft",
   locked: "Locked",
+
+  /* V5 PR-6 (C-1): one assistant per firm in beta. "New Assistant" above is
+     shown only when zero or more-than-one assistants exist (the >1 case is
+     legacy data — the create flow itself is unchanged). Once exactly one
+     exists, this line replaces it. */
+  contactToAddAnother: "Contact SiteMint to add another assistant.",
+} as const;
+
+/* ── One-assistant status card (C-1) ─────────────────────────────────────── */
+
+export const CARD = {
+  providerLinkLabel: "Provider link",
+  lastPublishedLabel: "Last published",
+  notYetPublished: "Not yet published",
+  configuration: "Configuration",
+  prompt: "Prompt",
+  voice: "Voice",
+  test: "Test",
 } as const;
 
 /** Every row control names its assistant, so a screen reader hears which row it is on. */
@@ -232,10 +267,51 @@ export const PRESET_RECOVERY = {
    it, so that sentence pointed at nothing. */
 
 export const VOICE_MODEL = {
-  title: "Voice & Model",
-  detail: "Choose how this assistant sounds and thinks.",
-  presetGroupLabel: "Voice and model preset",
+  /* V5 PR-6 (C-4): tab renamed "Voice & Model" -> "Voice" — provider/model
+     detail moved behind the Advanced disclosure below, so the tab title no
+     longer needs to name both. */
+  title: "Voice",
+  detail: "Choose how this assistant sounds.",
+  presetGroupLabel: "Voice preset",
   includedHeading: "What's included",
+  advancedHeading: "Advanced: provider and model detail",
+  moreOptionsHeading: "More voice options",
+  moreOptionsDetail:
+    "These aren't the two recommended presets, but they're still fully supported — choose one here if you need it.",
+  curatedNote: "Two curated options, tuned for most businesses.",
+} as const;
+
+/* ── Configuration tab (C-2) ───────────────────────────────────────────────
+   "Setup" renamed "Configuration". Business name and industry are no longer
+   editable fields here — they are read live from Workspace Settings and
+   shown for reference only; the customer edits them there. */
+
+export const CONFIGURATION = {
+  title: "Configuration",
+  detail: "The essentials — who this assistant is for, what it should do, and what it's allowed to do.",
+  businessFromWorkspace: "From Workspace Settings",
+  editWorkspaceSettings: "Edit in Workspace Settings",
+  permittedActionsLabel: "Permitted actions",
+  permittedActionsDetail: "What this assistant is allowed to do on a call.",
+} as const;
+
+/* ── Prompt tab (C-3) ─────────────────────────────────────────────────────
+   Guided sections by default, composed deterministically by
+   `lib/promptComposer.ts` into `prompt.systemInstructions` — the exact text
+   published. Unrestricted editing lives behind the Advanced disclosure. */
+
+export const PROMPT_TAB = {
+  title: "Prompt",
+  detail: "How the assistant opens, speaks, and knows when to stop or hand off.",
+  generatedHeading: "Generated prompt",
+  generatedDetail: "This is exactly what gets published — generated from the sections above.",
+  callerPreviewHeading: "How callers will hear this",
+  callerPreviewSimulatedLabel: "Simulated — not a live call",
+  callerPreviewEmpty: "Add a greeting to preview how callers will hear this.",
+  advancedToggleLabel: "Edit the full prompt directly",
+  advancedToggleDetail:
+    "Off: the sections above generate this automatically. On: edit it yourself — the sections above stop being applied.",
+  permittedActionsNote: "Edit permitted actions from the Configuration tab.",
 } as const;
 
 /* ── Template picker ───────────────────────────────────────────────────────
@@ -273,8 +349,18 @@ export const GUIDANCE_NOTE =
 export const LIST_PATH = "/assistants";
 export const NEW_PATH = "/assistants/new";
 
+/**
+ * V5 PR-6 (C-2/C-4): the builder's tab keys were renamed ("setup" ->
+ * "configuration", "voice-model" -> "voice") to match the new tab titles.
+ * `BUILDER_TAB_ALIASES` in `assistant-builder/BuilderShell.tsx` maps the old
+ * keys to the new ones so a bookmarked or previously-shared URL still
+ * resolves — it redirects (replacing history) to the canonical path rather
+ * than 404ing or silently rendering the wrong tab.
+ */
+export const DEFAULT_BUILDER_TAB = "configuration";
+
 /** Where every row control lands. One destination, named once. */
-export function assistantHref(id: number, tab = "setup"): string {
+export function assistantHref(id: number, tab: string = DEFAULT_BUILDER_TAB): string {
   return `${LIST_PATH}/${id}/${tab}`;
 }
 
@@ -285,9 +371,12 @@ export function assistantHref(id: number, tab = "setup"): string {
 export function everyRenderableString(): string[] {
   return [
     ...Object.values(LIST),
+    ...Object.values(CARD),
     ...Object.values(BUILDER),
     ...Object.values(PRESET_RECOVERY),
     ...Object.values(VOICE_MODEL),
+    ...Object.values(CONFIGURATION),
+    ...Object.values(PROMPT_TAB),
     ...Object.values(CREATE),
     PROVIDER_LINKED,
     PROVIDER_NOT_LINKED,
