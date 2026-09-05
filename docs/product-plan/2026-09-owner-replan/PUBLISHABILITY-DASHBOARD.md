@@ -24,17 +24,17 @@ owner-authorised migrations (B-09) and external certification (X-01…X-07).
 ## Scores
 
 <!-- scores:start -->
-_Computed 2026-09-04 19:06 UTC from V5-BUILD-CHECKLIST.md._
+_Computed 2026-09-05 01:13 UTC from V5-BUILD-CHECKLIST.md._
 
-Program-wide: **P0 items remaining 25** · owner blockers 18 · external blockers 1.
+Program-wide: **P0 items remaining 23** · owner blockers 20 · external blockers 1.
 
 ### E. Owner Visual Acceptance
 
-**Readiness 0%** = 0 ÷ 72 applicable weight · P0 remaining 14 · blockers 3 (owner 3, external 0)
+**Readiness 50.7%** = 76 ÷ 150 applicable weight · P0 remaining 14 · blockers 5 (owner 5, external 0)
 
 | Category | Items (status) |
 |---|---|
-| Palette approved | A-01:IN PROGRESS, F-01:IN PROGRESS, F-02:IN PROGRESS, F-03:IN PROGRESS, F-07:IN PROGRESS |
+| Palette approved | A-01:IN PROGRESS, F-01:VERIFIED COMPLETE, F-02:VERIFIED COMPLETE, F-03:VERIFIED COMPLETE, F-07:VERIFIED COMPLETE |
 | Visual hierarchy | A-02:IN PROGRESS |
 | Spacing and rhythm | A-03:IN PROGRESS |
 | Content density | A-04:IN PROGRESS |
@@ -45,20 +45,30 @@ Program-wide: **P0 items remaining 25** · owner blockers 18 · external blocker
 | Tablet review | A-09:IN PROGRESS |
 | Mobile review | A-10:IN PROGRESS |
 | Final acceptance | A-11:BLOCKED—OWNER |
+| Interaction and motion | A-12:VERIFIED COMPLETE |
+| Product header | A-13:VERIFIED COMPLETE |
+| Recommendations | A-14:IN PROGRESS |
+| Motion coverage | G-01:VERIFIED COMPLETE, G-02:VERIFIED COMPLETE, G-03:VERIFIED COMPLETE, G-04:VERIFIED COMPLETE, G-05:VERIFIED COMPLETE |
+| Theme compliance | G-06:VERIFIED COMPLETE |
+| Discovery redesign | G-07:BLOCKED—OWNER |
+| Routing and scroll | G-08:VERIFIED COMPLETE, G-09:VERIFIED COMPLETE, G-10:VERIFIED COMPLETE |
+| Full-screen hero | G-11:VERIFIED COMPLETE |
+| Marketing strategy | G-12:VERIFIED COMPLETE, G-13:IN PROGRESS |
+| Media | G-14:BLOCKED—OWNER, G-15:NOT STARTED |
 
 ### A. Company website
 
-**Readiness 66%** = 62 ÷ 94 applicable weight · P0 remaining 4 · blockers 3 (owner 2, external 1)
+**Readiness 91.5%** = 86 ÷ 94 applicable weight · P0 remaining 0 · blockers 3 (owner 2, external 1)
 
 | Category | Items (status) |
 |---|---|
-| Brand and visual consistency | F-01:IN PROGRESS, F-02:IN PROGRESS, F-04:VERIFIED COMPLETE, F-07:IN PROGRESS |
+| Brand and visual consistency | F-01:VERIFIED COMPLETE, F-02:VERIFIED COMPLETE, F-04:VERIFIED COMPLETE, F-07:VERIFIED COMPLETE |
 | Content and truthful claims | W-01:VERIFIED COMPLETE, W-02:VERIFIED COMPLETE, W-03:VERIFIED COMPLETE, W-07:VERIFIED COMPLETE, W-08:VERIFIED COMPLETE, W-13:VERIFIED COMPLETE |
 | Responsive navigation | W-04:VERIFIED COMPLETE, W-05:VERIFIED COMPLETE, W-06:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE, F-05:VERIFIED COMPLETE |
-| Discovery conversion | W-09:IMPLEMENTED—UNVERIFIED, W-10:VERIFIED COMPLETE |
+| Discovery conversion | W-09:VERIFIED COMPLETE, W-10:VERIFIED COMPLETE |
 | Pricing | W-11:VERIFIED COMPLETE |
-| Accessibility | V-04:VERIFIED COMPLETE, V-05:IMPLEMENTED—UNVERIFIED |
-| Performance | V-06:IN PROGRESS, W-14:VERIFIED COMPLETE |
+| Accessibility | V-04:VERIFIED COMPLETE, V-05:VERIFIED COMPLETE |
+| Performance | V-06:VERIFIED COMPLETE, W-14:VERIFIED COMPLETE |
 | SEO and metadata | W-15:IMPLEMENTED—UNVERIFIED |
 | Legal approval | W-16:BLOCKED—OWNER |
 | Production-domain verification | X-10:BLOCKED—OWNER, X-14:BLOCKED—EXTERNAL |
@@ -103,11 +113,11 @@ Program-wide: **P0 items remaining 25** · owner blockers 18 · external blocker
 
 ### D. SiteMint public-launch readiness
 
-**Readiness 50.5%** = 47 ÷ 93 applicable weight · P0 remaining 6 · blockers 11 (owner 10, external 1)
+**Readiness 55.9%** = 52 ÷ 93 applicable weight · P0 remaining 5 · blockers 11 (owner 10, external 1)
 
 | Category | Items (status) |
 |---|---|
-| Company website production-ready | W-01:VERIFIED COMPLETE, W-02:VERIFIED COMPLETE, W-03:VERIFIED COMPLETE, W-04:VERIFIED COMPLETE, W-07:VERIFIED COMPLETE, W-09:IMPLEMENTED—UNVERIFIED, W-10:VERIFIED COMPLETE, W-11:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE, W-13:VERIFIED COMPLETE, W-15:IMPLEMENTED—UNVERIFIED |
+| Company website production-ready | W-01:VERIFIED COMPLETE, W-02:VERIFIED COMPLETE, W-03:VERIFIED COMPLETE, W-04:VERIFIED COMPLETE, W-07:VERIFIED COMPLETE, W-09:VERIFIED COMPLETE, W-10:VERIFIED COMPLETE, W-11:VERIFIED COMPLETE, W-12:VERIFIED COMPLETE, W-13:VERIFIED COMPLETE, W-15:IMPLEMENTED—UNVERIFIED |
 | Private-beta evidence complete | X-01:BLOCKED—OWNER, X-03:BLOCKED—OWNER, X-04:BLOCKED—OWNER, X-06:BLOCKED—OWNER |
 | Public pricing decisions | X-11:BLOCKED—OWNER |
 | Production OAuth and domains | X-10:BLOCKED—OWNER |
