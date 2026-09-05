@@ -79,7 +79,7 @@ const STAGE_COLORS: Record<string, string> = {
 };
 const PRIORITY_BADGE: Record<string, string> = {
   High: "bg-red-100 text-red-600", Medium: "bg-yellow-50 text-yellow-700",
-  Low: "bg-gray-100 text-gray-500",
+  Low: "bg-muted text-muted-foreground",
 };
 const PRIORITY_ORDER: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
 const CLIENT_STATUSES = new Set(["Client", "Maintenance Client"]);
@@ -91,13 +91,13 @@ function StatCard({ label, value, sub, icon: Icon, color, loading }: {
   icon: React.ElementType; color: string; loading: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex items-start gap-4">
+    <div className="bg-white rounded-xl border border-border shadow-sm p-5 flex items-start gap-4">
       <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: color + "20" }}>
         <Icon className="w-5 h-5" style={{ color }} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase mb-1">{label}</p>
-        {loading ? <div className="h-7 w-20 bg-gray-200 rounded animate-pulse" /> : (
+        {loading ? <div className="h-7 w-20 bg-border rounded animate-pulse" /> : (
           <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
         )}
         <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
@@ -111,13 +111,13 @@ function MiniStatCard({ label, value, icon: Icon, color, loading }: {
   label: string; value: string; icon: React.ElementType; color: string; loading: boolean;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3">
+    <div className="bg-white rounded-lg border border-border shadow-sm px-4 py-3 flex items-center gap-3">
       <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ background: color + "20" }}>
         <Icon className="w-3.5 h-3.5" style={{ color }} />
       </div>
       <div className="min-w-0">
         <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-        {loading ? <div className="h-4 w-12 bg-gray-200 rounded animate-pulse mt-0.5" /> : (
+        {loading ? <div className="h-4 w-12 bg-border rounded animate-pulse mt-0.5" /> : (
           <p className="text-sm font-bold text-foreground leading-tight">{value}</p>
         )}
       </div>
@@ -131,14 +131,14 @@ function SummaryCard({ icon: Icon, color, title, body, href, hrefLabel, loading 
   href?: string; hrefLabel?: string; loading?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
+    <div className="bg-white rounded-xl border border-border shadow-sm p-4 flex items-center gap-3">
       <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: color + "20" }}>
         <Icon className="w-4 h-4" style={{ color }} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">{title}</p>
         {loading ? (
-          <div className="h-4 w-28 bg-gray-200 rounded animate-pulse mt-1" />
+          <div className="h-4 w-28 bg-border rounded animate-pulse mt-1" />
         ) : (
           <p className="text-sm font-medium text-foreground mt-0.5">{body}</p>
         )}
@@ -157,7 +157,7 @@ function SummaryCard({ icon: Icon, color, title, body, href, hrefLabel, loading 
 const CustomBarTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs">
+    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       <p className="text-muted-foreground">{payload[0]?.value} deal{payload[0]?.value !== 1 ? "s" : ""}</p>
     </div>
@@ -167,7 +167,7 @@ const CustomBarTooltip = ({ active, payload, label }: { active?: boolean; payloa
 const CustomLineTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs">
+    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       <p className="text-emerald-600 font-medium">{fmt(payload[0]?.value || 0)}</p>
     </div>
@@ -437,7 +437,7 @@ export default function CrmExecutiveDashboard() {
       "hot-lead":{ label: "Hot Lead",      cls: "bg-orange-100 text-orange-700" },
       inbox:     { label: "Inbox",         cls: "bg-sky-100 text-sky-700" },
     };
-    const { label, cls } = map[type] ?? { label: type, cls: "bg-gray-100 text-gray-600" };
+    const { label, cls } = map[type] ?? { label: type, cls: "bg-muted text-muted-foreground" };
     return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${cls}`}>{label}</span>;
   };
 
@@ -456,7 +456,7 @@ export default function CrmExecutiveDashboard() {
           <div className="flex items-center gap-2">
             <Link href="/admin/dashboard">
               <button title="Discovery Portal"
-                className="text-xs text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                className="text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-2 hover:bg-accent transition-colors">
                 Discovery Portal
               </button>
             </Link>
@@ -464,7 +464,7 @@ export default function CrmExecutiveDashboard() {
               onClick={() => load(true)}
               disabled={refreshing || loading}
               title="Refresh dashboard"
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors disabled:opacity-40"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             </button>
@@ -482,7 +482,7 @@ export default function CrmExecutiveDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
             {quickActions.map(({ icon: Icon, label, sub, href, color, bg, badge, badgeColor }) => (
               <Link key={href} href={href}>
-                <div className="relative bg-white rounded-xl border border-gray-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-gray-300 transition-all group">
+                <div className="relative bg-white rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-card-border transition-all group">
                   {badge !== null && badge !== undefined && (
                     <span className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeColor ?? "bg-blue-500"} text-white text-[10px] font-bold flex items-center justify-center leading-none`}>
                       {(badge as number) > 99 ? "99+" : badge}
@@ -500,8 +500,8 @@ export default function CrmExecutiveDashboard() {
         </div>
 
         {/* ── 1. Leads Needing Follow-Up ──────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
               <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Leads Needing Follow-Up</h2>
@@ -514,11 +514,11 @@ export default function CrmExecutiveDashboard() {
           </div>
 
           {loading ? (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-border/40">
               {Array.from<unknown>({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
-                  <div className="h-4 w-20 bg-gray-200 rounded-full shrink-0" />
-                  <div className="flex-1"><div className="h-3 w-36 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-24 bg-gray-100 rounded" /></div>
+                  <div className="h-4 w-20 bg-border rounded-full shrink-0" />
+                  <div className="flex-1"><div className="h-3 w-36 bg-border rounded mb-1.5" /><div className="h-2.5 w-24 bg-muted rounded" /></div>
                 </div>
               ))}
             </div>
@@ -529,12 +529,12 @@ export default function CrmExecutiveDashboard() {
               <p className="text-xs text-muted-foreground mt-1">Nothing overdue or due today.</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-border/40">
               {followUpLeads.map(l => (
                 <button
                   key={l.id}
                   onClick={() => navigate(`/admin/crm/leads/${l.id}`)}
-                  className={`w-full flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left ${l.overdue ? "border-l-2 border-red-400" : ""}`}
+                  className={`w-full flex items-start gap-3 px-5 py-3.5 hover:bg-accent transition-colors text-left ${l.overdue ? "border-l-2 border-red-400" : ""}`}
                 >
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${l.overdue ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
                     {l.overdue ? "Overdue" : "Due Today"}
@@ -566,9 +566,9 @@ export default function CrmExecutiveDashboard() {
               loading={loading}
             />
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
-                <Headphones className="w-4 h-4 text-gray-400" />
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-muted">
+                <Headphones className="w-4 h-4 text-muted-foreground/60" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Receptionist Health</p>
@@ -582,8 +582,8 @@ export default function CrmExecutiveDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
           {/* Today's Priorities / Tasks */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
               <div className="flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-orange-500" />
                 <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Today's Tasks</h2>
@@ -596,11 +596,11 @@ export default function CrmExecutiveDashboard() {
             </div>
 
             {loading ? (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {Array.from<unknown>({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
-                    <div className="h-4 w-20 bg-gray-200 rounded-full shrink-0" />
-                    <div className="flex-1"><div className="h-3 w-36 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-24 bg-gray-100 rounded" /></div>
+                    <div className="h-4 w-20 bg-border rounded-full shrink-0" />
+                    <div className="flex-1"><div className="h-3 w-36 bg-border rounded mb-1.5" /><div className="h-2.5 w-24 bg-muted rounded" /></div>
                   </div>
                 ))}
               </div>
@@ -611,12 +611,12 @@ export default function CrmExecutiveDashboard() {
                 <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {priorities.map((item, i) => (
                   <button
                     key={i}
                     onClick={() => navigate(item.href)}
-                    className={`w-full flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left ${item.urgent ? "border-l-2 border-red-400" : ""}`}
+                    className={`w-full flex items-start gap-3 px-5 py-3.5 hover:bg-accent transition-colors text-left ${item.urgent ? "border-l-2 border-red-400" : ""}`}
                   >
                     <PriorityBadge type={item.type} />
                     <div className="flex-1 min-w-0">
@@ -631,12 +631,12 @@ export default function CrmExecutiveDashboard() {
           </div>
 
           {/* Hot Leads to Review */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
               <div className="flex items-center gap-2">
                 <Flame className="w-4 h-4 text-orange-500" />
                 <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Hot Leads to Review</h2>
-                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">Rule-based</span>
+                <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">Rule-based</span>
               </div>
               <Link href="/admin/crm/leads">
                 <button className="text-xs text-primary hover:underline flex items-center gap-1">
@@ -646,18 +646,18 @@ export default function CrmExecutiveDashboard() {
             </div>
 
             {loading ? (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {Array.from<unknown>({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
-                    <div className="flex-1"><div className="h-3 w-28 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-20 bg-gray-100 rounded" /></div>
-                    <div className="h-4 w-14 bg-gray-100 rounded-full" />
+                    <div className="w-8 h-8 rounded-full bg-border shrink-0" />
+                    <div className="flex-1"><div className="h-3 w-28 bg-border rounded mb-1.5" /><div className="h-2.5 w-20 bg-muted rounded" /></div>
+                    <div className="h-4 w-14 bg-muted rounded-full" />
                   </div>
                 ))}
               </div>
             ) : hotLeads.length === 0 ? (
               <div className="py-12 text-center">
-                <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <Users className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">No leads to review</p>
                 <p className="text-xs text-muted-foreground mt-1">Add leads or import contacts to get started.</p>
                 <Link href="/admin/crm/leads">
@@ -665,14 +665,14 @@ export default function CrmExecutiveDashboard() {
                 </Link>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {hotLeads.map(lead => {
                   const initials = lead.name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase();
                   const colorIdx = lead.name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 8;
                   const colors = ["bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500","bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500"];
                   return (
                     <Link key={lead.id} href={`/admin/crm/leads/${lead.id}`}>
-                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-accent transition-colors cursor-pointer">
                         <div className={`w-8 h-8 rounded-full ${colors[colorIdx]} flex items-center justify-center shrink-0`}>
                           <span className="text-white text-[10px] font-bold">{initials}</span>
                         </div>
@@ -684,7 +684,7 @@ export default function CrmExecutiveDashboard() {
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[lead.priority] ?? "bg-gray-100 text-gray-500"}`}>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[lead.priority] ?? "bg-muted text-muted-foreground"}`}>
                             {lead.priority}
                           </span>
                           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
@@ -718,11 +718,11 @@ export default function CrmExecutiveDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {loading
               ? Array.from<unknown>({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 animate-pulse">
-                    <div className="w-10 h-10 rounded-lg bg-gray-200 mb-3" />
-                    <div className="h-2 w-16 bg-gray-200 rounded mb-2" />
-                    <div className="h-7 w-14 bg-gray-200 rounded mb-1" />
-                    <div className="h-2 w-20 bg-gray-100 rounded" />
+                  <div key={i} className="bg-white rounded-xl border border-border shadow-sm p-5 animate-pulse">
+                    <div className="w-10 h-10 rounded-lg bg-border mb-3" />
+                    <div className="h-2 w-16 bg-border rounded mb-2" />
+                    <div className="h-7 w-14 bg-border rounded mb-1" />
+                    <div className="h-2 w-20 bg-muted rounded" />
                   </div>
                 ))
               : statCards.map(card => <StatCard key={card.label} {...card} loading={false} />)
@@ -731,7 +731,7 @@ export default function CrmExecutiveDashboard() {
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="font-semibold text-foreground">Pipeline Distribution</h2>
@@ -744,10 +744,10 @@ export default function CrmExecutiveDashboard() {
                 </Link>
               </div>
               {loading ? (
-                <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="h-48 bg-muted rounded-lg animate-pulse" />
               ) : !stats?.pipeline.some(p => p.count > 0) ? (
                 <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
-                  <TrendingUp className="w-8 h-8 text-gray-200 mb-2" />
+                  <TrendingUp className="w-8 h-8 text-muted-foreground/30 mb-2" />
                   <p className="text-sm">No deals yet</p>
                   <Link href="/admin/crm/deals">
                     <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700">+ Create your first deal</button>
@@ -767,7 +767,7 @@ export default function CrmExecutiveDashboard() {
               )}
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="font-semibold text-foreground">Monthly Revenue</h2>
@@ -776,10 +776,10 @@ export default function CrmExecutiveDashboard() {
                 {stats && <span className="text-xs text-muted-foreground">Last 6 months</span>}
               </div>
               {loading ? (
-                <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="h-48 bg-muted rounded-lg animate-pulse" />
               ) : !stats || !hasAnyRevenue ? (
                 <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
-                  <DollarSign className="w-8 h-8 text-gray-200 mb-2" />
+                  <DollarSign className="w-8 h-8 text-muted-foreground/30 mb-2" />
                   <p className="text-sm">No revenue data yet</p>
                   <p className="text-xs text-muted-foreground mt-1">Close deals to see monthly trends</p>
                   <Link href="/admin/crm/deals">
@@ -803,8 +803,8 @@ export default function CrmExecutiveDashboard() {
           </div>
 
           {/* Recent Deals */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-emerald-500" />
                 <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Recent Deals</h2>
@@ -816,18 +816,18 @@ export default function CrmExecutiveDashboard() {
               </Link>
             </div>
             {loading ? (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {Array.from<unknown>({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-4 px-5 py-3.5 animate-pulse">
-                    <div className="h-3 w-32 bg-gray-200 rounded flex-1" />
-                    <div className="h-3 w-16 bg-gray-100 rounded" />
-                    <div className="h-5 w-16 bg-gray-100 rounded-full" />
+                    <div className="h-3 w-32 bg-border rounded flex-1" />
+                    <div className="h-3 w-16 bg-muted rounded" />
+                    <div className="h-5 w-16 bg-muted rounded-full" />
                   </div>
                 ))}
               </div>
             ) : recentDeals.length === 0 ? (
               <div className="py-12 text-center">
-                <Trophy className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <Trophy className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">No deals yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Create your first deal to start tracking revenue.</p>
                 <Link href="/admin/crm/deals">
@@ -837,10 +837,10 @@ export default function CrmExecutiveDashboard() {
                 </Link>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {recentDeals.slice(0, 5).map(deal => (
                   <Link key={deal.id} href="/admin/crm/deals">
-                    <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-3 px-5 py-3 hover:bg-accent transition-colors cursor-pointer">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{deal.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{deal.leadName || "No contact"}</p>
@@ -859,8 +859,8 @@ export default function CrmExecutiveDashboard() {
         </div>
 
         {/* ── Recent Communications ────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-sky-500" />
               <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Recent Communications</h2>
@@ -873,18 +873,18 @@ export default function CrmExecutiveDashboard() {
           </div>
 
           {loading ? (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-border/40">
               {Array.from<unknown>({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
-                  <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
-                  <div className="flex-1"><div className="h-3 w-32 bg-gray-200 rounded mb-1.5" /><div className="h-2.5 w-20 bg-gray-100 rounded" /></div>
-                  <div className="h-3 w-10 bg-gray-100 rounded" />
+                  <div className="w-7 h-7 rounded-full bg-border shrink-0" />
+                  <div className="flex-1"><div className="h-3 w-32 bg-border rounded mb-1.5" /><div className="h-2.5 w-20 bg-muted rounded" /></div>
+                  <div className="h-3 w-10 bg-muted rounded" />
                 </div>
               ))}
             </div>
           ) : recentConvs.length === 0 ? (
             <div className="py-12 text-center px-5">
-              <MessageSquare className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <MessageSquare className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
               <p className="text-xs text-muted-foreground mt-1">SMS and calls will appear here once Twilio is connected.</p>
               <Link href="/admin/crm/inbox">
@@ -894,7 +894,7 @@ export default function CrmExecutiveDashboard() {
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-border/40">
               {recentConvs.map((conv, i) => {
                 const lastMsg = conv.messages[conv.messages.length - 1];
                 const isCall = lastMsg?.channel === "call";
@@ -902,8 +902,8 @@ export default function CrmExecutiveDashboard() {
                 const contactName = conv.lead?.name ?? "Unknown";
                 return (
                   <Link key={i} href="/admin/crm/inbox">
-                    <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
-                      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+                    <div className="flex items-center gap-3 px-5 py-3 hover:bg-accent transition-colors cursor-pointer">
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0">
                         {isCall
                           ? <Phone className="w-3.5 h-3.5 text-green-600" />
                           : <MessageSquare className="w-3.5 h-3.5 text-sky-500" />
@@ -941,9 +941,9 @@ export default function CrmExecutiveDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {loading
               ? Array.from<unknown>({ length: 2 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm px-4 py-3 animate-pulse">
-                    <div className="w-7 h-7 rounded-md bg-gray-200 mb-2" />
-                    <div className="h-4 w-12 bg-gray-200 rounded" />
+                  <div key={i} className="bg-white rounded-lg border border-border shadow-sm px-4 py-3 animate-pulse">
+                    <div className="w-7 h-7 rounded-md bg-border mb-2" />
+                    <div className="h-4 w-12 bg-border rounded" />
                   </div>
                 ))
               : vanityCards.map(card => <MiniStatCard key={card.label} {...card} loading={false} />)

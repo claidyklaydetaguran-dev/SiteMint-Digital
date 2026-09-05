@@ -223,8 +223,8 @@ export function CrmNotFound() {
   return (
     <CrmLayout>
       <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
-        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-          <AlertCircle className="w-6 h-6 text-gray-400" />
+        <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+          <AlertCircle className="w-6 h-6 text-muted-foreground/60" />
         </div>
         <h1 className="text-lg font-semibold text-foreground">Page not found</h1>
         <p className="text-sm text-muted-foreground max-w-sm">
@@ -289,7 +289,7 @@ function EmailComposeModal({ leads, templates, onClose }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
           <h2 className="font-semibold text-foreground">New Email</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-4 h-4" /></button>
         </div>
@@ -303,7 +303,7 @@ function EmailComposeModal({ leads, templates, onClose }: {
           </div>
         ) : (
           <>
-            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+            <div className="divide-y divide-border/60 flex-1 overflow-y-auto">
               <div className="px-5 py-2.5 relative">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">To:</span>
@@ -316,7 +316,7 @@ function EmailComposeModal({ leads, templates, onClose }: {
                       <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-blue-400 hover:text-blue-600"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder-gray-400"
+                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60"
                       placeholder="Enter name or email" value={toSearch} onChange={e => setToSearch(e.target.value)} />
                   )}
                   <div className="ml-auto flex gap-2 text-xs text-blue-500">
@@ -325,10 +325,10 @@ function EmailComposeModal({ leads, templates, onClose }: {
                   </div>
                 </div>
                 {toResults.length > 0 && (
-                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
+                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-border shadow-xl z-10 overflow-hidden">
                     {toResults.map(l => (
                       <button key={l.id} onClick={() => { setToLead(l); setToSearch(""); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors">
                         <div className={`w-8 h-8 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                           <span className="text-white text-xs font-bold">{ini(l.name)}</span>
                         </div>
@@ -344,23 +344,23 @@ function EmailComposeModal({ leads, templates, onClose }: {
               {ccOpen && (
                 <div className="px-5 py-2.5 flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">CC:</span>
-                  <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="CC email addresses" value={cc} onChange={e => setCc(e.target.value)} />
+                  <input className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60" placeholder="CC email addresses" value={cc} onChange={e => setCc(e.target.value)} />
                 </div>
               )}
               {bccOpen && (
                 <div className="px-5 py-2.5 flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">BCC:</span>
-                  <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="BCC email addresses" value={bcc} onChange={e => setBcc(e.target.value)} />
+                  <input className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60" placeholder="BCC email addresses" value={bcc} onChange={e => setBcc(e.target.value)} />
                 </div>
               )}
               <div className="px-5 py-2.5 flex items-center gap-2">
                 <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">Subject:</span>
-                <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} />
+                <input className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} />
               </div>
               <div className="px-5 py-2.5">
-                <textarea className="w-full text-sm focus:outline-none resize-none placeholder-gray-400 min-h-[180px]"
+                <textarea className="w-full text-sm focus:outline-none resize-none placeholder:text-muted-foreground/60 min-h-[180px]"
                   placeholder="Write your message…" value={body} onChange={e => setBody(e.target.value)} />
-                <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-muted-foreground">
+                <div className="mt-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
                   <p>Best,</p>
                   <p className="font-medium text-foreground">SiteMint Digital Solutions</p>
                 </div>
@@ -371,15 +371,15 @@ function EmailComposeModal({ leads, templates, onClose }: {
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
               </div>
             )}
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
+            <div className="px-5 py-3 border-t border-border/60 flex items-center gap-2">
               <div className="relative">
                 <button onClick={() => setTplOpen(o => !o)} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">📋 Templates</button>
                 {tplOpen && (
-                  <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-10 overflow-hidden">
+                  <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-border rounded-xl shadow-xl z-10 overflow-hidden">
                     {templates.length === 0
                       ? <p className="p-3 text-xs text-muted-foreground">No templates yet.</p>
                       : templates.map(t => (
-                          <button key={t.id} onClick={() => applyTemplate(t)} className="w-full text-left px-4 py-2.5 text-xs hover:bg-gray-50 transition-colors">
+                          <button key={t.id} onClick={() => applyTemplate(t)} className="w-full text-left px-4 py-2.5 text-xs hover:bg-accent transition-colors">
                             <p className="font-medium text-foreground">{t.name}</p>
                             <p className="text-muted-foreground truncate">{t.subject}</p>
                           </button>
@@ -418,20 +418,20 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
     : leads.filter(l => l.phone).slice(0, 6);
 
   return (
-    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200]">
-      <div className="p-3 border-b border-gray-100">
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-border shadow-2xl z-[200]">
+      <div className="p-3 border-b border-border/60">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <input autoFocus className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          <input autoFocus className="w-full pl-8 pr-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
             placeholder="Search name or phone…" value={q} onChange={e => setQ(e.target.value)} />
         </div>
       </div>
-      <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+      <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
         {results.length === 0
           ? <p className="p-4 text-xs text-muted-foreground text-center">No leads with phone found</p>
           : results.map(l => (
               <a key={l.id} href={`tel:${l.phone}`} onClick={onClose}
-                className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors">
                 <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                   <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
                 </div>
@@ -487,7 +487,7 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
           <h2 className="font-semibold text-foreground flex items-center gap-2"><MessageSquare className="w-4 h-4 text-sky-500" /> New SMS</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
@@ -506,20 +506,20 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto"><MessageSquare className="w-6 h-6 text-blue-600" /></div>
             <h3 className="font-semibold text-foreground">SMS not configured yet</h3>
             <p className="text-sm text-muted-foreground">Add Twilio credentials to enable two-way texting.</p>
-            <div className="bg-gray-50 rounded-xl p-4 text-left text-xs space-y-1 text-muted-foreground">
+            <div className="bg-muted rounded-xl p-4 text-left text-xs space-y-1 text-muted-foreground">
               <p className="font-semibold text-foreground">Required env vars:</p>
               {["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"].map(k => (
-                <p key={k}><code className="bg-gray-200 px-1 rounded">{k}</code></p>
+                <p key={k}><code className="bg-border px-1 rounded">{k}</code></p>
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">Dismiss</button>
+              <button onClick={onClose} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Dismiss</button>
               <Link href="/admin/crm/settings"><button onClick={onClose} className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors">Go to Settings</button></Link>
             </div>
           </div>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
-            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+            <div className="divide-y divide-border/60 flex-1 overflow-y-auto">
               <div className="px-5 py-2.5 relative">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-8 shrink-0">To:</span>
@@ -533,15 +533,15 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                       <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-sky-400 hover:text-sky-600"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder-gray-400"
+                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60"
                       placeholder="Search lead by name or phone…" value={toSearch} onChange={e => setToSearch(e.target.value)} />
                   )}
                 </div>
                 {toResults.length > 0 && (
-                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
+                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-border shadow-xl z-10 overflow-hidden">
                     {toResults.map(l => (
                       <button key={l.id} onClick={() => { setToLead(l); setToSearch(""); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors">
                         <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                           <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
                         </div>
@@ -556,7 +556,7 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                 )}
               </div>
               <div className="px-5 py-3">
-                <textarea className="w-full text-sm focus:outline-none resize-none placeholder-gray-400 min-h-[160px]"
+                <textarea className="w-full text-sm focus:outline-none resize-none placeholder:text-muted-foreground/60 min-h-[160px]"
                   placeholder="Write your SMS message… (160 chars per segment)"
                   value={body} onChange={e => setBody(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); }} />
@@ -568,7 +568,7 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
               </div>
             )}
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
+            <div className="px-5 py-3 border-t border-border/60 flex items-center gap-2">
               <p className="text-xs text-muted-foreground">⌘+Enter to send</p>
               <div className="ml-auto flex items-center gap-2">
                 <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
@@ -619,7 +619,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
           <h2 className="font-semibold text-foreground">New Contact</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
@@ -628,14 +628,14 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
             <p className="text-sm text-muted-foreground mb-3">Search for an existing contact first to avoid duplicates.</p>
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <input autoFocus className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              <input autoFocus className="w-full pl-9 pr-3 py-2.5 text-sm border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 placeholder="Enter name or phone number" value={q} onChange={e => setQ(e.target.value)} />
             </div>
             {searchResults.length > 0 && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden mb-3 divide-y divide-gray-50">
+              <div className="border border-border rounded-xl overflow-hidden mb-3 divide-y divide-border/40">
                 {searchResults.map(l => (
                   <Link key={l.id} href={`/admin/crm/leads/${l.id}`}>
-                    <div onClick={onClose} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
+                    <div onClick={onClose} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent cursor-pointer">
                       <div className={`w-8 h-8 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                         <span className="text-white text-xs font-bold">{ini(l.name)}</span>
                       </div>
@@ -650,7 +650,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               </div>
             )}
             <button onClick={() => { setForm(f => ({ ...f, name: q })); setStep("form"); }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-muted-foreground hover:border-blue-300 hover:text-blue-600 transition-colors">
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-blue-300 hover:text-blue-600 transition-colors">
               <Plus className="w-4 h-4" /> Create new contact
             </button>
           </div>
@@ -670,7 +670,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               <div key={key}>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                 <input type={type} placeholder={ph}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   value={(form as Record<string, string>)[key]}
                   onChange={e => {
                     const v = e.target.value;
@@ -683,14 +683,14 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                   value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
                   {LEAD_STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Priority</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                   value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
                   {["High","Medium","Low"].map(p => <option key={p}>{p}</option>)}
                 </select>
@@ -698,7 +698,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-              <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+              <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                 value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
                 <option value="">Unassigned</option>
                 <option>Claidy Taguran</option>
@@ -707,7 +707,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               </select>
             </div>
             <div className="flex gap-2 pt-1">
-              <button onClick={() => setStep("search")} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">Back</button>
+              <button onClick={() => setStep("search")} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Back</button>
               <Button className="flex-1" onClick={save} disabled={saving || !form.name || !form.email}>
                 {saving ? "Saving…" : "Create Contact"}
               </Button>
@@ -741,8 +741,8 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
   const urgent = notifications.filter(n => n.urgent);
   const normal  = notifications.filter(n => !n.urgent);
   return (
-    <div ref={ref} className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-border shadow-2xl z-[200] overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-foreground">Notifications</span>
           {notifications.length > 0 && (
@@ -753,16 +753,16 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
       </div>
       {notifications.length === 0 ? (
         <div className="p-8 text-center">
-          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-gray-300" /></div>
+          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-muted-foreground/40" /></div>
           <p className="text-sm font-medium text-foreground">All caught up!</p>
           <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
         </div>
       ) : (
-        <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+        <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
           {[...urgent, ...normal].map(n => (
             <button key={n.id} onClick={() => { navigate(n.href); onClose(); }}
-              className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left ${n.urgent ? "border-l-2 border-red-400" : ""}`}>
-              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type] ?? "bg-gray-50"} flex items-center justify-center shrink-0 mt-0.5`}>
+              className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-accent transition-colors text-left ${n.urgent ? "border-l-2 border-red-400" : ""}`}>
+              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type] ?? "bg-muted"} flex items-center justify-center shrink-0 mt-0.5`}>
                 <NotifIcon type={n.type} />
               </div>
               <div className="flex-1 min-w-0">
@@ -775,7 +775,7 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
         </div>
       )}
       {notifications.length > 0 && (
-        <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
+        <div className="px-4 py-2.5 border-t border-border/60 bg-muted">
           <Link href="/admin/crm/tasks"><button onClick={onClose} className="text-xs text-primary font-medium hover:underline w-full text-center">Go to Tasks page</button></Link>
         </div>
       )}
@@ -784,7 +784,7 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
 }
 
 // ── Global Search ──────────────────────────────────────────────────────────────
-const PRIORITY_BADGE: Record<string, string> = { High:"bg-red-50 text-red-600", Low:"bg-gray-100 text-gray-500" };
+const PRIORITY_BADGE: Record<string, string> = { High:"bg-red-50 text-red-600", Low:"bg-muted text-muted-foreground" };
 
 function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: () => void; onNavigate: (href: string) => void }) {
   const [results, setResults] = useState<CrmLead[]>([]);
@@ -824,20 +824,20 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
   }, [results, selIdx, go, onClose]);
 
   return (
-    <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
+    <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-border shadow-2xl z-[200] overflow-hidden">
       {loading ? (
         <div className="flex items-center gap-2.5 px-4 py-3.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin shrink-0" /> Searching…
+          <div className="w-3 h-3 border-2 border-border border-t-muted-foreground rounded-full animate-spin shrink-0" /> Searching…
         </div>
       ) : fetchError ? (
         <div className="flex items-center gap-2 px-4 py-3.5 text-xs text-red-600"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> Search unavailable — please try again.</div>
       ) : results.length === 0 ? (
         <div className="px-4 py-3.5 text-xs text-muted-foreground text-center">No results for <span className="font-medium text-foreground">"{q}"</span></div>
       ) : (
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-border/40">
           {results.map((l, idx) => (
             <button key={l.id} onClick={() => go(l)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${idx === selIdx ? "bg-blue-50" : "hover:bg-gray-50"}`}>
+              className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${idx === selIdx ? "bg-blue-50" : "hover:bg-accent"}`}>
               <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                 <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
               </div>
@@ -846,8 +846,8 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
                 <p className="text-xs text-muted-foreground truncate">{l.company ? `${l.company} · ` : ""}{l.email || l.phone || ""}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {l.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${LEAD_STATUS_STYLES[normalizeLeadStatus(l.status)]?.pill ?? "bg-gray-100 text-gray-600"}`}>{normalizeLeadStatus(l.status)}</span>}
-                {l.priority && l.priority !== "Medium" && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[l.priority] ?? "bg-gray-100 text-gray-500"}`}>{l.priority}</span>}
+                {l.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${LEAD_STATUS_STYLES[normalizeLeadStatus(l.status)]?.pill ?? "bg-muted text-muted-foreground"}`}>{normalizeLeadStatus(l.status)}</span>}
+                {l.priority && l.priority !== "Medium" && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[l.priority] ?? "bg-muted text-muted-foreground"}`}>{l.priority}</span>}
               </div>
             </button>
           ))}
@@ -1210,18 +1210,18 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
               <ChevronDown className={`w-3 h-3 text-white/40 transition-transform ${modal === "profile" ? "rotate-180" : ""}`} />
             </button>
             {modal === "profile" && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden py-1">
-                <div className="px-4 py-2.5 border-b border-gray-100">
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-border z-[200] overflow-hidden py-1">
+                <div className="px-4 py-2.5 border-b border-border/60">
                   <p className="text-xs font-semibold text-foreground">SiteMint Digital</p>
                   <p className="text-xs text-muted-foreground">Admin</p>
                 </div>
                 <Link href="/admin/crm/settings">
-                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors flex items-center gap-2">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
                     <Settings className="w-3.5 h-3.5 text-muted-foreground" /> Settings
                   </button>
                 </Link>
                 <Link href="/admin/dashboard">
-                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors flex items-center gap-2">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
                     <LayoutDashboard className="w-3.5 h-3.5 text-muted-foreground" /> Discovery Portal
                   </button>
                 </Link>
