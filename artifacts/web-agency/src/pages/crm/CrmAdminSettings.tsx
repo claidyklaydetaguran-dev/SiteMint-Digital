@@ -12,7 +12,7 @@ function AdminCard({ icon: Icon, title, description, color, href }: {
   icon: React.ElementType; title: string; description: string; color: string; href?: string;
 }) {
   const Inner = () => (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer group h-full">
+    <div className="bg-white rounded-xl border border-border p-4 hover:shadow-md transition-shadow cursor-pointer group h-full">
       <div className="flex items-start gap-3">
         <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center shrink-0`}>
           <Icon className="w-4 h-4 text-white" />
@@ -40,7 +40,7 @@ const FOLLOW_UP = [
 ];
 
 const ACCOUNT = [
-  { icon: Download, title: "Import", description: "Bring your old CRM over? Use our quick import tool.", color: "bg-gray-500", href: "/admin/crm/import" },
+  { icon: Download, title: "Import", description: "Bring your old CRM over? Use our quick import tool.", color: "bg-muted-foreground", href: "/admin/crm/import" },
 ];
 
 const INTEGRATIONS = [
@@ -73,7 +73,7 @@ export default function CrmAdminSettings() {
         </div>
 
         {/* Sub-nav tabs */}
-        <div className="flex gap-0 border-b border-gray-200 mb-6 overflow-x-auto no-scrollbar">
+        <div className="flex gap-0 border-b border-border mb-6 overflow-x-auto no-scrollbar">
           {TABS.map((t, i) => (
             <button key={t}
               className={`px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors relative shrink-0 ${
@@ -131,7 +131,7 @@ export default function CrmAdminSettings() {
           </div>
 
           {/* Quick settings link */}
-          <div className="border border-gray-200 rounded-xl p-4 bg-white flex items-center justify-between">
+          <div className="border border-border rounded-xl p-4 bg-white flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Settings className="w-4 h-4 text-muted-foreground" />
               <div>

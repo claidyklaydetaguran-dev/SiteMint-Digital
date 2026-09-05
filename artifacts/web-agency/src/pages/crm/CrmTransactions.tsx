@@ -23,7 +23,7 @@ const STATUS_BADGE: Record<string, string> = {
   completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
   pending:   "bg-amber-100 text-amber-700 border-amber-200",
   failed:    "bg-red-100 text-red-700 border-red-200",
-  refunded:  "bg-gray-100 text-gray-600 border-gray-200",
+  refunded:  "bg-muted text-muted-foreground border-border",
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -104,7 +104,7 @@ export default function CrmTransactionsPage() {
           </div>
           <button
             onClick={load}
-            className="p-2 rounded-lg hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="p-2 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -122,7 +122,7 @@ export default function CrmTransactionsPage() {
           <div className="flex gap-1 flex-wrap">
             <button
               onClick={() => setStatusFilter("")}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${!statusFilter ? "bg-[#1e293b] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${!statusFilter ? "bg-[#1e293b] text-white" : "bg-muted text-muted-foreground hover:bg-accent"}`}
             >
               All
             </button>
@@ -131,7 +131,7 @@ export default function CrmTransactionsPage() {
                 key={s}
                 onClick={() => setStatusFilter(statusFilter === s ? "" : s)}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${
-                  statusFilter === s ? `${STATUS_BADGE[s]} shadow-sm` : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  statusFilter === s ? `${STATUS_BADGE[s]} shadow-sm` : "bg-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
                 {s}
@@ -141,33 +141,33 @@ export default function CrmTransactionsPage() {
           <div className="flex items-center gap-1.5 ml-auto">
             <input
               type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-              className="px-2 py-1 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="px-2 py-1 border border-input rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
             <span className="text-[10px] text-muted-foreground">to</span>
             <input
               type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-              className="px-2 py-1 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="px-2 py-1 border border-input rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
         </div>
 
         {loading ? (
           <div className="animate-pulse space-y-2">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
+            {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-muted rounded-xl" />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
-            <Receipt className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          <div className="bg-muted border border-border rounded-xl p-8 text-center">
+            <Receipt className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
             <p className="text-sm font-semibold text-muted-foreground">No transactions found</p>
             <p className="text-xs text-muted-foreground mt-1">
               Record a payment from a deal in the Pipeline to see it here.
             </p>
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+          <div className="bg-white border border-border rounded-xl shadow-sm overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
+                <tr className="bg-muted border-b border-border/60">
                   {["Deal", "Contact", "Amount", "Method", "Status", "Received", "Notes"].map(h => (
                     <th key={h} className="text-left px-4 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
@@ -177,7 +177,7 @@ export default function CrmTransactionsPage() {
                 {filtered.map(t => {
                   const deal = dealById(t.dealId);
                   return (
-                    <tr key={t.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                    <tr key={t.id} className="border-b border-border/40 last:border-0 hover:bg-accent/60">
                       <td className="px-4 py-2.5">
                         <button
                           onClick={() => navigate("/admin/crm/deals")}
@@ -190,7 +190,7 @@ export default function CrmTransactionsPage() {
                       <td className="px-4 py-2.5 font-semibold text-foreground whitespace-nowrap">{fmtMoney(t.amount)}</td>
                       <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{METHOD_LABEL[t.method] || t.method}</td>
                       <td className="px-4 py-2.5">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_BADGE[t.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_BADGE[t.status] || "bg-muted text-muted-foreground border-border"}`}>
                           {t.status}
                         </span>
                       </td>

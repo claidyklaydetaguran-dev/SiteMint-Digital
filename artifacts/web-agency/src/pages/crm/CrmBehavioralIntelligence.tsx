@@ -51,7 +51,7 @@ function SignalRow({ signal, onOpen }: { signal: LeadSignal; onOpen: (id: number
   return (
     <button
       onClick={() => onOpen(lead.id)}
-      className="w-full flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 text-left transition-colors last:border-b-0"
+      className="w-full flex items-center justify-between gap-3 px-4 py-3 border-b border-border/60 hover:bg-accent text-left transition-colors last:border-b-0"
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
@@ -84,8 +84,8 @@ function Panel({ title, icon: Icon, tone, signals, onOpen, emptyText }: {
   signals: LeadSignal[]; onOpen: (id: number) => void; emptyText: string;
 }) {
   return (
-    <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50">
+    <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted">
         <Icon className={`w-4 h-4 ${tone}`} />
         <span className="crm-insight-dot" />
         <h3 className="font-semibold text-sm text-foreground">{title}</h3>
@@ -166,7 +166,7 @@ export default function CrmBehavioralIntelligence() {
           </div>
           <button
             onClick={load}
-            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
@@ -180,7 +180,7 @@ export default function CrmBehavioralIntelligence() {
         )}
 
         {loading && !signals ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-muted-foreground">
+          <div className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
             Loading behavioral signals…
           </div>
         ) : (

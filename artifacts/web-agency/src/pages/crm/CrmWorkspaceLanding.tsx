@@ -39,7 +39,7 @@ function ini(name: string) {
 function priorityColor(p?: string) {
   if (p === "High")   return "bg-red-100 text-red-700 border-red-200";
   if (p === "Medium") return "bg-amber-100 text-amber-700 border-amber-200";
-  return "bg-gray-100 text-gray-600 border-gray-200";
+  return "bg-muted text-muted-foreground border-border";
 }
 
 function timeAgo(iso?: string | null): string {
@@ -57,7 +57,7 @@ function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50/80 transition-colors text-left group"
+      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/80 transition-colors text-left group"
     >
       <div className={`w-9 h-9 rounded-full ${av(lead.name)} flex items-center justify-center shrink-0`}>
         <span className="text-white text-xs font-bold">{ini(lead.name)}</span>
@@ -141,7 +141,7 @@ export default function CrmWorkspaceLanding() {
     <CrmLayout>
       <div className="flex flex-col h-full overflow-y-auto">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100">
+        <div className="px-6 py-5 border-b border-border/60">
           <div className="flex items-center gap-3 mb-1">
             <UserCheck className="w-5 h-5 text-muted-foreground" />
             <h1 className="text-xl font-bold font-serif text-foreground">Sales Workspace</h1>
@@ -175,13 +175,13 @@ export default function CrmWorkspaceLanding() {
 
           {/* Hot leads */}
           {hotLeads.length > 0 && (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+            <div className="bg-white border border-border/60 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2">
                 <Flame className="w-4 h-4 text-red-500" />
                 <h2 className="text-sm font-semibold text-foreground">Hot Leads</h2>
                 <span className="ml-auto text-xs text-muted-foreground">{hotLeads.length} high priority</span>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {hotLeads.map(l => (
                   <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                 ))}
@@ -197,7 +197,7 @@ export default function CrmWorkspaceLanding() {
                 <h2 className="text-sm font-semibold text-foreground">Overdue Follow-ups</h2>
                 <span className="ml-auto text-xs text-muted-foreground">{overdueLeads.length} overdue</span>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {overdueLeads.map(l => (
                   <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                 ))}
@@ -206,11 +206,11 @@ export default function CrmWorkspaceLanding() {
           )}
 
           {/* Search + recent contacts */}
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+          <div className="bg-white border border-border/60 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b border-border/60 flex items-center gap-3">
               <Search className="w-4 h-4 text-muted-foreground shrink-0" />
               <input
-                className="flex-1 text-sm focus:outline-none placeholder-gray-400 bg-transparent"
+                className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60 bg-transparent"
                 placeholder="Search contacts by name, company, or email…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -239,19 +239,19 @@ export default function CrmWorkspaceLanding() {
               </div>
             ) : (
               <>
-                <div className="px-4 py-2 border-b border-gray-50 flex items-center gap-2">
+                <div className="px-4 py-2 border-b border-border/40 flex items-center gap-2">
                   <Star className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     {search ? `${recentLeads.length} result${recentLeads.length !== 1 ? "s" : ""}` : "Recent Contacts"}
                   </span>
                 </div>
-                <div className="divide-y divide-gray-50">
+                <div className="divide-y divide-border/40">
                   {recentLeads.map(l => (
                     <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                   ))}
                 </div>
                 {!search && leads.length > 20 && (
-                  <div className="px-4 py-3 border-t border-gray-100 text-center">
+                  <div className="px-4 py-3 border-t border-border/60 text-center">
                     <button
                       onClick={() => navigate("/admin/crm/leads")}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors"

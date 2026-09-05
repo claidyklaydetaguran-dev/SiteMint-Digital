@@ -93,7 +93,7 @@ export default function CrmTasks() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-5">
+        <div className="flex gap-1 bg-muted p-1 rounded-xl mb-5">
           {tabFilters.map(f => (
             <button
               key={f}
@@ -105,7 +105,7 @@ export default function CrmTasks() {
               {tabLabels[f]}
               {counts[f] > 0 && (
                 <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
-                  f === "overdue" ? "bg-red-100 text-red-700" : f === "due-today" ? "bg-yellow-100 text-yellow-700" : "bg-gray-200 text-gray-600"
+                  f === "overdue" ? "bg-red-100 text-red-700" : f === "due-today" ? "bg-yellow-100 text-yellow-700" : "bg-muted text-muted-foreground"
                 }`}>
                   {counts[f]}
                 </span>
@@ -117,8 +117,8 @@ export default function CrmTasks() {
         {/* Task list */}
         <div className="space-y-2">
           {filtered.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
-              <Check className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <div className="bg-white rounded-xl border border-border py-16 text-center">
+              <Check className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-muted-foreground font-medium">No tasks in this category</p>
             </div>
           ) : (
@@ -127,13 +127,13 @@ export default function CrmTasks() {
               const isOverdue = task.status !== "completed" && due && due < todayStart;
               return (
                 <div key={task.id} className={`bg-white rounded-xl border shadow-sm flex items-start gap-3 p-4 ${
-                  task.status==="completed"?"border-gray-100 opacity-60":isOverdue?"border-red-200":"border-gray-200"
+                  task.status==="completed"?"border-border/60 opacity-60":isOverdue?"border-red-200":"border-border"
                 }`}>
                   <button
                     onClick={() => task.status !== "completed" && completeTask(task.id)}
                     disabled={task.status === "completed"}
                     className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                      task.status==="completed"?"bg-green-500 border-green-500":"border-gray-300 hover:border-green-500"
+                      task.status==="completed"?"bg-green-500 border-green-500":"border-input hover:border-green-500"
                     }`}
                   >
                     {task.status==="completed"&&<Check className="w-3 h-3 text-white"/>}

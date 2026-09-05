@@ -56,7 +56,7 @@ function fmtDate(iso: string | null): string {
 function ChannelIcon({ ch }: { ch: string }) {
   if (ch === "email") return <Mail className="w-4 h-4 text-blue-600" />;
   if (ch === "sms")   return <MessageSquare className="w-4 h-4 text-violet-600" />;
-  return <CheckSquare className="w-4 h-4 text-gray-500" />;
+  return <CheckSquare className="w-4 h-4 text-muted-foreground" />;
 }
 
 // ── Row + section ─────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ function QueueRow({ entry, onOpen }: { entry: QueueEntry; onOpen: (href: string)
   return (
     <button
       onClick={() => onOpen(entry.href)}
-      className="w-full flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 text-left transition-colors last:border-b-0"
+      className="w-full flex items-center justify-between gap-3 px-4 py-3 border-b border-border/60 hover:bg-accent text-left transition-colors last:border-b-0"
     >
       <div className="flex items-center gap-3 min-w-0">
         {entry.kind === "campaign" ? <ChannelIcon ch={entry.title} /> : <Cpu className="w-4 h-4 text-primary shrink-0" />}
@@ -95,8 +95,8 @@ function Section({ title, icon: Icon, tone, entries, onOpen, emptyText }: {
   entries: QueueEntry[]; onOpen: (href: string) => void; emptyText: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50">
+    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted">
         <Icon className={`w-4 h-4 ${tone}`} />
         <h3 className="font-semibold text-sm text-foreground">{title}</h3>
         <span className="text-xs text-muted-foreground ml-auto">{entries.length}</span>
@@ -241,7 +241,7 @@ export default function CrmAutomationQueue() {
           </div>
           <button
             onClick={load}
-            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
@@ -256,7 +256,7 @@ export default function CrmAutomationQueue() {
         )}
 
         {loading && !leads ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-muted-foreground">
+          <div className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
             Loading automation queue…
           </div>
         ) : (

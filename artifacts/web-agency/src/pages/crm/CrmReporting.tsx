@@ -57,14 +57,14 @@ function filterByRange<T extends { createdAt: string }>(items: T[], range: strin
 
 function KpiSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 animate-pulse">
+    <div className="bg-white rounded-xl border border-border shadow-sm p-4 animate-pulse">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
-          <div className="h-2.5 w-20 bg-gray-200 rounded mb-2" />
-          <div className="h-7 w-12 bg-gray-200 rounded mb-2" />
-          <div className="h-2 w-14 bg-gray-100 rounded" />
+          <div className="h-2.5 w-20 bg-border rounded mb-2" />
+          <div className="h-7 w-12 bg-border rounded mb-2" />
+          <div className="h-2 w-14 bg-muted rounded" />
         </div>
-        <div className="w-9 h-9 rounded-lg bg-gray-200 shrink-0" />
+        <div className="w-9 h-9 rounded-lg bg-border shrink-0" />
       </div>
     </div>
   );
@@ -75,7 +75,7 @@ function KpiCard({ label, value, sub, icon: Icon, bg, fg, warn }: {
   icon: React.ElementType; bg: string; fg: string; warn?: boolean;
 }) {
   return (
-    <div className={`bg-white rounded-xl border shadow-sm p-4 ${warn ? "border-red-200" : "border-gray-200"}`}>
+    <div className={`bg-white rounded-xl border shadow-sm p-4 ${warn ? "border-red-200" : "border-border"}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
@@ -94,7 +94,7 @@ function ChartCard({ title, sub, children, height = 220 }: {
   title: string; sub?: string; children: React.ReactNode; height?: number;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+    <div className="bg-white rounded-xl border border-border shadow-sm p-5">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
@@ -120,7 +120,7 @@ const BarTip = ({ active, payload, label }: {
 }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs">
+    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-muted-foreground">
@@ -138,7 +138,7 @@ const AreaTip = ({ active, payload, label }: {
 }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs">
+    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       <p className="text-emerald-600 font-medium">{fmt(payload[0]?.value ?? 0)}</p>
     </div>
@@ -304,7 +304,7 @@ export default function CrmReporting() {
     { label: "Outbound", value: commStats.outbound, bg: "bg-blue-50", fg: "text-blue-600", icon: Zap },
     { label: "SMS", value: commStats.sms, bg: "bg-sky-50", fg: "text-sky-600", icon: MessageSquare },
     { label: "Calls", value: commStats.calls, bg: "bg-green-50", fg: "text-green-600", icon: Phone },
-    { label: "Total Msgs", value: commStats.totalMsgs, bg: "bg-gray-50", fg: "text-gray-500", icon: Users },
+    { label: "Total Msgs", value: commStats.totalMsgs, bg: "bg-muted", fg: "text-muted-foreground", icon: Users },
   ];
 
   return (
@@ -327,7 +327,7 @@ export default function CrmReporting() {
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
             {/* Time range filter */}
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
               {RANGE_OPTIONS.map(r => (
                 <button
                   key={r.key}
@@ -388,8 +388,8 @@ export default function CrmReporting() {
               />
               <KpiCard
                 label="Overdue Tasks" value={overdueCount} sub="Need action"
-                icon={CheckSquare} bg={overdueCount > 0 ? "bg-red-50" : "bg-gray-50"}
-                fg={overdueCount > 0 ? "text-red-500" : "text-gray-400"} warn={overdueCount > 0}
+                icon={CheckSquare} bg={overdueCount > 0 ? "bg-red-50" : "bg-muted"}
+                fg={overdueCount > 0 ? "text-red-500" : "text-muted-foreground/60"} warn={overdueCount > 0}
               />
               <KpiCard
                 label="Conversations" value={conversations.length}
@@ -402,11 +402,11 @@ export default function CrmReporting() {
 
         {/* ── CRM Insights ────────────────────────────────────────────────────── */}
         {!loading && insights.length > 0 && (
-          <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="mb-6 bg-white rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <Lightbulb className="w-4 h-4 text-yellow-500" />
               <h3 className="text-sm font-semibold text-foreground">CRM Insights</h3>
-              <span className="ml-1 text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+              <span className="ml-1 text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
                 Rule-based
               </span>
             </div>

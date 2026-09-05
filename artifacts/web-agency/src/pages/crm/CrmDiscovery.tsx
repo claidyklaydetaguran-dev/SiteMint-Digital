@@ -55,7 +55,7 @@ const CRM_STATUS_COLORS: Record<string, string> = {
   "New": "bg-blue-100 text-blue-700",
   "Reviewed": "bg-yellow-100 text-yellow-700",
   "Proposal Generated": "bg-purple-100 text-purple-700",
-  "Archived": "bg-gray-100 text-gray-500",
+  "Archived": "bg-muted text-muted-foreground",
 };
 const COMPLEXITY_COLORS: Record<string, string> = {
   "Low": "text-green-600", "Medium": "text-yellow-600",
@@ -199,7 +199,7 @@ function DiscoveryDrawer({
     };
     return (
       <div className="fixed inset-0 z-[200] bg-white flex flex-col">
-        <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-200">
+        <div className="flex items-center gap-3 px-6 py-3 border-b border-border">
           <button onClick={() => setPreviewDoc(null)} className="text-muted-foreground hover:text-foreground">
             <X className="w-4 h-4" />
           </button>
@@ -210,7 +210,7 @@ function DiscoveryDrawer({
             </Button>
           </div>
         </div>
-        <div className="flex-1 overflow-hidden bg-gray-100 p-4">
+        <div className="flex-1 overflow-hidden bg-muted p-4">
           <iframe srcDoc={html || ""} sandbox="allow-same-origin allow-modals" className="w-full h-full bg-white rounded-lg shadow" title="Document preview" />
         </div>
       </div>
@@ -221,7 +221,7 @@ function DiscoveryDrawer({
     <div className="fixed inset-0 z-[100] flex" onClick={onClose}>
       <div className="ml-auto w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border/60">
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="w-4 h-4" />
           </button>
@@ -234,7 +234,7 @@ function DiscoveryDrawer({
 
         <div className="flex-1 overflow-y-auto">
           {/* Status + Actions */}
-          <div className="px-6 py-4 border-b border-gray-100 space-y-3">
+          <div className="px-6 py-4 border-b border-border/60 space-y-3">
             {error && (
               <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
@@ -250,7 +250,7 @@ function DiscoveryDrawer({
                   onClick={() => patchStatus(s)}
                   disabled={updatingStatus}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                    status === s ? CRM_STATUS_COLORS[s] || "bg-gray-100 text-gray-600" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                    status === s ? CRM_STATUS_COLORS[s] || "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground/60 hover:bg-accent"
                   }`}
                 >
                   {s}
@@ -304,7 +304,7 @@ function DiscoveryDrawer({
 
           {/* AI Summary */}
           {sub.aiSummary && (
-            <div className="px-6 py-4 border-b border-gray-100">
+            <div className="px-6 py-4 border-b border-border/60">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">AI Summary</h3>
               <p className="text-sm text-foreground leading-relaxed">{sub.aiSummary}</p>
               <div className="flex gap-4 mt-3">
@@ -333,7 +333,7 @@ function DiscoveryDrawer({
           )}
 
           {/* Key Info */}
-          <div className="px-6 py-4 border-b border-gray-100">
+          <div className="px-6 py-4 border-b border-border/60">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Key Details</h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
               {[
@@ -360,7 +360,7 @@ function DiscoveryDrawer({
           </div>
 
           {/* Form answers */}
-          <div className="px-6 py-4 border-b border-gray-100">
+          <div className="px-6 py-4 border-b border-border/60">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Discovery Answers</h3>
             <FormDataSection data={sub.formData} />
           </div>
@@ -369,7 +369,7 @@ function DiscoveryDrawer({
           <div className="px-6 py-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Internal Notes</h3>
             <textarea
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+              className="w-full text-sm border border-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
               rows={4}
               placeholder="Add internal notes…"
               value={notes}
@@ -450,7 +450,7 @@ export default function CrmDiscovery() {
 
       <div className="flex flex-col h-full">
         {/* Page header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-4 flex-wrap">
+        <div className="px-6 py-4 border-b border-border/60 flex items-center gap-4 flex-wrap">
           <div>
             <h1 className="text-lg font-semibold text-foreground">Discovery CRM</h1>
             <p className="text-xs text-muted-foreground">
@@ -462,7 +462,7 @@ export default function CrmDiscovery() {
           <div className="relative flex-1 min-w-48 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
-              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="w-full pl-8 pr-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
               placeholder="Search name, company, email…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -472,7 +472,7 @@ export default function CrmDiscovery() {
           {/* Filters */}
           <div className="flex gap-2 flex-wrap">
             <select
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
+              className="text-xs border border-input rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
             >
@@ -480,7 +480,7 @@ export default function CrmDiscovery() {
               {CRM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <select
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
+              className="text-xs border border-input rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
               value={budgetFilter}
               onChange={e => setBudgetFilter(e.target.value)}
             >
@@ -488,7 +488,7 @@ export default function CrmDiscovery() {
               {Object.entries(BUDGET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <select
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
+              className="text-xs border border-input rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-foreground/20 bg-white"
               value={timelineFilter}
               onChange={e => setTimelineFilter(e.target.value)}
             >
@@ -515,7 +515,7 @@ export default function CrmDiscovery() {
             </div>
           ) : (
             <table className="w-full">
-              <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
+              <thead className="sticky top-0 bg-white border-b border-border/60 z-10">
                 <tr className="text-left">
                   <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
                   <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Service</th>
@@ -528,11 +528,11 @@ export default function CrmDiscovery() {
                   <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border/40">
                 {submissions.map(sub => (
                   <tr
                     key={sub.id}
-                    className="hover:bg-gray-50/60 transition-colors cursor-pointer"
+                    className="hover:bg-accent/60 transition-colors cursor-pointer"
                     onClick={() => setSelected(sub)}
                   >
                     <td className="px-5 py-3.5">
@@ -559,7 +559,7 @@ export default function CrmDiscovery() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CRM_STATUS_COLORS[sub.crmStatus] || "bg-gray-100 text-gray-500"}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CRM_STATUS_COLORS[sub.crmStatus] || "bg-muted text-muted-foreground"}`}>
                         {sub.crmStatus}
                       </span>
                     </td>
