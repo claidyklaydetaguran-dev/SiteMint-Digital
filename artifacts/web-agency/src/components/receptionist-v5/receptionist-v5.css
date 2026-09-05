@@ -1351,3 +1351,10 @@
 .smv5-hero .sm-reveal {
   opacity: 1 !important;
 }
+
+
+/* Perf closeout: same below-fold deferral as the homepage (17 sections). */
+.smv5 .smv5__section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
+}

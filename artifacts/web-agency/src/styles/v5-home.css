@@ -996,3 +996,15 @@
     transition-duration: 500ms;
   }
 }
+
+
+/* ── Perf closeout: below-fold sections skip style/layout until approached.
+   The 15-section homepage spends ~2.3s (4x-throttled) in Style & Layout at
+   boot; content-visibility defers all of it past the hero. The hero itself
+   (first section) stays fully rendered. contain-intrinsic-size keeps the
+   scrollbar honest; reveals still fire (IntersectionObserver is unaffected)
+   and hash/anchor scrolling renders on demand per spec. */
+.sm-home-v5 .v4-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
+}
