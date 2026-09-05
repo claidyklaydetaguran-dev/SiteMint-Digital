@@ -179,6 +179,18 @@
 
   --accent: 161 61% 94%; /* mint-100 */
   --accent-foreground: 185 70% 14%;
+
+  /* Neutral-chrome roles for the CRM gray-* normalization: System B has no
+     generic gray, so muted surfaces are mist, muted text is slate-600, and
+     input boundaries are line-strong — the same trio the helpdesk's shadcn
+     layer resolves to. Without these, `bg-muted`/`text-muted-foreground`
+     inside the ops shell would fall through to the marketing site's
+     blue-tinted `:root` values. */
+  --muted: 187 55% 95%; /* mist-100 */
+  --muted-foreground: 201 21% 37%; /* slate-600 */
+  --secondary: 187 55% 95%; /* mist-100 */
+  --secondary-foreground: 185 70% 14%; /* teal-900 */
+  --input: 166 24% 77%; /* line-strong */
 }
 
 /* ── Internal-environment bar — ink-950 + mint voice, amber stays reserved. */
