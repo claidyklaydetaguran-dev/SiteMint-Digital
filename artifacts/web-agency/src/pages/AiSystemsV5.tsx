@@ -29,31 +29,7 @@ import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import crmLeadShot from "@/assets/product/crm-lead.png";
 import "@/styles/v5-pages.css";
-
-/** Shared "real proof" browser-frame composition — same visual language as
- *  the equivalent local component in HomeV5.tsx, styled by v5-pages.css. */
-function ShotFrame({ src, alt, caption }: { src: string; alt: string; caption: string }) {
-  return (
-    <figure className="sm-shot-frame">
-      <div className="sm-shot-frame__bar" aria-hidden="true">
-        <span className="sm-shot-frame__dot" />
-        <span className="sm-shot-frame__dot" />
-        <span className="sm-shot-frame__dot" />
-      </div>
-      <img
-        className="sm-shot-frame__img"
-        src={src}
-        alt={alt}
-        loading="lazy"
-        width={1600}
-        height={1000}
-      />
-      <figcaption className="sm-shot-frame__caption">{caption}</figcaption>
-    </figure>
-  );
-}
 
 const content: ServicePageContent = {
   eyebrow: "AI Systems & Automation",
@@ -259,14 +235,11 @@ function CrmSystemsSection() {
             </p>
           </div>
         </div>
-        <div className="reveal-scale-settle" style={{ marginTop: "1.5rem", maxWidth: "32rem" }}>
-          <ShotFrame
-            src={crmLeadShot}
-            alt="A lead record inside the SiteMint CRM, with pipeline stage and task history"
-            caption="SiteMint CRM lead record — preview data"
-          />
-        </div>
-        <div style={{ marginTop: "1.5rem" }}>
+        {/* CRM screenshots are never shown publicly (owner directive,
+            2026-09-05: "CRM shouldn't be publicized") — the section returns
+            to its icon-card treatment above as the sole visual, closed out
+            with a deliberate divider rather than trailing into empty space. */}
+        <div className="sm-crm-cta">
           <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
             Talk about a CRM for your business
           </Link>

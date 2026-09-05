@@ -1,15 +1,17 @@
 /**
  * V5 — poster-first hero media container (V5-BLUEPRINT §6/§17).
  *
- * No stock media exists in this repository and none is fetched here — the
- * poster is an inline, clearly labelled development placeholder (an inline
- * SVG, not a photo). An optional `videoSrc` plays only:
+ * The poster is an inline, abstract Glacier-composed illustration (an SVG,
+ * never a photo, generated face, or stock image) — it doubles as the
+ * always-rendered base layer and the fallback shown whenever video can't or
+ * shouldn't play. An optional `videoSrc` (an owner-approved produced asset)
+ * plays over it only:
  *   - at ≥ 768px viewport width,
- *   - after `window.load` (never competes with LCP/hero copy paint),
+ *   - after `window.load` *and* an idle tick (`requestIdleCallback`, with a
+ *     timeout fallback) — never competing with LCP/hero copy paint,
  *   - and never under `prefers-reduced-motion: reduce`.
- * Until the owner approves and supplies the produced hero video
- * (V5-BLUEPRINT §6/§7), `videoSrc` is simply omitted by every caller and this
- * renders the poster only.
+ * A caller with no produced video simply omits `videoSrc` and gets the
+ * poster only.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -30,7 +32,7 @@ export interface HeroMediaProps {
  * Two captions saying two different, hardcoded things here was the bug —
  * one accurate label, described twice in two modalities, is correct.
  */
-function DevPlaceholderPoster({ label }: { label: string }) {
+function GlacierPoster({ label }: { label: string }) {
   return (
     <svg
       className="sm-hero-media__poster"
@@ -69,16 +71,43 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
     ).matches;
     if (reduced) return;
 
-    function evaluate() {
-      if (window.innerWidth >= 768) setCanPlayVideo(true);
+    let idleHandle: number | undefined;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    function armAfterIdle() {
+      if (window.innerWidth < 768) return;
+      const requestIdle = (
+        window as typeof window & {
+          requestIdleCallback?: (cb: () => void) => number;
+        }
+      ).requestIdleCallback;
+      if (typeof requestIdle === "function") {
+        idleHandle = requestIdle(() => setCanPlayVideo(true));
+      } else {
+        // Safari/older browsers have no requestIdleCallback — a short
+        // timeout keeps the same "after load, not competing with paint"
+        // intent without the API.
+        timeoutHandle = setTimeout(() => setCanPlayVideo(true), 200);
+      }
     }
 
     if (document.readyState === "complete") {
-      evaluate();
-      return undefined;
+      armAfterIdle();
+    } else {
+      window.addEventListener("load", armAfterIdle, { once: true });
     }
-    window.addEventListener("load", evaluate, { once: true });
-    return () => window.removeEventListener("load", evaluate);
+
+    return () => {
+      window.removeEventListener("load", armAfterIdle);
+      if (idleHandle !== undefined) {
+        (
+          window as typeof window & {
+            cancelIdleCallback?: (handle: number) => void;
+          }
+        ).cancelIdleCallback?.(idleHandle);
+      }
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    };
   }, [videoSrc]);
 
   useEffect(() => {
@@ -87,7 +116,7 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
 
   return (
     <div className={["sm-hero-media", className].filter(Boolean).join(" ")}>
-      <DevPlaceholderPoster label={label} />
+      <GlacierPoster label={label} />
       {videoSrc && canPlayVideo && (
         <video
           ref={videoRef}

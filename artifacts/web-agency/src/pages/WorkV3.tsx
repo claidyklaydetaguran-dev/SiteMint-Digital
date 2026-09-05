@@ -113,6 +113,25 @@ const capabilityWork: CapabilityWorkItem[] = [
   },
 ];
 
+interface SelectedProjectV3 {
+  title: string;
+  client: string;
+  summary: string;
+  image: string;
+  imageAlt: string;
+  href: string;
+}
+
+/**
+ * Selected projects — real, named client work (owner directive, 2026-09-05:
+ * "our portfolios and our finished projects"). No entries yet: real project
+ * materials are still being prepared for publication with each client's
+ * permission — see the honest empty state in `SelectedProjectsSection`
+ * below. Populate this array once a project clears; the grid and card
+ * layout render real entries with zero markup changes.
+ */
+const selectedProjects: SelectedProjectV3[] = [];
+
 /**
  * Per-composition "the system" / "the interface" toggle (owner directive:
  * "useful interaction" on every retained container). "The system" is a
@@ -187,6 +206,60 @@ function CompositionEvidence({ item }: { item: CapabilityWorkItem }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Selected projects — structurally complete portfolio scaffold. Renders a
+ * clean, ready-to-fill grid; with no cleared entries yet it shows a single
+ * honest state card instead of a fabricated project, client, screenshot, or
+ * result.
+ */
+function SelectedProjectsSection({ reveal }: { reveal: ReturnType<typeof useReveal> }) {
+  return (
+    <section className="v3-section" data-tone="porcelain">
+      <div className="v3-container v3-reveal" ref={reveal}>
+        <div className="v3m-sechead">
+          <span className="v3m-sechead__no">03</span>
+          <h2 className="v3-h2 reveal-clip">Selected projects.</h2>
+          <p className="v3-lede reveal-fade-up">
+            Real, named client work — published once each client has agreed
+            to it, never before.
+          </p>
+        </div>
+        <div className="sm-portfolio-grid">
+          {selectedProjects.length === 0 ? (
+            <div className="sm-portfolio-empty reveal-scale-settle">
+              <p>
+                Client projects are being prepared for publication with each
+                client's permission.
+              </p>
+            </div>
+          ) : (
+            selectedProjects.map((project) => (
+              <article key={project.title} className="sm-portfolio-card reveal-scale-settle">
+                <img
+                  className="sm-portfolio-card__img"
+                  src={project.image}
+                  alt={project.imageAlt}
+                  loading="lazy"
+                />
+                <div className="sm-portfolio-card__body">
+                  <span className="sm-portfolio-card__client">{project.client}</span>
+                  <h3 className="sm-portfolio-card__title">{project.title}</h3>
+                  <p className="sm-portfolio-card__summary">{project.summary}</p>
+                  <div>
+                    <Link href={project.href} className="v3-btn v3-btn--outline">
+                      View project
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -275,6 +348,8 @@ export default function WorkV3() {
           </div>
         </div>
       </section>
+
+      <SelectedProjectsSection reveal={reveal} />
 
       <section className="v3-section v3m-cta" data-tone="ink">
         <div className="v3-container v3m-cta__inner v3-reveal" ref={reveal}>
