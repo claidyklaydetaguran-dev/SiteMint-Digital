@@ -88,7 +88,198 @@
 @media (max-width: 767px) {
   .sm-home-v5 #hero .v4-hero__field {
     max-height: 46vh;
-    min-height: 220px;
+    /* Lowered from the original 220px (owner review finding #1, predates
+       this feature) to make room for the film band introduced below —
+       still keeps flex:1 1 auto's shrink-to-fit as the primary behavior;
+       this is only the floor for genuinely short phones. */
+    min-height: 120px;
+  }
+}
+
+/* ── Hero film container (owner spec, wp-herofilm; treatment confirmed in
+   docs/product-plan/2026-09-owner-replan/HERO-FILM-TREATMENT.md — "Mobile:
+   poster + particles, no autoplay") ───────────────────────────────────────
+ * `SignalHeroV4` (`showFilm`, HomeV4.tsx) renders the film markup with no
+ * layout opinion of its own — every placement decision below lives here,
+ * exactly like the field-height fix above, so `v4-home.css` stays untouched.
+ *
+ * Below 768px: "poster + particles", both present, in normal flow — a
+ * thumbnail-sized band between the copy and the field. An earlier draft of
+ * this rule tried an absolutely-positioned corner overlay instead (zero
+ * added height), but the five system nodes' anchor points (`HERO_NODES` in
+ * HomeV4.tsx: x 0.12–0.88, y 0.46–0.74 of the *field's own* box) plus each
+ * node's own rendered height put a real node somewhere near every corner of
+ * the field at some viewport size — there is no fixed corner that is
+ * reliably clear without measuring the DOM, which a CSS-only rule can't do.
+ * Normal flow avoids that entirely by keeping the film structurally
+ * separate from the field, at the cost of the small height budgeted below
+ * (the field's own pre-existing mobile floor is trimmed to make room — see
+ * that rule's comment two rules up). The caption is dropped at this size
+ * (the SVG's own `<title>` still carries it to assistive tech) — it doesn't
+ * read legibly at a thumbnail width.
+ *
+ * Tablet (768–1023px): the same normal-flow band, taller. The field height
+ * above is trimmed further in this range to keep the full stack (copy +
+ * film band + field + HUD) inside the fixed-height sticky stage
+ * (`.v4-hero__stage` is `height:100svh; overflow:hidden` in v4-home.css).
+ *
+ * Desktop (≥1024px): `.v4-hero__stage` becomes a two-column grid — copy in
+ * column 1 only (a *structural* guarantee it can never sit under the film,
+ * not a tuned width), the film in column 1's neighbour at ~59% of the
+ * stage's width (upper-right, per spec), and the field spanning the full
+ * grid area behind both so its particles read as flowing under/left of the
+ * film and around the copy. No canvas/JS changes: the particle field
+ * already re-measures its own box every animation frame (`frame()` in
+ * `SignalHeroV4`), so resizing/repositioning it here is purely CSS. */
+.sm-home-v5 #hero .v4-hero__film {
+  position: relative;
+  /* `.v4-hero__stage` is a flex column below 1024px; without this the
+     film band (default flex-shrink:1, unlike copy/HUD which are
+     shrink:0 in v4-home.css) is the first thing squeezed on a short
+     viewport instead of the field, which already has its own
+     max-height ceiling to absorb it. */
+  flex-shrink: 0;
+  height: min(15vh, 72px);
+  width: auto;
+  max-width: 100%;
+  margin: 0.4rem auto 0;
+  z-index: 2;
+}
+.sm-home-v5 #hero .v4-hero__film .v4-hero__film-caption {
+  display: none;
+}
+@media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__film {
+    height: min(24vh, 220px);
+  }
+  .sm-home-v5 #hero .v4-hero__film .v4-hero__film-caption {
+    display: block;
+  }
+}
+.sm-home-v5 #hero .v4-hero__film-frame {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--sm-radius-l, 16px);
+  overflow: hidden;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  border: 1px solid rgba(159, 194, 204, 0.22);
+}
+.sm-home-v5 #hero .v4-hero__film-poster,
+.sm-home-v5 #hero .v4-hero__film-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sm-home-v5 #hero .v4-hero__film-caption {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--sm-dark-muted, #9FC2CC);
+  background: rgb(10 42 46 / 0.72);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 3px 7px;
+}
+
+/* Signal seam — hidden below 1024px (the film and field aren't spatially
+   separate yet, so there's nothing to visually bridge); a thin flowing
+   gradient thread above that, static under reduced motion. */
+.sm-home-v5 #hero .v4-hero__seam {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Tighten the field for the tablet band. `v4-home.css`'s own unscoped
+     base rule (not this workstream's file) carries `min-height:240px` at
+     every width the mobile override above doesn't touch — pre-existing,
+     unrelated to the film — and 240px is taller than the available space
+     on a short landscape tablet, which already overflows the fixed-height
+     sticky stage today with no film involved. Lowering the floor here
+     (this rule *is* more specific, so it wins) keeps the film's own
+     addition from compounding that pre-existing gap instead of pretending
+     to fix it, which isn't this file's edit to make. Scoped to 768–1023 —
+     below 768px the dedicated mobile rule (max-height:46vh/min-height:220px)
+     already owns this property and must not be overridden by a later,
+     equal-specificity rule matching the same width. */
+  .sm-home-v5 #hero .v4-hero__field {
+    max-height: 34vh;
+    min-height: 90px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sm-home-v5 #hero .v4-hero__stage {
+    display: grid;
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    column-gap: clamp(2rem, 4vw, 4.5rem);
+    /* v4-home.css's flex declarations no longer apply once display is grid;
+       nothing here needs !important. */
+  }
+  .sm-home-v5 #hero .v4-hero__copy {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: center;
+    max-width: none; /* the grid column itself is the width constraint */
+  }
+  .sm-home-v5 #hero .v4-hero__film {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: stretch;
+    height: auto;
+    width: 100%;
+    max-width: 100%;
+    margin: calc(var(--v4-hdr-h, 64px) * 0.35) 0 0;
+  }
+  .sm-home-v5 #hero .v4-hero__film-frame {
+    height: auto;
+    width: 100%;
+  }
+  .sm-home-v5 #hero .v4-hero__field {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    max-height: none;
+    height: 100%;
+    z-index: 0;
+  }
+  .sm-home-v5 #hero .v4-hero__hud {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .sm-home-v5 #hero .v4-hero__seam {
+    display: block;
+    position: absolute;
+    left: 14%;
+    top: 38%;
+    width: 40%;
+    height: 30%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .sm-home-v5 #hero .v4-hero__seam-path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sm-home-v5 #hero .v4-hero__seam-path {
+      animation: sm-hero-seam-flow 3.6s linear infinite;
+    }
+  }
+  @keyframes sm-hero-seam-flow {
+    0% {
+      stroke-dashoffset: 1;
+    }
+    100% {
+      stroke-dashoffset: -1;
+    }
   }
 }
 

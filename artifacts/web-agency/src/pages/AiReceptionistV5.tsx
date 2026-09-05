@@ -54,14 +54,23 @@ function ReadinessBadge({ status }: { status: Readiness }) {
 /* ── Hero media: poster-first, video only ≥768px after load ────────────── */
 
 /**
- * Development placeholder — final media pending. No cinematic hero video
- * asset exists in the repository yet (V5-BLUEPRINT §6 storyboard, §17
- * performance strategy: poster first, video only ≥768px after load, no
- * source without owner-authorised generation). The eligibility check below
- * is fully wired for when a real file lands; until then it always resolves
- * to the poster so nothing 404s.
+ * The film mount contract (owner spec, wp-herofilm): a cinematic film
+ * placement in the hero's right-column visual card, shipping now with a
+ * composed poster placeholder. No produced asset exists in the repository
+ * yet (V5-BLUEPRINT §6 storyboard, §17 performance strategy: poster first,
+ * video only ≥768px after load, no source without owner-authorised
+ * generation) — setting this to a produced video's URL (mp4/webm, ~2560×1440
+ * source, 16:9) is the only step required to go live; the eligibility check
+ * below is fully wired for that moment. Until then it stays `null` and
+ * always resolves to the poster, so nothing 404s.
  */
-const HERO_VIDEO_SRC = "";
+const HERO_FILM_SRC: string | null = null;
+
+/** A tiny hand-authored SVG data URI shown as the `<video poster>` for the
+ * instant between mount and first frame — separate from the JSX poster
+ * below so it needs no render-to-string dependency. */
+const HERO_FILM_POSTER_DATA_URI =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 400'%3E%3Crect width='640' height='400' fill='%23153E52'/%3E%3C/svg%3E";
 
 function useHeroVideoEligible(): boolean {
   const [eligible, setEligible] = useState(false);
@@ -88,6 +97,11 @@ function useHeroVideoEligible(): boolean {
  * overlay label below (`smv5-hero__media-label`) — this graphic carries no
  * text of its own beyond the non-visual `<title>` for assistive tech.
  *
+ * Film placement (wp-herofilm): a sprocket-hole rail along both edges reads
+ * this card unmistakably as a film container rather than a generic device
+ * illustration, at the same 16:9 aspect the eventual produced video ships
+ * at — the ring/grid motif underneath is unchanged.
+ *
  * Cinematic motion (2026-09-05 owner directive) — "call ring" motif: two
  * extra rings pulse outward ambiently (`.smv5-poster__pulse`), echoing the
  * call theater's own voice-object animation. Ambient and non-essential —
@@ -100,9 +114,10 @@ function HeroPosterSvg() {
     [88, 71], [258, 71], [428, 71], [564, 71],
     [54, 275], [190, 309], [394, 309], [599, 275],
   ];
+  const sprocketYs = [24, 78, 132, 186, 240, 294, 348];
   return (
     <svg viewBox="0 0 640 400" role="img" aria-labelledby="smv5-hero-poster-title">
-      <title id="smv5-hero-poster-title">Development placeholder — final media pending</title>
+      <title id="smv5-hero-poster-title">Film in production — final media pending</title>
       <defs>
         <pattern id="smv5-avail-grid" width="34" height="34" patternUnits="userSpaceOnUse">
           <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="#1c4a4d" strokeWidth="1.1" />
@@ -142,24 +157,38 @@ function HeroPosterSvg() {
       <circle cx="320" cy="200" r="92" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.85" />
       <circle cx="320" cy="200" r="56" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.6" />
       <circle cx="320" cy="200" r="6" fill="#32C5D2" />
+      {sprocketYs.map((y) => (
+        <g key={`sprocket-${y}`} opacity="0.55">
+          <rect x="10" y={y} width="14" height="20" rx="3" fill="none" stroke="#56D2CF" strokeWidth="1.2" />
+          <rect x="616" y={y} width="14" height="20" rx="3" fill="none" stroke="#56D2CF" strokeWidth="1.2" />
+        </g>
+      ))}
     </svg>
   );
 }
 
 function HeroMedia() {
   const eligible = useHeroVideoEligible();
-  const showVideo = eligible && HERO_VIDEO_SRC.length > 0;
+  const showVideo = eligible && !!HERO_FILM_SRC;
   const ambientRef = usePausableAmbient<HTMLDivElement>();
   return (
     <div className="smv5-hero__media" ref={ambientRef}>
-      {showVideo ? (
-        <video muted playsInline autoPlay loop aria-hidden="true">
-          <source src={HERO_VIDEO_SRC} type="video/mp4" />
+      {showVideo && HERO_FILM_SRC ? (
+        <video
+          muted
+          playsInline
+          autoPlay
+          loop
+          preload="none"
+          poster={HERO_FILM_POSTER_DATA_URI}
+          aria-hidden="true"
+        >
+          <source src={HERO_FILM_SRC} type="video/mp4" />
         </video>
       ) : (
         <HeroPosterSvg />
       )}
-      <span className="smv5-hero__media-label">Development placeholder — final media pending</span>
+      <span className="smv5-hero__media-label">Film in production — final media pending</span>
     </div>
   );
 }

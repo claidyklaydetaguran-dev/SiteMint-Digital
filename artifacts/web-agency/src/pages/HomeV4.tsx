@@ -20,7 +20,7 @@
  * runway entirely.
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { HOME_SECTIONS, ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
@@ -150,6 +150,150 @@ function HeroCheckGlyph() {
   );
 }
 
+/* ── Hero film container (owner spec, wp-herofilm) ───────────────────────
+ * A cinematic film placement layered into the Signal field — poster now,
+ * `<video>` mount point wired for the real asset when the owner supplies
+ * one. Rendered only when `showFilm` is set (HomeV5 passes it); this file's
+ * own unmodified `<SignalHeroV4 />` call site below omits it, so HomeV4's
+ * own rendered output is byte-for-byte unchanged.
+ *
+ * `HERO_FILM_SRC` is the entire video-mount contract: set it to a produced
+ * asset's URL (mp4/webm, ~2560×1440 source, 16:9) and the video starts
+ * mounting under the existing eligibility gate below — nothing else to
+ * wire up. Until then it stays `null` and only the poster ever renders. */
+const HERO_FILM_SRC: string | null = null;
+
+/** A tiny hand-authored SVG data URI — shown as the `<video poster>` for the
+ * instant between mount and first frame; kept separate from the JSX poster
+ * below so it needs no render-to-string dependency. */
+const HERO_FILM_POSTER_DATA_URI =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23153E52'/%3E%3C/svg%3E";
+
+function useFilmEligible(): boolean {
+  const [eligible, setEligible] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    function check() {
+      if (window.innerWidth >= 768) setEligible(true);
+    }
+    if (document.readyState === "complete") {
+      check();
+      return undefined;
+    }
+    // Loads after the window has finished loading — after LCP by
+    // construction, matching the same gate used by `components/v5/HeroMedia`
+    // and the AI Receptionist hero's own film placement.
+    window.addEventListener("load", check, { once: true });
+    return () => window.removeEventListener("load", check);
+  }, []);
+  return eligible;
+}
+
+/**
+ * Composed CSS/SVG poster — no photo, an honest development placeholder at
+ * the film's final 16:9 aspect. Dark ink ground, a faint availability-grid
+ * motif (echoing the field's own connected-system story), and the Signal
+ * gradient thread drawn once as a static preview of the seam element that
+ * travels between this container and the particle field outside it.
+ */
+function HeroFilmPoster() {
+  return (
+    <svg
+      className="v4-hero__film-poster"
+      viewBox="0 0 640 360"
+      role="img"
+      aria-labelledby="v4-hero-film-title"
+    >
+      <title id="v4-hero-film-title">Film in production — final media pending</title>
+      <defs>
+        <pattern id="v4-film-grid" width="34" height="34" patternUnits="userSpaceOnUse">
+          <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="rgba(159,194,204,0.28)" strokeWidth="1" />
+        </pattern>
+        <linearGradient id="v4-film-thread" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#56D2CF" stopOpacity="0" />
+          <stop offset="35%" stopColor="#32C5D2" />
+          <stop offset="100%" stopColor="#56D2CF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect width="640" height="360" fill="#153E52" />
+      <rect width="640" height="360" fill="url(#v4-film-grid)" opacity="0.55" />
+      <path
+        d="M18 322 C 150 250, 250 288, 350 210 S 520 130, 622 78"
+        fill="none"
+        stroke="url(#v4-film-thread)"
+        strokeWidth="2.5"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
+/**
+ * The film container. Always renders (a compact poster band on every width
+ * — see `styles/v5-home.css`, "Mobile: poster + particles" per the approved
+ * treatment). Video mounts only ≥768px, only without
+ * `prefers-reduced-motion: reduce`, and only after `HERO_FILM_SRC` is set —
+ * until then, and always below 768px, this renders the poster only.
+ */
+function HeroFilm() {
+  const eligible = useFilmEligible();
+  const showVideo = eligible && !!HERO_FILM_SRC;
+  return (
+    <div className="v4-hero__film" data-v4-hero-film aria-hidden="true">
+      <div className="v4-hero__film-frame">
+        <HeroFilmPoster />
+        {showVideo && HERO_FILM_SRC && (
+          <video
+            className="v4-hero__film-video"
+            muted
+            playsInline
+            autoPlay
+            loop
+            preload="none"
+            poster={HERO_FILM_POSTER_DATA_URI}
+          >
+            <source src={HERO_FILM_SRC} type="video/mp4" />
+          </video>
+        )}
+        <span className="v4-hero__film-caption">Film in production</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The Glacier Mint "signal" seam — a thin gradient path bridging the film
+ * container and the particle field beneath/beside it. CSS/SVG only; the
+ * flowing dash animation below is disabled under reduced motion, leaving
+ * the same path visible as a static gradient line (no motion, no removal).
+ */
+function HeroSignalSeam() {
+  return (
+    <svg
+      className="v4-hero__seam"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="v4-seam-grad" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#56D2CF" stopOpacity="0" />
+          <stop offset="45%" stopColor="#32C5D2" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#56D2CF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path
+        className="v4-hero__seam-path"
+        d="M4 90 C 26 74, 42 66, 56 50 S 80 22, 96 8"
+        fill="none"
+        stroke="url(#v4-seam-grad)"
+        strokeWidth="0.7"
+        pathLength={1}
+      />
+    </svg>
+  );
+}
+
 /**
  * V5 note: props were added (with defaults reproducing the original literal
  * copy exactly) so `HomeV5.tsx` can reuse this component's particle-canvas
@@ -172,6 +316,11 @@ export interface SignalHeroV4Props {
   secondaryLabel?: string;
   /** True when `secondaryHref` is an app route (Link) rather than a same-page hash (plain anchor). */
   secondaryIsRoute?: boolean;
+  /** Owner spec (wp-herofilm): renders the cinematic film container + its
+   *  gradient connecting thread alongside the particle field. Defaults to
+   *  unset so this file's own `<SignalHeroV4 />` call site (unrouted
+   *  HomeV4) is unchanged; HomeV5 passes `true`. */
+  showFilm?: boolean;
 }
 
 export function SignalHeroV4({
@@ -193,6 +342,7 @@ export function SignalHeroV4({
   secondaryHref = "#signal-journey",
   secondaryLabel = "See How It Works",
   secondaryIsRoute = false,
+  showFilm = false,
 }: SignalHeroV4Props = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -472,6 +622,21 @@ export function SignalHeroV4({
             )}
           </div>
         </div>
+
+        {/* Owner spec (wp-herofilm; HERO-FILM-TREATMENT.md — "Mobile: poster
+            + particles, no autoplay"): the cinematic film container + its
+            gradient connecting thread. A compact poster band between the
+            copy and the field below 1024px (small on mobile, taller on
+            tablet — both keep the particle field visible below it);
+            repositioned into the upper-right visual field at ≥1024px. All
+            of this lives in CSS (`styles/v5-home.css`) — no layout logic
+            lives here. */}
+        {showFilm && (
+          <>
+            <HeroFilm />
+            <HeroSignalSeam />
+          </>
+        )}
 
         {/* Region 2 — the Signal field. The narrative lives here, below the
             copy, at every width. */}

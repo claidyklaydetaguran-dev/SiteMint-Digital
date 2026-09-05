@@ -252,11 +252,15 @@
 }
 
 .smv5-hero__media {
+  /* Film container (wp-herofilm): 16:9, the eventual produced video's
+     source aspect — object-fit: cover on the poster/video below crops
+     gracefully at any other rendered aspect (e.g. the ≥861px stretch-to-
+     column-height rule further down). */
   position: relative;
   border-radius: var(--smv5-radius-l);
   overflow: hidden;
   background: #072022;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   min-height: 320px;
   box-shadow: var(--smv5-shadow-2);
 }
