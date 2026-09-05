@@ -30,4 +30,4 @@
 | 19 | 2026-09-05 | Homepage narrative v3 — Seedance Mini from verified board frame, short-word labels | Seedance 2.0 Mini multishot | 16:9 720p 10s | 1400 exact | 1400 | 6465 | BhF5w3RoQR | done — APPROVED: board text stable and correct, WON/QUOTE/LEAD/LIVE crisp, workflow demonstrated; 1.55 MB 720p web, INSTALLED as home hero film |
 | 13 | 2026-09-05 | About texture band (IMG-07, snapped 21:9→2:1) | auto (light) | 2:1 | ~100 var | 15 | 2065 | u5sg8gqQLD | done |
 
-**Cumulative spent: 6,465 / 6,800** — reserve 335; STOP: no further paid generation without owner instruction
+**Cumulative spent: 6,465 / 6,800** — reserve 335; generation CLOSED for this authorization. Owner-rejected takes 15-16 retained in the Magnific library per protocol (prompts + originals preserved).
