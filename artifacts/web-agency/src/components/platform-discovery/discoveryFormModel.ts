@@ -221,7 +221,7 @@ function setNestedError(target: Record<string, unknown>, path: string, message: 
   // which made findFirstStepWithError fall back to step 0 for every array-item
   // error (submit bounced the visitor to the first step instead of the one
   // holding the invalid field).
-  const segments = path.replace(/[(d+)]/g, ".$1").split(".");
+  const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".");
   let cursor: Record<string, unknown> = target;
   for (let i = 0; i < segments.length - 1; i++) {
     const key = segments[i];
