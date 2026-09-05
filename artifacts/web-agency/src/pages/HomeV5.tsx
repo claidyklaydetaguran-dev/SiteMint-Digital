@@ -31,9 +31,9 @@ import {
 } from "@/components/v5/pricingTiersV5";
 import { teamV5 } from "@/components/v5/teamV5";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
-import crmCommandShot from "@/assets/product/crm-command.png";
 import discoveryStepShot from "@/assets/product/discovery-step.png";
 import hdCallsShot from "@/assets/product/hd-calls.png";
+import homeHeroLoop from "@/assets/media/home-hero-loop.mp4";
 import "@/styles/v5-home.css";
 
 const PAGE_TITLE = "SiteMint Digital | Websites, CRM, and AI Systems Built to Connect";
@@ -195,6 +195,9 @@ function CrmSystemsSection() {
           </Link>
         </div>
         <div className="sm-visual-stack reveal-scale-settle" ref={reveal} data-v4-reveal>
+          {/* CRM screenshots are never shown publicly (owner directive,
+              2026-09-05: "CRM shouldn't be publicized") — this abstract
+              record illustration is the section's sole visual. */}
           <div className="sm-record" aria-hidden="true">
             <span className="sm-record__badge">Illustration</span>
             <div className="sm-record__row">
@@ -213,11 +216,6 @@ function CrmSystemsSection() {
               <span className="sm-record__v">Proposal sent</span>
             </div>
           </div>
-          <ShotFrame
-            src={crmCommandShot}
-            alt="SiteMint CRM command view showing pipeline stages and tasks"
-            caption="SiteMint CRM — preview data"
-          />
         </div>
       </div>
     </section>
@@ -711,13 +709,16 @@ export default function HomeV5() {
       <WhatWeBuildLedger />
 
       {/* Poster-first hero media (V5-BLUEPRINT §6/§17): a below-the-fold,
-          non-LCP visual break before the interactive diagram. No produced
-          video exists yet, so this renders the labelled development
-          placeholder poster only — `videoSrc` stays unset until the owner
-          approves a produced asset per the hero storyboard. */}
+          non-LCP visual break before the interactive diagram. Plays the
+          produced ambient studio loop (owner-approved asset, 2026-09-05);
+          `HeroMedia` still gates playback behind window-load + idle,
+          ≥768px, and prefers-reduced-motion, falling back to its poster. */}
       <section className="v4-section sm-media-break" data-tone="ink" aria-label="SiteMint connected system, visualised">
         <div className="v4-container reveal-scale-settle" ref={reveal} data-v4-reveal>
-          <HeroMedia label="Development placeholder — SiteMint connected-system visual, final media pending" />
+          <HeroMedia
+            videoSrc={homeHeroLoop}
+            label="SiteMint brand film — representative studio scene"
+          />
         </div>
       </section>
 
