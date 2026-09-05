@@ -14,9 +14,6 @@ import {
   Eye,
   Plug,
   PauseCircle,
-  Database,
-  ListChecks,
-  Users,
   LineChart,
   Webhook,
   Cookie,
@@ -29,6 +26,7 @@ import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { ConnectedOpsMap } from "@/components/v5/ConnectedOpsMap";
 import "@/styles/v5-pages.css";
 
 const content: ServicePageContent = {
@@ -203,42 +201,14 @@ function CrmSystemsSection() {
             remembered to log.
           </p>
         </div>
-        <div className="v3m-pillars v3m-pillars--3">
-          <div className="v3-card v3m-pillar reveal-scale-settle">
-            <span className="v3m-pillar__icon">
-              <Database aria-hidden="true" />
-            </span>
-            <h3 className="v3m-pillar__title">One system of record</h3>
-            <p className="v3m-pillar__desc">
-              Leads, contacts, and jobs live in one place instead of a
-              spreadsheet, an inbox, and someone's memory.
-            </p>
-          </div>
-          <div className="v3-card v3m-pillar reveal-scale-settle">
-            <span className="v3m-pillar__icon">
-              <ListChecks aria-hidden="true" />
-            </span>
-            <h3 className="v3m-pillar__title">Pipeline &amp; tasks</h3>
-            <p className="v3m-pillar__desc">
-              Every stage and every task is visible — what's next, what's
-              overdue, and who owns it.
-            </p>
-          </div>
-          <div className="v3-card v3m-pillar reveal-scale-settle">
-            <span className="v3m-pillar__icon">
-              <Users aria-hidden="true" />
-            </span>
-            <h3 className="v3m-pillar__title">Built for your team</h3>
-            <p className="v3m-pillar__desc">
-              Configured around how your business actually runs — not a
-              generic template with fields you'll never use.
-            </p>
-          </div>
-        </div>
         {/* CRM screenshots are never shown publicly (owner directive,
-            2026-09-05: "CRM shouldn't be publicized") — the section returns
-            to its icon-card treatment above as the sole visual, closed out
-            with a deliberate divider rather than trailing into empty space. */}
+            2026-09-05: "CRM shouldn't be publicized"; reaffirmed
+            2026-09-06) — this interactive, entirely synthetic workflow map
+            (components/v5/ConnectedOpsMap.tsx) is the section's sole visual.
+            Every name and record below is invented for illustration; the
+            seven steps and their panels are the sole source of truth,
+            shared with the equivalent section on HomeV5. */}
+        <ConnectedOpsMap />
         <div className="sm-crm-cta">
           <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
             Talk about a CRM for your business
