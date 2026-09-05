@@ -17,6 +17,11 @@
  *  4. The `Reveal` motion component (`components/v5/Reveal`) is used at most
  *     twice per section, per the global motion spec (V5-BLUEPRINT §11: "at
  *     most two animated groups per viewport").
+ *  5. Nine-capability expansion (V5 owner directive, 2026-09-05): the
+ *     capability ledger's heading and lede say "nine", and all nine approved
+ *     capability labels are present verbatim, including the four added by
+ *     this workstream (Strategy & Discovery, Growth Infrastructure,
+ *     Advertising Services, Ongoing Support & Optimization).
  */
 
 import { readFileSync } from "node:fs";
@@ -116,6 +121,30 @@ console.log("4. Reveal used at most twice per section");
     }
   }
   check("no section exceeds two <Reveal> uses", !anyOverLimit);
+}
+
+console.log("5. Nine-capability ledger expansion is present verbatim");
+check(
+  "ledger heading says 'Nine capabilities'",
+  /Nine capabilities\. One connected system\./.test(homeV5Src),
+);
+check(
+  "ledger lede says 'nine capabilities'",
+  /the same nine capabilities/.test(homeV5Src),
+);
+const NINE_CAPABILITY_LABELS = [
+  "Strategy & Discovery",
+  "Websites",
+  "Web Applications",
+  "CRM & Business Systems",
+  "AI Systems & Automation",
+  "Growth Infrastructure",
+  "Advertising Services",
+  "AI Receptionist",
+  "Ongoing Support & Optimization",
+];
+for (const label of NINE_CAPABILITY_LABELS) {
+  check(`ledger row present: "${label}"`, homeV5Src.includes(label));
 }
 
 if (failures > 0) {

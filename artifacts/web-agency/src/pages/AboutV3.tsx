@@ -15,7 +15,7 @@ export default function AboutV3() {
   const reveal = useReveal();
   usePageMeta({
     title: "Company — SiteMint Digital",
-    description: "A small studio that builds like an operator — what we believe, how we're organized, and the people doing the work.",
+    description: "A studio that builds like an operator — what we believe, how we're organized, and the people doing the work.",
   });
 
   return (
@@ -26,9 +26,15 @@ export default function AboutV3() {
           {/* Headline is the hero LCP text — left static (no mask-reveal) so
               first paint isn't delayed; eyebrow/lede/visual carry the motion. */}
           <h1 className="v3-display">
-            A small studio that builds like an operator.
+            A studio that builds like an operator.
           </h1>
           <p className="v3-lede reveal-fade-up">
+            SiteMint designs and builds connected digital systems—websites,
+            web applications, CRM tools, automation, and AI products—that
+            capture opportunities, organize operations, and move work toward
+            the next meaningful action.
+          </p>
+          <p className="v3-lede reveal-fade-up" style={{ fontSize: "1.05rem" }}>
             SiteMint Digital designs, builds, and runs business systems —
             including our own. The discovery flow on this site is the same
             structured intake we build for clients. The automation and CRM
@@ -111,7 +117,7 @@ export default function AboutV3() {
         <div className="v3-container v3m-split v3-reveal" ref={reveal}>
           <div className="v3m-split__copy reveal-h-left">
             <span className="v3-eyebrow">How we're organized</span>
-            <h2 className="v3-h2 reveal-clip">Small on purpose.</h2>
+            <h2 className="v3-h2 reveal-clip">Focused, not layered.</h2>
             <p className="v3-body reveal-fade-up">
               SiteMint is a focused team, not a layered agency. The people who
               design your system are the people who build it and the people who

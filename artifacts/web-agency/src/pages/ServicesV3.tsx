@@ -18,6 +18,9 @@ import {
   Workflow,
   Database,
   Plug,
+  TrendingUp,
+  Megaphone,
+  LifeBuoy,
 } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
@@ -80,6 +83,61 @@ const pillars: Pillar[] = [
     href: `${ROUTES.aiSystems}#crm-systems`,
     mapPos: { x: 390, y: 240 },
     connectsTo: ["AI Systems & Automation", "Websites & Web Apps"],
+  },
+];
+
+/**
+ * Growth Infrastructure, Advertising services, and Ongoing Support &
+ * Optimization (V5 nine-capability expansion, 2026-09-05 owner directive).
+ * These render as plain numbered v3wk-item entries after the four
+ * interactive pillars above — they are deliberately NOT added to `pillars`
+ * or the SVG systems map: the map is a diagram of the four *core, always-on*
+ * systems a build connects together (site, discovery, automation, CRM).
+ * Growth Infrastructure and Advertising are scoped, often-recurring services
+ * layered on top of that core, and Support & Optimization is a post-launch
+ * engagement rather than a system node — none of the three has the
+ * "everything else plugs into this" relationship the map is drawing, so
+ * adding nodes for them would misstate what the diagram means rather than
+ * complete it. They still get full, equally-weighted coverage as numbered
+ * articles below.
+ */
+interface ExpandedService {
+  id: string;
+  icon: typeof Globe;
+  title: string;
+  headline: string;
+  desc: string;
+  href: string;
+  connectsTo: string[];
+}
+
+const expandedServices: ExpandedService[] = [
+  {
+    id: "growth-infrastructure",
+    icon: TrendingUp,
+    title: "Growth Infrastructure",
+    headline: "The tracking that has to work before ad spend does.",
+    desc: "Technical SEO, analytics, conversion tracking, cookie-consent implementation, Meta/Google/TikTok pixels, webhooks, and campaign-ready landing pages, plus attribution and event instrumentation — offered on its own or as the foundation under an advertising engagement.",
+    href: `${ROUTES.aiSystems}#growth-infrastructure`,
+    connectsTo: ["Websites & Web Apps", "Advertising Services"],
+  },
+  {
+    id: "advertising-services",
+    icon: Megaphone,
+    title: "Advertising Services",
+    headline: "Meta and Google campaigns, run and reported on honestly.",
+    desc: "Campaign discovery and strategy, offer/audience/funnel planning, account and campaign setup, landing-page and creative coordination, pixels and conversion events, launch, and ongoing monitoring with plain reporting. Client ad spend is always separate from SiteMint's service fee. This is a separately scoped, usually recurring engagement — never a default part of a website package, and never sold with a promised result.",
+    href: ROUTES.start,
+    connectsTo: ["Growth Infrastructure", "Websites & Web Apps"],
+  },
+  {
+    id: "ongoing-support",
+    icon: LifeBuoy,
+    title: "Ongoing Support & Optimization",
+    headline: "The system tuned after launch, not abandoned at it.",
+    desc: "Monitoring, updates, content and performance tuning, and the small fixes that keep a system reliable months after launch — scoped as an ongoing engagement alongside any tier, not assumed to be included in it.",
+    href: `${ROUTES.pricing}#configure`,
+    connectsTo: ["Websites & Web Apps", "CRM & Internal Systems"],
   },
 ];
 
@@ -175,7 +233,7 @@ export default function ServicesV3() {
   usePageMeta({
     title: "What We Build — SiteMint Digital",
     description:
-      "Websites & web apps, discovery systems, AI systems & automation, and CRM & internal systems — four connected SiteMint pillars, plus pricing estimates.",
+      "Websites & web apps, discovery systems, AI systems & automation, CRM & internal systems, growth infrastructure, advertising services, and ongoing support — the full SiteMint service architecture, plus pricing estimates.",
   });
 
   return (
@@ -194,6 +252,11 @@ export default function ServicesV3() {
             system: attention arrives at the website, discovery turns it into
             a brief, AI systems and automation carry the work, and the CRM is
             where your team sees it all.
+          </p>
+          <p className="v3-body reveal-fade-up">
+            Growth infrastructure, advertising services, and ongoing support
+            &amp; optimization extend that core system — scoped separately,
+            on their own or layered on top of it.
           </p>
           <div className="v3m-hero__actions reveal-fade-up">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
@@ -243,9 +306,44 @@ export default function ServicesV3() {
             </Fragment>
           ))}
 
+          {expandedServices.map((service, i) => (
+            <article
+              className="v3wk-item reveal-scale-settle"
+              id={service.id}
+              key={service.id}
+              style={{ scrollMarginTop: "5rem" }}
+            >
+              <div className="v3wk-item__meta">
+                <span className="v3m-sechead__no">
+                  {String(i + 5).padStart(2, "0")}
+                </span>
+                <span className="v3-eyebrow">
+                  <service.icon aria-hidden="true" size={14} />
+                  {service.title}
+                </span>
+              </div>
+              <div className="v3wk-item__body">
+                <h2 className="v3-h2">{service.headline}</h2>
+                <p className="v3-body">{service.desc}</p>
+                <ul className="sm-connects">
+                  <li className="sm-connects__label">Connects to:</li>
+                  {service.connectsTo.map((name) => (
+                    <li className="sm-connects__item" key={name}>{name}</li>
+                  ))}
+                </ul>
+                <div>
+                  <Link href={service.href} className="v3-btn v3-btn--outline">
+                    Explore {service.title}
+                    <ArrowRight aria-hidden="true" size={16} />
+                  </Link>
+                </div>
+              </div>
+            </article>
+          ))}
+
           <article className="v3wk-item reveal-scale-settle" id="integrations" style={{ scrollMarginTop: "5rem" }}>
             <div className="v3wk-item__meta">
-              <span className="v3m-sechead__no">05</span>
+              <span className="v3m-sechead__no">08</span>
               <span className="v3-eyebrow">
                 <Plug aria-hidden="true" size={14} />
                 Integrations
@@ -273,7 +371,7 @@ export default function ServicesV3() {
 
           <article className="v3wk-item reveal-scale-settle" id="pricing-estimates" style={{ scrollMarginTop: "5rem" }}>
             <div className="v3wk-item__meta">
-              <span className="v3m-sechead__no">06</span>
+              <span className="v3m-sechead__no">09</span>
               <span className="v3-eyebrow">Pricing estimates</span>
             </div>
             <div className="v3wk-item__body">

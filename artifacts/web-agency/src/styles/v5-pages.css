@@ -133,6 +133,103 @@
   max-width: 42ch;
 }
 
+/* ── Real-product proof frame (container completion, nine-capability pass,
+   2026-09-05) — a real SiteMint screenshot in a labelled browser chrome,
+   shared visual language with the equivalent block in v5-home.css. ────── */
+.sm-v5page .sm-shot-frame {
+  margin: 0;
+  border-radius: var(--sm-radius-m, 10px);
+  overflow: hidden;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-v5page .sm-shot-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.55rem 0.75rem;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-v5page .sm-shot-frame__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #A9CFD6);
+}
+.sm-v5page .sm-shot-frame__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  background: var(--sm-surface-alt, #EDF9FA);
+}
+.sm-v5page .sm-shot-frame__caption {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--sm-text-muted, #4A6472);
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+}
+
+/* ── Growth Infrastructure anchored section (AiSystemsV5) ────────────────── */
+.sm-v5page .sm-growth-grid {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 620px) {
+  .sm-v5page .sm-growth-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 980px) {
+  .sm-v5page .sm-growth-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-v5page .sm-growth-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface, #fff);
+}
+.sm-v5page .sm-growth-item__icon {
+  display: inline-flex;
+  color: var(--sm-mint-700, #0B7487);
+  margin-bottom: 0.15rem;
+}
+.sm-v5page .sm-growth-item__title {
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-v5page .sm-growth-item__desc {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.9rem;
+}
+
+/* ── Pricing — advertising services (separately scoped, recurring) ───────── */
+.sm-v5page .sm-ads-note {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px dashed var(--sm-line-strong, #A9CFD6);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface-alt, #EDF9FA);
+  margin-top: 1.5rem;
+}
+.sm-v5page .sm-ads-note__list {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.1rem;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.92rem;
+}
+
 /* ── Process — connecting rail on the numbered stage list (finishes the
    "Process scroll timeline" interaction signature with a real visual rail,
    CSS-only — no scroll-linked JS risk). Anchored to the 120px number-column
