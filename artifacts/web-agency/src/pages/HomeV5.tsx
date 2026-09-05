@@ -24,6 +24,7 @@ import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
 import { HeroMedia } from "@/components/v5/HeroMedia";
 import { Reveal } from "@/components/v5/Reveal";
 import { BuildPreview } from "@/components/v5/BuildPreview";
+import { ConnectedOpsMap } from "@/components/v5/ConnectedOpsMap";
 import {
   pricingTiersV5,
   PRICING_DISCLAIMER_V5,
@@ -37,6 +38,11 @@ import discoveryStepShot from "@/assets/product/discovery-step.png";
 import hdCallsShot from "@/assets/product/hd-calls.png";
 import homeHeroLoop from "@/assets/media/home-hero-loop.mp4";
 import "@/styles/v5-home.css";
+// Connected Operations Map (CRM & Internal Systems section, below) shares
+// its styling with AiSystemsV5 via v5-pages.css rather than duplicating it
+// into v5-home.css — see the ".opsmap" rules there, deliberately unscoped
+// to `.sm-v5page` so they apply equally on this `.sm-home-v5` page.
+import "@/styles/v5-pages.css";
 
 const PAGE_TITLE = "SiteMint Digital | Websites, CRM, and AI Systems Built to Connect";
 const PAGE_DESCRIPTION =
@@ -155,54 +161,38 @@ function WebsitesAppsSection() {
   );
 }
 
-/* ── Section 5 — CRM & internal systems (labelled illustration) ─────────── */
+/* ── Section 5 — CRM & internal systems (Connected Operations Map) ──────── */
 
 function CrmSystemsSection() {
   const reveal = useReveal();
   return (
     <section className="v4-section" id="crm-systems" data-tone="white">
-      <div className="v4-container sm-split sm-split--reverse">
-        <div className="sm-split__copy reveal-h-right" ref={reveal} data-v4-reveal>
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
           <span className="v4-kicker">04 — CRM &amp; Internal Systems</span>
-          <h2 className="v4-h2 reveal-clip">Where the business runs, in one place.</h2>
-          <p className="v4-lede reveal-fade-up">
-            For teams whose leads live in a spreadsheet, an inbox, and
-            someone's memory: pipeline, tasks, and records the owner actually
-            looks at — built around how the business already works instead of
-            forcing a generic template onto it.
-          </p>
-          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
-            A CRM connection is part of the Growth and Custom systems above,
-            configured to your pipeline during discovery — it's the record
-            every website form, automated follow-up, and receptionist call
-            below writes to, so nothing lives in two places.
-          </p>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">Where the business runs, in one place.</h2>
+        <p className="v4-lede reveal-fade-up">
+          For teams whose leads live in a spreadsheet, an inbox, and
+          someone's memory: pipeline, tasks, and records the owner actually
+          looks at — built around how the business already works instead of
+          forcing a generic template onto it. The map below walks the same
+          seven steps a real project moves through — every name in it is
+          invented for illustration; the real Operations CRM is never shown
+          publicly.
+        </p>
+        <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
+          A CRM connection is part of the Growth and Custom systems above,
+          configured to your pipeline during discovery — it's the record
+          every website form, automated follow-up, and receptionist call
+          below writes to, so nothing lives in two places.
+        </p>
+        <ConnectedOpsMap />
+        <div className="sm-crm-cta">
           <Link href={`${ROUTES.aiSystems}#crm-systems`} className="v3-btn v3-btn--outline">
             See CRM &amp; internal systems →
           </Link>
-        </div>
-        <div className="sm-visual-stack reveal-scale-settle" ref={reveal} data-v4-reveal>
-          {/* CRM screenshots are never shown publicly (owner directive,
-              2026-09-05: "CRM shouldn't be publicized") — this abstract
-              record illustration is the section's sole visual. */}
-          <div className="sm-record" aria-hidden="true">
-            <span className="sm-record__badge">Illustration</span>
-            <div className="sm-record__row">
-              <span className="sm-record__dot" />
-              <span className="sm-record__k">Lead</span>
-              <span className="sm-record__v">New inquiry — routed</span>
-            </div>
-            <div className="sm-record__row">
-              <span className="sm-record__dot sm-record__dot--amber" />
-              <span className="sm-record__k">Task</span>
-              <span className="sm-record__v">Follow up — due today</span>
-            </div>
-            <div className="sm-record__row">
-              <span className="sm-record__dot sm-record__dot--mint" />
-              <span className="sm-record__k">Stage</span>
-              <span className="sm-record__v">Proposal sent</span>
-            </div>
-          </div>
         </div>
       </div>
     </section>

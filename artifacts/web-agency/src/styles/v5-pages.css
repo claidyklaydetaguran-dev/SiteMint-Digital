@@ -1105,6 +1105,80 @@
   top: 0.75rem;
   right: 0.75rem;
   display: inline-flex;
+/* ═══════════════════════════════════════════════════════════════════════
+   Connected Operations Map (CRM & Internal Systems containers, owner
+   directive 2026-09-06) — components/v5/ConnectedOpsMap.tsx.
+
+   The real Operations CRM is never shown publicly; this is a fully
+   synthetic, interactive workflow map (seven clickable steps on a mint
+   signal line + a neighbouring detail panel) used by both HomeV5's and
+   AiSystemsV5's "CRM & Internal Systems" sections.
+
+   Deliberately NOT scoped to `.sm-v5page`: unlike the rest of this file,
+   `.opsmap` renders inside two different page shells — AiSystemsV5
+   (`.sm-v5page`) and HomeV5 (`.sm-home-v5`) — so every rule below is
+   self-contained under the component's own `.opsmap` root instead of a
+   dual-selector list (the same cross-shell precedent as the
+   `.sm-person-avatar img, .sm-home-v5 .sm-team-card__avatar img` rule
+   above). Glacier Mint tokens only; hex fallbacks match tokens-v5.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.opsmap {
+  display: grid;
+  gap: 1.75rem;
+  margin-top: 1.75rem;
+}
+
+/* ── Rail — desktop: seven even columns. The decorative thread sits behind
+   the node dots at their shared vertical center (each dot is a fixed 44px
+   circle, the first element in its button, so 22px from the rail's top
+   edge is always the dot's center). ─────────────────────────────────── */
+.opsmap__rail-wrap {
+  position: relative;
+}
+.opsmap__thread {
+  position: absolute;
+  left: 0;
+  top: 22px;
+  width: 100%;
+  height: 4px;
+  overflow: visible;
+  pointer-events: none;
+}
+.opsmap__thread-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0; /* static/drawn by default — see the no-preference block below */
+}
+.opsmap__rail {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.opsmap__item {
+  min-width: 0;
+}
+.opsmap__node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.15rem;
+  border: 0;
+  border-radius: var(--sm-radius-m, 10px);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--sm-text, #173642);
+  -webkit-tap-highlight-color: transparent;
+}
+.opsmap__node-no {
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -1241,5 +1315,216 @@
 @media (prefers-reduced-motion: reduce) {
   .sm-v5page .sm-team-dialog[open] .sm-team-dialog__panel {
     animation: none;
+  border: 2px solid var(--sm-line-strong, #A9CFD6);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text-muted, #4A6472);
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.opsmap__node-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  max-width: 9ch;
+  overflow-wrap: anywhere;
+}
+.opsmap__node[aria-current="step"] .opsmap__node-no {
+  background: var(--sm-mint-500, #32C5D2);
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+}
+.opsmap__node[aria-current="step"] .opsmap__node-label {
+  color: var(--sm-mint-700, #0B7487);
+}
+.opsmap__node:hover .opsmap__node-no,
+.opsmap__node:focus-visible .opsmap__node-no {
+  border-color: var(--sm-mint-500, #32C5D2);
+  transform: translateY(-2px);
+}
+/* Additive focus ring — the global `[data-tone] button:focus-visible`
+   outline (tokens-v3.css) already applies and is never suppressed here;
+   this box-shadow only reinforces it with the same Glacier focus token. */
+.opsmap__node:focus-visible {
+  box-shadow: var(--sm-focus, 0 0 0 3px rgba(50, 197, 210, 0.45));
+}
+
+/* ── Panel slots — exactly one is ever displayed at a given viewport
+   width (see the two breakpoint blocks below); both start hidden so
+   neither flashes before its media query resolves. ─────────────────── */
+.opsmap__panel-slot--mobile,
+.opsmap__panel-slot--desktop {
+  display: none;
+}
+
+.opsmap-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-l, 16px);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-1, 0 1px 2px rgb(11 58 62 / .06), 0 6px 20px rgb(11 58 62 / .06));
+}
+.opsmap-panel__eyebrow {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-mint-700, #0B7487);
+}
+.opsmap-panel__title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--sm-text, #173642);
+}
+.opsmap-panel__facts {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+}
+.opsmap-panel__fact dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--sm-text-muted, #4A6472);
+  margin-bottom: 0.2rem;
+}
+.opsmap-panel__fact dd {
+  margin: 0;
+  color: var(--sm-text, #173642);
+  font-size: 0.94rem;
+  max-width: 62ch;
+}
+
+/* ── Synthetic record / task card — the small, clearly-generic HTML
+   artifact each panel carries (never a screenshot). ────────────────── */
+.opsmap-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border: 1px dashed var(--sm-line-strong, #A9CFD6);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface-alt, #EDF9FA);
+  min-width: 0;
+}
+.opsmap-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.opsmap-card__badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-mint-700, #0B7487);
+}
+.opsmap-card__note {
+  font-size: 0.7rem;
+  color: var(--sm-text-muted, #4A6472);
+  font-style: italic;
+}
+.opsmap-card__rows {
+  display: grid;
+  gap: 0.45rem;
+}
+.opsmap-card__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.opsmap-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-mint-500, #32C5D2);
+  flex-shrink: 0;
+}
+.opsmap-card__dot--amber { background: var(--sm-amber-600, #B45309); }
+.opsmap-card__dot--done { background: var(--sm-green-700, #15803D); }
+.opsmap-card__dot--muted { background: var(--sm-slate-300, #B9CBCE); }
+.opsmap-card__k {
+  min-width: 0;
+  font-size: 0.86rem;
+  color: var(--sm-text-muted, #4A6472);
+  overflow-wrap: anywhere;
+}
+.opsmap-card__v {
+  min-width: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* ── Desktop (≥768px): horizontal rail, one panel below it ─────────────── */
+@media (min-width: 768px) {
+  .opsmap__panel-slot--desktop {
+    display: block;
+  }
+}
+
+/* ── Mobile (≤767px): vertical list, panel inline under the active node —
+   the thread is a desktop-only decoration; the numbered dots plus the
+   panel appearing directly under the open step already read as connected
+   in a single column, and a full-width horizontal line has no honest
+   geometry once the rail is vertical. ──────────────────────────────────── */
+@media (max-width: 767px) {
+  .opsmap__thread {
+    display: none;
+  }
+  .opsmap__rail {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .opsmap__node {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.85rem;
+    min-height: 44px;
+  }
+  .opsmap__node-label {
+    max-width: none;
+    text-align: left;
+  }
+  .opsmap__panel-slot--mobile {
+    display: block;
+    margin-top: 0.85rem;
+  }
+}
+
+/* ── Motion: static/drawn by default (reduced-motion or no-JS baseline) —
+   the stroke-draw-on only animates under the no-preference query, the
+   same convention this file already uses for `.sm-map-path`. ─────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .opsmap__rail-wrap[data-reveal-ready] .opsmap__thread-path {
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 700ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 150ms;
+  }
+  .opsmap__rail-wrap[data-revealed] .opsmap__thread-path {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opsmap__node-no,
+  .opsmap__node:hover .opsmap__node-no,
+  .opsmap__node:focus-visible .opsmap__node-no {
+    transition: none;
+    transform: none;
   }
 }
