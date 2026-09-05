@@ -29,7 +29,7 @@ import { CallTheaterV5 } from "@/components/receptionist-v5/CallTheaterV5";
 import { LiveDemoPanel } from "@/components/receptionist-v5/LiveDemoPanel";
 import { BetaRequestForm } from "@/components/receptionist-v5/BetaRequestForm";
 import { Reveal } from "@/components/v5/Reveal";
-import { useArmedReveal, usePausableAmbient } from "@/components/receptionist-v5/heroMotion";
+import { useArmedReveal, useHeadlineEntrance, usePausableAmbient } from "@/components/receptionist-v5/heroMotion";
 import "@/components/receptionist-v5/receptionist-v5.css";
 
 const SECTION_ID = Object.fromEntries(
@@ -183,7 +183,7 @@ function HeroMedia() {
  * that never fires — always sees the finished heading, never a stuck wipe.
  */
 function HeroHeadlineReveal({ text }: { text: string }) {
-  const { ref, armed, revealed } = useArmedReveal<HTMLHeadingElement>(0.1);
+  const { ref, armed, revealed } = useHeadlineEntrance<HTMLHeadingElement>();
   const classes = [
     "smv5-hero__title",
     armed && "smv5-hero__title--armed",

@@ -94,6 +94,29 @@ export interface UseArmedRevealResult<T extends Element> {
  *  Bound to `Element` (not `HTMLElement`) so SVG targets — every glyph motif
  *  in `AiReceptionistV5.tsx` (`AvailabilitySlotGlyph`, `ConfirmCheckGlyph`)
  *  — can use it directly. */
+/** Entrance for the hero headline specifically. The headline's at-rest armed
+ *  state is `clip-path: inset(0 0 100%)`, and Chromium factors the target's
+ *  own clip-path into IntersectionObserver's intersectionRect — a fully
+ *  clipped element reports ratio 0 forever, so an observer-based reveal
+ *  deadlocks (measured live: armed class applied, `--in` never landed).
+ *  Since the headline is always first-viewport content, reveal it on a short
+ *  post-arm timer instead; reduced motion stays fully static via `armed`
+ *  never flipping. */
+export function useHeadlineEntrance<T extends Element>(): UseArmedRevealResult<T> {
+  const ref = useRef<T | null>(null);
+  const [armed, setArmed] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    setArmed(true);
+    const timer = setTimeout(() => setRevealed(true), 180);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return { ref, armed, revealed: prefersReducedMotion() ? true : revealed };
+}
+
 export function useArmedReveal<T extends Element>(
   threshold = 0.2,
 ): UseArmedRevealResult<T> {

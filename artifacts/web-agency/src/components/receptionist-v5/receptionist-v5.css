@@ -137,6 +137,7 @@
 }
 
 .smv5-hero__pill {
+  align-self: flex-start; /* flex-column parent stretches items; keep the badge chip-sized */
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -159,9 +160,20 @@
   width: 100%;
 }
 
+.smv5-hero__grid > div {
+  /* grid children default to min-width:auto; without this the CTA row's
+     min-content width forces the column past narrow viewports and the
+     hero's overflow:hidden clips the copy. */
+  min-width: 0;
+}
+
 .smv5-hero__grid > div:first-child {
   display: flex;
   flex-direction: column;
+}
+
+.smv5-hero__ctas {
+  flex-wrap: wrap;
 }
 
 .smv5-hero__title {
