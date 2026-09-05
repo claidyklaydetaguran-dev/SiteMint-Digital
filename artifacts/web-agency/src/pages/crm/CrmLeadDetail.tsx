@@ -68,7 +68,7 @@ const dispositionColor: Record<CallDisposition, string> = {
   "Connected": "bg-green-100 text-green-700",
   "No Answer": "bg-red-100 text-red-700",
   "Left Voicemail": "bg-yellow-100 text-yellow-700",
-  "Wrong Number": "bg-gray-100 text-gray-600",
+  "Wrong Number": "bg-muted text-muted-foreground",
   "Not Interested": "bg-red-100 text-red-700",
   "Follow Up": "bg-blue-100 text-blue-700",
 };
@@ -90,11 +90,11 @@ function Modal({
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
           <h2 className="font-semibold text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-muted-foreground"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground"
           >
             <X className="w-4 h-4" />
           </button>
@@ -686,7 +686,7 @@ export default function CrmLeadDetail() {
       <div className="fixed top-4 right-4 z-[60] space-y-2 pointer-events-none">
         {toasts.map(t => (
           <div key={t.id} className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium max-w-xs
-            ${t.type === "success" ? "bg-green-600 text-white" : t.type === "error" ? "bg-red-600 text-white" : "bg-gray-900 text-white"}`}>
+            ${t.type === "success" ? "bg-green-600 text-white" : t.type === "error" ? "bg-red-600 text-white" : "bg-foreground text-white"}`}>
             {t.type === "success"
               ? <CheckCircle2 className="w-4 h-4 shrink-0" />
               : t.type === "error"
@@ -706,10 +706,10 @@ export default function CrmLeadDetail() {
         </Link>
 
         {/* ── Summary + recommended next action ───────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-3">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-4 mb-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-foreground/5 border border-gray-200 flex items-center justify-center shrink-0 font-serif font-bold text-sm text-foreground">
+              <div className="w-10 h-10 rounded-full bg-foreground/5 border border-border flex items-center justify-center shrink-0 font-serif font-bold text-sm text-foreground">
                 {lead.name.split(" ").filter(Boolean).slice(0, 2).map(n => n[0]).join("").toUpperCase() || "?"}
               </div>
               <div className="min-w-0">
@@ -735,7 +735,7 @@ export default function CrmLeadDetail() {
           </div>
 
           {/* Recommended next action — derived from the already-loaded sales signals */}
-          <div className="mt-3 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 flex items-start gap-2">
+          <div className="mt-3 bg-muted rounded-lg px-3 py-2 border border-border/60 flex items-start gap-2">
             <span className="text-sm shrink-0 mt-0.5">👉</span>
             {salesNBA ? (
               <div className="min-w-0">
@@ -749,7 +749,7 @@ export default function CrmLeadDetail() {
         </div>
 
         {/* ── Contact information ──────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-3">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-4 mb-3">
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Contact Information</h2>
           <div className="grid sm:grid-cols-2 gap-2">
             <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
@@ -765,7 +765,7 @@ export default function CrmLeadDetail() {
                       value={editPhone}
                       onChange={e => setEditPhone(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") { setEditingPhone(false); setPhoneError(""); } }}
-                      className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
+                      className="flex-1 px-2.5 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
                       placeholder="+19498806515"
                       autoFocus
                     />
@@ -778,15 +778,15 @@ export default function CrmLeadDetail() {
                     </button>
                     <button
                       onClick={() => { setEditingPhone(false); setEditPhone(lead.phone || ""); setPhoneError(""); }}
-                      className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
+                      className="text-xs px-2 py-1.5 border border-border rounded-lg hover:bg-accent transition-colors shrink-0"
                     >
                       Cancel
                     </button>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     Use E.164 format when possible.{" "}
-                    US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
-                    · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
+                    US: <code className="bg-muted px-0.5 rounded">+19498806515</code>{" "}
+                    · PH: <code className="bg-muted px-0.5 rounded">+639186069624</code>
                   </p>
                   {phoneError && (
                     <p className="text-[10px] text-red-600 font-medium">{phoneError}</p>
@@ -806,7 +806,7 @@ export default function CrmLeadDetail() {
                     )}
                     <button
                       onClick={() => { setEditPhone(lead.phone || ""); setEditingPhone(true); setPhoneError(""); }}
-                      className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded text-muted-foreground hover:bg-gray-100 hover:text-foreground transition-colors"
+                      className="text-[10px] px-1.5 py-0.5 border border-border rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                     >
                       Edit
                     </button>
@@ -867,7 +867,7 @@ export default function CrmLeadDetail() {
           {lead.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {lead.tags.map(t => (
-                <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-foreground/5 rounded-full text-muted-foreground border border-gray-200">
+                <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-foreground/5 rounded-full text-muted-foreground border border-border">
                   <Tag className="w-2.5 h-2.5" />{t}
                 </span>
               ))}
@@ -876,8 +876,8 @@ export default function CrmLeadDetail() {
         </div>
 
         {/* ── Stage / status & quick actions ──────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-5">
-          <div className="flex items-stretch divide-x divide-gray-100">
+        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden mb-5">
+          <div className="flex items-stretch divide-x divide-border/60">
             {/* Call */}
             <button
               onClick={() => setOpenModal("call")}
@@ -930,7 +930,7 @@ export default function CrmLeadDetail() {
             >
               <RefreshCw className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Stage / Status</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium leading-tight max-w-full truncate ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium leading-tight max-w-full truncate ${statusColor[lead.status] || "bg-muted text-muted-foreground"}`}>
                 {lead.status}
               </span>
             </button>
@@ -942,8 +942,8 @@ export default function CrmLeadDetail() {
           {/* Main panel */}
           <div className="space-y-5">
             {/* Tab panel */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-              <div className="flex border-b border-gray-200 px-4 overflow-x-auto">
+            <div className="bg-white rounded-xl border border-border shadow-sm">
+              <div className="flex border-b border-border px-4 overflow-x-auto">
                 {(["timeline","tasks","communications","opportunity"] as const).map(tab => (
                   <button
                     key={tab}
@@ -967,7 +967,7 @@ export default function CrmLeadDetail() {
                 <div className="p-5">
                   <div className="mb-5">
                     <textarea
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                      className="w-full px-3 py-2.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                       rows={3}
                       placeholder="Add a note…"
                       value={noteText}
@@ -1001,7 +1001,7 @@ export default function CrmLeadDetail() {
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm font-medium ${isMissed ? "text-red-600" : "text-foreground"}`}>{a.title}</p>
                               {isOutcome && disposition && (
-                                <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-gray-100 text-gray-600"}`}>
+                                <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-muted text-muted-foreground"}`}>
                                   {disposition}
                                 </span>
                               )}
@@ -1023,26 +1023,26 @@ export default function CrmLeadDetail() {
                     <Plus className="w-3.5 h-3.5" /> Add Task
                   </Button>
                   {showTaskForm && (
-                    <div className="mb-4 border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                    <div className="mb-4 border border-border rounded-lg p-4 space-y-3 bg-muted">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-semibold text-muted-foreground block mb-1">Type</label>
-                          <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
+                          <select className="w-full px-3 py-2 text-sm border border-input rounded-lg" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
                             {TASK_TYPES.map(t=><option key={t}>{t}</option>)}
                           </select>
                         </div>
                         <div>
                           <label className="text-xs font-semibold text-muted-foreground block mb-1">Due Date</label>
-                          <input type="date" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
+                          <input type="date" className="w-full px-3 py-2 text-sm border border-input rounded-lg" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
                         </div>
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground block mb-1">Title</label>
-                        <input className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" placeholder="Task title" value={taskForm.title} onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))} />
+                        <input className="w-full px-3 py-2 text-sm border border-input rounded-lg" placeholder="Task title" value={taskForm.title} onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))} />
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground block mb-1">Description</label>
-                        <textarea className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none" rows={2} placeholder="Optional details" value={taskForm.description} onChange={e=>setTaskForm(f=>({...f,description:e.target.value}))} />
+                        <textarea className="w-full px-3 py-2 text-sm border border-input rounded-lg resize-none" rows={2} placeholder="Optional details" value={taskForm.description} onChange={e=>setTaskForm(f=>({...f,description:e.target.value}))} />
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={addTask} disabled={addingTask||!taskForm.title}>{addingTask?"Saving…":"Save Task"}</Button>
@@ -1058,10 +1058,10 @@ export default function CrmLeadDetail() {
                   ) : (
                     <ul className="space-y-2">
                       {tasks.map(task => (
-                        <li key={task.id} className={`flex items-start gap-3 p-3 rounded-lg border ${task.status==="completed"?"border-gray-100 bg-gray-50 opacity-60":task.status==="overdue"?"border-red-100 bg-red-50":"border-gray-200 bg-white"}`}>
+                        <li key={task.id} className={`flex items-start gap-3 p-3 rounded-lg border ${task.status==="completed"?"border-border/60 bg-muted opacity-60":task.status==="overdue"?"border-red-100 bg-red-50":"border-border bg-white"}`}>
                           <button
                             onClick={() => task.status!=="completed" && completeTask(task.id)}
-                            className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${task.status==="completed"?"bg-green-500 border-green-500":"border-gray-300 hover:border-green-500"}`}
+                            className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${task.status==="completed"?"bg-green-500 border-green-500":"border-input hover:border-green-500"}`}
                           >
                             {task.status==="completed"&&<Check className="w-3 h-3 text-white"/>}
                           </button>
@@ -1077,7 +1077,7 @@ export default function CrmLeadDetail() {
                               )}
                             </div>
                           </div>
-                          <button onClick={()=>deleteTask(task.id)} className="text-gray-300 hover:text-red-500 transition-colors mt-0.5 shrink-0">
+                          <button onClick={()=>deleteTask(task.id)} className="text-muted-foreground/40 hover:text-red-500 transition-colors mt-0.5 shrink-0">
                             <Trash2 className="w-3.5 h-3.5"/>
                           </button>
                         </li>
@@ -1098,7 +1098,7 @@ export default function CrmLeadDetail() {
                         className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
                           commSubTab === sub
                             ? "bg-foreground text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
                         }`}
                       >
                         {sub === "sms" ? "💬 SMS" : sub === "calls" ? "📞 Calls" : "✉️ Email"}
@@ -1135,7 +1135,7 @@ export default function CrmLeadDetail() {
                       return (
                         <div key={m.id} className={`flex flex-col ${isOut ? "items-end" : "items-start"}`}>
                           <div className={`max-w-sm rounded-2xl px-4 py-2.5 text-sm ${
-                            isCall ? "bg-gray-100 text-gray-700 border border-gray-200 w-full"
+                            isCall ? "bg-muted text-foreground/80 border border-border w-full"
                             : smsInfo?.isError ? "bg-red-50 border border-red-200 text-red-900"
                             : isOut ? "bg-foreground text-white"
                             : "bg-blue-50 border border-blue-200 text-foreground"
@@ -1186,10 +1186,10 @@ export default function CrmLeadDetail() {
                     })}
                   </div>
                   {lead.phone && !lead.smsOptOut && (
-                    <div className="border-t border-gray-200 p-4 space-y-2">
+                    <div className="border-t border-border p-4 space-y-2">
                       <div className="flex gap-2">
                         <textarea
-                          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                          className="flex-1 px-3 py-2 text-sm border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                           rows={3}
                           placeholder={`Text ${lead.name}…`}
                           value={smsBody}
@@ -1254,7 +1254,7 @@ export default function CrmLeadDetail() {
                           className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all ${
                             callFilter === p.key
                               ? "bg-foreground text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              : "bg-muted text-muted-foreground hover:bg-accent"
                           }`}
                         >
                           {p.label}
@@ -1280,7 +1280,7 @@ export default function CrmLeadDetail() {
                             const ok = m.callStatus === "completed";
                             const failed = m.callStatus === "no-answer" || m.callStatus === "busy" || m.callStatus === "failed";
                             return (
-                              <li key={entry.key} className="flex gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">
+                              <li key={entry.key} className="flex gap-3 p-3 rounded-xl border border-border bg-muted">
                                 <span className={`text-base mt-0.5 shrink-0 ${ok?"text-green-600":failed?"text-red-500":"text-yellow-600"}`}>
                                   {ok ? "✅" : failed ? "📵" : "📞"}
                                 </span>
@@ -1309,12 +1309,12 @@ export default function CrmLeadDetail() {
                             const isOutcome = a.type === "call_outcome";
                             const disposition = isOutcome ? (a.metadata?.disposition as CallDisposition | undefined) : undefined;
                             return (
-                              <li key={entry.key} className={`flex gap-3 p-3 rounded-xl border ${isMissed?"border-red-100 bg-red-50":"border-gray-200 bg-white"}`}>
+                              <li key={entry.key} className={`flex gap-3 p-3 rounded-xl border ${isMissed?"border-red-100 bg-red-50":"border-border bg-white"}`}>
                                 <span className="text-base mt-0.5 shrink-0">{activityIcon[a.type] || "•"}</span>
                                 <div className="flex-1 min-w-0">
                                   <p className={`text-sm font-medium ${isMissed?"text-red-600":"text-foreground"}`}>{a.title}</p>
                                   {isOutcome && disposition && (
-                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-gray-100 text-gray-600"}`}>
+                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-muted text-muted-foreground"}`}>
                                       {disposition}
                                     </span>
                                   )}
@@ -1347,7 +1347,7 @@ export default function CrmLeadDetail() {
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground block mb-1">Load Template</label>
                       <select
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-input rounded-lg text-sm"
                         onChange={e => {
                           const t = templates.find(t => t.id === Number(e.target.value));
                           if (t) { setEmailSubject(t.subject.replace("{{name}}",lead.name)); setEmailBody(t.body.replace("{{name}}",lead.name.split(" ")[0])); }
@@ -1361,15 +1361,15 @@ export default function CrmLeadDetail() {
                   )}
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">To</label>
-                    <div className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-muted-foreground bg-gray-50">{lead.email}</div>
+                    <div className="px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground bg-muted">{lead.email}</div>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">Subject</label>
-                    <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="Email subject" value={emailSubject} onChange={e=>setEmailSubject(e.target.value)} />
+                    <input className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="Email subject" value={emailSubject} onChange={e=>setEmailSubject(e.target.value)} />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">Body</label>
-                    <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none" rows={8} placeholder="Email body…" value={emailBody} onChange={e=>setEmailBody(e.target.value)} />
+                    <textarea className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none" rows={8} placeholder="Email body…" value={emailBody} onChange={e=>setEmailBody(e.target.value)} />
                   </div>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -1404,7 +1404,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Lead Health Score ──────────────────────────────────────── */}
             {health && (
-              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
                     <span className="crm-insight-dot" />
@@ -1425,7 +1425,7 @@ export default function CrmLeadDetail() {
                     <span className={`text-4xl font-bold leading-none ${health.color}`}>{health.score}</span>
                     <span className="text-sm text-muted-foreground mb-0.5">/ 100</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                     <div
                       className={`h-2 rounded-full transition-all ${health.barColor}`}
                       style={{ width: `${health.score}%` }}
@@ -1456,7 +1456,7 @@ export default function CrmLeadDetail() {
                 )}
 
                 {/* Recommended action */}
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                <div className="bg-muted rounded-lg px-3 py-2.5 border border-border/60">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Recommended Action</p>
                   <p className="text-xs text-foreground font-medium">{health.action}</p>
                 </div>
@@ -1465,7 +1465,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Relationship Intelligence ─────────────────────────────── */}
             {relProfile && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Relationship</h3>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${relProfile.strength.bgColor} ${relProfile.strength.color} ${relProfile.strength.borderColor}`}>
@@ -1485,7 +1485,7 @@ export default function CrmLeadDetail() {
                     </span>
                     <span className="text-xs text-muted-foreground mb-0.5">/ 100 strength</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-1.5 rounded-full ${relProfile.strength.barColor}`}
                       style={{ width: `${relProfile.strength.score}%` }}
@@ -1503,7 +1503,7 @@ export default function CrmLeadDetail() {
                 </div>
 
                 {/* Conversation recommendation */}
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100 space-y-1">
+                <div className="bg-muted rounded-lg px-3 py-2.5 border border-border/60 space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recommended Next Step</p>
                   <p className="text-xs font-semibold text-foreground">{relProfile.conversation.action}</p>
                   <p className="text-[10px] text-muted-foreground">{relProfile.conversation.why}</p>
@@ -1517,7 +1517,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Communication Intelligence ──────────────────────────────── */}
             {ciStats && (
-              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
                     <span className="crm-insight-dot" />
@@ -1539,7 +1539,7 @@ export default function CrmLeadDetail() {
                     </span>
                     <span className="text-xs text-muted-foreground mb-0.5">/ 100 engagement</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-1.5 rounded-full ${ciStats.engagementScore.barColor}`}
                       style={{ width: `${ciStats.engagementScore.score}%` }}
@@ -1548,14 +1548,14 @@ export default function CrmLeadDetail() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Response Rate</p>
                     <p className="text-sm font-bold text-foreground">{ciStats.responseRate.rate}%</p>
                     <p className="text-[10px] text-muted-foreground">
                       {ciStats.responseRate.inboundCount} / {ciStats.responseRate.outboundCount} msgs
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Reply Risk</p>
                     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ${
                       ciStats.replyRisk === "Low"    ? "bg-green-50  text-green-700  border-green-200" :
@@ -1568,7 +1568,7 @@ export default function CrmLeadDetail() {
                 </div>
 
                 {ciStats.engagementScore.badge !== "Highly Engaged" && (
-                  <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                  <div className="bg-muted rounded-lg px-3 py-2.5 border border-border/60">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Engagement Badge</p>
                     <p className={`text-xs font-semibold ${ciStats.engagementScore.color}`}>
                       {ciStats.engagementScore.badge}
@@ -1583,7 +1583,7 @@ export default function CrmLeadDetail() {
             )}
 
             {/* ── Call Summary ─────────────────────────────────────────────── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-serif font-bold text-sm text-foreground">Call Summary</h3>
                 {callSummary.lastCallAt && (
@@ -1595,7 +1595,7 @@ export default function CrmLeadDetail() {
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <div className="bg-muted rounded-lg px-2.5 py-2">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Total Calls</p>
                       <p className="text-2xl font-bold text-foreground">{callSummary.totalCalls}</p>
                     </div>
@@ -1613,7 +1613,7 @@ export default function CrmLeadDetail() {
                     </div>
                   </div>
                   {callSummary.recentOutcome && (
-                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="bg-muted rounded-lg px-3 py-2 border border-border/60">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Last Outcome</p>
                       <p className="text-xs font-semibold text-foreground">{callSummary.recentOutcome}</p>
                     </div>
@@ -1624,7 +1624,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Sales Intelligence ───────────────────────────────────────── */}
             {salesNBA && momentum && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Sales Intelligence</h3>
 
@@ -1632,7 +1632,7 @@ export default function CrmLeadDetail() {
                     salesNBA.priority === "critical" ? "bg-red-50 text-red-700 border-red-200" :
                     salesNBA.priority === "high"     ? "bg-orange-50 text-orange-700 border-orange-200" :
                     salesNBA.priority === "medium"   ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                                                       "bg-gray-50 text-gray-600 border-gray-200"
+                                                       "bg-muted text-muted-foreground border-border"
                   }`}>
                     {salesNBA.priority === "critical" ? "🚨 Critical" :
                      salesNBA.priority === "high"     ? "🔥 High"     :
@@ -1645,7 +1645,7 @@ export default function CrmLeadDetail() {
                   salesNBA.priority === "critical" ? "bg-red-50 border-red-200" :
                   salesNBA.priority === "high"     ? "bg-orange-50 border-orange-200" :
                   salesNBA.priority === "medium"   ? "bg-amber-50 border-amber-200" :
-                                                     "bg-gray-50 border-gray-100"
+                                                     "bg-muted border-border/60"
                 }`}>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Next Best Action</p>
                   <p className="text-sm font-bold text-foreground mb-1">{salesNBA.action}</p>
@@ -1655,20 +1655,20 @@ export default function CrmLeadDetail() {
 
                 {/* Confidence + Urgency */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Confidence</p>
                     <p className="text-sm font-bold text-foreground">{salesNBA.confidence}%</p>
-                    <div className="h-1 w-full bg-gray-200 rounded-full mt-1 overflow-hidden">
+                    <div className="h-1 w-full bg-border rounded-full mt-1 overflow-hidden">
                       <div
                         className={`h-1 rounded-full ${
                           salesNBA.confidence >= 80 ? "bg-emerald-500" :
-                          salesNBA.confidence >= 60 ? "bg-amber-400" : "bg-gray-400"
+                          salesNBA.confidence >= 60 ? "bg-amber-400" : "bg-muted-foreground/50"
                         }`}
                         style={{ width: `${salesNBA.confidence}%` }}
                       />
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Urgency</p>
                     <span className={`text-xs font-semibold ${
                       salesNBA.urgency === "immediate" ? "text-red-600" :
@@ -1701,7 +1701,7 @@ export default function CrmLeadDetail() {
                     }`}>{momentum.score}</span>
                     <span className="text-xs text-muted-foreground mb-0.5">/ 100</span>
                   </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mb-1.5">
                     <div
                       className={`h-1.5 rounded-full transition-all ${
                         momentum.score >= 65 ? "bg-emerald-400" :
@@ -1739,12 +1739,12 @@ export default function CrmLeadDetail() {
 
             {/* ── Sales Automation ─────────────────────────────────────────── */}
             {autoQueue && readiness && missingInfo && sequence && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Sales Automation</h3>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     autoQueue.availableCount === 0
-                      ? "bg-gray-50 text-gray-500 border-gray-200"
+                      ? "bg-muted text-muted-foreground border-border"
                       : autoQueue.topItem?.priority === "critical"
                         ? "bg-red-50 text-red-700 border-red-200"
                         : autoQueue.topItem?.priority === "high"
@@ -1761,19 +1761,19 @@ export default function CrmLeadDetail() {
                   <div className="grid grid-cols-2 gap-1.5">
                     {[readiness.salesReady, readiness.proposalReady, readiness.contractReady, readiness.onboardingReady].map(gate => (
                       <div key={gate.gate} className={`rounded-lg px-2.5 py-2 border ${
-                        gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"
+                        gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-muted border-border"
                       }`}>
                         <div className="flex items-center gap-1 mb-0.5">
-                          <span className={`text-[9px] font-bold ${gate.ready ? "text-emerald-600" : "text-gray-400"}`}>
+                          <span className={`text-[9px] font-bold ${gate.ready ? "text-emerald-600" : "text-muted-foreground/60"}`}>
                             {gate.ready ? "✓" : "○"}
                           </span>
                           <p className={`text-[9px] font-bold uppercase tracking-wide leading-tight ${gate.ready ? "text-emerald-700" : "text-muted-foreground"}`}>
                             {gate.gate.replace(" Ready", "")}
                           </p>
                         </div>
-                        <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-1 w-full bg-border rounded-full overflow-hidden">
                           <div
-                            className={`h-1 rounded-full ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-gray-300"}`}
+                            className={`h-1 rounded-full ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-border"}`}
                             style={{ width: `${gate.score}%` }}
                           />
                         </div>
@@ -1827,7 +1827,7 @@ export default function CrmLeadDetail() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sequence</p>
                     <span className="text-[10px] text-muted-foreground">Step {sequence.currentStep}/{sequence.totalSteps}</span>
                   </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mb-1.5">
                     <div
                       className="h-1.5 rounded-full bg-foreground transition-all"
                       style={{ width: `${(sequence.currentStep / sequence.totalSteps) * 100}%` }}
@@ -1846,7 +1846,7 @@ export default function CrmLeadDetail() {
 
             {/* ── DISC Behavioral Profile ──────────────────────────────────── */}
             {discProfile && (
-              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
@@ -1882,9 +1882,9 @@ export default function CrmLeadDetail() {
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Confidence</span>
                     <span className="text-[10px] font-bold text-foreground">{discProfile.confidence}%</span>
                   </div>
-                  <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-1 rounded-full bg-gray-400 transition-all"
+                      className="h-1 rounded-full bg-muted-foreground/50 transition-all"
                       style={{ width: `${discProfile.confidence}%` }}
                     />
                   </div>
@@ -1899,7 +1899,7 @@ export default function CrmLeadDetail() {
                     return (
                       <div key={style} className="flex items-center gap-2">
                         <span className={`text-[10px] font-medium w-16 shrink-0 ${meta.textColor}`}>{meta.emoji} {style}</span>
-                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                           <div className={`h-1.5 rounded-full ${meta.barColor} transition-all`} style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0">{pct}%</span>
@@ -1914,7 +1914,7 @@ export default function CrmLeadDetail() {
                     <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">Signals detected</p>
                     {discProfile.reasons.slice(0, 4).map((r, i) => (
                       <div key={i} className="flex items-start gap-1.5">
-                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style]?.textColor ?? "text-gray-700"}`}>{DISC_META[r.style]?.emoji ?? "•"}</span>
+                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style]?.textColor ?? "text-foreground/80"}`}>{DISC_META[r.style]?.emoji ?? "•"}</span>
                         <p className="text-[10px] text-muted-foreground leading-snug">{r.text}</p>
                       </div>
                     ))}
@@ -1936,7 +1936,7 @@ export default function CrmLeadDetail() {
             )}
 
             {/* Lead management */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-4">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-4">
               <h3 className="font-serif font-bold text-sm text-foreground">Lead Management</h3>
               {([
                 { label:"Status", value:editStatus, onChange:setEditStatus, options:STATUSES },
@@ -1946,7 +1946,7 @@ export default function CrmLeadDetail() {
                 <div key={label}>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                     value={value}
                     onChange={e => (onChange as (v: string) => void)(e.target.value)}
                   >
@@ -1956,15 +1956,15 @@ export default function CrmLeadDetail() {
               ))}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Next Follow-up</label>
-                <input type="date" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={editFollowUp} onChange={e=>setEditFollowUp(e.target.value)} />
+                <input type="date" className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={editFollowUp} onChange={e=>setEditFollowUp(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Est. Value ($)</label>
-                <input type="number" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" placeholder="0.00" value={editEstValue} onChange={e=>setEditEstValue(e.target.value)} />
+                <input type="number" className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" placeholder="0.00" value={editEstValue} onChange={e=>setEditEstValue(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Package Type</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={editPackage} onChange={e=>setEditPackage(e.target.value)}>
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={editPackage} onChange={e=>setEditPackage(e.target.value)}>
                   <option value="">— None —</option>
                   <option>Essential Presence</option>
                   <option>Lead Generation Website</option>
@@ -1990,7 +1990,7 @@ export default function CrmLeadDetail() {
             </div>
 
             {/* Pipeline docs */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
               <h3 className="font-serif font-bold text-sm text-foreground">Pipeline Docs</h3>
               {[
                 { label:"Discovery Form", key:"discoveryFormStatus", value:lead.discoveryFormStatus },
@@ -2000,7 +2000,7 @@ export default function CrmLeadDetail() {
                 <div key={key} className="flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">{label}</span>
                   <select
-                    className="text-xs px-2 py-1 border border-gray-200 rounded-md focus:outline-none"
+                    className="text-xs px-2 py-1 border border-input rounded-md focus:outline-none"
                     value={value}
                     onChange={e => saveField({ [key]: e.target.value })}
                   >
@@ -2016,7 +2016,7 @@ export default function CrmLeadDetail() {
             </div>
 
             {/* Lead info */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4">
               <h3 className="font-serif font-bold text-sm text-foreground mb-3">Lead Info</h3>
               <dl className="space-y-2 text-xs">
                 <div className="flex justify-between"><dt className="text-muted-foreground">Source</dt><dd className="font-medium text-foreground">{lead.source}</dd></div>
@@ -2043,7 +2043,7 @@ export default function CrmLeadDetail() {
             </div>
           ) : (
             <>
-              <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
+              <div className="bg-muted rounded-xl p-4 text-center border border-border/60">
                 <p className="text-xs text-muted-foreground mb-1">Calling</p>
                 <p className="font-semibold text-foreground text-lg">{lead.name}</p>
                 <a href={`tel:${lead.phone}`} className="text-sm text-blue-600">{lead.phone}</a>
@@ -2082,7 +2082,7 @@ export default function CrmLeadDetail() {
                   className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors text-left ${
                     callLogDisposition === d
                       ? `${dispositionColor[d]} border-current`
-                      : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                      : "border-card-border text-muted-foreground hover:border-card-border hover:bg-accent"
                   }`}
                 >
                   {d}
@@ -2094,7 +2094,7 @@ export default function CrmLeadDetail() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes <span className="font-normal">(optional)</span></label>
             <textarea
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+              className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
               rows={3}
               placeholder="What was discussed? Any follow-up needed?"
               value={callLogNotes}
@@ -2140,7 +2140,7 @@ export default function CrmLeadDetail() {
                       className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center ${
                         logActType === t.value
                           ? "bg-foreground text-white border-foreground"
-                          : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                          : "border-card-border text-muted-foreground hover:border-card-border hover:bg-accent"
                       }`}
                     >
                       <span className="block text-base mb-0.5">{t.icon}</span>
@@ -2161,7 +2161,7 @@ export default function CrmLeadDetail() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-left ${
                           logActDisposition === d
                             ? `${dispositionColor[d]} border-current`
-                            : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                            : "border-card-border text-muted-foreground hover:border-card-border hover:bg-accent"
                         }`}
                       >
                         {d}
@@ -2174,7 +2174,7 @@ export default function CrmLeadDetail() {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Title <span className="text-red-500">*</span></label>
                 <input
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="w-full px-3 py-2 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   placeholder={
                     logActType === "note_added" ? "Note summary…"
                     : logActType === "call_outcome" ? "e.g. Spoke with John about SEO package"
@@ -2191,7 +2191,7 @@ export default function CrmLeadDetail() {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes <span className="font-normal text-muted-foreground/60">(optional)</span></label>
                 <textarea
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                  className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                   rows={3}
                   placeholder="Additional details…"
                   value={logActDescription}
@@ -2235,7 +2235,7 @@ export default function CrmLeadDetail() {
                 To: <span className="font-medium text-foreground">{lead.name} ({lead.phone})</span>
               </p>
               <textarea
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                 rows={4}
                 placeholder={`Message ${lead.name}…`}
                 value={smsBody}
@@ -2270,7 +2270,7 @@ export default function CrmLeadDetail() {
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Template</label>
               <select
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-input rounded-lg text-sm"
                 onChange={e => {
                   const t = templates.find(t => t.id === Number(e.target.value));
                   if (t) { setEmailSubject(t.subject.replace("{{name}}",lead.name)); setEmailBody(t.body.replace("{{name}}",lead.name.split(" ")[0])); }
@@ -2284,14 +2284,14 @@ export default function CrmLeadDetail() {
           )}
           <p className="text-xs text-muted-foreground">To: <span className="font-medium text-foreground">{lead.email}</span></p>
           <input
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
             placeholder="Subject"
             value={emailSubject}
             onChange={e => setEmailSubject(e.target.value)}
             autoFocus
           />
           <textarea
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
             rows={6}
             placeholder="Email body…"
             value={emailBody}
@@ -2315,7 +2315,7 @@ export default function CrmLeadDetail() {
       <Modal open={openModal === "note"} onClose={() => setOpenModal(null)} title="📝 Add Note">
         <div className="px-5 py-4 space-y-3">
           <textarea
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+            className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
             rows={5}
             placeholder="Write a note about this lead…"
             value={noteText}
@@ -2337,19 +2337,19 @@ export default function CrmLeadDetail() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Type</label>
-              <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
+              <select className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
                 {TASK_TYPES.map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Due Date</label>
-              <input type="date" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
+              <input type="date" className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
             </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Title <span className="text-red-500">*</span></label>
             <input
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
               placeholder="Task title"
               value={taskForm.title}
               onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))}
@@ -2359,7 +2359,7 @@ export default function CrmLeadDetail() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>
             <textarea
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="w-full px-3 py-2 text-sm border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-foreground/20"
               rows={2}
               placeholder="Optional details"
               value={taskForm.description}
@@ -2380,7 +2380,7 @@ export default function CrmLeadDetail() {
         <div className="px-5 py-4">
           <p className="text-xs text-muted-foreground mb-3">
             Current:&nbsp;
-            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-muted text-muted-foreground"}`}>
               {lead.status}
             </span>
           </p>
@@ -2392,8 +2392,8 @@ export default function CrmLeadDetail() {
                 disabled={updatingStatus}
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all border text-left disabled:opacity-60
                   ${lead.status === s
-                    ? `${statusBtnColor[s] || "border-gray-200 bg-gray-50 text-gray-700"} ring-2 ring-offset-1 ring-foreground/20`
-                    : `${statusBtnColor[s] || "border-gray-200 bg-gray-50 text-gray-700"} opacity-75 hover:opacity-100`
+                    ? `${statusBtnColor[s] || "border-border bg-muted text-foreground/80"} ring-2 ring-offset-1 ring-foreground/20`
+                    : `${statusBtnColor[s] || "border-border bg-muted text-foreground/80"} opacity-75 hover:opacity-100`
                   }`}
               >
                 {lead.status === s ? `● ${s}` : s}

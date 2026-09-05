@@ -252,8 +252,8 @@ export default function CrmLeads() {
 
         {/* ── LEFT — Smart list sidebar ──────────────────────────────────── */}
         {sidebarOpen && (
-          <aside className="w-52 bg-white border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto">
-            <div className="p-3 border-b border-gray-100">
+          <aside className="w-52 bg-white border-r border-border flex flex-col shrink-0 overflow-y-auto">
+            <div className="p-3 border-b border-border/60">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">All People</span>
                 <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -263,7 +263,7 @@ export default function CrmLeads() {
               <div className="relative mt-2">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                 <input
-                  className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full pl-6 pr-2 py-1.5 text-xs border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-foreground/20"
                   placeholder="Search lists…"
                   readOnly
                 />
@@ -279,13 +279,13 @@ export default function CrmLeads() {
                 return (
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-gray-50"
+                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
                     {count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        isActive ? "bg-blue-200 text-blue-800" : "bg-gray-100 text-gray-600"
+                        isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
                     )}
                   </button>
@@ -300,13 +300,13 @@ export default function CrmLeads() {
                 return (
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-gray-50"
+                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
                     {count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        isActive ? "bg-blue-200 text-blue-800" : "bg-gray-100 text-gray-600"
+                        isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
                     )}
                   </button>
@@ -321,13 +321,13 @@ export default function CrmLeads() {
                 return (
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-gray-50"
+                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
                     {count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        isActive ? "bg-blue-200 text-blue-800" : "bg-gray-100 text-gray-600"
+                        isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
                     )}
                   </button>
@@ -340,7 +340,7 @@ export default function CrmLeads() {
         {/* ── MAIN content ──────────────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Header */}
-          <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap">
+          <div className="bg-white border-b border-border px-5 py-3 flex items-center gap-3 flex-wrap">
             {!sidebarOpen && (
               <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground mr-1">
                 <List className="w-4 h-4" />
@@ -368,18 +368,18 @@ export default function CrmLeads() {
           </div>
 
           {/* Filter bar */}
-          <div className="bg-white border-b border-gray-200 px-4 py-2 flex flex-wrap gap-2 items-center">
+          <div className="bg-white border-b border-border px-4 py-2 flex flex-wrap gap-2 items-center">
             <div className="relative min-w-44 flex-1 max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input
-                className="w-full pl-9 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                className="w-full pl-9 pr-3 py-1.5 text-xs border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 placeholder="Search name, email, phone…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             <select
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white"
+              className="px-3 py-1.5 text-xs border border-input rounded-lg focus:outline-none bg-white"
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); setActiveList(STAGE_LISTS[0]); }}
             >
@@ -387,17 +387,17 @@ export default function CrmLeads() {
               {STATUSES.map(s => <option key={s}>{s}</option>)}
             </select>
             <select
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white"
+              className="px-3 py-1.5 text-xs border border-input rounded-lg focus:outline-none bg-white"
               value={filterPriority}
               onChange={e => { setFilterPriority(e.target.value); setActiveList(STAGE_LISTS[0]); }}
             >
               <option value="">All Priorities</option>
               {PRIORITIES.map(p => <option key={p}>{p}</option>)}
             </select>
-            <button className="flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-muted-foreground">
+            <button className="flex items-center gap-1 text-xs border border-card-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors text-muted-foreground">
               <SlidersHorizontal className="w-3 h-3" /> Columns
             </button>
-            <button className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-muted-foreground">Me ▾</button>
+            <button className="text-xs border border-card-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors text-muted-foreground">Me ▾</button>
             <Button variant="ghost" size="sm" onClick={load} className="px-2 h-8">
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
@@ -405,11 +405,11 @@ export default function CrmLeads() {
 
           {/* Bulk action strip */}
           {leads.length > 0 && (
-            <div className="bg-gray-50 border-b border-gray-200 px-4 py-1.5 flex items-center gap-3">
+            <div className="bg-muted border-b border-border px-4 py-1.5 flex items-center gap-3">
               <span className="text-xs text-muted-foreground">Showing {leads.length} of {allLeads.length}</span>
               <div className="flex items-center gap-2 ml-auto">
                 {[{icon: Mail, label:"Email"},{icon: Phone, label:"Call"},{icon: MessageSquare, label:"Text"},{icon: Users, label:"Assign"}].map(({icon: Icon, label}) => (
-                  <button key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-gray-100 transition-colors">
+                  <button key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent transition-colors">
                     <Icon className="w-3 h-3" /> {label}
                   </button>
                 ))}
@@ -422,39 +422,39 @@ export default function CrmLeads() {
             {loading ? (
               <>
                 {/* M-3: below md, the table gives way to stacked card rows. */}
-                <div className="md:hidden divide-y divide-gray-50">
+                <div className="md:hidden divide-y divide-border/40">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="p-4 flex items-center gap-2.5 animate-pulse">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
+                      <div className="w-8 h-8 rounded-full bg-border shrink-0" />
                       <div className="space-y-1.5 flex-1">
-                        <div className="h-3 w-32 bg-gray-200 rounded" />
-                        <div className="h-2 w-20 bg-gray-100 rounded" />
+                        <div className="h-3 w-32 bg-border rounded" />
+                        <div className="h-2 w-20 bg-muted rounded" />
                       </div>
                     </div>
                   ))}
                 </div>
                 <table className="hidden md:table w-full text-sm border-collapse">
-                  <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
+                  <thead className="sticky top-0 bg-white border-b border-border/60 z-10">
                     <tr>
                       {["Name","Health","Last Communication","Updated","Stage","Assigned","Phone"].map(h => (
                         <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-border/40">
                     {Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i} className="animate-pulse">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
+                            <div className="w-7 h-7 rounded-full bg-border shrink-0" />
                             <div className="space-y-1">
-                              <div className="h-3 w-24 bg-gray-200 rounded" />
-                              <div className="h-2 w-16 bg-gray-100 rounded" />
+                              <div className="h-3 w-24 bg-border rounded" />
+                              <div className="h-2 w-16 bg-muted rounded" />
                             </div>
                           </div>
                         </td>
                         {Array.from({ length: 6 }).map((_, j) => (
-                          <td key={j} className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-16" /></td>
+                          <td key={j} className="px-4 py-3"><div className="h-3 bg-muted rounded w-16" /></td>
                         ))}
                       </tr>
                     ))}
@@ -463,7 +463,7 @@ export default function CrmLeads() {
               </>
             ) : leads.length === 0 ? (
               <div className="py-16 text-center">
-                <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-muted-foreground font-medium">No leads found</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">
                   {activeList.section === "intelligence"
@@ -477,12 +477,12 @@ export default function CrmLeads() {
             ) : (
               <>
                 {/* M-3: mobile card rows — the same `leads` array, key fields only. */}
-                <div className="md:hidden divide-y divide-gray-50">
+                <div className="md:hidden divide-y divide-border/40">
                   {leads.map(lead => {
                     const health = scoreMap.get(lead.id);
                     return (
                       <Link key={lead.id} href={`/admin/crm/leads/${lead.id}`}>
-                        <div className="p-4 flex items-start gap-3 active:bg-gray-50 cursor-pointer">
+                        <div className="p-4 flex items-start gap-3 active:bg-accent cursor-pointer">
                           <div className={`w-9 h-9 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
                             <span className="text-white text-xs font-bold">{initials(lead.name)}</span>
                           </div>
@@ -517,7 +517,7 @@ export default function CrmLeads() {
                   })}
                 </div>
                 <table className="hidden md:table w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
+                <thead className="sticky top-0 bg-white border-b border-border/60 z-10">
                   <tr>
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-48">Name</th>
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Health</th>
@@ -528,11 +528,11 @@ export default function CrmLeads() {
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Phone</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border/40">
                   {leads.map(lead => {
                     const health = scoreMap.get(lead.id);
                     return (
-                      <tr key={lead.id} className="hover:bg-gray-50/70 transition-colors group">
+                      <tr key={lead.id} className="hover:bg-accent/70 transition-colors group">
                         {/* Name + avatar */}
                         <td className="px-4 py-2.5">
                           <Link href={`/admin/crm/leads/${lead.id}`}>
@@ -558,7 +558,7 @@ export default function CrmLeads() {
                                 </span>
                               </div>
                             </Link>
-                          ) : <span className="text-gray-300">—</span>}
+                          ) : <span className="text-muted-foreground/40">—</span>}
                         </td>
                         {/* Last communication */}
                         <td className="px-4 py-2.5">
@@ -569,7 +569,7 @@ export default function CrmLeads() {
                                 <p className="text-[10px] text-muted-foreground/60">{normalizeLeadStatus(lead.status) === "Follow-Up Needed" ? "Outgoing call" : "Email"}</p>
                               </div>
                             ) : (
-                              <span className="text-gray-300 text-xs">Never</span>
+                              <span className="text-muted-foreground/40 text-xs">Never</span>
                             )}
                           </div>
                         </td>
@@ -591,7 +591,7 @@ export default function CrmLeads() {
                               <span className="text-xs text-muted-foreground truncate max-w-[70px]">{lead.assignedTo.split(" ")[0]}</span>
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-300">—</span>
+                            <span className="text-xs text-muted-foreground/40">—</span>
                           )}
                         </td>
                         {/* Phone */}
@@ -609,7 +609,7 @@ export default function CrmLeads() {
                               </a>
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-300">—</span>
+                            <span className="text-xs text-muted-foreground/40">—</span>
                           )}
                         </td>
                       </tr>
@@ -627,7 +627,7 @@ export default function CrmLeads() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-gray-100">
+            <div className="p-5 border-b border-border/60">
               <h2 className="font-semibold text-lg text-foreground">Add New Lead</h2>
             </div>
             <div className="p-5 space-y-3">
@@ -644,7 +644,7 @@ export default function CrmLeads() {
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                     <input type={type} placeholder={placeholder}
                       className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${
-                        err ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-gray-200 focus:ring-foreground/20"
+                        err ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-input focus:ring-foreground/20"
                       }`}
                       value={(form as unknown as Record<string, string>)[key]}
                       onChange={e => {
@@ -658,25 +658,25 @@ export default function CrmLeads() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Source</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
                     {["Website Form","Discovery Form","Referral","Cold Outreach","Social Media","Manual Entry","Other"].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
                     {STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Priority</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
                     <option value="">Unassigned</option>
                     <option>Claidy Taguran</option>
                     <option>Shasta Greene</option>
@@ -686,7 +686,7 @@ export default function CrmLeads() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Service Interest</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                   value={form.serviceInterest}
                   onChange={e => setForm(f => ({ ...f, serviceInterest: e.target.value }))}>
                   <option value="">— Select service —</option>
@@ -695,13 +695,13 @@ export default function CrmLeads() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>
-                <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none resize-none"
+                <textarea className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none resize-none"
                   rows={3} placeholder="Initial notes…"
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
             </div>
-            <div className="flex gap-2 p-5 border-t border-gray-100">
+            <div className="flex gap-2 p-5 border-t border-border/60">
               <Button variant="outline" className="flex-1" onClick={() => { setShowCreate(false); setFormErrors({}); setForm(emptyForm); }}>Cancel</Button>
               <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={createLead} disabled={saving}>
                 {saving ? "Saving…" : "Create Lead"}

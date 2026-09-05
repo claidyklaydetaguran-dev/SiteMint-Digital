@@ -159,7 +159,7 @@ export default function CrmLeadDna() {
     return (
       <CrmLayout>
         <div className="p-6 max-w-5xl mx-auto">
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-muted-foreground">
+          <div className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
             Loading Lead DNA…
           </div>
         </div>
@@ -199,7 +199,7 @@ export default function CrmLeadDna() {
           {lead.company && <span className="text-sm text-muted-foreground">{lead.company}</span>}
         </div>
 
-        <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2">
             <span className="crm-insight-dot" />
             <h3 className="font-semibold text-sm text-foreground">DNA Summary</h3>
@@ -208,7 +208,7 @@ export default function CrmLeadDna() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="crm-insight-dot" />
               <span className="text-lg">{discMeta.emoji}</span>
@@ -223,7 +223,7 @@ export default function CrmLeadDna() {
             </p>
           </div>
 
-          <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="crm-insight-dot" />
               <Heart className={`w-4 h-4 ${health.color}`} />
@@ -244,7 +244,7 @@ export default function CrmLeadDna() {
             </ul>
           </div>
 
-          <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="crm-insight-dot" />
               <MessageCircle className={`w-4 h-4 ${ciStats.engagementScore.color}`} />
@@ -263,7 +263,7 @@ export default function CrmLeadDna() {
             </p>
           </div>
 
-          <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="crm-insight-dot" />
               {trend.direction === "rising" ? (
