@@ -15,7 +15,7 @@
  * worktree's `PublicShell.tsx` yet — see the typed cast below.
  */
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { PublicShell } from "@/shells/PublicShell";
 import { DASHBOARD_URLS } from "@/lib/routes";
 import {
@@ -25,7 +25,7 @@ import {
   RECEPTIONIST_V5_SECTIONS,
   PRIVACY_STATEMENT,
 } from "@/pages/receptionist-v5/sections";
-import { CallTheaterV5 } from "@/components/receptionist-v5/CallTheaterV5";
+import { CallTheaterV5, HeroCallTheaterV5 } from "@/components/receptionist-v5/CallTheaterV5";
 import { LiveDemoPanel } from "@/components/receptionist-v5/LiveDemoPanel";
 import { BetaRequestForm } from "@/components/receptionist-v5/BetaRequestForm";
 import { Reveal } from "@/components/v5/Reveal";
@@ -51,18 +51,18 @@ function ReadinessBadge({ status }: { status: Readiness }) {
   return <span className={`smv5-badge smv5-badge--${status}`}>{READINESS_LABEL[status]}</span>;
 }
 
-/* ── Hero media: poster-first, video only ≥768px after load ────────────── */
+/* ── Hero background: full-viewport cinematic film, poster-first ───────── */
 
 /**
- * The film mount contract (owner spec, wp-herofilm; REVISED 2026-09-05 per
- * owner correction — the film previously lived in the hero's right-column
- * visual card; that card is reverted to the pre-film composed poster (see
- * `HeroPosterSvg`/`HeroMedia` below) and the film moves to a full-width
- * band at the TOP of the hero instead, crosswise above the headline block
- * — the same "video above, particles/content below" treatment applied to
- * the homepage hero). `HERO_FILM_SRC`/`HERO_FILM_POSTER_DATA_URI` and the
- * idle-mount eligibility gate below are unchanged and now serve
- * `HeroFilmBand` exclusively.
+ * The film mount contract (owner spec, wp-herofilm; REVISED 2026-09-06 per
+ * the product-theater redesign directive — the AI Receptionist hero must NOT
+ * mirror the homepage's crosswise film band. The same asset now renders as a
+ * dimmed, blurred-edge full-viewport background layer behind the whole hero
+ * (`HeroCinematicBg` below) instead of a band above the headline or a
+ * right-column card. `HERO_FILM_SRC`/`HERO_FILM_POSTER_DATA_URI` and the
+ * idle-mount eligibility gate are unchanged — the lead will swap in a
+ * purpose-generated busy-small-business film later through this same
+ * import.
  */
 import recepFilmSrc from "@/assets/media/recep-hero-film.mp4";
 import recepFilmPoster from "@/assets/media/recep-hero-film-poster.jpg";
@@ -107,124 +107,86 @@ function useHeroVideoEligible(): boolean {
 }
 
 /**
- * A composed Glacier Mint placeholder — a faint availability-grid motif
- * (echoing the calendar/scheduling capability) behind the same concentric
- * voice-object ring used in the Interactive Preview, tying the hero
- * visually to the product it's introducing. The caption lives once, in the
- * overlay label below (`smv5-hero__media-label`) — this graphic carries no
- * text of its own beyond the non-visual `<title>` for assistive tech.
- *
- * Restored 2026-09-05 to the pre-film "first model" composition (owner
- * correction — the sprocket-hole film rail this card grew for wp-herofilm
- * is removed; the film itself now lives in the full-width band above the
- * headline, `HeroFilmBand` below).
- *
- * Cinematic motion (2026-09-05 owner directive) — "call ring" motif: two
- * extra rings pulse outward ambiently (`.smv5-poster__pulse`), echoing the
- * call theater's own voice-object animation. Ambient and non-essential —
- * `stroke`/`transform`/`opacity` only, paused via `data-ambient-paused`
- * (set by `usePausableAmbient` on the enclosing `.smv5-hero__media`) and
- * removed entirely under `prefers-reduced-motion: reduce` in CSS.
+ * The full-viewport cinematic background (owner directive, 2026-09-06
+ * product-theater redesign): the poster always renders first and stays
+ * mounted underneath; the video overlays it only once
+ * `useHeroVideoEligible` flips true (≥768px, idle-load after window load,
+ * never under `prefers-reduced-motion: reduce`), so mobile and
+ * reduced-motion visitors only ever see the poster — matching the
+ * mandated "background becomes poster" mobile contract. Dimmed
+ * (`brightness(0.45)`) with a soft blurred edge (a radial mask, not a full
+ * blur filter, so the center stays sharp) and a Glacier ink gradient scrim
+ * on top so the left column's text keeps 4.5:1 contrast at every
+ * breakpoint. A ≥44px pause/play control (skill mandate: autoplaying hero
+ * video must be pausable) only renders once the video itself has mounted —
+ * there's nothing to pause before that.
  */
-function HeroPosterSvg() {
-  const availabilityDots: Array<[number, number]> = [
-    [88, 71], [258, 71], [428, 71], [564, 71],
-    [54, 275], [190, 309], [394, 309], [599, 275],
-  ];
+function HeroCinematicBg() {
+  const eligible = useHeroVideoEligible();
+  const showVideo = eligible && !!HERO_FILM_SRC;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(true);
+
+  function toggle() {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.play();
+    } else {
+      v.pause();
+    }
+  }
+
   return (
-    <svg viewBox="0 0 640 400" role="img" aria-labelledby="smv5-hero-poster-title">
-      <title id="smv5-hero-poster-title">SiteMint AI Receptionist</title>
-      <defs>
-        <pattern id="smv5-avail-grid" width="34" height="34" patternUnits="userSpaceOnUse">
-          <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="#1c4a4d" strokeWidth="1.1" />
-        </pattern>
-        <radialGradient id="smv5-hero-glow" cx="50%" cy="42%" r="70%">
-          <stop offset="0%" stopColor="#0d3336" />
-          <stop offset="100%" stopColor="#04181a" />
-        </radialGradient>
-      </defs>
-      <rect width="640" height="400" fill="url(#smv5-hero-glow)" />
-      <rect width="640" height="400" fill="url(#smv5-avail-grid)" opacity="0.6" />
-      {availabilityDots.map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="4" fill="#32C5D2" opacity="0.65" />
-      ))}
-      <circle
-        className="smv5-poster__pulse"
-        cx="320"
-        cy="200"
-        r="92"
-        fill="none"
-        stroke="#32C5D2"
-        strokeWidth="2"
-        style={{ animationDelay: "0ms" }}
-        aria-hidden="true"
-      />
-      <circle
-        className="smv5-poster__pulse"
-        cx="320"
-        cy="200"
-        r="92"
-        fill="none"
-        stroke="#56D2CF"
-        strokeWidth="2"
-        style={{ animationDelay: "900ms" }}
-        aria-hidden="true"
-      />
-      <circle cx="320" cy="200" r="92" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.85" />
-      <circle cx="320" cy="200" r="56" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.6" />
-      <circle cx="320" cy="200" r="6" fill="#32C5D2" />
+    <div className="smv5-hero__bg">
+      <img className="smv5-hero__bg-media" src={HERO_FILM_POSTER_DATA_URI} alt="" aria-hidden="true" />
+      {showVideo && HERO_FILM_SRC && (
+        <video
+          ref={videoRef}
+          className="smv5-hero__bg-media smv5-hero__bg-video"
+          muted
+          playsInline
+          autoPlay
+          loop
+          preload="none"
+          poster={HERO_FILM_POSTER_DATA_URI}
+          aria-hidden="true"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+        >
+          <source src={HERO_FILM_SRC} type="video/mp4" />
+        </video>
+      )}
+      <div className="smv5-hero__scrim" aria-hidden="true" />
+      {showVideo && (
+        <button
+          type="button"
+          className="smv5-hero__bg-toggle"
+          aria-pressed={!playing}
+          aria-label={playing ? "Pause background video" : "Play background video"}
+          onClick={toggle}
+        >
+          {playing ? <HeroPauseIcon /> : <HeroPlayIcon />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function HeroPauseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="3" y="2" width="3.4" height="12" rx="1" fill="currentColor" />
+      <rect x="9.6" y="2" width="3.4" height="12" rx="1" fill="currentColor" />
     </svg>
   );
 }
 
-/**
- * The right-column visual card (restored pre-film composition — always the
- * composed poster illustration, never the film; see `HeroPosterSvg` above).
- */
-function HeroMedia() {
-  const ambientRef = usePausableAmbient<HTMLDivElement>();
+function HeroPlayIcon() {
   return (
-    <div className="smv5-hero__media" ref={ambientRef}>
-      <HeroPosterSvg />
-      <span className="smv5-hero__media-label">SiteMint AI Receptionist</span>
-    </div>
-  );
-}
-
-/**
- * The crosswise film band (owner spec, wp-herofilm; REVISED 2026-09-05): a
- * full-width horizontal band at the top of the hero's visual composition,
- * below the fixed header and above the headline block — never beside the
- * copy or inside the right-column visual card. Poster-first, video mounts
- * only ≥768px, only without `prefers-reduced-motion: reduce`, and only
- * after `HERO_FILM_SRC` is set (`useHeroVideoEligible`, unchanged) — until
- * then, and always below 768px, this renders the poster image only. The
- * poster image sits underneath at all times so there is no flash when the
- * video is ineligible or hasn't mounted yet; the video, once mounted,
- * covers it completely via the same `object-fit: cover` crop.
- */
-function HeroFilmBand() {
-  const eligible = useHeroVideoEligible();
-  const showVideo = eligible && !!HERO_FILM_SRC;
-  return (
-    <div className="smv5-hero__filmband" aria-hidden="true">
-      <div className="smv5-hero__filmband-frame">
-        <img className="smv5-hero__filmband-poster" src={HERO_FILM_POSTER_DATA_URI} alt="" />
-        {showVideo && HERO_FILM_SRC && (
-          <video
-            className="smv5-hero__filmband-video"
-            muted
-            playsInline
-            autoPlay
-            loop
-            preload="none"
-            poster={HERO_FILM_POSTER_DATA_URI}
-          >
-            <source src={HERO_FILM_SRC} type="video/mp4" />
-          </video>
-        )}
-      </div>
-    </div>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 2.6v10.8a.6.6 0 0 0 .92.5l8.6-5.4a.6.6 0 0 0 0-1l-8.6-5.4A.6.6 0 0 0 4 2.6Z" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -662,24 +624,27 @@ export default function AiReceptionistV5() {
       <div className="smv5">
         {/*
          * ── 1 · Hero ──────────────────────────────────────────────────
-         * Full first viewport (owner directive, 2026-09-05): min-height is
-         * 100svh, minus the fixed product header's `--v4-hdr-h` (read from
-         * v4-chrome.css, never edited here — see receptionist-v5.css).
-         * REVISED same day (owner correction, crosswise film treatment): a
-         * full-width `HeroFilmBand` sits above the headline block, below the
-         * fixed header — never beside the copy or inside the right-column
-         * visual card (that card is restored to the pre-film composed
-         * poster; see `HeroMedia`). Entrance sequence — eyebrow → beta
-         * status → headline (masked line reveal, LCP-safe) → support →
-         * actions → theater visual (scale-settle) — each a `<Reveal>` beat
-         * except the headline, which uses `HeroHeadlineReveal` specifically
-         * to avoid animating the likely-LCP element via opacity (see that
+         * Full-viewport product theater (owner directive, 2026-09-06 — the
+         * previous crosswise band hero is REJECTED for this page; it must
+         * not mirror the homepage). `min-height` is 100svh, minus the fixed
+         * product header's `--v4-hdr-h` (read from v4-chrome.css, never
+         * edited here — see receptionist-v5.css). `HeroCinematicBg` is a
+         * full-bleed, dimmed, blurred-edge background layer behind
+         * everything; the copy sits left, and the right column is now the
+         * INTERACTIVE CALL THEATER (`HeroCallTheaterV5`) itself — a
+         * six-state scripted call, not a static illustration — the
+         * Vapi/Retell-style "copy + CTA left, live call right" pattern the
+         * owner asked for. Entrance sequence — eyebrow → beta status →
+         * headline (masked line reveal, LCP-safe) → support → actions →
+         * theater (scale-settle) — each a `<Reveal>` beat except the
+         * headline, which uses `HeroHeadlineReveal` specifically to avoid
+         * animating the likely-LCP element via opacity (see that
          * component's doc comment). `HeroScrollCue` signals there's more
          * below the fold.
          */}
         <section id={SECTION_ID.hero} className="smv5-hero">
+          <HeroCinematicBg />
           <div className="smv5-hero__stack">
-            <HeroFilmBand />
             <div className="smv5__container smv5-hero__grid">
               <div>
                 <Reveal as="span" className="smv5-hero__eyebrow" delay={0}>
@@ -716,7 +681,7 @@ export default function AiReceptionistV5() {
                 </ul>
               </div>
               <Reveal as="div" className="smv5-hero__visual" delay={620}>
-                <HeroMedia />
+                <HeroCallTheaterV5 />
               </Reveal>
             </div>
           </div>

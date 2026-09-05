@@ -125,77 +125,100 @@
   padding: calc(var(--v4-hdr-h, 64px) + var(--sm-space-48, 48px)) 0 96px;
 }
 
-/* ── Hero film band (owner spec, wp-herofilm; REVISED 2026-09-05 per owner
-   correction — same crosswise treatment as the homepage hero: a full-width
-   film band above the copy, never beside it or inside the right-column
-   visual card, which is restored to the pre-film poster — see `HeroMedia`
-   in AiReceptionistV5.tsx). `.smv5-hero__stack` is the sole flex child of
-   `.smv5-hero` (still centered by that rule's own `align-items: center`)
-   so the band and the existing copy/visual grid can stack vertically
-   without `.smv5-hero` itself needing a `flex-direction` change. ────────── */
+/* ── Hero cinematic background (owner directive, 2026-09-06 product-theater
+   redesign) — a full-viewport background layer BEHIND the whole hero, never
+   a band above the copy or a right-column card (the rejected wp-herofilm
+   treatments). `.smv5-hero__stack` sits above it (`position: relative;
+   z-index: 1`) so the copy/theater grid paints on top. ─────────────────── */
 .smv5-hero__stack {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
   gap: clamp(18px, 2.6vh, 28px);
 }
 
-.smv5-hero__filmband {
-  position: relative;
-  width: 100%;
-  /* Measured via a static reproduction of this exact markup/CSS at 360×780
-     (real fonts; the checked-out toolchain's Linux build sandbox was
-     unavailable mid-session): the owner's suggested "~180px" put the CTAs'
-     bottom edge at 803.68px, 23.68px past the fold. Reduced to 140px, which
-     clears it with margin — see the 1024px+ override below for the same
-     first-viewport math at 1440×900. */
-  height: 140px;
-  flex-shrink: 0;
-  border-radius: var(--smv5-radius-l);
+.smv5-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
-  box-shadow: var(--smv5-shadow-2);
   background: #072022;
 }
 
-@media (min-width: 768px) and (max-width: 1023px) {
-  .smv5-hero__filmband {
-    /* Reduced from an initial min(28vh, 300px) after checking a short
-       landscape tablet (1000×700): that value put the CTAs' bottom edge
-       at 736.13px, 36.13px past the fold. min(22vh, 260px) clears it. */
-    height: min(22vh, 260px);
-  }
-}
-
-@media (min-width: 1024px) {
-  .smv5-hero__filmband {
-    /* First-viewport inventory (1440×900, owner directive): band + eyebrow
-       + badge + headline + support + CTAs must fit above the fold. Measured
-       via a static reproduction of this exact markup/CSS (real fonts, the
-       checked-out toolchain's Linux build sandbox was unavailable
-       mid-session): the spec's own min(38vh, 430px) target (342px at 900px
-       height) put the CTAs' bottom edge at 912.65px — 12.65px past the
-       fold. Reduced to min(34vh, 380px) (306px at 900px height), which
-       lands the CTAs' bottom edge at 877.25px — comfortably inside the first
-       viewport with the capability strip and sign-in line the only things
-       left below it, exactly the tradeoff the spec calls acceptable. */
-    height: min(34vh, 380px);
-  }
-}
-
-.smv5-hero__filmband-frame {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.smv5-hero__filmband-poster,
-.smv5-hero__filmband-video {
+/* Poster and video share one crop; the poster stays mounted underneath at
+   all times so there is no flash when the video is ineligible or hasn't
+   mounted yet (`useHeroVideoEligible`, unchanged mount contract — idle-load
+   after window load, ≥768px only, never under reduced motion). Slightly
+   overscanned (`inset: -3%`) so the blurred-edge mask below never reveals a
+   hard crop edge. Dimmed to ~0.45 brightness so left-column text keeps
+   4.5:1 contrast even before the scrim gradient is added. */
+.smv5-hero__bg-media {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: -3%;
+  width: 106%;
+  height: 106%;
   object-fit: cover;
   display: block;
+  filter: brightness(0.45);
+  /* Blurred-edge treatment: a soft radial mask (not a full blur filter, so
+     the center of the shot stays legible as a "cinematic" background)
+     fades the frame into the ink ground toward the edges. */
+  mask-image: radial-gradient(ellipse 78% 74% at 50% 38%, #000 55%, transparent 97%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 74% at 50% 38%, #000 55%, transparent 97%);
+}
+
+/* Glacier ink gradient scrim — guarantees the left column's copy passes
+   4.5:1 regardless of what the underlying frame looks like; strongest over
+   the copy column, easing off toward the theater on the right. */
+.smv5-hero__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(7, 32, 34, 0.95) 0%,
+    rgba(7, 32, 34, 0.88) 30%,
+    rgba(7, 32, 34, 0.62) 56%,
+    rgba(7, 32, 34, 0.34) 100%
+  );
+}
+
+/* Pause/play control (skill mandate: autoplaying hero video must be
+   pausable) — ≥44px hit target, bottom-left of the hero, above the scrim. */
+.smv5-hero__bg-toggle {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  background: rgb(7 32 34 / 0.55);
+  color: var(--smv5-white);
+  cursor: pointer;
+}
+
+.smv5-hero__bg-toggle:hover {
+  background: rgb(7 32 34 / 0.75);
+}
+
+.smv5-hero__bg-toggle:focus-visible {
+  outline: 3px solid color-mix(in oklab, var(--smv5-mint-500) 45%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  /* Mobile simplification (owner spec): the background is the poster only —
+     `useHeroVideoEligible` already gates video to ≥768px, this just keeps
+     the control from ever rendering out of sync with that gate. */
+  .smv5-hero__bg-toggle {
+    display: none;
+  }
 }
 
 .smv5-hero__eyebrow {
@@ -231,6 +254,16 @@
   gap: 56px;
   align-items: stretch;
   width: 100%;
+}
+
+/* The hero's own grid centers its two columns instead of stretching them —
+   the call theater is an intrinsic-height card, not a fixed-aspect visual,
+   so stretching it to match a taller copy column would leave a hollow gap
+   inside the card. Scoped to the hero only; the dashboard section further
+   down reuses `.smv5-hero__grid` for its own two-column layout and keeps
+   `align-items: stretch`. */
+.smv5-hero .smv5-hero__grid {
+  align-items: center;
 }
 
 .smv5-hero__grid > div {
@@ -324,48 +357,6 @@
   flex: 0 0 auto;
 }
 
-.smv5-hero__media {
-  /* Film container (wp-herofilm): 16:9, the eventual produced video's
-     source aspect — object-fit: cover on the poster/video below crops
-     gracefully at any other rendered aspect (e.g. the ≥861px stretch-to-
-     column-height rule further down). */
-  position: relative;
-  border-radius: var(--smv5-radius-l);
-  overflow: hidden;
-  background: #072022;
-  aspect-ratio: 16 / 9;
-  min-height: 320px;
-  box-shadow: var(--smv5-shadow-2);
-}
-
-.smv5-hero__media video,
-.smv5-hero__media img,
-.smv5-hero__media svg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-@media (min-width: 861px) {
-  .smv5-hero__media {
-    aspect-ratio: auto;
-    height: 100%;
-  }
-}
-
-.smv5-hero__media-label {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: #cfe9e4;
-  background: rgb(10 42 46 / 0.72);
-  border-radius: var(--smv5-radius-s);
-  padding: 4px 8px;
-}
-
 /* Hero visual "scale-settle" entrance — overrides `.sm-reveal`'s default
    translateY rise with a scale, for the one beat in the sequence that's a
    product visual rather than text (§Reveal, components/v5/Reveal.tsx). Two
@@ -379,36 +370,181 @@
   transform: none;
 }
 
-/* "Call ring" motif — ambient concentric pulses on the hero poster,
-   echoing the Interactive Preview's own voice-object ring. `transform` +
-   `stroke-opacity` only; paused via `data-ambient-paused` (set by
-   `usePausableAmbient` on `.smv5-hero__media`) and removed under reduced
-   motion below. `transform-box: fill-box` keeps the scale centered on the
-   ring itself rather than the SVG's own (0,0) origin. */
-.smv5-poster__pulse {
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
-  stroke-opacity: 0.7;
-  animation: smv5-ring-pulse 2.4s var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) infinite;
+/* ── Hero call theater (embedded, six-state cinematic sequence) ──────────
+ * The hero's right column (owner directive, 2026-09-06): a solid card so
+ * its text stays dark-on-light regardless of the dimmed cinematic
+ * background behind it. Reuses `.smv5-theater__voice`/`.smv5-theater__canvas`
+ * (ring) and `.smv5-theater__waveform`/`.smv5-theater__wavebar` (waveform)
+ * from the Interactive Preview theater's own CSS further down this file —
+ * both theaters share one visual language. ───────────────────────────────
+ */
+.smv5-herotheater {
+  position: relative;
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-l);
+  box-shadow: var(--smv5-shadow-2);
+  padding: 20px 22px 18px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+  color: var(--smv5-teal-900);
 }
 
-@keyframes smv5-ring-pulse {
-  0% {
-    transform: scale(0.82);
-    stroke-opacity: 0.7;
-  }
-  70% {
-    transform: scale(1.28);
-    stroke-opacity: 0;
-  }
-  100% {
-    transform: scale(1.28);
-    stroke-opacity: 0;
-  }
+.smv5-herotheater__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
-.smv5-hero__media[data-ambient-paused] .smv5-poster__pulse {
-  animation-play-state: paused;
+.smv5-herotheater__badge {
+  font-family: var(--smv5-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--smv5-mint-700);
+}
+
+.smv5-herotheater__count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--smv5-slate-600);
+}
+
+.smv5-herotheater__stage {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  min-height: 128px;
+}
+
+.smv5-herotheater__ringcol {
+  flex: 0 0 auto;
+  width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.smv5-herotheater__ringcol .smv5-theater__voice {
+  width: 76px;
+  height: 76px;
+}
+
+.smv5-herotheater__card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.smv5-herotheater__stagelabel {
+  font-family: var(--smv5-font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.smv5-herotheater__panel {
+  background: var(--smv5-mist-100);
+  border-radius: var(--smv5-radius-m);
+  padding: 12px 14px;
+}
+
+.smv5-herotheater__panel--row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.smv5-herotheater__caller {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.smv5-herotheater__line {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.smv5-herotheater__note {
+  font-size: 12.5px;
+  color: var(--smv5-slate-600);
+  margin: 0;
+}
+
+.smv5-herotheater__list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--smv5-teal-900);
+  line-height: 1.6;
+}
+
+.smv5-herotheater__confirm {
+  font-family: var(--smv5-font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+
+.smv5-herotheater__summary {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.smv5-herotheater__summary div {
+  display: flex;
+  gap: 6px;
+}
+
+.smv5-herotheater__summary dt {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--smv5-mint-700);
+}
+
+.smv5-herotheater__summary dd {
+  margin: 0;
+  color: var(--smv5-teal-900);
+}
+
+.smv5-herotheater__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0 10px;
+}
+
+.smv5-herotheater__controls .smv5-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.smv5-herotheater__disclose {
+  font-size: 11.5px;
+  color: var(--smv5-slate-600);
+  text-align: center;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .smv5-herotheater {
+    max-width: none;
+    padding: 16px 16px 14px;
+  }
+
+  .smv5-herotheater__stage {
+    min-height: 0;
+  }
 }
 
 /* Scroll cue — signals there's more below the now full-viewport hero. Static
@@ -1335,13 +1471,6 @@
     gap: 32px;
   }
 
-  .smv5-hero__media {
-    /* aspect-ratio + min-height widened the box past narrow viewports
-       (min-height 320 forced width to 512 via the 16/10 ratio) */
-    width: 100%;
-    min-height: 0;
-  }
-
   .smv5-hero__grid > div:first-child {
     display: block;
   }
@@ -1357,31 +1486,10 @@
 
 /* Mobile motion simplification (owner directive §cinematic motion: "simplify
    below 768px"). The scroll cue competes with the sign-in link and CTAs for
-   already-tight vertical space, so it drops entirely; the ambient ring pulse
-   stays but slower and lower-amplitude so it reads as a quiet accent rather
-   than a competing animation next to every other reveal firing on load. */
+   already-tight vertical space, so it drops entirely. */
 @media (max-width: 768px) {
   .smv5-hero__scrollcue {
     display: none;
-  }
-
-  .smv5-poster__pulse {
-    animation-duration: 3.6s;
-  }
-
-  @keyframes smv5-ring-pulse {
-    0% {
-      transform: scale(0.9);
-      stroke-opacity: 0.5;
-    }
-    70% {
-      transform: scale(1.14);
-      stroke-opacity: 0;
-    }
-    100% {
-      transform: scale(1.14);
-      stroke-opacity: 0;
-    }
   }
 }
 
@@ -1391,17 +1499,12 @@
   }
 
   /* Every ambient/entrance motif settles to its final, fully visible state
-     with no animation — the hero visual's scale-settle override, the ring
-     pulse, and the scroll cue's drifting dot. `.sm-reveal`/`.sm-reveal--in`
-     themselves are already handled globally in tokens-v5.css. */
+     with no animation — the hero visual's scale-settle override and the
+     scroll cue's drifting dot. `.sm-reveal`/`.sm-reveal--in` themselves are
+     already handled globally in tokens-v5.css. */
   .smv5-hero__visual.sm-reveal,
   .smv5-hero__visual.sm-reveal--in {
     transform: none;
-  }
-
-  .smv5-poster__pulse {
-    animation: none;
-    stroke-opacity: 0.85;
   }
 
   .smv5-hero__scrollcue-glyph::after {
