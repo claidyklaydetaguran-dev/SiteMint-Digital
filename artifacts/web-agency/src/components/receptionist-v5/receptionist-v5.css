@@ -1256,6 +1256,13 @@
     gap: 32px;
   }
 
+  .smv5-hero__media {
+    /* aspect-ratio + min-height widened the box past narrow viewports
+       (min-height 320 forced width to 512 via the 16/10 ratio) */
+    width: 100%;
+    min-height: 0;
+  }
+
   .smv5-hero__grid > div:first-child {
     display: block;
   }
