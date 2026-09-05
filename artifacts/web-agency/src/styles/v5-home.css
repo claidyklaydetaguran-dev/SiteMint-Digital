@@ -154,15 +154,17 @@
  * the frame. */
 .sm-home-v5 #hero .v4-hero__film {
   position: relative;
+  overflow: visible;
   /* `.v4-hero__stage` is a flex column at every width now; without this the
      film band (default flex-shrink:1, unlike copy/HUD which are
      shrink:0 in v4-home.css) is the first thing squeezed on a short
      viewport instead of the field, which already has its own
      max-height ceiling to absorb it. */
   flex-shrink: 0;
-  height: 80px;
+  /* Mobile: dedicated poster block (never a crop of the desktop film). */
+  height: clamp(180px, 30svh, 260px);
   width: 100%;
-  margin: 0.4rem 0 0;
+  margin: 0;
   z-index: 2;
 }
 .sm-home-v5 #hero .v4-hero__film .v4-hero__film-caption {
@@ -170,7 +172,8 @@
 }
 @media (min-width: 768px) {
   .sm-home-v5 #hero .v4-hero__film {
-    height: min(24vh, 260px);
+    /* Integrated cinematic stage: half the usable hero on tablets. */
+    height: clamp(260px, calc((100svh - var(--v4-hdr-h, 64px)) * 0.5), 470px);
   }
   .sm-home-v5 #hero .v4-hero__film .v4-hero__film-caption {
     display: block;
@@ -178,7 +181,11 @@
 }
 @media (min-width: 1024px) {
   .sm-home-v5 #hero .v4-hero__film {
-    height: min(18vh, 200px);
+    /* Owner spec: the media stage is 55-60% of the usable hero height, the
+       particle composition fills the remaining 40-45% below it. The film
+       master is cut at ~3:1 specifically for this stage - not a crop of a
+       generic landscape video. */
+    height: clamp(340px, calc((100svh - var(--v4-hdr-h, 64px)) * 0.56), 620px);
   }
 }
 .sm-home-v5 #hero .v4-hero__film-frame {
@@ -1253,5 +1260,83 @@
 @media (max-width: 767px) {
   .sm-home-v5 #hero .v4-hero__film-labels {
     display: none;
+  }
+}
+
+/* ── Integrated-stage additions (final correction pass): dedicated mobile
+   poster, pausable film (UI UX Pro Max mandate), and the Signal seam that
+   carries one mint thread from the film stage into the particle field. */
+.sm-home-v5 #hero .v4-hero__film-poster--mobile {
+  display: none;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__film-poster--mobile {
+    display: block;
+  }
+  .sm-home-v5 #hero .v4-hero__film-video {
+    display: none;
+  }
+}
+.sm-home-v5 #hero .v4-hero__film-pause {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgb(159 194 204 / 0.4);
+  background: rgb(21 62 82 / 0.78);
+  color: var(--sm-mint-400, #56D2CF);
+  cursor: pointer;
+  transition: background 200ms ease, transform 200ms ease;
+}
+.sm-home-v5 #hero .v4-hero__film-pause:hover {
+  background: rgb(21 62 82 / 0.95);
+  transform: scale(1.05);
+}
+.sm-home-v5 #hero .v4-hero__film-pause:focus-visible {
+  outline: 3px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__film-pause {
+    display: none;
+  }
+}
+.sm-home-v5 #hero .v4-hero__seam {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  width: 2px;
+  height: 34px;
+  background: linear-gradient(to bottom, var(--sm-mint-500, #32C5D2), rgb(50 197 210 / 0));
+  z-index: 2;
+}
+.sm-home-v5 #hero .v4-hero__seam-pulse {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 999px;
+  background: var(--sm-mint-400, #56D2CF);
+  box-shadow: 0 0 10px 2px rgb(86 210 207 / 0.55);
+  animation: sm-seam-travel 2.6s ease-in-out infinite;
+}
+@keyframes sm-seam-travel {
+  0% { transform: translateY(-2px); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(30px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-home-v5 #hero .v4-hero__seam-pulse {
+    animation: none;
+    opacity: 0.6;
+    transform: translateY(12px);
   }
 }

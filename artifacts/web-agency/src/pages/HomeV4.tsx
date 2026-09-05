@@ -166,6 +166,7 @@ function HeroCheckGlyph() {
  * wire up. Until then it stays `null` and only the poster ever renders. */
 import heroFilmSrc from "@/assets/media/home-hero-film.mp4";
 import heroFilmPoster from "@/assets/media/home-hero-film-poster.jpg";
+import heroFilmPosterMobile from "@/assets/media/home-hero-film-poster-mobile.jpg";
 const HERO_FILM_SRC: string | null = heroFilmSrc;
 
 /** A tiny hand-authored SVG data URI — shown as the `<video poster>` for the
@@ -258,12 +259,34 @@ function HeroFilmPoster() {
 function HeroFilm() {
   const eligible = useFilmEligible();
   const showVideo = eligible && !!HERO_FILM_SRC;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [paused, setPaused] = useState(false);
+  function togglePlayback() {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      void v.play();
+      setPaused(false);
+    } else {
+      v.pause();
+      setPaused(true);
+    }
+  }
   return (
-    <div className="v4-hero__film" data-v4-hero-film aria-hidden="true">
-      <div className="v4-hero__film-frame">
+    <div className="v4-hero__film" data-v4-hero-film>
+      <div className="v4-hero__film-frame" aria-hidden="true">
         <HeroFilmPoster />
+        {/* Dedicated mobile poster (owner directive: mobile must not simply
+            crop the desktop film) — CSS shows exactly one of these. */}
+        <img
+          className="v4-hero__film-poster v4-hero__film-poster--mobile"
+          src={heroFilmPosterMobile}
+          alt=""
+          loading="lazy"
+        />
         {showVideo && HERO_FILM_SRC && (
           <video
+            ref={videoRef}
             className="v4-hero__film-video"
             muted
             playsInline
@@ -283,6 +306,33 @@ function HeroFilm() {
           AI systems · Automation · SEO &amp; analytics · Advertising
         </span>
       </div>
+      {showVideo && (
+        <button
+          type="button"
+          className="v4-hero__film-pause"
+          aria-pressed={paused}
+          aria-label={paused ? "Play the brand film" : "Pause the brand film"}
+          onClick={togglePlayback}
+        >
+          {paused ? (
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M3 2l9 5-9 5z" fill="currentColor" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="2.5" y="2" width="3.4" height="10" fill="currentColor" />
+              <rect x="8.1" y="2" width="3.4" height="10" fill="currentColor" />
+            </svg>
+          )}
+        </button>
+      )}
+      {/* The Signal seam — one mint thread travelling from the film stage
+          into the particle field below (owner: "a SiteMint signal travels
+          naturally between the film and particle field"). Static line under
+          reduced motion via the global override. */}
+      <span className="v4-hero__seam" aria-hidden="true">
+        <span className="v4-hero__seam-pulse" />
+      </span>
     </div>
   );
 }

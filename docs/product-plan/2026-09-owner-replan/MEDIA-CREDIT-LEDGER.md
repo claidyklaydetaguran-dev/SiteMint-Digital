@@ -40,7 +40,7 @@ Balance verified before start: 217,682 available. Owner: "use existing available
 |---|---|---|---|---|---|---|---|
 | A2-1 | Homepage flagship keyframe (Discover scene, text-free) | Seedream auto | 2:1 | ~100 var | 15 | YM8fMxpWeC | done — VERIFIED |
 | A2-2 | Receptionist theater background keyframe (busy studio + answering phone) | Seedream auto | 2:1 | ~100 var | 15 | LwNAw8YswO | done — VERIFIED |
-| A2-3 | Homepage flagship film — 6-beat story (Discover→Present), text-free | Seedance 2.0 Pro | 21:9 1080p 15s ×6 shots | 10,500 exact | 10,500 | tC5LErimZJ | rendering |
-| A2-4 | Receptionist full-bleed theater background | Seedance 2.0 Pro | 16:9 1080p 10s | 7,000 exact | 7,000 | 8aqxfLgIrU | rendering |
+| A2-3 | Homepage flagship film — 6-beat story (Discover→Present), text-free | Seedance 2.0 Pro | 21:9 1080p 15s ×6 shots | 10,500 exact | 10,500 | tC5LErimZJ | done — PASSED quality gate (frames 0/20/40/60/80/100% reviewed; consistent engineer, abstract system dive, warm client presentation; weakest beat = 3s standing transition, carried by motion). Mastered to 3:1 stage cut + dedicated mobile poster |
+| A2-4 | Receptionist full-bleed theater background | Seedance 2.0 Pro | 16:9 1080p 10s | 7,000 exact | 7,000 | 8aqxfLgIrU | done — PASSED (busy studio, mint answer-glow, tooth neon, Glacier palette); 981 KB web |
 
 Authorization-2 running total: 17,530. Program cumulative (all authorizations): 23,995.
