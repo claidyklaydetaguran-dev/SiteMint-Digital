@@ -226,7 +226,7 @@ const CH_COLOR: Record<string, string> = {
   email:       "bg-blue-100 text-blue-700 border-blue-200",
   sms:         "bg-violet-100 text-violet-700 border-violet-200",
   call_prompt: "bg-amber-100 text-amber-700 border-amber-200",
-  task:        "bg-gray-100 text-gray-600 border-gray-200",
+  task:        "bg-muted text-muted-foreground border-border",
 };
 
 const ENROLL_COLOR: Record<string, string> = {
@@ -276,12 +276,12 @@ function StepCard({
   const branchLine = branchSummary(step, allSteps);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+    <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60 bg-muted/60">
         <div className="w-7 h-7 rounded-full bg-[#1e293b] text-white flex items-center justify-center text-xs font-bold shrink-0">
           {step.stepNumber}
         </div>
-        <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${CH_COLOR[step.channel] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+        <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${CH_COLOR[step.channel] ?? "bg-muted text-muted-foreground border-border"}`}>
           <ChannelIcon ch={step.channel} cls="w-3 h-3" />
           {step.channel.replace("_", " ")}
         </div>
@@ -337,7 +337,7 @@ function StepCard({
           <p className="text-xs text-amber-700 font-medium">Prompt: {step.callPrompt}</p>
         )}
         {step.taskDescription && (
-          <p className="text-xs text-gray-600">Task: {step.taskDescription}</p>
+          <p className="text-xs text-muted-foreground">Task: {step.taskDescription}</p>
         )}
         {intelChips.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-0.5">
@@ -466,7 +466,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           <input
             type="number" min={1} value={stepNumber}
             onChange={e => setStepNumber(Number(e.target.value))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
           />
         </div>
         <div>
@@ -474,7 +474,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           <input
             type="number" min={0} value={dayOffset}
             onChange={e => setDayOffset(Number(e.target.value))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
           />
         </div>
         <div>
@@ -482,7 +482,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           <select
             value={sendTime}
             onChange={e => setSendTime(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
           >
             {SEND_TIMES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
           </select>
@@ -499,7 +499,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
               className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
                 channel === ch
                   ? `${CH_COLOR[ch]} shadow-sm`
-                  : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                  : "bg-white border-border text-muted-foreground hover:bg-accent"
               }`}
             >
               <ChannelIcon ch={ch} cls="w-3.5 h-3.5" />
@@ -518,7 +518,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
                 value={subject}
                 onChange={e => setSubject(e.target.value)}
                 placeholder="Email subject line…"
-                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
               />
             </div>
           )}
@@ -529,7 +529,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
               onChange={e => setBody(e.target.value)}
               rows={4}
               placeholder={channel === "sms" ? "SMS message text…" : "Email body (plain text)…"}
-              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+              className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
             />
           </div>
         </>
@@ -543,7 +543,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
             onChange={e => setCallPrompt(e.target.value)}
             rows={3}
             placeholder="What should the rep say on this call?…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
           />
         </div>
       )}
@@ -556,7 +556,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
             onChange={e => setTaskDescription(e.target.value)}
             rows={2}
             placeholder="What task should be completed?…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
           />
         </div>
       )}
@@ -605,7 +605,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           value={intentLabel}
           onChange={e => setIntentLabel(e.target.value)}
           placeholder="e.g. re-engagement nudge"
-          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+          className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
         />
       </div>
 
@@ -693,7 +693,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
       <div className="flex gap-2 pt-1">
         <button
           onClick={onCancel}
-          className="flex-1 px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          className="flex-1 px-4 py-2 border border-border text-xs font-medium rounded-lg hover:bg-accent transition-colors"
         >
           Cancel
         </button>
@@ -775,9 +775,9 @@ function LeadPicker({
           <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
         </div>
       )}
-      <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+      <div className="max-h-56 overflow-y-auto border border-border rounded-xl divide-y divide-border/60">
         {leads.map(l => (
-          <label key={l.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+          <label key={l.id} className="flex items-center gap-3 px-3 py-2 hover:bg-accent cursor-pointer">
             <input
               type="checkbox"
               checked={selected.has(l.id)}
@@ -820,8 +820,8 @@ function JourneyView({
 }) {
   if (steps.length === 0) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-        <Route className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+      <div className="bg-muted border border-border rounded-xl p-6 text-center">
+        <Route className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
         <p className="text-sm font-semibold text-muted-foreground">No journey to preview yet</p>
         <p className="text-xs text-muted-foreground mt-1">Add steps or generate them from a blueprint to see the contact journey.</p>
       </div>
@@ -861,8 +861,8 @@ function JourneyView({
                     const { cleanBody, intel } = parseStepBody(s.body);
                     const firstLine = (cleanBody.split("\n").find(l => l.trim()) ?? "").trim();
                     return (
-                      <div key={s.id} className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-start gap-2 shadow-sm">
-                        <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${CH_COLOR[s.channel] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                      <div key={s.id} className="bg-white border border-border rounded-lg px-3 py-2 flex items-start gap-2 shadow-sm">
+                        <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${CH_COLOR[s.channel] ?? "bg-muted text-muted-foreground border-border"}`}>
                           <ChannelIcon ch={s.channel} cls="w-2.5 h-2.5" />
                           {s.channel.replace("_", " ")}
                         </div>
@@ -887,7 +887,7 @@ function JourneyView({
 
       {/* Journey end marker */}
       <div className="flex items-center gap-2 pl-4 text-[11px] text-muted-foreground">
-        <GitBranch className="w-3.5 h-3.5 text-gray-400" />
+        <GitBranch className="w-3.5 h-3.5 text-muted-foreground/60" />
         <span>
           Journey ends after the last step{stopOnReply ? ", or earlier if the contact replies" : ""}.
           {autoSend === false ? " Sending is manual — nothing leaves without queue approval." : ""}
@@ -933,12 +933,12 @@ function CampaignEndsPanel({
       icon: GitBranch,
       label: "Branch / switch logic",
       detail: "Not configured — contacts follow a single linear path. Cross-campaign routing is a strategy note only.",
-      tone: "text-gray-500",
+      tone: "text-muted-foreground",
     },
   ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+    <div className="bg-white border border-border rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Target className="w-4 h-4 text-[#1e293b]" />
         <p className="text-xs font-bold text-foreground">Campaign ends when…</p>
@@ -954,7 +954,7 @@ function CampaignEndsPanel({
           </div>
         ))}
       </div>
-      <div className="flex items-start gap-2 text-[10px] text-muted-foreground border-t border-gray-100 pt-2.5">
+      <div className="flex items-start gap-2 text-[10px] text-muted-foreground border-t border-border/60 pt-2.5">
         <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px text-emerald-500" />
         <span>Safety: scheduler behaviour is unchanged. No contact is enrolled and no message is sent without explicit action.</span>
       </div>
@@ -1255,8 +1255,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     return (
       <CrmLayout>
         <div className="p-6 max-w-5xl mx-auto animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-gray-200 rounded" />
-          <div className="h-32 bg-gray-100 rounded-xl" />
+          <div className="h-8 w-48 bg-border rounded" />
+          <div className="h-32 bg-muted rounded-xl" />
         </div>
       </CrmLayout>
     );
@@ -1265,7 +1265,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const typeColor: Record<string, string> = {
     nurture:   "bg-violet-100 text-violet-700 border border-violet-200",
     drip:      "bg-blue-100 text-blue-700 border border-blue-200",
-    broadcast: "bg-gray-100 text-gray-600 border border-gray-200",
+    broadcast: "bg-muted text-muted-foreground border border-border",
   };
 
   return (
@@ -1281,9 +1281,9 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             <ArrowLeft className="w-3.5 h-3.5" />
             All Campaigns
           </button>
-          <span className="text-gray-300">/</span>
+          <span className="text-muted-foreground/40">/</span>
           <h1 className="text-sm font-bold text-foreground truncate max-w-xs">{campaignName}</h1>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${typeColor[campaignType] ?? "bg-gray-100 text-gray-600 border border-gray-200"}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${typeColor[campaignType] ?? "bg-muted text-muted-foreground border border-border"}`}>
             {campaignType}
           </span>
         </div>
@@ -1295,7 +1295,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
+        <div className="flex gap-1 bg-muted rounded-xl p-1 w-fit flex-wrap">
           <button
             onClick={() => setActiveTab("steps")}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "steps" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
@@ -1329,7 +1329,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
 
             {/* View toggle + blueprint generator */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex gap-1 bg-muted rounded-lg p-1">
                 {([["sequence", "Sequence", ListOrdered], ["journey", "Journey", Route]] as const).map(([v, label, Icon]) => (
                   <button
                     key={v}
@@ -1349,7 +1349,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <select
                   value={selectedBlueprintId}
                   onChange={e => { setSelectedBlueprintId(e.target.value); setGenConfirm(false); setGenResult(""); }}
-                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 max-w-[220px]"
+                  className="border border-input rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 max-w-[220px]"
                 >
                   <option value="">Start from a blueprint…</option>
                   {SITEMINT_CAMPAIGN_BLUEPRINTS.map(bp => (
@@ -1368,7 +1368,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <select
                   value={aiStepCount}
                   onChange={e => setAiStepCount(Number(e.target.value))}
-                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="border border-input rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
                   title="Number of AI-drafted steps to generate"
                 >
                   {[3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} steps</option>)}
@@ -1430,7 +1430,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                   <button
                     onClick={() => setAiPreview(null)}
                     disabled={aiAdding}
-                    className="px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
+                    className="px-4 py-2 border border-border text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
                   >
                     Discard
                   </button>
@@ -1510,7 +1510,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                     <button
                       onClick={() => { setGenConfirm(false); setGenMode("append"); }}
                       disabled={generating}
-                      className="px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
+                      className="px-4 py-2 border border-border text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
                     >
                       Cancel
                     </button>
@@ -1587,7 +1587,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             {!showStepForm && !editingStep && steps.length > 0 && (
               <button
                 onClick={() => setShowStepForm(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-semibold text-muted-foreground rounded-xl hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-card-border text-xs font-semibold text-muted-foreground rounded-xl hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Another Step
@@ -1595,7 +1595,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             )}
 
             {steps.length > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div className="bg-muted border border-border rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-muted-foreground mb-2">SEQUENCE TIMELINE</p>
                 <div className="flex flex-col gap-1">
                   {steps.map((s, i) => {
@@ -1641,30 +1641,30 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
         {activeTab === "recipients" && (
           <div className="space-y-3">
             {recipients.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-                <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <div className="bg-muted border border-border rounded-xl p-6 text-center">
+                <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
                 <p className="text-sm font-semibold text-muted-foreground">No contacts enrolled yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Switch to "Enroll Contacts" to add people to this sequence.</p>
               </div>
             ) : (
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50">
+                    <tr className="border-b border-border/60 bg-muted">
                       {["Contact", "Email", "Enrollment", "Step", "Enrolled On", "Actions"].map(h => (
                         <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-border/40">
                     {recipients.map(r => {
                       const isBusy = updatingRid === r.id;
                       return (
-                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                        <tr key={r.id} className="hover:bg-accent/50 transition-colors">
                           <td className="px-4 py-3 font-semibold text-xs text-foreground">{r.leadName}</td>
                           <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[160px]">{r.leadEmail}</td>
                           <td className="px-4 py-3">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ENROLL_COLOR[r.enrollmentStatus] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ENROLL_COLOR[r.enrollmentStatus] ?? "bg-muted text-muted-foreground border-border"}`}>
                               {r.enrollmentStatus}
                             </span>
                           </td>
@@ -1723,7 +1723,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 You must add at least one step before enrolling contacts.
               </div>
             )}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+            <div className="bg-white border border-border rounded-xl shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-foreground">Enroll Contacts</h2>
                 <button
@@ -1744,7 +1744,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <button
                   onClick={() => setExpandEnroll(true)}
                   disabled={steps.length === 0}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-semibold text-muted-foreground rounded-xl hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-card-border text-xs font-semibold text-muted-foreground rounded-xl hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Select Contacts to Enroll

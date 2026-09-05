@@ -41,7 +41,7 @@ const CH_COLOR: Record<string, string> = {
   email:       "text-blue-600",
   sms:         "text-violet-600",
   call_prompt: "text-amber-600",
-  task:        "text-gray-500",
+  task:        "text-muted-foreground",
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -49,7 +49,7 @@ const STATUS_BADGE: Record<string, string> = {
   queued:    "bg-violet-100 text-violet-700 border-violet-200",
   sent:      "bg-emerald-100 text-emerald-700 border-emerald-200",
   failed:    "bg-red-100 text-red-700 border-red-200",
-  canceled:  "bg-gray-100 text-gray-500 border-gray-200",
+  canceled:  "bg-muted text-muted-foreground border-border",
   skipped:   "bg-amber-100 text-amber-700 border-amber-200",
 };
 
@@ -105,7 +105,7 @@ function InlineEdit({
           value={subject}
           onChange={e => setSubject(e.target.value)}
           placeholder="Subject…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+          className="w-full border border-input rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
         />
       )}
       <textarea
@@ -113,11 +113,11 @@ function InlineEdit({
         onChange={e => setBody(e.target.value)}
         rows={3}
         placeholder="Message body…"
-        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+        className="w-full border border-input rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
       />
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
-        <button onClick={onCancel} className="px-3 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-accent transition-colors">Cancel</button>
         <button
           onClick={save} disabled={saving}
           className="flex items-center gap-1 px-3 py-1 text-xs bg-[#1e293b] text-white rounded-lg hover:bg-[#334155] disabled:opacity-40 transition-colors"
@@ -152,16 +152,16 @@ function MessageRow({
   const canAct = ["scheduled", "queued"].includes(msg.status);
 
   return (
-    <div className={`border-b border-gray-100 last:border-0 ${
+    <div className={`border-b border-border/60 last:border-0 ${
       msg.status === "sent"    ? "bg-emerald-50/30" :
       msg.status === "failed"  ? "bg-red-50/30" :
-      msg.status === "canceled"? "bg-gray-50/30 opacity-60" :
+      msg.status === "canceled"? "bg-muted/30 opacity-60" :
       ""
     }`}>
       <div className="grid grid-cols-[auto_1fr_1fr_auto_auto_auto] gap-2 items-center px-4 py-3 text-xs">
 
         {/* Channel icon */}
-        <ChannelIcon ch={msg.channel} cls={`w-4 h-4 shrink-0 ${CH_COLOR[msg.channel] ?? "text-gray-400"}`} />
+        <ChannelIcon ch={msg.channel} cls={`w-4 h-4 shrink-0 ${CH_COLOR[msg.channel] ?? "text-muted-foreground/60"}`} />
 
         {/* Contact + campaign */}
         <div className="min-w-0">
@@ -191,7 +191,7 @@ function MessageRow({
         </div>
 
         {/* Status badge */}
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${STATUS_BADGE[msg.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${STATUS_BADGE[msg.status] ?? "bg-muted text-muted-foreground border-border"}`}>
           {msg.status}
         </span>
 
@@ -424,7 +424,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
               <ArrowLeft className="w-3.5 h-3.5" />
               {campaignId ? "Campaign" : "All Campaigns"}
             </button>
-            <span className="text-gray-300">/</span>
+            <span className="text-muted-foreground/40">/</span>
             <div>
               <h1 className="text-lg font-bold font-serif text-foreground leading-tight">
                 {campaignName ? `${campaignName} — Queue` : "Message Queue"}
@@ -438,7 +438,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
           </div>
           <button
             onClick={load}
-            className="p-2 rounded-lg hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -470,7 +470,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
                 type="number"
                 value={shiftDays}
                 onChange={e => setShiftDays(e.target.value)}
-                className="w-16 text-center border border-gray-300 rounded px-1.5 py-1 text-xs"
+                className="w-16 text-center border border-input rounded px-1.5 py-1 text-xs"
                 aria-label="Days to shift"
               />
               <span className="text-amber-700">days (negative = earlier)</span>
@@ -494,7 +494,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
 
         {/* Scheduler status card */}
         {!campaignId && scheduler && (
-          <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs">
+          <div className="flex items-center gap-4 bg-white border border-border rounded-xl px-4 py-3 text-xs">
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${scheduler.running ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
               <span className="font-semibold text-foreground">Auto-Send Scheduler</span>
@@ -528,7 +528,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
               className={`rounded-xl border p-2.5 text-center transition-all ${
                 statusFilter === s
                   ? `${STATUS_BADGE[s]} shadow-sm`
-                  : "bg-white border-gray-200 hover:bg-gray-50"
+                  : "bg-white border-border hover:bg-accent"
               }`}
             >
               <p className="text-lg font-black text-foreground">{counts[s] ?? 0}</p>
@@ -544,7 +544,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
           <div className="flex gap-1 flex-wrap">
             <button
               onClick={() => setStatusFilter("")}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${!statusFilter ? "bg-[#1e293b] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${!statusFilter ? "bg-[#1e293b] text-white" : "bg-muted text-muted-foreground hover:bg-accent"}`}
             >
               All
             </button>
@@ -555,7 +555,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
                 className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${
                   statusFilter === s
                     ? `${STATUS_BADGE[s]} shadow-sm`
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : "bg-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
                 {s}
@@ -574,20 +574,20 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
         {/* Table */}
         {loading ? (
           <div className="animate-pulse space-y-2">
-            {[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
+            {[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-muted rounded-xl" />)}
           </div>
         ) : messages.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
-            <Clock className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          <div className="bg-muted border border-border rounded-xl p-8 text-center">
+            <Clock className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
             <p className="text-sm font-semibold text-muted-foreground">No messages in queue</p>
             <p className="text-xs text-muted-foreground mt-1">
               {statusFilter ? `No "${statusFilter}" messages found.` : "Enroll contacts in a sequence to start scheduling messages."}
             </p>
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
             {/* Column headers */}
-            <div className="grid grid-cols-[auto_1fr_1fr_auto_auto_auto] gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
+            <div className="grid grid-cols-[auto_1fr_1fr_auto_auto_auto] gap-2 px-4 py-2 bg-muted border-b border-border/60">
               {["Ch", "Contact / Campaign", "Message", "Scheduled", "Status", "Actions"].map(h => (
                 <p key={h} className="text-[10px] font-semibold text-muted-foreground">{h}</p>
               ))}

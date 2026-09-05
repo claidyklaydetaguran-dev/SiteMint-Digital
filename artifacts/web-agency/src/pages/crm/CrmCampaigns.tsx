@@ -182,7 +182,7 @@ function StepBadge({ n, label, active, done }: { n: number; label: string; activ
   return (
     <div className="flex items-center gap-2">
       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
-        done ? "bg-emerald-500 text-white" : active ? "bg-[#1e293b] text-white" : "bg-gray-100 text-gray-400"
+        done ? "bg-emerald-500 text-white" : active ? "bg-[#1e293b] text-white" : "bg-muted text-muted-foreground/60"
       }`}>
         {done ? <CheckCircle2 className="w-4 h-4" /> : n}
       </div>
@@ -195,13 +195,13 @@ function StepBadge({ n, label, active, done }: { n: number; label: string; activ
 
 function EmailCard({ subject, body, badge, badgeColor }: { subject: string; body: string; badge?: string; badgeColor?: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-white border border-border rounded-xl overflow-hidden shadow-sm">
       {badge && (
-        <div className={`px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase ${badgeColor ?? "bg-gray-100 text-gray-500"}`}>
+        <div className={`px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase ${badgeColor ?? "bg-muted text-muted-foreground"}`}>
           {badge}
         </div>
       )}
-      <div className="px-4 pt-3 pb-1 border-b border-gray-100">
+      <div className="px-4 pt-3 pb-1 border-b border-border/60">
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Subject</p>
         <p className="text-sm font-semibold text-foreground">{subject || "(no subject)"}</p>
       </div>
@@ -217,12 +217,12 @@ function EmailCard({ subject, body, badge, badgeColor }: { subject: string; body
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    draft:    "bg-gray-100 text-gray-600 border border-gray-200",
+    draft:    "bg-muted text-muted-foreground border border-border",
     ready:    "bg-blue-100 text-blue-700 border border-blue-200",
     archived: "bg-emerald-100 text-emerald-700 border border-emerald-200",
   };
   return (
-    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status] ?? "bg-gray-100 text-gray-500 border border-gray-200"}`}>
+    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status] ?? "bg-muted text-muted-foreground border border-border"}`}>
       {status}
     </span>
   );
@@ -986,9 +986,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
     return (
       <CrmLayout>
         <div className="p-6 max-w-5xl mx-auto animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-gray-200 rounded" />
-          <div className="h-4 w-64 bg-gray-100 rounded" />
-          <div className="h-32 bg-gray-100 rounded-xl" />
+          <div className="h-8 w-48 bg-border rounded" />
+          <div className="h-4 w-64 bg-muted rounded" />
+          <div className="h-32 bg-muted rounded-xl" />
         </div>
       </CrmLayout>
     );
@@ -1016,7 +1016,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to Campaign
               </button>
-              <span className="text-gray-300">/</span>
+              <span className="text-muted-foreground/40">/</span>
               <h1 className="text-sm font-bold text-foreground truncate max-w-xs">{campaignName}</h1>
               <StatusBadge status={campaignStatus} />
             </div>
@@ -1041,10 +1041,10 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           {/* Summary tiles */}
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: "Total",   value: total,              color: "bg-gray-50   border-gray-200  text-gray-700" },
+              { label: "Total",   value: total,              color: "bg-muted   border-border  text-foreground/80" },
               { label: "Sent",    value: sendResult.sent,    color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
-              { label: "Failed",  value: sendResult.failed,  color: sendResult.failed  > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
-              { label: "Skipped", value: sendResult.skipped, color: sendResult.skipped > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+              { label: "Failed",  value: sendResult.failed,  color: sendResult.failed  > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-muted border-border text-muted-foreground/60" },
+              { label: "Skipped", value: sendResult.skipped, color: sendResult.skipped > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-muted border-border text-muted-foreground/60" },
             ].map(({ label, value, color }) => (
               <div key={label} className={`border rounded-xl p-4 text-center ${color}`}>
                 <p className="text-2xl font-bold">{value}</p>
@@ -1054,12 +1054,12 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           </div>
 
           {/* Progress bar */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-foreground">Send Progress</p>
               <p className="text-xs text-muted-foreground">{pctDone}% complete</p>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${hasFailed ? "bg-amber-400" : "bg-emerald-500"}`}
                 style={{ width: `${pctDone}%` }}
@@ -1073,8 +1073,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           </div>
 
           {/* Per-recipient results table */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+          <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
               <Users className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-sm font-bold text-foreground">Recipient Results</h2>
               <span className="text-xs text-muted-foreground ml-1">({total} total)</span>
@@ -1082,13 +1082,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr className="border-b border-border/60 bg-muted">
                     {["Lead","Email","DISC Style","Status","Sent At","Error","Actions"].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border/40">
                   {sendResult.results.map(res => {
                     const lead = allLeads.find(l => l.id === res.leadId);
                     const disc = lead ? discMap.get(lead.id) : undefined;
@@ -1098,14 +1098,14 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       <tr key={res.recipientId} className={`transition-colors ${
                         res.status === "sent"    ? "bg-emerald-50/30" :
                         res.status === "failed"  ? "bg-red-50/30"     :
-                        "bg-gray-50/30"
+                        "bg-muted/30"
                       }`}>
                         <td className="px-4 py-3 font-medium text-foreground text-xs">{lead?.name ?? `Lead #${res.leadId}`}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[140px]">{res.email || "—"}</td>
                         <td className="px-4 py-3">
                           {meta && disc
                             ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {disc}</span>
-                            : <span className="text-gray-300 text-xs">—</span>}
+                            : <span className="text-muted-foreground/40 text-xs">—</span>}
                         </td>
                         <td className="px-4 py-3">
                           {res.status === "sent" && (
@@ -1196,7 +1196,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Campaigns
               </button>
-              <span className="text-gray-300">/</span>
+              <span className="text-muted-foreground/40">/</span>
               <span className="text-sm font-semibold text-foreground truncate max-w-xs">{campaignName}</span>
               <StatusBadge status={campaignStatus} />
             </div>
@@ -1240,7 +1240,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
           {/* ── Detail tab nav ── */}
           {!analyticsLoading && !analyticsError && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
               <div className="flex flex-wrap">
                 {DETAIL_TABS.map(t => (
                   <button
@@ -1249,7 +1249,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                       detailTab === t.id
                         ? "border-[#1e293b] text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-gray-50"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent"
                     }`}
                   >
                     {t.label}
@@ -1266,8 +1266,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <div className="space-y-5">
                   {/* Objective */}
                   {objective && (
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                      <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                         <Lightbulb className="w-4 h-4 text-amber-500" />
                         <h2 className="text-sm font-bold text-foreground">Objective</h2>
                       </div>
@@ -1282,9 +1282,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     // maxReach kept for potential future use
 
                 return (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
                     {/* Header */}
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                       <GitBranch className="w-4 h-4 text-violet-600" />
                       <h2 className="text-sm font-bold text-foreground">Sequence Funnel</h2>
                       <span className="text-[10px] font-semibold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full border border-violet-200 capitalize ml-1">
@@ -1306,10 +1306,10 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       {/* Enrollment status tiles */}
                       <div className="grid grid-cols-4 gap-3">
                         {[
-                          { label: "Enrolled",  value: es.total,     color: "bg-gray-50 border-gray-200 text-gray-700" },
-                          { label: "Active",    value: es.active,    color: es.active    > 0 ? "bg-blue-50 border-blue-200 text-blue-700"       : "bg-gray-50 border-gray-200 text-gray-400" },
-                          { label: "Completed", value: es.completed, color: es.completed > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400" },
-                          { label: "Stopped on Reply", value: es.stopped, color: es.stopped > 0 ? "bg-amber-50 border-amber-200 text-amber-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                          { label: "Enrolled",  value: es.total,     color: "bg-muted border-border text-foreground/80" },
+                          { label: "Active",    value: es.active,    color: es.active    > 0 ? "bg-blue-50 border-blue-200 text-blue-700"       : "bg-muted border-border text-muted-foreground/60" },
+                          { label: "Completed", value: es.completed, color: es.completed > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-muted border-border text-muted-foreground/60" },
+                          { label: "Stopped on Reply", value: es.stopped, color: es.stopped > 0 ? "bg-amber-50 border-amber-200 text-amber-700"   : "bg-muted border-border text-muted-foreground/60" },
                         ].map(({ label, value, color }) => (
                           <div key={label} className={`rounded-xl border p-3 text-center ${color}`}>
                             <p className="text-2xl font-black">{value}</p>
@@ -1327,7 +1327,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                           return (
                             <div key={step.stepId} className="space-y-1">
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="w-5 h-5 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">
+                                <span className="w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
                                   {step.stepNumber}
                                 </span>
                                 <span className="flex items-center gap-1 text-muted-foreground shrink-0">
@@ -1344,7 +1344,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                                 )}
                               </div>
                               {/* Stacked bar */}
-                              <div className="h-4 rounded-full bg-gray-100 overflow-hidden flex">
+                              <div className="h-4 rounded-full bg-muted overflow-hidden flex">
                                 {/* Sent — green */}
                                 <div
                                   className="h-full bg-emerald-400 transition-all"
@@ -1391,18 +1391,18 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       </div>
 
                       {/* Per-step detail table */}
-                      <div className="overflow-x-auto rounded-xl border border-gray-100">
+                      <div className="overflow-x-auto rounded-xl border border-border/60">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100">
+                            <tr className="bg-muted border-b border-border/60">
                               {["Step", "Channel", "Day", "Subject", "Sent", "Failed", "Skipped", "Pending", "Canceled", "Reach"].map(h => (
                                 <th key={h} className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-50">
+                          <tbody className="divide-y divide-border/40">
                             {f.steps.map(step => (
-                              <tr key={step.stepId} className="hover:bg-gray-50/50 transition-colors">
+                              <tr key={step.stepId} className="hover:bg-accent/50 transition-colors">
                                 <td className="px-3 py-2.5 font-bold text-foreground">{step.stepNumber}</td>
                                 <td className="px-3 py-2.5">
                                   <span className="flex items-center gap-1 text-muted-foreground font-medium">
@@ -1413,10 +1413,10 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                                 <td className="px-3 py-2.5 text-muted-foreground">{step.dayOffset}</td>
                                 <td className="px-3 py-2.5 text-foreground max-w-[160px] truncate" title={step.subject ?? ""}>{step.subject || "—"}</td>
                                 <td className="px-3 py-2.5 font-semibold text-emerald-700">{step.sent}</td>
-                                <td className={`px-3 py-2.5 font-semibold ${step.failed > 0 ? "text-red-600" : "text-gray-300"}`}>{step.failed}</td>
-                                <td className={`px-3 py-2.5 font-semibold ${step.skipped > 0 ? "text-amber-600" : "text-gray-300"}`}>{step.skipped}</td>
-                                <td className={`px-3 py-2.5 font-semibold ${step.pending > 0 ? "text-blue-600" : "text-gray-300"}`}>{step.pending}</td>
-                                <td className={`px-3 py-2.5 font-semibold ${step.canceled > 0 ? "text-gray-500" : "text-gray-300"}`}>{step.canceled}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.failed > 0 ? "text-red-600" : "text-muted-foreground/40"}`}>{step.failed}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.skipped > 0 ? "text-amber-600" : "text-muted-foreground/40"}`}>{step.skipped}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.pending > 0 ? "text-blue-600" : "text-muted-foreground/40"}`}>{step.pending}</td>
+                                <td className={`px-3 py-2.5 font-semibold ${step.canceled > 0 ? "text-muted-foreground" : "text-muted-foreground/40"}`}>{step.canceled}</td>
                                 <td className="px-3 py-2.5">
                                   <span className={`font-bold ${step.reachRate >= 60 ? "text-emerald-700" : step.reachRate >= 30 ? "text-amber-600" : "text-red-600"}`}>
                                     {step.reachRate}%
@@ -1432,8 +1432,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 );
               })() : (
                 /* Steps & Info — no sequence yet */
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-14 text-center">
-                  <GitBranch className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                <div className="bg-white border border-border rounded-xl shadow-sm py-14 text-center">
+                  <GitBranch className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-sm font-medium text-foreground mb-1">No sequence steps yet</p>
                   <p className="text-xs text-muted-foreground mb-4">
                     This is a broadcast campaign — or no steps have been added to the sequence.
@@ -1458,12 +1458,12 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   {/* Summary tiles */}
                   <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
                     {[
-                      { label: "Recipients", value: a.totals.recipients,  color: "bg-gray-50   border-gray-200  text-gray-700" },
-                      { label: "Sent",       value: a.totals.sent,        color: a.totals.sent       > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400" },
-                      { label: "Failed",     value: a.totals.failed,      color: a.totals.failed     > 0 ? "bg-red-50   border-red-200   text-red-700"        : "bg-gray-50 border-gray-200 text-gray-400" },
-                      { label: "Skipped",    value: a.totals.skipped,     color: a.totals.skipped    > 0 ? "bg-amber-50 border-amber-200 text-amber-700"      : "bg-gray-50 border-gray-200 text-gray-400" },
+                      { label: "Recipients", value: a.totals.recipients,  color: "bg-muted   border-border  text-foreground/80" },
+                      { label: "Sent",       value: a.totals.sent,        color: a.totals.sent       > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-muted border-border text-muted-foreground/60" },
+                      { label: "Failed",     value: a.totals.failed,      color: a.totals.failed     > 0 ? "bg-red-50   border-red-200   text-red-700"        : "bg-muted border-border text-muted-foreground/60" },
+                      { label: "Skipped",    value: a.totals.skipped,     color: a.totals.skipped    > 0 ? "bg-amber-50 border-amber-200 text-amber-700"      : "bg-muted border-border text-muted-foreground/60" },
                       { label: "Send Rate",  value: `${a.totals.sendRate}%`,    color: "bg-violet-50 border-violet-200 text-violet-700" },
-                      { label: "Fail Rate",  value: `${a.totals.failureRate}%`, color: a.totals.failureRate > 0 ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-400" },
+                      { label: "Fail Rate",  value: `${a.totals.failureRate}%`, color: a.totals.failureRate > 0 ? "bg-red-50 border-red-200 text-red-700" : "bg-muted border-border text-muted-foreground/60" },
                     ].map(({ label, value, color }) => (
                       <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
                         <p className="text-xl font-bold">{value}</p>
@@ -1474,8 +1474,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
                   {/* Open/click/bounce tracking */}
                   {a.eventMetrics?.hasEvents ? (
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
                     <h2 className="text-sm font-bold text-foreground">Email Engagement</h2>
                     <span className="ml-auto text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
@@ -1502,10 +1502,10 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       </div>
                       {/* Bounces, rates */}
                       {[
-                        { label: "Bounces",     value: a.eventMetrics.bounced,       color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                        { label: "Bounces",     value: a.eventMetrics.bounced,       color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-muted border-border text-muted-foreground/60" },
                         { label: "Open Rate",   value: `${a.eventMetrics.openRate}%`,   color: "bg-blue-50   border-blue-200   text-blue-700" },
                         { label: "Click Rate",  value: `${a.eventMetrics.clickRate}%`,  color: "bg-violet-50 border-violet-200 text-violet-700" },
-                        { label: "Bounce Rate", value: `${a.eventMetrics.bounceRate}%`, color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-gray-50 border-gray-200 text-gray-400" },
+                        { label: "Bounce Rate", value: `${a.eventMetrics.bounceRate}%`, color: a.eventMetrics.bounced > 0 ? "bg-red-50   border-red-200   text-red-700"   : "bg-muted border-border text-muted-foreground/60" },
                       ].map(({ label, value, color }) => (
                         <div key={label} className={`border rounded-xl p-3 text-center ${color}`}>
                           <p className="text-xl font-bold">{value}</p>
@@ -1522,17 +1522,17 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   </div>
                 </div>
               ) : (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-muted border border-border rounded-xl overflow-hidden">
                   <div className="flex items-start gap-2.5 px-4 py-3">
-                    <Info className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                    <Info className="w-4 h-4 text-muted-foreground/60 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="text-xs text-gray-500">
-                        <strong className="text-gray-600">Open and click tracking are not configured yet, or no events have been received.</strong>{" "}
+                      <p className="text-xs text-muted-foreground">
+                        <strong className="text-muted-foreground">Open and click tracking are not configured yet, or no events have been received.</strong>{" "}
                         Analytics below are based on send-time recipient status only.
                       </p>
-                      <p className="text-[10px] text-gray-400">
-                        Webhook URL: <code className="font-mono bg-white border border-gray-200 rounded px-1">/api/crm/webhooks/resend</code>
-                        {" · "}Required env: <code className="font-mono bg-white border border-gray-200 rounded px-1">RESEND_WEBHOOK_SECRET</code>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        Webhook URL: <code className="font-mono bg-white border border-border rounded px-1">/api/crm/webhooks/resend</code>
+                        {" · "}Required env: <code className="font-mono bg-white border border-border rounded px-1">RESEND_WEBHOOK_SECRET</code>
                       </p>
                     </div>
                   </div>
@@ -1553,8 +1553,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       "Needs Cleanup": "bg-amber-400", Risky: "bg-red-400",
                     };
                     return (
-                      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                           <Award className="w-4 h-4 text-muted-foreground" />
                           <h2 className="text-sm font-bold text-foreground">Campaign Quality Score</h2>
                           <span className="text-[10px] text-muted-foreground ml-auto">Not AI · Rule-based</span>
@@ -1568,13 +1568,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                             </span>
                           </div>
                           <div className="flex-1 space-y-2">
-                            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${trackColor[qs.badge]}`} style={{ width: `${qs.score}%` }} />
                             </div>
                             <ul className="space-y-1.5 mt-3">
                               {qs.reasons.map((r, i) => (
                                 <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                                  <TrendingUp className="w-3 h-3 shrink-0 mt-0.5 text-gray-400" />
+                                  <TrendingUp className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground/60" />
                                   {r}
                                 </li>
                               ))}
@@ -1589,8 +1589,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   {(() => {
                     const insights = generateInsights(a);
                     return (
-                      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                      <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                           <Lightbulb className="w-4 h-4 text-amber-500" />
                           <h2 className="text-sm font-bold text-foreground">Campaign Insights</h2>
                           <span className="text-[10px] text-muted-foreground ml-auto">Rule-based · Not AI generated</span>
@@ -1616,14 +1616,14 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   })()}
 
                   {/* ── DISC Performance ── */}
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                  <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-muted-foreground" />
                       <h2 className="text-sm font-bold text-foreground">DISC Performance</h2>
                     </div>
                     <div className="p-4 space-y-3">
                       {a.discBreakdown.map(d => {
-                        const dc   = DISC_COLORS[d.style] ?? { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-400" };
+                        const dc   = DISC_COLORS[d.style] ?? { bg: "bg-muted", text: "text-foreground/80", bar: "bg-muted-foreground/50" };
                         const meta = DISC_META[d.style as DiscStyle];
                         const successRate = d.count > 0 ? Math.round((d.sent / d.count) * 100) : 0;
                         const skippedRate = d.count > 0 ? Math.round((d.skipped / d.count) * 100) : 0;
@@ -1650,8 +1650,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                                 </div>
                                 <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold mb-2">
                                   <span className="text-emerald-700">{d.sent} sent ({successRate}%)</span>
-                                  <span className={d.failed > 0 ? "text-red-600" : "text-gray-400"}>{d.failed} failed</span>
-                                  <span className={d.skipped > 0 ? "text-amber-600" : "text-gray-400"}>{d.skipped} skipped ({skippedRate}%)</span>
+                                  <span className={d.failed > 0 ? "text-red-600" : "text-muted-foreground/60"}>{d.failed} failed</span>
+                                  <span className={d.skipped > 0 ? "text-amber-600" : "text-muted-foreground/60"}>{d.skipped} skipped ({skippedRate}%)</span>
                                 </div>
                                 <p className={`text-[10px] ${dc.text} opacity-80 italic`}>{RECO[d.style] ?? ""}</p>
                               </>
@@ -1670,8 +1670,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 const smsSteps = a.funnelData?.steps.filter(s => s.channel === "sms") ?? [];
                 if (smsSteps.length === 0) {
                   return (
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-14 text-center">
-                      <MessageSquare className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                    <div className="bg-white border border-border rounded-xl shadow-sm py-14 text-center">
+                      <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
                       <p className="text-sm font-medium text-foreground mb-1">No SMS steps yet</p>
                       <p className="text-xs text-muted-foreground mb-4">
                         Add SMS steps to this sequence via the Sequence Builder.
@@ -1688,8 +1688,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   );
                 }
                 return (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                  <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-muted-foreground" />
                       <h2 className="text-sm font-bold text-foreground">SMS Steps</h2>
                       <span className="text-xs text-muted-foreground ml-1">({smsSteps.length})</span>
@@ -1697,22 +1697,22 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100">
+                          <tr className="bg-muted border-b border-border/60">
                             {["Step","Day","Prompt / Subject","Sent","Failed","Skipped","Pending","Reach"].map(h => (
                               <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-border/40">
                           {smsSteps.map(step => (
-                            <tr key={step.stepId} className="hover:bg-gray-50/50 transition-colors">
+                            <tr key={step.stepId} className="hover:bg-accent/50 transition-colors">
                               <td className="px-4 py-3 font-bold text-foreground text-xs">{step.stepNumber}</td>
                               <td className="px-4 py-3 text-muted-foreground text-xs">Day {step.dayOffset}</td>
                               <td className="px-4 py-3 text-foreground text-xs max-w-[200px] truncate" title={step.subject ?? ""}>{step.subject || "—"}</td>
                               <td className="px-4 py-3 font-semibold text-emerald-700 text-xs">{step.sent}</td>
-                              <td className={`px-4 py-3 font-semibold text-xs ${step.failed  > 0 ? "text-red-600"  : "text-gray-300"}`}>{step.failed}</td>
-                              <td className={`px-4 py-3 font-semibold text-xs ${step.skipped > 0 ? "text-amber-600": "text-gray-300"}`}>{step.skipped}</td>
-                              <td className={`px-4 py-3 font-semibold text-xs ${step.pending > 0 ? "text-blue-600" : "text-gray-300"}`}>{step.pending}</td>
+                              <td className={`px-4 py-3 font-semibold text-xs ${step.failed  > 0 ? "text-red-600"  : "text-muted-foreground/40"}`}>{step.failed}</td>
+                              <td className={`px-4 py-3 font-semibold text-xs ${step.skipped > 0 ? "text-amber-600": "text-muted-foreground/40"}`}>{step.skipped}</td>
+                              <td className={`px-4 py-3 font-semibold text-xs ${step.pending > 0 ? "text-blue-600" : "text-muted-foreground/40"}`}>{step.pending}</td>
                               <td className="px-4 py-3 text-xs">
                                 <span className={`font-bold ${step.reachRate >= 60 ? "text-emerald-700" : step.reachRate >= 30 ? "text-amber-600" : "text-red-600"}`}>
                                   {step.reachRate}%
@@ -1729,8 +1729,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
               {/* ══ REPLIES ══════════════════════════════════════════════════════ */}
               {detailTab === "replies" && (
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-muted-foreground" />
                     <h2 className="text-sm font-bold text-foreground">Reply Estimate</h2>
                     <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
@@ -1744,7 +1744,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     </p>
                     {a.totals.sent === 0 ? (
                       <div className="text-center py-8">
-                        <Mail className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+                        <Mail className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
                         <p className="text-xs text-muted-foreground">No emails sent yet — reply estimate unavailable.</p>
                       </div>
                     ) : (
@@ -1755,7 +1755,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                             of {a.replyEstimate.total} sent ({a.replyEstimate.rate}%)
                           </span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <div className="h-full bg-violet-400 rounded-full transition-all" style={{ width: `${a.replyEstimate.rate}%` }} />
                         </div>
                         {a.replyEstimate.count === 0 && (
@@ -1771,15 +1771,15 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
               {/* ══ ENROLLED LEADS ═══════════════════════════════════════════════ */}
               {detailTab === "enrolled" && (
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <Users className="w-4 h-4 text-muted-foreground" />
                     <h2 className="text-sm font-bold text-foreground">Enrolled Leads</h2>
                     <span className="text-xs text-muted-foreground ml-1">({a.recentRecipients.length})</span>
                   </div>
                   {a.recentRecipients.length === 0 ? (
                     <div className="py-14 text-center">
-                      <Users className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                      <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
                       <p className="text-sm font-medium text-foreground mb-1">No enrolled leads yet</p>
                       <p className="text-xs text-muted-foreground mb-4">
                         Add recipients via the Campaign Builder or enroll contacts through the Sequence Builder.
@@ -1797,13 +1797,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-gray-100 bg-gray-50">
+                          <tr className="border-b border-border/60 bg-muted">
                             {["Name","Email","DISC Style","Status","Sent At","Error"].map(h => (
                               <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-border/40">
                           {a.recentRecipients.map(rec => {
                             const style = rec.discStyleUsed as DiscStyle | null;
                             const meta  = style ? DISC_META[style] : null;
@@ -1818,7 +1818,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                                 <td className="px-4 py-3">
                                   {meta && style
                                     ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {style}</span>
-                                    : <span className="text-gray-300 text-xs">—</span>}
+                                    : <span className="text-muted-foreground/40 text-xs">—</span>}
                                 </td>
                                 <td className="px-4 py-3">
                                   {rec.status === "sent" && (
@@ -1837,7 +1837,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                                     </span>
                                   )}
                                   {rec.status === "selected" && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                                       <Clock className="w-3 h-3" /> Pending
                                     </span>
                                   )}
@@ -1871,7 +1871,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
   if (view === "history") {
     const statusColors: Record<string, string> = {
-      draft:    "bg-gray-100 text-gray-600",
+      draft:    "bg-muted text-muted-foreground",
       ready:    "bg-emerald-100 text-emerald-700",
       archived: "bg-amber-100 text-amber-700",
     };
@@ -1886,7 +1886,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         <div className="flex flex-col h-full">
 
           {/* ── Page header ── */}
-          <div className="px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between shrink-0">
+          <div className="px-6 py-4 border-b border-border/60 bg-white flex items-center justify-between shrink-0">
             <div>
               <h1 className="text-lg font-bold font-serif text-foreground">Campaigns</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -1896,7 +1896,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate("/admin/crm/campaign-queue")}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-sm font-semibold rounded-lg hover:bg-gray-50 text-muted-foreground transition-colors"
+                className="flex items-center gap-2 px-3 py-2 border border-border text-sm font-semibold rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               >
                 <Calendar className="w-4 h-4" /> Queue
               </button>
@@ -1910,7 +1910,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           </div>
 
           {/* ── Tabs ── */}
-          <div className="flex gap-0 px-6 bg-white border-b border-gray-100 shrink-0">
+          <div className="flex gap-0 px-6 bg-white border-b border-border/60 shrink-0">
             {(["campaigns", "email-activity"] as const).map(tab => (
               <button
                 key={tab}
@@ -1930,11 +1930,11 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           {activeListTab === "campaigns" && (
             <div className="flex-1 overflow-auto">
               {/* Search + filter bar */}
-              <div className="px-6 py-3 bg-white border-b border-gray-50 flex items-center gap-3 flex-wrap shrink-0">
+              <div className="px-6 py-3 bg-white border-b border-border/40 flex items-center gap-3 flex-wrap shrink-0">
                 <div className="relative flex-1 min-w-[180px] max-w-[280px]">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                   <input
-                    className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full pl-8 pr-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     placeholder="Search campaigns…"
                     value={listSearch}
                     onChange={e => setListSearch(e.target.value)}
@@ -1948,7 +1948,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
                         listStatusFilter === s
                           ? "bg-[#1e293b] text-white"
-                          : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
+                          : "bg-muted text-muted-foreground hover:bg-accent"
                       }`}
                     >
                       {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -1962,7 +1962,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       key={s}
                       onClick={() => setSortOrder(s)}
                       className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${
-                        sortOrder === s ? "bg-[#1e293b] text-white" : "text-muted-foreground hover:bg-gray-100"
+                        sortOrder === s ? "bg-[#1e293b] text-white" : "text-muted-foreground hover:bg-accent"
                       }`}
                     >
                       {s === "newest" ? "Newest" : s === "oldest" ? "Oldest" : "A–Z"}
@@ -1974,8 +1974,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               {/* Campaign cards */}
               <div className="p-6 space-y-3">
                 {filteredCampaigns.length === 0 ? (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm py-16 text-center">
-                    <FileText className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                  <div className="bg-white border border-border rounded-xl shadow-sm py-16 text-center">
+                    <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
                     <p className="text-sm font-medium text-foreground mb-1">
                       {campaigns.length === 0 ? "No campaigns yet" : "No campaigns match your filter"}
                     </p>
@@ -1997,12 +1997,12 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   filteredCampaigns.map(c => (
                     <div
                       key={c.id}
-                      className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 hover:shadow-md transition-all cursor-pointer"
+                      className="bg-white border border-border rounded-xl shadow-sm hover:border-card-border hover:shadow-md transition-all cursor-pointer"
                       onClick={() => openAnalytics(c)}
                     >
                       <div className="px-5 py-4 flex items-center gap-4">
                         {/* Channel icon */}
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
                           {c.type === "drip" || c.type === "nurture"
                             ? <Layers className="w-4.5 h-4.5 text-violet-500" />
                             : <Mail className="w-4.5 h-4.5 text-blue-500" />}
@@ -2063,7 +2063,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                               }}
                             />
                           )}
-                          <ChevronRight className="w-4 h-4 text-gray-300 ml-1" />
+                          <ChevronRight className="w-4 h-4 text-muted-foreground/40 ml-1" />
                         </div>
                       </div>
                     </div>
@@ -2076,8 +2076,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           {/* ══════════════════ EMAIL ACTIVITY TAB ══════════════════ */}
           {activeListTab === "email-activity" && (
             <div className="flex-1 overflow-auto p-6">
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+              <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
                   <h2 className="text-sm font-bold text-foreground">Email Activity</h2>
                   <span className="text-xs text-muted-foreground ml-1">— per-campaign send totals</span>
@@ -2085,7 +2085,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
+                      <tr className="border-b border-border/60 bg-muted">
                         {["Campaign", "Type", "Status", "Recipients", "Sent", "Failed", "Open Rate", "Actions"].map(h => (
                           <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                             {h}
@@ -2093,7 +2093,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-border/40">
                       {campaigns.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">
@@ -2105,7 +2105,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         const hasData = ra && ra !== "loading" && ra !== "error";
                         const ad = hasData ? (ra as CampaignAnalytics) : null;
                         return (
-                          <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                          <tr key={c.id} className="hover:bg-accent/60 transition-colors">
                             <td className="px-4 py-3 font-medium text-foreground">
                               <button
                                 onClick={() => openAnalytics(c)}
@@ -2176,7 +2176,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Campaigns
             </button>
-            <span className="text-gray-300 shrink-0">/</span>
+            <span className="text-muted-foreground/40 shrink-0">/</span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold font-serif text-foreground truncate max-w-[220px]">
@@ -2233,12 +2233,12 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         </div>
 
         {/* ── Step indicator ─────────────────────────────────────────────────── */}
-        <div className="bg-white border border-gray-200 rounded-xl px-6 py-3.5 shadow-sm">
+        <div className="bg-white border border-border rounded-xl px-6 py-3.5 shadow-sm">
           <div className="flex items-center gap-6">
             <StepBadge n={1} label="Setup"          active={step === 0} done={step > 0} />
-            <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
             <StepBadge n={2} label="Audience"       active={step === 1} done={step > 1} />
-            <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
             <StepBadge n={3} label="Preview & Send" active={step === 2} done={false} />
           </div>
         </div>
@@ -2247,8 +2247,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             STEP 1 — SETUP
         ══════════════════════════════════════════════════════════════════════ */}
         {step === 0 && (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border/60 flex items-center gap-2">
               <Mail className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-sm font-bold text-foreground">Step 1 — Campaign Setup</h2>
             </div>
@@ -2258,7 +2258,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   Campaign Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   placeholder="e.g. Q3 Re-engagement Campaign"
                   value={campaignName}
                   onChange={e => mark(setCampaignName)(e.target.value)}
@@ -2271,7 +2271,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <div className="flex gap-2">
                   {(["broadcast", "nurture", "drip"] as const).map(t => {
                     const meta: Record<string, { label: string; desc: string; color: string }> = {
-                      broadcast: { label: "Broadcast",  desc: "One email to all recipients at once",     color: "border-gray-400 bg-gray-50 text-gray-700" },
+                      broadcast: { label: "Broadcast",  desc: "One email to all recipients at once",     color: "border-card-border bg-accent text-foreground/80" },
                       nurture:   { label: "Nurture",    desc: "Multi-step sequence over days/weeks",     color: "border-violet-400 bg-violet-50 text-violet-700" },
                       drip:      { label: "Drip",       desc: "Automated follow-up drip sequence",       color: "border-blue-400 bg-blue-50 text-blue-700" },
                     };
@@ -2283,7 +2283,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         className={`flex-1 rounded-xl border-2 p-3 text-left transition-all ${
                           campaignType === t
                             ? `${m.color} shadow-sm`
-                            : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                            : "border-border bg-white text-muted-foreground hover:bg-accent"
                         }`}
                       >
                         <p className="text-xs font-bold">{m.label}</p>
@@ -2312,7 +2312,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div>
                       <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Persona</label>
                       <select
-                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                        className="w-full px-2.5 py-2 border border-input rounded-lg text-xs focus:outline-none bg-white"
                         value={selectedPersonaId}
                         onChange={e => onSelectPersona(e.target.value)}
                       >
@@ -2326,7 +2326,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div>
                       <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Topic</label>
                       <select
-                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                        className="w-full px-2.5 py-2 border border-input rounded-lg text-xs focus:outline-none bg-white"
                         value={selectedTopicId}
                         onChange={e => setSelectedTopicId(e.target.value)}
                       >
@@ -2340,7 +2340,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div>
                       <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Blueprint</label>
                       <select
-                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                        className="w-full px-2.5 py-2 border border-input rounded-lg text-xs focus:outline-none bg-white"
                         value={selectedBlueprintId}
                         onChange={e => setSelectedBlueprintId(e.target.value)}
                       >
@@ -2375,7 +2375,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
                   {/* Topic preview card (Task 4) */}
                   {strategyHints?.topic && (
-                    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                    <div className="rounded-lg border border-border bg-white p-3 space-y-2">
                       <p className="text-[11px] font-bold text-foreground">{strategyHints.topic.title}</p>
                       <p className="text-[11px] text-muted-foreground">{strategyHints.topic.description}</p>
                       {strategyHints.subjectHooks.length > 0 && (
@@ -2397,7 +2397,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Target signals:</span>
                           {strategyHints.targetSignals.map(s => (
-                            <span key={s} className="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 rounded-full px-2 py-0.5">{s}</span>
+                            <span key={s} className="text-[10px] bg-muted text-muted-foreground border border-border rounded-full px-2 py-0.5">{s}</span>
                           ))}
                         </div>
                       )}
@@ -2409,7 +2409,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
                   {/* Blueprint preview + apply (Task 3) */}
                   {selectedBlueprint && (
-                    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                    <div className="rounded-lg border border-border bg-white p-3 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-bold text-foreground">{selectedBlueprint.label}</p>
                         <button
@@ -2430,7 +2430,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Example steps</p>
                         {selectedBlueprint.exampleSteps.map((s, i) => (
                           <div key={i} className="text-[11px] text-foreground flex items-start gap-1.5">
-                            <span className="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 rounded px-1.5 py-px shrink-0">Day {s.day}</span>
+                            <span className="text-[10px] bg-muted text-muted-foreground border border-border rounded px-1.5 py-px shrink-0">Day {s.day}</span>
                             <span className="text-muted-foreground shrink-0">{s.channel}</span>
                             <span>— {s.purpose}</span>
                           </div>
@@ -2445,7 +2445,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div>
                       <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Objective</label>
                       <input
-                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+                        className="w-full px-2.5 py-2 border border-input rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
                         placeholder="e.g. Book a discovery call"
                         value={objective}
                         onChange={e => { setObjective(e.target.value); setIsDirty(true); }}
@@ -2454,7 +2454,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div>
                       <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Tone Profile</label>
                       <input
-                        className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+                        className="w-full px-2.5 py-2 border border-input rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
                         placeholder="e.g. Warm, consultative"
                         value={toneProfile}
                         onChange={e => { setToneProfile(e.target.value); setIsDirty(true); }}
@@ -2464,7 +2464,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   <div>
                     <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Strategy Notes</label>
                     <textarea
-                      className="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white min-h-[60px] resize-y"
+                      className="w-full px-2.5 py-2 border border-input rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white min-h-[60px] resize-y"
                       placeholder="Internal notes on this campaign's strategy (persisted)."
                       value={strategyNote}
                       onChange={e => { setStrategyNote(e.target.value); setIsDirty(true); }}
@@ -2475,7 +2475,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       type="checkbox"
                       checked={stopOnReply}
                       onChange={e => { setStopOnReply(e.target.checked); setIsDirty(true); }}
-                      className="rounded border-gray-300"
+                      className="rounded border-input"
                     />
                     Stop sequence when a lead replies
                   </label>
@@ -2486,7 +2486,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <div className="flex-1">
                   <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Status</label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                     value={campaignStatus}
                     onChange={e => { setCampaignStatus(e.target.value as "draft"|"ready"|"archived"); setIsDirty(true); }}
                   >
@@ -2499,7 +2499,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   <div className="flex-1">
                     <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Load from Template</label>
                     <select
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                      className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                       value={selectedTemplate}
                       onChange={e => loadTemplate(e.target.value)}
                     >
@@ -2549,7 +2549,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   Base Subject Line <span className="text-red-500">*</span>
                 </label>
                 <input
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   placeholder="e.g. Let's talk about growing your business online"
                   value={baseSubject}
                   onChange={e => { mark(setBaseSubject)(e.target.value); setAiDrafted(false); }}
@@ -2564,7 +2564,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   Base Email Body <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 min-h-[160px] resize-y font-mono"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 min-h-[160px] resize-y font-mono"
                   placeholder={"Write your core message here.\n\nThe personalization engine wraps this with a DISC-appropriate greeting, tone, and CTA for each lead."}
                   value={baseBody}
                   onChange={e => { mark(setBaseBody)(e.target.value); setAiDrafted(false); }}
@@ -2573,7 +2573,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
               {/* Live DISC preview */}
               {baseSubject && baseBody && (
-                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="bg-muted rounded-xl border border-border p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
                     <p className="text-xs font-bold text-foreground">Live DISC Preview</p>
@@ -2599,7 +2599,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <button
                   onClick={saveDraft}
                   disabled={saving || !campaignName.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-accent disabled:opacity-40 transition-colors"
                 >
                   {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   Save Draft
@@ -2620,8 +2620,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             STEP 2 — AUDIENCE
         ══════════════════════════════════════════════════════════════════════ */}
         {step === 1 && (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border/60 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-muted-foreground" />
                 <h2 className="text-sm font-bold text-foreground">Step 2 — Select Audience</h2>
@@ -2630,13 +2630,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
             </div>
 
             {/* Filters */}
-            <div className="px-6 py-3.5 border-b border-gray-100 bg-gray-50 flex flex-wrap gap-3 items-center">
+            <div className="px-6 py-3.5 border-b border-border/60 bg-muted flex flex-wrap gap-3 items-center">
               {[
                 { label: "All Stages",     val: filterStatus,   set: setFilterStatus,   opts: STATUSES },
                 { label: "All Priorities", val: filterPriority, set: setFilterPriority, opts: PRIORITIES },
               ].map(f => (
                 <select key={f.label}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none"
+                  className="text-xs border border-input rounded-lg px-3 py-1.5 bg-white focus:outline-none"
                   value={f.val} onChange={e => f.set(e.target.value)}
                 >
                   <option value="">{f.label}</option>
@@ -2644,7 +2644,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 </select>
               ))}
               <select
-                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none"
+                className="text-xs border border-input rounded-lg px-3 py-1.5 bg-white focus:outline-none"
                 value={filterDisc} onChange={e => setFilterDisc(e.target.value)}
               >
                 <option value="">All DISC Styles</option>
@@ -2669,7 +2669,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100">
+                    <tr className="border-b border-border/60">
                       <th className="px-4 py-2.5 text-left">
                         <input type="checkbox"
                           checked={selectedLeads.size === filteredLeads.length && filteredLeads.length > 0}
@@ -2680,7 +2680,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-border/40">
                     {filteredLeads.map(lead => {
                       const style   = discMap.get(lead.id);
                       const meta    = style ? DISC_META[style] : null;
@@ -2688,7 +2688,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       const checked = selectedLeads.has(lead.id);
                       return (
                         <tr key={lead.id}
-                          className={`transition-colors ${noEmail ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50/60 cursor-pointer"} ${checked ? "bg-blue-50/40" : ""}`}
+                          className={`transition-colors ${noEmail ? "opacity-40 cursor-not-allowed" : "hover:bg-accent/60 cursor-pointer"} ${checked ? "bg-blue-50/40" : ""}`}
                           onClick={() => !noEmail && toggleLead(lead.id)}
                         >
                           <td className="px-4 py-3">
@@ -2707,20 +2707,20 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                               lead.status === "Won" ? "bg-green-100 text-green-700" :
                               lead.status === "Lost" ? "bg-red-100 text-red-600" :
                               lead.status === "New"  ? "bg-blue-100 text-blue-700" :
-                              "bg-gray-100 text-gray-600"
+                              "bg-muted text-muted-foreground"
                             }`}>{lead.status}</span>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                               lead.priority === "High" ? "bg-red-100 text-red-700" :
                               lead.priority === "Medium" ? "bg-yellow-100 text-yellow-700" :
-                              "bg-gray-100 text-gray-500"
+                              "bg-muted text-muted-foreground"
                             }`}>{lead.priority}</span>
                           </td>
                           <td className="px-4 py-3">
                             {meta && style
                               ? <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${meta.bgColor} ${meta.textColor} ${meta.borderColor}`}>{meta.emoji} {style}</span>
-                              : <span className="text-gray-300">—</span>}
+                              : <span className="text-muted-foreground/40">—</span>}
                           </td>
                           <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[110px]">{lead.serviceInterest ?? "—"}</td>
                         </tr>
@@ -2731,7 +2731,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               </div>
             )}
 
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div className="px-6 py-4 border-t border-border/60 bg-muted flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">
                   {selectedLeads.size} lead{selectedLeads.size !== 1 ? "s" : ""} selected
@@ -2743,12 +2743,12 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               </div>
               <div className="flex items-center gap-3">
                 <button onClick={saveDraft} disabled={saving || !campaignName.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-white disabled:opacity-40 transition-colors">
+                  className="flex items-center gap-1.5 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-white disabled:opacity-40 transition-colors">
                   {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   Save & Continue
                 </button>
                 <button onClick={() => setStep(0)}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  className="flex items-center gap-1.5 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-accent transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <button onClick={() => {
@@ -2786,8 +2786,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
               {/* ── Left: preview selector + DISC tabs ── */}
               <div className="lg:col-span-3 space-y-4">
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <Eye className="w-4 h-4 text-muted-foreground" />
                     <h2 className="text-sm font-bold text-foreground">Personalization Preview</h2>
                   </div>
@@ -2795,7 +2795,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Preview for lead</label>
                       <select
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                        className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                         value={previewLeadId ?? ""}
                         onChange={e => setPreviewLeadId(Number(e.target.value))}
                       >
@@ -2827,20 +2827,20 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
                 {/* DISC variant tabs */}
                 {previewLead && discVariants && (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                  <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-amber-500" />
                       <h2 className="text-sm font-bold text-foreground">All 4 DISC Variants</h2>
                       <span className="text-[10px] text-muted-foreground ml-1">— how this email adapts to each personality</span>
                     </div>
-                    <div className="flex border-b border-gray-100">
+                    <div className="flex border-b border-border/60">
                       {DISC_STYLES.map(style => {
                         const meta   = DISC_META[style];
                         const active = activeDiscTab === style;
                         return (
                           <button key={style} onClick={() => setActiveDiscTab(style)}
                             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-all border-b-2 ${
-                              active ? `border-current ${meta.textColor} ${meta.bgColor}` : "border-transparent text-muted-foreground hover:bg-gray-50"
+                              active ? `border-current ${meta.textColor} ${meta.bgColor}` : "border-transparent text-muted-foreground hover:bg-accent"
                             }`}>
                             <span>{meta.emoji}</span><span>{style}</span>
                           </button>
@@ -2855,7 +2855,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                           badge={`${DISC_META[activeDiscTab].emoji} ${activeDiscTab} Version`}
                           badgeColor={`${DISC_META[activeDiscTab].bgColor} ${DISC_META[activeDiscTab].textColor}`}
                         />
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                        <div className="bg-muted rounded-lg border border-border p-3">
                           <div className="flex items-center gap-1.5 mb-2">
                             <Info className="w-3.5 h-3.5 text-blue-500" />
                             <p className="text-xs font-semibold text-foreground">Personalization applied</p>
@@ -2875,7 +2875,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 )}
 
                 {!previewLead && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center text-sm text-muted-foreground">
+                  <div className="bg-muted border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
                     Select a lead above to preview their personalized email.
                   </div>
                 )}
@@ -2919,15 +2919,15 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   const StatusIcon = hasErrors ? XCircle : hasWarnings ? AlertCircle : CheckCircle2;
 
                   return (
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                    <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                      <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4 text-muted-foreground" />
                         <h2 className="text-sm font-bold text-foreground">Pre-Send Quality Check</h2>
                         <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${statusStyle}`}>
                           <StatusIcon className="w-3 h-3" /> {statusLabel}
                         </span>
                       </div>
-                      <ul className="divide-y divide-gray-50">
+                      <ul className="divide-y divide-border/40">
                         {checks.map((c, i) => (
                           <li key={i} className="flex items-center justify-between px-4 py-2.5 gap-3">
                             <span className="flex items-center gap-2 text-xs text-foreground">
@@ -2948,8 +2948,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   );
                 })()}
                 {previewResult && (
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100">
+                  <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-border/60">
                       <h2 className="text-sm font-bold text-foreground">Original vs Personalized</h2>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         For {previewLead?.name} — {previewDiscStyle} style
@@ -2957,7 +2957,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     </div>
                     <div className="p-4 space-y-3">
                       <EmailCard subject={previewResult.original.subject} body={previewResult.original.body}
-                        badge="Original (base)" badgeColor="bg-gray-100 text-gray-500" />
+                        badge="Original (base)" badgeColor="bg-muted text-muted-foreground" />
                       <EmailCard subject={previewResult.personalized.subject} body={previewResult.personalized.body}
                         badge={`${DISC_META[previewDiscStyle].emoji} Personalized`}
                         badgeColor={`${DISC_META[previewDiscStyle].bgColor} ${DISC_META[previewDiscStyle].textColor}`}
@@ -2971,8 +2971,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 )}
 
                 {/* Test send panel */}
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+                <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <Send className="w-4 h-4 text-muted-foreground" />
                     <h2 className="text-sm font-bold text-foreground">Test Send</h2>
                   </div>
@@ -2988,7 +2988,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         Send test to this address
                       </label>
                       <input type="email"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         placeholder="your@email.com"
                         value={testEmail}
                         onChange={e => setTestEmail(e.target.value)}
@@ -3019,7 +3019,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 </div>
 
                 {/* Summary */}
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+                <div className="bg-white border border-border rounded-xl shadow-sm p-5">
                   <h3 className="text-xs font-bold text-foreground mb-3">Campaign Summary</h3>
                   <dl className="space-y-1.5 text-xs">
                     {[
@@ -3041,12 +3041,12 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
             <div className="flex items-center justify-between pt-2">
               <button onClick={() => setStep(1)}
-                className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                className="flex items-center gap-1.5 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-accent transition-colors">
                 <ChevronLeft className="w-4 h-4" /> Back to Audience
               </button>
               <div className="flex items-center gap-3">
                 <button onClick={saveDraft} disabled={saving || !campaignName.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">
+                  className="flex items-center gap-1.5 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-accent disabled:opacity-40 transition-colors">
                   {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   Save Draft
                 </button>
@@ -3091,7 +3091,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  className="flex-1 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-accent transition-colors">
                   Cancel
                 </button>
                 <button onClick={deleteCampaign} disabled={deleting}
@@ -3118,7 +3118,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2 text-xs">
+              <div className="bg-muted rounded-xl border border-border p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Campaign</span>
                   <span className="font-semibold text-foreground truncate max-w-[200px]">{campaignName}</span>
@@ -3151,9 +3151,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   type="checkbox"
                   checked={sendConfirmChecked}
                   onChange={e => setSendConfirmChecked(e.target.checked)}
-                  className="mt-0.5 rounded border-gray-300 cursor-pointer"
+                  className="mt-0.5 rounded border-input cursor-pointer"
                 />
-                <span className="text-xs text-foreground font-medium group-hover:text-gray-700">
+                <span className="text-xs text-foreground font-medium group-hover:text-foreground/80">
                   I understand this will send emails to {selectedLeads.size} selected recipient{selectedLeads.size !== 1 ? "s" : ""}.
                 </span>
               </label>
@@ -3161,7 +3161,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               <div className="flex gap-3 pt-1">
                 <button
                   onClick={() => { setShowSendConfirm(false); setSendConfirmChecked(false); }}
-                  className="flex-1 px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-accent transition-colors"
                 >
                   Cancel
                 </button>
