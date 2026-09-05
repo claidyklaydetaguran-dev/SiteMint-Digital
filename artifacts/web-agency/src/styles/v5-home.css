@@ -470,16 +470,31 @@
   background: rgb(233 247 243 / 0.18);
 }
 
-/* ── Section 5 — CRM record illustration ─────────────────────────────── */
+/* ── Section 5 — CRM record illustration ─────────────────────────────────
+   The section's sole visual (owner directive, 2026-09-05: "CRM shouldn't be
+   publicized" — the real product capture was removed; this abstract
+   illustration was the pre-existing treatment and stays the only visual).
+   Sized and finished to read as a complete, deliberate visual on its own,
+   not a placeholder standing in for a screenshot. ───────────────────────── */
 .sm-record {
   position: relative;
+  max-width: 26rem;
+  margin: 0 auto;
   border-radius: var(--sm-radius-l, 16px);
   border: 1px solid var(--sm-line, #CFE7EA);
   background: var(--sm-surface, #fff);
-  box-shadow: var(--sm-shadow-1, 0 6px 20px rgb(11 58 62 / 0.06));
-  padding: 1.5rem;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  padding: 1.85rem;
   display: grid;
   gap: 0.9rem;
+  overflow: hidden;
+}
+.sm-record::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--sm-signal-thread, linear-gradient(90deg, #32C5D2, #56D2CF));
 }
 .sm-record__badge {
   justify-self: start;
@@ -818,17 +833,26 @@
   border: 1px solid var(--sm-line, #CFE7EA);
   border-radius: var(--sm-radius-l, 16px);
 }
+/* Team avatar (owner directive, 2026-09-05: named team, no stock/generated
+   photos yet). A CSS-only initials monogram on a mint→ink disc — a fixed
+   1:1 slot sized to accept a real photograph later with no layout change;
+   `object-fit: cover` is pre-set so a future `background-image`/`<img>`
+   drops in without touching this rule. */
 .sm-team-card__avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 88px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
-  background: var(--sm-mint-100, #DFF7F7);
-  color: var(--sm-mint-700, #0B7487);
+  background: linear-gradient(155deg, var(--sm-mint-400, #56D2CF), var(--sm-ink-950, #153E52));
+  color: var(--sm-white, #fff);
   font-weight: 700;
-  margin-bottom: 0.4rem;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.6rem;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgb(11 58 62 / 0.16);
 }
 .sm-team-card__name {
   font-weight: 600;
@@ -1052,14 +1076,12 @@
 }
 .sm-home-v5 .sm-team-card__avatar {
   transition:
-    background-color 220ms ease,
-    color 220ms ease,
+    box-shadow 220ms ease,
     transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .sm-home-v5 .sm-team-card:hover .sm-team-card__avatar,
 .sm-home-v5 .sm-team-card:focus-within .sm-team-card__avatar {
-  background: var(--sm-mint-500, #32c5d2);
-  color: var(--sm-white, #fff);
+  box-shadow: 0 10px 24px rgb(11 58 62 / 0.24);
   transform: translateY(-2px) scale(1.05);
 }
 .sm-home-v5 .sm-work-card__title,

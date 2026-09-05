@@ -62,7 +62,16 @@ export default function AboutV3() {
           </div>
           <div className="v3m-pillars v3m-pillars--3">
             {teamV5.map((member) => (
-              <div className="v3-card v3m-pillar reveal-scale-settle" key={member.name}>
+              <div className="v3-card v3m-pillar sm-person-card reveal-scale-settle" key={member.name}>
+                {/* CSS-only initials monogram — no generated faces, no stock
+                    photos. Fixed-aspect slot, ready to swap in a real
+                    photograph whenever the owner supplies one. */}
+                <span className="sm-person-avatar" aria-hidden="true">
+                  {member.name
+                    .split(" ")
+                    .map((part) => part[0])
+                    .join("")}
+                </span>
                 <h3 className="v3m-pillar__title">{member.name}</h3>
                 <p className="v3m-pillar__desc">{member.role}</p>
               </div>

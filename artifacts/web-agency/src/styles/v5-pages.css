@@ -133,44 +133,15 @@
   max-width: 42ch;
 }
 
-/* ── Real-product proof frame (container completion, nine-capability pass,
-   2026-09-05) — a real SiteMint screenshot in a labelled browser chrome,
-   shared visual language with the equivalent block in v5-home.css. ────── */
-.sm-v5page .sm-shot-frame {
-  margin: 0;
-  border-radius: var(--sm-radius-m, 10px);
-  overflow: hidden;
-  border: 1px solid var(--sm-line, #CFE7EA);
-  background: var(--sm-surface, #fff);
-  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
-}
-.sm-v5page .sm-shot-frame__bar {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0.55rem 0.75rem;
-  background: var(--sm-surface-alt, #EDF9FA);
-  border-bottom: 1px solid var(--sm-line, #CFE7EA);
-}
-.sm-v5page .sm-shot-frame__dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sm-line-strong, #A9CFD6);
-}
-.sm-v5page .sm-shot-frame__img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  object-position: top;
-  background: var(--sm-surface-alt, #EDF9FA);
-}
-.sm-v5page .sm-shot-frame__caption {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.75rem;
-  color: var(--sm-text-muted, #4A6472);
+/* ── AI Systems — CRM section closer ──────────────────────────────────────
+   CRM screenshots are never shown publicly (owner directive, 2026-09-05:
+   "CRM shouldn't be publicized") — the section returns to its icon-card
+   treatment (`.v3m-pillars` above) as the sole visual. A slim divider gives
+   the CTA a resolved edge instead of trailing off into empty space where
+   the removed screenshot used to sit. ───────────────────────────────────── */
+.sm-v5page .sm-crm-cta {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--sm-line, #CFE7EA);
 }
 
@@ -973,4 +944,98 @@
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
+}
+
+/* ── Team monogram avatar (About — the named team, owner directive
+   2026-09-05). CSS-only initials on a mint→ink disc, matching the treatment
+   on the homepage team section; a fixed 1:1 slot ready to accept a real
+   photograph later with no layout change. No generated faces, no stock
+   photos. ─────────────────────────────────────────────────────────────── */
+.sm-v5page .sm-person-card {
+  justify-items: start;
+}
+.sm-v5page .sm-person-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: linear-gradient(155deg, var(--sm-mint-400, #56D2CF), var(--sm-ink-950, #153E52));
+  color: var(--sm-white, #fff);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.75rem;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgb(11 58 62 / 0.16);
+}
+
+/* ── Selected projects (Work — portfolio scaffold, owner directive
+   2026-09-05: "our portfolios and our finished projects"). Real client
+   materials have not been supplied yet, so this ships structurally
+   complete — a clean grid a typed entry drops straight into — currently
+   showing one honest state card instead of fabricated work. ────────────── */
+.sm-v5page .sm-portfolio-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 720px) {
+  .sm-v5page .sm-portfolio-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1040px) {
+  .sm-v5page .sm-portfolio-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-v5page .sm-portfolio-card {
+  display: grid;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-l, 16px);
+  background: var(--sm-surface, #fff);
+  overflow: hidden;
+}
+.sm-v5page .sm-portfolio-card__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: var(--sm-surface-alt, #EDF9FA);
+}
+.sm-v5page .sm-portfolio-card__body {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1.25rem;
+}
+.sm-v5page .sm-portfolio-card__client {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-v5page .sm-portfolio-card__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+  margin: 0;
+}
+.sm-v5page .sm-portfolio-card__summary {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.92rem;
+}
+.sm-v5page .sm-portfolio-empty {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--sm-line-strong, #A9CFD6);
+  border-radius: var(--sm-radius-l, 16px);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--sm-text-muted, #4A6472);
+  background: var(--sm-surface-alt, #EDF9FA);
+}
+.sm-v5page .sm-portfolio-empty p {
+  max-width: 42ch;
+  margin: 0 auto;
 }
