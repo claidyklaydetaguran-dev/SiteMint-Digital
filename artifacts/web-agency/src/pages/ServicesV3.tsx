@@ -245,7 +245,7 @@ export default function ServicesV3() {
               first paint isn't delayed; eyebrow/lede/actions/map carry the
               motion. */}
           <h1 className="v3-display">
-            Four connected systems. One SiteMint build.
+            Nine capabilities. One connected SiteMint build.
           </h1>
           <p className="v3-lede reveal-fade-up">
             Each system stands on its own. Together they form the SiteMint

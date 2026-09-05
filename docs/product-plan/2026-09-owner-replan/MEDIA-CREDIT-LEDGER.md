@@ -31,3 +31,16 @@
 | 13 | 2026-09-05 | About texture band (IMG-07, snapped 21:9→2:1) | auto (light) | 2:1 | ~100 var | 15 | 2065 | u5sg8gqQLD | done |
 
 **Cumulative spent: 6,465 / 6,800** — reserve 335; generation CLOSED for this authorization. Owner-rejected takes 15-16 retained in the Magnific library per protocol (prompts + originals preserved).
+
+## Authorization 2 — 2026-09-06 final UI/UX correction (existing credits, no cap; no purchases)
+
+Balance verified before start: 217,682 available. Owner: "use existing available credits freely for this approved purpose; do not purchase."
+
+| # | Asset | Model | Spec | Predicted | Actual | Creation id | Status |
+|---|---|---|---|---|---|---|---|
+| A2-1 | Homepage flagship keyframe (Discover scene, text-free) | Seedream auto | 2:1 | ~100 var | 15 | YM8fMxpWeC | done — VERIFIED |
+| A2-2 | Receptionist theater background keyframe (busy studio + answering phone) | Seedream auto | 2:1 | ~100 var | 15 | LwNAw8YswO | done — VERIFIED |
+| A2-3 | Homepage flagship film — 6-beat story (Discover→Present), text-free | Seedance 2.0 Pro | 21:9 1080p 15s ×6 shots | 10,500 exact | 10,500 | tC5LErimZJ | rendering |
+| A2-4 | Receptionist full-bleed theater background | Seedance 2.0 Pro | 16:9 1080p 10s | 7,000 exact | 7,000 | 8aqxfLgIrU | rendering |
+
+Authorization-2 running total: 17,530. Program cumulative (all authorizations): 23,995.
