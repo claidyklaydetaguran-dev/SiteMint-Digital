@@ -9,6 +9,7 @@ import {
   applyFieldErrors,
   findFirstStepWithError,
   mapZodIssuesToFieldErrors,
+  countErrorsAtPaths,
   STEP_FIELD_PATHS,
   type DiscoveryDraft,
 } from "./discoveryFormModel";
@@ -19,13 +20,14 @@ import { DiscoveryStepNavigation } from "./DiscoveryStepNavigation";
 import { DiscoveryValidationSummary } from "./DiscoveryValidationSummary";
 import { DiscoveryReview } from "./DiscoveryReview";
 import { DiscoveryWelcome } from "./DiscoveryWelcome";
-import { ProjectDirectionStep } from "./steps/ProjectDirectionStep";
-import { BusinessStep } from "./steps/BusinessStep";
-import { DecisionContextStep } from "./steps/DecisionContextStep";
-import { ProjectScopeStep } from "./steps/ProjectScopeStep";
-import { ReadinessStep } from "./steps/ReadinessStep";
-import { CommercialStep } from "./steps/CommercialStep";
-import { ContactStep } from "./steps/ContactStep";
+import { ProjectStartingPointStep } from "./steps/ProjectStartingPointStep";
+import { SystemNeededStep } from "./steps/SystemNeededStep";
+import { BusinessAudienceStep } from "./steps/BusinessAudienceStep";
+import { BrandDirectionStep } from "./steps/BrandDirectionStep";
+import { ContentFunctionalityStep } from "./steps/ContentFunctionalityStep";
+import { SystemsIntegrationsStep } from "./steps/SystemsIntegrationsStep";
+import { GrowthAdvertisingStep } from "./steps/GrowthAdvertisingStep";
+import { DeliveryContactStep } from "./steps/DeliveryContactStep";
 import {
   loadDraft,
   clearDraft,
@@ -46,13 +48,14 @@ const SUPPORT_EMAIL = "info.sitemint@gmail.com";
 const REVIEW_STEP_INDEX = TOTAL_STEPS - 1;
 
 const STEP_COMPONENTS = [
-  ProjectDirectionStep,
-  BusinessStep,
-  DecisionContextStep,
-  ProjectScopeStep,
-  ReadinessStep,
-  CommercialStep,
-  ContactStep,
+  ProjectStartingPointStep,
+  SystemNeededStep,
+  BusinessAudienceStep,
+  BrandDirectionStep,
+  ContentFunctionalityStep,
+  SystemsIntegrationsStep,
+  GrowthAdvertisingStep,
+  DeliveryContactStep,
 ];
 
 export function PlatformDiscoveryShell() {
@@ -111,12 +114,17 @@ export function PlatformDiscoveryShell() {
   // ── Step navigation ──────────────────────────────────────────────────────
 
   async function handleContinue() {
-    const stepKey = STEP_FIELD_PATHS[currentStep];
-    const isValid = await form.trigger([stepKey]);
+    const stepPaths = STEP_FIELD_PATHS[currentStep];
+    // react-hook-form's trigger() accepts an array of any registered field
+    // paths (leaf or subtree) — it is not limited to top-level keys, so this
+    // validates exactly this step's fields regardless of which contract
+    // object(s) they belong to.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isValid = await form.trigger(stepPaths as any);
     if (isValid) {
       setCurrentStep((step) => Math.min(step + 1, REVIEW_STEP_INDEX));
     } else {
-      const failingCount = Object.keys(form.formState.errors[stepKey] ?? {}).length;
+      const failingCount = countErrorsAtPaths(form.formState.errors, stepPaths);
       setAnnouncement(
         failingCount === 1 ? "1 field needs attention" : `${Math.max(failingCount, 1)} fields need attention`,
       );
@@ -361,7 +369,7 @@ export function PlatformDiscoveryShell() {
 
             {currentStep < REVIEW_STEP_INDEX && (
               <DiscoveryValidationSummary
-                stepKey={STEP_FIELD_PATHS[currentStep]}
+                stepPaths={STEP_FIELD_PATHS[currentStep]}
                 errors={form.formState.errors}
                 onFocusField={handleFocusField}
               />

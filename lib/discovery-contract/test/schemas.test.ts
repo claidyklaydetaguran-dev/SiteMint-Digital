@@ -291,6 +291,145 @@ check("phone is optional (absent)", DiscoverySubmissionContract.safeParse(smalle
   check("full request envelope (meta + answers) validates", DiscoverySubmissionRequest.safeParse(envelope).success);
 }
 
+// ── Checkpoint 2C.3 additions (owner-directed intake reorganization) ────────
+// Additive only: every check below extends coverage without weakening or
+// removing any check above.
+
+// projectDirection.projectStage is new and optional — absent (legacy shape)
+// and present both validate.
+check(
+  "projectStage is optional (absent still parses, matches pre-2C.3 shape)",
+  DiscoverySubmissionContract.safeParse(smallestValid).success,
+);
+{
+  const withStage = {
+    ...smallestValid,
+    projectDirection: { ...smallestValid.projectDirection, projectStage: "redesign" },
+  };
+  const parsed = DiscoverySubmissionContract.safeParse(withStage);
+  check(
+    "projectStage is accepted when present",
+    parsed.success && parsed.data.projectDirection.projectStage === "redesign",
+  );
+}
+{
+  const badStage = {
+    ...smallestValid,
+    projectDirection: { ...smallestValid.projectDirection, projectStage: "not_a_real_stage" },
+  };
+  check("invalid projectStage value is rejected", !DiscoverySubmissionContract.safeParse(badStage).success);
+}
+
+// decisionContext.primaryProblem / successDefinition relaxed to optional.
+{
+  const { primaryProblem: _primaryProblem, ...decisionContextWithoutPrimaryProblem } = smallestValid.decisionContext;
+  const withoutPrimaryProblem = { ...smallestValid, decisionContext: decisionContextWithoutPrimaryProblem };
+  check(
+    "primaryProblem is now optional (submission without it still parses)",
+    DiscoverySubmissionContract.safeParse(withoutPrimaryProblem).success,
+  );
+}
+{
+  const { successDefinition: _successDefinition, ...decisionContextWithoutSuccessDefinition } = smallestValid.decisionContext;
+  const withoutSuccessDefinition = { ...smallestValid, decisionContext: decisionContextWithoutSuccessDefinition };
+  check(
+    "successDefinition is now optional (submission without it still parses)",
+    DiscoverySubmissionContract.safeParse(withoutSuccessDefinition).success,
+  );
+}
+
+// New optional top-level `growth` section.
+check(
+  "growth section is optional (absent entirely still parses)",
+  DiscoverySubmissionContract.safeParse(smallestValid).success && !("growth" in smallestValid),
+);
+{
+  const notInterested = { ...smallestValid, growth: { interested: false } };
+  check("growth.interested=false with nothing else set parses", DiscoverySubmissionContract.safeParse(notInterested).success);
+}
+{
+  const fullGrowth = {
+    ...smallestValid,
+    growth: {
+      interested: true,
+      platform: "meta_ads",
+      monthlyBudgetRange: "1500_5000",
+      campaignObjective: "lead_generation",
+      targetAudienceLocations: "Adults 25-54 within 25 miles of Portland, OR.",
+      hasLandingPage: "yes",
+      landingPageUrl: "https://example.com/landing",
+      hasPixelsConfigured: "unsure",
+      analyticsConsentReady: "no",
+      creativeAssetsAvailable: "in_progress",
+      previousCampaignResults: "Ran a small boosted-post test last year with mixed results.",
+      reportingCadence: "monthly",
+    },
+  };
+  check("fully populated growth section parses", DiscoverySubmissionContract.safeParse(fullGrowth).success);
+}
+{
+  const badGrowth = { ...smallestValid, growth: { interested: true, platform: "not_a_real_platform" } };
+  check("invalid growth.platform value is rejected", !DiscoverySubmissionContract.safeParse(badGrowth).success);
+}
+{
+  const missingInterested = { ...smallestValid, growth: { platform: "google_ads" } };
+  check(
+    "growth.interested is required once the growth section is present at all",
+    !DiscoverySubmissionContract.safeParse(missingInterested).success,
+  );
+}
+
+// The two api-server-shaped fixtures (protected files this checkpoint must
+// never touch or break) stay valid under the widened contract — asserted
+// here as a standing guardrail, not a copy of those tests.
+{
+  const apiServerShapedAnswers = {
+    projectDirection: { primaryType: "new_website" },
+    business: {
+      organizationName: "Acme Co",
+      industry: "Retail",
+      description: "A test business description that is long enough.",
+      primaryAudience: "Local shoppers looking for goods and services nearby.",
+      businessStage: "established",
+      teamSizeRange: "2_10",
+    },
+    decisionContext: {
+      currentSituation: "No website today, losing walk-in and online interest.",
+      primaryProblem: "No online presence at all for the business.",
+      whyNow: "Ready to invest in growth this quarter.",
+      desiredOutcome: "A credible site that converts visitors into customers.",
+      successDefinition: "More inbound inquiries each month.",
+      primaryGoal: "increase_leads",
+    },
+    projectScope: { features: [] },
+    readiness: {
+      logoStatus: "have_it",
+      brandStatus: "have_it",
+      contentStatus: "in_progress",
+      photoVideoStatus: "need_help",
+      domainStatus: "have_it",
+      hostingStatus: "need_recommendation",
+    },
+    commercial: {
+      launchWindow: "within_1_3_months",
+      investmentRange: "growth",
+      investmentApproved: true,
+      decisionMakers: "Just me, the owner.",
+      vendorProcurementInvolved: false,
+    },
+    contact: {
+      name: "Jane Doe",
+      email: "jane@example.com",
+      preferredContactMethod: "email",
+      consent: { privacyPolicyAcknowledged: true, operationalContactConsent: true, marketingConsent: false, smsConsent: false },
+    },
+  };
+  check(
+    "the artifacts/api-server discoveryV1 test fixture shape still parses unchanged",
+    DiscoverySubmissionContract.safeParse(apiServerShapedAnswers).success,
+  );
+}
+
 if (failures > 0) {
   console.error(`\n${failures} discoveryContract test(s) failed.`);
   process.exit(1);

@@ -8,13 +8,14 @@ interface DiscoveryWelcomeProps {
 }
 
 const WHAT_WE_ASK = [
-  "Your project type and direction",
-  "Your business and target audience",
-  "The problem you're solving and what success looks like",
-  "Key features and project scope",
-  "Content, design, and technical readiness",
-  "Timeline, investment, and decision process",
-  "Your contact information and how to reach you",
+  "Where you're starting from and what your business does",
+  "The system or service you need",
+  "Your business and audience",
+  "Brand and visual direction",
+  "Content and functionality",
+  "Systems and integrations",
+  "Growth and advertising support, if you're interested",
+  "Delivery timeline, budget, and how to reach you",
 ];
 
 export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: DiscoveryWelcomeProps) {

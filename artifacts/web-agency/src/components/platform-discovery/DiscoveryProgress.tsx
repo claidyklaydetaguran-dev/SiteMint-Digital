@@ -1,13 +1,19 @@
 import { cn } from "@/lib/utils";
 
+// Checkpoint 2C.3 — owner-directed intake reorganization (8 narrative steps
+// + review, replacing the prior 7 + review). Indexed identically to
+// STEP_FIELD_PATHS (discoveryFormModel.ts) and STEP_WHY_COPY
+// (discoveryStepCopy.ts): index 0-7 are the eight answer steps, index 8 is
+// the review step.
 export const STEP_LABELS = [
-  "Project Direction",
+  "Project Starting Point",
+  "System or Service Needed",
   "Business and Audience",
-  "Current Situation and Goals",
-  "Features and Project Scope",
-  "Content, Design, and Technical Readiness",
-  "Timeline, Investment, and Decision Process",
-  "Contact and Consent",
+  "Brand and Visual Direction",
+  "Content and Functionality",
+  "Systems and Integrations",
+  "Growth, Advertising, and Tracking",
+  "Delivery, Budget, and Contact",
   "Review",
 ] as const;
 
