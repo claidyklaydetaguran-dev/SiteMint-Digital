@@ -69,7 +69,7 @@ export default function CrmOpsNumbers() {
           </div>
           <button
             onClick={() => void load()}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-3 py-1.5 transition-colors hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors hover:bg-accent"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -87,9 +87,9 @@ export default function CrmOpsNumbers() {
         )}
 
         {!loading && !denied && !notProvided && !error && numbers.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <div className="bg-white rounded-xl border border-border overflow-x-auto">
             <table className="w-full text-sm border-collapse">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-muted border-b border-border/60">
                 <tr>
                   {["Phone number", "Firm", "State", "Assistant assigned"].map((h) => (
                     <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
@@ -98,9 +98,9 @@ export default function CrmOpsNumbers() {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border/40">
                 {numbers.map((n, idx) => (
-                  <tr key={n.id != null ? String(n.id) : idx} className="hover:bg-gray-50 transition-colors">
+                  <tr key={n.id != null ? String(n.id) : idx} className="hover:bg-accent transition-colors">
                     <td className="px-4 py-3 text-sm font-mono text-foreground">{n.phoneNumberDisplay || "—"}</td>
                     <td className="px-4 py-3 text-sm">
                       {n.firmId ? (
@@ -120,7 +120,7 @@ export default function CrmOpsNumbers() {
                           Yes
                         </span>
                       ) : (
-                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 font-semibold">
+                        <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border font-semibold">
                           No
                         </span>
                       )}

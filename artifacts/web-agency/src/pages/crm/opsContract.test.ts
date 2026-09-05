@@ -70,6 +70,10 @@ function walk(dir: string): string[] {
 // fetch("/api/...") pattern it is checking for, which would otherwise
 // self-match.
 const crmFiles = walk(crmDir).filter(f => path.basename(f) !== "opsContract.test.ts");
+// Receptionist Operations shares the theme guard (owner directive 2026-09-05:
+// "Receptionist Operations must share the same theme").
+const opsDir = path.join(repoRoot, "artifacts/web-agency/src/pages/ops");
+crmFiles.push(...walk(opsDir));
 
 console.log("\n--- O-10: no raw fetch(\"/api/...\") literal under src/pages/crm/** ---");
 {

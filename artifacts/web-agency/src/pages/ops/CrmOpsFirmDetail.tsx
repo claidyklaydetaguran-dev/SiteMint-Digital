@@ -133,7 +133,7 @@ export default function CrmOpsFirmDetail() {
 
         {!loading && !denied && !notProvided && !error && (
           <div className="space-y-4">
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Activation / readiness</h2>
               {data?.subscription ? (
                 <div className="flex items-center gap-3 flex-wrap">
@@ -147,7 +147,7 @@ export default function CrmOpsFirmDetail() {
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Assigned number</h2>
               {firstNumber ? (
                 <div className="flex items-center gap-3 flex-wrap text-sm">
@@ -158,7 +158,7 @@ export default function CrmOpsFirmDetail() {
                       Assigned
                     </span>
                   ) : (
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 font-semibold">
+                    <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border font-semibold">
                       Not assigned
                     </span>
                   )}
@@ -168,14 +168,14 @@ export default function CrmOpsFirmDetail() {
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Calendar status</h2>
               {/* Intentional: the diagnostics endpoint contract has no calendar
                   field yet — the backend doesn't expose calendar status here. */}
               <p className="text-sm text-muted-foreground">Not reported</p>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Usage</h2>
               {data?.usage ? (
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
@@ -201,7 +201,7 @@ export default function CrmOpsFirmDetail() {
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Limits</h2>
               {data?.usage?.totalSeconds != null && data?.usage?.includedMinutes != null ? (
                 <p className="text-sm text-foreground">
@@ -212,7 +212,7 @@ export default function CrmOpsFirmDetail() {
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Open issues</h2>
               <Link href={`/admin/ops/issues?firmId=${params.id ?? ""}`}>
                 <span className="text-sm text-blue-600 hover:underline cursor-pointer">
@@ -221,7 +221,7 @@ export default function CrmOpsFirmDetail() {
               </Link>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Recent failures</h2>
               {/* Intentional: this diagnostics contract doesn't define a
                   "recent failures" list — no failure feed exposed by this
@@ -229,17 +229,17 @@ export default function CrmOpsFirmDetail() {
               <p className="text-sm text-muted-foreground">Not reported — no failure feed exposed by this endpoint yet.</p>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-100 p-4">
+            <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-3">Support actions</h2>
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => void copySummary()}
-                  className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-foreground"
+                  className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors text-foreground"
                 >
                   {copyState === "copied" ? "Copied!" : "Copy support summary"}
                 </button>
                 <Link href="/admin/crm/dashboard">
-                  <span className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-foreground cursor-pointer inline-block">
+                  <span className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors text-foreground cursor-pointer inline-block">
                     Open in Command Center
                   </span>
                 </Link>

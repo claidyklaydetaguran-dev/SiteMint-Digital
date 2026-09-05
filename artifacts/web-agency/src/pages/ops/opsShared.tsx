@@ -23,7 +23,7 @@ export function OpsSpinner() {
 
 export function OpsEmpty({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+    <div className="bg-white rounded-xl border border-border py-16 text-center">
       <p className="text-muted-foreground font-medium">{title}</p>
       {hint && <p className="text-sm text-muted-foreground/70 mt-1">{hint}</p>}
     </div>
@@ -46,7 +46,7 @@ export function OpsError({ message, onRetry }: { message: string; onRetry: () =>
 
 export function OpsDenied() {
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-muted-foreground">
+    <div className="bg-muted border border-border rounded-xl p-4 text-sm text-muted-foreground">
       You don't have access to this.
     </div>
   );
@@ -54,7 +54,7 @@ export function OpsDenied() {
 
 export function OpsNotProvided({ thing }: { thing: string }) {
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center text-sm text-muted-foreground">
+    <div className="bg-muted border border-border rounded-xl p-6 text-center text-sm text-muted-foreground">
       This backend does not provide {thing} yet.
     </div>
   );
@@ -68,7 +68,7 @@ const BADGE_STYLES: Record<BadgeColor, string> = {
   green: "bg-green-100 text-green-700 border border-green-200",
   amber: "bg-amber-100 text-amber-700 border border-amber-200",
   red: "bg-red-100 text-red-700 border border-red-200",
-  gray: "bg-gray-100 text-gray-600 border border-gray-200",
+  gray: "bg-muted text-muted-foreground border border-border",
   blue: "bg-blue-100 text-blue-700 border border-blue-200",
 };
 

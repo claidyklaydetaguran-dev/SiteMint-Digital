@@ -192,13 +192,15 @@
    contract in tokens-v5.css. `will-change` is scoped to the armed state
    only, so it never lingers on the settled, most-common case. */
 .smv5-hero__title--armed {
-  clip-path: inset(0 0 100% 0);
-  transition: clip-path 640ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-  will-change: clip-path;
+  /* Perf closeout: the LCP headline must paint immediately — entrance is a
+     transform-only rise, never a clip/opacity mask. */
+  transform: translateY(16px);
+  transition: transform 560ms var(--smv5-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  will-change: transform;
 }
 
 .smv5-hero__title--armed.smv5-hero__title--in {
-  clip-path: inset(0 0 0% 0);
+  transform: none;
 }
 
 .smv5-hero__sub {
@@ -1342,4 +1344,10 @@
   .smv5-step__glyph--armed .smv5-step__confirm-check {
     transition: none;
   }
+}
+
+
+/* Perf closeout: hero beats paint immediately; entrance is transform-only. */
+.smv5-hero .sm-reveal {
+  opacity: 1 !important;
 }

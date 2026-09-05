@@ -594,3 +594,18 @@
   .sm-v5page .sm-flow__arrow:nth-of-type(2) line { transition-delay: 220ms; }
   .sm-v5page .sm-flow__arrow:nth-of-type(3) line { transition-delay: 320ms; }
 }
+
+
+/* ── Performance guard (owner directive 2026-09-05, closeout): above-the-fold
+   hero content — headline, eyebrow, lede, actions, hero visual — must render
+   immediately. Motion may enhance after paint but must not hide or delay the
+   initial rendering, so inside a page hero every reveal variant keeps
+   opacity/clip at their final values and animates transform only. ────────── */
+.sm-v5page .v3m-page-hero .reveal-clip,
+.sm-v5page .v3m-page-hero .reveal-fade-up,
+.sm-v5page .v3m-page-hero .reveal-scale-settle,
+.sm-v5page .v3m-page-hero .reveal-h-left,
+.sm-v5page .v3m-page-hero .reveal-h-right {
+  opacity: 1 !important;
+  clip-path: none !important;
+}

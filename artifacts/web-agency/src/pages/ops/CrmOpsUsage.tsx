@@ -82,11 +82,11 @@ export default function CrmOpsUsage() {
               type="month"
               value={period}
               onChange={(e) => setPeriod(e.target.value || currentPeriod())}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-foreground"
+              className="text-sm border border-border rounded-lg px-3 py-1.5 text-foreground"
             />
             <button
               onClick={() => void load(period)}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-3 py-1.5 transition-colors hover:bg-gray-50"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors hover:bg-accent"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -104,9 +104,9 @@ export default function CrmOpsUsage() {
         )}
 
         {!loading && !denied && !notProvided && !error && rows.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <div className="bg-white rounded-xl border border-border overflow-x-auto">
             <table className="w-full text-sm border-collapse">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-muted border-b border-border/60">
                 <tr>
                   {["Firm", "Calls", "Total time", "Included minutes", "Cap state"].map((h) => (
                     <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
@@ -115,9 +115,9 @@ export default function CrmOpsUsage() {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border/40">
                 {rows.map((row, idx) => (
-                  <tr key={row.firmId != null ? String(row.firmId) : idx} className="hover:bg-gray-50 transition-colors">
+                  <tr key={row.firmId != null ? String(row.firmId) : idx} className="hover:bg-accent transition-colors">
                     <td className="px-4 py-3 text-sm">
                       {row.firmId ? (
                         <Link href={`/admin/ops/firms/${row.firmId}`}>

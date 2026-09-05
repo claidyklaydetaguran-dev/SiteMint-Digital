@@ -157,28 +157,28 @@
 .v2-dashboard-shell.v2-dashboard-shell {
   /* System B as HSL triplets (shadcn format) — see tokens-v5.css header
      comment for why this file, not `:root`, is where they get declared. */
-  --background: 150 33% 98%; /* porcelain */
-  --foreground: 185 70% 14%; /* teal-900 */
-  --border: 165 25% 87%; /* line */
+  --background: 180 33% 98%; /* porcelain (Glacier #F8FCFC) */
+  --foreground: 197 48% 17%; /* ink (Glacier #173642) */
+  --border: 187 39% 87%; /* line (Glacier #CFE7EA) */
   --card: 0 0% 100%;
-  --card-foreground: 185 70% 14%;
-  --card-border: 166 24% 77%; /* line-strong */
+  --card-foreground: 197 48% 17%;
+  --card-border: 189 35% 75%; /* line-strong (Glacier #A9CFD6) */
 
-  --sidebar: 187 64% 11%; /* ink-950 — dark teal-ink sidebar, not navy */
-  --sidebar-foreground: 163 47% 94%; /* dark-text */
+  --sidebar: 203 59% 20%; /* ink-950 (Glacier #153E52) — blue-charcoal sidebar */
+  --sidebar-foreground: 188 48% 94%; /* dark-text (Glacier #E8F5F7) */
   --sidebar-border: color-mix(in oklab, var(--sm-dark-text) 14%, transparent);
-  --sidebar-primary: 169 70% 48%; /* mint-500 */
-  --sidebar-primary-foreground: 185 70% 14%; /* teal-900 */
-  --sidebar-accent: 161 61% 94%; /* mint-100 */
-  --sidebar-accent-foreground: 185 70% 14%;
-  --sidebar-ring: 169 80% 28%; /* mint-700 — AA focus on light */
+  --sidebar-primary: 185 64% 51%; /* mint-500 (Glacier #32C5D2) */
+  --sidebar-primary-foreground: 197 48% 17%; /* ink (Glacier #173642) */
+  --sidebar-accent: 185 60% 92%; /* mint-100 (Glacier #DFF7F7) */
+  --sidebar-accent-foreground: 197 48% 17%;
+  --sidebar-ring: 189 85% 29%; /* mint-700 (Glacier #0B7487) — AA focus on light */
 
-  --primary: 169 70% 48%; /* mint-500 fill */
-  --primary-foreground: 185 70% 14%; /* deep-teal text on mint */
-  --ring: 169 80% 28%; /* mint-700 */
+  --primary: 185 64% 51%; /* mint-500 fill (Glacier #32C5D2) */
+  --primary-foreground: 197 48% 17%; /* ink text on mint (6.1:1) */
+  --ring: 189 85% 29%; /* mint-700 (Glacier #0B7487) */
 
-  --accent: 161 61% 94%; /* mint-100 */
-  --accent-foreground: 185 70% 14%;
+  --accent: 185 60% 92%; /* mint-100 (Glacier #DFF7F7) */
+  --accent-foreground: 197 48% 17%;
 
   /* Neutral-chrome roles for the CRM gray-* normalization: System B has no
      generic gray, so muted surfaces are mist, muted text is slate-600, and
@@ -186,11 +186,11 @@
      layer resolves to. Without these, `bg-muted`/`text-muted-foreground`
      inside the ops shell would fall through to the marketing site's
      blue-tinted `:root` values. */
-  --muted: 187 55% 95%; /* mist-100 */
+  --muted: 185 57% 95%; /* mist (Glacier #EDF9FA) */
   --muted-foreground: 201 21% 37%; /* slate-600 */
-  --secondary: 187 55% 95%; /* mist-100 */
-  --secondary-foreground: 185 70% 14%; /* teal-900 */
-  --input: 166 24% 77%; /* line-strong */
+  --secondary: 185 57% 95%; /* mist (Glacier #EDF9FA) */
+  --secondary-foreground: 197 48% 17%; /* ink (Glacier #173642) */
+  --input: 189 35% 75%; /* line-strong (Glacier #A9CFD6) */
 }
 
 /* ── Internal-environment bar — ink-950 + mint voice, amber stays reserved. */

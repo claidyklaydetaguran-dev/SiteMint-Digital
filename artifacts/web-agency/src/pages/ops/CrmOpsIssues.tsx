@@ -98,7 +98,7 @@ export default function CrmOpsIssues() {
           </div>
           <button
             onClick={() => void load()}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-3 py-1.5 transition-colors hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors hover:bg-accent"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -132,9 +132,9 @@ export default function CrmOpsIssues() {
         {!loading && !denied && !notProvided && !error && visible.length > 0 && (
           <>
             {/* Desktop table */}
-            <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="hidden md:block bg-white rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm border-collapse">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead className="bg-muted border-b border-border/60">
                   <tr>
                     {["Level", "Firm", "Code", "Message", "Occurrences", "Created", ""].map((h) => (
                       <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">
@@ -143,9 +143,9 @@ export default function CrmOpsIssues() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border/40">
                   {visible.map((issue) => (
-                    <tr key={String(issue.id)} className="hover:bg-gray-50 transition-colors">
+                    <tr key={String(issue.id)} className="hover:bg-accent transition-colors">
                       <td className="px-4 py-3">{levelBadge(issue.level)}</td>
                       <td className="px-4 py-3 text-sm">
                         {issue.firmId ? (
@@ -169,7 +169,7 @@ export default function CrmOpsIssues() {
                           <button
                             onClick={() => void resolveIssue(issue.id)}
                             disabled={resolvingId === String(issue.id)}
-                            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50 transition-colors text-foreground disabled:opacity-50"
+                            className="text-xs border border-border rounded-lg px-2.5 py-1 hover:bg-accent transition-colors text-foreground disabled:opacity-50"
                           >
                             {resolvingId === String(issue.id) ? "Resolving…" : "Resolve"}
                           </button>
@@ -184,7 +184,7 @@ export default function CrmOpsIssues() {
             {/* Mobile card rows */}
             <div className="md:hidden space-y-2">
               {visible.map((issue) => (
-                <div key={String(issue.id)} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div key={String(issue.id)} className="bg-white rounded-xl border border-border p-4">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     {levelBadge(issue.level)}
                     <span className="text-xs text-muted-foreground">{formatDate(issue.createdAt)}</span>
@@ -208,7 +208,7 @@ export default function CrmOpsIssues() {
                       <button
                         onClick={() => void resolveIssue(issue.id)}
                         disabled={resolvingId === String(issue.id)}
-                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50 transition-colors text-foreground disabled:opacity-50"
+                        className="text-xs border border-border rounded-lg px-2.5 py-1 hover:bg-accent transition-colors text-foreground disabled:opacity-50"
                       >
                         {resolvingId === String(issue.id) ? "Resolving…" : "Resolve"}
                       </button>
