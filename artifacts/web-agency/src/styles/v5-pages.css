@@ -1105,80 +1105,6 @@
   top: 0.75rem;
   right: 0.75rem;
   display: inline-flex;
-/* ═══════════════════════════════════════════════════════════════════════
-   Connected Operations Map (CRM & Internal Systems containers, owner
-   directive 2026-09-06) — components/v5/ConnectedOpsMap.tsx.
-
-   The real Operations CRM is never shown publicly; this is a fully
-   synthetic, interactive workflow map (seven clickable steps on a mint
-   signal line + a neighbouring detail panel) used by both HomeV5's and
-   AiSystemsV5's "CRM & Internal Systems" sections.
-
-   Deliberately NOT scoped to `.sm-v5page`: unlike the rest of this file,
-   `.opsmap` renders inside two different page shells — AiSystemsV5
-   (`.sm-v5page`) and HomeV5 (`.sm-home-v5`) — so every rule below is
-   self-contained under the component's own `.opsmap` root instead of a
-   dual-selector list (the same cross-shell precedent as the
-   `.sm-person-avatar img, .sm-home-v5 .sm-team-card__avatar img` rule
-   above). Glacier Mint tokens only; hex fallbacks match tokens-v5.css.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-.opsmap {
-  display: grid;
-  gap: 1.75rem;
-  margin-top: 1.75rem;
-}
-
-/* ── Rail — desktop: seven even columns. The decorative thread sits behind
-   the node dots at their shared vertical center (each dot is a fixed 44px
-   circle, the first element in its button, so 22px from the rail's top
-   edge is always the dot's center). ─────────────────────────────────── */
-.opsmap__rail-wrap {
-  position: relative;
-}
-.opsmap__thread {
-  position: absolute;
-  left: 0;
-  top: 22px;
-  width: 100%;
-  height: 4px;
-  overflow: visible;
-  pointer-events: none;
-}
-.opsmap__thread-path {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0; /* static/drawn by default — see the no-preference block below */
-}
-.opsmap__rail {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.25rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.opsmap__item {
-  min-width: 0;
-}
-.opsmap__node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.15rem;
-  border: 0;
-  border-radius: var(--sm-radius-m, 10px);
-  background: none;
-  cursor: pointer;
-  font: inherit;
-  color: var(--sm-text, #173642);
-  -webkit-tap-highlight-color: transparent;
-}
-.opsmap__node-no {
-  display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -1315,6 +1241,88 @@
 @media (prefers-reduced-motion: reduce) {
   .sm-v5page .sm-team-dialog[open] .sm-team-dialog__panel {
     animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Connected Operations Map (CRM & Internal Systems containers, owner
+   directive 2026-09-06) — components/v5/ConnectedOpsMap.tsx.
+
+   The real Operations CRM is never shown publicly; this is a fully
+   synthetic, interactive workflow map (seven clickable steps on a mint
+   signal line + a neighbouring detail panel) used by both HomeV5's and
+   AiSystemsV5's "CRM & Internal Systems" sections.
+
+   Deliberately NOT scoped to `.sm-v5page`: unlike the rest of this file,
+   `.opsmap` renders inside two different page shells — AiSystemsV5
+   (`.sm-v5page`) and HomeV5 (`.sm-home-v5`) — so every rule below is
+   self-contained under the component's own `.opsmap` root instead of a
+   dual-selector list (the same cross-shell precedent as the
+   `.sm-person-avatar img, .sm-home-v5 .sm-team-card__avatar img` rule
+   above). Glacier Mint tokens only; hex fallbacks match tokens-v5.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.opsmap {
+  display: grid;
+  gap: 1.75rem;
+  margin-top: 1.75rem;
+}
+
+/* ── Rail — desktop: seven even columns. The decorative thread sits behind
+   the node dots at their shared vertical center (each dot is a fixed 44px
+   circle, the first element in its button, so 22px from the rail's top
+   edge is always the dot's center). ─────────────────────────────────── */
+.opsmap__rail-wrap {
+  position: relative;
+}
+.opsmap__thread {
+  position: absolute;
+  left: 0;
+  top: 22px;
+  width: 100%;
+  height: 4px;
+  overflow: visible;
+  pointer-events: none;
+}
+.opsmap__thread-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0; /* static/drawn by default — see the no-preference block below */
+}
+.opsmap__rail {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.opsmap__item {
+  min-width: 0;
+}
+.opsmap__node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.15rem;
+  border: 0;
+  border-radius: var(--sm-radius-m, 10px);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--sm-text, #173642);
+  -webkit-tap-highlight-color: transparent;
+}
+.opsmap__node-no {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   border: 2px solid var(--sm-line-strong, #A9CFD6);
   background: var(--sm-surface, #fff);
   color: var(--sm-text-muted, #4A6472);
