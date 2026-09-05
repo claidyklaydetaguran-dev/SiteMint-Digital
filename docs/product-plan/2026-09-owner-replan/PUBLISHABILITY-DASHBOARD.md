@@ -24,7 +24,7 @@ owner-authorised migrations (B-09) and external certification (X-01…X-07).
 ## Scores
 
 <!-- scores:start -->
-_Computed 2026-09-05 01:13 UTC from V5-BUILD-CHECKLIST.md._
+_Computed 2026-09-05 03:00 UTC from V5-BUILD-CHECKLIST.md._
 
 Program-wide: **P0 items remaining 23** · owner blockers 20 · external blockers 1.
 
