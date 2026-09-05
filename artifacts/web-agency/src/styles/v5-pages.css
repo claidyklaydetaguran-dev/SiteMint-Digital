@@ -1039,3 +1039,21 @@
   max-width: 42ch;
   margin: 0 auto;
 }
+
+/* ── Real portraits + approved portfolio variants (final owner directive). */
+.sm-v5page .sm-person-avatar img,
+.sm-home-v5 .sm-team-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+.sm-v5page .sm-portfolio-card--featured {
+  grid-column: 1 / -1;
+}
+.sm-v5page .sm-portfolio-card--portrait .sm-portfolio-card__img {
+  object-fit: contain;
+  background: var(--sm-mist, #EDF9FA);
+  max-height: 420px;
+}

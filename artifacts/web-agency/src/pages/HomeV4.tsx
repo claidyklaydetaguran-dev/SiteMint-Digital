@@ -276,6 +276,12 @@ function HeroFilm() {
           </video>
         )}
         <span className="v4-hero__film-caption">Brand film</span>
+        {/* Controlled HTML labels (owner directive: all workflow text is
+            post-produced page text, never trusted to generation). */}
+        <span className="v4-hero__film-labels" aria-hidden="true">
+          Discover → Design → Build → Launch · Websites · Web apps · CRM ·
+          AI systems · Automation · SEO &amp; analytics · Advertising
+        </span>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
 import { BrowserFrame } from "@/components/v5/BrowserFrame";
+import { portfolioProjects } from "@/components/platform-preview/portfolioProjects";
 import envClinic from "@/assets/media/support-work-clinic.jpg";
 import envTrade from "@/assets/media/support-work-trade.jpg";
 import envPractice from "@/assets/media/support-work-practice.jpg";
@@ -120,17 +121,39 @@ interface SelectedProjectV3 {
   image: string;
   imageAlt: string;
   href: string;
+  ctaLabel: string;
+  /** True when the only approved visual is the mobile capture (portrait). */
+  portrait: boolean;
+  featured: boolean;
 }
 
 /**
- * Selected projects — real, named client work (owner directive, 2026-09-05:
- * "our portfolios and our finished projects"). No entries yet: real project
- * materials are still being prepared for publication with each client's
- * permission — see the honest empty state in `SelectedProjectsSection`
- * below. Populate this array once a project clears; the grid and card
- * layout render real entries with zero markup changes.
+ * Populated from the owner-approved Phase 2B.2.4 lineup recovered from the
+ * portfolio manifests (docs/sitemint-platform/PORTFOLIO_PERMISSION_MANIFEST.md
+ * §12): Hand Homecare featured; OneFilAm, Herlinda (desktop-only visual) and
+ * Claidy Taguran (approved cropped mobile visual) supporting. Shasta Greene
+ * is approved in intent but has no approved visual asset yet, so it is not
+ * listed. Assets are the approved WebP files in public/portfolio/current/.
  */
-const selectedProjects: SelectedProjectV3[] = [];
+const selectedProjects: SelectedProjectV3[] = portfolioProjects
+  .slice()
+  .sort((a, b) => a.sortOrder - b.sortOrder)
+  .map((p) => {
+    const asset = p.desktopAsset ?? p.mobileAsset;
+    if (!asset) return null;
+    return {
+      title: p.projectName,
+      client: p.category,
+      summary: p.summary,
+      image: asset.src,
+      imageAlt: asset.alt,
+      href: p.publicUrl,
+      ctaLabel: p.ctaLabel,
+      portrait: !p.desktopAsset,
+      featured: p.featured,
+    };
+  })
+  .filter((p): p is SelectedProjectV3 => p !== null);
 
 /**
  * Per-composition "the system" / "the interface" toggle (owner directive:
@@ -237,7 +260,10 @@ function SelectedProjectsSection({ reveal }: { reveal: ReturnType<typeof useReve
             </div>
           ) : (
             selectedProjects.map((project) => (
-              <article key={project.title} className="sm-portfolio-card reveal-scale-settle">
+              <article
+                key={project.title}
+                className={`sm-portfolio-card reveal-scale-settle${project.featured ? " sm-portfolio-card--featured" : ""}${project.portrait ? " sm-portfolio-card--portrait" : ""}`}
+              >
                 <img
                   className="sm-portfolio-card__img"
                   src={project.image}
@@ -249,9 +275,14 @@ function SelectedProjectsSection({ reveal }: { reveal: ReturnType<typeof useReve
                   <h3 className="sm-portfolio-card__title">{project.title}</h3>
                   <p className="sm-portfolio-card__summary">{project.summary}</p>
                   <div>
-                    <Link href={project.href} className="v3-btn v3-btn--outline">
-                      View project
-                    </Link>
+                    <a
+                      href={project.href}
+                      className="v3-btn v3-btn--outline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {project.ctaLabel}
+                    </a>
                   </div>
                 </div>
               </article>

@@ -552,11 +552,8 @@ function TeamSection() {
         <div className="sm-team-grid">
           {teamV5.map((member) => (
             <div className="sm-team-card reveal-scale-settle" key={member.name}>
-              <span className="sm-team-card__avatar" aria-hidden="true">
-                {member.name
-                  .split(" ")
-                  .map((part) => part[0])
-                  .join("")}
+              <span className="sm-team-card__avatar">
+                <img src={member.photo} alt={`Portrait of ${member.name}`} loading="lazy" />
               </span>
               <span className="sm-team-card__name">{member.name}</span>
               <span className="sm-team-card__role">{member.role}</span>

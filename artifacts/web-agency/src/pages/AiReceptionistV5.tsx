@@ -346,9 +346,11 @@ function ConfirmCheckGlyph() {
  * heights instead of leaving empty space below the sign-in link. ───────── */
 
 const HERO_CAPABILITY_HIGHLIGHTS = [
+  // Owner-approved public benefit, verbatim (final decisions, 2026-09-05).
+  // Honest scope: routine calls; no claim of replacing every receptionist.
+  "Handles routine calls without immediately hiring additional reception staff",
   "Fewer missed opportunities",
   "Consistent caller handling",
-  "Less repetitive admin",
 ];
 
 function HeroCheckIcon() {
@@ -614,6 +616,7 @@ const SAFE_FAILURE_EXAMPLES = [
 ];
 
 const OUTCOMES = [
+  "Handles routine calls without immediately hiring additional reception staff",
   "Fewer missed opportunities",
   "Consistent caller handling",
   "Less repetitive admin",
