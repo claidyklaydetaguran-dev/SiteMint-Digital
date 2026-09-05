@@ -401,10 +401,10 @@ export default function CrmInbox() {
             M-3: below md this is a single master/detail pane — the list fills
             the screen until a thread is selected, then the center pane takes
             over (with a back control) instead of a squeezed 3-column layout. */}
-        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-72 bg-white border-r border-gray-200 flex-col shrink-0`}>
+        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-72 bg-white border-r border-border flex-col shrink-0`}>
 
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-100 space-y-1.5">
+          <div className="px-4 py-3 border-b border-border/60 space-y-1.5">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                 Inbox
@@ -426,7 +426,7 @@ export default function CrmInbox() {
                   onClick={() => silentRefresh(true)}
                   disabled={isRefreshing || loading}
                   title="Refresh inbox"
-                  className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors text-muted-foreground disabled:opacity-40"
+                  className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground disabled:opacity-40"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
                 </button>
@@ -457,7 +457,7 @@ export default function CrmInbox() {
           </div>
 
           {/* Thread list */}
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+          <div className="flex-1 overflow-y-auto divide-y divide-border/40">
             {loading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
@@ -500,7 +500,7 @@ export default function CrmInbox() {
                         ? "bg-blue-50 border-blue-500 hover:bg-blue-50"
                         : isNewlyUpdated
                           ? "bg-emerald-50 border-emerald-400 hover:bg-emerald-50" // TASK 5 — new message highlight
-                          : "border-transparent hover:bg-gray-50"
+                          : "border-transparent hover:bg-accent"
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -531,7 +531,7 @@ export default function CrmInbox() {
                         <div className="flex items-center gap-1 mt-0.5">
                           {last && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                              last.channel === "sms" ? "bg-sky-100 text-sky-700" : "bg-gray-100 text-gray-600"
+                              last.channel === "sms" ? "bg-sky-100 text-sky-700" : "bg-muted text-muted-foreground"
                             }`}>
                               {last.channel === "sms" ? "SMS" : "Call"}
                             </span>
@@ -558,10 +558,10 @@ export default function CrmInbox() {
           {selected ? (
             <>
               {/* Thread header */}
-              <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 shrink-0">
+              <div className="bg-white border-b border-border px-5 py-3 flex items-center gap-3 shrink-0">
                 <button
                   onClick={() => setSelected(null)}
-                  className="md:hidden w-7 h-7 -ml-1 flex items-center justify-center rounded-md hover:bg-gray-100 text-muted-foreground shrink-0"
+                  className="md:hidden w-7 h-7 -ml-1 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground shrink-0"
                   title="Back to inbox"
                   aria-label="Back to inbox"
                 >
@@ -602,7 +602,7 @@ export default function CrmInbox() {
               </div>
 
               {/* Messages scroll area */}
-              <div ref={threadRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50">
+              <div ref={threadRef} className="flex-1 overflow-y-auto p-5 space-y-3 bg-muted">
                 {loadingMsgs ? (
                   <div className="flex items-center justify-center h-32">
                     <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
@@ -623,10 +623,10 @@ export default function CrmInbox() {
                         msg.callStatus === "completed" ? "text-green-600 bg-green-100" :
                         msg.callStatus === "no-answer" || msg.callStatus === "busy" || msg.callStatus === "failed"
                           ? "text-red-500 bg-red-100"
-                          : "text-gray-500 bg-gray-100";
+                          : "text-muted-foreground bg-muted";
                       return (
                         <div key={msg.id} className="flex justify-center">
-                          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 max-w-xs shadow-sm w-full">
+                          <div className="bg-white border border-border rounded-xl px-4 py-3 flex items-center gap-3 max-w-xs shadow-sm w-full">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${statusColor}`}>
                               <Phone className="w-4 h-4" />
                             </div>
@@ -661,7 +661,7 @@ export default function CrmInbox() {
                             ? "bg-red-50 border border-red-200 text-red-900"
                             : isOut
                               ? "bg-foreground text-background"
-                              : "bg-white border border-gray-200 text-foreground"
+                              : "bg-white border border-border text-foreground"
                         }`}>
                           <p className="whitespace-pre-wrap leading-relaxed">{msg.body}</p>
                           <div className={`flex items-center gap-1.5 mt-1 ${isOut ? "justify-end" : "justify-start"}`}>
@@ -719,7 +719,7 @@ export default function CrmInbox() {
 
               {/* SMS Compose panel */}
               {selected.leadId ? (
-                <div className="bg-white border-t border-gray-200 p-4 shrink-0">
+                <div className="bg-white border-t border-border p-4 shrink-0">
                   {smsOptOut ? (
                     <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -741,7 +741,7 @@ export default function CrmInbox() {
                       <div className="flex gap-2 items-end">
                         <MessageSquare className="w-4 h-4 text-muted-foreground mb-2.5 shrink-0" />
                         <textarea
-                          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                          className="flex-1 px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                           rows={3}
                           placeholder={`Message ${selected.lead.phone}…`}
                           value={smsBody}
@@ -765,7 +765,7 @@ export default function CrmInbox() {
                   )}
                 </div>
               ) : (
-                <div className="bg-white border-t border-gray-200 p-4 text-center text-sm text-muted-foreground shrink-0">
+                <div className="bg-white border-t border-border p-4 text-center text-sm text-muted-foreground shrink-0">
                   This conversation has no linked CRM lead — SMS unavailable.
                 </div>
               )}
@@ -794,8 +794,8 @@ export default function CrmInbox() {
 
         {/* ══ RIGHT — Contact profile ══════════════════════════════════════════ */}
         {selected?.lead && (
-          <div className="hidden lg:block w-64 bg-white border-l border-gray-200 overflow-y-auto shrink-0">
-            <div className="p-4 border-b border-gray-100">
+          <div className="hidden lg:block w-64 bg-white border-l border-border overflow-y-auto shrink-0">
+            <div className="p-4 border-b border-border/60">
               <div className="flex items-center gap-3 mb-3">
                 <div className={`w-10 h-10 rounded-full ${avatarColor(displayName(selected))} flex items-center justify-center shrink-0`}>
                   <span className="text-white font-bold">{initials(displayName(selected))}</span>
@@ -848,7 +848,7 @@ export default function CrmInbox() {
             </div>
 
             {/* Thread stats */}
-            <div className="p-4 border-b border-gray-100">
+            <div className="p-4 border-b border-border/60">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">This Thread</h3>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
@@ -872,7 +872,7 @@ export default function CrmInbox() {
 
             {/* CRM details */}
             {selectedLead && (
-              <div className="p-4 border-b border-gray-100 space-y-1.5">
+              <div className="p-4 border-b border-border/60 space-y-1.5">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">CRM Details</h3>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Stage</span>
@@ -897,11 +897,11 @@ export default function CrmInbox() {
 
             {/* Tags */}
             {(selectedLead?.tags?.length ?? 0) > 0 && (
-              <div className="p-4 border-b border-gray-100">
+              <div className="p-4 border-b border-border/60">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Tags</h3>
                 <div className="flex flex-wrap gap-1">
                   {selectedLead?.tags?.map(t => (
-                    <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 rounded-full text-muted-foreground">
+                    <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-muted rounded-full text-muted-foreground">
                       <Tag className="w-2.5 h-2.5" />{t}
                     </span>
                   ))}

@@ -220,7 +220,7 @@ export default function CrmImport() {
             <p className="text-sm text-muted-foreground mt-0.5">Upload a CSV to add contacts into your CRM without duplicates.</p>
           </div>
           <Link href="/admin/crm/leads">
-            <button className="flex items-center gap-1.5 text-sm border border-gray-200 bg-white hover:bg-gray-50 px-3.5 py-2 rounded-lg transition-colors font-medium text-muted-foreground">
+            <button className="flex items-center gap-1.5 text-sm border border-border bg-white hover:bg-accent px-3.5 py-2 rounded-lg transition-colors font-medium text-muted-foreground">
               <Users className="w-3.5 h-3.5" /> View Leads
             </button>
           </Link>
@@ -228,8 +228,8 @@ export default function CrmImport() {
 
         {/* ── Import Result ─────────────────────────────────────────────────── */}
         {importResult && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-border/60 flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-green-500" />
               <h2 className="font-semibold text-foreground">Import Complete</h2>
             </div>
@@ -268,7 +268,7 @@ export default function CrmImport() {
                   </button>
                 </Link>
                 <button onClick={resetFile}
-                  className="flex items-center gap-1.5 text-sm border border-gray-200 bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                  className="flex items-center gap-1.5 text-sm border border-border bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-accent transition-colors font-medium">
                   <Upload className="w-3.5 h-3.5" /> Import Another CSV
                 </button>
               </div>
@@ -279,20 +279,20 @@ export default function CrmImport() {
         {/* ── Upload Card (no file selected, no result) ─────────────────────── */}
         {!fileName && !importResult && (
           <>
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
+            <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/60">
                 <h2 className="font-semibold text-foreground">Upload CSV File</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Accepts .csv only. Data is validated before import.</p>
               </div>
               <div className="p-5">
                 <div
-                  className={`border-2 border-dashed rounded-xl p-14 text-center cursor-pointer transition-all ${dragOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-300"}`}
+                  className={`border-2 border-dashed rounded-xl p-14 text-center cursor-pointer transition-all ${dragOver ? "border-blue-400 bg-blue-50" : "border-border bg-muted/50 hover:bg-accent hover:border-card-border"}`}
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={handleDrop}
                   onClick={() => fileRef.current?.click()}
                 >
-                  <Upload className={`w-10 h-10 mx-auto mb-3 ${dragOver ? "text-blue-400" : "text-gray-300"}`} />
+                  <Upload className={`w-10 h-10 mx-auto mb-3 ${dragOver ? "text-blue-400" : "text-muted-foreground/40"}`} />
                   <p className="font-semibold text-foreground">Drop your CSV here</p>
                   <p className="text-sm text-muted-foreground mt-1">or <span className="text-blue-600 underline">click to browse</span></p>
                   <p className="text-xs text-muted-foreground mt-3">.csv files only</p>
@@ -307,25 +307,25 @@ export default function CrmImport() {
             </div>
 
             {/* Column reference */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
+            <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/60">
                 <h2 className="font-semibold text-foreground">Supported CSV Columns</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Column headers must match exactly (case-sensitive)</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <tr className="border-b border-border/60 bg-muted/60">
                       <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Column</th>
                       <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Required</th>
                       <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-border/40">
                     {COLUMNS.map(col => (
                       <tr key={col.name}>
                         <td className="px-5 py-2.5">
-                          <code className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">{col.name}</code>
+                          <code className="text-xs bg-muted text-foreground/80 px-1.5 py-0.5 rounded">{col.name}</code>
                         </td>
                         <td className="px-5 py-2.5">
                           {col.req
@@ -344,9 +344,9 @@ export default function CrmImport() {
 
         {/* ── Preview & Validate (file selected, not yet imported) ──────────── */}
         {fileName && !importResult && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
             {/* File header */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <FileText className="w-4 h-4 text-blue-500 shrink-0" />
                 <div>
@@ -354,13 +354,13 @@ export default function CrmImport() {
                   <p className="text-xs text-muted-foreground mt-0.5">{rows.length} row{rows.length !== 1 ? "s" : ""} parsed</p>
                 </div>
               </div>
-              <button onClick={resetFile} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-muted-foreground">
+              <button onClick={resetFile} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Validation summary bar */}
-            <div className="flex items-center gap-4 px-5 py-3 bg-gray-50/60 border-b border-gray-100 flex-wrap">
+            <div className="flex items-center gap-4 px-5 py-3 bg-muted/60 border-b border-border/60 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
                 <span className="text-xs font-medium text-foreground">{sendable.length} valid</span>
@@ -383,7 +383,7 @@ export default function CrmImport() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/40">
+                  <tr className="border-b border-border/60 bg-muted/40">
                     <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground w-8">#</th>
                     <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Row</th>
                     <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Name</th>
@@ -395,7 +395,7 @@ export default function CrmImport() {
                     <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground">Issues</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border/40">
                   {displayRows.map(row => {
                     const hasErr = row.errors.length > 0;
                     const isDup = row.isDupInCSV;
@@ -441,7 +441,7 @@ export default function CrmImport() {
             </div>
 
             {rows.length > 15 && (
-              <div className="px-5 py-3 border-t border-gray-100 text-center">
+              <div className="px-5 py-3 border-t border-border/60 text-center">
                 <button onClick={() => setShowAll(v => !v)} className="text-xs text-blue-600 hover:text-blue-700">
                   {showAll ? "Show first 15 rows" : `Show all ${rows.length} rows`}
                 </button>
@@ -449,7 +449,7 @@ export default function CrmImport() {
             )}
 
             {/* Import CTA */}
-            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between gap-4">
+            <div className="px-5 py-4 border-t border-border/60 bg-muted/40 flex items-center justify-between gap-4">
               <div>
                 {sendable.length > 0 ? (
                   <p className="text-sm text-foreground font-medium">{sendable.length} row{sendable.length !== 1 ? "s" : ""} ready to import</p>
@@ -467,7 +467,7 @@ export default function CrmImport() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={resetFile}
-                  className="text-sm border border-gray-200 bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                  className="text-sm border border-border bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-accent transition-colors font-medium">
                   Cancel
                 </button>
                 <button
@@ -491,8 +491,8 @@ export default function CrmImport() {
         )}
 
         {/* ── Discovery Import Section ──────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
+        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border/60">
             <h2 className="font-semibold text-foreground">Import from Discovery Portal</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               Pull all unimported discovery form submissions into the CRM. Already-imported submissions are skipped automatically.
@@ -518,7 +518,7 @@ export default function CrmImport() {
                     </button>
                   </Link>
                   <button onClick={() => { setDiscResult(null); setDiscError(null); }}
-                    className="text-sm border border-gray-200 bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    className="text-sm border border-border bg-white text-muted-foreground px-4 py-2 rounded-lg hover:bg-accent transition-colors font-medium">
                     Import Again
                   </button>
                 </div>

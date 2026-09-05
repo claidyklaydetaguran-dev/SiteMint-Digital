@@ -75,7 +75,7 @@ function ProjectCard({ project, onDragStart, onOpen }: {
       draggable
       onDragStart={() => onDragStart(project.id)}
       onClick={() => onOpen(project)}
-      className="bg-white rounded-xl border border-gray-200 shadow-sm p-3.5 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group select-none"
+      className="bg-white rounded-xl border border-border shadow-sm p-3.5 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group select-none"
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <p className="font-semibold text-sm text-foreground leading-snug flex-1">{project.name}</p>
@@ -108,7 +108,7 @@ function ProjectCard({ project, onDragStart, onOpen }: {
             <span className="flex items-center gap-1"><ClipboardList className="w-3 h-3" /> Tasks</span>
             <span>{project.taskDone}/{project.taskTotal}</span>
           </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: col.accent }} />
           </div>
         </div>
@@ -219,7 +219,7 @@ export default function CrmProjectsPage() {
   return (
     <CrmLayout>
       <div className="flex flex-col h-[calc(100vh-48px)]">
-        <div className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center gap-3 shrink-0">
+        <div className="bg-white border-b border-border px-6 py-3.5 flex items-center gap-3 shrink-0">
           <div>
             <h1 className="font-bold text-foreground">Project Pipeline</h1>
             <p className="text-xs text-muted-foreground">Track delivery from kickoff to launch and maintenance.</p>
@@ -237,7 +237,7 @@ export default function CrmProjectsPage() {
         {loading ? (
           <div className="flex-1 flex gap-4 p-5 overflow-x-auto">
             {PROJECT_STAGES.slice(0, 6).map(s => (
-              <div key={s} className="w-64 shrink-0 bg-gray-100 rounded-xl animate-pulse h-48" />
+              <div key={s} className="w-64 shrink-0 bg-muted rounded-xl animate-pulse h-48" />
             ))}
           </div>
         ) : (
@@ -274,7 +274,7 @@ export default function CrmProjectsPage() {
 
                   <div
                     className={`flex-1 overflow-y-auto p-2 space-y-2 rounded-b-xl border border-t-0 ${col.border} transition-colors ${
-                      isDragOver ? `${col.bg} opacity-80` : "bg-gray-50/80"
+                      isDragOver ? `${col.bg} opacity-80` : "bg-muted/80"
                     }`}
                     style={{ minHeight: "120px" }}
                   >
@@ -306,7 +306,7 @@ export default function CrmProjectsPage() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 sticky top-0 bg-white">
               <h2 className="font-semibold text-foreground">New Project</h2>
               <button onClick={() => setShowCreate(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
@@ -320,7 +320,7 @@ export default function CrmProjectsPage() {
                   autoFocus value={form.name}
                   onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setFormError(""); }}
                   className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${
-                    formError && !form.name ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-gray-200 focus:ring-foreground/20"
+                    formError && !form.name ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-input focus:ring-foreground/20"
                   }`}
                   placeholder="e.g. Website Redesign — Acme Corp"
                 />
@@ -331,7 +331,7 @@ export default function CrmProjectsPage() {
                   <select
                     value={form.projectType}
                     onChange={e => setForm(f => ({ ...f, projectType: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                   >
                     <option value="">— Select type —</option>
                     {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -342,7 +342,7 @@ export default function CrmProjectsPage() {
                   <select
                     value={form.stage}
                     onChange={e => setForm(f => ({ ...f, stage: e.target.value as ProjectStage }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                   >
                     {PROJECT_STAGES.map(s => <option key={s}>{s}</option>)}
                   </select>
@@ -353,20 +353,20 @@ export default function CrmProjectsPage() {
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Budget ($)</label>
                   <input type="number" min="0" value={form.budget}
                     onChange={e => setForm(f => ({ ...f, budget: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                     placeholder="0" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Target Launch</label>
                   <input type="date" value={form.targetLaunchDate}
                     onChange={e => setForm(f => ({ ...f, targetLaunchDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Link to Lead / Client (optional)</label>
                 <select value={form.leadId} onChange={e => onPickLead(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white">
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white">
                   <option value="">— No contact linked —</option>
                   {leads.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
@@ -375,14 +375,14 @@ export default function CrmProjectsPage() {
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
                 <input value={form.assignedTo}
                   onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   placeholder="Team member" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>
                 <textarea rows={2} value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                   placeholder="Optional notes…" />
               </div>
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
@@ -494,7 +494,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
           </div>
         ) : (
           <>
-            <div className={`px-5 py-4 border-b border-gray-100 ${col.bg}`}>
+            <div className={`px-5 py-4 border-b border-border/60 ${col.bg}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h2 className="font-bold text-foreground">{project.name}</h2>
@@ -512,7 +512,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
                 <Field label="Stage">
                   <select value={project.stage}
                     onChange={e => { setProject({ ...project, stage: e.target.value }); patchProject({ stage: e.target.value }); }}
-                    className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none">
+                    className="w-full px-2 py-1.5 border border-input rounded-lg text-sm bg-white focus:outline-none">
                     {PROJECT_STAGES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </Field>
@@ -550,7 +550,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
                     <div key={t.id} className="flex items-center gap-2 group">
                       <button onClick={() => toggleTask(t)}
                         className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                          t.status === "completed" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300 hover:border-emerald-400"
+                          t.status === "completed" ? "bg-emerald-500 border-emerald-500 text-white" : "border-card-border hover:border-emerald-400"
                         }`}>
                         {t.status === "completed" && <Check className="w-3 h-3" />}
                       </button>
@@ -565,7 +565,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
                   <input value={newTask} onChange={e => setNewTask(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") addTask(); }}
                     placeholder="Add a task…"
-                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+                    className="flex-1 px-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
                   <Button size="sm" variant="outline" onClick={addTask} className="gap-1"><Plus className="w-3.5 h-3.5" /></Button>
                 </div>
               </div>
@@ -580,7 +580,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
                   {checklist.map((c, i) => (
                     <button key={i} onClick={() => toggleChecklist(i)} className="flex items-center gap-2 w-full text-left">
                       <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                        c.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300 hover:border-emerald-400"
+                        c.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-card-border hover:border-emerald-400"
                       }`}>
                         {c.done && <Check className="w-3 h-3" />}
                       </span>
@@ -603,7 +603,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
                 {maintEdit ? (
                   <div className="space-y-2">
                     <textarea rows={3} value={maintText} onChange={e => setMaintText(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                      className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                       placeholder="e.g. Monthly backups, plugin updates, 2h support/month…" />
                     <div className="flex gap-2">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0"
@@ -618,7 +618,7 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
                 )}
               </div>
 
-              <div className="pt-2 border-t border-gray-100">
+              <div className="pt-2 border-t border-border/60">
                 <button onClick={deleteProject} className="text-xs text-red-500 hover:text-red-600 flex items-center gap-1.5">
                   <Trash2 className="w-3.5 h-3.5" /> Delete project
                 </button>
@@ -643,7 +643,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function LinkChip({ href, label }: { href: string; label: string }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
-      className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-gray-200 text-foreground hover:bg-gray-50 transition">
+      className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-border text-foreground hover:bg-accent transition">
       <ExternalLink className="w-3 h-3" /> {label}
     </a>
   );

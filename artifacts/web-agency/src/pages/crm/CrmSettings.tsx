@@ -284,7 +284,7 @@ export default function CrmSettings() {
         </div>
 
         {/* ── CRM System Health ────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">CRM System Health</h2>
@@ -332,7 +332,7 @@ export default function CrmSettings() {
           {loadingPhone ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-20 bg-gray-50 border border-gray-100 rounded-xl animate-pulse" />
+                <div key={i} className="h-20 bg-muted border border-border/60 rounded-xl animate-pulse" />
               ))}
             </div>
           ) : (
@@ -366,7 +366,7 @@ export default function CrmSettings() {
         </div>
 
         {/* Email settings */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <TestTube className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">Email Settings</h2>
@@ -384,21 +384,21 @@ export default function CrmSettings() {
               </div>
               <label className="relative inline-flex items-center cursor-pointer shrink-0">
                 <input type="checkbox" className="sr-only peer" checked={testMode} onChange={e => setTestMode(e.target.checked)} />
-                <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-yellow-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
+                <div className="w-10 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:bg-yellow-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
               </label>
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">From Email Address</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-muted-foreground">
+              <div className="px-3 py-2 bg-muted border border-border rounded-lg text-sm text-muted-foreground">
                 SiteMint Digital Solutions &lt;noreply@sitemintdigital.com&gt;
               </div>
-              <p className="text-xs text-muted-foreground/70 mt-1">Set via <code className="bg-gray-100 px-1 rounded">RESEND_FROM_EMAIL</code> environment variable.</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Set via <code className="bg-muted px-1 rounded">RESEND_FROM_EMAIL</code> environment variable.</p>
             </div>
           </div>
         </div>
 
         {/* Phone / SMS — Twilio Integration */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-1">
             <Phone className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">Phone &amp; SMS — Twilio Integration</h2>
@@ -418,7 +418,7 @@ export default function CrmSettings() {
                   <AlertCircle className="w-3 h-3" /> Partially Configured
                 </span>
               ) : (
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Not Connected</span>
+                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">Not Connected</span>
               )}
               <button onClick={loadPhoneStatus} className="text-muted-foreground hover:text-foreground transition-colors" title="Refresh status">
                 <RefreshCw className={`w-3.5 h-3.5 ${loadingPhone ? "animate-spin" : ""}`} />
@@ -448,22 +448,22 @@ export default function CrmSettings() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Provider</label>
-                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-foreground capitalize">
+                <div className="px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground capitalize">
                   {phoneStatus?.provider ?? "twilio"}
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Account Status</label>
-                <div className={`px-3 py-2 border rounded-lg text-sm capitalize ${isConnected ? "bg-green-50 border-green-200 text-green-700" : "bg-gray-50 border-gray-200 text-muted-foreground"}`}>
+                <div className={`px-3 py-2 border rounded-lg text-sm capitalize ${isConnected ? "bg-green-50 border-green-200 text-green-700" : "bg-muted border-border text-muted-foreground"}`}>
                   {phoneStatus?.accountStatus ?? (phoneStatus?.configured ? "Unknown" : "—")}
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Business Phone Number</label>
-                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-foreground font-mono">
+                <div className="px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground font-mono">
                   {phoneStatus?.businessNumber || <span className="text-muted-foreground">Not set</span>}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Set via <code className="bg-gray-100 px-0.5 rounded">TWILIO_PHONE_NUMBER</code></p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Set via <code className="bg-muted px-0.5 rounded">TWILIO_PHONE_NUMBER</code></p>
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">
@@ -486,7 +486,7 @@ export default function CrmSettings() {
                   phoneStatus?.forwardConfigured
                     ? phoneStatus.forwardingNumberLooksValid === false
                       ? "bg-amber-50 border-amber-200 text-amber-700"
-                      : "bg-gray-50 border-gray-200 text-foreground"
+                      : "bg-muted border-border text-foreground"
                     : "bg-red-50 border-red-200 text-red-600"
                 }`}>
                   {phoneStatus?.forwardTo
@@ -504,11 +504,11 @@ export default function CrmSettings() {
 
                 {/* Format guidance */}
                 <div className="mt-1.5 text-[10px] text-muted-foreground space-y-0.5">
-                  <p>Set via <code className="bg-gray-100 px-0.5 rounded">FORWARD_TO_PHONE_NUMBER</code> environment variable</p>
+                  <p>Set via <code className="bg-muted px-0.5 rounded">FORWARD_TO_PHONE_NUMBER</code> environment variable</p>
                   <p>
                     <span className="font-semibold">Format examples:</span>{" "}
-                    US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
-                    · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
+                    US: <code className="bg-muted px-0.5 rounded">+19498806515</code>{" "}
+                    · PH: <code className="bg-muted px-0.5 rounded">+639186069624</code>
                   </p>
                   <p className="text-[10px] text-muted-foreground">Always use E.164 format (+ followed by country code and number, no spaces or dashes).</p>
                 </div>
@@ -531,7 +531,7 @@ export default function CrmSettings() {
 
             {/* Webhook Security */}
             {phoneStatus?.configured && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
                 <Shield className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground">Webhook Signature Validation</p>
@@ -580,7 +580,7 @@ export default function CrmSettings() {
                   { label: "Voice Status", key: "voiceStatus", url: phoneStatus.webhooks.voiceStatus },
                   { label: "SMS Delivery Status", key: "smsStatus", url: phoneStatus.webhooks.smsStatus },
                 ] as const).map(({ label, key, url }) => (
-                  <div key={key} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <div key={key} className="flex items-center gap-2 bg-muted border border-border rounded-lg px-3 py-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-semibold text-muted-foreground">{label}</p>
                       <p className="text-xs font-mono text-foreground truncate">{url}</p>
@@ -595,12 +595,12 @@ export default function CrmSettings() {
           )}
 
           {/* Test SMS */}
-          <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+          <div className="border border-border rounded-lg p-4 space-y-3">
             <p className="text-xs font-semibold text-foreground">Test SMS</p>
             <p className="text-xs text-muted-foreground">Send a test text to verify your Twilio setup. Enter any phone number.</p>
             <div className="flex gap-2">
               <input
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 font-mono"
+                className="flex-1 px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 font-mono"
                 placeholder="+1 (949) 555-0000"
                 value={testSmsTo}
                 onChange={e => setTestSmsTo(e.target.value)}
@@ -611,7 +611,7 @@ export default function CrmSettings() {
               </Button>
             </div>
             {!phoneStatus?.configured && (
-              <p className="text-xs text-muted-foreground">Twilio not configured. Add <code className="bg-gray-100 px-0.5 rounded">TWILIO_ACCOUNT_SID</code>, <code className="bg-gray-100 px-0.5 rounded">TWILIO_AUTH_TOKEN</code>, and <code className="bg-gray-100 px-0.5 rounded">TWILIO_PHONE_NUMBER</code> to your environment secrets.</p>
+              <p className="text-xs text-muted-foreground">Twilio not configured. Add <code className="bg-muted px-0.5 rounded">TWILIO_ACCOUNT_SID</code>, <code className="bg-muted px-0.5 rounded">TWILIO_AUTH_TOKEN</code>, and <code className="bg-muted px-0.5 rounded">TWILIO_PHONE_NUMBER</code> to your environment secrets.</p>
             )}
             {testSmsResult && (
               <div className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${testSmsResult.ok ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
@@ -622,7 +622,7 @@ export default function CrmSettings() {
           </div>
 
           {/* Setup instructions */}
-          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="mt-4 bg-muted border border-border rounded-lg p-4">
             <p className="text-xs font-semibold text-foreground mb-2">Required environment variables</p>
             <div className="space-y-1.5 text-xs font-mono">
               {[
@@ -659,13 +659,13 @@ export default function CrmSettings() {
 
           <p className="text-xs text-muted-foreground mt-3">
             📍 SMS delivery status (Delivered, Failed, Undelivered) is updated via Twilio status callbacks.
-            This requires <code className="bg-gray-100 px-0.5 rounded">CRM_BASE_URL</code> to be configured and
+            This requires <code className="bg-muted px-0.5 rounded">CRM_BASE_URL</code> to be configured and
             webhook URLs set in your Twilio Console.
           </p>
         </div>
 
         {/* Phone Data Hygiene */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-1">
             <Search className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">Phone Data Hygiene</h2>
@@ -733,10 +733,10 @@ export default function CrmSettings() {
                 )}
               </div>
 
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
+                    <tr className="bg-muted border-b border-border">
                       <th className="w-8 px-3 py-2 text-left">
                         <span className="sr-only">Select</span>
                       </th>
@@ -746,7 +746,7 @@ export default function CrmSettings() {
                       <th className="px-3 py-2 text-left font-semibold text-foreground">Issue</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-border/60">
                     {auditRows.map(row => (
                       <tr key={row.id} className={`${selectedIds.has(row.id) ? "bg-blue-50/40" : ""}`}>
                         <td className="px-3 py-2">
@@ -755,10 +755,10 @@ export default function CrmSettings() {
                               type="checkbox"
                               checked={selectedIds.has(row.id)}
                               onChange={() => toggleSelect(row.id)}
-                              className="rounded border-gray-300 text-foreground focus:ring-foreground/30 cursor-pointer"
+                              className="rounded border-input text-foreground focus:ring-foreground/30 cursor-pointer"
                             />
                           ) : (
-                            <span className="text-gray-300 text-[10px]">—</span>
+                            <span className="text-muted-foreground/40 text-[10px]">—</span>
                           )}
                         </td>
                         <td className="px-3 py-2 font-medium text-foreground max-w-[120px] truncate">
@@ -769,14 +769,14 @@ export default function CrmSettings() {
                           {row.canAutoFix ? (
                             <span className="text-green-700">{row.normalizedPhone}</span>
                           ) : (
-                            <span className="text-gray-400 text-[11px]">Manual review needed</span>
+                            <span className="text-muted-foreground/60 text-[11px]">Manual review needed</span>
                           )}
                         </td>
                         <td className="px-3 py-2">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             row.canAutoFix
                               ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-gray-100 text-gray-500"
+                              : "bg-muted text-muted-foreground"
                           }`}>
                             {row.issue}
                           </span>
@@ -809,7 +809,7 @@ export default function CrmSettings() {
         </div>
 
         {/* Security */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Shield className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">Security</h2>
@@ -832,7 +832,7 @@ export default function CrmSettings() {
         </div>
 
         {/* Team */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">Team Members</h2>
@@ -843,7 +843,7 @@ export default function CrmSettings() {
               { name: "Shasta Greene", role: "Head of Strategy" },
               { name: "Saisa Lorraigne", role: "Project & Admin Manager" },
             ].map(m => (
-              <div key={m.name} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg">
+              <div key={m.name} className="flex items-center gap-3 p-2.5 bg-muted rounded-lg">
                 <div className="w-8 h-8 bg-foreground/10 rounded-full flex items-center justify-center text-sm font-bold text-foreground">
                   {m.name[0]}
                 </div>

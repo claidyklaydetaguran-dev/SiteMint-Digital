@@ -20,7 +20,7 @@ const TYPE_COLORS: Record<string, string> = {
   Email: "bg-blue-100 text-blue-800 border-blue-200",
   "Follow Up": "bg-yellow-100 text-yellow-800 border-yellow-200",
   "Send Proposal": "bg-purple-100 text-purple-800 border-purple-200",
-  default: "bg-gray-100 text-gray-700 border-gray-200",
+  default: "bg-muted text-foreground/80 border-border",
 };
 
 interface CalEvent { id: string; date: string; title: string; type: string; leadId?: number; leadName?: string; }
@@ -113,16 +113,16 @@ export default function CrmCalendar() {
       <div className="flex h-[calc(100vh-48px)]">
 
         {/* Left mini panel */}
-        <div className="w-56 bg-white border-r border-gray-200 flex flex-col p-4 shrink-0 overflow-y-auto">
+        <div className="w-56 bg-white border-r border-border flex flex-col p-4 shrink-0 overflow-y-auto">
           {/* Mini nav calendar */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-foreground">{MONTHS[month].slice(0,3)} {year}</span>
               <div className="flex gap-1">
-                <button onClick={prevMonth} className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded transition-colors">
+                <button onClick={prevMonth} className="w-5 h-5 flex items-center justify-center hover:bg-accent rounded transition-colors">
                   <ChevronLeft className="w-3 h-3" />
                 </button>
-                <button onClick={nextMonth} className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded transition-colors">
+                <button onClick={nextMonth} className="w-5 h-5 flex items-center justify-center hover:bg-accent rounded transition-colors">
                   <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
@@ -139,10 +139,10 @@ export default function CrmCalendar() {
                 return (
                   <button key={i} onClick={() => setSelected(k)}
                     className={`text-center text-[10px] py-1 rounded transition-colors relative ${
-                      !cell.isCurrentMonth ? "text-gray-300" :
+                      !cell.isCurrentMonth ? "text-muted-foreground/40" :
                       isToday ? "bg-blue-600 text-white font-bold" :
                       isSel ? "bg-blue-100 text-blue-700 font-semibold" :
-                      "hover:bg-gray-100 text-foreground"
+                      "hover:bg-accent text-foreground"
                     }`}>
                     {cell.date.getDate()}
                     {hasEvt && !isToday && (
@@ -155,7 +155,7 @@ export default function CrmCalendar() {
           </div>
 
           <button onClick={goToday}
-            className="w-full text-xs text-center py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-foreground mb-4">
+            className="w-full text-xs text-center py-1.5 border border-border rounded-lg hover:bg-accent transition-colors text-foreground mb-4">
             Today
           </button>
 
@@ -174,13 +174,13 @@ export default function CrmCalendar() {
         {/* Main calendar */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Toolbar */}
-          <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3">
+          <div className="bg-white border-b border-border px-5 py-3 flex items-center gap-3">
             <h2 className="text-lg font-bold text-foreground">{MONTHS[month]} {year}</h2>
             <div className="flex items-center gap-1 ml-4">
-              <button onClick={prevMonth} className="w-7 h-7 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-50 transition-colors">
+              <button onClick={prevMonth} className="w-7 h-7 border border-border rounded flex items-center justify-center hover:bg-accent transition-colors">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button onClick={nextMonth} className="w-7 h-7 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-50 transition-colors">
+              <button onClick={nextMonth} className="w-7 h-7 border border-border rounded flex items-center justify-center hover:bg-accent transition-colors">
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -189,13 +189,13 @@ export default function CrmCalendar() {
               {(["day","week","month"] as const).map(v => (
                 <button key={v} onClick={() => setView(v)}
                   className={`px-3 py-1 text-xs font-medium rounded-lg capitalize transition-colors ${
-                    view === v ? "bg-blue-600 text-white" : "border border-gray-200 text-foreground hover:bg-gray-50"
+                    view === v ? "bg-blue-600 text-white" : "border border-border text-foreground hover:bg-accent"
                   }`}>
                   {v}
                 </button>
               ))}
               <button onClick={goToday}
-                className="px-3 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-foreground">
+                className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-accent transition-colors text-foreground">
                 Today
               </button>
               <Link href="/admin/crm/tasks">
@@ -209,9 +209,9 @@ export default function CrmCalendar() {
           <div className="flex flex-1 overflow-hidden">
             {/* Month grid */}
             <div className="flex-1 overflow-auto">
-              <div className="grid grid-cols-7 border-b border-gray-200 bg-white sticky top-0">
+              <div className="grid grid-cols-7 border-b border-border bg-white sticky top-0">
                 {DAYS.map(d => (
-                  <div key={d} className="text-center py-2 text-xs font-semibold text-muted-foreground border-r border-gray-100 last:border-r-0">{d}</div>
+                  <div key={d} className="text-center py-2 text-xs font-semibold text-muted-foreground border-r border-border/60 last:border-r-0">{d}</div>
                 ))}
               </div>
               <div className="grid grid-cols-7 flex-1">
@@ -222,12 +222,12 @@ export default function CrmCalendar() {
                   const dayEvts = eventsOnDate(cell.date);
                   return (
                     <div key={i} onClick={() => setSelected(k)}
-                      className={`min-h-[90px] border-r border-b border-gray-100 p-1.5 cursor-pointer transition-colors hover:bg-blue-50/30 ${
-                        !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"
+                      className={`min-h-[90px] border-r border-b border-border/60 p-1.5 cursor-pointer transition-colors hover:bg-blue-50/30 ${
+                        !cell.isCurrentMonth ? "bg-muted/50" : "bg-white"
                       } ${isSel ? "ring-1 ring-inset ring-blue-400" : ""}`}>
                       <div className={`w-6 h-6 flex items-center justify-center text-xs font-semibold rounded-full mb-1 ${
                         isToday ? "bg-blue-600 text-white" :
-                        cell.isCurrentMonth ? "text-foreground" : "text-gray-300"
+                        cell.isCurrentMonth ? "text-foreground" : "text-muted-foreground/40"
                       }`}>
                         {cell.date.getDate()}
                       </div>
@@ -250,16 +250,16 @@ export default function CrmCalendar() {
             </div>
 
             {/* Upcoming list */}
-            <div className="w-56 bg-white border-l border-gray-200 flex flex-col shrink-0">
-              <div className="px-4 py-3 border-b border-gray-100">
+            <div className="w-56 bg-white border-l border-border flex flex-col shrink-0">
+              <div className="px-4 py-3 border-b border-border/60">
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Upcoming</p>
               </div>
-              <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+              <div className="flex-1 overflow-y-auto divide-y divide-border/40">
                 {upcoming.length === 0 ? (
                   <div className="py-8 text-center text-xs text-muted-foreground">No upcoming events</div>
                 ) : upcoming.map(evt => (
                   <Link key={evt.id} href={evt.leadId ? `/admin/crm/leads/${evt.leadId}` : "/admin/crm/tasks"}>
-                    <div className="px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
                       <p className="text-xs font-medium text-foreground truncate">{evt.title}</p>
                       <div className="flex items-center gap-1 mt-0.5">
                         <Clock className="w-2.5 h-2.5 text-muted-foreground" />
