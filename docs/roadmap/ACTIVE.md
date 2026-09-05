@@ -1,5 +1,18 @@
 # Active SiteMint Delivery
 
+> **SUPERSEDED HEADER (2026-09-05).** The owner-directed **SiteMint V5 Brand and
+> Product Program** is the active delivery, executed on
+> `feature/ai-receptionist-private-beta-readiness`. Its authority chain is the
+> dated owner directives recorded in `docs/product-plan/2026-09-owner-replan/`
+> (OWNER-REVIEW-WORKBOOK.md §0a and supplements; V5-BUILD-CHECKLIST.md;
+> PUBLISHABILITY-DASHBOARD.md). Scope: public-site visual/motion/content
+> completion, nine-capability service architecture (incl. Growth Infrastructure
+> and Advertising services), Discovery reorganization, owner-authorized Magnific
+> media (cap 6,800 credits), and the unified owner preview. Stop conditions:
+> no deploy, no Replit resume, no external migrations, no provider activation,
+> no merge to protected main. The AR-001 material below is retained as the
+> prior context; AR-002A/B certified staging state is recorded in memory/docs.
+
 **Only active delivery:** `AR-001 — AI Receptionist Browser Voice Launch Candidate`
 
 **Current implementation branch:** `redesign/frontend-v2` (Windows worktree).
