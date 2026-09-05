@@ -34,7 +34,10 @@ import { DashboardShell } from "@/shells/DashboardShell";
 // ROLLBACK: swap HomeV5 back to HomeV4 to revert instantly. V3 pages remain
 // routed under the V4 chrome (the .v4-shell token remap re-skins their
 // vocabulary); V3 components stay untouched as the rollback layer.
-const HomeV5 = lazy(() => import("@/pages/HomeV5"));
+// Perf (owner closeout directive): the landing route is EAGER — a lazy "/"
+// spent a second round-trip fetching the home chunk before the hero copy
+// (the LCP element) could render. Every other page stays lazy.
+import HomeV5 from "@/pages/HomeV5";
 // `HomeV4` is not imported here — it is no longer routed, and its only
 // remaining consumer is `HomeV5.tsx` (`import { SignalHeroV4 } from
 // "@/pages/HomeV4"`), which is enough to keep it in the bundle and keep it
