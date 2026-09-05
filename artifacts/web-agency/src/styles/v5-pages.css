@@ -1057,3 +1057,189 @@
   background: var(--sm-mist, #EDF9FA);
   max-height: 420px;
 }
+
+/* ── Team member bio dialog (owner directive 2026-09-06: "make team members
+   clickable"). Native <dialog> — TeamMemberDialog.tsx calls showModal(),
+   which gives a real top-layer modal with a browser-native Tab focus trap
+   and Escape-to-close; this block only supplies the visual chrome, the
+   entrance animation (skipped under reduced motion), and the mobile
+   bottom-sheet layout. Duplicated verbatim from v5-home.css so the same
+   dialog looks identical from the homepage team section. ───────────────── */
+.sm-v5page .sm-team-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(640px, calc(100vh - 2rem));
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+.sm-v5page .sm-team-dialog::backdrop {
+  background: rgb(11 58 62 / 0.45);
+}
+.sm-v5page .sm-team-dialog__panel {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-height: min(640px, calc(100vh - 2rem));
+  overflow-y: auto;
+  background: var(--sm-surface, #fff);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-l, 16px);
+  padding: 2rem;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-v5page .sm-team-dialog[open] .sm-team-dialog__panel {
+  animation: sm-team-dialog-in 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+@keyframes sm-team-dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sm-v5page .sm-team-dialog__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text, #173642);
+  cursor: pointer;
+}
+.sm-v5page .sm-team-dialog__close svg {
+  width: 18px;
+  height: 18px;
+}
+.sm-v5page .sm-team-dialog__close:hover {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-v5page .sm-team-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-right: 2.5rem;
+}
+.sm-v5page .sm-team-dialog__avatar {
+  flex: none;
+  display: block;
+  width: 72px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgb(11 58 62 / 0.16);
+}
+.sm-v5page .sm-team-dialog__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sm-v5page .sm-team-dialog__name {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--sm-text, #173642);
+}
+.sm-v5page .sm-team-dialog__role {
+  margin: 0.2rem 0 0;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.95rem;
+}
+.sm-v5page .sm-team-dialog__intro {
+  margin: 0;
+  color: var(--sm-text, #173642);
+  line-height: 1.6;
+}
+.sm-v5page .sm-team-dialog__responsibilities {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.5rem;
+  color: var(--sm-text, #173642);
+  line-height: 1.55;
+}
+.sm-v5page .sm-team-dialog__support {
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+  color: var(--sm-text-muted, #4A6472);
+  line-height: 1.6;
+}
+.sm-v5page .sm-team-dialog__support strong {
+  color: var(--sm-text, #173642);
+}
+.sm-v5page .sm-team-dialog__panel :focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 2px;
+}
+
+/* The About page's team pillar can't use a <button> wrapper (it contains an
+   <h3>, and headings cannot legally nest inside a <button>). Instead the
+   card stays a <div> and this visible "Meet <name>" control is the real
+   click target — its ::after expands the hit area to the full card, so the
+   whole card still opens the dialog. */
+.sm-v5page .sm-person-card {
+  position: relative;
+}
+.sm-v5page .sm-person-card__cta {
+  justify-self: start;
+  margin-top: 0.25rem;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--sm-mint-700, #0B7487);
+  cursor: pointer;
+}
+.sm-v5page .sm-person-card__cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.sm-v5page .sm-person-card__cta:focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 2px;
+}
+
+/* Mobile (<640px): bottom-sheet — full-width, slides up from the bottom
+   edge, drag-free (the close button/Escape/backdrop are the only exits). */
+@media (max-width: 639px) {
+  .sm-v5page .sm-team-dialog {
+    inset: auto 0 0 0;
+    margin: 0;
+    width: 100%;
+    max-height: 85vh;
+  }
+  .sm-v5page .sm-team-dialog__panel {
+    max-height: 85vh;
+    border-radius: var(--sm-radius-l, 16px) var(--sm-radius-l, 16px) 0 0;
+    padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  .sm-v5page .sm-team-dialog[open] .sm-team-dialog__panel {
+    animation-name: sm-team-dialog-in-sheet;
+  }
+  @keyframes sm-team-dialog-in-sheet {
+    from { opacity: 0; transform: translateY(100%); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Reduced motion: instant open, no slide/fade. Closing is always instant —
+   there is no exit animation to disable. */
+@media (prefers-reduced-motion: reduce) {
+  .sm-v5page .sm-team-dialog[open] .sm-team-dialog__panel {
+    animation: none;
+  }
+}

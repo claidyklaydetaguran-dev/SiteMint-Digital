@@ -3,17 +3,20 @@
  * awards, or history.
  */
 
+import { useState } from "react";
 import { Link } from "wouter";
 import { ShieldCheck, Wrench, Compass, HandMetal } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
-import { teamV5 } from "@/components/v5/teamV5";
+import { teamV5, type TeamMemberV5 } from "@/components/v5/teamV5";
+import { TeamMemberDialog } from "@/components/v5/TeamMemberDialog";
 import aboutTexture from "@/assets/media/support-about-texture.jpg";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import "@/styles/v5-pages.css";
 
 export default function AboutV3() {
   const reveal = useReveal();
+  const [activeMember, setActiveMember] = useState<TeamMemberV5 | null>(null);
   usePageMeta({
     title: "Company — SiteMint Digital",
     description: "A studio that builds like an operator — what we believe, how we're organized, and the people doing the work.",
@@ -71,10 +74,26 @@ export default function AboutV3() {
                 </span>
                 <h3 className="v3m-pillar__title">{member.name}</h3>
                 <p className="v3m-pillar__desc">{member.role}</p>
+                {/* A heading can't legally nest inside a <button>, so the
+                    card stays a <div> and this control is the click target —
+                    its ::after expands the hit area to the full card (see
+                    v5-pages.css), satisfying "whole card opens it" without
+                    invalid markup. */}
+                <button
+                  type="button"
+                  className="sm-person-card__cta"
+                  onClick={(e) => {
+                    e.currentTarget.focus();
+                    setActiveMember(member);
+                  }}
+                >
+                  Meet {member.name.split(" ")[0]}
+                </button>
               </div>
             ))}
           </div>
         </div>
+        <TeamMemberDialog member={activeMember} onClose={() => setActiveMember(null)} />
       </section>
 
       <figure className="sm-about-texture" aria-hidden="false">

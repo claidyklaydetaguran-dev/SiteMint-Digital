@@ -30,7 +30,8 @@ import {
   AI_RECEPTIONIST_PRICING_NOTE_V5,
   ADVERTISING_SERVICES_NOTE_V5,
 } from "@/components/v5/pricingTiersV5";
-import { teamV5 } from "@/components/v5/teamV5";
+import { teamV5, type TeamMemberV5 } from "@/components/v5/teamV5";
+import { TeamMemberDialog } from "@/components/v5/TeamMemberDialog";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
 import discoveryStepShot from "@/assets/product/discovery-step.png";
 import hdCallsShot from "@/assets/product/hd-calls.png";
@@ -527,6 +528,7 @@ function WhySiteMintSection() {
 
 function TeamSection() {
   const reveal = useReveal();
+  const [activeMember, setActiveMember] = useState<TeamMemberV5 | null>(null);
   return (
     <section className="v4-section" id="team" data-tone="white">
       <div className="v4-container" ref={reveal} data-v4-reveal>
@@ -537,16 +539,25 @@ function TeamSection() {
         <h2 className="v4-h2 reveal-clip">The people doing the work.</h2>
         <div className="sm-team-grid">
           {teamV5.map((member) => (
-            <div className="sm-team-card reveal-scale-settle" key={member.name}>
+            <button
+              type="button"
+              className="sm-team-card reveal-scale-settle"
+              key={member.name}
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setActiveMember(member);
+              }}
+            >
               <span className="sm-team-card__avatar">
                 <img src={member.photo} alt={`Portrait of ${member.name}`} loading="lazy" />
               </span>
               <span className="sm-team-card__name">{member.name}</span>
               <span className="sm-team-card__role">{member.role}</span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+      <TeamMemberDialog member={activeMember} onClose={() => setActiveMember(null)} />
     </section>
   );
 }
