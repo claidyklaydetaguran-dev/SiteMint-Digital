@@ -29,12 +29,18 @@ export default function AboutV3() {
             A studio that builds like an operator.
           </h1>
           <p className="v3-lede reveal-fade-up">
-            We run our own version of everything we sell. The discovery flow
-            on this site is the same structured intake we build for clients.
-            The automation and CRM we recommend runs our own pipeline. Our AI
-            Receptionist product is in private, invite-only beta. We use what
-            we build, which keeps us honest about what works and what's still
-            in progress.
+            SiteMint designs and builds connected digital systems—websites,
+            web applications, CRM tools, automation, and AI products—that
+            capture opportunities, organize operations, and move work toward
+            the next meaningful action.
+          </p>
+          <p className="v3-lede reveal-fade-up" style={{ fontSize: "1.05rem" }}>
+            SiteMint Digital designs, builds, and runs business systems —
+            including our own. The discovery flow on this site is the same
+            structured intake we build for clients. The automation and CRM
+            we recommend runs our own pipeline. Our AI Receptionist product is
+            in private, invite-only beta. We use what we build, which keeps
+            us honest about what works and what's still in progress.
           </p>
         </div>
       </section>
@@ -119,7 +125,7 @@ export default function AboutV3() {
         <div className="v3-container v3m-split v3-reveal" ref={reveal}>
           <div className="v3m-split__copy reveal-h-left">
             <span className="v3-eyebrow">How we're organized</span>
-            <h2 className="v3-h2 reveal-clip">Direct access, by design.</h2>
+            <h2 className="v3-h2 reveal-clip">Focused, not layered.</h2>
             <p className="v3-body reveal-fade-up">
               SiteMint is a focused team, not a layered agency. The people who
               design your system are the people who build it and the people who

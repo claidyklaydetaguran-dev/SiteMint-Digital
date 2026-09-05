@@ -23,9 +23,17 @@ import { SignalHeroV4 } from "@/pages/HomeV4";
 import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
 import { HeroMedia } from "@/components/v5/HeroMedia";
 import { Reveal } from "@/components/v5/Reveal";
-import { pricingTiersV5, PRICING_DISCLAIMER_V5, AI_RECEPTIONIST_PRICING_NOTE_V5 } from "@/components/v5/pricingTiersV5";
+import {
+  pricingTiersV5,
+  PRICING_DISCLAIMER_V5,
+  AI_RECEPTIONIST_PRICING_NOTE_V5,
+  ADVERTISING_SERVICES_NOTE_V5,
+} from "@/components/v5/pricingTiersV5";
 import { teamV5 } from "@/components/v5/teamV5";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
+import crmCommandShot from "@/assets/product/crm-command.png";
+import discoveryStepShot from "@/assets/product/discovery-step.png";
+import hdCallsShot from "@/assets/product/hd-calls.png";
 import "@/styles/v5-home.css";
 
 const PAGE_TITLE = "SiteMint Digital | Websites, CRM, and AI Systems Built to Connect";
@@ -40,12 +48,15 @@ interface LedgerRow {
 }
 
 const LEDGER_ROWS: LedgerRow[] = [
+  { label: "Strategy & Discovery", outcome: "A structured brief before a single page gets built." },
   { label: "Websites", outcome: "A credible, converting front door." },
   { label: "Web Applications", outcome: "Custom software for how the business actually works." },
-  { label: "CRM & Internal Systems", outcome: "One place the team trusts, instead of five." },
+  { label: "CRM & Business Systems", outcome: "One place the team trusts, instead of five." },
   { label: "AI Systems & Automation", outcome: "Routine work handled; judgment stays human." },
-  { label: "Custom Software Engineering", outcome: "Built for the business, when off-the-shelf doesn't fit." },
-  { label: "AI-Assisted Development", outcome: "We build faster without cutting review or testing." },
+  { label: "Growth Infrastructure", outcome: "Tracking, pixels, and consent working before a dollar is spent." },
+  { label: "Advertising Services", outcome: "Meta and Google campaigns planned, launched, and reported on honestly." },
+  { label: "AI Receptionist", outcome: "Every call answered, qualified, and logged — private beta." },
+  { label: "Ongoing Support & Optimization", outcome: "The system tuned after launch, not abandoned at it." },
 ];
 
 function WhatWeBuildLedger() {
@@ -58,12 +69,13 @@ function WhatWeBuildLedger() {
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
         <Reveal as="h2" className="v4-h2" words>
-          Six capabilities. One connected system.
+          Nine capabilities. One connected system.
         </Reveal>
         <p className="v4-lede reveal-fade-up" ref={reveal} data-v4-reveal>
-          Every SiteMint engagement draws from the same six capabilities —
+          Every SiteMint engagement draws from the same nine capabilities —
           alone or combined into one system, depending on what the business
-          actually needs.
+          actually needs. Advertising services are a separately scoped,
+          recurring engagement, never bundled by default.
         </p>
         <ol className="sm-ledger__list" ref={reveal} data-v4-reveal>
           {LEDGER_ROWS.map((row, i) => (
@@ -76,6 +88,33 @@ function WhatWeBuildLedger() {
         </ol>
       </div>
     </section>
+  );
+}
+
+/**
+ * Real-product proof frame — an actual SiteMint screenshot in a labelled
+ * browser chrome, used wherever a section claims a capability the product
+ * already delivers (container-completion "real proof" step). Every caption
+ * says plainly that the data shown is preview/demo data, never a client's.
+ */
+function ShotFrame({ src, alt, caption }: { src: string; alt: string; caption: string }) {
+  return (
+    <figure className="sm-shot-frame">
+      <div className="sm-shot-frame__bar" aria-hidden="true">
+        <span className="sm-shot-frame__dot" />
+        <span className="sm-shot-frame__dot" />
+        <span className="sm-shot-frame__dot" />
+      </div>
+      <img
+        className="sm-shot-frame__img"
+        src={src}
+        alt={alt}
+        loading="lazy"
+        width={1600}
+        height={1000}
+      />
+      <figcaption className="sm-shot-frame__caption">{caption}</figcaption>
+    </figure>
   );
 }
 
@@ -155,23 +194,30 @@ function CrmSystemsSection() {
             See CRM &amp; internal systems →
           </Link>
         </div>
-        <div className="sm-record reveal-scale-settle" ref={reveal} data-v4-reveal aria-hidden="true">
-          <span className="sm-record__badge">Illustration</span>
-          <div className="sm-record__row">
-            <span className="sm-record__dot" />
-            <span className="sm-record__k">Lead</span>
-            <span className="sm-record__v">New inquiry — routed</span>
+        <div className="sm-visual-stack reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <div className="sm-record" aria-hidden="true">
+            <span className="sm-record__badge">Illustration</span>
+            <div className="sm-record__row">
+              <span className="sm-record__dot" />
+              <span className="sm-record__k">Lead</span>
+              <span className="sm-record__v">New inquiry — routed</span>
+            </div>
+            <div className="sm-record__row">
+              <span className="sm-record__dot sm-record__dot--amber" />
+              <span className="sm-record__k">Task</span>
+              <span className="sm-record__v">Follow up — due today</span>
+            </div>
+            <div className="sm-record__row">
+              <span className="sm-record__dot sm-record__dot--mint" />
+              <span className="sm-record__k">Stage</span>
+              <span className="sm-record__v">Proposal sent</span>
+            </div>
           </div>
-          <div className="sm-record__row">
-            <span className="sm-record__dot sm-record__dot--amber" />
-            <span className="sm-record__k">Task</span>
-            <span className="sm-record__v">Follow up — due today</span>
-          </div>
-          <div className="sm-record__row">
-            <span className="sm-record__dot sm-record__dot--mint" />
-            <span className="sm-record__k">Stage</span>
-            <span className="sm-record__v">Proposal sent</span>
-          </div>
+          <ShotFrame
+            src={crmCommandShot}
+            alt="SiteMint CRM command view showing pipeline stages and tasks"
+            caption="SiteMint CRM — preview data"
+          />
         </div>
       </div>
     </section>
@@ -265,11 +311,18 @@ function ReceptionistSpotlight() {
             See the AI Receptionist →
           </Link>
         </div>
-        <div className="sm-ring reveal-scale-settle" ref={reveal} data-v4-reveal aria-hidden="true">
-          <span className="sm-ring__pulse sm-ring__pulse--1" />
-          <span className="sm-ring__pulse sm-ring__pulse--2" />
-          <span className="sm-ring__pulse sm-ring__pulse--3" />
-          <span className="sm-ring__core" />
+        <div className="sm-visual-stack reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <div className="sm-ring" aria-hidden="true">
+            <span className="sm-ring__pulse sm-ring__pulse--1" />
+            <span className="sm-ring__pulse sm-ring__pulse--2" />
+            <span className="sm-ring__pulse sm-ring__pulse--3" />
+            <span className="sm-ring__core" />
+          </div>
+          <ShotFrame
+            src={hdCallsShot}
+            alt="SiteMint AI Receptionist dashboard showing a logged call"
+            caption="AI Receptionist dashboard — preview data"
+          />
         </div>
       </div>
     </section>
@@ -293,11 +346,18 @@ function DiscoverySection() {
           one live on this site right now. It saves as you go, and a person
           reads every answer before you hear back.
         </p>
-        <ol className="sm-steps-inline">
-          <li className="reveal-fade-up">Answer structured questions about the business and the goal</li>
-          <li className="reveal-fade-up">Save and resume any time — nothing is lost</li>
-          <li className="reveal-fade-up">SiteMint reviews the brief and replies with a straight answer</li>
-        </ol>
+        <div className="sm-discovery-grid">
+          <ol className="sm-steps-inline">
+            <li className="reveal-fade-up">Answer structured questions about the business and the goal</li>
+            <li className="reveal-fade-up">Save and resume any time — nothing is lost</li>
+            <li className="reveal-fade-up">SiteMint reviews the brief and replies with a straight answer</li>
+          </ol>
+          <ShotFrame
+            src={discoveryStepShot}
+            alt="A structured discovery brief step, mid-flow, with save-and-resume progress"
+            caption="SiteMint discovery intake — the flow live on this site"
+          />
+        </div>
         <div className="sm-actions">
           <Link href={ROUTES.discovery} className="v3-btn v3-btn--primary">
             Start the discovery brief
@@ -427,6 +487,7 @@ function PricingSection() {
         </div>
         <p className="sm-disclaimer">{PRICING_DISCLAIMER_V5}</p>
         <p className="sm-disclaimer">{AI_RECEPTIONIST_PRICING_NOTE_V5}</p>
+        <p className="sm-disclaimer">{ADVERTISING_SERVICES_NOTE_V5}</p>
         <Link href={ROUTES.pricing} className="v3-btn v3-btn--primary">
           Configure your scope →
         </Link>

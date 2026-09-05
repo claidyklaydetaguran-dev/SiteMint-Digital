@@ -12,6 +12,13 @@
  *   SiteMint analytics product exists.
  * - "AI-assisted workflow" (Custom tier) never implies the AI Receptionist is
  *   included — see `AI_RECEPTIONIST_PRICING_NOTE` below.
+ * - "Growth infrastructure setup" (Growth and Custom tiers) means technical
+ *   SEO, analytics, conversion tracking, cookie-consent implementation,
+ *   pixels, webhooks, and campaign-ready landing pages, scoped per project —
+ *   see `AiSystemsV5`'s `#growth-infrastructure` section for the full list.
+ *   It never implies ongoing advertising management: see
+ *   `ADVERTISING_SERVICES_NOTE_V5` below — advertising is always a
+ *   separately scoped, recurring service with no price asserted here.
  */
 
 export interface PricingTierV5 {
@@ -55,6 +62,7 @@ export const pricingTiersV5: PricingTierV5[] = [
       "Custom conversion journey",
       "CRM or workflow connection",
       "Automation",
+      "Growth infrastructure setup (scoped per project)",
       "Expanded analytics",
       "Training + launch support",
     ],
@@ -71,6 +79,7 @@ export const pricingTiersV5: PricingTierV5[] = [
       "CRM / internal operations system",
       "AI-assisted workflow",
       "Multiple integrations",
+      "Growth infrastructure setup (scoped per project)",
       "Advanced permissions & dashboards",
       "Implementation planning",
       "Testing + deployment support",
@@ -79,6 +88,15 @@ export const pricingTiersV5: PricingTierV5[] = [
       "“AI-assisted workflow” means AI-assisted automation inside your system (drafting, routing, evaluation) — it does not include the AI Receptionist product, which is priced separately during private-beta onboarding.",
   },
 ];
+
+/**
+ * Advertising services are never priced or bundled here (owner directive,
+ * V5 nine-capability expansion, 2026-09-05): Meta/Google Ads management is a
+ * separately scoped, usually recurring engagement, on top of any tier —
+ * never assumed to be included, and never sold with an invented number.
+ */
+export const ADVERTISING_SERVICES_NOTE_V5 =
+  "Advertising services (Meta Ads and Google Ads) are a separately scoped, usually recurring engagement — never included by default in any tier above, and never priced with a fixed number here. Client ad spend is always separate from SiteMint's service fee, and we don't guarantee leads, revenue, ROAS, or platform approval.";
 
 /** Mandatory disclaimer — verbatim, V5-BLUEPRINT §9. */
 export const PRICING_DISCLAIMER_V5 =

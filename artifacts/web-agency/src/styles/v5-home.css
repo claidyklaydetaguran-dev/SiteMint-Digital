@@ -431,6 +431,63 @@
   margin-top: 1rem;
 }
 
+/* ── Real-product proof frame (container completion) ─────────────────── */
+.sm-visual-stack {
+  display: grid;
+  gap: 1.1rem;
+}
+.sm-shot-frame {
+  margin: 0;
+  border-radius: var(--sm-radius-m, 10px);
+  overflow: hidden;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-shot-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.55rem 0.75rem;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-shot-frame__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #A9CFD6);
+}
+.sm-shot-frame__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  background: var(--sm-surface-alt, #EDF9FA);
+}
+.sm-shot-frame__caption {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--sm-text-muted, #4A6472);
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-discovery-grid {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+  margin: 1.5rem 0;
+}
+@media (min-width: 780px) {
+  .sm-discovery-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  }
+  .sm-discovery-grid .sm-steps-inline {
+    margin: 0;
+  }
+}
+
 /* ── Section 9 — selected work grid ──────────────────────────────────── */
 .sm-work-grid {
   display: grid;

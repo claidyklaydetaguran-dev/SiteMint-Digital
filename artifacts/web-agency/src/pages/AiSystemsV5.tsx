@@ -17,13 +17,43 @@ import {
   Database,
   ListChecks,
   Users,
+  LineChart,
+  Webhook,
+  Cookie,
+  Tags,
+  Gauge,
+  Layers,
 } from "lucide-react";
 import { Link } from "wouter";
 import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import crmLeadShot from "@/assets/product/crm-lead.png";
 import "@/styles/v5-pages.css";
+
+/** Shared "real proof" browser-frame composition — same visual language as
+ *  the equivalent local component in HomeV5.tsx, styled by v5-pages.css. */
+function ShotFrame({ src, alt, caption }: { src: string; alt: string; caption: string }) {
+  return (
+    <figure className="sm-shot-frame">
+      <div className="sm-shot-frame__bar" aria-hidden="true">
+        <span className="sm-shot-frame__dot" />
+        <span className="sm-shot-frame__dot" />
+        <span className="sm-shot-frame__dot" />
+      </div>
+      <img
+        className="sm-shot-frame__img"
+        src={src}
+        alt={alt}
+        loading="lazy"
+        width={1600}
+        height={1000}
+      />
+      <figcaption className="sm-shot-frame__caption">{caption}</figcaption>
+    </figure>
+  );
+}
 
 const content: ServicePageContent = {
   eyebrow: "AI Systems & Automation",
@@ -229,9 +259,100 @@ function CrmSystemsSection() {
             </p>
           </div>
         </div>
+        <div className="reveal-scale-settle" style={{ marginTop: "1.5rem", maxWidth: "32rem" }}>
+          <ShotFrame
+            src={crmLeadShot}
+            alt="A lead record inside the SiteMint CRM, with pipeline stage and task history"
+            caption="SiteMint CRM lead record — preview data"
+          />
+        </div>
         <div style={{ marginTop: "1.5rem" }}>
           <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
             Talk about a CRM for your business
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Growth Infrastructure (V5 nine-capability expansion, 2026-09-05 owner
+ * directive) — technical SEO, analytics, conversion tracking, cookie-consent
+ * implementation, pixels, webhooks, campaign-ready landing pages, and
+ * attribution/event instrumentation. Reachable at #growth-infrastructure
+ * from the homepage ledger and the /services hub entry. Offered on its own
+ * or as the foundation under an Advertising Services engagement — this
+ * section never implies advertising management is included.
+ */
+const GROWTH_INFRA_ITEMS = [
+  {
+    icon: Gauge,
+    title: "Technical SEO",
+    desc: "Page speed, structured data, indexability, and the crawl hygiene search engines actually reward.",
+  },
+  {
+    icon: LineChart,
+    title: "Analytics & conversion tracking",
+    desc: "Third-party analytics configured against real conversion events, not just page views.",
+  },
+  {
+    icon: Cookie,
+    title: "Cookie-consent implementation",
+    desc: "A compliant consent layer that gates tracking correctly, region by region.",
+  },
+  {
+    icon: Tags,
+    title: "Meta, Google & TikTok pixels",
+    desc: "Conversion events wired to the platforms you actually advertise on.",
+  },
+  {
+    icon: Webhook,
+    title: "Webhooks",
+    desc: "Events from the site or CRM pushed to the ad platforms and tools that need them.",
+  },
+  {
+    icon: Layers,
+    title: "Campaign-ready landing pages",
+    desc: "Pages built to receive paid traffic, with tracking already wired in before launch.",
+  },
+];
+
+function GrowthInfrastructureSection() {
+  const reveal = useReveal();
+  return (
+    <section
+      className="v3-section"
+      data-tone="porcelain"
+      id="growth-infrastructure"
+      style={{ scrollMarginTop: "5rem" }}
+    >
+      <div className="v3-container v3-reveal" ref={reveal}>
+        <div className="v3m-sechead">
+          <span className="v3m-sechead__no">04c · Growth infrastructure</span>
+          <h2 className="v3-h2 reveal-clip">The tracking that has to work before ad spend does.</h2>
+          <p className="v3-lede reveal-fade-up">
+            Every SiteMint website ships with the instrumentation an
+            advertising or growth engagement will eventually need — so
+            nothing gets rebuilt later under time pressure. Available on its
+            own, scoped per project, whether or not you ever run paid media
+            with us.
+          </p>
+        </div>
+        <div className="sm-growth-grid">
+          {GROWTH_INFRA_ITEMS.map((item) => (
+            <div className="sm-growth-item reveal-scale-settle" key={item.title}>
+              <span className="sm-growth-item__icon">
+                <item.icon aria-hidden="true" size={20} />
+              </span>
+              <span className="sm-growth-item__title">{item.title}</span>
+              <p className="sm-growth-item__desc">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: "1.5rem" }}>
+          <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
+            Scope growth infrastructure for your site
           </Link>
         </div>
       </div>
@@ -243,13 +364,18 @@ export default function AiSystemsV5() {
   usePageMeta({
     title: "AI Systems & Automation — SiteMint Digital",
     description:
-      "Automation, CRM & internal systems, and AI-assisted workflows — evaluation, routing, follow-up, and record-keeping handled automatically, with people kept in the loop.",
+      "Automation, CRM & internal systems, growth infrastructure, and AI-assisted workflows — evaluation, routing, follow-up, tracking, and record-keeping handled automatically, with people kept in the loop.",
   });
   return (
     <div id="integrations-scope" className="sm-v5page sm-v5page--ai-systems">
       <ServicePage
         content={content}
-        extraSection={<CrmSystemsSection />}
+        extraSection={
+          <>
+            <CrmSystemsSection />
+            <GrowthInfrastructureSection />
+          </>
+        }
         demo={
           <div className="v3-card v3h-demo reveal-scale-settle" data-tone="ice" id="integrations">
             <div className="sm-flow reveal-h-left" role="img" aria-label="Workflow: evaluate, then route, then follow up, then draft">

@@ -13,13 +13,22 @@ import { Link } from "wouter";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { Megaphone } from "lucide-react";
 import {
   pricingTiersV5,
   PRICING_DISCLAIMER_V5,
   AI_RECEPTIONIST_PRICING_NOTE_V5,
+  ADVERTISING_SERVICES_NOTE_V5,
   type PricingTierV5,
 } from "@/components/v5/pricingTiersV5";
 import "@/styles/v5-pages.css";
+
+const ADVERTISING_BOUNDARIES = [
+  "Client ad spend is always separate from SiteMint's service fee.",
+  "We never guarantee leads, revenue, ROAS, platform approval, or rankings.",
+  "Not every website package includes ongoing campaign management.",
+  "Offered as a recurring or separately scoped engagement — never bundled by default.",
+];
 
 const PRICE_FACTORS = [
   {
@@ -53,6 +62,8 @@ const SCOPE_ADD_ONS = [
   { id: "automation", label: "Automation for follow-up and routing" },
   { id: "integrations", label: "Integrations with existing tools" },
   { id: "custom-app", label: "A custom web application" },
+  { id: "growth-infrastructure", label: "Growth infrastructure (tracking, pixels, consent)" },
+  { id: "advertising", label: "Advertising services (separately scoped, recurring)" },
   { id: "training", label: "Team training after launch" },
 ] as const;
 
@@ -236,6 +247,45 @@ export default function PricingV5() {
 
       <section className="v3-section" data-tone="porcelain">
         <div className="v3-container v3-reveal" ref={reveal}>
+          <span className="v3-eyebrow">
+            <Megaphone aria-hidden="true" size={14} style={{ verticalAlign: "-2px", marginRight: "0.35rem" }} />
+            Advertising services
+          </span>
+          <h2 className="v3-h2 reveal-clip" style={{ marginTop: "0.5rem" }}>
+            A separately scoped, recurring service — never a package line item.
+          </h2>
+          <p className="v3-body reveal-fade-up" style={{ marginTop: "0.5rem", maxWidth: "62ch" }}>
+            Meta Ads and Google Ads management — campaign discovery and
+            strategy, offer/audience/funnel planning, account and campaign
+            setup, landing-page and creative coordination, pixels and
+            conversion events, launch, and ongoing monitoring with plain
+            reporting. Growth infrastructure (tracking, pixels, consent,
+            landing pages) can be set up on its own, independent of whether
+            you ever run paid media with us.
+          </p>
+          <div className="sm-ads-note reveal-scale-settle">
+            <span className="v3-eyebrow" style={{ color: "var(--sm-mint-700, #0B7487)" }}>
+              What this never means
+            </span>
+            <ul className="sm-ads-note__list">
+              {ADVERTISING_BOUNDARIES.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="v3-body" style={{ marginTop: "1rem", fontSize: "0.85rem", color: "var(--sm-text-muted, #4A6472)" }}>
+            {ADVERTISING_SERVICES_NOTE_V5}
+          </p>
+          <div style={{ marginTop: "1.25rem" }}>
+            <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
+              Talk about an advertising engagement
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="v3-section" data-tone="white">
+        <div className="v3-container v3-reveal" ref={reveal}>
           <span className="v3-eyebrow">What affects the price</span>
           <h2 className="v3-h2 reveal-clip" style={{ marginTop: "0.5rem" }}>
             Six things that move a project between tiers.
@@ -257,7 +307,7 @@ export default function PricingV5() {
         </div>
       </section>
 
-      <section className="v3-section" data-tone="white" id="configure" style={{ scrollMarginTop: "5rem" }}>
+      <section className="v3-section" data-tone="porcelain" id="configure" style={{ scrollMarginTop: "5rem" }}>
         <div className="v3-container v3-reveal" ref={reveal}>
           <div className="reveal-scale-settle">
             <ScopeConfigurator />
