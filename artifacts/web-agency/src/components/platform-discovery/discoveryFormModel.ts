@@ -25,6 +25,7 @@ export type DiscoveryDraft = Draft<DiscoverySubmissionContract>;
 
 export const defaultDiscoveryDraft: DiscoveryDraft = {
   projectDirection: {
+    projectStage: undefined,
     primaryType: undefined,
     secondaryInterests: [],
   },
@@ -81,6 +82,21 @@ export const defaultDiscoveryDraft: DiscoveryDraft = {
     privacyRegulatoryNeeds: undefined,
     technicalOwner: undefined,
     contentOwner: undefined,
+  },
+  growth: {
+    interested: false,
+    platform: undefined,
+    otherPlatformNote: undefined,
+    monthlyBudgetRange: undefined,
+    campaignObjective: undefined,
+    targetAudienceLocations: undefined,
+    hasLandingPage: undefined,
+    landingPageUrl: undefined,
+    hasPixelsConfigured: undefined,
+    analyticsConsentReady: undefined,
+    creativeAssetsAvailable: undefined,
+    previousCampaignResults: undefined,
+    reportingCadence: undefined,
   },
   commercial: {
     launchWindow: undefined,
@@ -254,28 +270,142 @@ export const discoveryResolver: Resolver<DiscoveryDraft> = async (draft, _contex
   return { values: {}, errors: mapZodIssuesToFieldErrors(scopedIssues) };
 };
 
-// ── Step field paths — one top-level contract key per step. Passing the
-// parent path to trigger()/lookups validates and reports the whole subtree
-// in one call. Reused by every step's Continue handler and by
-// findFirstStepWithError below. ─────────────────────────────────────────────
+// ── Step field paths — Checkpoint 2C.3 (owner-directed reorganization). The
+// reorganized wizard has UI steps that no longer map one-to-one onto the
+// contract's top-level keys (e.g. "Business and audience" now also carries
+// several decisionContext leaf fields, and "Project starting point" carries
+// only two leaf fields out of projectDirection/business rather than either
+// object in full) — so each step is now an explicit list of dot-paths
+// (leaf fields or whole subtrees) rather than a single top-level key.
+// `filterIssuesToNames` above already matches by exact path or path-prefix,
+// so this generalizes the original one-key-per-step model without changing
+// its matching semantics. Reused by every step's Continue handler and by
+// findFirstStepWithError/countErrorsAtPaths below. ──────────────────────────
 
-export const STEP_FIELD_PATHS: readonly (keyof DiscoveryDraft)[] = [
-  "projectDirection",
-  "business",
-  "decisionContext",
-  "projectScope",
-  "readiness",
-  "commercial",
-  "contact",
+export type StepFieldPaths = readonly string[];
+
+export const STEP_FIELD_PATHS: readonly StepFieldPaths[] = [
+  // 0 — Project starting point
+  ["projectDirection.projectStage", "business.description"],
+  // 1 — System or service needed
+  ["projectDirection.primaryType", "projectDirection.secondaryInterests"],
+  // 2 — Business and audience (+ the situation/goals questions that used to
+  // be their own step — folded in here per the owner-directed audit)
+  [
+    "business.organizationName",
+    "business.industry",
+    "business.currentWebsite",
+    "business.serviceArea",
+    "business.primaryAudience",
+    "business.secondaryAudience",
+    "business.businessStage",
+    "business.teamSizeRange",
+    "decisionContext.currentSituation",
+    "decisionContext.whyNow",
+    "decisionContext.desiredOutcome",
+    "decisionContext.primaryGoal",
+    "decisionContext.secondaryGoals",
+    "decisionContext.customerImpact",
+  ],
+  // 3 — Brand and visual direction
+  [
+    "readiness.logoStatus",
+    "readiness.brandStatus",
+    "readiness.referenceSites",
+    "readiness.designPreferences",
+    "readiness.designDislikes",
+  ],
+  // 4 — Content and functionality
+  ["projectScope.features", "projectScope.additionalRequirements", "readiness.contentStatus", "readiness.photoVideoStatus"],
+  // 5 — Systems and integrations
+  [
+    "readiness.domainStatus",
+    "readiness.hostingStatus",
+    "readiness.currentPlatform",
+    "readiness.integrations",
+    "readiness.migrationNeeds",
+  ],
+  // 6 — Growth, advertising, and tracking
+  [
+    "growth.interested",
+    "growth.platform",
+    "growth.otherPlatformNote",
+    "growth.monthlyBudgetRange",
+    "growth.campaignObjective",
+    "growth.targetAudienceLocations",
+    "growth.hasLandingPage",
+    "growth.landingPageUrl",
+    "growth.hasPixelsConfigured",
+    "growth.analyticsConsentReady",
+    "growth.creativeAssetsAvailable",
+    "growth.previousCampaignResults",
+    "growth.reportingCadence",
+  ],
+  // 7 — Delivery, budget, and contact
+  [
+    "commercial.launchWindow",
+    "commercial.targetDate",
+    "commercial.dateFlexibility",
+    "commercial.deadlineReason",
+    "commercial.investmentRange",
+    "commercial.investmentApproved",
+    "commercial.decisionMakers",
+    "commercial.finalApprover",
+    "commercial.vendorProcurementInvolved",
+    "commercial.supportModelPreference",
+    "contact.name",
+    "contact.title",
+    "contact.email",
+    "contact.phone",
+    "contact.preferredContactMethod",
+    "contact.preferredContactTime",
+    "contact.timeZone",
+    "contact.referralSource",
+    "contact.consent",
+  ],
 ];
 
-/** Generic: walks a fixed, ordered list of top-level step keys and returns the index of the first one with any error. */
+/** Walks a dot-path (no array-index segments expected here) through a nested object, returning whatever is found (or undefined). */
+function getNodeAtPath(root: unknown, path: string): unknown {
+  let cursor: unknown = root;
+  for (const segment of path.split(".")) {
+    if (cursor === null || typeof cursor !== "object") return undefined;
+    cursor = (cursor as Record<string, unknown>)[segment];
+  }
+  return cursor;
+}
+
+/** True if a RHF FieldErrors tree has any error at or beneath the given dot-path. */
+function hasErrorAtPath(errors: FieldErrors<DiscoveryDraft>, path: string): boolean {
+  return getNodeAtPath(errors, path) != null;
+}
+
+function countLeafErrors(node: unknown): number {
+  if (node === null || node === undefined) return 0;
+  if (typeof node === "object" && "message" in (node as Record<string, unknown>) && !Array.isArray(node)) {
+    return typeof (node as { message?: unknown }).message === "string" ? 1 : 0;
+  }
+  if (Array.isArray(node)) {
+    return node.reduce<number>((sum, child) => sum + countLeafErrors(child), 0);
+  }
+  if (typeof node === "object") {
+    return Object.values(node as Record<string, unknown>).reduce<number>((sum, child) => sum + countLeafErrors(child), 0);
+  }
+  return 0;
+}
+
+/** Total number of leaf field errors across a step's field paths — drives the "N fields need attention" wording. */
+export function countErrorsAtPaths(errors: FieldErrors<DiscoveryDraft>, paths: StepFieldPaths): number {
+  return paths.reduce((sum, path) => sum + countLeafErrors(getNodeAtPath(errors, path)), 0);
+}
+
+/** Generic: walks the ordered list of step field-path groups and returns the index of the first one with any error. */
 export function findFirstStepWithError(
   errors: FieldErrors<DiscoveryDraft>,
-  stepFieldPaths: readonly (keyof DiscoveryDraft)[] = STEP_FIELD_PATHS,
+  stepFieldPaths: readonly StepFieldPaths[] = STEP_FIELD_PATHS,
 ): number {
   for (let i = 0; i < stepFieldPaths.length; i++) {
-    if (errors[stepFieldPaths[i]]) return i;
+    if (stepFieldPaths[i].some((path) => hasErrorAtPath(errors, path))) return i;
   }
   return 0;
 }

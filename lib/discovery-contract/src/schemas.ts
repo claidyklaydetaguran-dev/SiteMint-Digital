@@ -17,8 +17,20 @@ import { z } from "zod/v4";
 // stored with — this contract is never retroactively applied to legacy rows
 // (see discoverySubmissions' additive, nullable Phase 2C.2B columns).
 
-export const DISCOVERY_SCHEMA_VERSION = "1.0.0";
-export const DISCOVERY_FORM_VERSION = "1.0.0";
+// Checkpoint 2C.3 (owner-directed intake reorganization, 2026-09):
+// projectDirection.projectStage and the top-level `growth` section are new,
+// and decisionContext.primaryProblem / decisionContext.successDefinition
+// relaxed from required to optional — schemaVersion bump. The reorganized
+// step order/copy is a formVersion bump. Every change below is additive or a
+// required->optional relaxation only: no existing field is renamed, removed,
+// or tightened, and `formData` is a JSONB column (see
+// artifacts/api-server/src/lib/discoveryV1Persistence.ts), so legacy rows are
+// completely unaffected. No new field is ever made required — the shared
+// contract type is consumed verbatim (`DiscoverySubmissionContract`-typed
+// fixtures) by artifacts/api-server's own test suite, which this checkpoint
+// must not touch or break.
+export const DISCOVERY_SCHEMA_VERSION = "1.1.0";
+export const DISCOVERY_FORM_VERSION = "2.0.0";
 export const DISCOVERY_IDEMPOTENCY_CANONICALIZATION_VERSION = "v1";
 
 const shortText = (max: number) => z.string().trim().min(1).max(max);
@@ -42,7 +54,22 @@ export const PROJECT_PRIMARY_TYPES = [
   "not_sure_yet",
 ] as const;
 
+// Checkpoint 2C.3: the project's *starting point* (new build vs. an existing
+// system being redesigned/upgraded/extended) is a distinct question from
+// *which system type* is needed (primaryType, below) — the owner-directed
+// reorganization asks these as two separate steps instead of one blended
+// enum. New, optional (never required — see the versioning note above), so
+// every historical row and every existing fixture that omits it stays valid.
+export const PROJECT_STAGES = [
+  "new_build",
+  "redesign",
+  "upgrade",
+  "extension",
+  "not_sure",
+] as const;
+
 const projectDirectionSchema = z.strictObject({
+  projectStage: z.enum(PROJECT_STAGES).optional(),
   primaryType: z.enum(PROJECT_PRIMARY_TYPES),
   // Order-insensitive (a set of additional interests, not a ranking) — the
   // canonicalization utility below is explicitly told to sort this field.
@@ -97,7 +124,13 @@ export const PROJECT_GOALS = [
 
 const decisionContextSchema = z.strictObject({
   currentSituation: shortText(2000),
-  primaryProblem: shortText(2000),
+  // Checkpoint 2C.3: relaxed from required to optional — the reorganized
+  // "Business and audience" step folds this question's intent into
+  // currentSituation's expanded prompt rather than asking it twice
+  // (owner-directed question audit, "repeated questions asked in different
+  // words"). The field itself is untouched (same path, same bound, still
+  // accepted when present) — only its required-ness changed.
+  primaryProblem: optionalLongText(2000),
   customerImpact: optionalLongText(2000),
   teamImpact: optionalLongText(2000),
   currentManualWork: optionalLongText(2000),
@@ -111,7 +144,10 @@ const decisionContextSchema = z.strictObject({
   // absent key (see discoveryCanonicalization.ts).
   consequenceOfDelay: z.string().trim().min(1).max(2000).nullable().optional(),
   desiredOutcome: shortText(2000),
-  successDefinition: shortText(2000),
+  // Checkpoint 2C.3: relaxed from required to optional — redundant with
+  // desiredOutcome in the reorganized narrative (question audit); kept in
+  // the contract, unchanged path, still accepted when present.
+  successDefinition: optionalLongText(2000),
   primaryGoal: z.enum(PROJECT_GOALS),
   // Order-insensitive set of additional goals.
   secondaryGoals: z.array(z.enum(PROJECT_GOALS)).max(9).optional(),
@@ -167,6 +203,53 @@ const readinessSchema = z.strictObject({
   privacyRegulatoryNeeds: optionalLongText(500),
   technicalOwner: optionalShortText(200),
   contentOwner: optionalShortText(200),
+});
+
+// ── Growth, advertising, and tracking (Checkpoint 2C.3, owner-confirmed
+// service scope) ──────────────────────────────────────────────────────────
+// A brand-new, wholly optional top-level section — never asked unless the
+// visitor opts in via `interested`, and every other field here is itself
+// optional so a partial answer never blocks submission. Commercial
+// boundaries (ad spend is separate from SiteMint's fee; no guaranteed
+// leads/revenue/ROAS/approval; management is a recurring or separately
+// scoped service) are conveyed in the form's copy, not encoded here.
+
+export const AD_PLATFORMS = ["meta_ads", "google_ads", "other"] as const;
+export const MEDIA_BUDGET_RANGES = [
+  "under_500",
+  "500_1500",
+  "1500_5000",
+  "5000_15000",
+  "15000_plus",
+  "not_sure",
+] as const;
+export const CAMPAIGN_OBJECTIVES = [
+  "lead_generation",
+  "sales_conversions",
+  "brand_awareness",
+  "app_installs",
+  "local_visibility",
+  "other",
+] as const;
+export const YES_NO = ["yes", "no"] as const;
+export const YES_NO_UNSURE = ["yes", "no", "unsure"] as const;
+export const CREATIVE_ASSET_STATUSES = ["yes", "in_progress", "need_help"] as const;
+export const REPORTING_CADENCES = ["weekly", "biweekly", "monthly", "not_sure"] as const;
+
+const growthSchema = z.strictObject({
+  interested: z.boolean(),
+  platform: z.enum(AD_PLATFORMS).optional(),
+  otherPlatformNote: optionalShortText(200),
+  monthlyBudgetRange: z.enum(MEDIA_BUDGET_RANGES).optional(),
+  campaignObjective: z.enum(CAMPAIGN_OBJECTIVES).optional(),
+  targetAudienceLocations: optionalLongText(1000),
+  hasLandingPage: z.enum(YES_NO).optional(),
+  landingPageUrl: z.url().max(2048).optional(),
+  hasPixelsConfigured: z.enum(YES_NO_UNSURE).optional(),
+  analyticsConsentReady: z.enum(YES_NO_UNSURE).optional(),
+  creativeAssetsAvailable: z.enum(CREATIVE_ASSET_STATUSES).optional(),
+  previousCampaignResults: optionalLongText(2000),
+  reportingCadence: z.enum(REPORTING_CADENCES).optional(),
 });
 
 // ── §12.6 Timeline, investment, decision process ─────────────────────────────
@@ -227,6 +310,10 @@ export const DiscoverySubmissionContract = z.strictObject({
   decisionContext: decisionContextSchema,
   projectScope: projectScopeSchema,
   readiness: readinessSchema,
+  // New, optional top-level section (Checkpoint 2C.3) — see growthSchema
+  // above. Absent entirely on any submission from before this checkpoint,
+  // and safe to omit going forward (never asked unless the visitor opts in).
+  growth: growthSchema.optional(),
   commercial: commercialSchema,
   contact: contactSchema,
 });

@@ -1,4 +1,4 @@
-import { useFormContext, Controller } from "react-hook-form";
+import { useFormContext, Controller, useWatch } from "react-hook-form";
 import { PROJECT_PRIMARY_TYPES } from "@workspace/discovery-contract";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { DiscoveryDraft } from "../discoveryFormModel";
 
 const PRIMARY_TYPE_LABELS: Record<(typeof PROJECT_PRIMARY_TYPES)[number], string> = {
-  new_website: "A brand-new website",
+  new_website: "A website",
   redesign: "A redesign of an existing website",
   web_application: "A custom web application",
   customer_portal: "A customer portal or account area",
@@ -17,12 +17,22 @@ const PRIMARY_TYPE_LABELS: Record<(typeof PROJECT_PRIMARY_TYPES)[number], string
   workflow_automation: "Workflow automation",
   seo_ai_search_visibility: "SEO and AI search visibility",
   maintenance_support: "Ongoing maintenance and support",
-  multiple_connected_systems: "Multiple connected systems",
+  multiple_connected_systems: "A combination of systems",
   not_sure_yet: "Not sure yet",
 };
 
-export function ProjectDirectionStep() {
+/**
+ * Step 1 of the reorganized (Checkpoint 2C.3) intake — "System or service
+ * needed." Distinct from step 0's "starting point" question: this is about
+ * *what kind* of system, independent of whether it's new or existing.
+ * Selecting "AI receptionist" here intentionally shows nothing beyond this
+ * step's own two fields — full configuration is a separate, later
+ * conversation, not part of this brief (owner-directed conditional
+ * branching: "short interest block, not full config").
+ */
+export function SystemNeededStep() {
   const { control } = useFormContext<DiscoveryDraft>();
+  const primaryType = useWatch({ control, name: "projectDirection.primaryType" });
 
   return (
     <div className="space-y-6">
@@ -50,6 +60,13 @@ export function ProjectDirectionStep() {
           </FormItem>
         )}
       />
+
+      {primaryType === "ai_receptionist" && (
+        <p className="dv5-alert-in rounded-md border border-[hsl(var(--sm-color-border-default))] bg-[hsl(var(--sm-color-bg-subtle))] p-3 text-sm text-[hsl(var(--sm-color-text-secondary))]">
+          Good to know — we'll follow up with AI Receptionist specifics separately. No need to configure call flows or
+          scripts here.
+        </p>
+      )}
 
       <div>
         <Label>Anything else you're also interested in? (optional)</Label>

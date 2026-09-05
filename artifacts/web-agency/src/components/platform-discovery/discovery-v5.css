@@ -459,3 +459,57 @@
   color: hsl(var(--sm-mint-700));
   word-break: break-all;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 4 — flat "Glacier" primary button, scoped to `.discovery-v5` only
+   (platform-preview.css's own `.pp-btn-primary` — the glossy gradient +
+   sheen treatment used on every other /platform-preview page — is left
+   completely untouched; this file never edits it directly). Applies to
+   every button using the shared `.pp-btn.pp-btn-primary` classes within
+   Discovery: "Start the form" / "Continue where you left off" (Welcome),
+   "Continue" (step navigation), and "Submit Discovery Brief" (Review).
+   Solid mint fill, dark ink text, a restrained border, and a small flat
+   shadow for depth — no gradient, no gloss layer, no lift-on-hover.
+   Selector specificity (.discovery-v5 .pp-btn.pp-btn-primary, 3 classes)
+   beats platform-preview.css's own (.platform-preview .pp-btn-primary, 2
+   classes) without needing !important. ═══════════════════════════════════ */
+
+.discovery-v5 .pp-btn::before {
+  /* Removes the shared gloss/sheen overlay for every button in Discovery,
+     not just the primary one — the flat treatment is meant to replace the
+     glossy language entirely here, not leave secondary buttons glossy. */
+  content: none;
+}
+
+.discovery-v5 .pp-btn.pp-btn-primary {
+  min-height: 44px;
+  background: #32c5d2; /* --sm-mint-500, solid — no gradient */
+  color: #173642; /* dark ink, per Task 4 */
+  border: 1.5px solid #1fa9bc; /* --sm-mint-600, restrained */
+  box-shadow: 0 2px 4px rgba(5, 24, 36, 0.12); /* subtle depth only */
+  transform: none;
+}
+
+.discovery-v5 .pp-btn.pp-btn-primary:hover {
+  transform: none;
+  background: #2bb8c8;
+  box-shadow: 0 2px 4px rgba(5, 24, 36, 0.16);
+}
+
+.discovery-v5 .pp-btn.pp-btn-primary:active {
+  transform: none;
+  background: #1fa9bc;
+  box-shadow: 0 1px 2px rgba(5, 24, 36, 0.14);
+}
+
+.discovery-v5 .pp-btn.pp-btn-primary:focus-visible {
+  outline: var(--sm-focus-ring-width) solid hsl(var(--sm-color-border-focus));
+  outline-offset: var(--sm-focus-ring-offset);
+  box-shadow: 0 2px 4px rgba(5, 24, 36, 0.12);
+}
+
+.discovery-v5 .pp-btn.pp-btn-primary:disabled,
+.discovery-v5 .pp-btn.pp-btn-primary[aria-disabled="true"] {
+  opacity: 0.5;
+  box-shadow: none;
+}

@@ -1,5 +1,5 @@
 import type { FieldErrors } from "react-hook-form";
-import type { DiscoveryDraft } from "./discoveryFormModel";
+import type { DiscoveryDraft, StepFieldPaths } from "./discoveryFormModel";
 
 interface FlatError {
   path: string;
@@ -46,18 +46,27 @@ function flattenErrors(node: unknown, path: string, out: FlatError[]): void {
   }
 }
 
+/** Walks a dot-path through a nested object, returning whatever is found (or undefined). Mirrors discoveryFormModel's own helper. */
+function getNodeAtPath(root: unknown, path: string): unknown {
+  let cursor: unknown = root;
+  for (const segment of path.split(".")) {
+    if (cursor === null || typeof cursor !== "object") return undefined;
+    cursor = (cursor as Record<string, unknown>)[segment];
+  }
+  return cursor;
+}
+
 interface DiscoveryValidationSummaryProps {
-  stepKey: keyof DiscoveryDraft;
+  stepPaths: StepFieldPaths;
   errors: FieldErrors<DiscoveryDraft>;
   onFocusField: (path: string) => void;
 }
 
-export function DiscoveryValidationSummary({ stepKey, errors, onFocusField }: DiscoveryValidationSummaryProps) {
-  const stepErrors = errors[stepKey];
-  if (!stepErrors) return null;
-
+export function DiscoveryValidationSummary({ stepPaths, errors, onFocusField }: DiscoveryValidationSummaryProps) {
   const flat: FlatError[] = [];
-  flattenErrors(stepErrors, String(stepKey), flat);
+  for (const path of stepPaths) {
+    flattenErrors(getNodeAtPath(errors, path), path, flat);
+  }
 
   if (flat.length === 0) return null;
 
