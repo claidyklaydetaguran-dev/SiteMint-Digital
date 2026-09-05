@@ -609,3 +609,232 @@
   opacity: 1 !important;
   clip-path: none !important;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Real product-evidence containers (owner directive 2026-09-05: "don't
+   remove the unfinished containers — make it finish and polish. More
+   visual, more real product evidence, useful interaction"). Wires the eight
+   real preview captures in `assets/product/*.png` into Work, Process, and
+   Start via `BrowserFrame` (components/v5/BrowserFrame.tsx). Every rule stays
+   scoped under `.sm-v5page` per this file's own rule at the top.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── BrowserFrame — the shared "real interface" chrome ───────────────────
+   Fixed aspect-ratio (2560×1600, the real capture dimensions) so the box
+   never resizes as the image decodes — zero CLS regardless of network
+   speed or `loading="lazy"` timing. ───────────────────────────────────── */
+.sm-v5page .sm-browser-frame {
+  margin: 0;
+  border-radius: var(--v3-radius-card, 14px);
+  border: 1px solid var(--sm-line, #cfe7ea);
+  background: var(--sm-white, #fff);
+  overflow: hidden;
+  box-shadow: var(--v3-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-v5page .sm-browser-frame__chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--sm-porcelain, #f1f7f8);
+  border-bottom: 1px solid var(--sm-line, #cfe7ea);
+}
+.sm-v5page .sm-browser-frame__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #a9cfd6);
+  flex-shrink: 0;
+}
+.sm-v5page .sm-browser-frame__address {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  background: var(--sm-white, #fff);
+  border: 1px solid var(--sm-line, #cfe7ea);
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  color: var(--sm-text-muted, #4a6472);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sm-v5page .sm-browser-frame__viewport {
+  aspect-ratio: 2560 / 1600;
+  overflow: hidden;
+  background: var(--sm-porcelain, #f1f7f8);
+}
+.sm-v5page .sm-browser-frame__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sm-v5page .sm-browser-frame__img {
+    opacity: 0;
+    transition: opacity 320ms ease;
+  }
+  .sm-v5page .sm-browser-frame__img.sm-is-loaded {
+    opacity: 1;
+  }
+}
+.sm-v5page .sm-browser-frame__caption {
+  padding: 0.6rem 0.9rem 0.85rem;
+  font-size: 0.78rem;
+  color: var(--sm-text-muted, #4a6472);
+}
+.sm-v5page .sm-browser-frame--compact {
+  max-width: 26rem;
+}
+
+/* ── Work — "the system" / "the interface" toggle per composition ────────
+   A plain two-state toggle (native `<button aria-pressed>`, no custom ARIA
+   tab pattern needed for a two-way switch). "The system" renders a small
+   flow diagram reusing the `.sm-flow` node/arrow vocabulary already defined
+   above (Services workflow strip); "the interface" renders the matching
+   real capture in a `BrowserFrame`. ──────────────────────────────────────── */
+.sm-v5page .sm-evidence {
+  margin-top: var(--v3-space-4, 1rem);
+  display: grid;
+  gap: var(--v3-space-3, 0.75rem);
+}
+.sm-v5page .sm-evidence__tabs {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.2rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  background: var(--sm-porcelain, #f1f7f8);
+  border: 1px solid var(--sm-line, #cfe7ea);
+  width: fit-content;
+}
+.sm-v5page .sm-evidence__tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--sm-text-muted, #4a6472);
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.sm-v5page .sm-evidence__tab:hover {
+  color: var(--sm-text, #173642);
+}
+.sm-v5page .sm-evidence__tab:focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32c5d2);
+  outline-offset: 2px;
+}
+.sm-v5page .sm-evidence__tab[aria-pressed="true"] {
+  background: var(--sm-white, #fff);
+  color: var(--sm-text, #173642);
+  box-shadow: var(--v3-shadow-1, 0 4px 14px rgb(11 58 62 / 0.12));
+}
+.sm-v5page .sm-evidence__panel {
+  min-height: 0;
+}
+.sm-v5page .sm-evidence__diagram {
+  display: grid;
+  gap: 0.6rem;
+  padding: var(--v3-space-5, 1.25rem);
+  border-radius: var(--v3-radius-card, 14px);
+  border: 1px dashed var(--sm-line-strong, #a9cfd6);
+  background: var(--sm-porcelain, #f1f7f8);
+}
+.sm-v5page .sm-evidence__diagram .sm-flow {
+  margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.sm-v5page .sm-evidence__diagram-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--sm-text-muted, #4a6472);
+}
+
+/* ── Process — interactive phase selector ─────────────────────────────────
+   The number and title become real buttons (`font: inherit` reset below so
+   they read exactly like the original static text) driving a single
+   `activeIndex` in `ProcessV3`. Clicking any phase expands its detail panel
+   (the other four collapse) and highlights that phase's segment of the
+   connecting rail defined above — one phase open at a time, keyboard
+   reachable via native button focus/Enter/Space, no custom key handling. ── */
+.sm-v5page .v3m-step__trigger,
+.sm-v5page .v3m-step__head-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+/* `.v3m-step__no`/`.v3m-step__title` (protected v3-marketing.css) already
+   set the large mono digit and heading type — only `.v3m-step__head-btn`
+   (nested inside the `<h2>`, carrying none of the heading's own classes)
+   needs to inherit that type explicitly. */
+.sm-v5page .v3m-step__head-btn {
+  font: inherit;
+  color: inherit;
+}
+.sm-v5page .v3m-step__trigger:focus-visible,
+.sm-v5page .v3m-step__head-btn:focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32c5d2);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.sm-v5page .v3m-step--active .v3m-step__no,
+.sm-v5page .v3m-step--active .v3m-step__title {
+  color: var(--sm-mint-500, #32c5d2);
+}
+.sm-v5page .v3m-step--active::before {
+  opacity: 1;
+}
+.sm-v5page .v3m-step__detail {
+  display: grid;
+  gap: var(--v3-space-3, 0.75rem);
+  padding-top: var(--v3-space-3, 0.75rem);
+}
+.sm-v5page .v3m-step__artifact {
+  padding: 0.6rem 0.9rem;
+  border-left: 2px solid var(--sm-mint-500, #32c5d2);
+  background: var(--sm-porcelain, #f1f7f8);
+  border-radius: 0 8px 8px 0;
+}
+.sm-v5page .v3m-step__detail .sm-browser-frame {
+  max-width: 30rem;
+}
+
+/* ── Start — discovery mini-preview ───────────────────────────────────────
+   A small, non-interactive proof next to the "what to expect" list: the
+   real first discovery step, framed and captioned with verified facts
+   (8 guided steps, browser-only autosave — see `useDiscoveryDraft.ts`). ─── */
+.sm-v5page .v3st-preview {
+  display: grid;
+  gap: 0.6rem;
+}
+.sm-v5page .v3st-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--sm-text-muted, #4a6472);
+}
+.sm-v5page .v3st-preview__meta span {
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  border: 1px solid var(--sm-line, #cfe7ea);
+  background: var(--sm-white, #fff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-v5page .sm-evidence__tab {
+    transition: none;
+  }
+}

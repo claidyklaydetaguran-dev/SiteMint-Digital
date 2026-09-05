@@ -15,7 +15,7 @@ export default function AboutV3() {
   const reveal = useReveal();
   usePageMeta({
     title: "Company — SiteMint Digital",
-    description: "A small studio that builds like an operator — what we believe, how we're organized, and the people doing the work.",
+    description: "A studio that builds like an operator — what we believe, how we're organized, and the people doing the work.",
   });
 
   return (
@@ -26,15 +26,15 @@ export default function AboutV3() {
           {/* Headline is the hero LCP text — left static (no mask-reveal) so
               first paint isn't delayed; eyebrow/lede/visual carry the motion. */}
           <h1 className="v3-display">
-            A small studio that builds like an operator.
+            A studio that builds like an operator.
           </h1>
           <p className="v3-lede reveal-fade-up">
-            SiteMint Digital designs, builds, and runs business systems —
-            including our own. The discovery flow on this site is the same
-            structured intake we build for clients. The automation and CRM
-            we recommend runs our own pipeline. Our AI Receptionist product is
-            in private, invite-only beta. We use what we build, which keeps
-            us honest about what works and what's still in progress.
+            We run our own version of everything we sell. The discovery flow
+            on this site is the same structured intake we build for clients.
+            The automation and CRM we recommend runs our own pipeline. Our AI
+            Receptionist product is in private, invite-only beta. We use what
+            we build, which keeps us honest about what works and what's still
+            in progress.
           </p>
         </div>
       </section>
@@ -44,6 +44,14 @@ export default function AboutV3() {
           <div className="v3m-sechead">
             <span className="v3m-sechead__no">00</span>
             <h2 className="v3-h2 reveal-clip">The people doing the work.</h2>
+            <p className="v3-lede reveal-fade-up">
+              SiteMint designs and builds connected digital systems —
+              websites, web applications, CRM tools, automation, and AI
+              products — that capture opportunities, organize operations, and
+              move work toward the next meaningful action. These are the
+              roles that make that happen, and the names attached to them
+              today.
+            </p>
           </div>
           <div className="v3m-pillars v3m-pillars--3">
             {teamV5.map((member) => (
@@ -111,7 +119,7 @@ export default function AboutV3() {
         <div className="v3-container v3m-split v3-reveal" ref={reveal}>
           <div className="v3m-split__copy reveal-h-left">
             <span className="v3-eyebrow">How we're organized</span>
-            <h2 className="v3-h2 reveal-clip">Small on purpose.</h2>
+            <h2 className="v3-h2 reveal-clip">Direct access, by design.</h2>
             <p className="v3-body reveal-fade-up">
               SiteMint is a focused team, not a layered agency. The people who
               design your system are the people who build it and the people who
@@ -121,6 +129,15 @@ export default function AboutV3() {
           </div>
           <div className="v3m-split__media">
             <div className="v3m-receipt reveal-scale-settle">
+              <div className="v3m-receipt__row">
+                <span className="v3m-receipt__k">What SiteMint builds</span>
+                <span className="v3m-receipt__v">
+                  Connected digital systems — websites, web applications, CRM
+                  tools, automation, and AI products — that capture
+                  opportunities, organize operations, and move work toward the
+                  next meaningful action.
+                </span>
+              </div>
               <div className="v3m-receipt__row">
                 <span className="v3m-receipt__k">What that means for you</span>
                 <span className="v3m-receipt__v">
