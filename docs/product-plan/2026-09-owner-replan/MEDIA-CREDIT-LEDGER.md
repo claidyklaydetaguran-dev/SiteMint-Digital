@@ -22,7 +22,7 @@
 | 10 | 2026-09-05 | Work composition ambient — clinic (IMG-06a) | Seedream auto | 4:3 | ~100 var | 75 | 1900 | xS4NQgpjfW | done |
 | 11 | 2026-09-05 | Work composition ambient — trade (IMG-06b) | Seedream auto | 4:3 | ~100 var | 75 | 1975 | EbLloK0uuO | done |
 | 12 | 2026-09-05 | Work composition ambient — practice (IMG-06c) | Seedream auto | 4:3 | ~100 var | 75 | 2050 | LwNiH4nswO | done |
-| 14 | 2026-09-05 | Homepage NARRATIVE film (3-shot: brief → inside-the-system → resolved work) | Kling 3.0 multishot | 16:9 1080p 15s | 1350 exact | 1350 | 3415 | 4RW0ggc9Aa | rendering |
+| 14 | 2026-09-05 | Homepage NARRATIVE film (3-shot: brief → inside-the-system → resolved work) | Kling 3.0 multishot | 16:9 1080p 15s | 1350 exact | 1350 | 3415 | 4RW0ggc9Aa | done — approved quality: 3-beat story holds continuity; 781 KB 720p web |
 | 13 | 2026-09-05 | About texture band (IMG-07, snapped 21:9→2:1) | auto (light) | 2:1 | ~100 var | 15 | 2065 | u5sg8gqQLD | done |
 
 **Cumulative spent: 3,415 / 6,800** (homepage lane 2,225/2,800 · receptionist lane 875/2,200 · supporting 315/1,400 · reserve untouched) (balance verified 224,147 available before start; account unlimited-mode does NOT apply to this session — generations consume credits)
