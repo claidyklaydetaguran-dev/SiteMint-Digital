@@ -1538,3 +1538,12 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 640px;
 }
+
+/* #beta opts out of content-visibility: axe resolves backgrounds through
+   skipped rendering and reports a phantom 2.09:1 on the email link (live
+   computed contrast is 5.44:1 on porcelain, verified). One section of
+   eager layout is cheaper than a permanent false positive in every audit. */
+.smv5 #beta {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
