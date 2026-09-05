@@ -1235,6 +1235,578 @@
   display: block;
 }
 
+/* ═════════════════════════════════════════════════════════════════════════
+   Build Preview — `components/v5/BuildPreview.tsx` (owner directive,
+   2026-09-06: "The empty right-hand area must become a substantial
+   interactive Build Preview, not another static decorative card").
+   Mounted in place of the old `.sm-devices` illustration inside Section 4's
+   split (`WebsitesAppsSection`, this file's only other section touched by
+   this workstream) and, optionally, as `WebsitesAppsV3`'s demo pane.
+
+   Structure: `.sm-bp` is the root (carries `data-stage` / `data-viewport` /
+   `data-type` / `data-mode` set by the component), holding the controls row,
+   the Discover→Design→Build→Launch stepper, and the device `.sm-bp__frame`.
+   Every stage/viewport/type/mode rule below keys off those four data
+   attributes rather than re-rendering markup, so the reflow is pure CSS.
+   Glacier tokens only; no gradient (§1); no retired V4 hex. ═════════════════ */
+
+.sm-bp {
+  display: grid;
+  gap: 0.9rem;
+}
+.sm-bp__controls {
+  display: grid;
+  gap: 0.6rem;
+}
+.sm-bp__control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Toggle buttons (Website/Web App, New Build/Redesign) ────────────────── */
+.sm-bp__toggle {
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    transform 200ms ease;
+}
+.sm-bp__toggle:hover {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+  transform: translateY(-1px);
+}
+.sm-bp__toggle[aria-pressed="true"] {
+  background: var(--sm-mint-500, #32C5D2);
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+}
+.sm-bp__toggle--ghost[aria-pressed="true"] {
+  background: var(--sm-ink-950, #153E52);
+  border-color: var(--sm-ink-950, #153E52);
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-bp__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus, 0 0 0 3px rgb(50 197 210 / 0.45));
+}
+
+/* ── Viewport control (Desktop/Tablet/Mobile) ─────────────────────────────── */
+.sm-bp__viewport-row {
+  margin-left: auto;
+}
+.sm-bp__viewport-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--sm-radius-m, 10px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.62rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+.sm-bp__viewport-btn:hover {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__viewport-btn[aria-pressed="true"] {
+  border-color: var(--sm-mint-500, #32C5D2);
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__viewport-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus, 0 0 0 3px rgb(50 197 210 / 0.45));
+}
+
+/* ── Stage stepper (Discover → Design → Build → Launch) ───────────────────── */
+.sm-bp__stages {
+  list-style: none;
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+}
+.sm-bp__stage-item {
+  flex: 1;
+}
+.sm-bp__stage-btn {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.4rem;
+  border: none;
+  border-top: 3px solid var(--sm-line, #CFE7EA);
+  background: transparent;
+  color: var(--sm-text-muted, #4A6472);
+  cursor: pointer;
+  transition: border-color 200ms ease, color 200ms ease;
+}
+.sm-bp__stage-btn:hover {
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__stage-btn[data-complete] {
+  border-top-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-text, #173642);
+}
+.sm-bp__stage-btn[aria-current="step"] {
+  border-top-color: var(--sm-mint-700, #0B7487);
+  color: var(--sm-text, #173642);
+  font-weight: 600;
+}
+.sm-bp__stage-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus, 0 0 0 3px rgb(50 197 210 / 0.45));
+}
+.sm-bp__stage-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sm-surface-alt, #EDF9FA);
+  font-size: 0.65rem;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.sm-bp__stage-btn[data-complete] .sm-bp__stage-dot {
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__stage-btn[aria-current="step"] .sm-bp__stage-dot {
+  background: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+}
+.sm-bp__stage-label {
+  font-size: 0.74rem;
+}
+.sm-bp__stage-caption {
+  margin: -0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--sm-text-muted, #4A6472);
+  min-height: 1.2em;
+}
+
+/* ── Device frame ──────────────────────────────────────────────────────────
+   Width keyed off `[data-viewport]` on the `.sm-bp` root — the same
+   attribute the module reflow rules below key off, so the frame narrowing
+   and the internal layout collapse happen together. */
+.sm-bp__frame-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+}
+.sm-bp__frame {
+  width: 100%;
+  border-radius: var(--sm-radius-m, 10px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  overflow: hidden;
+  transition: width var(--sm-dur-slow, 420ms) var(--sm-ease, ease), border-radius 200ms ease;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__frame {
+  width: min(420px, 100%);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__frame {
+  width: min(260px, 100%);
+  border-radius: 20px;
+}
+.sm-bp__chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 0.7rem;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-bp__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #A9CFD6);
+}
+.sm-bp__chrome-tag {
+  margin-left: auto;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sm-text-muted, #4A6472);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-pill, 999px);
+  padding: 0.1rem 0.5rem;
+}
+.sm-bp__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sm-mint-500, #32C5D2);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sm-bp__live-dot {
+    animation: sm-bp-pulse 1.7s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-bp__live-dot {
+    opacity: 0.75;
+  }
+}
+@keyframes sm-bp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.5); }
+}
+.sm-bp__canvas {
+  padding: 1rem;
+  min-height: 220px;
+}
+
+/* ── Wireframe/design placeholder blocks (Discover + Design stages) ──────── */
+.sm-bp__block {
+  display: block;
+  border-radius: 4px;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border: 1px dashed var(--sm-line-strong, #A9CFD6);
+  transition: background-color 200ms ease, border-color 200ms ease, border-radius 200ms ease;
+}
+.sm-bp[data-stage="design"] .sm-bp__block {
+  background: var(--sm-mint-100, #DFF7F7);
+  border: 1px solid var(--sm-mint-400, #56D2CF);
+  border-radius: 6px;
+}
+.sm-bp[data-stage="design"] .sm-bp__block--cta,
+.sm-bp[data-stage="design"] .sm-bp__block--icon {
+  background: var(--sm-mint-500, #32C5D2);
+  border-color: var(--sm-mint-500, #32C5D2);
+}
+.sm-bp__block--logo { width: 70px; height: 16px; }
+.sm-bp__block--nav-item { width: 38px; height: 10px; }
+.sm-bp__block--headline { width: 72%; height: 20px; }
+.sm-bp__block--sub { width: 55%; height: 12px; }
+.sm-bp__block--cta { width: 92px; height: 28px; border-radius: 999px; }
+.sm-bp__block--icon { width: 26px; height: 26px; border-radius: 50%; }
+.sm-bp__block--line { width: 80%; height: 10px; }
+.sm-bp__block--label { width: 50%; height: 12px; }
+.sm-bp__block--field { width: 100%; height: 26px; }
+.sm-bp__block--stat-value { width: 40px; height: 18px; }
+.sm-bp__block--stat-label { width: 70%; height: 10px; }
+.sm-bp__block--row { width: 100%; height: 16px; }
+
+/* ── Website modules ───────────────────────────────────────────────────── */
+.sm-bp__site,
+.sm-bp__app {
+  display: grid;
+  gap: 0.75rem;
+}
+.sm-bp__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.sm-bp__logo {
+  font-family: var(--sm-font-display, inherit);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__nav-links {
+  display: flex;
+  gap: 0.85rem;
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp__nav-burger {
+  display: none;
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__nav-links {
+  display: none;
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__nav-burger {
+  display: inline-flex;
+}
+.sm-bp__hero {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+.sm-bp__headline {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1rem;
+  margin: 0;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__sub {
+  font-size: 0.78rem;
+  margin: 0;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp__cta-btn {
+  justify-self: start;
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  background: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.sm-bp__features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__features {
+  grid-template-columns: repeat(2, 1fr);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__features {
+  grid-template-columns: 1fr;
+}
+.sm-bp__feature {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+}
+.sm-bp__feature-text {
+  font-size: 0.7rem;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__form {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--sm-line, #CFE7EA);
+}
+.sm-bp__form-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__form-field {
+  font-size: 0.68rem;
+  color: var(--sm-text-muted, #4A6472);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 0.35rem 0.5rem;
+}
+.sm-bp__cta-btn--form {
+  margin-top: 0.2rem;
+}
+.sm-bp__audit-tag {
+  justify-self: start;
+  font-size: 0.66rem;
+  color: var(--sm-amber-600, #B45309);
+  border: 1px dashed var(--sm-amber-600, #B45309);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 0.2rem 0.5rem;
+}
+
+/* ── Launch — real portfolio capture (Website only) ───────────────────────
+   Deliberately cropped: `object-fit: cover` + a fixed aspect-ratio box that
+   itself changes per viewport, so the same 1221×850 capture visibly recrops
+   as the device narrows — never a raw screenshot pasted at native size. */
+.sm-bp__hero-shot {
+  margin: 0;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--sm-radius-s, 6px);
+}
+.sm-bp__hero-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__hero-shot {
+  aspect-ratio: 4 / 3;
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__hero-shot {
+  aspect-ratio: 3 / 4;
+}
+.sm-bp__caption {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--sm-text-muted, #4A6472);
+  text-align: center;
+}
+
+/* ── Web App modules ───────────────────────────────────────────────────── */
+.sm-bp__app-topbar {
+  display: flex;
+  align-items: center;
+}
+.sm-bp__app-title {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__stats {
+  grid-template-columns: repeat(2, 1fr);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__stats {
+  grid-template-columns: 1fr;
+}
+.sm-bp__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface, #fff);
+}
+.sm-bp__stat-value {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__stat-label {
+  font-size: 0.64rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp__table {
+  overflow-x: auto;
+}
+.sm-bp__data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+.sm-bp__data-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--sm-text-muted, #4A6472);
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-bp__data-table td {
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+  color: var(--sm-text, #173642);
+}
+.sm-bp__status {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.sm-bp__status--ok {
+  background: var(--sm-green-100, #DCFCE7);
+  color: var(--sm-green-700, #15803D);
+}
+.sm-bp__status--pending {
+  background: var(--sm-amber-100, #FFF4DE);
+  color: var(--sm-amber-600, #B45309);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__data-table th:nth-child(3),
+.sm-bp[data-viewport="mobile"] .sm-bp__data-table td:nth-child(3) {
+  display: none;
+}
+.sm-bp__table-wire {
+  display: grid;
+  gap: 0.4rem;
+}
+.sm-bp__chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 64px;
+}
+.sm-bp__chart-bar {
+  width: 14px;
+  height: var(--bp-bar-h, 40%);
+  border-radius: 3px 3px 0 0;
+  background: var(--sm-line-strong, #A9CFD6);
+  transition: background-color 200ms ease;
+}
+.sm-bp__chart-bar[data-populated] {
+  background: var(--sm-mint-500, #32C5D2);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__chart-bar:nth-child(n+5) {
+  display: none;
+}
+
+/* ── Compact stacked layout below the split's 900px breakpoint ───────────── */
+@media (max-width: 899px) {
+  .sm-bp__canvas {
+    min-height: 160px;
+    padding: 0.85rem;
+  }
+  .sm-bp__viewport-row {
+    margin-left: 0;
+  }
+}
+
+/* ── Reduced motion — every transition collapses to instant; the only
+   continuous loop (the Launch "live" pulse, gated above) never autoplays
+   here — nothing else in this component animates on its own. ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sm-bp__toggle,
+  .sm-bp__viewport-btn,
+  .sm-bp__stage-btn,
+  .sm-bp__stage-dot,
+  .sm-bp__frame,
+  .sm-bp__block,
+  .sm-bp__chart-bar {
+    transition: none;
+  }
+  .sm-bp__toggle:hover {
+    transform: none;
+  }
+}
+
 /* Controlled workflow labels on the film band — page-rendered text, always
    readable and correctly spelled (owner directive). */
 .sm-home-v5 #hero .v4-hero__film-labels {
