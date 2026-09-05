@@ -24,13 +24,13 @@ owner-authorised migrations (B-09) and external certification (X-01…X-07).
 ## Scores
 
 <!-- scores:start -->
-_Computed 2026-09-05 03:00 UTC from V5-BUILD-CHECKLIST.md._
+_Computed 2026-09-05 10:12 UTC from V5-BUILD-CHECKLIST.md._
 
-Program-wide: **P0 items remaining 23** · owner blockers 20 · external blockers 1.
+Program-wide: **P0 items remaining 20** · owner blockers 17 · external blockers 1.
 
 ### E. Owner Visual Acceptance
 
-**Readiness 50.7%** = 76 ÷ 150 applicable weight · P0 remaining 14 · blockers 5 (owner 5, external 0)
+**Readiness 62%** = 93 ÷ 150 applicable weight · P0 remaining 11 · blockers 2 (owner 2, external 0)
 
 | Category | Items (status) |
 |---|---|
@@ -39,8 +39,8 @@ Program-wide: **P0 items remaining 23** · owner blockers 20 · external blocker
 | Spacing and rhythm | A-03:IN PROGRESS |
 | Content density | A-04:IN PROGRESS |
 | Page individuality | A-05:IN PROGRESS |
-| Imagery implemented | A-06:BLOCKED—OWNER |
-| Video/media implemented | A-07:BLOCKED—OWNER |
+| Imagery implemented | A-06:VERIFIED COMPLETE |
+| Video/media implemented | A-07:VERIFIED COMPLETE |
 | Desktop review | A-08:IN PROGRESS |
 | Tablet review | A-09:IN PROGRESS |
 | Mobile review | A-10:IN PROGRESS |
@@ -54,7 +54,7 @@ Program-wide: **P0 items remaining 23** · owner blockers 20 · external blocker
 | Routing and scroll | G-08:VERIFIED COMPLETE, G-09:VERIFIED COMPLETE, G-10:VERIFIED COMPLETE |
 | Full-screen hero | G-11:VERIFIED COMPLETE |
 | Marketing strategy | G-12:VERIFIED COMPLETE, G-13:IN PROGRESS |
-| Media | G-14:BLOCKED—OWNER, G-15:NOT STARTED |
+| Media | G-14:VERIFIED COMPLETE, G-15:VERIFIED COMPLETE |
 
 ### A. Company website
 
