@@ -2096,3 +2096,77 @@
     display: block;
   }
 }
+
+/* ── Crosswise order correction (owner final directive 2026-09-06) ───────
+   The media stage is the UPPER portion of the hero and the original
+   approved composition (copy, CTAs, particle field, HUD) sits beneath it.
+   Two geometry facts drive every rule below:
+   1. `.v4-hero__stage` is a FIXED-height (100svh) overflow:hidden sticky
+      box (v4-home.css, unchanged) — anything the budget doesn't fit is
+      silently clipped off the BOTTOM, which under the previous fixed film
+      heights meant the particle field and phase HUD were simply gone at
+      common desktop heights. Here the FILM is the flexible element
+      instead: it absorbs whatever height the lower portion leaves over
+      (capped at 58% of the usable hero per the 55–60% spec), so the
+      restored composition below it can never be clipped again.
+   2. The site header is `position:fixed` and ink heroes run beneath it —
+      the copy used to carry the header clearance; now the film is first,
+      the clearance moves to the film's top margin and the copy keeps only
+      breathing room. */
+.sm-home-v5 #hero .v4-hero__film {
+  margin: var(--v4-hdr-h, 64px) 0 0;
+  padding-inline: clamp(0.6rem, 1.5vw, 1.25rem);
+}
+.sm-home-v5 #hero .v4-hero__copy {
+  padding-top: clamp(1rem, 2.2vh, 1.6rem);
+}
+@media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__film {
+    /* Flexible upper stage: grows into the leftover, never past 58% of
+       the usable hero, never below a height that still reads cinematic. */
+    flex: 1 1 0px;
+    height: auto;
+    min-height: 280px;
+    max-height: calc((100svh - var(--v4-hdr-h, 64px)) * 0.58);
+  }
+  /* Lower portion — the original approved composition, compacted just
+     enough that copy + field + HUD genuinely fit beneath the stage in one
+     viewport (layout, copy, CTAs, particles and movement all preserved;
+     only the type scale steps down). */
+  .sm-home-v5 #hero .v4-hero__title {
+    font-size: clamp(1.9rem, 3.1vw, 2.75rem);
+  }
+  .sm-home-v5 #hero .v4-hero__sub1 {
+    font-size: clamp(1rem, 1.5vw, 1.25rem);
+    margin-bottom: 0.55rem;
+  }
+  .sm-home-v5 #hero .v4-hero__sub {
+    font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+  }
+  /* The field takes a fixed share so the film (flex:1) — not the field —
+     absorbs viewport variance; overrides the v4 base 240px floor that
+     forced the old clipping. */
+  .sm-home-v5 #hero .v4-hero__field {
+    flex: 0 0 auto;
+    height: clamp(150px, 22svh, 280px);
+    min-height: 0;
+    max-height: none;
+  }
+}
+@media (max-width: 767px) {
+  /* Mobile: fixed-height dedicated poster band (video never mounts here);
+     the budget is tightened so band + copy + field + HUD fit a small
+     phone viewport without clipping the HUD. */
+  .sm-home-v5 #hero .v4-hero__film {
+    height: clamp(120px, 18svh, 190px);
+  }
+  .sm-home-v5 #hero .v4-hero__copy {
+    padding-top: clamp(0.9rem, 2vh, 1.3rem);
+  }
+  .sm-home-v5 #hero .v4-hero__title {
+    font-size: clamp(1.6rem, 7vw, 2rem);
+  }
+  .sm-home-v5 #hero .v4-hero__field {
+    min-height: 104px;
+  }
+}

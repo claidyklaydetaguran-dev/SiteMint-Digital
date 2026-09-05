@@ -337,9 +337,10 @@ function HeroFilm() {
         </button>
       )}
       {/* The Signal seam — one mint thread travelling from the film stage
-          into the particle field below (owner: "a SiteMint signal travels
-          naturally between the film and particle field"). Static line under
-          reduced motion via the global override. */}
+          down into the restored hero composition below (owner: a signal
+          travels naturally between the upper media stage and the lower
+          portion). Static line under reduced motion via the global
+          override. */}
       <span className="v4-hero__seam" aria-hidden="true">
         <span className="v4-hero__seam-pulse" />
       </span>
@@ -653,6 +654,10 @@ export function SignalHeroV4({
   return (
     <div className="v4-hero" ref={rootRef} data-tone="ink">
       <div className="v4-hero__stage">
+        {/* Owner spec (final correction): the cinematic media stage is the
+            UPPER portion of the crosswise hero; the original approved hero
+            (copy, CTAs, particle field) is the lower portion beneath it. */}
+        {showFilm && <HeroFilm />}
         {/* Region 1 — the readable layer. Static through every phase. */}
         <div className="v4-hero__copy" data-v4-hero-copy>
           {!hideKicker && <p className="v4-kicker">{kicker}</p>}
@@ -682,8 +687,6 @@ export function SignalHeroV4({
             film band, stacked between the copy and the field at every
             breakpoint (small on mobile, taller on tablet, a cinematic band
             roughly half the sub-copy height on desktop). All of this lives
-            in CSS (`styles/v5-home.css`) — no layout logic lives here. */}
-        {showFilm && <HeroFilm />}
 
         {/* Region 2 — the Signal field. The narrative lives here, below the
             copy, at every width. */}
