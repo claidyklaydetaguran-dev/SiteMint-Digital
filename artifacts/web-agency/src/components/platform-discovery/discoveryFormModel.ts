@@ -216,7 +216,12 @@ function issuePathToString(path: ZodIssueLike["path"]): string {
 }
 
 function setNestedError(target: Record<string, unknown>, path: string, message: string): void {
-  const segments = path.split(".");
+  // "features[0].priority" must nest as features → 0 → priority: a literal
+  // "features[0]" key is invisible to getNodeAtPath("projectScope.features"),
+  // which made findFirstStepWithError fall back to step 0 for every array-item
+  // error (submit bounced the visitor to the first step instead of the one
+  // holding the invalid field).
+  const segments = path.replace(/[(d+)]/g, ".$1").split(".");
   let cursor: Record<string, unknown> = target;
   for (let i = 0; i < segments.length - 1; i++) {
     const key = segments[i];
