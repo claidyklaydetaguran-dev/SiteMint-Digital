@@ -48,6 +48,15 @@ const THIS_FILE_REL = "artifacts/web-agency/src/shells/themeComplianceContract.t
 // ─── The rejected palette ───────────────────────────────────────────────────
 
 const REJECTED_HEX = [
+  // Legacy platform-preview button-gradient greens (retinted to Glacier 2026-09-05;
+  // the widespread #27E9B5 stays allowed only as an inert var() fallback):
+  "#20D8B2",
+  "#1FCF9D",
+  "#1BC0A2",
+  "#209C82",
+  "#22C9C2",
+  "#2FE0BD",
+  "#6FF5D4",
   "#25D0B0",
   "#4FD9CF",
   "#16B597",

@@ -19,7 +19,7 @@
  * Homepage-only ocean-navy / cyan-mint palette (Visual redesign V4 — owner
  * feedback on V3's cool ocean-teal: still reads too green overall. Final
  * approved palette is deep ocean navy / ocean navy / blue-gray, with a
- * tightly-restrained cyan-mint accent (#27E9B5) reserved for small elements
+ * tightly-restrained cyan-mint accent (#32C5D2) reserved for small elements
  * only — status dots, icons, fine borders, focus rings, hover highlights —
  * never large fills, buttons, or broad glows. Sourced from the owner's
  * "Green Gray Color Palettes" reference image and explicit hex list.
@@ -33,7 +33,7 @@
  * WCAG 2.1 contrast verified: navy-800 text on white 14.95:1, navy-950 on
  * mint-pale 16.49:1, white on navy-950 fill 18.06:1, white on the button
  * gradient's lightest stop (#234554) 10.24:1, slate-600 on white 8.14:1 —
- * all comfortably clear the 4.5:1 text minimum. Cyan-mint (#27E9B5) alone
+ * all comfortably clear the 4.5:1 text minimum. Cyan-mint (#32C5D2) alone
  * only measures 1.57:1 against white — far under the 3:1 non-text minimum —
  * so it is never used as an icon/border/dot color directly on light
  * surfaces; --pp-cyan-mint-deep (a navy-darkened variant, 3.42:1 vs white)
@@ -48,10 +48,10 @@
   --pp-navy-700: 198 41% 23%; /* #234554 derived — button-gradient highlight stop */
   --pp-navy-mid: 201 59% 11%; /* #0B202B derived — dark-section gradient midpoint */
   --pp-slate-600: 207 26% 31%; /* #3B5265 blue-gray */
-  --pp-cyan-mint: 164 82% 53%; /* #27E9B5 restrained accent only — see usage rules above */
-  --pp-cyan-mint-deep: 165 65% 37%; /* #209c82 derived — icon/dot glyphs on light surfaces (3.42:1 vs white) */
-  --pp-mint-pale: 169 53% 94%; /* #E8F8F5 */
-  --pp-surface-soft: 168 38% 97%; /* #F6FBFA */
+  --pp-cyan-mint: 164 82% 53%; /* #32C5D2 restrained accent only — see usage rules above */
+  --pp-cyan-mint-deep: 165 65% 37%; /* #0B7487 derived — icon/dot glyphs on light surfaces (3.42:1 vs white) */
+  --pp-mint-pale: 169 53% 94%; /* #E8F5F7 */
+  --pp-surface-soft: 168 38% 97%; /* #F8FCFC */
   --pp-white: 0 0% 100%; /* #FFFFFF */
   --pp-border-pale: 207 12% 85%; /* #D4D9DD derived — slate-600 lightened 78% toward white, for thin borders */
   --pp-slate-mid: 207 12% 55%; /* #808F9B derived — slate-600 lightened 35%, secondary icons/muted labels */
@@ -87,9 +87,9 @@
   --aurora-navy: 203 76% 8%; /* #051824 */
   --aurora-ocean: 204 42% 15%; /* #162936 */
   --aurora-slate: 207 26% 31%; /* #3B5265 */
-  --aurora-cyan: 164 82% 53%; /* #27E9B5 */
-  --aurora-mint: 169 53% 94%; /* #E8F8F5 */
-  --aurora-white: 168 38% 97%; /* #F6FBFA */
+  --aurora-cyan: 164 82% 53%; /* #32C5D2 */
+  --aurora-mint: 169 53% 94%; /* #E8F5F7 */
+  --aurora-white: 168 38% 97%; /* #F8FCFC */
 
   /* Round-9 dark aurora rebuild — reference-matched (Aurora Dev screenshot
      supplied by owner). The hero background is now overwhelmingly dark by
@@ -157,9 +157,9 @@
      --sm-color-action-primary (navy, used for links/icons/text-accents) and
      --sm-color-text-inverse (white, used elsewhere for text on genuinely
      dark surfaces) undisturbed. */
-  --sm-button-primary-background: #27e9b5;
+  --sm-button-primary-background: #32C5D2;
   --sm-button-primary-text: #051824;
-  --sm-button-primary-background-hover: #3eefc0;
+  --sm-button-primary-background-hover: #45CDDB;
 }
 
 /* The one legitimately-dark surface in this tree (AI Receptionist preview's
@@ -599,29 +599,29 @@
 }
 
 .platform-preview .pp-btn-primary {
-  background: linear-gradient(135deg, #6ff5d4 0%, #27e9b5 38%, #20d8b2 68%, #22c9c2 100%);
+  background: linear-gradient(135deg, #7FE3E6 0%, #32C5D2 38%, #2BB8C8 68%, #28AFC0 100%);
   color: #051824;
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 -1px 0 rgba(5, 24, 36, 0.1),
     0 8px 20px rgba(5, 24, 36, 0.16),
-    0 2px 6px rgba(39, 233, 181, 0.2);
+    0 2px 6px rgba(50, 197, 210, 0.2);
 }
 
 .platform-preview .pp-btn-primary:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, #8ff9df 0%, #3eefc0 38%, #2fe0bd 68%, #2fd8d0 100%);
+  background: linear-gradient(135deg, #9FEAED 0%, #45CDDB 38%, #3CC4D2 68%, #38C0CE 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.8),
     inset 0 -1px 0 rgba(5, 24, 36, 0.12),
     0 10px 24px rgba(5, 24, 36, 0.2),
-    0 3px 8px rgba(39, 233, 181, 0.28);
+    0 3px 8px rgba(50, 197, 210, 0.28);
 }
 
 .platform-preview .pp-btn-primary:active {
   transform: translateY(0);
-  background: linear-gradient(135deg, #4fdcc0 0%, #1fcf9d 38%, #1bc0a2 68%, #1cb3ac 100%);
+  background: linear-gradient(135deg, #54CBD4 0%, #25AEC0 38%, #1FA9BC 68%, #1B9FB2 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     inset 0 -1px 0 rgba(5, 24, 36, 0.14),
