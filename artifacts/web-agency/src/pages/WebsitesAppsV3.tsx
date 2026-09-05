@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
+import { BuildPreview } from "@/components/v5/BuildPreview";
 
 const content: ServicePageContent = {
   eyebrow: "Websites & Web Apps",
@@ -167,35 +168,10 @@ export default function WebsitesAppsV3() {
       demo={
         <div className="v3-card v3h-demo" data-tone="ice">
           <div className="v3h-demo__head">
-            <p className="v3h-demo__title">Anatomy of a SiteMint page</p>
-            <span className="v3m-example-note">Demonstration</span>
+            <p className="v3h-demo__title">Try a build preview</p>
+            <span className="v3m-example-note">Interactive demonstration</span>
           </div>
-          <div className="v3m-receipt">
-            <div className="v3m-receipt__row">
-              <span className="v3m-receipt__k">Above the fold</span>
-              <span className="v3m-receipt__v">
-                One promise, one action, zero sliders
-              </span>
-            </div>
-            <div className="v3m-receipt__row">
-              <span className="v3m-receipt__k">The middle</span>
-              <span className="v3m-receipt__v">
-                Proof and specifics — how it works, what it costs to ignore
-              </span>
-            </div>
-            <div className="v3m-receipt__row">
-              <span className="v3m-receipt__k">The action</span>
-              <span className="v3m-receipt__v">
-                Structured intake that starts the real conversation
-              </span>
-            </div>
-            <div className="v3m-receipt__row">
-              <span className="v3m-receipt__k">After the click</span>
-              <span className="v3m-receipt__v">
-                Record created, team notified, follow-up scheduled
-              </span>
-            </div>
-          </div>
+          <BuildPreview />
         </div>
       }
     />

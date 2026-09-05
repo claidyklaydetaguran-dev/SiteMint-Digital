@@ -23,6 +23,7 @@ import { SignalHeroV4 } from "@/pages/HomeV4";
 import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
 import { HeroMedia } from "@/components/v5/HeroMedia";
 import { Reveal } from "@/components/v5/Reveal";
+import { BuildPreview } from "@/components/v5/BuildPreview";
 import {
   pricingTiersV5,
   PRICING_DISCLAIMER_V5,
@@ -145,23 +146,8 @@ function WebsitesAppsSection() {
             Explore Websites &amp; Web Apps →
           </Link>
         </div>
-        <div className="sm-devices reveal-scale-settle" ref={reveal} data-v4-reveal aria-hidden="true">
-          <div className="sm-devices__browser">
-            <span className="sm-devices__dot" />
-            <span className="sm-devices__dot" />
-            <span className="sm-devices__dot" />
-            <div className="sm-devices__browser-body">
-              <div className="sm-devices__line sm-devices__line--wide" />
-              <div className="sm-devices__line" />
-              <div className="sm-devices__line sm-devices__line--short" />
-            </div>
-          </div>
-          <div className="sm-devices__phone">
-            <div className="sm-devices__phone-body">
-              <div className="sm-devices__line sm-devices__line--short" />
-              <div className="sm-devices__line" />
-            </div>
-          </div>
+        <div className="sm-buildpreview-wrap reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <BuildPreview />
         </div>
       </div>
     </section>
