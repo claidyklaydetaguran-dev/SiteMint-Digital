@@ -64,13 +64,15 @@ function ReadinessBadge({ status }: { status: Readiness }) {
  * below is fully wired for that moment. Until then it stays `null` and
  * always resolves to the poster, so nothing 404s.
  */
-const HERO_FILM_SRC: string | null = null;
+import recepFilmSrc from "@/assets/media/recep-hero-film.mp4";
+import recepFilmPoster from "@/assets/media/recep-hero-film-poster.jpg";
+const HERO_FILM_SRC: string | null = recepFilmSrc;
 
 /** A tiny hand-authored SVG data URI shown as the `<video poster>` for the
  * instant between mount and first frame — separate from the JSX poster
  * below so it needs no render-to-string dependency. */
 const HERO_FILM_POSTER_DATA_URI =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 400'%3E%3Crect width='640' height='400' fill='%23153E52'/%3E%3C/svg%3E";
+  recepFilmPoster;
 
 function useHeroVideoEligible(): boolean {
   const [eligible, setEligible] = useState(false);
@@ -117,7 +119,7 @@ function HeroPosterSvg() {
   const sprocketYs = [24, 78, 132, 186, 240, 294, 348];
   return (
     <svg viewBox="0 0 640 400" role="img" aria-labelledby="smv5-hero-poster-title">
-      <title id="smv5-hero-poster-title">Film in production — final media pending</title>
+      <title id="smv5-hero-poster-title">Brand film — representative small-business scene</title>
       <defs>
         <pattern id="smv5-avail-grid" width="34" height="34" patternUnits="userSpaceOnUse">
           <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="#1c4a4d" strokeWidth="1.1" />
@@ -188,7 +190,7 @@ function HeroMedia() {
       ) : (
         <HeroPosterSvg />
       )}
-      <span className="smv5-hero__media-label">Film in production — final media pending</span>
+      <span className="smv5-hero__media-label">Brand film — representative small-business scene</span>
     </div>
   );
 }

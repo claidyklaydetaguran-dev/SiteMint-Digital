@@ -13,6 +13,9 @@ import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
 import { BrowserFrame } from "@/components/v5/BrowserFrame";
+import envClinic from "@/assets/media/support-work-clinic.jpg";
+import envTrade from "@/assets/media/support-work-trade.jpg";
+import envPractice from "@/assets/media/support-work-practice.jpg";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import hdAvailability from "@/assets/product/hd-availability.png";
 import hdAppointments from "@/assets/product/hd-appointments.png";
@@ -61,6 +64,8 @@ interface CapabilityWorkItem {
   flow: string[];
   /** "The interface" tab: the real SiteMint surface that would power this stage. */
   evidence: { image: string; alt: string; caption: string; addressLabel: string };
+  /** Representative environment photograph (generated illustration, labelled as such). */
+  environment: { image: string; alt: string };
 }
 
 const capabilityWork: CapabilityWorkItem[] = [
@@ -70,6 +75,7 @@ const capabilityWork: CapabilityWorkItem[] = [
     title: "Booking-led clinic site",
     body: "A representative composition: a service site whose every page routes to scheduling, connected to an existing calendar, with automated confirmations and reminders replacing phone-tag.",
     flow: ["Client picks a time", "Calendar checked", "Confirmation sent", "Reminder before the visit"],
+    environment: { image: envClinic, alt: "Calm clinic reception environment with a teal accent — generated illustration" },
     evidence: {
       image: hdAvailability,
       alt: "SiteMint dashboard availability screen showing open time slots on a calendar grid",
@@ -83,6 +89,7 @@ const capabilityWork: CapabilityWorkItem[] = [
     title: "Trade-services quoting intake",
     body: "A representative composition: photo-and-detail intake for quote requests, branching by job type, producing priced-ready briefs and a follow-up queue the owner works through in minutes.",
     flow: ["Photo + job details", "Branches by job type", "Priced-ready brief", "Follow-up queue"],
+    environment: { image: envTrade, alt: "Trade-services workshop environment at golden hour — generated illustration" },
     evidence: {
       image: discoveryStep,
       alt: "SiteMint guided discovery form showing a structured question step with progress indicator",
@@ -96,6 +103,7 @@ const capabilityWork: CapabilityWorkItem[] = [
     title: "Practice intake & follow-through",
     body: "A representative composition: structured client intake feeding a case record, with document requests, reminders, and status updates handled automatically between human touchpoints.",
     flow: ["Structured intake", "Case record created", "Document request sent", "Status updates automated"],
+    environment: { image: envPractice, alt: "Professional practice meeting room environment — generated illustration" },
     evidence: {
       image: hdAppointments,
       alt: "SiteMint dashboard appointments screen listing scheduled client appointments",
@@ -123,6 +131,10 @@ function CompositionEvidence({ item }: { item: CapabilityWorkItem }) {
 
   return (
     <div className="sm-evidence">
+      <figure className="sm-evidence__env">
+        <img src={item.environment.image} alt={item.environment.alt} loading="lazy" />
+        <figcaption>Representative environment — generated illustration</figcaption>
+      </figure>
       <div className="sm-evidence__tabs" role="group" aria-label={`View ${item.title} as`}>
         <button
           type="button"

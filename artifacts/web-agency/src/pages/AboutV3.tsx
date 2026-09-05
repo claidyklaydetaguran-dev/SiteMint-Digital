@@ -8,6 +8,7 @@ import { ShieldCheck, Wrench, Compass, HandMetal } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { teamV5 } from "@/components/v5/teamV5";
+import aboutTexture from "@/assets/media/support-about-texture.jpg";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import "@/styles/v5-pages.css";
 
@@ -69,6 +70,14 @@ export default function AboutV3() {
           </div>
         </div>
       </section>
+
+      <figure className="sm-about-texture" aria-hidden="false">
+        <img
+          src={aboutTexture}
+          alt="Overhead view of a quiet design-studio desk — generated illustration"
+          loading="lazy"
+        />
+      </figure>
 
       <section className="v3-section" data-tone="white">
         <div className="v3-container v3-reveal" ref={reveal}>

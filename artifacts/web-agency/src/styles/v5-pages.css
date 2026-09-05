@@ -935,3 +935,33 @@
     transition: none;
   }
 }
+
+/* ── Work composition environment banner (generated illustration, labelled;
+   owner media program 2026-09-05). Slim crop keeps the real interface capture
+   as the dominant evidence; explicit aspect keeps CLS at zero. ────────── */
+.sm-v5page .sm-evidence__env {
+  margin: 0 0 0.9rem;
+}
+.sm-v5page .sm-evidence__env img {
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+.sm-v5page .sm-evidence__env figcaption {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+
+/* ── About texture band (generated illustration; slim editorial breather). */
+.sm-v5page .sm-about-texture {
+  margin: 0;
+}
+.sm-v5page .sm-about-texture img {
+  width: 100%;
+  aspect-ratio: 5 / 1;
+  object-fit: cover;
+  display: block;
+}

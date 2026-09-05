@@ -161,13 +161,14 @@ function HeroCheckGlyph() {
  * asset's URL (mp4/webm, ~2560×1440 source, 16:9) and the video starts
  * mounting under the existing eligibility gate below — nothing else to
  * wire up. Until then it stays `null` and only the poster ever renders. */
-const HERO_FILM_SRC: string | null = null;
+import heroFilmSrc from "@/assets/media/home-hero-film.mp4";
+import heroFilmPoster from "@/assets/media/home-hero-film-poster.jpg";
+const HERO_FILM_SRC: string | null = heroFilmSrc;
 
 /** A tiny hand-authored SVG data URI — shown as the `<video poster>` for the
  * instant between mount and first frame; kept separate from the JSX poster
  * below so it needs no render-to-string dependency. */
-const HERO_FILM_POSTER_DATA_URI =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23153E52'/%3E%3C/svg%3E";
+const HERO_FILM_POSTER_DATA_URI = heroFilmPoster;
 
 function useFilmEligible(): boolean {
   const [eligible, setEligible] = useState(false);
@@ -204,7 +205,7 @@ function HeroFilmPoster() {
       role="img"
       aria-labelledby="v4-hero-film-title"
     >
-      <title id="v4-hero-film-title">Film in production — final media pending</title>
+      <title id="v4-hero-film-title">Brand film — representative engineer, not SiteMint staff</title>
       <defs>
         <pattern id="v4-film-grid" width="34" height="34" patternUnits="userSpaceOnUse">
           <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="rgba(159,194,204,0.28)" strokeWidth="1" />
@@ -255,7 +256,7 @@ function HeroFilm() {
             <source src={HERO_FILM_SRC} type="video/mp4" />
           </video>
         )}
-        <span className="v4-hero__film-caption">Film in production</span>
+        <span className="v4-hero__film-caption">Brand film</span>
       </div>
     </div>
   );
