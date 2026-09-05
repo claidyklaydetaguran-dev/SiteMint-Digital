@@ -174,8 +174,23 @@ function useFilmEligible(): boolean {
   const [eligible, setEligible] = useState(false);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    // Mounting the <video> forces a hero-sized style/layout pass; doing it AT
+    // the load event landed that long task inside the TBT/TTI window (measured:
+    // TBT 308ms -> 1042ms). Defer to real idle time after load instead - the
+    // poster keeps the frame identical, so nothing visible changes.
+    let idleHandle: number | undefined;
+    function mountWhenIdle() {
+      if (window.innerWidth < 768) return;
+      type IdleWindow = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+      const w = window as IdleWindow;
+      if (typeof w.requestIdleCallback === "function") {
+        idleHandle = w.requestIdleCallback(() => setEligible(true), { timeout: 6000 });
+      } else {
+        idleHandle = window.setTimeout(() => setEligible(true), 3500);
+      }
+    }
     function check() {
-      if (window.innerWidth >= 768) setEligible(true);
+      mountWhenIdle();
     }
     if (document.readyState === "complete") {
       check();
