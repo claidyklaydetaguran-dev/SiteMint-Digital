@@ -23,6 +23,14 @@
  *     that CrmLayout.tsx's nav links to are registered as routes in App.tsx.
  *  4. `.overflow-y-auto` is not applied to the sidebar nav element — the
  *     page body is the one primary scroll region.
+ *  5. Theme: no raw Tailwind neutral-palette utility (`gray-*`, `slate-*`,
+ *     `zinc-*`, `neutral-*`, `stone-*`) anywhere under `src/pages/crm/**` —
+ *     neutral chrome must use the semantic token classes (`bg-muted`,
+ *     `border-border`, `text-muted-foreground`, `bg-accent`, `border-input`,
+ *     …) so it resolves through the Glacier Mint palette in
+ *     `v5-remap.css` / `index.css`. Deliberate exceptions go in
+ *     RAW_NEUTRAL_ALLOWLIST below with a reason — the list is exact-match
+ *     per file+class, so a new raw gray anywhere fails immediately.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -158,6 +166,56 @@ console.log("\n--- wayfinding: sidebar is not an independent scroll region ---")
   check(
     "the main content region remains the single scroller",
     /<main className="[^"]*overflow-y-auto[^"]*"/.test(layoutSrc),
+  );
+}
+
+// ── Theme: no raw Tailwind neutral-palette utilities under src/pages/crm/** ──
+console.log("\n--- theme: no raw gray/slate/zinc/neutral/stone utilities in CRM pages ---");
+{
+  // Deliberate, documented exceptions only. Each entry allows EXACTLY that
+  // utility class in EXACTLY that file (repo-relative path, forward slashes),
+  // and must carry the reason it cannot be a semantic token.
+  const RAW_NEUTRAL_ALLOWLIST: ReadonlyArray<{
+    file: string;
+    className: string;
+    reason: string;
+  }> = [];
+
+  // A raw neutral utility is any (optionally variant-prefixed) color utility
+  // on the five neutral Tailwind palettes. Word-boundary on the left so
+  // semantic classes ("text-muted-foreground") and identifiers never match;
+  // the optional /NN keeps opacity-modified forms in one token.
+  const rawNeutral =
+    /(?:^|[^\w/-])((?:[a-z-]+:)*(?:bg|text|border|divide|ring|outline|placeholder|from|via|to|fill|stroke|shadow|accent|caret|decoration)-(?:gray|slate|zinc|neutral|stone)-[0-9]{2,3}(?:\/[0-9]{1,3})?)/g;
+
+  let offendingFiles = 0;
+  for (const file of crmFiles) {
+    const rel = path.relative(repoRoot, file).replace(/\\/g, "/");
+    const src = readFileSync(file, "utf8");
+    const found: string[] = [];
+    for (const m of src.matchAll(rawNeutral)) {
+      const cls = m[1];
+      const allowed = RAW_NEUTRAL_ALLOWLIST.some(
+        a => a.file === rel && a.className === cls,
+      );
+      if (!allowed) found.push(cls);
+    }
+    if (found.length > 0) {
+      offendingFiles++;
+      const summary = [...new Set(found)].slice(0, 8).join(", ");
+      check(
+        `${rel} has no raw neutral-palette utility`,
+        false,
+        `${found.length} hit(s): ${summary}${found.length > 8 ? ", …" : ""}`,
+      );
+    }
+  }
+  check("zero files with raw neutral utilities", offendingFiles === 0, `${offendingFiles} file(s)`);
+  check(
+    "every allowlist entry names an existing file",
+    RAW_NEUTRAL_ALLOWLIST.every(a =>
+      crmFiles.some(f => path.relative(repoRoot, f).replace(/\\/g, "/") === a.file),
+    ),
   );
 }
 
