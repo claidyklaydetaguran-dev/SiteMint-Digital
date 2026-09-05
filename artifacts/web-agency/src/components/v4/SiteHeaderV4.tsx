@@ -80,13 +80,13 @@ import {
  * since this component is the only consumer.
  */
 const productSubNavV4: { id: string; label: string; href: string }[] = [
-  { id: "hero", label: "Overview", href: `${ROUTES.aiReceptionist}#hero` },
-  { id: "hero-theater", label: "Try the Demo", href: `${ROUTES.aiReceptionist}#hero-theater` },
-  { id: "scheduling", label: "How It Works", href: `${ROUTES.aiReceptionist}#scheduling` },
-  { id: "what-it-does", label: "Capabilities", href: `${ROUTES.aiReceptionist}#what-it-does` },
-  { id: "setup", label: "Setup & Integrations", href: `${ROUTES.aiReceptionist}#setup` },
-  { id: "use-cases", label: "Business Uses", href: `${ROUTES.aiReceptionist}#use-cases` },
-  { id: "faq", label: "FAQ", href: `${ROUTES.aiReceptionist}#faq` },
+  { id: "hero", label: "Overview", href: `#hero` },
+  { id: "hero-theater", label: "Try the Demo", href: `#hero-theater` },
+  { id: "scheduling", label: "How It Works", href: `#scheduling` },
+  { id: "what-it-does", label: "Capabilities", href: `#what-it-does` },
+  { id: "setup", label: "Setup & Integrations", href: `#setup` },
+  { id: "use-cases", label: "Business Uses", href: `#use-cases` },
+  { id: "faq", label: "FAQ", href: `#faq` },
 ];
 
 const productSubNavIdsV4 = productSubNavV4.map((item) => item.id);
@@ -349,13 +349,17 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
               <ul className="v4-product-nav__list">
                 {productSubNavV4.map((item) => (
                   <li key={item.id}>
-                    <Link
+                    {/* Native <a>: fragment hrefs must use browser same-page
+                        jumps (scroll-margin-top applies); a wouter <Link>
+                        routes them through the SPA scroll manager, which
+                        skips hash scrolling on the same route. */}
+                    <a
                       href={item.href}
                       className="v4-product-nav__link"
                       aria-current={activeSubNavId === item.id ? "true" : undefined}
                     >
                       {item.label}
-                    </Link>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -540,14 +544,14 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                      route-change auto-close effect never fires for these. */
                   productSubNavV4.map((item) => (
                     <li key={item.id}>
-                      <Link
+                      <a
                         href={item.href}
                         className="v4-sheet__link"
                         aria-current={activeSubNavId === item.id ? "true" : undefined}
                         onClick={() => setMenuOpen(false)}
                       >
                         {item.label}
-                      </Link>
+                      </a>
                     </li>
                   ))
                 ) : (
