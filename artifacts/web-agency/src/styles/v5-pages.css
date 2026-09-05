@@ -965,3 +965,12 @@
   object-fit: cover;
   display: block;
 }
+
+/* 768px: the evidence card exceeded the viewport by 3px (border-box rounding
+   on the frame chrome inside a min-width:auto grid track). Contain it. */
+.sm-v5page .sm-evidence,
+.sm-v5page .sm-evidence * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
