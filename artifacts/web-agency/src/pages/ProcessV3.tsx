@@ -2,48 +2,71 @@
  * Frontend V3 — the SiteMint process page.
  */
 
+import { useState } from "react";
 import { Link } from "wouter";
 import { ShieldCheck, Eye, PauseCircle, MessagesSquare } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { BrowserFrame } from "@/components/v5/BrowserFrame";
+import discoveryStep from "@/assets/product/discovery-step.png";
 import "@/styles/v5-pages.css";
 
 /**
  * V5 (W-8): the five real phases — Discover · Design · Build · Validate ·
  * Launch & Improve — each with the concrete client output, matching the
  * "how SiteMint works" homepage section (`HomeV5`'s `PROCESS_STEPS`).
+ *
+ * `artifact` (owner directive 2026-09-05: "what you receive") names the
+ * literal deliverable object for the phase — a document, a link, an
+ * environment — not a restated benefit.
  */
-const steps = [
+interface ProcessStep {
+  title: string;
+  body: string;
+  artifact: string;
+  /** Only Discover carries a real capture — the discovery form is the one
+      phase with a public, screenshot-able surface today. */
+  evidence?: { image: string; alt: string; caption: string; addressLabel: string };
+}
+
+const steps: ProcessStep[] = [
   {
     title: "Discover",
     body: "You complete a short structured brief — what you do, what keeps falling through, what a win looks like. We read it properly before we ever get on a call, so the first conversation starts in the middle, not at the beginning.",
-    outcome: "a structured brief we both work from, plus a plain recommendation on what to build and what to skip.",
+    artifact: "The brief itself — the same one you'd fill in at Start — plus a one-page written recommendation.",
+    evidence: {
+      image: discoveryStep,
+      alt: "SiteMint's real guided discovery form, showing a structured question step with a progress bar",
+      caption: "SiteMint discovery flow — the actual form, preview data",
+      addressLabel: "/discovery",
+    },
   },
   {
     title: "Design",
     body: "You see the system taking shape early — real pages, real flows, real words — not a surprise unveiling at the end. Feedback lands while it's still cheap to act on.",
-    outcome: "real pages and flows you review and approve before anything is built.",
+    artifact: "A reviewable staging link with real pages and real copy — comment or approve directly on it.",
   },
   {
     title: "Build",
     body: "We ship in focused stages you can use, connected to your calendar, phone, and records from the start.",
-    outcome: "working software at every checkpoint — not a single reveal at the end.",
+    artifact: "A working staging environment, already wired to your calendar, phone number, and records.",
   },
   {
     title: "Validate",
     body: "Every stage is verified before the next begins — typechecked, tested, and reviewed, with the standing rules below applied throughout.",
-    outcome: "a verified stage — typechecked, tested, and reviewed — before it ships.",
+    artifact: "A short verification note: what was tested, what passed, and what changed since the last stage.",
   },
   {
     title: "Launch & Improve",
     body: "Every automated path launches with a human handoff and an audit trail. We watch the first weeks of real traffic together and tune what it teaches us. Systems drift as businesses grow — we stay available for the adjustments that keep yours matched to reality.",
-    outcome: "a live system with a human handoff, plus ongoing tuning as your business changes.",
+    artifact: "Your live system, plus a written tuning log from the first weeks of real traffic.",
   },
 ];
 
 export default function ProcessV3() {
   const reveal = useReveal();
+  const [activeIndex, setActiveIndex] = useState(0);
   usePageMeta({
     title: "Process — SiteMint Digital",
     description: "How a SiteMint project runs: Discover, Design, Build, Validate, Launch & Improve — each with a concrete output.",
@@ -76,20 +99,57 @@ export default function ProcessV3() {
       <section className="v3-section" data-tone="white">
         <div className="v3-container v3-reveal" ref={reveal}>
           <ol className="v3m-steps">
-            {steps.map((step, i) => (
-              <li key={step.title} className="v3m-step reveal-scale-settle">
-                <span className="v3m-step__no" aria-hidden="true">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <h2 className="v3m-step__title v3m-step__head">{step.title}</h2>
-                <div>
-                  <p className="v3m-step__body">{step.body}</p>
-                  <p className="v3m-step__body">
-                    <strong>Outcome:</strong> {step.outcome}
-                  </p>
-                </div>
-              </li>
-            ))}
+            {steps.map((step, i) => {
+              const isActive = i === activeIndex;
+              const panelId = `v3m-step-panel-${i}`;
+              return (
+                <li
+                  key={step.title}
+                  className={`v3m-step reveal-scale-settle${isActive ? " v3m-step--active" : ""}`}
+                >
+                  {/* Number and title are real buttons driving `activeIndex` —
+                      keyboard-reachable natively (Tab/Enter/Space), no custom
+                      key handling. The three children below stay direct
+                      children of `.v3m-step` so the existing two-column grid
+                      (number | content, protected v3-marketing.css) still
+                      applies exactly as before this pass. */}
+                  <button
+                    type="button"
+                    className="v3m-step__no v3m-step__trigger"
+                    aria-expanded={isActive}
+                    aria-controls={panelId}
+                    onClick={() => setActiveIndex(i)}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </button>
+                  <h2 className="v3m-step__title v3m-step__head">
+                    <button
+                      type="button"
+                      className="v3m-step__head-btn"
+                      aria-expanded={isActive}
+                      aria-controls={panelId}
+                      onClick={() => setActiveIndex(i)}
+                    >
+                      {step.title}
+                    </button>
+                  </h2>
+                  <div id={panelId} className="v3m-step__detail" hidden={!isActive}>
+                    <p className="v3m-step__body">{step.body}</p>
+                    <p className="v3m-step__body v3m-step__artifact">
+                      <strong>What you receive:</strong> {step.artifact}
+                    </p>
+                    {step.evidence && (
+                      <BrowserFrame
+                        src={step.evidence.image}
+                        alt={step.evidence.alt}
+                        caption={step.evidence.caption}
+                        addressLabel={step.evidence.addressLabel}
+                      />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </div>
       </section>

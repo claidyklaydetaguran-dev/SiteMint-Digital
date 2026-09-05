@@ -11,6 +11,8 @@ import { ArrowRight, Clock, FileText, MessagesSquare, Phone, Mail, ShieldCheck }
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { BrowserFrame } from "@/components/v5/BrowserFrame";
+import discoveryStep from "@/assets/product/discovery-step.png";
 import "@/styles/v5-pages.css";
 
 /** Real contact details (W-12) — same values as `ThankYou.tsx`. */
@@ -85,6 +87,25 @@ export default function StartV3() {
                 </span>
               </li>
             </ol>
+            {/* Mini-preview of the actual discovery form (owner directive
+                2026-09-05: "more real product evidence"). Claims verified
+                against the live form: `DiscoveryProgress.tsx` sets
+                `TOTAL_STEPS` from an 8-entry `STEP_LABELS` list, and
+                `useDiscoveryDraft.ts` persists every change to
+                `localStorage` only — no server draft exists yet. */}
+            <div className="v3st-preview reveal-scale-settle">
+              <BrowserFrame
+                src={discoveryStep}
+                alt="SiteMint's real guided discovery form, showing a structured question step with a progress bar"
+                caption="This is the actual form — preview data"
+                addressLabel="/discovery"
+                className="sm-browser-frame--compact"
+              />
+              <p className="v3st-preview__meta">
+                <span>8 guided steps</span>
+                <span>Autosaves in your browser</span>
+              </p>
+            </div>
           </div>
           <div className="v3m-split__media">
             <div className="v3-card v3st-panel reveal-scale-settle" data-tone="ice">

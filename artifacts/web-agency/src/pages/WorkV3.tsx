@@ -6,12 +6,17 @@
  * capability compositions as exactly that.
  */
 
+import { Fragment, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, AudioLines, Search, Workflow, Globe } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
+import { BrowserFrame } from "@/components/v5/BrowserFrame";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import hdAvailability from "@/assets/product/hd-availability.png";
+import hdAppointments from "@/assets/product/hd-appointments.png";
+import discoveryStep from "@/assets/product/discovery-step.png";
 import "@/styles/v5-pages.css";
 
 const productionWork = [
@@ -47,26 +52,131 @@ const productionWork = [
   },
 ];
 
-const capabilityWork = [
+interface CapabilityWorkItem {
+  icon: typeof Globe;
+  kicker: string;
+  title: string;
+  body: string;
+  /** "The system" tab: the composition's flow, as node labels left→right. */
+  flow: string[];
+  /** "The interface" tab: the real SiteMint surface that would power this stage. */
+  evidence: { image: string; alt: string; caption: string; addressLabel: string };
+}
+
+const capabilityWork: CapabilityWorkItem[] = [
   {
     icon: Globe,
     kicker: capabilityLabelsV5.planned,
     title: "Booking-led clinic site",
     body: "A representative composition: a service site whose every page routes to scheduling, connected to an existing calendar, with automated confirmations and reminders replacing phone-tag.",
+    flow: ["Client picks a time", "Calendar checked", "Confirmation sent", "Reminder before the visit"],
+    evidence: {
+      image: hdAvailability,
+      alt: "SiteMint dashboard availability screen showing open time slots on a calendar grid",
+      caption: "SiteMint dashboard — availability view, preview data",
+      addressLabel: "/dashboard/availability",
+    },
   },
   {
     icon: Search,
     kicker: capabilityLabelsV5.planned,
     title: "Trade-services quoting intake",
     body: "A representative composition: photo-and-detail intake for quote requests, branching by job type, producing priced-ready briefs and a follow-up queue the owner works through in minutes.",
+    flow: ["Photo + job details", "Branches by job type", "Priced-ready brief", "Follow-up queue"],
+    evidence: {
+      image: discoveryStep,
+      alt: "SiteMint guided discovery form showing a structured question step with progress indicator",
+      caption: "SiteMint discovery flow — preview data",
+      addressLabel: "/discovery",
+    },
   },
   {
     icon: Workflow,
     kicker: capabilityLabelsV5.planned,
     title: "Practice intake & follow-through",
     body: "A representative composition: structured client intake feeding a case record, with document requests, reminders, and status updates handled automatically between human touchpoints.",
+    flow: ["Structured intake", "Case record created", "Document request sent", "Status updates automated"],
+    evidence: {
+      image: hdAppointments,
+      alt: "SiteMint dashboard appointments screen listing scheduled client appointments",
+      caption: "SiteMint dashboard — appointments view, preview data",
+      addressLabel: "/dashboard/appointments",
+    },
   },
 ];
+
+/**
+ * Per-composition "the system" / "the interface" toggle (owner directive:
+ * "useful interaction" on every retained container). "The system" is a
+ * labelled flow diagram of the representative composition itself — still
+ * honestly a composition, not a client record. "The interface" is the real
+ * SiteMint surface that would power that stage, in a `BrowserFrame`. Two
+ * plain toggle buttons (`aria-pressed`), not a full ARIA tabs pattern —
+ * appropriate for a simple two-state switch.
+ */
+function CompositionEvidence({ item }: { item: CapabilityWorkItem }) {
+  // Defaults to "the interface" — the owner directive is "more real product
+  // evidence" first, with the composition diagram as the secondary,
+  // explicitly-labelled-representative view a click away.
+  const [view, setView] = useState<"system" | "interface">("interface");
+  const panelId = `sm-evidence-${item.title.replace(/\s+/g, "-").toLowerCase()}`;
+
+  return (
+    <div className="sm-evidence">
+      <div className="sm-evidence__tabs" role="group" aria-label={`View ${item.title} as`}>
+        <button
+          type="button"
+          className="sm-evidence__tab"
+          aria-pressed={view === "system"}
+          aria-controls={panelId}
+          onClick={() => setView("system")}
+        >
+          The system
+        </button>
+        <button
+          type="button"
+          className="sm-evidence__tab"
+          aria-pressed={view === "interface"}
+          aria-controls={panelId}
+          onClick={() => setView("interface")}
+        >
+          The interface
+        </button>
+      </div>
+      <div className="sm-evidence__panel" id={panelId}>
+        {view === "system" ? (
+          <div className="sm-evidence__diagram">
+            <div className="sm-flow">
+              {item.flow.map((node, i) => (
+                <Fragment key={node}>
+                  <span className="sm-flow__node">
+                    <span className="sm-flow__dot" aria-hidden="true" />
+                    {node}
+                  </span>
+                  {i < item.flow.length - 1 && (
+                    <svg className="sm-flow__arrow" viewBox="0 0 24 6" aria-hidden="true">
+                      <line x1="0" y1="3" x2="24" y2="3" pathLength={1} />
+                    </svg>
+                  )}
+                </Fragment>
+              ))}
+            </div>
+            <p className="sm-evidence__diagram-note">
+              The composition's flow — representative, not a client record.
+            </p>
+          </div>
+        ) : (
+          <BrowserFrame
+            src={item.evidence.image}
+            alt={item.evidence.alt}
+            caption={item.evidence.caption}
+            addressLabel={item.evidence.addressLabel}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function WorkV3() {
   const reveal = useReveal();
@@ -147,6 +257,7 @@ export default function WorkV3() {
                 <span className="v3m-card-link__kicker">{item.kicker}</span>
                 <h3 className="v3m-card-link__title">{item.title}</h3>
                 <p className="v3m-card-link__desc">{item.body}</p>
+                <CompositionEvidence item={item} />
               </div>
             ))}
           </div>
