@@ -619,7 +619,11 @@ export default function HomeV5() {
     <div className="v4-home sm-home-v5">
       {/* Section 1 — Hero. Reuses SignalHeroV4's particle canvas / scroll
           transition / phase HUD unchanged; only the copy region and CTAs are
-          overridden (W-1 amendment). */}
+          overridden (W-1 amendment). `showFilm` (wp-herofilm) adds the
+          cinematic film container + its gradient connecting thread,
+          repositioned into the upper-right visual field at ≥1024px by this
+          page's own stylesheet (`styles/v5-home.css`) — SignalHeroV4 itself
+          carries no layout logic for it. */}
       <div id="hero">
         <SignalHeroV4
           hideKicker
@@ -638,6 +642,7 @@ export default function HomeV5() {
           secondaryHref={ROUTES.services}
           secondaryLabel="Explore What We Build"
           secondaryIsRoute
+          showFilm
         />
       </div>
 
