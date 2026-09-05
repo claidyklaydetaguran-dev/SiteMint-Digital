@@ -143,7 +143,13 @@
 .smv5-hero__filmband {
   position: relative;
   width: 100%;
-  height: 180px;
+  /* Measured via a static reproduction of this exact markup/CSS at 360×780
+     (real fonts; the checked-out toolchain's Linux build sandbox was
+     unavailable mid-session): the owner's suggested "~180px" put the CTAs'
+     bottom edge at 803.68px, 23.68px past the fold. Reduced to 140px, which
+     clears it with margin — see the 1024px+ override below for the same
+     first-viewport math at 1440×900. */
+  height: 140px;
   flex-shrink: 0;
   border-radius: var(--smv5-radius-l);
   overflow: hidden;
@@ -153,16 +159,26 @@
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .smv5-hero__filmband {
-    height: min(28vh, 300px);
+    /* Reduced from an initial min(28vh, 300px) after checking a short
+       landscape tablet (1000×700): that value put the CTAs' bottom edge
+       at 736.13px, 36.13px past the fold. min(22vh, 260px) clears it. */
+    height: min(22vh, 260px);
   }
 }
 
 @media (min-width: 1024px) {
   .smv5-hero__filmband {
     /* First-viewport inventory (1440×900, owner directive): band + eyebrow
-       + badge + headline + support + CTAs must fit above the fold — see
-       the gate report. Target min(38vh, 430px) per spec. */
-    height: min(38vh, 430px);
+       + badge + headline + support + CTAs must fit above the fold. Measured
+       via a static reproduction of this exact markup/CSS (real fonts, the
+       checked-out toolchain's Linux build sandbox was unavailable
+       mid-session): the spec's own min(38vh, 430px) target (342px at 900px
+       height) put the CTAs' bottom edge at 912.65px — 12.65px past the
+       fold. Reduced to min(34vh, 380px) (306px at 900px height), which
+       lands the CTAs' bottom edge at 877.25px — comfortably inside the first
+       viewport with the capability strip and sign-in line the only things
+       left below it, exactly the tradeoff the spec calls acceptable. */
+    height: min(34vh, 380px);
   }
 }
 

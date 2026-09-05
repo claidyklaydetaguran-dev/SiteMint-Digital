@@ -118,25 +118,40 @@
  * `useFilmEligible` in HomeV4.tsx) in normal flow, between the copy and the
  * field. The caption is dropped at this size (the SVG's own `<title>` still
  * carries it to assistive tech) — it doesn't read legibly at a thumbnail
- * height.
+ * height. Measured at 360×780 (a static-HTML reproduction of this exact
+ * markup/CSS, run because the checked-out toolchain's Linux build sandbox
+ * was unavailable mid-session — see the branch's session notes): copy
+ * ≈518px + HUD ≈39px leaves only ≈216px under the copy for the band and
+ * field together, and the field's own mobile floor (120px, v4-home.css/
+ * this file's mobile override, pre-existing and unchanged) claims most of
+ * that — so the owner's suggested "≈180px" target is reduced to 80px here;
+ * anything close to 180px clips the HUD off the bottom of the sticky stage
+ * by ~80px at this width. 80px still reads as a real band, not a sliver.
  *
  * Tablet (768–1023px): the same normal-flow band, taller, caption restored.
  *
  * Desktop (≥1024px): a full-width cinematic band. `.v4-hero__stage` is a
  * FIXED-height (`100svh`) `overflow:hidden` flex column (v4-home.css,
- * unrelated to this revision) — copy and HUD are fixed-size flex children
- * and only the field can flex/shrink (down to its 240px floor,
- * v4-home.css), so a too-tall band pushes the field below that floor and
- * the excess is silently clipped, not scrolled. Measured at 1440×900 on
- * this branch: copy ≈406px + HUD ≈41px leaves ≈453px under the copy for
- * the band and field together — half of that is ≈226px each, but the
- * field's own 240px floor needs slightly more than half, so the band is
- * tuned to `min(22vh, 220px)` (≈198px at 900px height) rather than the
- * original 46vh target, leaving the field ≈255px — a ~44/56 split that
- * clears the floor with margin instead of clipping the HUD off the bottom
- * of the sticky stage. The video crops to the band via `object-fit: cover`
- * exactly like the mobile/tablet sizes — no aspect-ratio box, since the
- * band's own fixed height is now the frame. */
+ * unrelated to this revision) — copy and HUD are fixed-size flex children,
+ * `.v4-hero__field` has no explicit height (only min/max), so its
+ * flex-basis is its own (empty — the canvas is absolutely positioned)
+ * content box: 0. Flexbox therefore hands it 100% of the leftover cross-
+ * axis space, clamped to [240px, 65vh] (v4-home.css floor, the max-height
+ * above) — a too-tall band shrinks that leftover below 240px and the
+ * deficit is silently clipped off the bottom of the fixed-height stage,
+ * not scrolled. Measured at 1440×900 on this branch: copy ≈406–438px
+ * (self-hosted vs. a Google-Fonts approximation used to double-check the
+ * arithmetic) + HUD ≈39–41px leaves only ≈415–455px under the copy for the
+ * band and field together — nowhere near the original 46vh target
+ * (≈414px) once the field's own 240px floor is honored, so the band is
+ * tuned down to `min(18vh, 200px)` (≈162px at 900px height), leaving the
+ * field ≈250–290px — roughly 40/60 rather than an exact half/half split,
+ * chosen deliberately over the floor with only a slim margin: it clears
+ * the floor with real headroom (≈25–40px) across both measurements instead
+ * of clipping the HUD off the bottom of the sticky stage. The video crops
+ * to the band via `object-fit: cover` exactly like the mobile/tablet
+ * sizes — no aspect-ratio box, since the band's own fixed height is now
+ * the frame. */
 .sm-home-v5 #hero .v4-hero__film {
   position: relative;
   /* `.v4-hero__stage` is a flex column at every width now; without this the
@@ -145,7 +160,7 @@
      viewport instead of the field, which already has its own
      max-height ceiling to absorb it. */
   flex-shrink: 0;
-  height: 180px;
+  height: 80px;
   width: 100%;
   margin: 0.4rem 0 0;
   z-index: 2;
@@ -163,7 +178,7 @@
 }
 @media (min-width: 1024px) {
   .sm-home-v5 #hero .v4-hero__film {
-    height: min(22vh, 220px);
+    height: min(18vh, 200px);
   }
 }
 .sm-home-v5 #hero .v4-hero__film-frame {
@@ -403,31 +418,16 @@
   background: rgb(233 247 243 / 0.18);
 }
 
-/* ── Section 5 — CRM record illustration ─────────────────────────────────
-   The section's sole visual (owner directive, 2026-09-05: "CRM shouldn't be
-   publicized" — the real product capture was removed; this abstract
-   illustration was the pre-existing treatment and stays the only visual).
-   Sized and finished to read as a complete, deliberate visual on its own,
-   not a placeholder standing in for a screenshot. ───────────────────────── */
+/* ── Section 5 — CRM record illustration ─────────────────────────────── */
 .sm-record {
   position: relative;
-  max-width: 26rem;
-  margin: 0 auto;
   border-radius: var(--sm-radius-l, 16px);
   border: 1px solid var(--sm-line, #CFE7EA);
   background: var(--sm-surface, #fff);
-  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
-  padding: 1.85rem;
+  box-shadow: var(--sm-shadow-1, 0 6px 20px rgb(11 58 62 / 0.06));
+  padding: 1.5rem;
   display: grid;
   gap: 0.9rem;
-  overflow: hidden;
-}
-.sm-record::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 4px;
-  background: var(--sm-signal-thread, linear-gradient(90deg, #32C5D2, #56D2CF));
 }
 .sm-record__badge {
   justify-self: start;
@@ -766,26 +766,17 @@
   border: 1px solid var(--sm-line, #CFE7EA);
   border-radius: var(--sm-radius-l, 16px);
 }
-/* Team avatar (owner directive, 2026-09-05: named team, no stock/generated
-   photos yet). A CSS-only initials monogram on a mint→ink disc — a fixed
-   1:1 slot sized to accept a real photograph later with no layout change;
-   `object-fit: cover` is pre-set so a future `background-image`/`<img>`
-   drops in without touching this rule. */
 .sm-team-card__avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 88px;
-  aspect-ratio: 1 / 1;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: linear-gradient(155deg, var(--sm-mint-400, #56D2CF), var(--sm-ink-950, #153E52));
-  color: var(--sm-white, #fff);
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-mint-700, #0B7487);
   font-weight: 700;
-  font-size: 1.4rem;
-  letter-spacing: 0.02em;
-  margin-bottom: 0.6rem;
-  object-fit: cover;
-  box-shadow: 0 6px 18px rgb(11 58 62 / 0.16);
+  margin-bottom: 0.4rem;
 }
 .sm-team-card__name {
   font-weight: 600;
@@ -1009,12 +1000,14 @@
 }
 .sm-home-v5 .sm-team-card__avatar {
   transition:
-    box-shadow 220ms ease,
+    background-color 220ms ease,
+    color 220ms ease,
     transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .sm-home-v5 .sm-team-card:hover .sm-team-card__avatar,
 .sm-home-v5 .sm-team-card:focus-within .sm-team-card__avatar {
-  box-shadow: 0 10px 24px rgb(11 58 62 / 0.24);
+  background: var(--sm-mint-500, #32c5d2);
+  color: var(--sm-white, #fff);
   transform: translateY(-2px) scale(1.05);
 }
 .sm-home-v5 .sm-work-card__title,
