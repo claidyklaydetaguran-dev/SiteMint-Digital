@@ -150,12 +150,15 @@ function HeroCheckGlyph() {
   );
 }
 
-/* ── Hero film container (owner spec, wp-herofilm) ───────────────────────
- * A cinematic film placement layered into the Signal field — poster now,
- * `<video>` mount point wired for the real asset when the owner supplies
- * one. Rendered only when `showFilm` is set (HomeV5 passes it); this file's
- * own unmodified `<SignalHeroV4 />` call site below omits it, so HomeV4's
- * own rendered output is byte-for-byte unchanged.
+/* ── Hero film band (owner spec, wp-herofilm; REVISED 2026-09-05 per owner
+ * correction — the earlier upper-right grid composition "looked messed
+ * up"; rolled back to the original approved vertical hero (copy full-width
+ * on top, particle field below) with the film re-inserted as a full-width
+ * horizontal band BETWEEN the two, never beside either. See `styles/
+ * v5-home.css` for the placement rules — this component carries no layout
+ * opinion of its own. Rendered only when `showFilm` is set (HomeV5 passes
+ * it); this file's own unmodified `<SignalHeroV4 />` call site below omits
+ * it, so HomeV4's own rendered output is byte-for-byte unchanged.
  *
  * `HERO_FILM_SRC` is the entire video-mount contract: set it to a produced
  * asset's URL (mp4/webm, ~2560×1440 source, 16:9) and the video starts
@@ -245,11 +248,12 @@ function HeroFilmPoster() {
 }
 
 /**
- * The film container. Always renders (a compact poster band on every width
- * — see `styles/v5-home.css`, "Mobile: poster + particles" per the approved
- * treatment). Video mounts only ≥768px, only without
- * `prefers-reduced-motion: reduce`, and only after `HERO_FILM_SRC` is set —
- * until then, and always below 768px, this renders the poster only.
+ * The film band. Always renders (a compact poster band on every width — see
+ * `styles/v5-home.css`, now a FULL-WIDTH horizontal band stacked between the
+ * copy and the particle field at every breakpoint, never beside either).
+ * Video mounts only ≥768px, only without `prefers-reduced-motion: reduce`,
+ * and only after `HERO_FILM_SRC` is set — until then, and always below
+ * 768px, this renders the poster only.
  */
 function HeroFilm() {
   const eligible = useFilmEligible();
@@ -278,39 +282,6 @@ function HeroFilm() {
 }
 
 /**
- * The Glacier Mint "signal" seam — a thin gradient path bridging the film
- * container and the particle field beneath/beside it. CSS/SVG only; the
- * flowing dash animation below is disabled under reduced motion, leaving
- * the same path visible as a static gradient line (no motion, no removal).
- */
-function HeroSignalSeam() {
-  return (
-    <svg
-      className="v4-hero__seam"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id="v4-seam-grad" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#56D2CF" stopOpacity="0" />
-          <stop offset="45%" stopColor="#32C5D2" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#56D2CF" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path
-        className="v4-hero__seam-path"
-        d="M4 90 C 26 74, 42 66, 56 50 S 80 22, 96 8"
-        fill="none"
-        stroke="url(#v4-seam-grad)"
-        strokeWidth="0.7"
-        pathLength={1}
-      />
-    </svg>
-  );
-}
-
-/**
  * V5 note: props were added (with defaults reproducing the original literal
  * copy exactly) so `HomeV5.tsx` can reuse this component's particle-canvas
  * mechanics — the rAF loop, node lighting, and phase HUD below are otherwise
@@ -332,10 +303,10 @@ export interface SignalHeroV4Props {
   secondaryLabel?: string;
   /** True when `secondaryHref` is an app route (Link) rather than a same-page hash (plain anchor). */
   secondaryIsRoute?: boolean;
-  /** Owner spec (wp-herofilm): renders the cinematic film container + its
-   *  gradient connecting thread alongside the particle field. Defaults to
-   *  unset so this file's own `<SignalHeroV4 />` call site (unrouted
-   *  HomeV4) is unchanged; HomeV5 passes `true`. */
+  /** Owner spec (wp-herofilm; revised 2026-09-05): renders the cinematic
+   *  film band, stacked full-width between the copy and the particle field.
+   *  Defaults to unset so this file's own `<SignalHeroV4 />` call site
+   *  (unrouted HomeV4) is unchanged; HomeV5 passes `true`. */
   showFilm?: boolean;
 }
 
@@ -640,19 +611,13 @@ export function SignalHeroV4({
         </div>
 
         {/* Owner spec (wp-herofilm; HERO-FILM-TREATMENT.md — "Mobile: poster
-            + particles, no autoplay"): the cinematic film container + its
-            gradient connecting thread. A compact poster band between the
-            copy and the field below 1024px (small on mobile, taller on
-            tablet — both keep the particle field visible below it);
-            repositioned into the upper-right visual field at ≥1024px. All
-            of this lives in CSS (`styles/v5-home.css`) — no layout logic
-            lives here. */}
-        {showFilm && (
-          <>
-            <HeroFilm />
-            <HeroSignalSeam />
-          </>
-        )}
+            + particles, no autoplay"; REVISED 2026-09-05 — the earlier
+            upper-right grid placement is reverted): a full-width horizontal
+            film band, stacked between the copy and the field at every
+            breakpoint (small on mobile, taller on tablet, a cinematic band
+            roughly half the sub-copy height on desktop). All of this lives
+            in CSS (`styles/v5-home.css`) — no layout logic lives here. */}
+        {showFilm && <HeroFilm />}
 
         {/* Region 2 — the Signal field. The narrative lives here, below the
             copy, at every width. */}

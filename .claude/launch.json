@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-agency",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@workspace/web-agency", "run", "dev"],
+      "port": 22065
+    }
+  ]
+}

@@ -125,6 +125,63 @@
   padding: calc(var(--v4-hdr-h, 64px) + var(--sm-space-48, 48px)) 0 96px;
 }
 
+/* ── Hero film band (owner spec, wp-herofilm; REVISED 2026-09-05 per owner
+   correction — same crosswise treatment as the homepage hero: a full-width
+   film band above the copy, never beside it or inside the right-column
+   visual card, which is restored to the pre-film poster — see `HeroMedia`
+   in AiReceptionistV5.tsx). `.smv5-hero__stack` is the sole flex child of
+   `.smv5-hero` (still centered by that rule's own `align-items: center`)
+   so the band and the existing copy/visual grid can stack vertically
+   without `.smv5-hero` itself needing a `flex-direction` change. ────────── */
+.smv5-hero__stack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: clamp(18px, 2.6vh, 28px);
+}
+
+.smv5-hero__filmband {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  flex-shrink: 0;
+  border-radius: var(--smv5-radius-l);
+  overflow: hidden;
+  box-shadow: var(--smv5-shadow-2);
+  background: #072022;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .smv5-hero__filmband {
+    height: min(28vh, 300px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .smv5-hero__filmband {
+    /* First-viewport inventory (1440×900, owner directive): band + eyebrow
+       + badge + headline + support + CTAs must fit above the fold — see
+       the gate report. Target min(38vh, 430px) per spec. */
+    height: min(38vh, 430px);
+  }
+}
+
+.smv5-hero__filmband-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.smv5-hero__filmband-poster,
+.smv5-hero__filmband-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .smv5-hero__eyebrow {
   display: block;
   font-family: var(--smv5-font-display);

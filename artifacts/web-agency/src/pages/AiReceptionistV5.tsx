@@ -54,15 +54,15 @@ function ReadinessBadge({ status }: { status: Readiness }) {
 /* ── Hero media: poster-first, video only ≥768px after load ────────────── */
 
 /**
- * The film mount contract (owner spec, wp-herofilm): a cinematic film
- * placement in the hero's right-column visual card, shipping now with a
- * composed poster placeholder. No produced asset exists in the repository
- * yet (V5-BLUEPRINT §6 storyboard, §17 performance strategy: poster first,
- * video only ≥768px after load, no source without owner-authorised
- * generation) — setting this to a produced video's URL (mp4/webm, ~2560×1440
- * source, 16:9) is the only step required to go live; the eligibility check
- * below is fully wired for that moment. Until then it stays `null` and
- * always resolves to the poster, so nothing 404s.
+ * The film mount contract (owner spec, wp-herofilm; REVISED 2026-09-05 per
+ * owner correction — the film previously lived in the hero's right-column
+ * visual card; that card is reverted to the pre-film composed poster (see
+ * `HeroPosterSvg`/`HeroMedia` below) and the film moves to a full-width
+ * band at the TOP of the hero instead, crosswise above the headline block
+ * — the same "video above, particles/content below" treatment applied to
+ * the homepage hero). `HERO_FILM_SRC`/`HERO_FILM_POSTER_DATA_URI` and the
+ * idle-mount eligibility gate below are unchanged and now serve
+ * `HeroFilmBand` exclusively.
  */
 import recepFilmSrc from "@/assets/media/recep-hero-film.mp4";
 import recepFilmPoster from "@/assets/media/recep-hero-film-poster.jpg";
@@ -114,10 +114,10 @@ function useHeroVideoEligible(): boolean {
  * overlay label below (`smv5-hero__media-label`) — this graphic carries no
  * text of its own beyond the non-visual `<title>` for assistive tech.
  *
- * Film placement (wp-herofilm): a sprocket-hole rail along both edges reads
- * this card unmistakably as a film container rather than a generic device
- * illustration, at the same 16:9 aspect the eventual produced video ships
- * at — the ring/grid motif underneath is unchanged.
+ * Restored 2026-09-05 to the pre-film "first model" composition (owner
+ * correction — the sprocket-hole film rail this card grew for wp-herofilm
+ * is removed; the film itself now lives in the full-width band above the
+ * headline, `HeroFilmBand` below).
  *
  * Cinematic motion (2026-09-05 owner directive) — "call ring" motif: two
  * extra rings pulse outward ambiently (`.smv5-poster__pulse`), echoing the
@@ -131,10 +131,9 @@ function HeroPosterSvg() {
     [88, 71], [258, 71], [428, 71], [564, 71],
     [54, 275], [190, 309], [394, 309], [599, 275],
   ];
-  const sprocketYs = [24, 78, 132, 186, 240, 294, 348];
   return (
     <svg viewBox="0 0 640 400" role="img" aria-labelledby="smv5-hero-poster-title">
-      <title id="smv5-hero-poster-title">Brand film — representative small-business scene</title>
+      <title id="smv5-hero-poster-title">SiteMint AI Receptionist</title>
       <defs>
         <pattern id="smv5-avail-grid" width="34" height="34" patternUnits="userSpaceOnUse">
           <rect x="3" y="3" width="24" height="24" rx="4" fill="none" stroke="#1c4a4d" strokeWidth="1.1" />
@@ -174,38 +173,57 @@ function HeroPosterSvg() {
       <circle cx="320" cy="200" r="92" fill="none" stroke="#32C5D2" strokeWidth="2" opacity="0.85" />
       <circle cx="320" cy="200" r="56" fill="none" stroke="#56D2CF" strokeWidth="2" opacity="0.6" />
       <circle cx="320" cy="200" r="6" fill="#32C5D2" />
-      {sprocketYs.map((y) => (
-        <g key={`sprocket-${y}`} opacity="0.55">
-          <rect x="10" y={y} width="14" height="20" rx="3" fill="none" stroke="#56D2CF" strokeWidth="1.2" />
-          <rect x="616" y={y} width="14" height="20" rx="3" fill="none" stroke="#56D2CF" strokeWidth="1.2" />
-        </g>
-      ))}
     </svg>
   );
 }
 
+/**
+ * The right-column visual card (restored pre-film composition — always the
+ * composed poster illustration, never the film; see `HeroPosterSvg` above).
+ */
 function HeroMedia() {
-  const eligible = useHeroVideoEligible();
-  const showVideo = eligible && !!HERO_FILM_SRC;
   const ambientRef = usePausableAmbient<HTMLDivElement>();
   return (
     <div className="smv5-hero__media" ref={ambientRef}>
-      {showVideo && HERO_FILM_SRC ? (
-        <video
-          muted
-          playsInline
-          autoPlay
-          loop
-          preload="none"
-          poster={HERO_FILM_POSTER_DATA_URI}
-          aria-hidden="true"
-        >
-          <source src={HERO_FILM_SRC} type="video/mp4" />
-        </video>
-      ) : (
-        <HeroPosterSvg />
-      )}
-      <span className="smv5-hero__media-label">Brand film — representative small-business scene</span>
+      <HeroPosterSvg />
+      <span className="smv5-hero__media-label">SiteMint AI Receptionist</span>
+    </div>
+  );
+}
+
+/**
+ * The crosswise film band (owner spec, wp-herofilm; REVISED 2026-09-05): a
+ * full-width horizontal band at the top of the hero's visual composition,
+ * below the fixed header and above the headline block — never beside the
+ * copy or inside the right-column visual card. Poster-first, video mounts
+ * only ≥768px, only without `prefers-reduced-motion: reduce`, and only
+ * after `HERO_FILM_SRC` is set (`useHeroVideoEligible`, unchanged) — until
+ * then, and always below 768px, this renders the poster image only. The
+ * poster image sits underneath at all times so there is no flash when the
+ * video is ineligible or hasn't mounted yet; the video, once mounted,
+ * covers it completely via the same `object-fit: cover` crop.
+ */
+function HeroFilmBand() {
+  const eligible = useHeroVideoEligible();
+  const showVideo = eligible && !!HERO_FILM_SRC;
+  return (
+    <div className="smv5-hero__filmband" aria-hidden="true">
+      <div className="smv5-hero__filmband-frame">
+        <img className="smv5-hero__filmband-poster" src={HERO_FILM_POSTER_DATA_URI} alt="" />
+        {showVideo && HERO_FILM_SRC && (
+          <video
+            className="smv5-hero__filmband-video"
+            muted
+            playsInline
+            autoPlay
+            loop
+            preload="none"
+            poster={HERO_FILM_POSTER_DATA_URI}
+          >
+            <source src={HERO_FILM_SRC} type="video/mp4" />
+          </video>
+        )}
+      </div>
     </div>
   );
 }
@@ -644,52 +662,60 @@ export default function AiReceptionistV5() {
          * Full first viewport (owner directive, 2026-09-05): min-height is
          * 100svh, minus the fixed product header's `--v4-hdr-h` (read from
          * v4-chrome.css, never edited here — see receptionist-v5.css).
-         * Entrance sequence — eyebrow → beta status → headline (masked line
-         * reveal, LCP-safe) → support → actions → theater visual
-         * (scale-settle) — each a `<Reveal>` beat except the headline,
-         * which uses `HeroHeadlineReveal` specifically to avoid animating
-         * the likely-LCP element via opacity (see that component's doc
-         * comment). `HeroScrollCue` signals there's more below the fold.
+         * REVISED same day (owner correction, crosswise film treatment): a
+         * full-width `HeroFilmBand` sits above the headline block, below the
+         * fixed header — never beside the copy or inside the right-column
+         * visual card (that card is restored to the pre-film composed
+         * poster; see `HeroMedia`). Entrance sequence — eyebrow → beta
+         * status → headline (masked line reveal, LCP-safe) → support →
+         * actions → theater visual (scale-settle) — each a `<Reveal>` beat
+         * except the headline, which uses `HeroHeadlineReveal` specifically
+         * to avoid animating the likely-LCP element via opacity (see that
+         * component's doc comment). `HeroScrollCue` signals there's more
+         * below the fold.
          */}
         <section id={SECTION_ID.hero} className="smv5-hero">
-          <div className="smv5__container smv5-hero__grid">
-            <div>
-              <Reveal as="span" className="smv5-hero__eyebrow" delay={0}>
-                {HERO_COPY.eyebrow}
+          <div className="smv5-hero__stack">
+            <HeroFilmBand />
+            <div className="smv5__container smv5-hero__grid">
+              <div>
+                <Reveal as="span" className="smv5-hero__eyebrow" delay={0}>
+                  {HERO_COPY.eyebrow}
+                </Reveal>
+                <Reveal as="span" className="smv5-hero__pill" delay={60}>
+                  {HERO_COPY.betaStatus}
+                </Reveal>
+                <HeroHeadlineReveal text={HERO_COPY.title} />
+                <Reveal as="p" className="smv5-hero__sub" delay={420}>
+                  {HERO_COPY.supporting}
+                </Reveal>
+                <Reveal as="div" className="smv5-hero__ctas" delay={520}>
+                  {/* Filled/primary — Interactive Preview is the lowest-friction
+                      next step and gets the visual emphasis. */}
+                  <a href={`#${SECTION_ID.preview}`} className="smv5-btn smv5-btn--primary">
+                    {HERO_COPY.primaryCta}
+                  </a>
+                  <a href={`#${SECTION_ID.beta}`} className="smv5-btn smv5-btn--outline">
+                    {HERO_COPY.secondaryCta}
+                  </a>
+                </Reveal>
+                <Reveal as="p" className="smv5-hero__signin" delay={560}>
+                  {HERO_COPY.signInPrompt}{" "}
+                  <a href={DASHBOARD_URLS.login}>{HERO_COPY.signInCta}</a>
+                </Reveal>
+                <ul className="smv5-hero__capabilities">
+                  {HERO_CAPABILITY_HIGHLIGHTS.map((c) => (
+                    <li key={c}>
+                      <HeroCheckIcon />
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <Reveal as="div" className="smv5-hero__visual" delay={620}>
+                <HeroMedia />
               </Reveal>
-              <Reveal as="span" className="smv5-hero__pill" delay={60}>
-                {HERO_COPY.betaStatus}
-              </Reveal>
-              <HeroHeadlineReveal text={HERO_COPY.title} />
-              <Reveal as="p" className="smv5-hero__sub" delay={420}>
-                {HERO_COPY.supporting}
-              </Reveal>
-              <Reveal as="div" className="smv5-hero__ctas" delay={520}>
-                {/* Filled/primary — Interactive Preview is the lowest-friction
-                    next step and gets the visual emphasis. */}
-                <a href={`#${SECTION_ID.preview}`} className="smv5-btn smv5-btn--primary">
-                  {HERO_COPY.primaryCta}
-                </a>
-                <a href={`#${SECTION_ID.beta}`} className="smv5-btn smv5-btn--outline">
-                  {HERO_COPY.secondaryCta}
-                </a>
-              </Reveal>
-              <Reveal as="p" className="smv5-hero__signin" delay={560}>
-                {HERO_COPY.signInPrompt}{" "}
-                <a href={DASHBOARD_URLS.login}>{HERO_COPY.signInCta}</a>
-              </Reveal>
-              <ul className="smv5-hero__capabilities">
-                {HERO_CAPABILITY_HIGHLIGHTS.map((c) => (
-                  <li key={c}>
-                    <HeroCheckIcon />
-                    {c}
-                  </li>
-                ))}
-              </ul>
             </div>
-            <Reveal as="div" className="smv5-hero__visual" delay={620}>
-              <HeroMedia />
-            </Reveal>
           </div>
           <HeroScrollCue />
         </section>
