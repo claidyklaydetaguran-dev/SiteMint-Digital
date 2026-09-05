@@ -276,6 +276,16 @@ function HeroFilm() {
     <div className="v4-hero__film" data-v4-hero-film>
       <div className="v4-hero__film-frame" aria-hidden="true">
         <HeroFilmPoster />
+        {/* Real film-frame poster, eager + high priority: it IS the desktop
+            LCP element and also what visitors see until the video idle-mounts
+            (previously the abstract SVG placeholder showed in that window). */}
+        <img
+          className="v4-hero__film-poster v4-hero__film-poster--desktop"
+          src={heroFilmPoster}
+          alt=""
+          fetchPriority="high"
+          decoding="async"
+        />
         {/* Dedicated mobile poster (owner directive: mobile must not simply
             crop the desktop film) — CSS shows exactly one of these. */}
         <img

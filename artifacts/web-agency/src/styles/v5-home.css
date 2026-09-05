@@ -2086,3 +2086,13 @@
     animation: none;
   }
 }
+
+/* Desktop shows the real film-frame poster; mobile its own dedicated crop. */
+.sm-home-v5 #hero .v4-hero__film-poster--desktop {
+  display: none;
+}
+@media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__film-poster--desktop {
+    display: block;
+  }
+}

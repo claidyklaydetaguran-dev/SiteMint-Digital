@@ -139,7 +139,7 @@ function HeroCinematicBg() {
 
   return (
     <div className="smv5-hero__bg">
-      <img className="smv5-hero__bg-media" src={HERO_FILM_POSTER_DATA_URI} alt="" aria-hidden="true" />
+      <img className="smv5-hero__bg-media" src={HERO_FILM_POSTER_DATA_URI} alt="" aria-hidden="true" fetchPriority="high" decoding="async" />
       {showVideo && HERO_FILM_SRC && (
         <video
           ref={videoRef}
