@@ -25,7 +25,7 @@
  * hidden or the theater scrolls offscreen.
  */
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type ComponentType, type RefObject } from "react";
 import {
   PREVIEW_BRANCHES,
   PREVIEW_STATE_LABEL,
@@ -355,6 +355,334 @@ export function CallTheaterV5() {
       <p className="smv5-theater__disclose">
         Simulated conversation. No microphone is requested, no audio plays, and no call is placed.
       </p>
+    </div>
+  );
+}
+
+/* ── Hero call theater (§AiReceptionistV5 hero, product-theater redesign,
+ * 2026-09-06) ────────────────────────────────────────────────────────────
+ *
+ * Embedded in the hero's right column (owner directive: "copy + CTA left,
+ * live call experience right", the Vapi/Retell reference pattern) — a
+ * SEPARATE scripted six-state sequence from the topic-picker theater above
+ * (`CallTheaterV5`/`PREVIEW_BRANCHES`): incoming-call ring → answering
+ * (waveform, listening/speaking) → business-rule lookup → availability
+ * check → appointment confirmed → organized outcome. Every stage renders
+ * obviously synthetic data for one illustrative scenario (a dental
+ * practice, "Bloom Dental") — never a real caller, business, or number.
+ *
+ * Reuses this file's own ring/waveform pieces (`useVoiceObject`,
+ * `TheaterWaveform`) against the same five-state voice-object vocabulary,
+ * so the hero's cinematic sequence and the Interactive Preview's
+ * conversation share one visual language. A visitor can either press Play
+ * to auto-advance through the full sequence (each stage timed like a real
+ * call) or step manually with Previous/Next — both are real, keyboard-
+ * operable `<button>`s, and the always-visible disclosure line is a
+ * binding, exact-copy requirement, never paraphrased.
+ */
+
+type HeroCallVoice = VoiceState;
+
+interface HeroCallBeat {
+  voice: HeroCallVoice;
+  /** How long this beat holds before advancing, during auto-play. The
+   *  final beat's value is unused (auto-play stops there). */
+  holdMs: number;
+}
+
+interface HeroCallStage {
+  id: string;
+  /** Shown in the stage label (aria-live) and as the on-screen heading. */
+  label: string;
+  beats: HeroCallBeat[];
+  Card: ComponentType;
+}
+
+function HeroPhoneRingGlyph() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 5c0 8 7 15 15 15l3-4-6-3-2 2c-2-1-4-3-5-5l2-2-3-6-4 3Z" />
+    </svg>
+  );
+}
+
+/** A compact 3×2 availability grid — the same "one slot lights up" motif as
+ *  `AvailabilitySlotGlyph` in AiReceptionistV5.tsx, reimplemented locally
+ *  (self-contained, static — no reveal-once gate needed for a beat that's
+ *  already gated by the stage sequencer above it) rather than exported
+ *  cross-file for one small SVG. */
+function HeroAvailabilityGlyph() {
+  const lit = 4;
+  return (
+    <svg width="56" height="38" viewBox="0 0 66 44" aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const x = (i % 3) * 22 + 2;
+        const y = Math.floor(i / 3) * 20 + 2;
+        return (
+          <rect
+            key={i}
+            x={x}
+            y={y}
+            width="18"
+            height="16"
+            rx="3"
+            fill={i === lit ? "var(--smv5-mint-500)" : "var(--smv5-mist-100)"}
+            stroke="var(--smv5-line-strong)"
+            strokeWidth="1"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function HeroConfirmGlyph() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 44 44" aria-hidden="true">
+      <circle cx="22" cy="22" r="19" fill="var(--smv5-mint-100)" stroke="var(--smv5-mint-500)" strokeWidth="2" />
+      <path d="M13 22.5 19 28.5 31 15" fill="none" stroke="var(--smv5-mint-700)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function HeroIncomingCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__caller">
+        <HeroPhoneRingGlyph />
+        (555) 019-2874
+      </p>
+      <p className="smv5-herotheater__note">Ringing — routed to the AI Receptionist.</p>
+    </div>
+  );
+}
+
+function HeroAnsweringCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__line">
+        <b>Assistant:</b> &ldquo;Thanks for calling Bloom Dental — this is the virtual
+        receptionist. How can I help?&rdquo;
+      </p>
+    </div>
+  );
+}
+
+function HeroRulesCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__note">Checking business hours &amp; booking rules…</p>
+      <ul className="smv5-herotheater__list">
+        <li>Open Mon–Fri, 8:00 AM–5:00 PM</li>
+        <li>Cleanings — 30-minute slots</li>
+        <li>New patients require an intake form</li>
+      </ul>
+    </div>
+  );
+}
+
+function HeroAvailabilityCard() {
+  return (
+    <div className="smv5-herotheater__panel smv5-herotheater__panel--row">
+      <HeroAvailabilityGlyph />
+      <p className="smv5-herotheater__note">Checking Tuesday afternoon openings against the calendar…</p>
+    </div>
+  );
+}
+
+function HeroConfirmedCard() {
+  return (
+    <div className="smv5-herotheater__panel smv5-herotheater__panel--row">
+      <HeroConfirmGlyph />
+      <div>
+        <p className="smv5-herotheater__confirm">Tue 2:30 PM — Cleaning</p>
+        <p className="smv5-herotheater__note">Bloom Dental · confirmation texted to the caller</p>
+      </div>
+    </div>
+  );
+}
+
+function HeroSummaryCard() {
+  return (
+    <dl className="smv5-herotheater__summary">
+      <div>
+        <dt>Caller</dt>
+        <dd>New patient, first-time caller</dd>
+      </div>
+      <div>
+        <dt>Intent</dt>
+        <dd>Book a cleaning appointment</dd>
+      </div>
+      <div>
+        <dt>Outcome</dt>
+        <dd>Appointment confirmed — Tue 2:30 PM</dd>
+      </div>
+      <div>
+        <dt>Follow-up</dt>
+        <dd>Send the new-patient intake form before the visit</dd>
+      </div>
+    </dl>
+  );
+}
+
+const HERO_CALL_STAGES: HeroCallStage[] = [
+  { id: "incoming", label: "Incoming call", beats: [{ voice: "ready", holdMs: 1800 }], Card: HeroIncomingCard },
+  {
+    id: "answering",
+    label: "Answering the call",
+    beats: [
+      { voice: "listening", holdMs: 650 },
+      { voice: "speaking", holdMs: 2200 },
+    ],
+    Card: HeroAnsweringCard,
+  },
+  {
+    id: "rules",
+    label: "Checking business hours & booking rules",
+    beats: [{ voice: "thinking", holdMs: 2200 }],
+    Card: HeroRulesCard,
+  },
+  {
+    id: "availability",
+    label: "Checking availability",
+    beats: [{ voice: "thinking", holdMs: 2200 }],
+    Card: HeroAvailabilityCard,
+  },
+  {
+    id: "confirmed",
+    label: "Appointment confirmed",
+    beats: [{ voice: "ended", holdMs: 2200 }],
+    Card: HeroConfirmedCard,
+  },
+  { id: "summary", label: "Call summary", beats: [{ voice: "ended", holdMs: 0 }], Card: HeroSummaryCard },
+];
+
+const HERO_CALL_BEATS: Array<HeroCallBeat & { stageIndex: number }> = HERO_CALL_STAGES.flatMap(
+  (stage, stageIndex) => stage.beats.map((beat) => ({ ...beat, stageIndex })),
+);
+
+const LAST_BEAT_INDEX = HERO_CALL_BEATS.length - 1;
+
+export function HeroCallTheaterV5() {
+  const [beatIndex, setBeatIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timersRef = useRef<number[]>([]);
+
+  const beat = HERO_CALL_BEATS[beatIndex];
+  const stageIndex = beat.stageIndex;
+  const stage = HERO_CALL_STAGES[stageIndex];
+  const isFirstStage = stageIndex === 0;
+  const isLastStage = stageIndex === HERO_CALL_STAGES.length - 1;
+  const atEnd = beatIndex === LAST_BEAT_INDEX;
+
+  useVoiceObject(beat.voice, canvasRef);
+
+  function clearTimers() {
+    timersRef.current.forEach((t) => window.clearTimeout(t));
+    timersRef.current = [];
+  }
+
+  function playFrom(startIndex: number) {
+    clearTimers();
+    setPlaying(true);
+    setBeatIndex(startIndex);
+    let cumulative = 0;
+    for (let i = startIndex; i < LAST_BEAT_INDEX; i++) {
+      cumulative += HERO_CALL_BEATS[i].holdMs;
+      const nextIndex = i + 1;
+      timersRef.current.push(window.setTimeout(() => setBeatIndex(nextIndex), cumulative));
+    }
+    timersRef.current.push(window.setTimeout(() => setPlaying(false), cumulative));
+  }
+
+  function handlePlayPause() {
+    if (playing) {
+      clearTimers();
+      setPlaying(false);
+      return;
+    }
+    playFrom(atEnd ? 0 : beatIndex);
+  }
+
+  function goToStage(nextStageIndex: number) {
+    clearTimers();
+    setPlaying(false);
+    const clamped = Math.max(0, Math.min(HERO_CALL_STAGES.length - 1, nextStageIndex));
+    const firstBeatOfStage = HERO_CALL_BEATS.findIndex((b) => b.stageIndex === clamped);
+    setBeatIndex(firstBeatOfStage === -1 ? 0 : firstBeatOfStage);
+  }
+
+  useEffect(() => clearTimers, []);
+
+  const showWaveform = beat.voice === "listening" || beat.voice === "speaking";
+  const Card = stage.Card;
+  const playLabel = playing ? "Pause" : atEnd ? "Replay" : "Play";
+
+  return (
+    <div className="smv5-herotheater" id="hero-theater" data-stage={stage.id}>
+      <div className="smv5-herotheater__top">
+        <span className="smv5-herotheater__badge">Simulated call</span>
+        <span className="smv5-herotheater__count">
+          {stageIndex + 1} / {HERO_CALL_STAGES.length}
+        </span>
+      </div>
+
+      <div className="smv5-herotheater__stage">
+        <div className="smv5-herotheater__ringcol">
+          <div className="smv5-theater__voice" aria-hidden="true">
+            <canvas ref={canvasRef} className="smv5-theater__canvas" />
+          </div>
+          {showWaveform && <TheaterWaveform />}
+        </div>
+        <div className="smv5-herotheater__card">
+          <p className="smv5-herotheater__stagelabel" aria-live="polite">
+            {stage.label}
+          </p>
+          <Card />
+        </div>
+      </div>
+
+      <div className="smv5-herotheater__controls" role="group" aria-label="Simulated call playback">
+        <button
+          type="button"
+          className="smv5-btn smv5-btn--ghost"
+          onClick={() => goToStage(stageIndex - 1)}
+          disabled={isFirstStage}
+          aria-label="Previous call state"
+        >
+          ‹ Prev
+        </button>
+        <button
+          type="button"
+          className="smv5-btn smv5-btn--primary"
+          onClick={handlePlayPause}
+          aria-pressed={playing}
+        >
+          {playLabel}
+        </button>
+        <button
+          type="button"
+          className="smv5-btn smv5-btn--ghost"
+          onClick={() => goToStage(stageIndex + 1)}
+          disabled={isLastStage}
+          aria-label="Next call state"
+        >
+          Next ›
+        </button>
+      </div>
+
+      <p className="smv5-herotheater__disclose">Simulated preview — no live calls yet</p>
     </div>
   );
 }

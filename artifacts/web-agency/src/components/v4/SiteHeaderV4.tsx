@@ -22,11 +22,22 @@
  * two extra CTAs onto the end — seven interactive targets in one row.
  * Product mode now renders its own lean row instead of extending the
  * company one: brand → quiet separator → "AI Receptionist" as plain text
- * (no pill, we're already on that page) → up to three quiet in-page anchors
- * → "Sign in" → one primary CTA. See the "Product-mode header" CSS block in
- * v4-chrome.css for the responsive collapse strategy. Company mode's JSX
- * and CSS are untouched — every product-only rule is scoped under
- * `[data-mode="product"]`.
+ * (no pill, we're already on that page) → the product sub-nav → "Sign in" →
+ * one primary CTA. See the "Product-mode header" CSS block in v4-chrome.css
+ * for the responsive collapse strategy. Company mode's JSX and CSS are
+ * untouched — every product-only rule is scoped under `[data-mode=
+ * "product"]`.
+ *
+ * Product sub-nav repair (owner review, 2026-09-06, full-viewport product
+ * theater): the three quick links above were replaced with a full,
+ * verified sub-nav (`productSubNavV4`) — Overview, Try the Demo, How It
+ * Works, Capabilities, Setup & Integrations, Business Uses, FAQ, each
+ * mapped to a real anchor id on the AI Receptionist page — plus
+ * IntersectionObserver-driven active-section tracking
+ * (`useProductSubNavActiveId`) so the current section carries
+ * `aria-current="true"` on both the desktop row and, now, the mobile sheet
+ * (which previously showed the company nav in product mode with no in-page
+ * links at all).
  */
 
 import {
@@ -55,17 +66,68 @@ import {
 } from "./publicNavV4";
 
 /**
- * Product-mode quick links (owner review fix). At most three, into the
- * strongest sections of the AI Receptionist page — real ids from
- * `pages/receptionist-v5/sections.ts` (`RECEPTIONIST_V5_SECTIONS`). Kept
- * local to the header rather than in `publicNavV4.ts` since this component
- * is the only consumer.
+ * Product sub-navigation (owner review fix, 2026-09-06 — "the nav bar on
+ * AI Receptionist, it's too messy" plus "repair its product navigation").
+ * The previous three quick links pointed at only three sections and had no
+ * mobile presence and no active-state indication. Every id below is a real,
+ * rendered anchor on the AI Receptionist page — six of the seven are ids
+ * from `pages/receptionist-v5/sections.ts` (`RECEPTIONIST_V5_SECTIONS`);
+ * `hero-theater` is the id on the embedded call theater inside the hero
+ * (`HeroCallTheaterV5` in `components/receptionist-v5/CallTheaterV5.tsx`,
+ * rendered from `pages/AiReceptionistV5.tsx`). "Request Private Beta" is
+ * not in this list — it's the existing primary CTA button, not a quiet
+ * in-page link. Kept local to the header rather than in `publicNavV4.ts`
+ * since this component is the only consumer.
  */
-const productQuickLinksV4 = [
-  { label: "What it does", href: `${ROUTES.aiReceptionist}#what-it-does` },
-  { label: "Try it", href: `${ROUTES.aiReceptionist}#try` },
-  { label: "FAQ", href: `${ROUTES.aiReceptionist}#faq` },
+const productSubNavV4: { id: string; label: string; href: string }[] = [
+  { id: "hero", label: "Overview", href: `${ROUTES.aiReceptionist}#hero` },
+  { id: "hero-theater", label: "Try the Demo", href: `${ROUTES.aiReceptionist}#hero-theater` },
+  { id: "scheduling", label: "How It Works", href: `${ROUTES.aiReceptionist}#scheduling` },
+  { id: "what-it-does", label: "Capabilities", href: `${ROUTES.aiReceptionist}#what-it-does` },
+  { id: "setup", label: "Setup & Integrations", href: `${ROUTES.aiReceptionist}#setup` },
+  { id: "use-cases", label: "Business Uses", href: `${ROUTES.aiReceptionist}#use-cases` },
+  { id: "faq", label: "FAQ", href: `${ROUTES.aiReceptionist}#faq` },
 ];
+
+const productSubNavIdsV4 = productSubNavV4.map((item) => item.id);
+
+/**
+ * Scrollspy for the product sub-nav: tracks which anchored section is
+ * currently in view so the matching link can carry `aria-current="true"`
+ * plus a visual state (`.v4-product-nav__link[aria-current="true"]` /
+ * `.v4-sheet__link[aria-current="true"]` in v4-chrome.css). `enabled` gates
+ * the observer entirely — the six-plus-one ids this watches only exist on
+ * the AI Receptionist page, so this never runs in company mode. The
+ * `-96px … -55%` root margin arms a section as active once it clears the
+ * fixed header, and prefers the earliest-still-visible section when more
+ * than one qualifies (e.g. short sections near a fast scroll).
+ */
+function useProductSubNavActiveId(enabled: boolean, ids: string[]): string | null {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const targets = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (targets.length === 0) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        setActiveId(visible[0].target.id);
+      },
+      { rootMargin: "-96px 0px -55% 0px", threshold: [0, 1] },
+    );
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, ids.join("|")]);
+
+  return activeId;
+}
 
 function isActive(location: string, href?: string): boolean {
   if (!href || href.includes("#")) return false;
@@ -124,6 +186,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
   const sheetRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const sheetId = useId();
+  const activeSubNavId = useProductSubNavActiveId(headerMode === "product", productSubNavIdsV4);
 
   // Ink-hero pages let the transparent-dark bar sit over the hero until the
   // page scrolls past it; light pages are light immediately.
@@ -282,11 +345,15 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
             <span className="v4-header__product-sep" aria-hidden="true" />
             <span className="v4-header__product-name">AI Receptionist</span>
 
-            <nav className="v4-product-nav" aria-label="Primary">
+            <nav className="v4-product-nav" aria-label="AI Receptionist sections">
               <ul className="v4-product-nav__list">
-                {productQuickLinksV4.map((item) => (
-                  <li key={item.label}>
-                    <Link href={item.href} className="v4-product-nav__link">
+                {productSubNavV4.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      href={item.href}
+                      className="v4-product-nav__link"
+                      aria-current={activeSubNavId === item.id ? "true" : undefined}
+                    >
                       {item.label}
                     </Link>
                   </li>
@@ -302,15 +369,15 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
               <Link
                 href={requestBetaHrefV4}
                 className="v4-btn v4-btn--primary v4-header__cta"
-                aria-label="Request Beta"
+                aria-label="Request Private Beta"
               >
                 {/* Below ~480px the brand wordmark is already gone (CSS);
-                    shortening "Request Beta" → "Beta" buys back the width
-                    the product name needs to never truncate. "Beta" is a
-                    substring of the constant aria-label above, so the
+                    shortening "Request Private Beta" → "Beta" buys back the
+                    width the product name needs to never truncate. "Beta"
+                    is a substring of the constant aria-label above, so the
                     visible text is always contained in the accessible name
                     at both sizes. */}
-                <span className="v4-header__cta-full" aria-hidden="true">Request Beta</span>
+                <span className="v4-header__cta-full" aria-hidden="true">Request Private Beta</span>
                 <span className="v4-header__cta-short" aria-hidden="true">Beta</span>
               </Link>
             </div>
@@ -462,40 +529,65 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
 
             <nav aria-label="Mobile primary">
               <ul className="v4-sheet__list">
-                <MobileGroup
-                  title="What We Build"
-                  location={location}
-                  onCloseMenu={() => setMenuOpen(false)}
-                >
-                  {whatWeBuildV4.map((item) => ({
-                    label: item.label,
-                    href: item.href,
-                  }))}
-                </MobileGroup>
-                {/* W-17: mobile group renamed "Company" → "Explore". */}
-                <MobileGroup
-                  title="Explore"
-                  location={location}
-                  onCloseMenu={() => setMenuOpen(false)}
-                >
-                  {primaryNavV4}
-                </MobileGroup>
-                <li>
-                  <Link
-                    href={productNavV4.href}
-                    className="v4-sheet__link"
-                    aria-current={
-                      isActive(location, productNavV4.href) ? "page" : undefined
-                    }
-                    onClick={(e) =>
-                      handleActiveNavClick(e, isActive(location, productNavV4.href), () =>
-                        setMenuOpen(false),
-                      )
-                    }
-                  >
-                    {productNavV4.label}
-                  </Link>
-                </li>
+                {headerMode === "product" ? (
+                  /* Product-mode mobile menu (owner review fix): the same
+                     dedicated sub-nav as the desktop row, not the company
+                     "What We Build"/"Explore" groups — this is the fix for
+                     mobile visitors on the AI Receptionist page previously
+                     having no in-page navigation at all. Each link closes
+                     the sheet on click since a same-route hash navigation
+                     never changes `location`, so the sheet's own
+                     route-change auto-close effect never fires for these. */
+                  productSubNavV4.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        href={item.href}
+                        className="v4-sheet__link"
+                        aria-current={activeSubNavId === item.id ? "true" : undefined}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))
+                ) : (
+                  <>
+                    <MobileGroup
+                      title="What We Build"
+                      location={location}
+                      onCloseMenu={() => setMenuOpen(false)}
+                    >
+                      {whatWeBuildV4.map((item) => ({
+                        label: item.label,
+                        href: item.href,
+                      }))}
+                    </MobileGroup>
+                    {/* W-17: mobile group renamed "Company" → "Explore". */}
+                    <MobileGroup
+                      title="Explore"
+                      location={location}
+                      onCloseMenu={() => setMenuOpen(false)}
+                    >
+                      {primaryNavV4}
+                    </MobileGroup>
+                    <li>
+                      <Link
+                        href={productNavV4.href}
+                        className="v4-sheet__link"
+                        aria-current={
+                          isActive(location, productNavV4.href) ? "page" : undefined
+                        }
+                        onClick={(e) =>
+                          handleActiveNavClick(e, isActive(location, productNavV4.href), () =>
+                            setMenuOpen(false),
+                          )
+                        }
+                      >
+                        {productNavV4.label}
+                      </Link>
+                    </li>
+                  </>
+                )}
               </ul>
             </nav>
 
@@ -508,7 +600,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                   href={requestBetaHrefV4}
                   className="v4-btn v4-btn--primary v4-sheet__cta"
                 >
-                  Request Beta
+                  Request Private Beta
                 </Link>
               </>
             ) : (
