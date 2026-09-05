@@ -1910,6 +1910,9 @@
     animation: none;
     opacity: 0.6;
     transform: translateY(12px);
+  }
+}
+
 /* ── Team member bio dialog (owner directive 2026-09-06: "make team members
    clickable"). Native <dialog> — TeamMemberDialog.tsx calls showModal(),
    which gives a real top-layer modal with a browser-native Tab focus trap
