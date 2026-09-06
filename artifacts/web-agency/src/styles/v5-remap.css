@@ -489,3 +489,105 @@ html[data-sm-motion="off"] .sm-home-v5 * {
     margin-top: 1.2rem;
   }
 }
+
+/* ── Pastel-mint distribution (owner responsive-first directive):
+   varied, intentional mint moments on every page while the blue-charcoal
+   / cyan / white foundation stays put. ─────────────────────────────────── */
+
+/* 1 · Alternating section washes: every porcelain-toned section site-wide
+   picks up a barely-green mint wash (was #F8FCFC near-white cyan). Ink and
+   white sections are untouched, so pages alternate white → mint wash → ink
+   instead of reading uniformly blue. */
+.v4-shell {
+  --sm-porcelain-mint: #F1FAF7;
+}
+.v4-shell[data-tone="porcelain"],
+.v4-shell [data-tone="porcelain"] {
+  --v3-bg: var(--sm-porcelain-mint);
+}
+
+/* 2 · Editorial accents on light surfaces: chapter numbers, eyebrows, and
+   kickers carry the brand mint instead of neutral slate. */
+.v4-shell [data-tone="white"] .v3m-sechead__no,
+.v4-shell [data-tone="porcelain"] .v3m-sechead__no,
+.v4-shell [data-tone="white"] .v3-eyebrow,
+.v4-shell [data-tone="porcelain"] .v3-eyebrow,
+.v4-shell [data-tone="white"] .v4-kicker,
+.v4-shell [data-tone="porcelain"] .v4-kicker {
+  color: var(--sm-mint-700, #0B7487);
+}
+
+/* 3 · Icon backplates: pillar/value icons sit on a mint surface. */
+.v4-shell .v3m-pillar__icon {
+  background: var(--sm-mint-wash-deep, #DFF4EF);
+  color: var(--sm-mint-700, #0B7487);
+}
+.v4-shell .v4-pillar__glyph {
+  background: var(--sm-mint-wash-deep, #DFF4EF);
+  color: var(--sm-mint-700, #0B7487);
+  border-radius: 12px;
+  padding: 9px;
+  box-sizing: content-box;
+  width: 30px;
+  height: 30px;
+}
+
+/* 4 · Footer: link hovers + the brand line pick up mint. */
+.v4-footer__cols a:hover {
+  color: var(--sm-mint-400, #56D2CF);
+}
+.v4-footer__legal span:last-child {
+  color: var(--sm-mint-400, #56D2CF);
+  opacity: 0.85;
+}
+
+/* ── AI Receptionist sub-nav on compact widths (owner responsive-first
+   directive): a scrollable rail as a second header row, instead of hiding
+   the in-page navigation behind the hamburger. `--v4-hdr-h` is raised on
+   this shell only (the :has() scope), so the fixed-header offset contract
+   (scroll-margin-top, hero clearance) stays correct everywhere. */
+@media (max-width: 1023px) {
+  .v4-shell:has(.v4-header[data-mode="product"]) {
+    --v4-hdr-h: 108px;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-header__inner {
+    flex-wrap: wrap;
+    row-gap: 0;
+    align-content: start;
+    padding-top: 10px;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav {
+    display: block;
+    order: 10;
+    flex: 1 1 100%;
+    margin-left: 0;
+    overflow: hidden;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.1rem;
+    padding-bottom: 2px;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__list::-webkit-scrollbar {
+    display: none;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link {
+    min-height: 40px;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    font-size: 0.85rem;
+  }
+  /* Mint active pill for the scrollspy state on the rail. */
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link[aria-current="true"] {
+    color: var(--sm-mint-700, #0B7487);
+    background: var(--sm-mint-wash-deep, #DFF4EF);
+  }
+  .v4-shell .v4-header[data-mode="product"][data-surface="dark"] .v4-product-nav__link[aria-current="true"] {
+    color: var(--sm-mint-400, #56D2CF);
+    background: rgb(86 210 207 / 0.12);
+  }
+}
