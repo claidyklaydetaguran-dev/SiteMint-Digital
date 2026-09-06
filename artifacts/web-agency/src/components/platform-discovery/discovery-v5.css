@@ -513,3 +513,34 @@
   opacity: 0.5;
   box-shadow: none;
 }
+
+/* ── Brand repair (owner final polish, 2026-09-06): the header wordmark is
+   the SAME mark + type voice as the public site chrome (SignalMarkV4 +
+   Space Grotesk "SiteMint"), so Discovery unmistakably belongs to the same
+   product. ───────────────────────────────────────────────────────────── */
+.discovery-v5 .dsc-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--v4-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: var(--sm-teal-900, #173642);
+  text-decoration: none;
+}
+.discovery-v5 .dsc-brand:hover {
+  color: var(--sm-mint-700, #0B7487);
+}
+.discovery-v5 .dsc-brand:focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+/* Pastel-mint selected/hover language on choice tiles — same vocabulary as
+   the rest of the site (tokens, not scattered hex). */
+.discovery-v5 [aria-pressed="true"],
+.discovery-v5 [aria-checked="true"],
+.discovery-v5 [data-selected="true"] {
+  box-shadow: var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+}
