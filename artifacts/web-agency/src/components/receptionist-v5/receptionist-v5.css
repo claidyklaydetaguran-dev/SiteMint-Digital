@@ -1990,3 +1990,95 @@
     white-space: normal;
   }
 }
+
+/* ── Owner-preview live voice call UI (responsive-first directive) ─────── */
+.smv5-livecall {
+  background: var(--smv5-white);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  border-radius: var(--smv5-radius-l);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.smv5-livecall__badge {
+  font-family: var(--smv5-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--smv5-mint-700);
+  margin: 0;
+}
+.smv5-livecall__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--smv5-slate-700, #3D5A66);
+}
+.smv5-livecall__disclosure {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--smv5-slate-700, #3D5A66);
+}
+.smv5-livecall__disclosure li::marker {
+  color: var(--smv5-mint-500);
+}
+.smv5-livecall__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.smv5-livecall__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--smv5-mint-500);
+  box-shadow: 0 0 0 4px rgb(50 197 210 / 0.18);
+}
+.smv5-livecall__dot[data-speaking] {
+  background: var(--smv5-mint-600);
+  animation: smv5-live-pulse 900ms ease-in-out infinite;
+}
+@keyframes smv5-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgb(50 197 210 / 0.16); }
+  50% { box-shadow: 0 0 0 7px rgb(50 197 210 / 0.28); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .smv5-livecall__dot[data-speaking] { animation: none; }
+}
+.smv5-livecall__meter {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--smv5-mist-100);
+  position: relative;
+  overflow: hidden;
+}
+.smv5-livecall__meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: calc(var(--sm-vol, 0) * 100%);
+  background: linear-gradient(90deg, var(--smv5-mint-400, #56D2CF), var(--smv5-mint-500));
+  transition: width 120ms linear;
+}
+.smv5-livecall__clock {
+  font-family: var(--smv5-font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--smv5-slate-600);
+}
+.smv5-livecall__controls {
+  display: flex;
+  gap: 10px;
+}
+.smv5-livecall__note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--smv5-slate-600);
+}

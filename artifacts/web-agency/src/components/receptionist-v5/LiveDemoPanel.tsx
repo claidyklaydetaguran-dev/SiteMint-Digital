@@ -9,9 +9,22 @@
  * tree. No provider SDK is imported anywhere in this file.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { publicDemoEnabled } from "./publicDemoFlag";
 import { startDemoSession, type DemoSession } from "./liveDemoClient";
+import { liveVoiceEnabled } from "./liveVoice/liveVoiceConfig";
+
+/**
+ * Owner-preview live voice mode (owner responsive-first directive,
+ * 2026-09-06): a REAL browser voice conversation behind the clearly-named
+ * `VITE_RECEPTIONIST_LIVE_VOICE_ENABLED` flag. The lazy import sits behind
+ * the build-time constant so a committed build (flag unset) folds the
+ * entire chunk — including the Vapi Web SDK — out of the bundle. The
+ * simulated theater above this panel is always the fallback experience.
+ */
+const LiveVoiceCallLazy = liveVoiceEnabled
+  ? lazy(() => import("./liveVoice/LiveVoiceCall"))
+  : null;
 
 type LiveDemoState =
   | { phase: "disabled" }
@@ -60,6 +73,24 @@ export function LiveDemoPanel() {
     stopCountdown();
     setState({ phase: "ended" });
   }, [stopCountdown]);
+
+  // Owner-preview live voice mode takes over this panel when its flag is
+  // set; every fallback state (denied mic, unsupported browser, provider
+  // error, missing config) is handled inside LiveVoiceCall and always
+  // points back to the simulated preview.
+  if (LiveVoiceCallLazy) {
+    return (
+      <Suspense
+        fallback={
+          <div className="smv5-live" data-phase="connecting" aria-live="polite">
+            <p className="smv5-live__body">Loading the live demo…</p>
+          </div>
+        }
+      >
+        <LiveVoiceCallLazy />
+      </Suspense>
+    );
+  }
 
   if (!publicDemoEnabled || state.phase === "disabled") {
     return (

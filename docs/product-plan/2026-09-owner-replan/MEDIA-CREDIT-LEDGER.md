@@ -44,3 +44,17 @@ Balance verified before start: 217,682 available. Owner: "use existing available
 | A2-4 | Receptionist full-bleed theater background | Seedance 2.0 Pro | 16:9 1080p 10s | 7,000 exact | 7,000 | 8aqxfLgIrU | done — PASSED (busy studio, mint answer-glow, tooth neon, Glacier palette); 981 KB web |
 
 Authorization-2 running total: 17,530. Program cumulative (all authorizations): 23,995.
+
+## Authorization 3 — responsive-first finalization media (2026-09-06, owner: "I approve you to use credits on my Magnific")
+
+Balance verified before start: 200,152 available (= 217,682 − 17,530 auth-2 ✓). Unlimited mode NOT active in this session — real credits consumed. simulate_cost before generation: images_generate auto/16:9 ≈ 100/image predicted (actual 75/image).
+
+| # | Purpose · target | Prompt summary | Predicted | Actual | Verdict |
+|---|---|---|---|---|---|
+| A3-1 | Process planning artifacts band (/process) | Overhead planning table, printed abstract wireframes + sitemap, mint stickies, no text/people/logos | ~200 (2 cand.) | 150 | Cand. A PASSED gate; B unused (retained) |
+| A3-2 | Systems diagram band (/ai-systems) | Printed connected-node diagram on charcoal wall, mint highlights, no text/screens/neon | ~200 | 150 | Cand. A PASSED; B retained |
+| A3-3 | Growth workspace figure (/services#growth-infrastructure) | Marketing desk, abstract printed charts + abstract laptop dashboard, warm light, no text | ~200 | 150 | Cand. A PASSED; B retained |
+| A3-4 | Responsive devices band (/websites-apps) | Laptop+tablet+phone, same abstract layout scaled, mint accents, no text/people | ~200 | 150 | Cand. A PASSED; B retained |
+
+**Auth-3 total: 600. Program cumulative: 24,595. Balance after: 199,552. No purchases or top-ups.**
+Frame gate applied to each winner: no readable generated text, no logos, no people/anatomy, palette on-brand; delivered as 1600w JPEG 44–79KB, lazy-loaded.

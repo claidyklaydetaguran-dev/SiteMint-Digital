@@ -126,21 +126,47 @@ console.log("\n--- privacy sentence is present verbatim ---");
   check("the page renders PRIVACY_STATEMENT (not a paraphrase)", pageSrc.includes("{PRIVACY_STATEMENT}"));
 }
 
-console.log("\n--- no provider SDK anywhere in receptionist-v5 components ---");
+console.log("\n--- provider SDK boundary in receptionist-v5 components ---");
+// AMENDED by the owner responsive-first directive (2026-09-06): the
+// owner-preview live voice demo is explicitly authorized to use the Vapi
+// Web SDK in the frontend. The boundary is now:
+//  - `VAPI_API_KEY` (the PRIVATE key) may appear NOWHERE, ever — unchanged.
+//  - `@vapi-ai` may appear in exactly ONE file, `liveVoice/vapiLoader.ts`,
+//    and only as a dynamic `import(...)` — so the SDK loads only after
+//    user consent, and a committed build (flag unset) folds the whole
+//    chunk out (the lazy call site is gated on `liveVoiceEnabled`).
 {
   const componentsDir = path.join(webAgencySrc, "components/receptionist-v5");
   const files = listFilesRecursive(componentsDir).filter((f) => /\.(ts|tsx)$/.test(f));
   check("component directory has files to scan", files.length > 0, componentsDir);
+  const loaderRel = path.join("components", "receptionist-v5", "liveVoice", "vapiLoader.ts");
   for (const file of files) {
     const src = readFileSync(file, "utf8");
     // Strip comments first (same reasoning as `pageText` above): a doc
     // comment is allowed to name `@vapi-ai` or `VAPI_API_KEY` to explain
-    // that the file deliberately avoids them — only actual code may not.
+    // the boundary — only actual code is scanned.
     const code = src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
     const rel = path.relative(webAgencySrc, file);
-    check(`${rel} does not import @vapi-ai`, !/@vapi-ai/.test(code));
+    if (rel === loaderRel) {
+      check(`${rel} references @vapi-ai ONLY as a dynamic import`, /await import\("@vapi-ai\/web"\)/.test(code));
+      check(`${rel} has no static @vapi-ai import`, !/^\s*import[^;]*@vapi-ai/m.test(code));
+    } else {
+      check(`${rel} does not import @vapi-ai`, !/@vapi-ai/.test(code));
+    }
     check(`${rel} does not reference VAPI_API_KEY`, !/VAPI_API_KEY/.test(code));
   }
+  // The lazy call site must be gated on the build-time flag constant so a
+  // committed build folds the live chunk (and the SDK) out entirely.
+  const panelSrc = readFileSync(path.join(componentsDir, "LiveDemoPanel.tsx"), "utf8");
+  check(
+    "LiveDemoPanel lazy-imports LiveVoiceCall only behind liveVoiceEnabled",
+    /liveVoiceEnabled\s*\?\s*lazy\(\(\) => import\("\.\/liveVoice\/LiveVoiceCall"\)\)\s*:\s*null/.test(panelSrc),
+  );
+  const flagSrc = readFileSync(path.join(componentsDir, "liveVoice", "liveVoiceConfig.ts"), "utf8");
+  check(
+    "liveVoiceConfig reads VITE_RECEPTIONIST_LIVE_VOICE_ENABLED with an exact-string comparison",
+    /import\.meta\.env\.VITE_RECEPTIONIST_LIVE_VOICE_ENABLED\s*===\s*"true"/.test(flagSrc),
+  );
 }
 
 console.log("\n--- live-demo button is gated on VITE_PUBLIC_DEMO_ENABLED ---");
