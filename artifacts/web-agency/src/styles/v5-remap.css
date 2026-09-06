@@ -591,3 +591,19 @@ html[data-sm-motion="off"] .sm-home-v5 * {
     background: rgb(86 210 207 / 0.12);
   }
 }
+
+/* ── Mobile/tablet sheet containment fix (root cause of the "no mobile
+   navigation" report): the header's backdrop-filter makes it the
+   CONTAINING BLOCK for fixed descendants, so the sheet's `inset: 0`
+   resolved to the 64px header box — the menu opened as a 63px sliver.
+   The header is pinned at the viewport origin, so explicit viewport
+   sizing (rather than inset) restores the full-screen overlay no matter
+   what filter the header carries. */
+.v4-shell .v4-sheet {
+  inset: auto;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
