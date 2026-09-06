@@ -1583,3 +1583,36 @@
   color: var(--sm-mint-chip-text, #0B7487);
   border: 1px solid var(--sm-mint-border, #C9E9E3);
 }
+
+/* ── Process accordion affordance (rendered audit, 2026-09-06): collapsed
+   stages read as plain headings with no cue that they open — add a chevron
+   tied to aria-expanded and a mint hover so the interaction is legible
+   before the first click. (v3-marketing.css is protected; scoped here.) */
+.sm-v5page .v3m-step__head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.sm-v5page .v3m-step__head-btn::after {
+  content: "";
+  width: 0.55em;
+  height: 0.55em;
+  border-right: 2px solid var(--sm-mint-500, #32C5D2);
+  border-bottom: 2px solid var(--sm-mint-500, #32C5D2);
+  transform: rotate(45deg) translateY(-15%);
+  transition: transform 220ms ease;
+  flex: 0 0 auto;
+}
+.sm-v5page .v3m-step__head-btn[aria-expanded="true"]::after {
+  transform: rotate(225deg) translateY(-15%);
+}
+.sm-v5page .v3m-step__head-btn:hover {
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-v5page .v3m-step__head-btn:focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 3px;
+  border-radius: 6px;
+}

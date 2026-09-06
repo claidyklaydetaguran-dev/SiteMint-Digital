@@ -60,3 +60,21 @@ Every retained section now provides ≥2 of: clear message · meaningful visual 
 ## 7. Media quality gate record
 
 See MEDIA-CREDIT-LEDGER.md authorization-2 and the owner package: frame checks at 0/20/40/60/80/100% across desktop/laptop/tablet/mobile crops for every installed film; rejected takes recorded with reasons.
+
+## 8. Final polish pass (owner layout correction, 2026-09-06 late)
+
+The owner rejected the media-stage-on-top order and issued the final layout:
+particles TOP → transparent floating copy → cinematic film BOTTOM.
+
+| Item | Implementation | Verified |
+|---|---|---|
+| Hero order | Field first (40% of usable hero), copy `position:absolute` floating across the boundary with NO card/panel/background (contrast = ink field above + localized gradient inside the film frame + glyph text-shadow), film flex-grows to ~60%, phase HUD overlaid on the film's bottom edge | Rect probe at 360/768/1440/1920: field→copy→film order, HUD in view, nothing clipped; copy overlap raised so CTAs clear the opening-beat face (frame review) |
+| Chrome-less films | All decorative videos: `controls={false}`, `disablePictureInPicture`, `disableRemotePlayback`, `controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"`, `data-sm-decorative-film`, `pointer-events:none`, webkit media-controls suppressed | qa-video-chrome: Chrome 6/6, Edge 6/6; hover screenshots show no PiP/Enhance affordance |
+| Motion accessibility | Per-video pause buttons removed per owner; WCAG 2.2.2 satisfied by (a) reduced-motion never mounting films, (b) global footer "Motion: On/Off" preference (motionPref.ts, persists, flips gates live, pauses ambient CSS animation) | Footer control ≥44px, aria-pressed, focus ring |
+| Receptionist hero | Film brightness 0.45→0.72, radial mask widened, scrim localized to the copy column + foot; theater carries its own solid surfaces | F3 capture: film clearly visible, copy ≥4.5:1 over its gradient |
+| Call theater | Product identity header (SiteMint AI Receptionist · Bloom Dental · state chip · elapsed clock), 9-stage rail covering the eight canonical states incl. "Needs human attention" (insurance question → follow-up task) and "Completed" with outcome tags; current-system-action line; disclosure exactly "Simulated preview — no live call is being placed." | Interactions 8/8; attention-state capture reviewed |
+| Owner dashboard | DashboardPreview: 4 KPIs, Today/7-Days, activity feed w/ outcome tags + All/Booked/Needs-attention filter, weekly chart, appointments, follow-up queue, knowledge status, "Illustrative dashboard — example data" label; synthetic Bloom Dental data only | Capture reviewed; toggle/filter clickable |
+| Team cards | Larger real portraits (116px, rounded-rect), owner-verbatim ownership sentences + 3 tags each, "Meet … →" affordance, mint top-accent, hover lift/glow; dialogs gain tags + "What X owns" / "How X supports your project" subheads | Dialog battery passes |
+| Discovery brand | Canonical SignalMarkV4 + "SiteMint" wordmark (Space Grotesk) replaces the legacy slate/emerald logo; mint selection glow language | Capture in final sweep |
+| Pastel-mint layer | Semantic tokens (`--sm-mint-wash/-wash-deep/-hover/-border/-glow/-chip-*`) + global touches: `::selection`, outline-button hover wash, light-surface card hover glow, component accents above | Computed-color audit via Lighthouse a11y sweep |
+| Film review (new crop) | 6-point ffmpeg frame review of the stage master in the rendered crop: PASSES (no malformed anatomy, no readable generated text, plan→build→deliver arc, Glacier light). Notes: 3s transitional torso-only beat; 12s stylized on-screen glow. NOT regenerated — layout correction did not degrade the film. | stage-*.jpg in shots/film-review |
