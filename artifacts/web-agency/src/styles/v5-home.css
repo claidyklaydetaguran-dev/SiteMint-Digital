@@ -2167,7 +2167,10 @@
     left: 0;
     right: 0;
     z-index: 4;
-    top: calc(var(--v4-hdr-h, 64px) + (100svh - var(--v4-hdr-h, 64px)) * 0.4 - clamp(120px, 16vh, 156px));
+    /* Overlap tuned so the CTA row ends within the film's top scrim zone,
+       clear of the subject's face in the opening beat (frame review,
+       2026-09-06). */
+    top: calc(var(--v4-hdr-h, 64px) + (100svh - var(--v4-hdr-h, 64px)) * 0.4 - clamp(150px, 19vh, 190px));
     padding-top: 0;
     /* Soft text shadow for the frontier pixels where copy meets moving
        footage — a shadow on the glyphs, not a panel behind them. */
