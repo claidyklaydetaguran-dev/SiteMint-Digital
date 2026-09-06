@@ -10,6 +10,7 @@ import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { BrowserFrame } from "@/components/v5/BrowserFrame";
 import discoveryStep from "@/assets/product/discovery-step.png";
+import processPlanningImg from "@/assets/media/support-process-planning.jpg";
 import "@/styles/v5-pages.css";
 
 /**
@@ -153,6 +154,18 @@ export default function ProcessV3() {
           </ol>
         </div>
       </section>
+
+      {/* Atmospheric planning-artifacts band (owner responsive-first media
+          pass, 2026-09-06) — generated illustration, frame-gated: printed
+          wireframes + sitemap, no readable text, no people. */}
+      <figure className="sm-about-texture">
+        <img
+          src={processPlanningImg}
+          alt="Printed website wireframes and a sitemap diagram laid out on a planning table — generated illustration"
+          loading="lazy"
+          decoding="async"
+        />
+      </figure>
 
       <section className="v3-section" data-tone="ink">
         <div className="v3-container v3m-split v3-reveal" ref={reveal}>

@@ -25,6 +25,7 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import growthWorkspaceImg from "@/assets/media/support-growth-workspace.jpg";
 import "@/styles/v5-pages.css";
 
 type PillarId = "websites-apps" | "discovery-systems" | "ai-systems" | "crm-systems";
@@ -35,6 +36,8 @@ interface Pillar {
   title: string;
   headline: string;
   desc: string;
+  /** Optional purposeful illustration (owner responsive-first media pass). */
+  image?: { src: string; alt: string };
   href: string;
   mapPos: { x: number; y: number };
   /** Owner §7: how each system connects to the rest — shown as a small
@@ -103,6 +106,8 @@ const pillars: Pillar[] = [
  */
 interface ExpandedService {
   id: string;
+  /** Optional purposeful illustration (owner responsive-first media pass). */
+  image?: { src: string; alt: string };
   icon: typeof Globe;
   title: string;
   headline: string;
@@ -120,6 +125,10 @@ const expandedServices: ExpandedService[] = [
     desc: "Technical SEO, analytics, conversion tracking, cookie-consent implementation, Meta/Google/TikTok pixels, webhooks, and campaign-ready landing pages, plus attribution and event instrumentation — offered on its own or as the foundation under an advertising engagement.",
     href: `${ROUTES.aiSystems}#growth-infrastructure`,
     connectsTo: ["Websites & Web Apps", "Advertising Services"],
+    image: {
+      src: growthWorkspaceImg,
+      alt: "A marketing workspace with printed charts and an abstract analytics dashboard — generated illustration",
+    },
   },
   {
     id: "advertising-services",
@@ -289,6 +298,11 @@ export default function ServicesV3() {
                 <div className="v3wk-item__body">
                   <h2 className="v3-h2">{service.headline}</h2>
                   <p className="v3-body">{service.desc}</p>
+                  {service.image && (
+                    <figure className="sm-service-figure">
+                      <img src={service.image.src} alt={service.image.alt} loading="lazy" decoding="async" />
+                    </figure>
+                  )}
                   <ul className="sm-connects">
                     <li className="sm-connects__label">Connects to:</li>
                     {service.connectsTo.map((name) => (
@@ -325,6 +339,11 @@ export default function ServicesV3() {
               <div className="v3wk-item__body">
                 <h2 className="v3-h2">{service.headline}</h2>
                 <p className="v3-body">{service.desc}</p>
+                {service.image && (
+                  <figure className="sm-service-figure">
+                    <img src={service.image.src} alt={service.image.alt} loading="lazy" decoding="async" />
+                  </figure>
+                )}
                 <ul className="sm-connects">
                   <li className="sm-connects__label">Connects to:</li>
                   {service.connectsTo.map((name) => (

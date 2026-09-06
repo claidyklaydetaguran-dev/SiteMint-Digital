@@ -1616,3 +1616,19 @@
   outline-offset: 3px;
   border-radius: 6px;
 }
+
+/* ── Purposeful service figure (owner responsive-first media pass) ─────── */
+.sm-v5page .sm-service-figure {
+  margin: 1.2rem 0 0.4rem;
+  border-radius: var(--sm-radius-l, 16px);
+  overflow: hidden;
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  max-width: 640px;
+}
+.sm-v5page .sm-service-figure img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}

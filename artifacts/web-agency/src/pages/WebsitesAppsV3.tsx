@@ -14,6 +14,10 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
 import { BuildPreview } from "@/components/v5/BuildPreview";
+// Owner responsive-first media pass (2026-09-06): purposeful generated
+// illustration — one layout adapting across three devices. Magnific,
+// frame-gated (no readable text, no logos, no people).
+import responsiveDevicesImg from "@/assets/media/support-responsive-devices.jpg";
 
 const content: ServicePageContent = {
   eyebrow: "Websites & Web Apps",
@@ -165,6 +169,10 @@ export default function WebsitesAppsV3() {
   return (
     <ServicePage
       content={content}
+      texture={{
+        src: responsiveDevicesImg,
+        alt: "Laptop, tablet, and phone showing the same abstract layout at three sizes — generated illustration",
+      }}
       demo={
         <div className="v3-card v3h-demo" data-tone="ice">
           <div className="v3h-demo__head">

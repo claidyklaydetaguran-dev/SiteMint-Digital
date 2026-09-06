@@ -27,6 +27,10 @@ import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePag
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { ConnectedOpsMap } from "@/components/v5/ConnectedOpsMap";
+// Owner responsive-first media pass (2026-09-06): art-directed systems
+// illustration (printed connected-node diagram, mint-highlighted) — no
+// readable text, no people, no neon. Magnific, frame-gated.
+import systemsDiagramImg from "@/assets/media/support-systems-diagram.jpg";
 import "@/styles/v5-pages.css";
 
 const content: ServicePageContent = {

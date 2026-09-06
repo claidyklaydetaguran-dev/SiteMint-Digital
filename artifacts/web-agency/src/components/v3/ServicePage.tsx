@@ -58,6 +58,7 @@ export function ServicePage({
   content,
   demo,
   extraSection,
+  texture,
 }: {
   content: ServicePageContent;
   /** Bespoke demonstration pane rendered beside "what we build". */
@@ -69,6 +70,11 @@ export function ServicePage({
    * unaffected.
    */
   extraSection?: ReactNode;
+  /** Atmospheric editorial band after "How it works" (owner responsive-first
+   *  media pass, 2026-09-06) — a purposeful generated illustration, same
+   *  treatment as the About texture band. Optional; alt text must say it is
+   *  a generated illustration. */
+  texture?: { src: string; alt: string };
 }) {
   const reveal = useReveal();
   const Icon = content.eyebrowIcon;
@@ -143,6 +149,12 @@ export function ServicePage({
           </ol>
         </div>
       </section>
+
+      {texture && (
+        <figure className="sm-about-texture">
+          <img src={texture.src} alt={texture.alt} loading="lazy" decoding="async" />
+        </figure>
+      )}
 
       {/* 4 · Capabilities */}
       <section className="v3-section" data-tone="white">
