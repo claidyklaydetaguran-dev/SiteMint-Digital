@@ -79,6 +79,17 @@
      2-stop mint→aqua; never a fill, never a button. ─────────────────── */
   --sm-signal-thread: linear-gradient(90deg, var(--sm-mint-500), var(--sm-mint-400));
 
+  /* ── Pastel-mint brand layer (owner final polish, 2026-09-06) — semantic
+     tokens only; consumers never hard-code these values. Restrained by
+     rule: washes and hovers, never full-section green fills. ─────────── */
+  --sm-mint-wash: #EDF9F6;        /* soft section wash over porcelain */
+  --sm-mint-wash-deep: #DFF4EF;   /* selected states, icon backplates */
+  --sm-mint-hover: #F2FBF8;       /* hover backgrounds on light surfaces */
+  --sm-mint-border: #C9E9E3;      /* subtle borders, dividers */
+  --sm-mint-glow: 0 0 0 4px rgb(86 210 207 / 0.14); /* small glows */
+  --sm-mint-chip-bg: var(--sm-mint-wash-deep);
+  --sm-mint-chip-text: var(--sm-mint-700);
+
   /* ── shape, depth ──────────────────────────────────────────────────── */
   --sm-radius-s: 6px;
   --sm-radius-m: 10px;

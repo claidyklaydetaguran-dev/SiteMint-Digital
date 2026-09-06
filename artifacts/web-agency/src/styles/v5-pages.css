@@ -1536,3 +1536,50 @@
     transform: none;
   }
 }
+
+/* ── About team cards — owner final polish (2026-09-06), mirroring the
+   homepage treatment: larger portrait, ownership sentence, tags, mint
+   accent, purposeful hover. ─────────────────────────────────────────── */
+.sm-v5page .sm-person-card {
+  border-top: 3px solid var(--sm-mint-border, #C9E9E3);
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+.sm-v5page .sm-person-card:hover,
+.sm-v5page .sm-person-card:focus-within {
+  border-top-color: var(--sm-mint-500, #32C5D2);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+  transform: translateY(-2px);
+}
+.sm-v5page .sm-person-avatar {
+  width: 116px;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.sm-v5page .sm-person-card__role {
+  color: var(--sm-mint-700, #0B7487);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.sm-v5page .sm-person-card__summary {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.93rem;
+  line-height: 1.55;
+  margin: 0.2rem 0 0;
+}
+.sm-v5page .sm-person-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.5rem;
+}
+.sm-v5page .sm-person-card__tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sm-mint-chip-bg, #DFF4EF);
+  color: var(--sm-mint-chip-text, #0B7487);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+}

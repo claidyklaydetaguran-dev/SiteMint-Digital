@@ -211,3 +211,70 @@
   border-color: color-mix(in oklab, var(--sm-amber-600) 45%, transparent);
   color: var(--sm-amber-600);
 }
+
+/* ── Owner final polish (2026-09-06): global decorative-film contract,
+   Motion preference, and the pastel-mint brand layer. ─────────────────── */
+
+/* 1 · Decorative films are pointer-inert everywhere: no hover, no Chrome/
+   Edge PiP or "Enhance" affordances, no native controls, ever. */
+video[data-sm-decorative-film] {
+  pointer-events: none;
+}
+video[data-sm-decorative-film]::-webkit-media-controls,
+video[data-sm-decorative-film]::-webkit-media-controls-enclosure,
+video[data-sm-decorative-film]::-webkit-media-controls-panel {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+/* 2 · Global Motion preference: decorative videos are unmounted by their
+   eligibility gates (motionPref.ts); this pauses ambient CSS animation. */
+html[data-sm-motion="off"] .v4-shell *,
+html[data-sm-motion="off"] .sm-v5page *,
+html[data-sm-motion="off"] .sm-home-v5 * {
+  animation-play-state: paused !important;
+}
+
+/* The footer control itself — discreet, text-like, ≥44px hit target. */
+.v4-footer__motion {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 10px 0;
+  min-height: 44px;
+  font: inherit;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--sm-mint-400, #56D2CF);
+}
+.v4-footer__motion:hover {
+  opacity: 1;
+}
+.v4-footer__motion:focus-visible {
+  outline: 2px solid var(--sm-mint-400, #56D2CF);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* 3 · Pastel-mint brand layer — small global touches; section washes and
+   per-component accents are applied in the page stylesheets. */
+.v4-shell ::selection {
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-ink-950, #153E52);
+}
+/* Outline buttons pick up a mint hover wash on light surfaces. */
+.v4-shell [data-tone="white"] .v4-btn--outline:hover,
+.v4-shell [data-tone="porcelain"] .v4-btn--outline:hover {
+  background: var(--sm-mint-hover, #F2FBF8);
+  border-color: var(--sm-mint-border, #C9E9E3);
+}
+/* Cards on light surfaces: mint border + soft glow on hover (150–300ms
+   transitions already exist on the card primitives). */
+.v4-shell [data-tone="white"] .v3-card:hover,
+.v4-shell [data-tone="porcelain"] .v3-card:hover {
+  border-color: var(--sm-mint-border, #C9E9E3);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+}

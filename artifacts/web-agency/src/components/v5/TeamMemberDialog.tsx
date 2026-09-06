@@ -132,18 +132,22 @@ export function TeamMemberDialog({ member, onClose }: TeamMemberDialogProps) {
                 {person.name}
               </h2>
               <p className="sm-team-dialog__role">{person.role}</p>
+              <span className="sm-team-dialog__tags">
+                {person.tags.map((tag) => (
+                  <span className="sm-team-dialog__tag" key={tag}>{tag}</span>
+                ))}
+              </span>
             </div>
           </div>
           <p className="sm-team-dialog__intro">{person.intro}</p>
+          <h3 className="sm-team-dialog__subhead">What {person.name.split(" ")[0]} owns</h3>
           <ul className="sm-team-dialog__responsibilities">
             {person.responsibilities.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
-          <p className="sm-team-dialog__support">
-            <strong>How {person.name.split(" ")[0]} supports your project: </strong>
-            {person.support}
-          </p>
+          <h3 className="sm-team-dialog__subhead">How {person.name.split(" ")[0]} supports your project</h3>
+          <p className="sm-team-dialog__support">{person.support}</p>
         </div>
       )}
     </dialog>

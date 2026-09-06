@@ -90,7 +90,11 @@ export function SignalLoopMedia({ poster, src }: SignalLoopMediaProps) {
       muted
       loop
       playsInline
+      controls={false}
       disablePictureInPicture
+      disableRemotePlayback
+      controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
+      data-sm-decorative-film
       aria-hidden="true"
       tabIndex={-1}
     >

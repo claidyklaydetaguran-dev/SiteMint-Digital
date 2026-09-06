@@ -161,12 +161,12 @@
   height: 106%;
   object-fit: cover;
   display: block;
-  filter: brightness(0.45);
+  filter: brightness(0.72) saturate(1.02);
   /* Blurred-edge treatment: a soft radial mask (not a full blur filter, so
      the center of the shot stays legible as a "cinematic" background)
      fades the frame into the ink ground toward the edges. */
-  mask-image: radial-gradient(ellipse 78% 74% at 50% 38%, #000 55%, transparent 97%);
-  -webkit-mask-image: radial-gradient(ellipse 78% 74% at 50% 38%, #000 55%, transparent 97%);
+  mask-image: radial-gradient(ellipse 88% 84% at 50% 40%, #000 62%, transparent 99%);
+  -webkit-mask-image: radial-gradient(ellipse 88% 84% at 50% 40%, #000 62%, transparent 99%);
 }
 
 /* Glacier ink gradient scrim — guarantees the left column's copy passes
@@ -175,13 +175,16 @@
 .smv5-hero__scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    100deg,
-    rgba(7, 32, 34, 0.95) 0%,
-    rgba(7, 32, 34, 0.88) 30%,
-    rgba(7, 32, 34, 0.62) 56%,
-    rgba(7, 32, 34, 0.34) 100%
-  );
+  background:
+    linear-gradient(
+      97deg,
+      rgba(7, 32, 34, 0.88) 0%,
+      rgba(7, 32, 34, 0.7) 26%,
+      rgba(7, 32, 34, 0.34) 46%,
+      rgba(7, 32, 34, 0.06) 64%,
+      rgba(7, 32, 34, 0) 100%
+    ),
+    linear-gradient(0deg, rgba(7, 32, 34, 0.5) 0%, rgba(7, 32, 34, 0) 14%);
 }
 
 /* Pause/play control (skill mandate: autoplaying hero video must be
@@ -1546,4 +1549,444 @@
 .smv5 #beta {
   content-visibility: visible;
   contain-intrinsic-size: none;
+}
+
+/* Owner final polish: decorative background film is pointer-inert (no
+   Chrome/Edge hover PiP or Enhance affordances) and never shows controls. */
+.smv5-hero__bg,
+.smv5-hero__bg-media,
+.smv5-hero__bg-video {
+  pointer-events: none;
+}
+.smv5-hero__bg-video::-webkit-media-controls,
+.smv5-hero__bg-video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+/* ── Hero call theater redesign (owner final polish, 2026-09-06): product
+   identity header, eight-state chip + progress rail, elapsed clock, and a
+   "current system action" line. Layered solid surfaces — the card itself
+   stays solid white; only the identity strip carries a faint mint wash. */
+.smv5-herotheater__id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -20px -22px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--smv5-line);
+  background: var(--sm-mint-wash, #EDF9F6);
+  border-radius: var(--smv5-radius-l) var(--smv5-radius-l) 0 0;
+}
+.smv5-herotheater__id-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--smv5-mint-500);
+  box-shadow: 0 0 0 4px rgb(50 197 210 / 0.18);
+}
+.smv5-herotheater__id-dot[data-voice="listening"],
+.smv5-herotheater__id-dot[data-voice="speaking"] {
+  background: var(--smv5-mint-600);
+}
+.smv5-herotheater__id-dot[data-voice="thinking"] {
+  background: var(--smv5-amber-500, #D9A441);
+  box-shadow: 0 0 0 4px rgb(217 164 65 / 0.16);
+}
+.smv5-herotheater__id-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.smv5-herotheater__id-names b {
+  font-family: var(--smv5-font-display);
+  font-size: 13px;
+  font-weight: 700;
+}
+.smv5-herotheater__id-names span {
+  font-size: 11px;
+  color: var(--smv5-slate-600);
+}
+.smv5-herotheater__id-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.smv5-herotheater__chip {
+  font-family: var(--smv5-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--sm-mint-wash-deep, #DFF4EF);
+  color: var(--smv5-mint-700);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  white-space: nowrap;
+}
+.smv5-herotheater__chip[data-chip="attention"] {
+  background: #FBF3E2;
+  color: #7A5A17;
+  border-color: #EAD9AE;
+}
+.smv5-herotheater__clock {
+  font-family: var(--smv5-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--smv5-slate-600);
+}
+.smv5-herotheater__steps {
+  list-style: none;
+  display: flex;
+  gap: 5px;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.smv5-herotheater__step {
+  flex: 1 1 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--smv5-mist-200, #E3EEF1);
+  transition: background 200ms ease;
+}
+.smv5-herotheater__step[data-done] {
+  background: var(--sm-mint-border, #C9E9E3);
+}
+.smv5-herotheater__step[data-current] {
+  background: var(--smv5-mint-500);
+}
+.smv5-herotheater__stagelabel .smv5-herotheater__count {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--smv5-mint-700);
+  font-weight: 600;
+}
+.smv5-herotheater__action {
+  margin: 10px 0 0;
+  font-family: var(--smv5-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--smv5-slate-600);
+  border-top: 1px dashed var(--smv5-line);
+  padding-top: 8px;
+}
+.smv5-herotheater__action span {
+  color: var(--smv5-mint-600);
+}
+.smv5-herotheater__line--caller b {
+  color: var(--smv5-slate-600);
+}
+.smv5-herotheater__panel--attention {
+  background: #FBF6EA;
+  border: 1px solid #EAD9AE;
+}
+.smv5-herotheater__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.smv5-herotheater__tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--smv5-mist-100);
+  border: 1px solid var(--smv5-line);
+  color: var(--smv5-slate-700, #3D5A66);
+}
+.smv5-herotheater__tag--booked {
+  background: var(--sm-mint-wash-deep, #DFF4EF);
+  border-color: var(--sm-mint-border, #C9E9E3);
+  color: var(--smv5-mint-700);
+}
+.smv5-herotheater__tag--attention {
+  background: #FBF3E2;
+  border-color: #EAD9AE;
+  color: #7A5A17;
+}
+
+/* ── Illustrative owner dashboard (owner final polish, 2026-09-06) ─────── */
+.smv5-dash {
+  margin-top: 28px;
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: var(--smv5-radius-l);
+  box-shadow: var(--smv5-shadow-2);
+  overflow: hidden;
+}
+.smv5-dash__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--smv5-line);
+  background: var(--sm-mint-wash, #EDF9F6);
+}
+.smv5-dash__biz {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.smv5-dash__biz b {
+  font-family: var(--smv5-font-display);
+  font-size: 14px;
+}
+.smv5-dash__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--smv5-mint-500);
+  box-shadow: 0 0 0 3px rgb(50 197 210 / 0.18);
+}
+.smv5-dash__status {
+  font-size: 12px;
+  color: var(--smv5-slate-600);
+}
+.smv5-dash__range,
+.smv5-dash__filters {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--smv5-white);
+  border: 1px solid var(--smv5-line);
+  border-radius: 999px;
+}
+.smv5-dash__range button,
+.smv5-dash__filters button {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--smv5-slate-600);
+  padding: 6px 12px;
+  min-height: 32px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+.smv5-dash__range button:hover,
+.smv5-dash__filters button:hover {
+  background: var(--sm-mint-hover, #F2FBF8);
+}
+.smv5-dash__range button[aria-pressed="true"],
+.smv5-dash__filters button[aria-pressed="true"] {
+  background: var(--sm-mint-wash-deep, #DFF4EF);
+  color: var(--smv5-mint-700);
+}
+.smv5-dash__range button:focus-visible,
+.smv5-dash__filters button:focus-visible {
+  outline: 2px solid var(--smv5-mint-500);
+  outline-offset: 1px;
+}
+.smv5-dash__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--smv5-line);
+  border-bottom: 1px solid var(--smv5-line);
+}
+.smv5-dash__kpi {
+  background: var(--smv5-white);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.smv5-dash__kpi-value {
+  font-family: var(--smv5-font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--smv5-teal-900);
+  font-variant-numeric: tabular-nums;
+}
+.smv5-dash__kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--smv5-slate-700, #3D5A66);
+}
+.smv5-dash__kpi-hint {
+  font-size: 11px;
+  color: var(--smv5-slate-600);
+}
+.smv5-dash__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+.smv5-dash__side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.smv5-dash__panel {
+  min-width: 0;
+}
+.smv5-dash__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.smv5-dash__panel-head h3 {
+  font-family: var(--smv5-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--smv5-teal-900);
+}
+.smv5-dash__calls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.smv5-dash__calls li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: var(--smv5-radius-m);
+  border-bottom: 1px solid var(--smv5-mist-100);
+}
+.smv5-dash__calls li:hover {
+  background: var(--sm-mint-hover, #F2FBF8);
+}
+.smv5-dash__call-time {
+  flex: 0 0 60px;
+  font-family: var(--smv5-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--smv5-slate-600);
+  font-variant-numeric: tabular-nums;
+}
+.smv5-dash__call-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+.smv5-dash__call-body b {
+  font-size: 12px;
+  font-weight: 600;
+}
+.smv5-dash__call-body span {
+  font-size: 12px;
+  color: var(--smv5-slate-600);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.smv5-dash__tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--smv5-mist-100);
+  border: 1px solid var(--smv5-line);
+  color: var(--smv5-slate-700, #3D5A66);
+  white-space: nowrap;
+}
+.smv5-dash__tag[data-tag="booked"] {
+  background: var(--sm-mint-wash-deep, #DFF4EF);
+  border-color: var(--sm-mint-border, #C9E9E3);
+  color: var(--smv5-mint-700);
+}
+.smv5-dash__tag[data-tag="attention"] {
+  background: #FBF3E2;
+  border-color: #EAD9AE;
+  color: #7A5A17;
+}
+.smv5-dash__tag[data-tag="after-hours"] {
+  background: #EEF2FB;
+  border-color: #D4DEF3;
+  color: #3D5384;
+}
+.smv5-dash__empty {
+  font-size: 12px;
+  color: var(--smv5-slate-600);
+  padding: 12px 10px;
+}
+.smv5-dash__chart {
+  width: 100%;
+  max-width: 220px;
+  display: block;
+}
+.smv5-dash__mini {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.smv5-dash__mini li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.smv5-dash__mini b {
+  flex: 0 0 84px;
+  font-family: var(--smv5-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--smv5-mint-700);
+}
+.smv5-dash__mini span {
+  color: var(--smv5-slate-700, #3D5A66);
+}
+.smv5-dash__knowledge {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--smv5-radius-m);
+  background: var(--sm-mint-wash, #EDF9F6);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  font-size: 11px;
+  color: var(--smv5-slate-700, #3D5A66);
+}
+.smv5-dash__label {
+  margin: 0;
+  padding: 8px 18px 12px;
+  font-size: 11px;
+  color: var(--smv5-slate-600);
+  border-top: 1px dashed var(--smv5-line);
+  background: var(--smv5-white);
+}
+@media (max-width: 860px) {
+  .smv5-dash__kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .smv5-dash__grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .smv5-dash__call-time {
+    flex-basis: 46px;
+  }
+  /* Outcome tags are content — keep them; let rows wrap instead. */
+  .smv5-dash__calls li {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .smv5-dash__call-body span {
+    white-space: normal;
+  }
 }

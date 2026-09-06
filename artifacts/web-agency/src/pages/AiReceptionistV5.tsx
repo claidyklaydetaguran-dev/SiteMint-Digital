@@ -28,7 +28,9 @@ import {
 import { CallTheaterV5, HeroCallTheaterV5 } from "@/components/receptionist-v5/CallTheaterV5";
 import { LiveDemoPanel } from "@/components/receptionist-v5/LiveDemoPanel";
 import { BetaRequestForm } from "@/components/receptionist-v5/BetaRequestForm";
+import { DashboardPreview } from "@/components/receptionist-v5/DashboardPreview";
 import { Reveal } from "@/components/v5/Reveal";
+import { motionOff, onMotionChange } from "@/components/v5/motionPref";
 import { useArmedReveal, useHeadlineEntrance, usePausableAmbient } from "@/components/receptionist-v5/heroMotion";
 import "@/components/receptionist-v5/receptionist-v5.css";
 
@@ -78,6 +80,12 @@ function useHeroVideoEligible(): boolean {
   const [eligible, setEligible] = useState(false);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    // Global Motion preference (footer) — see components/v5/motionPref.ts.
+    const offMotion = onMotionChange((off) => {
+      if (off) setEligible(false);
+      else if (window.innerWidth >= 768) setEligible(true);
+    });
+    if (motionOff()) return offMotion;
     // Mounting the <video> forces a hero-sized style/layout pass; doing it AT
     // the load event landed that long task inside the TBT/TTI window (measured:
     // TBT 308ms -> 1042ms). Defer to real idle time after load instead - the
@@ -98,10 +106,13 @@ function useHeroVideoEligible(): boolean {
     }
     if (document.readyState === "complete") {
       check();
-      return undefined;
+      return offMotion;
     }
     window.addEventListener("load", check, { once: true });
-    return () => window.removeEventListener("load", check);
+    return () => {
+      window.removeEventListener("load", check);
+      offMotion();
+    };
   }, []);
   return eligible;
 }
@@ -124,69 +135,38 @@ function useHeroVideoEligible(): boolean {
 function HeroCinematicBg() {
   const eligible = useHeroVideoEligible();
   const showVideo = eligible && !!HERO_FILM_SRC;
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(true);
-
-  function toggle() {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) {
-      v.play();
-    } else {
-      v.pause();
-    }
-  }
 
   return (
     <div className="smv5-hero__bg">
       <img className="smv5-hero__bg-media" src={HERO_FILM_POSTER_DATA_URI} alt="" aria-hidden="true" fetchPriority="high" decoding="async" />
+      {/* Owner directive (final polish): decorative films carry no player
+          chrome — no pause button, no PiP/Enhance/hover controls. The film
+          is brighter now (owner: the background was too hidden); contrast
+          comes from LOCALIZED gradients behind the copy column and the call
+          theater, not from dimming the whole frame. Reduced-motion visitors
+          get the static poster (the video never mounts); the global Motion
+          preference in the footer pauses it site-wide. */}
       {showVideo && HERO_FILM_SRC && (
         <video
-          ref={videoRef}
           className="smv5-hero__bg-media smv5-hero__bg-video"
           muted
           playsInline
           autoPlay
           loop
           preload="none"
+          controls={false}
+          disablePictureInPicture
+          disableRemotePlayback
+          controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
+          data-sm-decorative-film
           poster={HERO_FILM_POSTER_DATA_URI}
           aria-hidden="true"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
         >
           <source src={HERO_FILM_SRC} type="video/mp4" />
         </video>
       )}
       <div className="smv5-hero__scrim" aria-hidden="true" />
-      {showVideo && (
-        <button
-          type="button"
-          className="smv5-hero__bg-toggle"
-          aria-pressed={!playing}
-          aria-label={playing ? "Pause background video" : "Play background video"}
-          onClick={toggle}
-        >
-          {playing ? <HeroPauseIcon /> : <HeroPlayIcon />}
-        </button>
-      )}
     </div>
-  );
-}
-
-function HeroPauseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="3" y="2" width="3.4" height="12" rx="1" fill="currentColor" />
-      <rect x="9.6" y="2" width="3.4" height="12" rx="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function HeroPlayIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M4 2.6v10.8a.6.6 0 0 0 .92.5l8.6-5.4a.6.6 0 0 0 0-1l-8.6-5.4A.6.6 0 0 0 4 2.6Z" fill="currentColor" />
-    </svg>
   );
 }
 
@@ -333,59 +313,6 @@ function OutcomeCheckIcon() {
   );
 }
 
-/**
- * A composed placeholder for the owner-dashboard section — a small mock
- * console (header bar, three stat tiles, four data rows) rather than a
- * dashed box holding only a caption. Purely illustrative, no real or
- * implied numbers.
- *
- * "Dashboard outcome" motif (2026-09-05): once the section scrolls into
- * view, the three stat tiles and four rows populate in sequence instead of
- * appearing all at once — `transform` + `opacity` only, staggered via
- * `--sm-stagger-index`, scoped under `.sm-reveal`/`.sm-reveal--in` (added
- * post-mount by the `<Reveal>` wrapper below) so the illustration is fully
- * visible by default with no JavaScript.
- */
-function DashboardIllustration() {
-  return (
-    <Reveal as="div" className="smv5-illustration">
-      <svg viewBox="0 0 320 220" aria-hidden="true" className="smv5-illustration__svg">
-        <rect x="1" y="1" width="318" height="218" rx="14" fill="var(--smv5-white, #fff)" stroke="var(--smv5-line, #CFE7EA)" />
-        <circle cx="30" cy="30" r="6" fill="var(--smv5-mint-500, #32C5D2)" />
-        <rect x="44" y="26" width="120" height="8" rx="4" fill="var(--smv5-line-strong, #A9CFD6)" />
-        {[0, 1, 2].map((i) => (
-          <g
-            key={i}
-            className="smv5-illustration__tile"
-            transform={`translate(${16 + i * 100}, 56)`}
-            style={{ "--sm-stagger-index": i } as CSSProperties}
-          >
-            <rect width="88" height="46" rx="8" fill="var(--smv5-mint-100, #DFF7F7)" />
-            <rect x="10" y="12" width="40" height="6" rx="3" fill="var(--smv5-mint-700, #0B7487)" opacity="0.5" />
-            <rect x="10" y="24" width="28" height="10" rx="4" fill="var(--smv5-mint-700, #0B7487)" />
-          </g>
-        ))}
-        {[0, 1, 2, 3].map((i) => (
-          <rect
-            key={i}
-            className="smv5-illustration__row"
-            x="16"
-            y={116 + i * 24}
-            width="288"
-            height="16"
-            rx="4"
-            fill={i % 2 === 0 ? "var(--smv5-mist-100, #EDF9FA)" : "var(--smv5-white, #fff)"}
-            stroke="var(--smv5-line, #CFE7EA)"
-            style={{ "--sm-stagger-index": i + 3 } as CSSProperties}
-          />
-        ))}
-      </svg>
-      <span className="smv5-illustration__label">
-        Illustration — dashboard overview, development placeholder
-      </span>
-    </Reveal>
-  );
-}
 
 /* ── Static content ──────────────────────────────────────────────────────
  * Verified, non-numeric ideas only (no statistics), harvested per W-18 from
@@ -817,16 +744,16 @@ export default function AiReceptionistV5() {
 
         {/* ── 7 · Business-owner dashboard ─────────────────────────────── */}
         <section id={SECTION_ID.dashboard} className="smv5__section">
-          <div className="smv5__container smv5-hero__grid">
-            <div>
-              <span className="smv5__eyebrow">Owner dashboard</span>
-              <h2 className="smv5__h2">One place to see what the receptionist is doing</h2>
-              <p className="smv5__lede">
-                Setup progress, receptionist status, what needs attention, recent calls,
-                appointments, and usage — with one clear next action, not a wall of numbers.
-              </p>
-            </div>
-            <DashboardIllustration />
+          <div className="smv5__container">
+            <span className="smv5__eyebrow">Owner dashboard</span>
+            <h2 className="smv5__h2">One place to see what the receptionist is doing</h2>
+            <p className="smv5__lede">
+              Setup progress, receptionist status, what needs attention, recent calls,
+              appointments, and usage — with one clear next action, not a wall of numbers.
+            </p>
+            {/* Populated illustrative dashboard (owner final polish) — every
+                value is synthetic Bloom Dental data; never the private CRM. */}
+            <DashboardPreview />
           </div>
         </section>
 

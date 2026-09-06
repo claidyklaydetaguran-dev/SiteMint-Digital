@@ -64,6 +64,10 @@ export default function AboutV3() {
             </p>
           </div>
           <div className="v3m-pillars v3m-pillars--3">
+            {/* Owner final polish (2026-09-06): larger portrait, owner-
+                verbatim ownership sentence, three responsibility tags, and
+                an explicit "Meet …" affordance — real people must read as
+                real and active. No invented credentials or statistics. */}
             {teamV5.map((member) => (
               <div className="v3-card v3m-pillar sm-person-card reveal-scale-settle" key={member.name}>
                 {/* Real owner-supplied portrait (recovered from public/;
@@ -73,7 +77,13 @@ export default function AboutV3() {
                   <img src={member.photo} alt={`Portrait of ${member.name}`} loading="lazy" />
                 </span>
                 <h3 className="v3m-pillar__title">{member.name}</h3>
-                <p className="v3m-pillar__desc">{member.role}</p>
+                <p className="v3m-pillar__desc sm-person-card__role">{member.role}</p>
+                <p className="sm-person-card__summary">{member.summary}</p>
+                <span className="sm-person-card__tags">
+                  {member.tags.map((tag) => (
+                    <span className="sm-person-card__tag" key={tag}>{tag}</span>
+                  ))}
+                </span>
                 {/* A heading can't legally nest inside a <button>, so the
                     card stays a <div> and this control is the click target —
                     its ::after expands the hit area to the full card (see
@@ -87,7 +97,7 @@ export default function AboutV3() {
                     setActiveMember(member);
                   }}
                 >
-                  Meet {member.name.split(" ")[0]}
+                  Meet {member.name.split(" ")[0]} →
                 </button>
               </div>
             ))}

@@ -22,6 +22,11 @@ export interface TeamMemberV5 {
   /** "How this person supports your project" line, derived from the final
    *  responsibility. */
   support: string;
+  /** Card sentence — owner-provided verbatim (final polish directive,
+   *  2026-09-06): one strong sentence explaining what this person owns. */
+  summary: string;
+  /** Three concise responsibility tags — owner-provided verbatim. */
+  tags: string[];
 }
 
 export const teamV5: TeamMemberV5[] = [
@@ -39,6 +44,9 @@ export const teamV5: TeamMemberV5[] = [
     ],
     support:
       "Shasta helps ensure the finished product supports your business's actual objectives — not just how it looks, but what it needs to do for you.",
+    summary:
+      "Shapes the business strategy, client experience, project direction, and growth priorities behind every build.",
+    tags: ["Discovery", "Positioning", "Growth Strategy"],
   },
   {
     name: "Claidy Taguran",
@@ -54,6 +62,9 @@ export const teamV5: TeamMemberV5[] = [
     ],
     support:
       "Claidy reviews technical decisions and launch readiness so your project ships secure, maintainable, and ready to run.",
+    summary:
+      "Leads the architecture and engineering that turn approved ideas into reliable digital products.",
+    tags: ["Engineering", "Systems", "AI & Automation"],
   },
   {
     name: "Saisa Lorraigne",
@@ -69,5 +80,8 @@ export const teamV5: TeamMemberV5[] = [
     ],
     support:
       "Saisa supports your project from intake through completion and ongoing service, so nothing you need gets lost along the way.",
+    summary:
+      "Keeps requirements, communication, timelines, approvals, and deliverables moving from intake through completion.",
+    tags: ["Coordination", "Documentation", "Delivery"],
   },
 ];

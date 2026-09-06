@@ -394,6 +394,10 @@ interface HeroCallStage {
   id: string;
   /** Shown in the stage label (aria-live) and as the on-screen heading. */
   label: string;
+  /** Short state chip — the owner's eight canonical states. */
+  chip: string;
+  /** The "current system action" line (monospace status under the card). */
+  action: string;
   beats: HeroCallBeat[];
   Card: ComponentType;
 }
@@ -455,6 +459,21 @@ function HeroConfirmGlyph() {
   );
 }
 
+function HeroReadyCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__note">
+        Line open. Business hours active — calls route to the AI Receptionist
+        immediately.
+      </p>
+      <ul className="smv5-herotheater__list">
+        <li>Bloom Dental · Mon–Fri, 8:00 AM–5:00 PM</li>
+        <li>Booking rules and calendar connected</li>
+      </ul>
+    </div>
+  );
+}
+
 function HeroIncomingCard() {
   return (
     <div className="smv5-herotheater__panel">
@@ -462,7 +481,20 @@ function HeroIncomingCard() {
         <HeroPhoneRingGlyph />
         (555) 019-2874
       </p>
-      <p className="smv5-herotheater__note">Ringing — routed to the AI Receptionist.</p>
+      <p className="smv5-herotheater__note">
+        New caller · no existing record — routed to the AI Receptionist.
+      </p>
+    </div>
+  );
+}
+
+function HeroListeningCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__line smv5-herotheater__line--caller">
+        <b>Caller:</b> &ldquo;Hi — I&rsquo;d like to book a cleaning sometime next
+        week, and I have a question about my insurance.&rdquo;
+      </p>
     </div>
   );
 }
@@ -471,9 +503,26 @@ function HeroAnsweringCard() {
   return (
     <div className="smv5-herotheater__panel">
       <p className="smv5-herotheater__line">
-        <b>Assistant:</b> &ldquo;Thanks for calling Bloom Dental — this is the virtual
-        receptionist. How can I help?&rdquo;
+        <b>Assistant:</b> &ldquo;Happy to help with the cleaning — let me check
+        next week&rsquo;s openings. I&rsquo;ll make sure the team follows up on the
+        insurance question.&rdquo;
       </p>
+    </div>
+  );
+}
+
+function HeroAttentionCard() {
+  return (
+    <div className="smv5-herotheater__panel smv5-herotheater__panel--attention">
+      <p className="smv5-herotheater__note">
+        <b>Insurance question flagged for the team</b> — outside the
+        receptionist&rsquo;s configured knowledge, so it becomes a follow-up task
+        instead of a guess.
+      </p>
+      <ul className="smv5-herotheater__list">
+        <li>Task: confirm coverage details with the caller</li>
+        <li>Assigned: front desk · due before the visit</li>
+      </ul>
     </div>
   );
 }
@@ -514,57 +563,106 @@ function HeroConfirmedCard() {
 
 function HeroSummaryCard() {
   return (
-    <dl className="smv5-herotheater__summary">
-      <div>
-        <dt>Caller</dt>
-        <dd>New patient, first-time caller</dd>
+    <div className="smv5-herotheater__panel">
+      <div className="smv5-herotheater__tags" aria-label="Call outcome tags">
+        <span className="smv5-herotheater__tag smv5-herotheater__tag--booked">Booked</span>
+        <span className="smv5-herotheater__tag smv5-herotheater__tag--attention">Follow-up</span>
+        <span className="smv5-herotheater__tag">New patient</span>
       </div>
-      <div>
-        <dt>Intent</dt>
-        <dd>Book a cleaning appointment</dd>
-      </div>
-      <div>
-        <dt>Outcome</dt>
-        <dd>Appointment confirmed — Tue 2:30 PM</dd>
-      </div>
-      <div>
-        <dt>Follow-up</dt>
-        <dd>Send the new-patient intake form before the visit</dd>
-      </div>
-    </dl>
+      <dl className="smv5-herotheater__summary">
+        <div>
+          <dt>Caller</dt>
+          <dd>New patient, first-time caller</dd>
+        </div>
+        <div>
+          <dt>Outcome</dt>
+          <dd>Cleaning confirmed — Tue 2:30 PM</dd>
+        </div>
+        <div>
+          <dt>Follow-up</dt>
+          <dd>Insurance question → front desk; intake form before the visit</dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
 const HERO_CALL_STAGES: HeroCallStage[] = [
-  { id: "incoming", label: "Incoming call", beats: [{ voice: "ready", holdMs: 1800 }], Card: HeroIncomingCard },
   {
-    id: "answering",
-    label: "Answering the call",
-    beats: [
-      { voice: "listening", holdMs: 650 },
-      { voice: "speaking", holdMs: 2200 },
-    ],
+    id: "ready",
+    label: "Ready",
+    chip: "Ready",
+    action: "Standing by · business hours active",
+    beats: [{ voice: "ready", holdMs: 1400 }],
+    Card: HeroReadyCard,
+  },
+  {
+    id: "incoming",
+    label: "Incoming call",
+    chip: "Incoming",
+    action: "Inbound from (555) 019-2874 · answering",
+    beats: [{ voice: "ready", holdMs: 1800 }],
+    Card: HeroIncomingCard,
+  },
+  {
+    id: "listening",
+    label: "Listening to the caller",
+    chip: "Listening",
+    action: "Transcribing caller audio · detecting intent",
+    beats: [{ voice: "listening", holdMs: 2400 }],
+    Card: HeroListeningCard,
+  },
+  {
+    id: "responding",
+    label: "Responding",
+    chip: "Responding",
+    action: "Composing reply from the business profile",
+    beats: [{ voice: "speaking", holdMs: 2400 }],
     Card: HeroAnsweringCard,
   },
   {
-    id: "rules",
-    label: "Checking business hours & booking rules",
-    beats: [{ voice: "thinking", holdMs: 2200 }],
+    id: "checking",
+    label: "Checking rules & availability",
+    chip: "Checking",
+    action: "Reading booking rules · querying the calendar",
+    beats: [
+      { voice: "thinking", holdMs: 1600 },
+      { voice: "thinking", holdMs: 1600 },
+    ],
     Card: HeroRulesCard,
   },
   {
     id: "availability",
-    label: "Checking availability",
-    beats: [{ voice: "thinking", holdMs: 2200 }],
+    label: "Matching an open slot",
+    chip: "Checking",
+    action: "Tuesday afternoon · 3 openings found",
+    beats: [{ voice: "thinking", holdMs: 2000 }],
     Card: HeroAvailabilityCard,
   },
   {
     id: "confirmed",
     label: "Appointment confirmed",
+    chip: "Confirmed",
+    action: "Writing appointment · texting confirmation",
     beats: [{ voice: "ended", holdMs: 2200 }],
     Card: HeroConfirmedCard,
   },
-  { id: "summary", label: "Call summary", beats: [{ voice: "ended", holdMs: 0 }], Card: HeroSummaryCard },
+  {
+    id: "attention",
+    label: "Needs human attention",
+    chip: "Needs attention",
+    action: "Creating a follow-up task for the team",
+    beats: [{ voice: "ended", holdMs: 2400 }],
+    Card: HeroAttentionCard,
+  },
+  {
+    id: "summary",
+    label: "Completed — organized outcome",
+    chip: "Completed",
+    action: "Call logged · outcome and tags recorded",
+    beats: [{ voice: "ended", holdMs: 0 }],
+    Card: HeroSummaryCard,
+  },
 ];
 
 const HERO_CALL_BEATS: Array<HeroCallBeat & { stageIndex: number }> = HERO_CALL_STAGES.flatMap(
@@ -629,14 +727,39 @@ export function HeroCallTheaterV5() {
   const Card = stage.Card;
   const playLabel = playing ? "Pause" : atEnd ? "Replay" : "Play";
 
+  // Elapsed call clock: the cumulative scripted time up to the current beat
+  // (deterministic, so jumping stages moves the clock coherently).
+  const elapsedMs = HERO_CALL_BEATS.slice(0, beatIndex).reduce((sum, b) => sum + b.holdMs, 0);
+
   return (
     <div className="smv5-herotheater" id="hero-theater" data-stage={stage.id}>
-      <div className="smv5-herotheater__top">
-        <span className="smv5-herotheater__badge">Simulated call</span>
-        <span className="smv5-herotheater__count">
-          {stageIndex + 1} / {HERO_CALL_STAGES.length}
-        </span>
-      </div>
+      {/* Product identity header — this is a SiteMint product surface, not
+          an anonymous card (owner: finished-product hierarchy). */}
+      <header className="smv5-herotheater__id">
+        <span className="smv5-herotheater__id-dot" data-voice={beat.voice} aria-hidden="true" />
+        <div className="smv5-herotheater__id-names">
+          <b>SiteMint AI Receptionist</b>
+          <span>Bloom Dental · simulated line</span>
+        </div>
+        <div className="smv5-herotheater__id-meta">
+          <span className="smv5-herotheater__chip" data-chip={stage.id}>{stage.chip}</span>
+          <span className="smv5-herotheater__clock" aria-label="Elapsed call time">
+            {formatClock(Math.round(elapsedMs / 1000))}
+          </span>
+        </div>
+      </header>
+
+      {/* Stage progress rail — one dot per state, current highlighted. */}
+      <ol className="smv5-herotheater__steps" aria-hidden="true">
+        {HERO_CALL_STAGES.map((s, i) => (
+          <li
+            key={s.id}
+            className="smv5-herotheater__step"
+            data-done={i < stageIndex || undefined}
+            data-current={i === stageIndex || undefined}
+          />
+        ))}
+      </ol>
 
       <div className="smv5-herotheater__stage">
         <div className="smv5-herotheater__ringcol">
@@ -647,11 +770,19 @@ export function HeroCallTheaterV5() {
         </div>
         <div className="smv5-herotheater__card">
           <p className="smv5-herotheater__stagelabel" aria-live="polite">
+            <span className="smv5-herotheater__count">
+              {stageIndex + 1} / {HERO_CALL_STAGES.length}
+            </span>
             {stage.label}
           </p>
           <Card />
         </div>
       </div>
+
+      {/* Current system action — what the product is doing right now. */}
+      <p className="smv5-herotheater__action" aria-live="polite">
+        <span aria-hidden="true">▸</span> {stage.action}
+      </p>
 
       <div className="smv5-herotheater__controls" role="group" aria-label="Simulated call playback">
         <button
@@ -682,7 +813,7 @@ export function HeroCallTheaterV5() {
         </button>
       </div>
 
-      <p className="smv5-herotheater__disclose">Simulated preview — no live calls yet</p>
+      <p className="smv5-herotheater__disclose">Simulated preview — no live call is being placed.</p>
     </div>
   );
 }

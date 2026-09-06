@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { motionOff, onMotionChange } from "@/components/v5/motionPref";
 
 export interface HeroMediaProps {
   /** Optional produced video (owner-approved asset). Omit until one exists. */
@@ -71,6 +72,13 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
     ).matches;
     if (reduced) return;
 
+    // Global Motion preference (footer) — see components/v5/motionPref.ts.
+    const offMotion = onMotionChange((off) => {
+      if (off) setCanPlayVideo(false);
+      else if (window.innerWidth >= 768) setCanPlayVideo(true);
+    });
+    if (motionOff()) return offMotion;
+
     let idleHandle: number | undefined;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
@@ -98,6 +106,7 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
     }
 
     return () => {
+      offMotion();
       window.removeEventListener("load", armAfterIdle);
       if (idleHandle !== undefined) {
         (
@@ -125,6 +134,11 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
           playsInline
           loop
           preload="none"
+          controls={false}
+          disablePictureInPicture
+          disableRemotePlayback
+          controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
+          data-sm-decorative-film
           aria-hidden="true"
         >
           <source src={videoSrc} />

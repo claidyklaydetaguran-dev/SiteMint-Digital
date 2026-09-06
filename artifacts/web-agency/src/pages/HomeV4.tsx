@@ -30,6 +30,7 @@ import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
 // Owner routing directive (2026-09-05): re-clicking the wordmark/nav item
 // while already on Home replays this hero's entrance — see useIntroReplay.ts.
 import { useIntroReplayKey } from "@/components/v5/useIntroReplay";
+import { motionOff, onMotionChange } from "@/components/v5/motionPref";
 
 /* ── Hero field geometry — single source for nodes, canvas, and HUD ────── */
 
@@ -178,6 +179,13 @@ function useFilmEligible(): boolean {
   const [eligible, setEligible] = useState(false);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    // Global Motion preference (footer): "off" keeps the film unmounted and
+    // flips it live in both directions without a reload.
+    const offMotion = onMotionChange((off) => {
+      if (off) setEligible(false);
+      else if (window.innerWidth >= 768) setEligible(true);
+    });
+    if (motionOff()) return offMotion;
     // Mounting the <video> forces a hero-sized style/layout pass; doing it AT
     // the load event landed that long task inside the TBT/TTI window (measured:
     // TBT 308ms -> 1042ms). Defer to real idle time after load instead - the
@@ -198,13 +206,16 @@ function useFilmEligible(): boolean {
     }
     if (document.readyState === "complete") {
       check();
-      return undefined;
+      return offMotion;
     }
     // Loads after the window has finished loading — after LCP by
     // construction, matching the same gate used by `components/v5/HeroMedia`
     // and the AI Receptionist hero's own film placement.
     window.addEventListener("load", check, { once: true });
-    return () => window.removeEventListener("load", check);
+    return () => {
+      window.removeEventListener("load", check);
+      offMotion();
+    };
   }, []);
   return eligible;
 }
@@ -259,19 +270,6 @@ function HeroFilmPoster() {
 function HeroFilm() {
   const eligible = useFilmEligible();
   const showVideo = eligible && !!HERO_FILM_SRC;
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [paused, setPaused] = useState(false);
-  function togglePlayback() {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) {
-      void v.play();
-      setPaused(false);
-    } else {
-      v.pause();
-      setPaused(true);
-    }
-  }
   return (
     <div className="v4-hero__film" data-v4-hero-film>
       <div className="v4-hero__film-frame" aria-hidden="true">
@@ -294,56 +292,35 @@ function HeroFilm() {
           alt=""
           loading="lazy"
         />
+        {/* Owner directive (final polish): decorative films carry NO player
+            chrome — no pause button, no PiP/Enhance/hover controls. The
+            surface is pointer-inert via CSS; playback stops for reduced-
+            motion visitors (the video never mounts) and via the global
+            Motion preference in the footer. */}
         {showVideo && HERO_FILM_SRC && (
           <video
-            ref={videoRef}
             className="v4-hero__film-video"
             muted
             playsInline
             autoPlay
             loop
             preload="none"
+            controls={false}
+            disablePictureInPicture
+            disableRemotePlayback
+            controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
+            data-sm-decorative-film
             poster={HERO_FILM_POSTER_DATA_URI}
           >
             <source src={HERO_FILM_SRC} type="video/mp4" />
           </video>
         )}
+        {/* Localized readability gradient — the copy layer floats over the
+            frame's upper edge; this scrim lives on the media itself, never
+            behind the text (owner: no text-box background). */}
+        <span className="v4-hero__film-scrim" aria-hidden="true" />
         <span className="v4-hero__film-caption">Brand film</span>
-        {/* Controlled HTML labels (owner directive: all workflow text is
-            post-produced page text, never trusted to generation). */}
-        <span className="v4-hero__film-labels" aria-hidden="true">
-          Discover → Design → Build → Launch · Websites · Web apps · CRM ·
-          AI systems · Automation · SEO &amp; analytics · Advertising
-        </span>
       </div>
-      {showVideo && (
-        <button
-          type="button"
-          className="v4-hero__film-pause"
-          aria-pressed={paused}
-          aria-label={paused ? "Play the brand film" : "Pause the brand film"}
-          onClick={togglePlayback}
-        >
-          {paused ? (
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M3 2l9 5-9 5z" fill="currentColor" />
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-              <rect x="2.5" y="2" width="3.4" height="10" fill="currentColor" />
-              <rect x="8.1" y="2" width="3.4" height="10" fill="currentColor" />
-            </svg>
-          )}
-        </button>
-      )}
-      {/* The Signal seam — one mint thread travelling from the film stage
-          down into the restored hero composition below (owner: a signal
-          travels naturally between the upper media stage and the lower
-          portion). Static line under reduced motion via the global
-          override. */}
-      <span className="v4-hero__seam" aria-hidden="true">
-        <span className="v4-hero__seam-pulse" />
-      </span>
     </div>
   );
 }
@@ -654,11 +631,36 @@ export function SignalHeroV4({
   return (
     <div className="v4-hero" ref={rootRef} data-tone="ink">
       <div className="v4-hero__stage">
-        {/* Owner spec (final correction): the cinematic media stage is the
-            UPPER portion of the crosswise hero; the original approved hero
-            (copy, CTAs, particle field) is the lower portion beneath it. */}
-        {showFilm && <HeroFilm />}
-        {/* Region 1 — the readable layer. Static through every phase. */}
+        {/* Owner layout correction (2026-09-06, supersedes the media-stage-
+            on-top order): the Signal particle field is the TOP of the hero,
+            the cinematic film is the BOTTOM, and the copy floats across the
+            boundary between them with no card, panel, or background of its
+            own — contrast comes from the ink field above and a localized
+            gradient inside the film frame below. */}
+        {/* Region 1 — the Signal field. */}
+        <div className="v4-hero__field" ref={fieldRef} aria-hidden="true">
+          <canvas className="v4-hero__canvas" ref={canvasRef} />
+          {HERO_NODES.map((node, i) => (
+            <div
+              key={node.label}
+              className={`v4-hero__node${node.terminus ? " v4-hero__node--terminus" : ""}`}
+              data-v4-hero-node
+              data-t={(0.04 + ((i + 1) / HERO_NODES.length) * 0.93).toFixed(3)}
+              style={{ left: `${node.x * 100}%`, top: `${node.y * 100}%` }}
+            >
+              <span className="v4-hero__node-ring">
+                {node.glyph === "check" ? (
+                  <HeroCheckGlyph />
+                ) : (
+                  <SignalGlyphV4 glyph={node.glyph} />
+                )}
+              </span>
+              <span className="v4-hero__node-label">{node.label}</span>
+            </div>
+          ))}
+        </div>
+        {/* Region 2 — the readable layer, floating over the field→film
+            boundary. Static through every phase. */}
         <div className="v4-hero__copy" data-v4-hero-copy>
           {!hideKicker && <p className="v4-kicker">{kicker}</p>}
           <h1 className="v4-hero__title">{title}</h1>
@@ -681,38 +683,10 @@ export function SignalHeroV4({
           </div>
         </div>
 
-        {/* Owner spec (wp-herofilm; HERO-FILM-TREATMENT.md — "Mobile: poster
-            + particles, no autoplay"; REVISED 2026-09-05 — the earlier
-            upper-right grid placement is reverted): a full-width horizontal
-            film band, stacked between the copy and the field at every
-            breakpoint (small on mobile, taller on tablet, a cinematic band
-            roughly half the sub-copy height on desktop). All of this lives
+        {/* Region 3 — the cinematic film stage, the bottom of the hero. */}
+        {showFilm && <HeroFilm />}
 
-        {/* Region 2 — the Signal field. The narrative lives here, below the
-            copy, at every width. */}
-        <div className="v4-hero__field" ref={fieldRef} aria-hidden="true">
-          <canvas className="v4-hero__canvas" ref={canvasRef} />
-          {HERO_NODES.map((node, i) => (
-            <div
-              key={node.label}
-              className={`v4-hero__node${node.terminus ? " v4-hero__node--terminus" : ""}`}
-              data-v4-hero-node
-              data-t={(0.04 + ((i + 1) / HERO_NODES.length) * 0.93).toFixed(3)}
-              style={{ left: `${node.x * 100}%`, top: `${node.y * 100}%` }}
-            >
-              <span className="v4-hero__node-ring">
-                {node.glyph === "check" ? (
-                  <HeroCheckGlyph />
-                ) : (
-                  <SignalGlyphV4 glyph={node.glyph} />
-                )}
-              </span>
-              <span className="v4-hero__node-label">{node.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Region 3 — phase HUD. Full five-step narration on desktop; a
+        {/* Region 4 — phase HUD. Full five-step narration on desktop; a
             progress line + current stage on small screens (owner correction 5). */}
         <div className="v4-hero__hud" aria-hidden="true">
           <div className="v4-hero__hud-steps">

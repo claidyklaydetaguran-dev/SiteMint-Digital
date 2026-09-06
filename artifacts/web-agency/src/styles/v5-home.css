@@ -2101,43 +2101,82 @@
     display: block;
   }
 }
-
-/* ── Crosswise order correction (owner final directive 2026-09-06) ───────
-   The media stage is the UPPER portion of the hero and the original
-   approved composition (copy, CTAs, particle field, HUD) sits beneath it.
-   Two geometry facts drive every rule below:
-   1. `.v4-hero__stage` is a FIXED-height (100svh) overflow:hidden sticky
-      box (v4-home.css, unchanged) — anything the budget doesn't fit is
-      silently clipped off the BOTTOM, which under the previous fixed film
-      heights meant the particle field and phase HUD were simply gone at
-      common desktop heights. Here the FILM is the flexible element
-      instead: it absorbs whatever height the lower portion leaves over
-      (capped at 58% of the usable hero per the 55–60% spec), so the
-      restored composition below it can never be clipped again.
-   2. The site header is `position:fixed` and ink heroes run beneath it —
-      the copy used to carry the header clearance; now the film is first,
-      the clearance moves to the film's top margin and the copy keeps only
-      breathing room. */
+/* ── Owner layout correction (final polish directive 2026-09-06) ─────────
+   Supersedes the media-stage-on-top order. Final hero order:
+     1. Signal particle field on TOP (≈40% of the usable hero on desktop).
+     2. The copy floating ACROSS the field→film boundary — no card, panel,
+        border, blur, or background of any kind. Readability comes from the
+        ink field behind its upper half and a localized gradient inside the
+        film frame behind its lower half.
+     3. The cinematic film on the BOTTOM (≈60%), chrome-less.
+     4. The phase HUD overlaid along the film's bottom edge on desktop.
+   The stage stays the fixed-height 100svh sticky box (v4-home.css), so the
+   copy is position:absolute on desktop — it consumes no flex row, which is
+   what lets field + film split the full viewport without clipping. */
+.sm-home-v5 #hero .v4-hero__stage {
+  position: sticky; /* restated so position:absolute children resolve here */
+}
+.sm-home-v5 #hero .v4-hero__field {
+  /* First child now — carries the fixed-header clearance. */
+  margin-top: var(--v4-hdr-h, 64px);
+}
 .sm-home-v5 #hero .v4-hero__film {
-  margin: var(--v4-hdr-h, 64px) 0 0;
+  margin: 0;
   padding-inline: clamp(0.6rem, 1.5vw, 1.25rem);
+  padding-bottom: clamp(0.6rem, 1.2vh, 1rem);
 }
-.sm-home-v5 #hero .v4-hero__copy {
-  padding-top: clamp(1rem, 2.2vh, 1.6rem);
+/* Localized gradients ON the media (never behind the text): a deep ink
+   fade across the frame's top ~48% for the overlapping copy, and a slim
+   fade along the bottom edge for the phase HUD overlay. */
+.sm-home-v5 #hero .v4-hero__film-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(7 19 36 / 0.92) 0%, rgb(7 19 36 / 0.55) 22%, rgb(7 19 36 / 0) 48%),
+    linear-gradient(0deg, rgb(7 19 36 / 0.6) 0%, rgb(7 19 36 / 0) 16%);
 }
+/* Decorative film surfaces are pointer-inert: no hover, no PiP/Enhance
+   affordances in Chrome or Edge, no accidental interaction. */
+.sm-home-v5 #hero .v4-hero__film-frame,
+.sm-home-v5 #hero .v4-hero__film-video,
+.sm-home-v5 #hero .v4-hero__film-poster {
+  pointer-events: none;
+}
+.sm-home-v5 #hero .v4-hero__film-video::-webkit-media-controls,
+.sm-home-v5 #hero .v4-hero__film-video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
 @media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__field {
+    flex: 0 0 auto;
+    height: calc((100svh - var(--v4-hdr-h, 64px)) * 0.4);
+    min-height: 220px;
+    max-height: none;
+  }
   .sm-home-v5 #hero .v4-hero__film {
-    /* Flexible upper stage: grows into the leftover, never past 58% of
-       the usable hero, never below a height that still reads cinematic. */
     flex: 1 1 0px;
     height: auto;
-    min-height: 280px;
-    max-height: calc((100svh - var(--v4-hdr-h, 64px)) * 0.58);
+    min-height: 300px;
+    max-height: calc((100svh - var(--v4-hdr-h, 64px)) * 0.62);
   }
-  /* Lower portion — the original approved composition, compacted just
-     enough that copy + field + HUD genuinely fit beneath the stage in one
-     viewport (layout, copy, CTAs, particles and movement all preserved;
-     only the type scale steps down). */
+  /* The floating copy layer: absolute, straddling the boundary. */
+  .sm-home-v5 #hero .v4-hero__copy {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    top: calc(var(--v4-hdr-h, 64px) + (100svh - var(--v4-hdr-h, 64px)) * 0.4 - clamp(120px, 16vh, 156px));
+    padding-top: 0;
+    /* Soft text shadow for the frontier pixels where copy meets moving
+       footage — a shadow on the glyphs, not a panel behind them. */
+    text-shadow: 0 1px 18px rgb(7 19 36 / 0.55);
+  }
+  .sm-home-v5 #hero .v4-hero__copy .v4-btn {
+    text-shadow: none;
+  }
+  /* Compacted type (unchanged from the approved compaction). */
   .sm-home-v5 #hero .v4-hero__title {
     font-size: clamp(1.9rem, 3.1vw, 2.75rem);
   }
@@ -2148,22 +2187,25 @@
   .sm-home-v5 #hero .v4-hero__sub {
     font-size: clamp(0.95rem, 1.1vw, 1.05rem);
   }
-  /* The field takes a fixed share so the film (flex:1) — not the field —
-     absorbs viewport variance; overrides the v4 base 240px floor that
-     forced the old clipping. */
-  .sm-home-v5 #hero .v4-hero__field {
-    flex: 0 0 auto;
-    height: clamp(150px, 22svh, 280px);
-    min-height: 0;
-    max-height: none;
+  /* Phase HUD rides the film's bottom edge — the film stays the visual
+     bottom of the hero and no phase element is clipped. */
+  .sm-home-v5 #hero .v4-hero__hud {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    padding-bottom: 0.9rem;
   }
 }
+
 @media (max-width: 767px) {
-  /* Mobile: fixed-height dedicated poster band (video never mounts here);
-     the budget is tightened so band + copy + field + HUD fit a small
-     phone viewport without clipping the HUD. */
-  .sm-home-v5 #hero .v4-hero__film {
-    height: clamp(120px, 18svh, 190px);
+  /* Mobile: particles first, copy near the transition, dedicated poster
+     band after — all inside one phone viewport, no overlap gymnastics. */
+  .sm-home-v5 #hero .v4-hero__field {
+    order: 0;
+    min-height: 104px;
+    max-height: 20svh;
   }
   .sm-home-v5 #hero .v4-hero__copy {
     padding-top: clamp(0.9rem, 2vh, 1.3rem);
@@ -2171,7 +2213,113 @@
   .sm-home-v5 #hero .v4-hero__title {
     font-size: clamp(1.6rem, 7vw, 2rem);
   }
-  .sm-home-v5 #hero .v4-hero__field {
-    min-height: 104px;
+  .sm-home-v5 #hero .v4-hero__film {
+    height: clamp(120px, 16svh, 180px);
   }
+}
+
+/* ── Team cards — owner final polish (2026-09-06): larger portrait,
+   ownership sentence, responsibility tags, explicit Meet affordance, and a
+   pastel-mint accent so the people read as real and active. ───────────── */
+.sm-home-v5 .sm-team-card {
+  background: var(--sm-surface, #fff);
+  cursor: pointer;
+  text-align: left;
+  gap: 0.4rem;
+  padding: 1.4rem 1.4rem 1.2rem;
+  border-top: 3px solid var(--sm-mint-border, #C9E9E3);
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+.sm-home-v5 .sm-team-card:hover,
+.sm-home-v5 .sm-team-card:focus-visible {
+  border-color: var(--sm-mint-border, #C9E9E3);
+  border-top-color: var(--sm-mint-500, #32C5D2);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+  transform: translateY(-2px);
+}
+.sm-home-v5 .sm-team-card__avatar {
+  width: 116px;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.sm-home-v5 .sm-team-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sm-home-v5 .sm-team-card__name {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+.sm-home-v5 .sm-team-card__role {
+  color: var(--sm-mint-700, #0B7487);
+  font-weight: 600;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.sm-home-v5 .sm-team-card__summary {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.93rem;
+  line-height: 1.55;
+  margin-top: 0.15rem;
+}
+.sm-home-v5 .sm-team-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.45rem;
+}
+.sm-home-v5 .sm-team-card__tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sm-mint-chip-bg, #DFF4EF);
+  color: var(--sm-mint-chip-text, #0B7487);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+}
+.sm-home-v5 .sm-team-card__cta {
+  margin-top: 0.7rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--sm-mint-700, #0B7487);
+  transition: transform 200ms ease;
+}
+.sm-home-v5 .sm-team-card:hover .sm-team-card__cta {
+  transform: translateX(3px);
+}
+
+/* ── Team dialog editorial polish (owner final polish, 2026-09-06) ─────── */
+.sm-team-dialog__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.45rem;
+}
+.sm-team-dialog__tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sm-mint-chip-bg, #DFF4EF);
+  color: var(--sm-mint-chip-text, #0B7487);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+}
+.sm-team-dialog__subhead {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-mint-700, #0B7487);
+  margin: 1.2rem 0 0.45rem;
+}
+.sm-team-dialog__support {
+  background: var(--sm-mint-wash, #EDF9F6);
+  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  border-radius: var(--sm-radius-m, 10px);
+  padding: 0.8rem 1rem;
 }

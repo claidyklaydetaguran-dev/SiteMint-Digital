@@ -4,6 +4,7 @@
  * mirrors the approved navigation model; no invented destinations.
  */
 
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ROUTES } from "@/lib/routes";
 import { SignalMarkV4 } from "./SignalMarkV4";
@@ -14,6 +15,36 @@ import {
   startHrefV4,
   whatWeBuildV4,
 } from "./publicNavV4";
+import { applyMotionAttr, motionOff, setMotionOff } from "@/components/v5/motionPref";
+
+/**
+ * The single site-wide Motion preference (owner final polish directive):
+ * decorative films no longer carry their own pause buttons, so this
+ * discreet control — well away from any film surface — satisfies WCAG
+ * 2.2.2 pause/stop/hide for autoplaying media. "Off" unmounts every
+ * decorative video (posters remain) and pauses ambient CSS animation.
+ */
+function MotionPrefToggle() {
+  const [off, setOff] = useState(false);
+  useEffect(() => {
+    setOff(motionOff());
+    applyMotionAttr();
+  }, []);
+  return (
+    <button
+      type="button"
+      className="v4-footer__motion"
+      aria-pressed={off}
+      onClick={() => {
+        const next = !off;
+        setOff(next);
+        setMotionOff(next);
+      }}
+    >
+      Motion: {off ? "Off" : "On"}
+    </button>
+  );
+}
 
 export function SiteFooterV4() {
   return (
@@ -70,6 +101,7 @@ export function SiteFooterV4() {
           {/* W-1 amended brand line — "From first click to booked customer"
               is reserved for lead-generation / AI Receptionist contexts. */}
           <span>Capture. Organize. Connect. Resolve.</span>
+          <MotionPrefToggle />
         </div>
       </div>
     </footer>

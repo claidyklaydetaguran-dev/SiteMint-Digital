@@ -528,6 +528,10 @@ function TeamSection() {
         </div>
         <h2 className="v4-h2 reveal-clip">The people doing the work.</h2>
         <div className="sm-team-grid">
+          {/* Owner final polish (2026-09-06): real people must read as real,
+              credible, and active — larger portrait, one owner-verbatim
+              ownership sentence, three responsibility tags, and an explicit
+              "Meet …" affordance. No invented credentials or statistics. */}
           {teamV5.map((member) => (
             <button
               type="button"
@@ -543,6 +547,15 @@ function TeamSection() {
               </span>
               <span className="sm-team-card__name">{member.name}</span>
               <span className="sm-team-card__role">{member.role}</span>
+              <span className="sm-team-card__summary">{member.summary}</span>
+              <span className="sm-team-card__tags">
+                {member.tags.map((tag) => (
+                  <span className="sm-team-card__tag" key={tag}>{tag}</span>
+                ))}
+              </span>
+              <span className="sm-team-card__cta" aria-hidden="true">
+                Meet {member.name.split(" ")[0]} →
+              </span>
             </button>
           ))}
         </div>
