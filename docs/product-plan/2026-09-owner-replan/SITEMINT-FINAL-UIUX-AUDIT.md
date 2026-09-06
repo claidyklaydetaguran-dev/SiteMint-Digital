@@ -78,3 +78,18 @@ particles TOP → transparent floating copy → cinematic film BOTTOM.
 | Discovery brand | Canonical SignalMarkV4 + "SiteMint" wordmark (Space Grotesk) replaces the legacy slate/emerald logo; mint selection glow language | Capture in final sweep |
 | Pastel-mint layer | Semantic tokens (`--sm-mint-wash/-wash-deep/-hover/-border/-glow/-chip-*`) + global touches: `::selection`, outline-button hover wash, light-surface card hover glow, component accents above | Computed-color audit via Lighthouse a11y sweep |
 | Film review (new crop) | 6-point ffmpeg frame review of the stage master in the rendered crop: PASSES (no malformed anatomy, no readable generated text, plan→build→deliver arc, Glacier light). Notes: 3s transitional torso-only beat; 12s stylized on-screen glow. NOT regenerated — layout correction did not degrade the film. | stage-*.jpg in shots/film-review |
+
+## 9. Responsive-first finalization (owner directive, 2026-09-06 latest)
+
+| Item | Implementation | Verification |
+|---|---|---|
+| Mobile nav root cause | The header's always-on `backdrop-filter` made it the containing block for the fixed sheet — the menu opened as a 64px sliver (why mobile "had no navigation"). Fixed with explicit viewport sizing on the sheet. | Nav battery 10/10; full-screen capture reviewed |
+| Desktop mega menu | Five completed destinations w/ one-line descriptions + outcome kickers + two new glyphs (CRM stacked-records, Growth rising-line); mint hover rail; Motion pref in panel foot | Battery: 5 cards, Escape/focus, CRM card lands `/#crm-systems` top=8px |
+| Tablet 640–1023 | Wide (520px) right-anchored panel over dimmed backdrop, slide-in 220ms | Battery + capture |
+| Mobile sheet | Full-screen designed takeover: SiteMint **Digital** wordmark, What-We-Build accordion, flat Work/Process/Company/AI Receptionist, mint active rail + wash, Client Sign In, Start a Project, PREFERENCES group with the Motion switch (footer control removed), scroll lock, focus trap, Escape, close-after-nav, safe-area padding, reduced-motion instant entrance | Battery + capture |
+| Product sub-nav <1024 | Scrollable second header row (scroll-snap, mint active pill); `--v4-hdr-h` raised via `:has()` scope so anchors/offsets stay exact | Landscape 844×390 capture; FAQ scrollspy still faqTop=-1 |
+| Hero brand | "— SITEMINT DIGITAL" mono mint eyebrow + rule above the headline, no card | Battery + captures at 320–1920 |
+| Hero scroll rail | Six-capability rail (Websites → SEO & Growth): CSS-var mint fill + active label driven by a passive rAF-coalesced scroll listener (no React state, no LCP cost); vertical right rail on desktop, horizontal scroll-snap strip between copy and poster on mobile; reduced-motion renders it complete | Battery: p=0→0.70, active 0→4 |
+| Responsive matrix | 264-combo six-width sweep (0 overflow, expected 401 noise only) + 54-combo extra matrix: 320/412/430 phones, 820 tablet, 1280 laptop, 844×390 + 932×430 landscape, 720×450 (200%-zoom equivalent), 1920 | 0 failures; key captures visually reviewed. Chromium + Edge tested; Firefox/WebKit not installed in this environment — reported as untested |
+| Media pass | 4 purposeful Magnific illustrations placed (Process planning band, AI-systems diagram band, Growth workspace figure, Websites responsive-devices band); 600 credits; ledger auth-3 | Frame gate per image; pages re-captured |
+| Live voice demo | Flag-gated (`VITE_RECEPTIONIST_LIVE_VOICE_ENABLED`), consent-first, real-event-driven 17-state call UI, 90s cap, mute/end, per-tab single call; @vapi-ai/web only via dynamic import in vapiLoader.ts; committed bundle verified to contain zero SDK bytes; contract test amended accordingly (private-key ban unchanged) | Full gates: chain 2126 PASS, 1055/1055 tests; bundle grep 0 |
