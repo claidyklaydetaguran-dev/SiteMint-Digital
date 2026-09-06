@@ -684,6 +684,8 @@ export default function HomeV5() {
       <div id="hero">
         <SignalHeroV4
           hideKicker
+          brandEyebrow="SiteMint Digital"
+          showServiceRail
           title="Digital systems built to move your business forward."
           hideSub1
           sub={

@@ -352,6 +352,84 @@ export interface SignalHeroV4Props {
    *  Defaults to unset so this file's own `<SignalHeroV4 />` call site
    *  (unrouted HomeV4) is unchanged; HomeV5 passes `true`. */
   showFilm?: boolean;
+  /** Owner responsive-first directive (2026-09-06): a prominent brand line
+   *  ("SITEMINT DIGITAL") above the headline, pastel-mint treatment, no
+   *  card. HomeV5 passes "SiteMint Digital". */
+  brandEyebrow?: string;
+  /** Owner responsive-first directive: the scroll-responsive service rail —
+   *  a mint signal travels through six capability labels as the visitor
+   *  scrolls the hero runway. HomeV5 passes `true`. */
+  showServiceRail?: boolean;
+}
+
+/* ── Hero service rail (owner responsive-first directive, 2026-09-06) ────
+ * A thin interactive rail of SiteMint's six capability labels; a mint
+ * signal fills the track and the active label advances with the visitor's
+ * progress through the hero's scroll runway. Implementation notes:
+ * - No React state: a passive scroll listener updates one CSS custom
+ *   property + a data-attribute on the root, coalesced through rAF —
+ *   nothing here re-renders, nothing delays LCP (the rail is plain static
+ *   DOM on first paint).
+ * - Reduced motion: no listener at all; the rail renders complete (thread
+ *   fully drawn, final label active).
+ * - Decorative narration of the same story the section chapters tell, so
+ *   the whole rail is aria-hidden; the capabilities are announced by the
+ *   real content below.
+ */
+const RAIL_SERVICES = ["Websites", "Web Apps", "CRM", "AI Systems", "Automation", "SEO & Growth"];
+
+function HeroServiceRail() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.style.setProperty("--sm-rail-p", "1");
+      el.dataset.active = String(RAIL_SERVICES.length - 1);
+      return;
+    }
+    const hero = el.closest<HTMLElement>(".v4-hero");
+    let raf = 0;
+    let pending = false;
+    function update() {
+      pending = false;
+      if (!hero) return;
+      const runway = hero.offsetHeight - window.innerHeight;
+      const top = hero.getBoundingClientRect().top;
+      const p = Math.min(1, Math.max(0, runway > 0 ? -top / runway : 0));
+      el!.style.setProperty("--sm-rail-p", p.toFixed(4));
+      el!.dataset.active = String(
+        Math.min(RAIL_SERVICES.length - 1, Math.floor(p * RAIL_SERVICES.length)),
+      );
+    }
+    function onScroll() {
+      if (pending) return;
+      pending = true;
+      raf = requestAnimationFrame(update);
+    }
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+  return (
+    <div className="v4-hero__rail" ref={ref} data-active="0" aria-hidden="true">
+      <span className="v4-hero__rail-track">
+        <span className="v4-hero__rail-fill" />
+      </span>
+      <ul className="v4-hero__rail-list">
+        {RAIL_SERVICES.map((label, i) => (
+          <li key={label} className="v4-hero__rail-item" data-i={i}>
+            {label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function SignalHeroV4({
@@ -374,6 +452,8 @@ export function SignalHeroV4({
   secondaryLabel = "See How It Works",
   secondaryIsRoute = false,
   showFilm = false,
+  brandEyebrow,
+  showServiceRail = false,
 }: SignalHeroV4Props = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -662,6 +742,14 @@ export function SignalHeroV4({
         {/* Region 2 — the readable layer, floating over the field→film
             boundary. Static through every phase. */}
         <div className="v4-hero__copy" data-v4-hero-copy>
+          {/* Brand line (owner responsive-first directive): establishes the
+              company name above the headline — pastel-mint, no card. */}
+          {brandEyebrow && (
+            <p className="v4-hero__brand-eyebrow">
+              <span className="v4-hero__brand-eyebrow-rule" aria-hidden="true" />
+              {brandEyebrow}
+            </p>
+          )}
           {!hideKicker && <p className="v4-kicker">{kicker}</p>}
           <h1 className="v4-hero__title">{title}</h1>
           {!hideSub1 && <p className="v4-hero__sub1">{sub1}</p>}
@@ -685,6 +773,12 @@ export function SignalHeroV4({
 
         {/* Region 3 — the cinematic film stage, the bottom of the hero. */}
         {showFilm && <HeroFilm />}
+
+        {/* Scroll-responsive service rail (owner responsive-first
+            directive) — vertical on desktop along the hero's right edge,
+            a horizontal scroll-snap strip between copy and poster on
+            mobile (CSS owns the placement). */}
+        {showServiceRail && <HeroServiceRail />}
 
         {/* Region 4 — phase HUD. Full five-step narration on desktop; a
             progress line + current stage on small screens (owner correction 5). */}

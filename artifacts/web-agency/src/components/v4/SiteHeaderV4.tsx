@@ -64,6 +64,7 @@ import {
   whatWeBuildV4,
   requestBetaHrefV4,
 } from "./publicNavV4";
+import { applyMotionAttr, motionOff, setMotionOff } from "@/components/v5/motionPref";
 
 /**
  * Product sub-navigation (owner review fix, 2026-09-06 — "the nav bar on
@@ -434,10 +435,14 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                       ))}
                     </div>
                     <div className="v4-panel__foot">
-                      <span>Four systems, one connected signal.</span>
+                      <span>Five ways in. One connected system.</span>
                       <Link href="/services">
                         See how the systems connect →
                       </Link>
+                      {/* Desktop home of the global Motion preference — the
+                          <1024px sheet carries the same control in its
+                          Preferences group. */}
+                      <SheetMotionPref />
                     </div>
                   </div>
                 </div>
@@ -520,7 +525,15 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
         >
           <div className="v4-sheet__panel" id={sheetId} ref={sheetRef}>
             <div className="v4-sheet__head">
-              <SignalMarkV4 size={24} />
+              {/* Full brand identity in the sheet (owner responsive-first
+                  directive): mark + "SiteMint Digital" wordmark, not the
+                  bare mark. */}
+              <span className="v4-sheet__brand">
+                <SignalMarkV4 size={24} />
+                <span>
+                  SiteMint <b>Digital</b>
+                </span>
+              </span>
               <button
                 type="button"
                 className="v4-sheet__close"
@@ -566,14 +579,24 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                         href: item.href,
                       }))}
                     </MobileGroup>
-                    {/* W-17: mobile group renamed "Company" → "Explore". */}
-                    <MobileGroup
-                      title="Explore"
-                      location={location}
-                      onCloseMenu={() => setMenuOpen(false)}
-                    >
-                      {primaryNavV4}
-                    </MobileGroup>
+                    {/* Owner responsive-first directive: Work / Process /
+                        Company are flat, top-level destinations (the former
+                        "Explore" group added one tap for no gain). */}
+                    {primaryNavV4.map((item) => {
+                      const active = isActive(location, item.href);
+                      return (
+                        <li key={item.label}>
+                          <Link
+                            href={item.href}
+                            className="v4-sheet__link"
+                            aria-current={active ? "page" : undefined}
+                            onClick={(e) => handleActiveNavClick(e, active, () => setMenuOpen(false))}
+                          >
+                            {item.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
                     <li>
                       <Link
                         href={productNavV4.href}
@@ -620,10 +643,51 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                 </Link>
               </>
             )}
+
+            {/* Preferences — the single global Motion setting lives here now
+                (owner responsive-first directive: removed from the footer). */}
+            <div className="v4-sheet__prefs">
+              <span className="v4-sheet__prefs-title">Preferences</span>
+              <SheetMotionPref />
+            </div>
           </div>
         </div>
       )}
     </header>
+  );
+}
+
+/**
+ * The global Motion preference control, relocated from the footer into the
+ * navigation sheet's Preferences area (owner responsive-first directive).
+ * One persistent setting: "off" unmounts every decorative film (posters
+ * remain), pauses ambient CSS animation, and freezes the hero particle
+ * drift; `prefers-reduced-motion` is always honored independently.
+ */
+function SheetMotionPref() {
+  const [off, setOff] = useState(false);
+  useEffect(() => {
+    setOff(motionOff());
+    applyMotionAttr();
+  }, []);
+  return (
+    <button
+      type="button"
+      className="v4-sheet__pref-toggle"
+      role="switch"
+      aria-checked={!off}
+      onClick={() => {
+        const next = !off;
+        setOff(next);
+        setMotionOff(next);
+      }}
+    >
+      <span>Motion</span>
+      <span className="v4-sheet__pref-state" data-on={!off || undefined}>
+        <span className="v4-sheet__pref-knob" aria-hidden="true" />
+        {off ? "Off" : "On"}
+      </span>
+    </button>
   );
 }
 

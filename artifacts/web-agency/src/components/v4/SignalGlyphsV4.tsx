@@ -85,11 +85,49 @@ function VoiceGlyph() {
   );
 }
 
+/** CRM & internal systems — stacked records with one row lighting up. */
+function CrmGlyph() {
+  return (
+    <>
+      <rect x="3.5" y="4" width="17" height="5" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="3.5" y="11" width="17" height="5" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.6" opacity="0.55" />
+      <path
+        className="v4-glyph-anim"
+        d="M6.5 18.5h11M6.5 6.5h.01M6.5 13.5h.01"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+/** SEO, analytics & growth — a baseline with a rising measured line. */
+function GrowthGlyph() {
+  return (
+    <>
+      <path d="M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M4 20V5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+      <path
+        className="v4-glyph-anim"
+        d="M6 16.5 10.5 12l3 2.5L19 8m0 0h-3.4M19 8v3.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </>
+  );
+}
+
 const GLYPHS: Record<V4Glyph, () => ReactElement> = {
   site: SiteGlyph,
   discovery: DiscoveryGlyph,
   automation: AutomationGlyph,
   voice: VoiceGlyph,
+  crm: CrmGlyph,
+  growth: GrowthGlyph,
 };
 
 export interface SignalGlyphV4Props {

@@ -11,7 +11,7 @@
 
 import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 
-export type V4Glyph = "site" | "discovery" | "automation" | "voice";
+export type V4Glyph = "site" | "discovery" | "automation" | "voice" | "crm" | "growth";
 
 export interface V4PanelItem {
   label: string;
@@ -23,10 +23,12 @@ export interface V4PanelItem {
 }
 
 /**
- * The three service categories in the mega panel (W-3). AI Systems &
- * Automation (renamed from "Workflow Automation", W-6) folds CRM & internal
- * systems in as a section of that page rather than a fourth card — there is
- * no separate CRM route yet.
+ * The five service categories in the mega panel (owner responsive-first
+ * directive, 2026-09-06 — supersedes W-3's three-card panel): CRM & Internal
+ * Systems and SEO, Analytics & Growth become first-class entries, and the
+ * AI Receptionist product appears here as well as in its nav pill so the
+ * dropdown is a complete map of what SiteMint builds. Every href is a
+ * completed destination (routes or real section anchors — no placeholders).
  */
 export const whatWeBuildV4: V4PanelItem[] = [
   {
@@ -38,19 +40,36 @@ export const whatWeBuildV4: V4PanelItem[] = [
     glyph: "site",
   },
   {
-    label: "Discovery Systems",
-    outcome: "Capture every inquiry usefully",
-    description: "Turn first contact into a brief your team can act on.",
-    href: ROUTES.discoverySystems,
-    glyph: "discovery",
+    label: "CRM & Internal Systems",
+    outcome: "See every deal in one place",
+    description:
+      "Records, pipelines, tasks, and permissions — the operating view behind the website.",
+    href: "/#crm-systems",
+    glyph: "crm",
   },
   {
     label: "AI Systems & Automation",
     outcome: "Never lose a follow-up",
     description:
-      "Automation, CRM and internal systems, and AI-assisted workflows — connected.",
+      "Automation, AI-assisted workflows, and the connections that carry work forward.",
     href: ROUTES.aiSystems,
     glyph: "automation",
+  },
+  {
+    label: "AI Receptionist",
+    outcome: "Answer every call usefully",
+    description:
+      "A voice product that handles routine calls by your business rules. Private beta.",
+    href: ROUTES.aiReceptionist,
+    glyph: "voice",
+  },
+  {
+    label: "SEO, Analytics & Growth",
+    outcome: "Know what actually converts",
+    description:
+      "Technical SEO, analytics, pixels, and campaign-ready infrastructure under it all.",
+    href: `${ROUTES.services}#growth-infrastructure`,
+    glyph: "growth",
   },
 ];
 
