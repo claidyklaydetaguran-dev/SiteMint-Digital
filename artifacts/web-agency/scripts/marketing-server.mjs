@@ -65,7 +65,10 @@ const MIME = {
 const COMPRESSIBLE = new Set([".html", ".js", ".css", ".svg", ".json", ".txt", ".xml", ".webmanifest"]);
 const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"]);
 
-function proxy(req, res) {
+// `htmlIsMiss`: the upstream SPA answers unknown paths with its index.html
+// (200); for a file-shaped fallback that means "no such file", so it becomes
+// this site's real 404 rather than a stale HTML document under a .js/.map URL.
+function proxy(req, res, { htmlIsMiss = false } = {}) {
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) {
     if (!HOP_BY_HOP.has(k.toLowerCase()) && k.toLowerCase() !== "host") headers[k] = v;
@@ -76,6 +79,11 @@ function proxy(req, res) {
   const up = httpsRequest(
     { host: UPSTREAM, port: 443, path: req.url, method: req.method, headers },
     (upRes) => {
+      if (htmlIsMiss && /text\/html/i.test(String(upRes.headers["content-type"] || ""))) {
+        upRes.resume();
+        serveNotFound(res).catch(() => { if (!res.headersSent) res.writeHead(404); res.end(); });
+        return;
+      }
       const outHeaders = {};
       for (const [k, v] of Object.entries(upRes.headers)) {
         if (!HOP_BY_HOP.has(k.toLowerCase())) outHeaders[k] = v;
@@ -109,6 +117,12 @@ async function serveFile(res, file, status = 200) {
     res.writeHead(status, headers);
     res.end(body);
   }
+}
+
+async function serveNotFound(res) {
+  const nf = join(WA_DIST, "404.html");
+  if (existsSync(nf)) { await serveFile(res, nf, 404); return; }
+  await serveFile(res, join(WA_DIST, "index.html"));
 }
 
 createServer(async (req, res) => {
@@ -146,7 +160,7 @@ createServer(async (req, res) => {
     // pages reference root-absolute, content-hashed files (/assets/...,
     // legacy root images) that live only in the previous deployment. Hashed
     // names cannot collide with this dist, so the fallback is unambiguous.
-    if (extname(path)) { proxy(req, res); return; }
+    if (extname(path)) { proxy(req, res, { htmlIsMiss: true }); return; }
 
     // Prerendered route documents, then SPA prefixes, then the real 404.
     const clean = path.replace(/\/+$/, "");
@@ -156,9 +170,7 @@ createServer(async (req, res) => {
       await serveFile(res, join(WA_DIST, "index.html"));
       return;
     }
-    const nf = join(WA_DIST, "404.html");
-    if (existsSync(nf)) { await serveFile(res, nf, 404); return; }
-    await serveFile(res, join(WA_DIST, "index.html"));
+    await serveNotFound(res);
   } catch (e) {
     if (!res.headersSent) res.writeHead(500, { "content-type": "text/plain" });
     res.end("server error");
