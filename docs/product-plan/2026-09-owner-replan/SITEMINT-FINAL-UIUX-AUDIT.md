@@ -132,3 +132,36 @@ content in #root, canonicals, og:url, noindex retained, 404 status).
 **Cross-browser:** genuine Firefox 155 + WebKit 26.6 (Playwright 1.63 in the
 WSL runner) — 88/88 checks across 16 routes × overflow/console/buttons/
 underline/video/nav-sheet/discovery/login at 1440, 390, and 844×390.
+
+## 11. Featured-work, interaction, client-access, performance and publication pass (owner directive, 2026-09-07 final)
+
+Certified head `1736a19` (design pass `1e80c24`, mobile fix `88605c9`).
+Release artifact: branch `release/marketing-dist-2026-09-07`, bundle
+`assets/index-B8qHQzvi.js`, 253-file `MANIFEST.sha256`.
+
+| Gate | Result |
+|---|---|
+| Contract chain / typecheck / tests / builds / scans | 2126 PASS · 0 TS errors · 1055/1055 · wa + hd + hd-voice + wa-live · 0 leaks · boundary greps 0 |
+| Prerender gate (22 documents + spa-fallback.json) | CLEAN — route titles/canonicals/OG, ≥4KB real content, noindex retained, real 404 |
+| Route/access gate (server + browser) | 26/26 — receptionist signup/demo/thank-you/admin serve the SPA (200), unknown → 404, dashboard login + deep links 200, invalid invite honest, Back works |
+| Project-overlay gate | 19/19 — hierarchy, real-button opening, native focus trap, Escape/backdrop, focus return, labelled carousel, next/prev, reduced motion, mobile full-screen viewer ≥44px targets |
+| Errors / routing / nav / interactions / forms / motion / mobile video / live-voice / matrix | CLEAN · 9/9 · 10/10 · 8/8 · 7/7 · 12 routes 0 stuck · 4/4 · 2/2 · 66/66 |
+| Firefox 155 + WebKit 26.6 | 88/88 |
+| Accessibility | 100 × 17 routes (demo page included) |
+| Performance (3-run throttled-mobile medians) | Home LCP 4.03s · CLS 0.000 · TBT 76ms · score 81 — Receptionist LCP 3.36s · CLS 0.000 · TBT 8ms · score 87 |
+
+**Performance workstream outcome.** The focused implementation (fold-scoped
+critical CSS with containment keep, `optional` faces on the metric-matched
+fallbacks, paint-first bootloader) is complete in `scripts/prerender.mjs`
+but ships OFF: across five instrumented iterations it left the simulated
+home LCP at ~4.25s while costing CLS 0.258, so by the owner's rule the
+stable blocking-stylesheet prerender ships. Remaining cost to reach ~2.9s:
+the 448KB four-generation stylesheet (82KB gz) plus full-page style/layout
+under 4× CPU throttle — a CSS-architecture diet, not a prerender setting.
+
+**UI-quality re-audit (17 routes × 1440/390):** all surfaces approved.
+Featured stages read as an editorial composition (verified at 1440 and
+390); the demo page's disclosure, mint action trio and framed synthetic
+surfaces verified; mark/favicon mint; no remaining cyan interaction
+accents on public surfaces; CRM shell and customer dashboard primaries on
+the signature.
