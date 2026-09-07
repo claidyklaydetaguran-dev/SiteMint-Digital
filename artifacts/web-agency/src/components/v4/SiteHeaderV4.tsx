@@ -658,16 +658,17 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
 }
 
 /**
- * The global Motion preference control, relocated from the footer into the
- * navigation sheet's Preferences area (owner responsive-first directive).
- * One persistent setting: "off" unmounts every decorative film (posters
- * remain), pauses ambient CSS animation, and freezes the hero particle
- * drift; `prefers-reduced-motion` is always honored independently.
+ * The global "Reduce animation" preference (mint-brand release directive,
+ * 2026-09-07 — renamed from "Motion: On/Off"), living in the navigation's
+ * Preferences area on every breakpoint. Switch semantics: checked = reduce
+ * animation ON. When on, every decorative film unmounts (posters remain),
+ * ambient CSS animation pauses, and the hero particle drift freezes;
+ * `prefers-reduced-motion` is always honored independently.
  */
 function SheetMotionPref() {
-  const [off, setOff] = useState(false);
+  const [reduced, setReduced] = useState(false);
   useEffect(() => {
-    setOff(motionOff());
+    setReduced(motionOff());
     applyMotionAttr();
   }, []);
   return (
@@ -675,17 +676,17 @@ function SheetMotionPref() {
       type="button"
       className="v4-sheet__pref-toggle"
       role="switch"
-      aria-checked={!off}
+      aria-checked={reduced}
       onClick={() => {
-        const next = !off;
-        setOff(next);
+        const next = !reduced;
+        setReduced(next);
         setMotionOff(next);
       }}
     >
-      <span>Motion</span>
-      <span className="v4-sheet__pref-state" data-on={!off || undefined}>
+      <span>Reduce animation</span>
+      <span className="v4-sheet__pref-state" data-on={reduced || undefined}>
         <span className="v4-sheet__pref-knob" aria-hidden="true" />
-        {off ? "Off" : "On"}
+        {reduced ? "On" : "Off"}
       </span>
     </button>
   );

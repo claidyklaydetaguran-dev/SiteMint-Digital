@@ -10,6 +10,7 @@ import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { teamV5, type TeamMemberV5 } from "@/components/v5/teamV5";
 import { TeamMemberDialog } from "@/components/v5/TeamMemberDialog";
+import { MintSignalCorner } from "@/components/v5/MintSignal";
 import aboutTexture from "@/assets/media/support-about-texture.jpg";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import "@/styles/v5-pages.css";
@@ -30,7 +31,7 @@ export default function AboutV3() {
           {/* Headline is the hero LCP text — left static (no mask-reveal) so
               first paint isn't delayed; eyebrow/lede/visual carry the motion. */}
           <h1 className="v3-display">
-            A studio that builds like an operator.
+            A studio that builds like <span className="sm-mark">an operator.</span>
           </h1>
           <p className="v3-lede reveal-fade-up">
             SiteMint designs and builds connected digital systems—websites,

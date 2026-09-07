@@ -81,7 +81,7 @@ export default function ProcessV3() {
           <p className="v3-serif-note reveal-fade-up">No mystery, no big reveal.</p>
           {/* Headline is the hero LCP text — left static (no mask-reveal) so
               first paint isn't delayed; eyebrow/lede/actions carry the motion. */}
-          <h1 className="v3-display">How a SiteMint project runs.</h1>
+          <h1 className="v3-display">How a SiteMint project <span className="sm-mark">runs.</span></h1>
           <p className="v3-lede reveal-fade-up">
             Five stages, each with a concrete output. You always know where
             the project is, what happens next, and what you can already use.

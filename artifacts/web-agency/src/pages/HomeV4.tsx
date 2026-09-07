@@ -22,7 +22,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { HOME_SECTIONS, ROUTES } from "@/lib/routes";
+import { HOME_SECTIONS, ROUTES, withBase } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { SignalGlyphV4 } from "@/components/v4/SignalGlyphsV4";
 import { whatWeBuildV4, startHrefV4, startLabelV4 } from "@/components/v4/publicNavV4";
@@ -166,6 +166,11 @@ function HeroCheckGlyph() {
  * mounting under the existing eligibility gate below — nothing else to
  * wire up. Until then it stays `null` and only the poster ever renders. */
 import heroFilmSrc from "@/assets/media/home-hero-film.mp4";
+// Dedicated mobile masters (release directive 2026-09-07): the same
+// frame-gated film in a mobile-band crop — VP9 where supported, H.264
+// fallback, no audio track on either.
+import heroFilmMobileMp4 from "@/assets/media/home-hero-film-mobile.mp4";
+import heroFilmMobileWebm from "@/assets/media/home-hero-film-mobile.webm";
 import heroFilmPoster from "@/assets/media/home-hero-film-poster.jpg";
 import heroFilmPosterMobile from "@/assets/media/home-hero-film-poster-mobile.jpg";
 const HERO_FILM_SRC: string | null = heroFilmSrc;
@@ -179,20 +184,24 @@ function useFilmEligible(): boolean {
   const [eligible, setEligible] = useState(false);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
-    // Global Motion preference (footer): "off" keeps the film unmounted and
+    // Data-saver visitors keep the poster (release directive: no forced
+    // video bytes under savings mode).
+    type ConnectionInfo = { saveData?: boolean };
+    const conn = (navigator as Navigator & { connection?: ConnectionInfo }).connection;
+    if (conn?.saveData === true) return undefined;
+    // Global "Reduce animation" preference: keeps the film unmounted and
     // flips it live in both directions without a reload.
-    const offMotion = onMotionChange((off) => {
-      if (off) setEligible(false);
-      else if (window.innerWidth >= 768) setEligible(true);
-    });
+    const offMotion = onMotionChange((off) => setEligible(!off));
     if (motionOff()) return offMotion;
     // Mounting the <video> forces a hero-sized style/layout pass; doing it AT
     // the load event landed that long task inside the TBT/TTI window (measured:
     // TBT 308ms -> 1042ms). Defer to real idle time after load instead - the
     // poster keeps the frame identical, so nothing visible changes.
+    // Release directive 2026-09-07: mobile now mounts the film too (its own
+    // dedicated crop) through this same after-load idle gate — critical
+    // content paints first, then playback is attempted.
     let idleHandle: number | undefined;
     function mountWhenIdle() {
-      if (window.innerWidth < 768) return;
       type IdleWindow = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
       const w = window as IdleWindow;
       if (typeof w.requestIdleCallback === "function") {
@@ -269,7 +278,43 @@ function HeroFilmPoster() {
  */
 function HeroFilm() {
   const eligible = useFilmEligible();
-  const showVideo = eligible && !!HERO_FILM_SRC;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Autoplay refusal / decode failure keeps the poster with no empty frame
+  // and no error chrome (release directive): the video simply unmounts.
+  const [playFailed, setPlayFailed] = useState(false);
+  const [isMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
+  const showVideo = eligible && !playFailed && !!HERO_FILM_SRC;
+
+  // Explicit handled play() + offscreen pause/resume (IntersectionObserver):
+  // decoding stops when the hero scrolls sufficiently out of view, and only
+  // resumes while the Reduce-animation preference is off.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !showVideo) return;
+    const tryPlay = () => {
+      const p = v.play();
+      if (p) p.catch(() => setPlayFailed(true));
+    };
+    const onErr = () => setPlayFailed(true);
+    v.addEventListener("error", onErr);
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) v.pause();
+        else if (document.documentElement.dataset.smMotion !== "off") tryPlay();
+      },
+      { threshold: 0.05 },
+    );
+    io.observe(v);
+    tryPlay();
+    return () => {
+      v.removeEventListener("error", onErr);
+      io.disconnect();
+      v.pause();
+    };
+  }, [showVideo]);
+
   return (
     <div className="v4-hero__film" data-v4-hero-film>
       <div className="v4-hero__film-frame" aria-hidden="true">
@@ -277,9 +322,11 @@ function HeroFilm() {
         {/* Real film-frame poster, eager + high priority: it IS the desktop
             LCP element and also what visitors see until the video idle-mounts
             (previously the abstract SVG placeholder showed in that window). */}
+        {/* Served from the stable public path so index.html can preload it
+            (release LCP work, 2026-09-07) — same bytes as the hashed asset. */}
         <img
           className="v4-hero__film-poster v4-hero__film-poster--desktop"
-          src={heroFilmPoster}
+          src={withBase("/hero-poster.jpg")}
           alt=""
           fetchPriority="high"
           decoding="async"
@@ -299,6 +346,7 @@ function HeroFilm() {
             Motion preference in the footer. */}
         {showVideo && HERO_FILM_SRC && (
           <video
+            ref={videoRef}
             className="v4-hero__film-video"
             muted
             playsInline
@@ -310,9 +358,16 @@ function HeroFilm() {
             disableRemotePlayback
             controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
             data-sm-decorative-film
-            poster={HERO_FILM_POSTER_DATA_URI}
+            poster={isMobile ? heroFilmPosterMobile : HERO_FILM_POSTER_DATA_URI}
           >
-            <source src={HERO_FILM_SRC} type="video/mp4" />
+            {isMobile ? (
+              <>
+                <source src={heroFilmMobileWebm} type="video/webm" />
+                <source src={heroFilmMobileMp4} type="video/mp4" />
+              </>
+            ) : (
+              <source src={HERO_FILM_SRC} type="video/mp4" />
+            )}
           </video>
         )}
         {/* Localized readability gradient — the copy layer floats over the
@@ -336,7 +391,9 @@ function HeroFilm() {
 export interface SignalHeroV4Props {
   kicker?: string;
   hideKicker?: boolean;
-  title?: string;
+  /** Widened to ReactNode (mint-brand directive 2026-09-07) so the key
+   *  headline phrase can carry the mint signature highlight. */
+  title?: ReactNode;
   sub1?: string;
   hideSub1?: boolean;
   sub?: ReactNode;
@@ -639,6 +696,13 @@ export function SignalHeroV4({
 
     function frame(now: number) {
       if (!running) return;
+      // Global "Reduce animation" preference (nav Preferences): freeze the
+      // particle drift — hold the last painted frame, keep the loop armed
+      // so flipping the preference back resumes instantly.
+      if (document.documentElement.dataset.smMotion === "off") {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       if (canvas.clientWidth !== W || canvas.clientHeight !== H) resize();
       parX += (tgX - parX) * 0.06;
       parY += (tgY - parY) * 0.06;

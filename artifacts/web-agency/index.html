@@ -7,7 +7,10 @@
     <title>SiteMint Digital | AI-Powered Websites &amp; Business Systems</title>
     <meta name="description" content="SiteMint Digital builds AI-powered websites, CRM systems, automation workflows, and custom business applications that help service businesses get more customers and operate smarter." />
     <meta name="keywords" content="AI website development, business automation services, CRM website system, custom business web app, website developer for service businesses, real estate website CRM, nonprofit website development, law firm website automation, SiteMint Digital" />
-    <meta name="robots" content="index, follow" />
+    <!-- Release gate (2026-09-07): indexing stays OFF until the owner
+         approves the Privacy/Terms legal copy. Flip to "index, follow" as
+         the single launch action once legal sign-off lands. -->
+    <meta name="robots" content="noindex, follow" />
     <link rel="canonical" href="https://sitemintdigital.com/" />
 
     <meta property="og:title" content="SiteMint Digital | AI-Powered Websites &amp; Business Systems" />
@@ -49,6 +52,15 @@
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
     <link rel="shortcut icon" href="/favicon.svg?v=2" />
+
+    <!-- Release polish (2026-09-07): the homepage LCP element is the hero
+         film poster — preload it from a stable public path so its bytes are
+         in flight before the SPA renders; and paint the page ground
+         immediately so first paint is never a blank white frame. -->
+    <link rel="preload" as="image" href="/hero-poster.jpg" fetchpriority="high" />
+    <style>
+      html { background-color: #f4f8fb; }
+    </style>
     <!-- Frontend V2 Phase 1: the Inter stylesheet link and both font preconnects
          were removed. Combined with the Plus Jakarta Sans + Playfair Display
          @import removed from src/index.css, this takes web-agency from three

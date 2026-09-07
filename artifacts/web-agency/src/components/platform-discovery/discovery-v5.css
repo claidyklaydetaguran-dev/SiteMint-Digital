@@ -542,5 +542,5 @@
 .discovery-v5 [aria-pressed="true"],
 .discovery-v5 [aria-checked="true"],
 .discovery-v5 [data-selected="true"] {
-  box-shadow: var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+  box-shadow: var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
 }

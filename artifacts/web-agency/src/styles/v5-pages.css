@@ -1541,13 +1541,13 @@
    homepage treatment: larger portrait, ownership sentence, tags, mint
    accent, purposeful hover. ─────────────────────────────────────────── */
 .sm-v5page .sm-person-card {
-  border-top: 3px solid var(--sm-mint-border, #C9E9E3);
+  border-top: 3px solid var(--sm-mint-border, #80E9BE);
   transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 .sm-v5page .sm-person-card:hover,
 .sm-v5page .sm-person-card:focus-within {
   border-top-color: var(--sm-mint-500, #32C5D2);
-  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
   transform: translateY(-2px);
 }
 .sm-v5page .sm-person-avatar {
@@ -1579,9 +1579,9 @@
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 999px;
-  background: var(--sm-mint-chip-bg, #DFF4EF);
+  background: var(--sm-mint-chip-bg, #D9FAEC);
   color: var(--sm-mint-chip-text, #0B7487);
-  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
 }
 
 /* ── Process accordion affordance (rendered audit, 2026-09-06): collapsed
@@ -1622,7 +1622,7 @@
   margin: 1.2rem 0 0.4rem;
   border-radius: var(--sm-radius-l, 16px);
   overflow: hidden;
-  border: 1px solid var(--sm-mint-border, #C9E9E3);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
   box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
   max-width: 640px;
 }

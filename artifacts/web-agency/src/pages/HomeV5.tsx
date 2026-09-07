@@ -22,6 +22,7 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 import { SignalHeroV4 } from "@/pages/HomeV4";
 import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
 import { HeroMedia } from "@/components/v5/HeroMedia";
+import { MintSignalCorner } from "@/components/v5/MintSignal";
 import { Reveal } from "@/components/v5/Reveal";
 import { BuildPreview } from "@/components/v5/BuildPreview";
 import { ConnectedOpsMap } from "@/components/v5/ConnectedOpsMap";
@@ -131,7 +132,8 @@ function ShotFrame({ src, alt, caption }: { src: string; alt: string; caption: s
 function WebsitesAppsSection() {
   const reveal = useReveal();
   return (
-    <section className="v4-section" id="websites-apps" data-tone="porcelain">
+    <section className="v4-section sm-corner-host" id="websites-apps" data-tone="porcelain">
+      <MintSignalCorner />
       <div className="v4-container sm-split">
         <div className="sm-split__copy reveal-h-left" ref={reveal} data-v4-reveal>
           <span className="v4-kicker">03 — Websites & Web Apps</span>
@@ -495,7 +497,8 @@ const WHY_POINTS = [
 function WhySiteMintSection() {
   const reveal = useReveal();
   return (
-    <section className="v4-section" id="why-sitemint" data-tone="porcelain">
+    <section className="v4-section sm-corner-host" id="why-sitemint" data-tone="porcelain">
+      <MintSignalCorner flip />
       <div className="v4-container" ref={reveal} data-v4-reveal>
         <div className="v4-chapter-head">
           <span className="v4-kicker">11 — Why SiteMint</span>
@@ -686,7 +689,12 @@ export default function HomeV5() {
           hideKicker
           brandEyebrow="SiteMint Digital"
           showServiceRail
-          title="Digital systems built to move your business forward."
+          title={
+            <>
+              Digital systems built to{" "}
+              <span className="sm-mark">move your business forward.</span>
+            </>
+          }
           hideSub1
           sub={
             <>

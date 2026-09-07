@@ -29,6 +29,7 @@ import { CallTheaterV5, HeroCallTheaterV5 } from "@/components/receptionist-v5/C
 import { LiveDemoPanel } from "@/components/receptionist-v5/LiveDemoPanel";
 import { BetaRequestForm } from "@/components/receptionist-v5/BetaRequestForm";
 import { DashboardPreview } from "@/components/receptionist-v5/DashboardPreview";
+import { MintSignalCorner } from "@/components/v5/MintSignal";
 import { Reveal } from "@/components/v5/Reveal";
 import { motionOff, onMotionChange } from "@/components/v5/motionPref";
 import { useArmedReveal, useHeadlineEntrance, usePausableAmbient } from "@/components/receptionist-v5/heroMotion";
@@ -743,7 +744,8 @@ export default function AiReceptionistV5() {
         </section>
 
         {/* ── 7 · Business-owner dashboard ─────────────────────────────── */}
-        <section id={SECTION_ID.dashboard} className="smv5__section">
+        <section id={SECTION_ID.dashboard} className="smv5__section sm-corner-host">
+          <MintSignalCorner flip />
           <div className="smv5__container">
             <span className="smv5__eyebrow">Owner dashboard</span>
             <h2 className="smv5__h2">One place to see what the receptionist is doing</h2>

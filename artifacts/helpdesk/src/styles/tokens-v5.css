@@ -79,16 +79,23 @@
      2-stop mint→aqua; never a fill, never a button. ─────────────────── */
   --sm-signal-thread: linear-gradient(90deg, var(--sm-mint-500), var(--sm-mint-400));
 
-  /* ── Pastel-mint brand layer (owner final polish, 2026-09-06) — semantic
-     tokens only; consumers never hard-code these values. Restrained by
-     rule: washes and hovers, never full-section green fills. ─────────── */
-  --sm-mint-wash: #EDF9F6;        /* soft section wash over porcelain */
-  --sm-mint-wash-deep: #DFF4EF;   /* selected states, icon backplates */
-  --sm-mint-hover: #F2FBF8;       /* hover backgrounds on light surfaces */
-  --sm-mint-border: #C9E9E3;      /* subtle borders, dividers */
-  --sm-mint-glow: 0 0 0 4px rgb(86 210 207 / 0.14); /* small glows */
-  --sm-mint-chip-bg: var(--sm-mint-wash-deep);
-  --sm-mint-chip-text: var(--sm-mint-700);
+  /* ── Canonical pastel-mint signature system (owner swatch, final
+     mint-brand directive 2026-09-07) — the supplied #99F5D0 is the brand's
+     secondary signature over the Glacier blue-charcoal foundation.
+     Semantic tokens only; consumers never hard-code these values.
+     Contrast facts: --sm-mint-ink on white 6.4:1; ink-950 text on the
+     signature 8.8:1. ─────────────────────────────────────────────────── */
+  --sm-mint-signature: #99F5D0; /* the exact owner swatch */
+  --sm-mint-wash: #ECFFF7;        /* soft section wash */
+  --sm-mint-wash-strong: #D9FAEC; /* selected states, chips, backplates */
+  --sm-mint-border: #80E9BE;      /* borders, dividers */
+  --sm-mint-ink: #0B6B57;         /* mint-family TEXT on white — never pale mint */
+  --sm-mint-glow: 0 0 0 4px rgba(153, 245, 208, 0.28);
+  /* Aliases for pre-existing consumers of the earlier pastel layer. */
+  --sm-mint-wash-deep: var(--sm-mint-wash-strong);
+  --sm-mint-hover: #F4FFFA;
+  --sm-mint-chip-bg: var(--sm-mint-wash-strong);
+  --sm-mint-chip-text: var(--sm-mint-ink);
 
   /* ── shape, depth ──────────────────────────────────────────────────── */
   --sm-radius-s: 6px;

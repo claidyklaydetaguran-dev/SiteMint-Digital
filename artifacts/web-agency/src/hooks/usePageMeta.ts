@@ -12,6 +12,9 @@ export interface PageMeta {
   description: string;
 }
 
+/** Production origin — the canonical host (release directive 2026-09-07). */
+const CANONICAL_ORIGIN = "https://sitemintdigital.com";
+
 export function usePageMeta({ title, description }: PageMeta): void {
   useEffect(() => {
     const prevTitle = document.title;
@@ -23,9 +26,22 @@ export function usePageMeta({ title, description }: PageMeta): void {
     const prevDesc = metaDesc?.getAttribute("content") ?? "";
     if (metaDesc) metaDesc.setAttribute("content", description);
 
+    // Per-route canonical (release directive): the SPA's static canonical
+    // pointed every route at "/"; each page now claims its own URL on the
+    // canonical apex host.
+    const canonical = document.querySelector<HTMLLinkElement>(
+      'link[rel="canonical"]',
+    );
+    const prevCanonical = canonical?.getAttribute("href") ?? "";
+    if (canonical) {
+      const path = window.location.pathname.replace(/\/$/, "");
+      canonical.setAttribute("href", `${CANONICAL_ORIGIN}${path || "/"}`);
+    }
+
     return () => {
       document.title = prevTitle;
       if (metaDesc) metaDesc.setAttribute("content", prevDesc);
+      if (canonical && prevCanonical) canonical.setAttribute("href", prevCanonical);
     };
   }, [title, description]);
 }

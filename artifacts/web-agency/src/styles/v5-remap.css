@@ -268,15 +268,15 @@ html[data-sm-motion="off"] .sm-home-v5 * {
 /* Outline buttons pick up a mint hover wash on light surfaces. */
 .v4-shell [data-tone="white"] .v4-btn--outline:hover,
 .v4-shell [data-tone="porcelain"] .v4-btn--outline:hover {
-  background: var(--sm-mint-hover, #F2FBF8);
-  border-color: var(--sm-mint-border, #C9E9E3);
+  background: var(--sm-mint-hover, #F4FFFA);
+  border-color: var(--sm-mint-border, #80E9BE);
 }
 /* Cards on light surfaces: mint border + soft glow on hover (150–300ms
    transitions already exist on the card primitives). */
 .v4-shell [data-tone="white"] .v3-card:hover,
 .v4-shell [data-tone="porcelain"] .v3-card:hover {
-  border-color: var(--sm-mint-border, #C9E9E3);
-  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgb(86 210 207 / 0.14));
+  border-color: var(--sm-mint-border, #80E9BE);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
 }
 
 /* ── Navigation system (owner responsive-first directive, 2026-09-06) ────
@@ -303,7 +303,7 @@ html[data-sm-motion="off"] .sm-home-v5 * {
 }
 .v4-shell .v4-panel__card:hover,
 .v4-shell .v4-panel__card:focus-visible {
-  background: var(--sm-mint-hover, #F2FBF8);
+  background: var(--sm-mint-hover, #F4FFFA);
   box-shadow: inset 3px 0 0 var(--sm-mint-500, #32C5D2);
 }
 .v4-shell .v4-panel__foot {
@@ -499,7 +499,7 @@ html[data-sm-motion="off"] .sm-home-v5 * {
    white sections are untouched, so pages alternate white → mint wash → ink
    instead of reading uniformly blue. */
 .v4-shell {
-  --sm-porcelain-mint: #F1FAF7;
+  --sm-porcelain-mint: #ECFFF7;
 }
 .v4-shell[data-tone="porcelain"],
 .v4-shell [data-tone="porcelain"] {
@@ -519,11 +519,11 @@ html[data-sm-motion="off"] .sm-home-v5 * {
 
 /* 3 · Icon backplates: pillar/value icons sit on a mint surface. */
 .v4-shell .v3m-pillar__icon {
-  background: var(--sm-mint-wash-deep, #DFF4EF);
+  background: var(--sm-mint-wash-deep, #D9FAEC);
   color: var(--sm-mint-700, #0B7487);
 }
 .v4-shell .v4-pillar__glyph {
-  background: var(--sm-mint-wash-deep, #DFF4EF);
+  background: var(--sm-mint-wash-deep, #D9FAEC);
   color: var(--sm-mint-700, #0B7487);
   border-radius: 12px;
   padding: 9px;
@@ -584,7 +584,7 @@ html[data-sm-motion="off"] .sm-home-v5 * {
   /* Mint active pill for the scrollspy state on the rail. */
   .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link[aria-current="true"] {
     color: var(--sm-mint-700, #0B7487);
-    background: var(--sm-mint-wash-deep, #DFF4EF);
+    background: var(--sm-mint-wash-deep, #D9FAEC);
   }
   .v4-shell .v4-header[data-mode="product"][data-surface="dark"] .v4-product-nav__link[aria-current="true"] {
     color: var(--sm-mint-400, #56D2CF);
@@ -606,4 +606,51 @@ html[data-sm-motion="off"] .sm-home-v5 * {
   width: 100vw;
   height: 100vh;
   height: 100dvh;
+}
+
+/* ── Canonical mint signature (mint-brand directive, 2026-09-07) ───────── */
+
+/* Key-phrase highlight: exact #99F5D0 behind deep blue-charcoal text —
+   works on ink heroes and light page heroes alike (8.8:1). */
+.v4-shell .sm-mark,
+.sm-v5page .sm-mark {
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+  padding: 0.02em 0.16em;
+  border-radius: 0.16em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Mint Signal corner ornament host. */
+.v4-shell .sm-corner-host,
+.sm-v5page .sm-corner-host {
+  position: relative;
+  overflow: hidden;
+}
+.sm-mint-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+  line-height: 0;
+  opacity: 0.9;
+}
+.sm-mint-corner--flip {
+  right: auto;
+  left: 0;
+  transform: scaleX(-1);
+}
+@media (max-width: 639px) {
+  .sm-mint-corner svg {
+    width: 150px;
+    height: 110px;
+  }
+}
+
+/* Focus rings site-wide pick up the signature glow (contrast preserved by
+   the 2px ink-outline underneath on light surfaces). */
+.v4-shell a:focus-visible,
+.v4-shell button:focus-visible {
+  outline-color: var(--sm-mint-border, #80E9BE);
 }
