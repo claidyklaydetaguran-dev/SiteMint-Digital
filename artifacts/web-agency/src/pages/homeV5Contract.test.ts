@@ -77,10 +77,15 @@ console.log("2. Brand hygiene (W-1) — no visible 'Signal' copy");
   // The only approved "Signal"-named identifiers this page reuses (not
   // replaces) are these two components — strip their usages, then assert
   // nothing else contains "Signal".
+  // `MintSignalCorner` joined the approved internal names with the
+  // mint-brand directive (2026-09-07): the "Mint Signal" graphic language
+  // ornament — an identifier only, never visible copy.
   const withoutApprovedNames = codeOnlyLines
     .join("\n")
     .replace(/SignalHeroV4/g, "")
-    .replace(/SignalJourneyV4/g, "");
+    .replace(/SignalJourneyV4/g, "")
+    .replace(/MintSignalCorner/g, "")
+    .replace(/MintSignal/g, "");
   check(
     "no 'Signal' string outside approved internal component names",
     !/Signal/.test(withoutApprovedNames),
@@ -88,9 +93,15 @@ console.log("2. Brand hygiene (W-1) — no visible 'Signal' copy");
 }
 
 console.log("3. Amended hero copy literals (W-1) are present verbatim");
+// Mint-brand directive (2026-09-07): the key phrase carries the signature
+// highlight (`.sm-mark`), so the VISIBLE text is unchanged but the source
+// splits it across the mark markup — the check asserts both halves in
+// order, with exactly the approved highlight span between them.
 check(
   "headline",
-  /Digital systems built to move your business forward\./.test(homeV5Src),
+  /Digital systems built to\{" "\}[\s\S]{0,40}<span className="sm-mark">move your business forward\.<\/span>/.test(
+    homeV5Src,
+  ),
 );
 check(
   "supporting copy",
