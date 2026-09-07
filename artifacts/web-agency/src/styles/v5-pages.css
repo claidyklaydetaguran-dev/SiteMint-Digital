@@ -2163,3 +2163,115 @@
   }
   .sm-v5page .sm-demo-stop:nth-child(even) .sm-demo-stop__copy { order: 0; }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Process-page signal rail + output artifacts (owner work order 2026-09-08
+   §4/§7: finish visibly shallow sections with the SiteMint digital-
+   architecture language — signal paths, system annotations — using CSS
+   only). The protected v3-marketing.css grid (120px number column at
+   ≥768px) is untouched; everything below layers on top, scoped to
+   `.sm-v5page`.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* A mint signal thread runs through the stage numbers, reading the five
+   phases as one routed path. Only where the 120px number column exists. */
+@media (min-width: 768px) {
+  .sm-v5page .v3m-steps .v3m-step {
+    position: relative;
+  }
+  .sm-v5page .v3m-steps .v3m-step::before {
+    content: "";
+    position: absolute;
+    left: 60px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      180deg,
+      rgb(153 245 208 / 0) 0%,
+      rgb(153 245 208 / 0.75) 18%,
+      rgb(153 245 208 / 0.75) 82%,
+      rgb(153 245 208 / 0) 100%
+    );
+    pointer-events: none;
+  }
+  .sm-v5page .v3m-steps .v3m-step:first-child::before { top: 2.2rem; }
+  .sm-v5page .v3m-steps .v3m-step:last-child::before { bottom: auto; height: 2.2rem; }
+  /* The number masks the thread behind its digits and marks the active
+     stage as a routed node: ink digits + a signature node dot. */
+  .sm-v5page .v3m-step__no {
+    position: relative;
+    z-index: 1;
+    background: var(--sm-surface, #fff);
+    padding-block: 0.35rem;
+    justify-self: start;
+    padding-inline-end: 0.75rem;
+  }
+  .sm-v5page .v3m-step--active .v3m-step__no {
+    color: var(--sm-mint-ink, #0B7487);
+  }
+  .sm-v5page .v3m-step--active .v3m-step__no::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 2.1em;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--sm-mint-signature, #99F5D0);
+  }
+}
+
+/* "What you receive" renders as a deliverable card — the phase's concrete
+   output, edged in the signature like a routed hand-off. */
+.sm-v5page .v3m-step__artifact {
+  border-left: 3px solid var(--sm-mint-signature, #99F5D0);
+  background: rgb(153 245 208 / 0.12);
+  border-radius: 0 10px 10px 0;
+  padding: 0.8rem 1rem;
+  margin-top: 0.9rem;
+}
+.sm-v5page .v3m-step__artifact strong {
+  display: block;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sm-mint-ink, #0B7487);
+  margin-bottom: 0.25rem;
+}
+
+/* Insights index cards pick up the shared card hover signature (lift +
+   signature top rule) so the listing stops reading as a flat archive. */
+.v3-insights-page .v3in-list .v3-card {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.v3-insights-page .v3in-list .v3-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--sm-mint-signature, #99F5D0);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .v3-insights-page .v3in-list .v3-card:hover,
+  .v3-insights-page .v3in-list .v3-card:focus-within {
+    transform: translateY(-3px);
+    box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  }
+  .v3-insights-page .v3in-list .v3-card:hover::before,
+  .v3-insights-page .v3in-list .v3-card:focus-within::before {
+    transform: scaleX(1);
+  }
+}

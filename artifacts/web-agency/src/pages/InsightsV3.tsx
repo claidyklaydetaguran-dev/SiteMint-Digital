@@ -12,6 +12,10 @@ import { PenLine, Bell } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
+// Card hover signature + mint top rule for the index list (2026-09-08
+// enrichment pass) — the rules live in v5-pages.css, so the page must load
+// it itself for direct visits.
+import "@/styles/v5-pages.css";
 
 const upcoming = [
   {
