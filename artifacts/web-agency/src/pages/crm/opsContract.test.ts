@@ -223,6 +223,49 @@ console.log("\n--- theme: no raw gray/slate/zinc/neutral/stone utilities in CRM 
   );
 }
 
+// ── Theme: no decorative accent palettes in the ops surfaces ────────────────
+console.log("\n--- theme: no purple/indigo/violet/fuchsia/pink utilities in CRM/ops ---");
+{
+  // Owner mint discipline (2026-09-08 §6): the ops chrome uses the
+  // mint/ocean family (teal/cyan/sky/emerald + the semantic tokens) for
+  // identity and progress; red/amber/yellow/orange/green stay for their
+  // semantic meanings. The five decorative palettes below have no meaning
+  // in this system, so a new use anywhere in CRM/ops fails immediately.
+  // The 2026-09-08 migration removed every existing use (shade-preserving
+  // purple/violet→teal, indigo/fuchsia→cyan, pink→teal) — the allowlist
+  // starts, and should stay, empty.
+  const DECORATIVE_ALLOWLIST: ReadonlyArray<{ file: string; className: string; reason: string }> = [];
+
+  const decorative =
+    /(?:^|[^\w/-])((?:[a-z-]+:)*(?:bg|text|border|divide|ring|outline|placeholder|from|via|to|fill|stroke|shadow|accent|caret|decoration)-(?:purple|indigo|violet|fuchsia|pink)-[0-9]{2,3}(?:\/[0-9]{1,3})?)/g;
+
+  // The shared taxonomy/intent color maps feed these surfaces — hold them
+  // to the same rule even though they live under src/lib.
+  const themedFiles = [
+    ...crmFiles,
+    path.join(repoRoot, "artifacts/web-agency/src/lib/crmTaxonomy.ts"),
+    path.join(repoRoot, "artifacts/web-agency/src/lib/behavioralIntelligence.ts"),
+  ];
+
+  let offendingFiles = 0;
+  for (const file of themedFiles) {
+    const rel = path.relative(repoRoot, file).replace(/\\/g, "/");
+    const src = readFileSync(file, "utf8");
+    const found: string[] = [];
+    for (const m of src.matchAll(decorative)) {
+      const cls = m[1];
+      const allowed = DECORATIVE_ALLOWLIST.some(a => a.file === rel && a.className === cls);
+      if (!allowed) found.push(cls);
+    }
+    if (found.length > 0) {
+      offendingFiles++;
+      const summary = [...new Set(found)].slice(0, 8).join(", ");
+      check(`${rel} has no decorative accent utility`, false, `${found.length} hit(s): ${summary}`);
+    }
+  }
+  check("zero files with decorative accent utilities", offendingFiles === 0, `${offendingFiles} file(s)`);
+}
+
 console.log(
   failed === 0
     ? "\nAll opsContract tests passed."

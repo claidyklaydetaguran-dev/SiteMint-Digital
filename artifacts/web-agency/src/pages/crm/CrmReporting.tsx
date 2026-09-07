@@ -145,11 +145,14 @@ const AreaTip = ({ active, payload, label }: {
   );
 };
 
+// Chart hues follow the ops mint ramp (crmTaxonomy.ts) — mint/ocean for
+// progress, amber for pending, green/red semantic; source slices stay in
+// the same tonal family so reports read as one product.
 const DEAL_STAGE_COLORS: Record<string, string> = {
-  Lead: "#6366f1", Qualified: "#0ea5e9", Proposal: "#f97316", Won: "#10b981", Lost: "#ef4444",
+  Lead: "#0ea5e9", Qualified: "#14b8a6", Proposal: "#f59e0b", Won: "#10b981", Lost: "#ef4444",
 };
 const SOURCE_COLORS = [
-  "#6366f1", "#0ea5e9", "#10b981", "#f97316", "#ec4899", "#8b5cf6", "#06b6d4", "#84cc16",
+  "#14b8a6", "#0ea5e9", "#10b981", "#f59e0b", "#0891b2", "#0d9488", "#06b6d4", "#84cc16",
 ];
 
 const RANGE_OPTIONS = [
@@ -299,7 +302,7 @@ export default function CrmReporting() {
   }, [pipelineData, sourceData, overdueCount, dealStats, commStats, loading]);
 
   const commCards = [
-    { label: "Conversations", value: commStats.total, bg: "bg-purple-50", fg: "text-purple-600", icon: MessageSquare },
+    { label: "Conversations", value: commStats.total, bg: "bg-teal-50", fg: "text-teal-600", icon: MessageSquare },
     { label: "Inbound", value: commStats.inbound, bg: "bg-emerald-50", fg: "text-emerald-600", icon: TrendingUp },
     { label: "Outbound", value: commStats.outbound, bg: "bg-blue-50", fg: "text-blue-600", icon: Zap },
     { label: "SMS", value: commStats.sms, bg: "bg-sky-50", fg: "text-sky-600", icon: MessageSquare },
@@ -368,7 +371,7 @@ export default function CrmReporting() {
               />
               <KpiCard
                 label="New This Week" value={crmStats?.newLeads ?? 0} sub="Uncontacted"
-                icon={Zap} bg="bg-indigo-50" fg="text-indigo-600"
+                icon={Zap} bg="bg-cyan-50" fg="text-cyan-600"
               />
               <KpiCard
                 label="Hot Leads" value={crmStats?.hotLeads ?? 0} sub="High priority"
@@ -394,7 +397,7 @@ export default function CrmReporting() {
               <KpiCard
                 label="Conversations" value={conversations.length}
                 sub={`${commStats.totalMsgs} total messages`}
-                icon={MessageSquare} bg="bg-purple-50" fg="text-purple-600"
+                icon={MessageSquare} bg="bg-teal-50" fg="text-teal-600"
               />
             </>
           )}
@@ -448,7 +451,7 @@ export default function CrmReporting() {
                   <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                   <Tooltip content={<BarTip />} />
-                  <Bar dataKey="count" name="Leads" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                  <Bar dataKey="count" name="Leads" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={60} />
                 </BarChart>
               </ResponsiveContainer>
             )}

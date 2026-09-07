@@ -69,8 +69,8 @@ export default function CrmOpsUsage() {
       <div className="p-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <BarChart2 className="w-5 h-5 text-indigo-600" />
+            <div className="w-9 h-9 bg-cyan-100 rounded-xl flex items-center justify-center">
+              <BarChart2 className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">Receptionist Ops — Usage</h1>

@@ -34,7 +34,7 @@ function AdminCard({ icon: Icon, title, description, color, href }: {
 
 const FOLLOW_UP = [
   { icon: Zap, title: "Action Plans", description: "Send personalized drip emails, setup tasks, change stages & more.", color: "bg-blue-500" },
-  { icon: Bot, title: "Automations", description: "Trigger action plans & quick actions when a stage changes or other trigger events.", color: "bg-purple-500" },
+  { icon: Bot, title: "Automations", description: "Trigger action plans & quick actions when a stage changes or other trigger events.", color: "bg-teal-600" },
   { icon: Mail, title: "Email Templates", description: "View & edit email templates, see opens & click-through rates.", color: "bg-blue-600", href: "/admin/crm/email-templates" },
   { icon: MessageSquare, title: "Text Templates", description: "View & edit text templates, track effectiveness based on reply rates.", color: "bg-sky-500" },
 ];
@@ -48,12 +48,12 @@ const INTEGRATIONS = [
   { icon: Globe, title: "Website Forms", description: "Track all your website activity and Discovery form submissions.", color: "bg-teal-500" },
   { icon: Mail, title: "Resend Email", description: "Configure your email sender domain and manage Resend API integration.", color: "bg-blue-500" },
   { icon: MessageSquare, title: "SMS Provider", description: "Connect Twilio or Telnyx to enable two-way text messaging with leads.", color: "bg-green-500" },
-  { icon: BarChart2, title: "All Integrations", description: "Email marketing, Zapier, and all other third-party integrations.", color: "bg-indigo-500" },
+  { icon: BarChart2, title: "All Integrations", description: "Email marketing, Zapier, and all other third-party integrations.", color: "bg-cyan-500" },
 ];
 
 const CUSTOMIZE = [
   { icon: Tag, title: "Tags", description: "See all your tags — auto-created & delete unwanted ones.", color: "bg-orange-500" },
-  { icon: Layers, title: "Stages", description: "Customize your pipeline stages to match your sales process.", color: "bg-purple-500" },
+  { icon: Layers, title: "Stages", description: "Customize your pipeline stages to match your sales process.", color: "bg-teal-600" },
   { icon: Globe, title: "Lead Sources", description: "Manage your lead sources and track where your business comes from.", color: "bg-teal-500" },
   { icon: Users, title: "Users & Roles", description: "Manage team members, roles, and permissions.", color: "bg-blue-500" },
 ];

@@ -156,7 +156,7 @@ function StatusBadge({ status }: { status: string }) {
     "Draft": "bg-yellow-100 text-yellow-700",
     "Needs Review": "bg-amber-100 text-amber-700",
     "Sent": "bg-blue-100 text-blue-700",
-    "Viewed": "bg-indigo-100 text-indigo-700",
+    "Viewed": "bg-cyan-100 text-cyan-700",
     "Accepted": "bg-green-100 text-green-700",
     "Declined": "bg-red-100 text-red-700",
     "Expired": "bg-muted text-muted-foreground",
@@ -670,8 +670,8 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
         )}
         {lead.packageType && (
           <div className="flex items-center gap-3 bg-white rounded-xl border border-border p-3.5">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4 text-purple-600" />
+            <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+              <Package className="w-4 h-4 text-teal-600" />
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Package</p>

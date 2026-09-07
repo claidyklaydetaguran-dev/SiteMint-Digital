@@ -25,7 +25,7 @@ interface Lead {
 }
 
 const AVATAR_COLORS = [
-  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
+  "bg-blue-500","bg-cyan-500","bg-teal-500","bg-teal-500",
   "bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500","bg-red-400","bg-yellow-500",
 ];
 function av(name: string) {
@@ -155,18 +155,18 @@ export default function CrmWorkspaceLanding() {
 
           {/* Continue where you left off */}
           {lastLead && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center gap-4">
+            <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 flex items-center gap-4">
               <div className={`w-10 h-10 rounded-full ${av(lastLead.name)} flex items-center justify-center shrink-0`}>
                 <span className="text-white text-sm font-bold">{ini(lastLead.name)}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-indigo-600 mb-0.5">Continue where you left off</p>
+                <p className="text-xs font-semibold text-cyan-600 mb-0.5">Continue where you left off</p>
                 <p className="text-sm font-semibold text-foreground">{lastLead.name}</p>
                 <p className="text-xs text-muted-foreground">{lastLead.company || lastLead.email}</p>
               </div>
               <button
                 onClick={() => openLead(lastLead)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+                className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
               >
                 Open <ArrowRight className="w-3.5 h-3.5" />
               </button>

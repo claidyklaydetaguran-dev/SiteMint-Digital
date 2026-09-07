@@ -902,9 +902,9 @@ export default function CrmLeadDetail() {
             {/* Email */}
             <button
               onClick={() => setOpenModal("email")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-indigo-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-cyan-50 transition-colors group"
             >
-              <Mail className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+              <Mail className="w-4 h-4 text-cyan-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Email</span>
             </button>
             {/* Note */}
@@ -918,9 +918,9 @@ export default function CrmLeadDetail() {
             {/* Task */}
             <button
               onClick={() => setOpenModal("task")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-purple-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-teal-50 transition-colors group"
             >
-              <Plus className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform shrink-0" />
+              <Plus className="w-4 h-4 text-teal-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Task</span>
             </button>
             {/* Status */}

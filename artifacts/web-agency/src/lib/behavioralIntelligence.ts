@@ -192,14 +192,16 @@ export function computeIntentTrend(events: BehavioralEvent[], windowSize = 5): {
 
 // ── Signal label helpers ──────────────────────────────────────────────────────
 
+// Intent stages follow the ops mint ramp (crmTaxonomy.ts): mint/ocean for
+// forward motion, amber/orange for waiting states, red for risk.
 export const INTENT_STAGE_COLOR: Record<IntentStage, string> = {
-  "Discovering":      "bg-blue-100 text-blue-700",
-  "Evaluating":       "bg-indigo-100 text-indigo-700",
-  "Proposal Ready":   "bg-violet-100 text-violet-700",
+  "Discovering":      "bg-sky-100 text-sky-700",
+  "Evaluating":       "bg-cyan-100 text-cyan-700",
+  "Proposal Ready":   "bg-teal-100 text-teal-800",
   "Negotiating":      "bg-amber-100 text-amber-700",
   "Committed":        "bg-emerald-100 text-emerald-700",
   "Active Client":    "bg-green-100 text-green-700",
-  "Project Complete": "bg-gray-100 text-gray-600",
+  "Project Complete": "bg-muted text-muted-foreground",
   "Referring":        "bg-teal-100 text-teal-700",
   "Dormant":          "bg-orange-100 text-orange-700",
   "At Risk":          "bg-red-100 text-red-700",

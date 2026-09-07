@@ -54,7 +54,7 @@ const TIMELINE_LABELS: Record<string, string> = {
 const CRM_STATUS_COLORS: Record<string, string> = {
   "New": "bg-blue-100 text-blue-700",
   "Reviewed": "bg-yellow-100 text-yellow-700",
-  "Proposal Generated": "bg-purple-100 text-purple-700",
+  "Proposal Generated": "bg-teal-100 text-teal-700",
   "Archived": "bg-muted text-muted-foreground",
 };
 const COMPLEXITY_COLORS: Record<string, string> = {
@@ -264,7 +264,7 @@ function DiscoveryDrawer({
                 size="sm"
                 onClick={generateProposal}
                 disabled={generatingProposal}
-                className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-white"
               >
                 {generatingProposal ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                 {generatingProposal ? "Generating…" : sub.generatedProposal ? "Regenerate Proposal" : "Generate Proposal"}
@@ -570,7 +570,7 @@ export default function CrmDiscovery() {
                       <div className="flex items-center gap-1">
                         {sub.generatedProposal && (
                           <span title="Proposal generated">
-                            <FileText className="w-4 h-4 text-indigo-500" />
+                            <FileText className="w-4 h-4 text-cyan-500" />
                           </span>
                         )}
                         {sub.convertedProjectId && (

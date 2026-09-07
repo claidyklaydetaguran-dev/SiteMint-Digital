@@ -74,7 +74,7 @@ interface VoiceIssue {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STAGE_COLORS: Record<string, string> = {
-  Lead: "#6366f1", Qualified: "#0ea5e9", Proposal: "#f97316",
+  Lead: "#0ea5e9", Qualified: "#14b8a6", Proposal: "#f59e0b",
   Won: "#10b981", Lost: "#ef4444",
 };
 const PRIORITY_BADGE: Record<string, string> = {
@@ -246,8 +246,8 @@ export default function CrmExecutiveDashboard() {
   // ── Computed values ─────────────────────────────────────────────────────────
 
   const statCards = stats ? [
-    { label: "Active Leads", value: String(stats.activeLeads), sub: "In pipeline", icon: Users, color: "#6366f1" },
-    { label: "Open Deals", value: String(stats.openDeals), sub: "Lead · Qualified · Proposal", icon: TrendingUp, color: "#f97316" },
+    { label: "Active Leads", value: String(stats.activeLeads), sub: "In pipeline", icon: Users, color: "#14b8a6" },
+    { label: "Open Deals", value: String(stats.openDeals), sub: "Lead · Qualified · Proposal", icon: TrendingUp, color: "#f59e0b" },
     { label: "Won Deals", value: String(stats.wonDeals), sub: "Closed successfully", icon: Trophy, color: "#10b981" },
     { label: "Lost Deals", value: String(stats.lostDeals), sub: "Did not close", icon: XCircle, color: "#ef4444" },
   ] : [];
@@ -393,37 +393,40 @@ export default function CrmExecutiveDashboard() {
 
   // ── Quick Actions definition ────────────────────────────────────────────────
 
+  // One visual identity for the whole tile row (owner mint discipline):
+  // mint-wash chip, dark mint-teal glyph. Urgency still comes through the
+  // red badge counters, not through per-tile hues.
   const quickActions = [
     {
       icon: UserPlus, label: "Add Lead", sub: "Create a new contact",
-      href: "/admin/crm/leads", color: "text-indigo-600", bg: "bg-indigo-50",
+      href: "/admin/crm/leads", color: "text-teal-700", bg: "bg-accent",
       badge: null,
     },
     {
       icon: GitBranch, label: "Lead Pipeline", sub: "View all 8 stages",
-      href: "/admin/crm/pipeline", color: "text-blue-600", bg: "bg-blue-50",
+      href: "/admin/crm/pipeline", color: "text-teal-700", bg: "bg-accent",
       badge: leads.filter(l => l.status !== "Won" && l.status !== "Lost").length || null,
     },
     {
       icon: LayoutGrid, label: "Deals Kanban", sub: "Track revenue opportunities",
-      href: "/admin/crm/deals", color: "text-emerald-600", bg: "bg-emerald-50",
+      href: "/admin/crm/deals", color: "text-teal-700", bg: "bg-accent",
       badge: null,
     },
     {
       icon: MessageSquare, label: "Inbox", sub: "SMS & call threads",
-      href: "/admin/crm/inbox", color: "text-sky-600", bg: "bg-sky-50",
+      href: "/admin/crm/inbox", color: "text-teal-700", bg: "bg-accent",
       badge: inboundUnread > 0 ? inboundUnread : null,
       badgeColor: "bg-red-500",
     },
     {
       icon: CheckSquare, label: "Tasks", sub: "Manage follow-ups",
-      href: "/admin/crm/tasks", color: "text-orange-600", bg: "bg-orange-50",
+      href: "/admin/crm/tasks", color: "text-teal-700", bg: "bg-accent",
       badge: overdueCount > 0 ? overdueCount : null,
       badgeColor: "bg-red-500",
     },
     {
       icon: Upload, label: "Import Leads", sub: "Bulk upload contacts",
-      href: "/admin/crm/import", color: "text-purple-600", bg: "bg-purple-50",
+      href: "/admin/crm/import", color: "text-teal-700", bg: "bg-accent",
       badge: null,
     },
   ];
@@ -469,7 +472,7 @@ export default function CrmExecutiveDashboard() {
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             </button>
             <Link href="/admin/crm/deals">
-              <button className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+              <button className="flex items-center gap-1.5 text-sm bg-primary hover:bg-primary/85 text-primary-foreground px-4 py-2 rounded-lg transition-colors font-medium">
                 <Plus className="w-4 h-4" /> New Deal
               </button>
             </Link>
@@ -560,7 +563,7 @@ export default function CrmExecutiveDashboard() {
           />
           {receptionistSummary ? (
             <SummaryCard
-              icon={Headphones} color="#6366f1" title="Receptionist Health"
+              icon={Headphones} color="#14b8a6" title="Receptionist Health"
               body={`${receptionistSummary.total} receptionist firm${receptionistSummary.total !== 1 ? "s" : ""}${receptionistSummary.nearLimit > 0 ? ` · ${receptionistSummary.nearLimit} near their trial limit` : ""}`}
               href="/admin/ops/firms" hrefLabel="View all"
               loading={loading}
@@ -669,7 +672,7 @@ export default function CrmExecutiveDashboard() {
                 {hotLeads.map(lead => {
                   const initials = lead.name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase();
                   const colorIdx = lead.name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 8;
-                  const colors = ["bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500","bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500"];
+                  const colors = ["bg-blue-500","bg-cyan-500","bg-teal-500","bg-teal-500","bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500"];
                   return (
                     <Link key={lead.id} href={`/admin/crm/leads/${lead.id}`}>
                       <div className="flex items-center gap-3 px-5 py-3 hover:bg-accent transition-colors cursor-pointer">
@@ -760,7 +763,7 @@ export default function CrmExecutiveDashboard() {
                     <XAxis dataKey="stage" tick={{ fontSize: 11, fill: "#4A6472" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: "#4A6472" }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#EDF9FA" }} />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#6366f1"
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#14b8a6"
                       label={{ position: "top", fontSize: 10, fill: "#4A6472" }} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -831,7 +834,7 @@ export default function CrmExecutiveDashboard() {
                 <p className="text-sm font-medium text-muted-foreground">No deals yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Create your first deal to start tracking revenue.</p>
                 <Link href="/admin/crm/deals">
-                  <button className="mt-3 text-sm bg-emerald-600 text-white px-4 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                  <button className="mt-3 text-sm bg-primary text-primary-foreground px-4 py-1.5 rounded-lg hover:bg-primary/85 transition-colors">
                     + New Deal
                   </button>
                 </Link>
@@ -847,7 +850,7 @@ export default function CrmExecutiveDashboard() {
                       </div>
                       <p className="text-sm font-semibold text-foreground shrink-0">{fmt(Number(deal.value))}</p>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
-                        style={{ background: (STAGE_COLORS[deal.stage] || "#6366f1") + "20", color: STAGE_COLORS[deal.stage] || "#6366f1" }}>
+                        style={{ background: (STAGE_COLORS[deal.stage] || "#14b8a6") + "20", color: STAGE_COLORS[deal.stage] || "#14b8a6" }}>
                         {deal.stage}
                       </span>
                     </div>

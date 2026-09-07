@@ -55,7 +55,7 @@ function fmtDate(iso: string | null): string {
 
 function ChannelIcon({ ch }: { ch: string }) {
   if (ch === "email") return <Mail className="w-4 h-4 text-blue-600" />;
-  if (ch === "sms")   return <MessageSquare className="w-4 h-4 text-violet-600" />;
+  if (ch === "sms")   return <MessageSquare className="w-4 h-4 text-teal-600" />;
   return <CheckSquare className="w-4 h-4 text-muted-foreground" />;
 }
 

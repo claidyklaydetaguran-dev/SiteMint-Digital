@@ -36,9 +36,12 @@ interface Notification {
 }
 
 // ── Avatar helpers ─────────────────────────────────────────────────────────────
+// Tonal, on-brand avatar set (owner mint discipline 2026-09-08): enough
+// variation to tell people apart, all of it in the mint/ocean family —
+// no decorative purple/pink/orange/red hues in the chrome.
 const AVATAR_COLORS = [
-  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
-  "bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500","bg-red-400","bg-yellow-500",
+  "bg-teal-600","bg-cyan-700","bg-emerald-600","bg-sky-700",
+  "bg-teal-800","bg-cyan-500","bg-emerald-800","bg-sky-500",
 ];
 function av(name: string) {
   const i = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length;
@@ -308,12 +311,12 @@ function EmailComposeModal({ leads, templates, onClose }: {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">To:</span>
                   {toLead ? (
-                    <div className="flex items-center gap-2 bg-blue-50 rounded-full px-2 py-0.5">
+                    <div className="flex items-center gap-2 bg-accent rounded-full px-2 py-0.5">
                       <div className={`w-5 h-5 rounded-full ${av(toLead.name)} flex items-center justify-center`}>
                         <span className="text-white text-[9px] font-bold">{ini(toLead.name)}</span>
                       </div>
-                      <span className="text-xs text-blue-700 font-medium">{toLead.name}</span>
-                      <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-blue-400 hover:text-blue-600"><X className="w-3 h-3" /></button>
+                      <span className="text-xs text-teal-800 font-medium">{toLead.name}</span>
+                      <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-teal-600 hover:text-teal-800"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
                     <input autoFocus className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60"
@@ -389,7 +392,7 @@ function EmailComposeModal({ leads, templates, onClose }: {
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
-                <Button size="sm" onClick={send} disabled={sending || !toLead} className="gap-1.5 bg-blue-600 hover:bg-blue-700">
+                <Button size="sm" onClick={send} disabled={sending || !toLead} className="gap-1.5">
                   <Send className="w-3.5 h-3.5" />
                   {sending ? "Sending…" : "Send Email"}
                 </Button>
@@ -514,7 +517,7 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
             </div>
             <div className="flex gap-2">
               <button onClick={onClose} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Dismiss</button>
-              <Link href="/admin/crm/settings"><button onClick={onClose} className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors">Go to Settings</button></Link>
+              <Link href="/admin/crm/settings"><button onClick={onClose} className="flex-1 text-sm bg-primary text-primary-foreground rounded-lg py-2 hover:bg-primary/85 transition-colors">Go to Settings</button></Link>
             </div>
           </div>
         ) : (
@@ -650,7 +653,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               </div>
             )}
             <button onClick={() => { setForm(f => ({ ...f, name: q })); setStep("form"); }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-blue-300 hover:text-blue-600 transition-colors">
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-teal-400 hover:text-teal-700 transition-colors">
               <Plus className="w-4 h-4" /> Create new contact
             </button>
           </div>
@@ -878,10 +881,10 @@ function SideNavItem({ item, isActive, onNavigate }: {
     <Link href={item.href!}>
       <button onClick={onNavigate}
         className={`${base} ${isActive
-          ? "bg-blue-500/20 text-white border-l-2 border-blue-400 pl-[10px]"
+          ? "bg-primary/15 text-white border-l-2 border-primary pl-[10px]"
           : "text-white/60 hover:text-white hover:bg-white/8 border-l-2 border-transparent pl-[10px]"
         }`}>
-        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-blue-300" : "text-white/50 group-hover:text-white/80"}`} />
+        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-primary" : "text-white/50 group-hover:text-white/80"}`} />
         <span className="flex-1 truncate">{item.label}</span>
         {item.href === "/admin/dashboard" && (
           <ExternalLink className="w-3 h-3 text-white/30 group-hover:text-white/60 shrink-0" />
@@ -1166,24 +1169,27 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right action buttons */}
         <div className="flex items-center gap-1 ml-auto shrink-0">
+          {/* One quiet treatment for the whole action row (owner mint
+              discipline): dark chip, mint glyph — matching the bell — so the
+              top bar stops reading as four unrelated colored products. */}
           <button onClick={() => setModal("email")} title="Compose email"
-            className="w-7 h-7 bg-blue-600 hover:bg-blue-500 rounded-full flex items-center justify-center transition-colors">
-            <Mail className="w-3.5 h-3.5 text-white" />
+            className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+            <Mail className="w-3.5 h-3.5 text-primary" />
           </button>
           <div className="relative" ref={phoneRef}>
             <button onClick={() => setModal(m => m === "phone" ? null : "phone")} title="Call a contact"
-              className="w-7 h-7 bg-green-600 hover:bg-green-500 rounded-full flex items-center justify-center transition-colors">
-              <Phone className="w-3.5 h-3.5 text-white" />
+              className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+              <Phone className="w-3.5 h-3.5 text-primary" />
             </button>
             {modal === "phone" && <PhoneDropdown leads={allLeads} onClose={() => setModal(null)} />}
           </div>
           <button onClick={() => setModal("sms")} title="Send SMS"
-            className="w-7 h-7 bg-sky-600 hover:bg-sky-500 rounded-full flex items-center justify-center transition-colors">
-            <MessageSquare className="w-3.5 h-3.5 text-white" />
+            className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+            <MessageSquare className="w-3.5 h-3.5 text-primary" />
           </button>
           <button onClick={() => setModal("person")} title="Add new contact"
-            className="w-7 h-7 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center transition-colors">
-            <UserPlus className="w-3.5 h-3.5 text-white" />
+            className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+            <UserPlus className="w-3.5 h-3.5 text-primary" />
           </button>
 
           {/* Bell */}

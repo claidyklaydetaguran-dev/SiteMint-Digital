@@ -92,8 +92,8 @@ export default function CrmIntakeCases() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-violet-100 rounded-xl flex items-center justify-center">
-              <BotMessageSquare className="w-5 h-5 text-violet-600" />
+            <div className="w-9 h-9 bg-teal-100 rounded-xl flex items-center justify-center">
+              <BotMessageSquare className="w-5 h-5 text-teal-600" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">AI Intake Cases</h1>
@@ -141,8 +141,8 @@ export default function CrmIntakeCases() {
 
         {!loading && !error && cases.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center mb-4">
-              <BotMessageSquare className="w-7 h-7 text-violet-400" />
+            <div className="w-14 h-14 bg-teal-50 rounded-2xl flex items-center justify-center mb-4">
+              <BotMessageSquare className="w-7 h-7 text-teal-400" />
             </div>
             <p className="text-foreground font-semibold mb-1">No intake cases yet</p>
             <p className="text-sm text-muted-foreground max-w-xs">

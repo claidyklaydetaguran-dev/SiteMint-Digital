@@ -19,7 +19,7 @@ const TYPE_COLORS: Record<string, string> = {
   Call: "bg-green-100 text-green-800 border-green-200",
   Email: "bg-blue-100 text-blue-800 border-blue-200",
   "Follow Up": "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "Send Proposal": "bg-purple-100 text-purple-800 border-purple-200",
+  "Send Proposal": "bg-teal-100 text-teal-800 border-teal-200",
   default: "bg-muted text-foreground/80 border-border",
 };
 

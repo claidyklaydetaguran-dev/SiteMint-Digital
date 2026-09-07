@@ -168,8 +168,8 @@ function Chip({
       onClick={onClick}
       className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
         selected
-          ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-          : "bg-white text-muted-foreground border-border hover:border-violet-300 hover:text-violet-700"
+          ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+          : "bg-white text-muted-foreground border-border hover:border-teal-300 hover:text-teal-700"
       }`}
     >
       {label}
@@ -207,7 +207,7 @@ function RenderedOutput({ text }: { text: string }) {
       );
     } else if (line.startsWith("## ")) {
       rendered.push(
-        <h2 key={i} className="text-base font-bold text-violet-900 mt-6 mb-2">
+        <h2 key={i} className="text-base font-bold text-teal-900 mt-6 mb-2">
           {line.replace("## ", "")}
         </h2>
       );
@@ -403,11 +403,11 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
     <div className="space-y-4">
 
       {/* Safety notice */}
-      <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3">
-        <Shield className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+        <Shield className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
         <div>
-          <p className="text-xs font-bold text-violet-900">AI Campaign Copilot</p>
-          <p className="text-[11px] text-violet-700 mt-0.5">
+          <p className="text-xs font-bold text-teal-900">AI Campaign Copilot</p>
+          <p className="text-[11px] text-teal-700 mt-0.5">
             AI generates strategy drafts only. No contacts are enrolled, no messages are queued, and nothing is sent automatically. Review all copy before use.
           </p>
         </div>
@@ -420,10 +420,10 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-violet-600" />
+            <Sparkles className="w-4 h-4 text-teal-600" />
             <span className="text-sm font-bold text-foreground">Campaign Configuration</span>
             {!showConfig && effectiveGoal && (
-              <span className="text-[10px] text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-semibold">
+              <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full font-semibold">
                 {effectiveGoal}
               </span>
             )}
@@ -449,7 +449,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   placeholder="Describe your campaign goal…"
                   value={customGoal}
                   onChange={e => setCustomGoal(e.target.value)}
-                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               )}
             </div>
@@ -461,7 +461,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                 <select
                   value={personaId}
                   onChange={e => setPersonaId(e.target.value)}
-                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200 bg-white"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200 bg-white"
                 >
                   <option value="">— Any persona —</option>
                   {SITEMINT_PERSONAS.map(p => (
@@ -469,7 +469,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   ))}
                 </select>
                 {selectedPersona && (
-                  <p className="text-[10px] text-violet-700 mt-1 leading-relaxed">
+                  <p className="text-[10px] text-teal-700 mt-1 leading-relaxed">
                     {selectedPersona.description} · CTA: {selectedPersona.bestCTA}
                   </p>
                 )}
@@ -501,7 +501,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   placeholder="e.g. Real Estate, Law…"
                   value={industry}
                   onChange={e => setIndustry(e.target.value)}
-                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               </div>
               <div>
@@ -511,7 +511,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   placeholder="e.g. Referral, Google, Form…"
                   value={leadSource}
                   onChange={e => setLeadSource(e.target.value)}
-                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               </div>
             </div>
@@ -545,7 +545,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   <input
                     type="number" min={1} max={30} value={customTouches}
                     onChange={e => setCustomTouches(Number(e.target.value))}
-                    className="w-24 border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                    className="w-24 border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                   />
                 )}
               </div>
@@ -568,7 +568,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
             <button
               onClick={generate}
               disabled={generating || !effectiveGoal}
-              className="flex items-center gap-2 px-6 py-2.5 bg-violet-600 text-white text-sm font-bold rounded-xl hover:bg-violet-700 disabled:opacity-40 transition-colors shadow-sm"
+              className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700 disabled:opacity-40 transition-colors shadow-sm"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {generating ? "Generating campaign…" : "✨ Generate Complete Campaign"}
@@ -592,10 +592,10 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
           {/* Output header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-muted/60">
             <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-violet-600" />
+              <Brain className="w-4 h-4 text-teal-600" />
               <span className="text-xs font-bold text-foreground">AI Campaign Strategy</span>
               {generating && !done && (
-                <span className="flex items-center gap-1 text-[10px] text-violet-600 font-semibold">
+                <span className="flex items-center gap-1 text-[10px] text-teal-600 font-semibold">
                   <Loader2 className="w-3 h-3 animate-spin" /> Writing…
                 </span>
               )}
@@ -632,7 +632,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
             {output ? (
               <RenderedOutput text={output} />
             ) : (
-              <div className="flex items-center gap-2 text-xs text-violet-600 animate-pulse py-4">
+              <div className="flex items-center gap-2 text-xs text-teal-600 animate-pulse py-4">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Thinking about your campaign strategy…
               </div>
@@ -650,16 +650,16 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     {meta.name && (
-                      <div className="col-span-2 bg-violet-50 border border-violet-200 rounded-xl p-3">
-                        <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide mb-0.5">Campaign Name</p>
-                        <p className="text-sm font-bold text-violet-900">{meta.name}</p>
-                        {meta.objective && <p className="text-[11px] text-violet-700 mt-1">{meta.objective}</p>}
+                      <div className="col-span-2 bg-teal-50 border border-teal-200 rounded-xl p-3">
+                        <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide mb-0.5">Campaign Name</p>
+                        <p className="text-sm font-bold text-teal-900">{meta.name}</p>
+                        {meta.objective && <p className="text-[11px] text-teal-700 mt-1">{meta.objective}</p>}
                       </div>
                     )}
                     {meta.overallScore && (
                       <div className="bg-white border border-border rounded-xl p-3">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <BarChart3 className="w-3.5 h-3.5 text-violet-600" />
+                          <BarChart3 className="w-3.5 h-3.5 text-teal-600" />
                           <p className="text-[10px] font-bold text-foreground/80">Campaign Score</p>
                         </div>
                         <p className="text-xs text-muted-foreground">{meta.overallScore}</p>
@@ -719,7 +719,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                 <button
                   onClick={generate}
                   disabled={generating}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-violet-200 text-violet-700 text-xs font-semibold rounded-xl hover:bg-violet-50 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2.5 border border-teal-200 text-teal-700 text-xs font-semibold rounded-xl hover:bg-teal-50 disabled:opacity-40 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   Regenerate

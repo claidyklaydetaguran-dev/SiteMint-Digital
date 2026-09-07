@@ -224,7 +224,7 @@ function ChannelIcon({ ch, cls = "w-4 h-4" }: { ch: string; cls?: string }) {
 
 const CH_COLOR: Record<string, string> = {
   email:       "bg-blue-100 text-blue-700 border-blue-200",
-  sms:         "bg-violet-100 text-violet-700 border-violet-200",
+  sms:         "bg-teal-100 text-teal-700 border-teal-200",
   call_prompt: "bg-amber-100 text-amber-700 border-amber-200",
   task:        "bg-muted text-muted-foreground border-border",
 };
@@ -344,7 +344,7 @@ function StepCard({
             {intelChips.map(([label, val]) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100"
+                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100"
                 title={`${label}: ${val}`}
               >
                 <Brain className="w-2.5 h-2.5 shrink-0" />
@@ -562,16 +562,16 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
       )}
 
       {/* ── Step Intelligence (collapsible) ── */}
-      <div className="border border-indigo-200 rounded-lg overflow-hidden bg-indigo-50/40">
+      <div className="border border-cyan-200 rounded-lg overflow-hidden bg-cyan-50/40">
         <button
           type="button"
           onClick={() => setShowIntel(s => !s)}
-          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-indigo-50 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-cyan-50 transition-colors"
         >
-          <Brain className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          <span className="text-xs font-bold text-indigo-900">Step Intelligence</span>
-          <span className="text-[9px] text-indigo-500 font-medium">optional · strategy metadata</span>
-          {showIntel ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-indigo-500" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-indigo-500" />}
+          <Brain className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+          <span className="text-xs font-bold text-cyan-900">Step Intelligence</span>
+          <span className="text-[9px] text-cyan-500 font-medium">optional · strategy metadata</span>
+          {showIntel ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-cyan-500" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-cyan-500" />}
         </button>
         {showIntel && (
           <div className="px-3 pb-3 pt-1 space-y-2">
@@ -583,16 +583,16 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
               ["routingHint", "Routing hint", "e.g. If clicked, move to CRM/Automation campaign"],
             ] as Array<[keyof StepIntel, string, string]>).map(([k, label, ph]) => (
               <div key={k}>
-                <label className="block text-[10px] font-semibold text-indigo-700/80 mb-0.5">{label}</label>
+                <label className="block text-[10px] font-semibold text-cyan-700/80 mb-0.5">{label}</label>
                 <input
                   value={intel[k]}
                   onChange={e => setIntelField(k, e.target.value)}
                   placeholder={ph}
-                  className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
+                  className="w-full border border-cyan-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-200 bg-white"
                 />
               </div>
             ))}
-            <p className="text-[9px] text-indigo-500/80 leading-relaxed pt-0.5">
+            <p className="text-[9px] text-cyan-500/80 leading-relaxed pt-0.5">
               Stored inside the step body under a marked <span className="font-mono">[Step Intelligence]</span> block — no schema change. Strategy metadata only; no AI generation yet.
             </p>
           </div>
@@ -840,20 +840,20 @@ function JourneyView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <Route className="w-4 h-4 text-indigo-500" />
+        <Route className="w-4 h-4 text-cyan-500" />
         <span>Read-only preview of the contact journey. Cadence tapers as the relationship matures — later touches sit further apart.</span>
       </div>
 
       <div className="relative pl-4">
-        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-indigo-300 via-indigo-200 to-transparent" />
+        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-cyan-300 via-cyan-200 to-transparent" />
         <div className="space-y-5">
           {weekKeys.map(wk => {
             const wkSteps = weeks.get(wk)!;
             return (
               <div key={wk} className="relative">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-indigo-500 border-2 border-white shadow" />
-                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide">Week {wk}</span>
+                  <span className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-cyan-500 border-2 border-white shadow" />
+                  <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">Week {wk}</span>
                   <span className="text-[10px] text-muted-foreground">· {wkSteps.length} touch{wkSteps.length !== 1 ? "es" : ""}</span>
                 </div>
                 <div className="space-y-2">
@@ -871,7 +871,7 @@ function JourneyView({
                             {s.subject ?? intel.objective ?? firstLine ?? s.channel.replace("_", " ")}
                           </p>
                           {intel.desiredBehavior && (
-                            <p className="text-[10px] text-indigo-600 truncate">Goal: {intel.desiredBehavior}</p>
+                            <p className="text-[10px] text-cyan-600 truncate">Goal: {intel.desiredBehavior}</p>
                           )}
                         </div>
                         <span className="text-[10px] text-muted-foreground shrink-0">Day {s.dayOffset}</span>
@@ -1263,7 +1263,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   }
 
   const typeColor: Record<string, string> = {
-    nurture:   "bg-violet-100 text-violet-700 border border-violet-200",
+    nurture:   "bg-teal-100 text-teal-700 border border-teal-200",
     drip:      "bg-blue-100 text-blue-700 border border-blue-200",
     broadcast: "bg-muted text-muted-foreground border border-border",
   };
@@ -1304,7 +1304,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
           </button>
           <button
             onClick={() => setActiveTab("copilot")}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "copilot" ? "bg-violet-600 text-white shadow-sm" : "text-violet-600 hover:bg-violet-50"}`}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "copilot" ? "bg-teal-600 text-white shadow-sm" : "text-teal-600 hover:bg-teal-50"}`}
           >
             <Sparkles className="w-3 h-3" />
             AI Copilot
@@ -1349,7 +1349,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <select
                   value={selectedBlueprintId}
                   onChange={e => { setSelectedBlueprintId(e.target.value); setGenConfirm(false); setGenResult(""); }}
-                  className="border border-input rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 max-w-[220px]"
+                  className="border border-input rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-cyan-200 max-w-[220px]"
                 >
                   <option value="">Start from a blueprint…</option>
                   {SITEMINT_CAMPAIGN_BLUEPRINTS.map(bp => (
@@ -1359,7 +1359,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 {selectedBlueprintId && !genConfirm && (
                   <button
                     onClick={() => setGenConfirm(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white text-xs font-semibold rounded-lg hover:bg-cyan-700 transition-colors"
                   >
                     <Wand2 className="w-3.5 h-3.5" />
                     Generate Steps
@@ -1368,7 +1368,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <select
                   value={aiStepCount}
                   onChange={e => setAiStepCount(Number(e.target.value))}
-                  className="border border-input rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="border border-input rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-200"
                   title="Number of AI-drafted steps to generate"
                 >
                   {[3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} steps</option>)}
@@ -1376,7 +1376,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <button
                   onClick={generateSequenceWithAi}
                   disabled={aiGenerating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-40 transition-colors"
                 >
                   {aiGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   {aiGenerating ? "Generating…" : "Generate with AI"}
@@ -1392,26 +1392,26 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
 
             {/* AI sequence draft preview — nothing is saved until explicitly confirmed */}
             {aiPreview && (
-              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
+                  <Sparkles className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-violet-900">
+                    <p className="text-xs font-bold text-teal-900">
                       AI-drafted, review before saving — {aiPreview.length} step{aiPreview.length !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-[11px] text-violet-700 mt-0.5">
+                    <p className="text-[11px] text-teal-700 mt-0.5">
                       Nothing is created, enrolled, or sent yet. Review the copy below, then confirm to append these as draft steps.
                     </p>
                   </div>
                 </div>
                 <ul className="space-y-2">
                   {aiPreview.map((s, i) => (
-                    <li key={i} className="bg-white rounded-lg border border-violet-100 p-2.5 text-xs">
-                      <div className="flex items-center gap-2 text-[10px] font-semibold text-violet-700 mb-1">
+                    <li key={i} className="bg-white rounded-lg border border-teal-100 p-2.5 text-xs">
+                      <div className="flex items-center gap-2 text-[10px] font-semibold text-teal-700 mb-1">
                         <span>Day {s.dayOffset}</span>
-                        <span className="text-violet-300">·</span>
+                        <span className="text-teal-300">·</span>
                         <span className="capitalize">{s.channel}</span>
-                        {s.intentLabel && <><span className="text-violet-300">·</span><span className="text-muted-foreground font-normal">{s.intentLabel}</span></>}
+                        {s.intentLabel && <><span className="text-teal-300">·</span><span className="text-muted-foreground font-normal">{s.intentLabel}</span></>}
                       </div>
                       {s.subject && <p className="font-semibold text-foreground mb-0.5">{s.subject}</p>}
                       <p className="text-muted-foreground whitespace-pre-line">{s.body}</p>
@@ -1422,7 +1422,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                   <button
                     onClick={addAiDraftSteps}
                     disabled={aiAdding}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-40 transition-colors"
                   >
                     {aiAdding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                     {aiAdding ? "Adding…" : "Add these draft steps"}
@@ -1453,12 +1453,12 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
               const canReplace  = steps.length > 0 && replaceSafe;
               const effectiveMode = genMode === "replace" && canReplace ? "replace" : "append";
               return (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
+                <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-start gap-2">
-                    <Wand2 className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+                    <Wand2 className="w-4 h-4 text-cyan-600 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-indigo-900">Generate {bp?.exampleSteps.length ?? 0} draft step{(bp?.exampleSteps.length ?? 0) !== 1 ? "s" : ""} from "{bp?.label}"</p>
-                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                      <p className="text-xs font-bold text-cyan-900">Generate {bp?.exampleSteps.length ?? 0} draft step{(bp?.exampleSteps.length ?? 0) !== 1 ? "s" : ""} from "{bp?.label}"</p>
+                      <p className="text-[11px] text-cyan-700 mt-0.5">
                         {bp?.goal}{persona ? ` · Audience: ${persona.label}` : ""}
                       </p>
                     </div>
@@ -1473,7 +1473,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                           onChange={() => setGenMode("append")}
                           className="mt-0.5"
                         />
-                        <span className="text-[11px] text-indigo-900">
+                        <span className="text-[11px] text-cyan-900">
                           <span className="font-semibold">Append</span> after your existing {steps.length} step{steps.length !== 1 ? "s" : ""} — nothing is removed.
                         </span>
                       </label>
@@ -1484,7 +1484,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                           onChange={() => setGenMode("replace")}
                           className="mt-0.5"
                         />
-                        <span className="text-[11px] text-indigo-900">
+                        <span className="text-[11px] text-cyan-900">
                           <span className="font-semibold">Replace</span> all existing draft steps with this blueprint.
                           {!replaceSafe && (
                             <span className="block text-[10px] text-amber-700">Disabled — contacts are enrolled. Replacing is only allowed before anyone is enrolled.</span>
@@ -1494,7 +1494,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                     </div>
                   )}
 
-                  <ul className="text-[10px] text-indigo-700/90 space-y-1 pl-6 list-disc">
+                  <ul className="text-[10px] text-cyan-700/90 space-y-1 pl-6 list-disc">
                     <li>These are <span className="font-semibold">strategy drafts</span> — no AI copy is generated.</li>
                     <li>No contacts are enrolled and nothing is sent. Review &amp; personalise each step first.</li>
                   </ul>
@@ -1502,7 +1502,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                     <button
                       onClick={generateFromBlueprint}
                       disabled={generating}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 text-white text-xs font-semibold rounded-lg hover:bg-cyan-700 disabled:opacity-40 transition-colors"
                     >
                       {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                       {generating ? "Generating…" : effectiveMode === "replace" ? "Replace draft steps" : "Append draft steps"}

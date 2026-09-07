@@ -39,14 +39,14 @@ function ChannelIcon({ ch, cls = "w-4 h-4" }: { ch: string; cls?: string }) {
 
 const CH_COLOR: Record<string, string> = {
   email:       "text-blue-600",
-  sms:         "text-violet-600",
+  sms:         "text-teal-600",
   call_prompt: "text-amber-600",
   task:        "text-muted-foreground",
 };
 
 const STATUS_BADGE: Record<string, string> = {
   scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  queued:    "bg-violet-100 text-violet-700 border-violet-200",
+  queued:    "bg-teal-100 text-teal-700 border-teal-200",
   sent:      "bg-emerald-100 text-emerald-700 border-emerald-200",
   failed:    "bg-red-100 text-red-700 border-red-200",
   canceled:  "bg-muted text-muted-foreground border-border",

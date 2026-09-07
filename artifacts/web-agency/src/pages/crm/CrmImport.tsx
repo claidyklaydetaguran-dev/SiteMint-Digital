@@ -263,7 +263,7 @@ export default function CrmImport() {
                   </button>
                 </Link>
                 <Link href="/admin/crm/pipeline">
-                  <button className="flex items-center gap-1.5 text-sm bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+                  <button className="flex items-center gap-1.5 text-sm bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition-colors font-medium">
                     <GitBranch className="w-3.5 h-3.5" /> Lead Pipeline
                   </button>
                 </Link>
