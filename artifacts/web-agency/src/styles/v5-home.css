@@ -1850,9 +1850,9 @@
   .sm-home-v5 #hero .v4-hero__film-poster--mobile {
     display: block;
   }
-  .sm-home-v5 #hero .v4-hero__film-video {
-    display: none;
-  }
+  /* Release directive 2026-09-07: mobile now PLAYS its dedicated film crop
+     — the old display:none (poster-only mobile contract) is retired. The
+     video overlays the mobile poster once mounted and playing. */
 }
 .sm-home-v5 #hero .v4-hero__film-pause {
   position: absolute;

@@ -295,10 +295,24 @@ function HeroFilm() {
     if (!v || !showVideo) return;
     const tryPlay = () => {
       const p = v.play();
-      if (p) p.catch(() => setPlayFailed(true));
+      // Only genuine refusals keep the poster: autoplay policy denial or an
+      // undecodable source. AbortError (a play() interrupted by a pause —
+      // e.g. the observer's initial callback racing the load) is benign and
+      // the observer retries on the next intersection.
+      if (p) {
+        p.catch((e: unknown) => {
+          const name = (e as DOMException)?.name;
+          if (name === "NotAllowedError" || name === "NotSupportedError") {
+            setPlayFailed(true);
+          }
+        });
+      }
     };
     const onErr = () => setPlayFailed(true);
     v.addEventListener("error", onErr);
+    // Playback is observer-driven: play only while sufficiently on screen
+    // (the initial callback reports the starting state), pause when the
+    // hero scrolls away, and respect the Reduce-animation preference.
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) v.pause();
@@ -307,7 +321,6 @@ function HeroFilm() {
       { threshold: 0.05 },
     );
     io.observe(v);
-    tryPlay();
     return () => {
       v.removeEventListener("error", onErr);
       io.disconnect();
