@@ -99,7 +99,7 @@ function proxy(req, res, { htmlIsMiss = false } = {}) {
   req.pipe(up);
 }
 
-async function serveFile(res, file, status = 200) {
+async function serveFile(res, file, status = 200, rangeHeader) {
   const body = await readFile(file);
   const ext = extname(file);
   const headers = {
@@ -108,12 +108,46 @@ async function serveFile(res, file, status = 200) {
       ? "public, max-age=31536000, immutable"
       : "no-cache",
     "x-content-type-options": "nosniff",
+    "accept-ranges": "bytes",
   };
+  // Single-range byte serving. Safari (desktop and iOS) probes media with a
+  // Range request and refuses playback when the server answers with a full
+  // 200 — which is what shipped on 2026-09-07 and kept the brand films from
+  // ever starting there. Ranges are served identity-encoded (never gzip).
+  if (rangeHeader && status === 200) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader).trim());
+    if (m && (m[1] !== "" || m[2] !== "")) {
+      const size = body.length;
+      let start, end;
+      if (m[1] === "") {
+        start = Math.max(0, size - Number(m[2]));
+        end = size - 1;
+      } else {
+        start = Number(m[1]);
+        end = m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+      }
+      if (start >= size || start > end) {
+        res.writeHead(416, { ...headers, "content-range": `bytes */${size}` });
+        res.end();
+        return;
+      }
+      res.writeHead(206, {
+        ...headers,
+        "content-range": `bytes ${start}-${end}/${size}`,
+        "content-length": end - start + 1,
+      });
+      res.end(body.subarray(start, end + 1));
+      return;
+    }
+  }
   if (COMPRESSIBLE.has(ext)) {
+    const zipped = gzipSync(body);
     headers["content-encoding"] = "gzip";
+    headers["content-length"] = zipped.length;
     res.writeHead(status, headers);
-    res.end(gzipSync(body));
+    res.end(zipped);
   } else {
+    headers["content-length"] = body.length;
     res.writeHead(status, headers);
     res.end(body);
   }
@@ -153,7 +187,7 @@ createServer(async (req, res) => {
 
     let file = join(WA_DIST, path || "index.html");
     if (existsSync(file) && (await stat(file)).isDirectory()) file = join(file, "index.html");
-    if (existsSync(file)) { await serveFile(res, file); return; }
+    if (existsSync(file)) { await serveFile(res, file, 200, req.headers.range); return; }
 
     // File-shaped requests (an extension) missing from the marketing dist
     // fall through to the upstream app: the proxied admin/dashboard/toolkit

@@ -62,8 +62,10 @@ function GlacierPoster({ label }: { label: string }) {
 }
 
 export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [canPlayVideo, setCanPlayVideo] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (!videoSrc) return;
@@ -73,29 +75,54 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
     if (reduced) return;
 
     // Global Motion preference (footer) — see components/v5/motionPref.ts.
+    // Owner work order 2026-09-08 §2: the film plays on EVERY viewport
+    // width — the old ≥768px gate read as "video unavailable" on phones.
+    // It stays non-LCP by arming only near the viewport, after load+idle.
     const offMotion = onMotionChange((off) => {
-      if (off) setCanPlayVideo(false);
-      else if (window.innerWidth >= 768) setCanPlayVideo(true);
+      if (off) {
+        setCanPlayVideo(false);
+        setIsPlaying(false);
+      } else setCanPlayVideo(true);
     });
     if (motionOff()) return offMotion;
 
     let idleHandle: number | undefined;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    let observer: IntersectionObserver | undefined;
 
     function armAfterIdle() {
-      if (window.innerWidth < 768) return;
       const requestIdle = (
         window as typeof window & {
           requestIdleCallback?: (cb: () => void) => number;
         }
       ).requestIdleCallback;
+      const arm = () => {
+        // Mount + play only once the media break is approaching the
+        // viewport, so the film never competes with above-the-fold work
+        // and phones don't fetch it for a section they may never reach.
+        const node = containerRef.current;
+        if (!node || typeof IntersectionObserver === "undefined") {
+          setCanPlayVideo(true);
+          return;
+        }
+        observer = new IntersectionObserver(
+          (entries) => {
+            if (entries.some((e) => e.isIntersecting)) {
+              setCanPlayVideo(true);
+              observer?.disconnect();
+            }
+          },
+          { rootMargin: "50% 0px 50% 0px" },
+        );
+        observer.observe(node);
+      };
       if (typeof requestIdle === "function") {
-        idleHandle = requestIdle(() => setCanPlayVideo(true));
+        idleHandle = requestIdle(arm);
       } else {
         // Safari/older browsers have no requestIdleCallback — a short
         // timeout keeps the same "after load, not competing with paint"
         // intent without the API.
-        timeoutHandle = setTimeout(() => setCanPlayVideo(true), 200);
+        timeoutHandle = setTimeout(arm, 200);
       }
     }
 
@@ -108,6 +135,7 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
     return () => {
       offMotion();
       window.removeEventListener("load", armAfterIdle);
+      observer?.disconnect();
       if (idleHandle !== undefined) {
         (
           window as typeof window & {
@@ -124,7 +152,10 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
   }, [canPlayVideo]);
 
   return (
-    <div className={["sm-hero-media", className].filter(Boolean).join(" ")}>
+    <div
+      ref={containerRef}
+      className={["sm-hero-media", className].filter(Boolean).join(" ")}
+    >
       <GlacierPoster label={label} />
       {videoSrc && canPlayVideo && (
         <video
@@ -133,15 +164,20 @@ export function HeroMedia({ videoSrc, label, className }: HeroMediaProps) {
           muted
           playsInline
           loop
-          preload="none"
+          preload="metadata"
           controls={false}
           disablePictureInPicture
           disableRemotePlayback
           controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
           data-sm-decorative-film
+          data-sm-playing={isPlaying || undefined}
           aria-hidden="true"
+          onPlaying={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onError={() => setIsPlaying(false)}
+          onStalled={() => setIsPlaying(false)}
         >
-          <source src={videoSrc} />
+          <source src={videoSrc} type="video/mp4" />
         </video>
       )}
       <span className="sm-hero-media__badge">{label}</span>
