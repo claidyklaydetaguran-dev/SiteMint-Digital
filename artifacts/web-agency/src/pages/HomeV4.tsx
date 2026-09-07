@@ -348,9 +348,10 @@ function HeroFilm() {
             crop the desktop film) — CSS shows exactly one of these. */}
         <img
           className="v4-hero__film-poster v4-hero__film-poster--mobile"
-          src={heroFilmPosterMobile}
+          src={withBase("/hero-poster-mobile.jpg")}
           alt=""
-          loading="lazy"
+          fetchPriority="high"
+          decoding="async"
         />
         {/* Owner directive (final polish): decorative films carry NO player
             chrome — no pause button, no PiP/Enhance/hover controls. The

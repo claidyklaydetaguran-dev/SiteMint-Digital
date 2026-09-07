@@ -2217,7 +2217,11 @@
     font-size: clamp(1.6rem, 7vw, 2rem);
   }
   .sm-home-v5 #hero .v4-hero__film {
-    height: clamp(120px, 16svh, 180px);
+    /* 12svh (was 16): keeps the playing band substantial while the hero
+       COPY stays the largest first-viewport element — text-LCP paints with
+       the app render instead of waiting on image raster (release perf
+       gate, 2026-09-07). */
+    height: clamp(96px, 12svh, 150px);
   }
 }
 
