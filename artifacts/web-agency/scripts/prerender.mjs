@@ -63,6 +63,7 @@ const ROUTES = [
   "/discovery-systems",
   "/ai-systems",
   "/ai-receptionist",
+  "/ai-receptionist/demo",
   "/pricing",
   "/work",
   "/portfolio",
@@ -74,8 +75,27 @@ const ROUTES = [
   "/contact",
   "/privacy",
   "/terms",
+  "/automation",
+  "/ai-for-lawyers",
+  "/ai-for-realtors",
 ];
 const NOT_FOUND_PROBE = "/__prerender-404-probe__";
+
+/**
+ * Route prefixes that are VALID but intentionally not prerendered (auth
+ * surfaces, post-submit pages, dynamic subpaths). A production or preview
+ * server must serve the SPA document (200) for these instead of the
+ * prerendered 404 — the client-access regression this fixes was legitimate
+ * AI Receptionist auth routes landing on "We couldn't find that page."
+ * Written into the dist as spa-fallback.json for the servers to read.
+ */
+const SPA_FALLBACK_PREFIXES = [
+  "/ai-receptionist", // signup + future subroutes (dashboard is its own app)
+  "/thank-you",
+  "/discovery", // saved-draft subroutes + __legacy rollback route
+  "/admin", // staff CRM SPA (role-protected in-app)
+  "/app", // legacy receptionist app routes
+];
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -215,7 +235,7 @@ function mediaSpans(cssText) {
   return spans;
 }
 
-function buildCritical(cssText, rawRanges) {
+function mergeRanges(rawRanges) {
   // The tracker reports one entry per match, so the same rule appears many
   // times; dedupe and merge overlapping ranges before emitting.
   const seen = new Set();
@@ -236,7 +256,7 @@ function buildCritical(cssText, rawRanges) {
       merged.push({ ...r });
     }
   }
-  return buildCriticalMerged(cssText, merged);
+  return merged;
 }
 
 function buildCriticalMerged(cssText, ranges) {
@@ -301,6 +321,19 @@ const SERIALIZE = `(() => {
   // stylesheet link to an async load (print-media swap + noscript copy).
   const criticalCss = __CRITICAL__;
   if (criticalCss) {
+    // Paint-first boot: the app bundle is requested only after the browser
+    // has painted the static document (two animation frames), so the
+    // prerendered headline/CTA/navigation are the first — and the
+    // largest — contentful paint. The replacement render then lands on
+    // an already-loaded stylesheet and fonts (geometry verified identical).
+    for (const s of document.querySelectorAll('script[type="module"][src]')) {
+      const boot = document.createElement("script");
+      boot.textContent =
+        "(function(){var s=" + JSON.stringify(s.getAttribute("src")) +
+        ";function b(){var e=document.createElement('script');e.type='module';e.crossOrigin='';e.src=s;document.head.appendChild(e)}" +
+        "if(window.requestAnimationFrame){requestAnimationFrame(function(){requestAnimationFrame(b)})}else{setTimeout(b,0)}})();";
+      s.replaceWith(boot);
+    }
     const firstLink = document.querySelector('link[rel="stylesheet"]');
     const style = document.createElement("style");
     style.id = "sm-critical";
@@ -330,19 +363,68 @@ const SWEEP = `(async () => {
 })()`;
 
 /**
- * EXPERIMENTAL — OFF by default (set PRERENDER_CRITICAL_CSS=1 to enable).
- * Measured 2026-09-07: inlining the matched rules and async-loading the
- * full sheet moves first paint dramatically earlier, but the SPA's boot
- * REPLACEMENT render re-creates every text node after the web fonts have
- * finished loading, so `font-display: optional` no longer protects the
- * page and the fallback→web-font metric difference lands as CLS ~0.26.
- * Finishing this workstream needs fallback font metric overrides
- * (size-adjust/ascent-override on local fallbacks inserted into the token
- * font stacks) and ideally hero-scoped critical + deferred below-fold
- * content. Until then the shipped configuration keeps the blocking
- * stylesheet: CLS 0.000 across the battery.
+ * Above-the-fold critical CSS (performance workstream, 2026-09-07 final
+ * pass). OFF by default — set PRERENDER_CRITICAL_CSS=1 to enable.
+ *
+ * Measured outcome (five instrumented iterations on the release harness):
+ * fold-scoped critical + async full sheet + optional faces + metric
+ * fallbacks + paint-first boot left the simulated home LCP unchanged
+ * (~4.25s) while costing CLS 0.258 (a transient swap-time reflow), whereas
+ * the blocking-stylesheet prerender measures LCP 4.00s at CLS 0.000. The
+ * owner's rule — never ship an unstable critical system to move one score —
+ * selects the blocking configuration; the machinery stays here, working
+ * and documented, for a future CSS-architecture diet (the 448KB
+ * four-generation stylesheet is the remaining cost).
+ *
+ * How the critical path stays SAFE when enabled:
+ *  1. Coverage-tracked rules are additionally FOLD-FILTERED in-page: a
+ *     rule survives only if one of its matching elements starts within
+ *     1.5 viewport-heights on the desktop OR mobile layout (root-level,
+ *     unparseable, and layout-containment rules are always kept). CSS
+ *     matching alone is not viewport-scoped, so this geometric pass is what
+ *     makes the inline sheet genuinely above-the-fold-sized.
+ *  2. Every @font-face — including the metric-matched local fallbacks
+ *     (size-adjust/ascent/descent overrides in tokens-v4.css) — plus all
+ *     @keyframes/@property blocks ride along, so text renders on
+ *     dimension-identical fallbacks and the branded font arriving (or the
+ *     boot replacement re-rendering) cannot move the page.
+ *  3. Below-fold sections keep their content-visibility rules (they match
+ *     above-fold sections too, so the fold filter retains them), which
+ *     skips rendering unstyled below-fold content until the full sheet —
+ *     loaded async via the print-media swap — has applied.
  */
 const CRITICAL_ENABLED = process.env.PRERENDER_CRITICAL_CSS === "1";
+const KEEP_ALWAYS = /^\s*(html|body|:root|\*|::selection|:where\(html)/;
+// Layout-containment rules are page-height safety, not decoration: without
+// them, below-fold sections render unstyled (tall) in the critical-only
+// pass and collapse when the full sheet applies — a whole-body layout shift.
+// They must ride along regardless of where their elements sit.
+const KEEP_ALWAYS_CHUNK = /content-visibility|contain-intrinsic-size|contain\s*:/;
+
+/** In-page fold filter: returns keep flags for the given selectors. */
+function foldFilterScript(selectorsJson) {
+  return `((selectors) => {
+    const fold = window.innerHeight * 1.5;
+    const clean = (sel) => sel
+      .replace(/::?(hover|focus-visible|focus-within|focus|active|visited)/g, "")
+      .replace(/::(before|after|marker|placeholder|backdrop|first-line|first-letter)/g, "")
+      .trim();
+    return selectors.map((sel) => {
+      try {
+        for (const part of sel.split(",")) {
+          const c = clean(part);
+          if (!c) return true;
+          const els = document.querySelectorAll(c);
+          for (const el of els) {
+            const r = el.getBoundingClientRect();
+            if (r.top < fold) return true;
+          }
+        }
+        return false;
+      } catch { return true; }
+    });
+  })(${selectorsJson})`;
+}
 
 async function snapshot(route, outFile) {
   styleSheets.clear();
@@ -376,12 +458,54 @@ async function snapshot(route, outFile) {
       // the cascade order the full page ends up with.
       return (sa.includes("/assets/index-") ? 0 : 1) - (sb.includes("/assets/index-") ? 0 : 1);
     });
+
+    // Assemble the merged rule chunks per sheet, then fold-filter them
+    // geometrically on the live page at BOTH viewports.
+    const sheets = [];
+    const selectors = [];
     for (const id of orderedIds) {
       const { text } = await S("CSS.getStyleSheetText", { styleSheetId: id });
-      criticalCss += buildCritical(text, bySheet.get(id));
-      for (const block of extractAtBlocks(text, "@font-face")) criticalCss += block + "\n";
-      for (const block of extractAtBlocks(text, "@keyframes")) criticalCss += block + "\n";
-      for (const block of extractAtBlocks(text, "@property")) criticalCss += block + "\n";
+      const merged = mergeRanges(bySheet.get(id));
+      const entries = merged.map((r) => {
+        const chunk = text.slice(r.startOffset, r.endOffset);
+        const selector = chunk.slice(0, chunk.indexOf("{")).trim();
+        return { range: r, selector, forceKeep: KEEP_ALWAYS_CHUNK.test(chunk) };
+      });
+      for (const e of entries) selectors.push(e.selector);
+      sheets.push({ text, entries });
+    }
+    const evalKeep = async () => {
+      const { result } = await S("Runtime.evaluate", {
+        expression: foldFilterScript(JSON.stringify(selectors)),
+        returnByValue: true,
+      });
+      return result.value;
+    };
+    const keepDesktop = await evalKeep();
+    await S("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await sleep(500);
+    const keepMobile = await evalKeep();
+    await S("Emulation.setDeviceMetricsOverride", { width: 1366, height: 900, deviceScaleFactor: 1, mobile: false });
+    await sleep(500);
+
+    let flat = 0;
+    for (const sheet of sheets) {
+      const kept = sheet.entries
+        .filter((e, iLocal) => {
+          const i = flat + iLocal;
+          return e.forceKeep || KEEP_ALWAYS.test(e.selector) || keepDesktop[i] || keepMobile[i];
+        })
+        .map((e) => e.range);
+      flat += sheet.entries.length;
+      criticalCss += buildCriticalMerged(sheet.text, kept);
+      // Faces ride along as `optional` in the static document: text paints
+      // once on the metric-matched fallbacks and never re-flows when the
+      // branded font arrives (no swap-time shift on mono/secondary weights).
+      for (const block of extractAtBlocks(sheet.text, "@font-face")) {
+        criticalCss += block.replace(/font-display:\s*swap/g, "font-display:optional") + "\n";
+      }
+      for (const block of extractAtBlocks(sheet.text, "@keyframes")) criticalCss += block + "\n";
+      for (const block of extractAtBlocks(sheet.text, "@property")) criticalCss += block + "\n";
     }
   }
 
@@ -424,7 +548,11 @@ if (failed === 0) {
     await mkdir(dirname(outFile), { recursive: true });
     await writeFile(outFile, html);
   }
-  console.log(`PRERENDER COMPLETE (${staged.length} documents installed)`);
+  await writeFile(
+    join(DIST, "spa-fallback.json"),
+    JSON.stringify({ spaPrefixes: SPA_FALLBACK_PREFIXES }, null, 2),
+  );
+  console.log(`PRERENDER COMPLETE (${staged.length} documents + spa-fallback.json installed)`);
 } else {
   console.error(`PRERENDER: ${failed} route(s) FAILED — nothing written`);
 }

@@ -472,3 +472,15 @@ selected-work system."
 - **Placement:** SUPPORTING, `sortOrder: 1` (immediately after the
   featured Hand Homecare), `visualMode: "responsive-pair"`, public CTA to
   `https://simplysavesolar.com/`.
+
+## 14. Featured-work hierarchy (owner directive, September 7, 2026 — final pass)
+
+The owner re-ordered the published lineup: **Simply Save Solar** is the
+primary featured project, **OneFilAm Community** (`https://onefilamcommunity.org/`,
+already the recorded public URL — no `onefilam.org` substitution) is the
+second feature stage, and **Hand Homecare** leads the supporting grid,
+followed by Herlinda Valdovinos and Claidy Taguran per §12. Both featured
+projects use only their already-approved responsive pairs. Each project now
+carries truthful detail copy (overview / challenge / what SiteMint built /
+outcome) in the data module for the interactive project dialog — no invented
+metrics, totals, audience figures, or performance claims anywhere.

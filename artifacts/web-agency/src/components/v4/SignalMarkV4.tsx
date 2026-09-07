@@ -1,7 +1,10 @@
 /**
- * Frontend V4 — the Signal brand mark: the SiteMint diamond drawn with the
- * signal gradient, core dot in cyan. Decorative; pair it with visible text
- * or an aria-label on the wrapping link.
+ * Frontend V4 — the SiteMint brand mark: the diamond drawn in the pastel
+ * mint signature (owner brand directive, 2026-09-07 final pass — the cyan
+ * gradient is retired). The stroke runs signature #99F5D0 → border #80E9BE
+ * so the mark keeps definition on white surfaces while reading as the
+ * exact swatch; the core dot is the pure signature. Decorative; pair it
+ * with visible text or an aria-label on the wrapping link.
  */
 
 import { useId } from "react";
@@ -25,9 +28,9 @@ export function SignalMarkV4({ size = 22 }: SignalMarkV4Props) {
     >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="var(--v4-cyan)" />
-          <stop offset="0.55" stopColor="var(--v4-turquoise)" />
-          <stop offset="1" stopColor="var(--v4-mint)" />
+          <stop offset="0" stopColor="var(--sm-mint-signature, #99F5D0)" />
+          <stop offset="0.55" stopColor="#8CEFC7" />
+          <stop offset="1" stopColor="var(--sm-mint-border, #80E9BE)" />
         </linearGradient>
       </defs>
       <rect
@@ -41,7 +44,7 @@ export function SignalMarkV4({ size = 22 }: SignalMarkV4Props) {
         stroke={`url(#${gradId})`}
         strokeWidth="2"
       />
-      <circle cx="12" cy="12" r="2.4" fill="var(--v4-cyan)" />
+      <circle cx="12" cy="12" r="2.4" fill="var(--sm-mint-signature, #99F5D0)" />
     </svg>
   );
 }

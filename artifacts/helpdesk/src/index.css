@@ -188,9 +188,9 @@
   --popover-foreground: 203 76% 8%;
   --popover-border: 207 12% 85%;
 
-  /* Ocean navy = primary action color (#162936) */
-  --primary: 204 42% 15%;
-  --primary-foreground: 0 0% 100%;
+  /* Pastel mint signature = primary action color (#99F5D0, final brand pass 2026-09-07) */
+  --primary: 156 82% 78%;
+  --primary-foreground: 203 59% 20%;
 
   --secondary: 169 53% 94%;
   --secondary-foreground: 203 76% 8%;
@@ -312,8 +312,8 @@
   --popover-foreground: 207 20% 92%;
   --popover-border: 207 25% 20%;
 
-  /* Bright cyan-mint for contrast on dark navy */
-  --primary: 164 70% 60%;
+  /* Pastel mint signature on dark navy (final brand pass 2026-09-07) */
+  --primary: 156 82% 78%;
   --primary-foreground: 203 76% 8%;
 
   --secondary: 203 35% 18%;

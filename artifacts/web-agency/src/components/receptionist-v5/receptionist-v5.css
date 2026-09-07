@@ -11,9 +11,9 @@
 
 .smv5 {
   --smv5-mint-500: var(--sm-mint-500, #32C5D2);
-  --smv5-mint-400: var(--sm-mint-400, #56D2CF);
-  --smv5-mint-600: var(--sm-mint-600, #1FA9BC);
-  --smv5-mint-700: var(--sm-mint-700, #0B7487);
+  --smv5-mint-400: var(--sm-mint-signature, #99F5D0); /* on-dark accent: pastel signature */
+  --smv5-mint-600: var(--sm-mint-ink, #0B6B57);
+  --smv5-mint-700: var(--sm-mint-ink, #0B6B57); /* text accents: green mint-ink (final brand pass) */
   --smv5-mint-100: var(--sm-mint-100, #DFF7F7);
   --smv5-mist-100: var(--sm-mist-100, #EDF9FA);
   --smv5-porcelain: var(--sm-porcelain, #F8FCFC);

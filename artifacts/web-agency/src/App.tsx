@@ -50,6 +50,7 @@ const DiscoverySystemsV3 = lazy(() => import("@/pages/DiscoverySystemsV3"));
 // stays in the repository, unrouted, as a rollback reference — the old
 // `/automation` path 301s to `aiSystems` below instead of rendering it.
 const AiReceptionistV5 = lazy(() => import("@/pages/AiReceptionistV5"));
+const AiReceptionistDemoV5 = lazy(() => import("@/pages/AiReceptionistDemoV5"));
 const AiSystemsV5 = lazy(() => import("@/pages/AiSystemsV5"));
 const WorkV3 = lazy(() => import("@/pages/WorkV3"));
 const ProcessV3 = lazy(() => import("@/pages/ProcessV3"));
@@ -284,6 +285,9 @@ function Router() {
           </AuthShell>
         )}
       </Route>
+      {/* Client demonstration tour — registered before the landing page for
+          the same prefix-extension reason as signup. */}
+      <Route path={ROUTES.aiReceptionistDemo}>{() => <AiReceptionistDemoV5 />}</Route>
       {/* V5: the product page renders its own PublicShell (product header
           actions, ink hero) — no App-level shell wrapper here. */}
       <Route path={ROUTES.aiReceptionist}>{() => <AiReceptionistV5 />}</Route>

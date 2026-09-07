@@ -44,8 +44,8 @@
   --sd-rail-muted: var(--sm-dark-muted);
   --sd-rail-border: color-mix(in oklab, var(--sm-dark-text) 12%, transparent);
   --sd-rail-hover: color-mix(in oklab, var(--sm-dark-text) 7%, transparent);
-  --sd-rail-active: color-mix(in oklab, var(--sm-mint-500) 14%, transparent);
-  --sd-rail-accent: var(--sm-mint-500);
+  --sd-rail-active: color-mix(in oklab, var(--sm-mint-signature, #99F5D0) 14%, transparent);
+  --sd-rail-accent: var(--sm-mint-signature, #99F5D0);
 
   /* Focus ring needs the text-safe deep mint for contrast on light surfaces
      (4.92:1 on white — V5-BLUEPRINT §1). */
@@ -76,8 +76,8 @@
   --sd-border: color-mix(in oklab, var(--sm-dark-text) 12%, transparent);
   --sd-border-strong: color-mix(in oklab, var(--sm-dark-text) 24%, transparent);
 
-  --sd-accent: var(--sm-mint-500);
-  --sd-accent-soft: color-mix(in oklab, var(--sm-mint-500) 14%, transparent);
+  --sd-accent: var(--sm-mint-signature, #99F5D0); /* pastel signature (final brand pass 2026-09-07) */
+  --sd-accent-soft: color-mix(in oklab, var(--sm-mint-signature, #99F5D0) 22%, transparent);
 
   --sd-rail: color-mix(in oklab, var(--sm-ink-950) 82%, black);
 

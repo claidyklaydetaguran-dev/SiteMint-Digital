@@ -58,6 +58,8 @@ export const ROUTES = {
    * specific path wins — see App.tsx.
    */
   aiReceptionistSignup: "/ai-receptionist/signup",
+  /** Client demonstration tour (owner client-access directive, 2026-09-07). */
+  aiReceptionistDemo: "/ai-receptionist/demo",
   aiReceptionist: "/ai-receptionist",
 
   // ── Frontend V3 — Operational Editorial IA (additive) ───────────────────

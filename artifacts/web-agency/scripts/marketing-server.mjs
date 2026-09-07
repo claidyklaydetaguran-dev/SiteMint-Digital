@@ -45,6 +45,14 @@ const PROXY_PREFIXES = [
   "/app",
 ];
 
+// Valid-but-not-prerendered SPA prefixes (written by prerender.mjs): these
+// serve the SPA document with 200 — a legitimate route (receptionist
+// signup, thank-you, admin) must never land on the prerendered 404.
+let SPA_PREFIXES = [];
+try {
+  SPA_PREFIXES = JSON.parse(await readFile(join(WA_DIST, "spa-fallback.json"), "utf8")).spaPrefixes || [];
+} catch {}
+
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png",
@@ -140,10 +148,14 @@ createServer(async (req, res) => {
     // names cannot collide with this dist, so the fallback is unambiguous.
     if (extname(path)) { proxy(req, res); return; }
 
-    // Prerendered route documents, then the real 404.
+    // Prerendered route documents, then SPA prefixes, then the real 404.
     const clean = path.replace(/\/+$/, "");
     const routeDoc = join(WA_DIST, clean, "index.html");
     if (clean && existsSync(routeDoc)) { await serveFile(res, routeDoc); return; }
+    if (SPA_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p + "/"))) {
+      await serveFile(res, join(WA_DIST, "index.html"));
+      return;
+    }
     const nf = join(WA_DIST, "404.html");
     if (existsSync(nf)) { await serveFile(res, nf, 404); return; }
     await serveFile(res, join(WA_DIST, "index.html"));

@@ -45,6 +45,14 @@ export type PortfolioProject = {
   desktopPosition?: string;
   mobilePosition?: string;
   visualMode: PortfolioVisualMode;
+  /** Truthful project-detail content for the interactive project dialog
+   *  (owner featured-work directive, 2026-09-07). No invented metrics. */
+  detail: {
+    overview: string;
+    challenge: string;
+    built: string[];
+    outcome: string;
+  };
   statusLabel?: string;
 };
 
@@ -75,11 +83,25 @@ export const portfolioProjects: PortfolioProject[] = [
       height: 838,
       alt: "Hand Homecare website homepage on a mobile screen",
     },
-    featured: true,
-    sortOrder: 0,
+    featured: false,
+    sortOrder: 2,
     imageFit: "cover",
     desktopPosition: "top center",
     mobilePosition: "top center",
+    detail: {
+      overview:
+        "A responsive marketing site for a licensed California home-care provider, built to help families understand non-medical care services and reach the business quickly.",
+      challenge:
+        "Families researching elder care are stressed and short on time; the site had to establish trust immediately and make the next step obvious without pressure.",
+      built: [
+        "Responsive website design",
+        "Care-service presentation and service-area structure",
+        "Conversion-focused contact and assessment pathways",
+        "Testimonial and credential placement",
+      ],
+      outcome:
+        "A trustworthy digital presence where families can understand the care offered and schedule an assessment or call in a couple of taps.",
+    },
     visualMode: "responsive-pair",
   },
   {
@@ -110,11 +132,26 @@ export const portfolioProjects: PortfolioProject[] = [
       height: 838,
       alt: "Simply Save Solar website homepage on a mobile screen",
     },
-    featured: false,
-    sortOrder: 1,
+    featured: true,
+    sortOrder: 0,
     imageFit: "cover",
     desktopPosition: "top center",
     mobilePosition: "top center",
+    detail: {
+      overview:
+        "A responsive solar education and estimate platform that walks homeowners through solar, battery storage, roofing, and financing options without industry jargon.",
+      challenge:
+        "Solar shopping is noisy and high-pressure. The platform had to organize complicated information, keep education separate from sales pressure, and still create a clear pathway to a personalized estimate.",
+      built: [
+        "Website strategy and information architecture",
+        "Responsive design across the education journey",
+        "Solar, storage, roofing, and financing content structure",
+        "A step-by-step estimate journey with a no-obligation entry point",
+        "Conversion architecture serving residential and business visitors",
+      ],
+      outcome:
+        "A clear estimate pathway that lets a homeowner learn at their own pace and move confidently toward a personalized estimate, with legal, accessibility, and contact routes kept usable throughout.",
+    },
     visualMode: "responsive-pair",
   },
   {
@@ -143,11 +180,25 @@ export const portfolioProjects: PortfolioProject[] = [
       height: 840,
       alt: "OneFilAm Community website homepage on a mobile screen",
     },
-    featured: false,
-    sortOrder: 2,
+    featured: true,
+    sortOrder: 1,
     imageFit: "cover",
     desktopPosition: "top center",
     mobilePosition: "top center",
+    detail: {
+      overview:
+        "A community and nonprofit digital platform — the central home for OneFilAm's programs, events, resources, and community participation.",
+      challenge:
+        "A growing community organization needed one place where programs, events, and ways to take part are easy to find, instead of being scattered across social posts.",
+      built: [
+        "Responsive public website",
+        "Programs and events architecture",
+        "Participation and join pathways",
+        "Organization and content structure built for ongoing updates",
+      ],
+      outcome:
+        "A central digital home where community members find programs, upcoming events, and clear ways to participate.",
+    },
     visualMode: "responsive-pair",
   },
   {
@@ -174,6 +225,19 @@ export const portfolioProjects: PortfolioProject[] = [
     sortOrder: 3,
     imageFit: "cover",
     desktopPosition: "center",
+    detail: {
+      overview:
+        "A personal real-estate presence for a working agent, built to communicate local expertise and invite client conversations.",
+      challenge:
+        "An individual agent competes with portal listings and franchise sites; the site had to feel personal and local rather than templated.",
+      built: [
+        "Personal-brand website",
+        "Property-focused storytelling",
+        "Lead-generation and contact pathways",
+      ],
+      outcome:
+        "A professional presence that presents the agent's local expertise and gives prospective clients a direct way to start a conversation.",
+    },
     visualMode: "desktop-only",
   },
   {
@@ -200,6 +264,19 @@ export const portfolioProjects: PortfolioProject[] = [
     sortOrder: 4,
     imageFit: "cover",
     mobilePosition: "top center",
+    detail: {
+      overview:
+        "A modern portfolio experience presenting technical skills and project work as an interactive, responsive site.",
+      challenge:
+        "A developer portfolio has to demonstrate craft by existing — the site itself is the proof of work.",
+      built: [
+        "Interactive portfolio design",
+        "Responsive presentation",
+        "Modern frontend experience",
+      ],
+      outcome:
+        "A portfolio that presents skills and project work clearly and performs the craft it describes.",
+    },
     visualMode: "mobile-only",
     statusLabel: "Portfolio Experience",
   },

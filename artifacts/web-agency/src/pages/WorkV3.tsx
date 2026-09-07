@@ -13,7 +13,8 @@ import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
 import { BrowserFrame } from "@/components/v5/BrowserFrame";
-import { portfolioProjects } from "@/components/platform-preview/portfolioProjects";
+import { portfolioProjects, type PortfolioProject } from "@/components/platform-preview/portfolioProjects";
+import { ProjectDialog } from "@/components/platform-preview/ProjectDialog";
 import envClinic from "@/assets/media/support-work-clinic.jpg";
 import envTrade from "@/assets/media/support-work-trade.jpg";
 import envPractice from "@/assets/media/support-work-practice.jpg";
@@ -114,46 +115,17 @@ const capabilityWork: CapabilityWorkItem[] = [
   },
 ];
 
-interface SelectedProjectV3 {
-  title: string;
-  client: string;
-  summary: string;
-  image: string;
-  imageAlt: string;
-  href: string;
-  ctaLabel: string;
-  /** True when the only approved visual is the mobile capture (portrait). */
-  portrait: boolean;
-  featured: boolean;
-}
-
 /**
- * Populated from the owner-approved Phase 2B.2.4 lineup recovered from the
- * portfolio manifests (docs/sitemint-platform/PORTFOLIO_PERMISSION_MANIFEST.md
- * §12): Hand Homecare featured; OneFilAm, Herlinda (desktop-only visual) and
- * Claidy Taguran (approved cropped mobile visual) supporting. Shasta Greene
- * is approved in intent but has no approved visual asset yet, so it is not
- * listed. Assets are the approved WebP files in public/portfolio/current/.
+ * The published lineup (owner featured-work hierarchy, 2026-09-07):
+ * Simply Save Solar is the primary featured project, OneFilAm Community
+ * the second feature stage, and Hand Homecare leads the supporting grid —
+ * all ordering and copy come from the manifest-backed data module
+ * (docs/sitemint-platform/PORTFOLIO_PERMISSION_MANIFEST.md). Shasta Greene
+ * remains approved-in-intent with no approved visual, so it is not listed.
  */
-const selectedProjects: SelectedProjectV3[] = portfolioProjects
+const publishedProjects = portfolioProjects
   .slice()
-  .sort((a, b) => a.sortOrder - b.sortOrder)
-  .map((p) => {
-    const asset = p.desktopAsset ?? p.mobileAsset;
-    if (!asset) return null;
-    return {
-      title: p.projectName,
-      client: p.category,
-      summary: p.summary,
-      image: asset.src,
-      imageAlt: asset.alt,
-      href: p.publicUrl,
-      ctaLabel: p.ctaLabel,
-      portrait: !p.desktopAsset,
-      featured: p.featured,
-    };
-  })
-  .filter((p): p is SelectedProjectV3 => p !== null);
+  .sort((a, b) => a.sortOrder - b.sortOrder);
 
 /**
  * Per-composition "the system" / "the interface" toggle (owner directive:
@@ -238,7 +210,68 @@ function CompositionEvidence({ item }: { item: CapabilityWorkItem }) {
  * honest state card instead of a fabricated project, client, screenshot, or
  * result.
  */
+/**
+ * Interactive project presentation (owner featured-work + interaction
+ * directive, 2026-09-07). Two editorial feature stages (Simply Save Solar,
+ * then OneFilAm Community) followed by the supporting grid. Every project
+ * opens the ProjectDialog through a REAL button (the stretched
+ * "Explore project" control); the live-site link stays its own anchor
+ * layered above the button so nested-interactive semantics never occur.
+ * Hover behavior (image zoom ≤1.05, mint frame illumination, signal-line
+ * draw, tag reveal, restrained lift at 180–280ms) lives in v5-pages.css
+ * and is fully disabled under prefers-reduced-motion.
+ */
+function ProjectCardBody({ project, index, onOpen }: {
+  project: PortfolioProject;
+  index: number;
+  onOpen: (index: number) => void;
+}) {
+  return (
+    <>
+      <span className="sm-proj-card__no" aria-hidden="true">
+        {String(index + 1).padStart(2, "0")}
+      </span>
+      <span className="sm-proj-card__client">{project.category}</span>
+      <h3 className="sm-proj-card__title">{project.projectName}</h3>
+      <p className="sm-proj-card__summary">{project.summary}</p>
+      <span className="sm-proj-card__tags" aria-hidden="true">
+        {project.contribution.slice(0, 3).map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
+      </span>
+      <span className="sm-proj-card__row">
+        <button
+          type="button"
+          className="sm-proj-card__open"
+          onClick={(e) => {
+            e.currentTarget.focus();
+            onOpen(index);
+          }}
+        >
+          Explore project
+          <ArrowRight aria-hidden="true" size={16} />
+        </button>
+        {project.publicUrl && (
+          <a
+            className="sm-proj-card__visit"
+            href={project.publicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Live site ↗
+          </a>
+        )}
+      </span>
+      <span className="sm-proj-card__signal" aria-hidden="true" />
+    </>
+  );
+}
+
 function SelectedProjectsSection({ reveal }: { reveal: ReturnType<typeof useReveal> }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const featured = publishedProjects.filter((p) => p.featured);
+  const supporting = publishedProjects.filter((p) => !p.featured);
+
   return (
     <section className="v3-section" data-tone="porcelain">
       <div className="v3-container v3-reveal" ref={reveal}>
@@ -250,45 +283,78 @@ function SelectedProjectsSection({ reveal }: { reveal: ReturnType<typeof useReve
             to it, never before.
           </p>
         </div>
-        <div className="sm-portfolio-grid">
-          {selectedProjects.length === 0 ? (
-            <div className="sm-portfolio-empty reveal-scale-settle">
-              <p>
-                Client projects are being prepared for publication with each
-                client's permission.
-              </p>
-            </div>
-          ) : (
-            selectedProjects.map((project) => (
+
+        {featured.map((project, fi) => {
+          const index = publishedProjects.indexOf(project);
+          return (
+            <article
+              key={project.id}
+              className={`sm-proj-feature reveal-scale-settle${fi % 2 === 1 ? " sm-proj-feature--flip" : ""}`}
+            >
+              <div className="sm-proj-feature__media">
+                {project.desktopAsset && (
+                  <img
+                    className="sm-proj-feature__desktop"
+                    src={project.desktopAsset.src}
+                    alt={project.desktopAsset.alt}
+                    width={project.desktopAsset.width}
+                    height={project.desktopAsset.height}
+                    loading={fi === 0 ? "eager" : "lazy"}
+                  />
+                )}
+                {project.mobileAsset && (
+                  <img
+                    className="sm-proj-feature__mobile"
+                    src={project.mobileAsset.src}
+                    alt=""
+                    aria-hidden="true"
+                    width={project.mobileAsset.width}
+                    height={project.mobileAsset.height}
+                    loading="lazy"
+                  />
+                )}
+              </div>
+              <div className="sm-proj-feature__copy">
+                <ProjectCardBody project={project} index={index} onOpen={setOpenIndex} />
+              </div>
+            </article>
+          );
+        })}
+
+        <div className="sm-proj-grid">
+          {supporting.map((project) => {
+            const index = publishedProjects.indexOf(project);
+            const asset = project.desktopAsset ?? project.mobileAsset ?? project.fallbackAsset;
+            return (
               <article
-                key={project.title}
-                className={`sm-portfolio-card reveal-scale-settle${project.featured ? " sm-portfolio-card--featured" : ""}${project.portrait ? " sm-portfolio-card--portrait" : ""}`}
+                key={project.id}
+                className={`sm-proj-card reveal-scale-settle${!project.desktopAsset ? " sm-proj-card--portrait" : ""}`}
               >
-                <img
-                  className="sm-portfolio-card__img"
-                  src={project.image}
-                  alt={project.imageAlt}
-                  loading="lazy"
-                />
-                <div className="sm-portfolio-card__body">
-                  <span className="sm-portfolio-card__client">{project.client}</span>
-                  <h3 className="sm-portfolio-card__title">{project.title}</h3>
-                  <p className="sm-portfolio-card__summary">{project.summary}</p>
-                  <div>
-                    <a
-                      href={project.href}
-                      className="v3-btn v3-btn--outline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {project.ctaLabel}
-                    </a>
-                  </div>
+                {asset && (
+                  <span className="sm-proj-card__media">
+                    <img
+                      src={asset.src}
+                      alt={asset.alt}
+                      width={asset.width}
+                      height={asset.height}
+                      loading="lazy"
+                    />
+                  </span>
+                )}
+                <div className="sm-proj-card__body">
+                  <ProjectCardBody project={project} index={index} onOpen={setOpenIndex} />
                 </div>
               </article>
-            ))
-          )}
+            );
+          })}
         </div>
+
+        <ProjectDialog
+          projects={publishedProjects}
+          openIndex={openIndex}
+          onNavigate={setOpenIndex}
+          onClose={() => setOpenIndex(null)}
+        />
       </div>
     </section>
   );

@@ -17,7 +17,8 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { PublicShell } from "@/shells/PublicShell";
-import { DASHBOARD_URLS } from "@/lib/routes";
+import { Link } from "wouter";
+import { DASHBOARD_URLS, ROUTES } from "@/lib/routes";
 import {
   CONTACT_EMAIL,
   HERO_COPY,
@@ -600,6 +601,9 @@ export default function AiReceptionistV5() {
                   <a href={`#${SECTION_ID.beta}`} className="smv5-btn smv5-btn--outline">
                     {HERO_COPY.secondaryCta}
                   </a>
+                  <Link href={ROUTES.aiReceptionistDemo} className="smv5-btn smv5-btn--ghost">
+                    Explore the dashboard demo
+                  </Link>
                 </Reveal>
                 <Reveal as="p" className="smv5-hero__signin" delay={560}>
                   {HERO_COPY.signInPrompt}{" "}
