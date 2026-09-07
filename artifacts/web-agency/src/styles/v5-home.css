@@ -351,6 +351,14 @@
   gap: 2.5rem;
   align-items: center;
 }
+/* Grid items may never widen the track past the container (owner work
+   order 2026-09-08 §1: children must shrink with min-width: 0). At 320px
+   the Build Preview's intrinsic min-content stretched the single-column
+   grid 28px past the clipped `.sm-corner-host` section edge, cutting the
+   copy column's kicker and heading. */
+.sm-split > * {
+  min-width: 0;
+}
 @media (min-width: 900px) {
   .sm-split {
     grid-template-columns: 1fr 1fr;
@@ -2138,6 +2146,12 @@
     height: auto;
     min-height: 100vh;
     min-height: 100svh;
+    /* In flow mode the header clearance belongs on the stage itself, so
+       the first line of copy never starts underneath the fixed header. */
+    padding-top: var(--v4-hdr-h, 64px);
+  }
+  .sm-home-v5 #hero .v4-hero__field {
+    margin-top: 0;
   }
 }
 .sm-home-v5 #hero .v4-hero__field {
