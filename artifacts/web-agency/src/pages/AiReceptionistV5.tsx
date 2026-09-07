@@ -69,6 +69,7 @@ function ReadinessBadge({ status }: { status: Readiness }) {
  */
 import recepFilmSrc from "@/assets/media/recep-hero-film.mp4";
 import recepFilmPoster from "@/assets/media/recep-hero-film-poster.jpg";
+import { usePageMeta } from "@/hooks/usePageMeta";
 const HERO_FILM_SRC: string | null = recepFilmSrc;
 
 /** A tiny hand-authored SVG data URI shown as the `<video poster>` for the
@@ -542,6 +543,11 @@ const FAQ: { q: string; a: string }[] = [
 ];
 
 export default function AiReceptionistV5() {
+  usePageMeta({
+    title: "AI Receptionist — SiteMint Digital",
+    description:
+      "See how an AI receptionist answers, qualifies, and books for your business — explore the simulated preview and request private-beta access.",
+  });
   return (
     <PublicShell
       routeLabel="AI Receptionist"

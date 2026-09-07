@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePage";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const content: ServicePageContent = {
   eyebrow: "Discovery Systems",
@@ -161,6 +162,11 @@ const content: ServicePageContent = {
 };
 
 export default function DiscoverySystemsV3() {
+  usePageMeta({
+    title: "Discovery Systems — SiteMint Digital",
+    description:
+      "Structured discovery systems that turn scattered project requirements into a clear, buildable brief.",
+  });
   return (
     <ServicePage
       content={content}

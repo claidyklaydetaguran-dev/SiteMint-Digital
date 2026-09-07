@@ -18,6 +18,7 @@ import { BuildPreview } from "@/components/v5/BuildPreview";
 // illustration — one layout adapting across three devices. Magnific,
 // frame-gated (no readable text, no logos, no people).
 import responsiveDevicesImg from "@/assets/media/support-responsive-devices.jpg";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const content: ServicePageContent = {
   eyebrow: "Websites & Web Apps",
@@ -166,6 +167,11 @@ const content: ServicePageContent = {
 };
 
 export default function WebsitesAppsV3() {
+  usePageMeta({
+    title: "Websites & Web Apps — SiteMint Digital",
+    description:
+      "Custom websites and web applications engineered for speed, clarity, and conversion — designed and built by SiteMint Digital.",
+  });
   return (
     <ServicePage
       content={content}

@@ -91,6 +91,11 @@
   --sm-mint-border: #80E9BE;      /* borders, dividers */
   --sm-mint-ink: #0B6B57;         /* mint-family TEXT on white — never pale mint */
   --sm-mint-glow: 0 0 0 4px rgba(153, 245, 208, 0.28);
+  /* Button-family interaction steps (final release directive, 2026-09-07):
+     the primary fill is the exact signature; hover is a subtly darker mint
+     and press one step deeper. Ink-950 text stays ≥7:1 on all three. */
+  --sm-mint-signature-hover: #7DEFC5;
+  --sm-mint-signature-press: #69E7B8;
   /* Aliases for pre-existing consumers of the earlier pastel layer. */
   --sm-mint-wash-deep: var(--sm-mint-wash-strong);
   --sm-mint-hover: #F4FFFA;

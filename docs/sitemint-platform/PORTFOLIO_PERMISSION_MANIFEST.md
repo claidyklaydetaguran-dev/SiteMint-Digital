@@ -448,3 +448,27 @@ replacement — and the public UI must never expose internal permission or
 audit language. See `PORTFOLIO_ASSET_MANIFEST.md` §10.7 and §12 for the
 model definition and the full approval record; adopting the model remains
 a Phase 2B.3 implementation decision, not performed in this checkpoint.
+
+## 13. Simply Save Solar (owner-directed addition, September 7, 2026)
+
+Added under the owner's "SITEMINT FINAL UI QUALITY, PRERENDER, PORTFOLIO,
+AND PRODUCTION RELEASE" directive, which names the project and its URL
+explicitly: "Add `https://simplysavesolar.com/` to the portfolio and
+selected-work system."
+
+- **Permission status:** owner-authorized for public publication (the
+  directive itself is the authorization record).
+- **Visual assets:** freshly captured from the live public site on
+  2026-09-07 via clean headless capture (no browser chrome, no personal
+  form data, no overlays):
+  - `simply-save-solar-desktop.webp` (1221×850)
+  - `simply-save-solar-mobile.webp` (388×838)
+  - a third detail capture (How-it-works / ownership pathways) was taken
+    and retained in release evidence; the two-asset responsive pair is
+    what ships.
+- **Copy:** owner-recommended title/category/summary/capability tags used
+  verbatim; no lead totals, conversion rates, savings, customer counts,
+  or performance claims are stated anywhere.
+- **Placement:** SUPPORTING, `sortOrder: 1` (immediately after the
+  featured Hand Homecare), `visualMode: "responsive-pair"`, public CTA to
+  `https://simplysavesolar.com/`.

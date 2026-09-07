@@ -624,24 +624,42 @@
   text-decoration: none;
 }
 
+/* Unified public button family (final release directive, 2026-09-07):
+   primary = solid signature #99F5D0 + blue-charcoal text; secondary = mint
+   border with a wash hover. Matches the `.v3-btn`/`.v4-btn` remap. */
 .smv5-btn--primary {
-  background: var(--smv5-mint-500);
+  background: var(--sm-mint-signature, #99F5D0);
   color: var(--smv5-ink-950);
 }
 
 .smv5-btn--primary:hover {
-  background: var(--smv5-mint-400);
+  background: var(--sm-mint-signature-hover, #7DEFC5);
+  box-shadow: 0 4px 16px -6px rgba(11, 107, 87, 0.35);
+}
+
+.smv5-btn--primary:active {
+  background: var(--sm-mint-signature-press, #69E7B8);
 }
 
 .smv5-btn--outline {
-  background: transparent;
-  border-color: var(--smv5-slate-300);
+  background: var(--sm-mint-wash, #ECFFF7);
+  border-color: var(--sm-mint-border, #80E9BE);
   color: inherit;
 }
 
+.smv5-btn--outline:hover {
+  background: var(--sm-mint-wash-strong, #D9FAEC);
+}
+
 .smv5-hero .smv5-btn--outline {
-  border-color: #3a5f5c;
+  background: transparent;
+  border-color: rgba(153, 245, 208, 0.45);
   color: var(--smv5-white);
+}
+
+.smv5-hero .smv5-btn--outline:hover {
+  background: rgba(153, 245, 208, 0.08);
+  border-color: var(--sm-mint-signature, #99F5D0);
 }
 
 .smv5-btn--ghost {

@@ -4,8 +4,14 @@
  */
 
 import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function LegalTermsV3() {
+  usePageMeta({
+    title: "Terms of Service — SiteMint Digital",
+    description:
+      "The terms that govern use of SiteMint Digital's website and services.",
+  });
   const reveal = useReveal();
 
   return (

@@ -2453,3 +2453,14 @@
     white-space: nowrap;
   }
 }
+
+/* ── Blueprint watermark (mint graphic system, final release directive
+   2026-09-07): a faint mint technical grid behind the ink final-CTA band —
+   the "connected systems" drawing surface. Decorative only; text sits on
+   the ink ground unchanged. */
+.sm-home-v5 .v4-cta-band {
+  background-image:
+    linear-gradient(rgba(153, 245, 208, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(153, 245, 208, 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+}

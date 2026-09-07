@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { PenLine, Bell } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const upcoming = [
   {
@@ -31,6 +32,11 @@ const upcoming = [
 ];
 
 export default function InsightsV3() {
+  usePageMeta({
+    title: "Insights — SiteMint Digital",
+    description:
+      "Practical thinking from SiteMint Digital on websites, CRM systems, automation, and AI for service businesses.",
+  });
   const reveal = useReveal();
 
   return (

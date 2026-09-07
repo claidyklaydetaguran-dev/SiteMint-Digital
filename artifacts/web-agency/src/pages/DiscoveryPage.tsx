@@ -18,7 +18,7 @@
  */
 import "@/styles/platform-preview.css";
 import "@/components/platform-discovery/discovery-v5.css";
-import { useEffect } from "react";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { PlatformDiscoveryShell } from "@/components/platform-discovery/PlatformDiscoveryShell";
 // Owner final polish (2026-09-06, Discovery brand repair): Discovery now
 // carries the SAME canonical brand as the public site chrome — the
@@ -31,17 +31,10 @@ const PAGE_DESCRIPTION =
   "Tell us about your project. SiteMint will review your answers and prepare a personalized proposal and scope of work within 24–48 hours.";
 
 export default function DiscoveryPage() {
-  useEffect(() => {
-    const prev = document.title;
-    document.title = PAGE_TITLE;
-    const metaDesc = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    const prevDesc = metaDesc?.getAttribute("content") ?? "";
-    if (metaDesc) metaDesc.setAttribute("content", PAGE_DESCRIPTION);
-    return () => {
-      document.title = prev;
-      if (metaDesc) metaDesc.setAttribute("content", prevDesc);
-    };
-  }, []);
+  // Centralised per-route meta (title/description/canonical/OG) — the ad-hoc
+  // title effect predated usePageMeta and left the canonical pointing at "/",
+  // which the prerender workstream (2026-09-07) surfaced.
+  usePageMeta({ title: PAGE_TITLE, description: PAGE_DESCRIPTION });
 
   return (
     <div className="platform-preview discovery-v5 flex min-h-[100dvh] flex-col bg-[hsl(var(--sm-color-bg-canvas))] text-[hsl(var(--sm-color-text-primary))]">

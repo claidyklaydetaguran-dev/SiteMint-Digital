@@ -7,8 +7,14 @@
  */
 
 import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function LegalPrivacyV3() {
+  usePageMeta({
+    title: "Privacy Policy — SiteMint Digital",
+    description:
+      "How SiteMint Digital collects, uses, and protects information across our website and products.",
+  });
   const reveal = useReveal();
 
   return (

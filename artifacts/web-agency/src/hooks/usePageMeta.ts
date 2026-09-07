@@ -38,10 +38,31 @@ export function usePageMeta({ title, description }: PageMeta): void {
       canonical.setAttribute("href", `${CANONICAL_ORIGIN}${path || "/"}`);
     }
 
+    // Route-specific social meta (prerender workstream, 2026-09-07): the
+    // static head carries homepage OG/Twitter copy; each route re-points
+    // title/description/url so the prerendered snapshot of every route
+    // ships correct social tags. Restored on unmount like the rest.
+    const sync = (selector: string, value: string): (() => void) => {
+      const el = document.querySelector<HTMLMetaElement>(selector);
+      if (!el) return () => {};
+      const prev = el.getAttribute("content") ?? "";
+      el.setAttribute("content", value);
+      return () => el.setAttribute("content", prev);
+    };
+    const path = window.location.pathname.replace(/\/$/, "");
+    const restores = [
+      sync('meta[property="og:title"]', title),
+      sync('meta[property="og:description"]', description),
+      sync('meta[property="og:url"]', `${CANONICAL_ORIGIN}${path || "/"}`),
+      sync('meta[name="twitter:title"]', title),
+      sync('meta[name="twitter:description"]', description),
+    ];
+
     return () => {
       document.title = prevTitle;
       if (metaDesc) metaDesc.setAttribute("content", prevDesc);
       if (canonical && prevCanonical) canonical.setAttribute("href", prevCanonical);
+      for (const restore of restores) restore();
     };
   }, [title, description]);
 }

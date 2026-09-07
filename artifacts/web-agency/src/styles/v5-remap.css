@@ -91,12 +91,18 @@
    6.35:1). The pinned rule hardcodes `color: #ffffff` and a cyan-deep fill,
    so both need a direct restatement rather than a primitive remap. ────── */
 .v4-shell .v4-btn--primary {
-  background: var(--sm-accent);
-  color: var(--sm-accent-ink);
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
 }
 
 .v4-shell .v4-btn--primary:hover {
-  box-shadow: 0 6px 24px -8px rgba(50, 197, 210, 0.45); /* mint-500 #32C5D2 — was the REJECTED System-B green rgba(37,208,176 = #25D0B0) */
+  background: var(--sm-mint-signature-hover, #7DEFC5);
+  box-shadow: 0 4px 16px -6px rgba(11, 107, 87, 0.35); /* restrained mint-ink shadow, no gloss */
+}
+
+.v4-shell .v4-btn--primary:active {
+  background: var(--sm-mint-signature-press, #69E7B8);
+  box-shadow: 0 2px 8px -4px rgba(11, 107, 87, 0.3);
 }
 
 .v4-shell[data-tone="ink"] .v4-btn--primary,
@@ -104,8 +110,8 @@
 .v4-shell[data-tone="charcoal"] .v4-btn--primary,
 .v4-shell [data-tone="charcoal"] .v4-btn--primary,
 .v4-shell .v4-on-dark .v4-btn--primary {
-  background: var(--sm-accent);
-  color: var(--sm-accent-ink);
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
 }
 
 /* ── Header dark-surface tint: the pinned rule hardcodes navy rgba rather
@@ -610,16 +616,42 @@ html[data-sm-motion="off"] .sm-home-v5 * {
 
 /* ── Canonical mint signature (mint-brand directive, 2026-09-07) ───────── */
 
-/* Key-phrase highlight: exact #99F5D0 behind deep blue-charcoal text —
-   works on ink heroes and light page heroes alike (8.8:1). */
+/* Key-phrase emphasis: refined signature UNDERLINE (owner correction,
+   2026-09-07 — the thick #99F5D0 highlight block is retired). A gently
+   imperfect signal-line in the exact swatch sits just below the phrase:
+   rounded ends, 2px-scale on mobile, 3px maximum on desktop, never
+   covering the letterforms. Text color is inherited, so the phrase reads
+   correctly on ink heroes (light text) and light page heroes (dark text)
+   alike. Draws once during reveal when motion is allowed; immediately
+   visible under prefers-reduced-motion or the Reduce-animation preference. */
 .v4-shell .sm-mark,
 .sm-v5page .sm-mark {
-  background: var(--sm-mint-signature, #99F5D0);
-  color: var(--sm-ink-950, #153E52);
-  padding: 0.02em 0.16em;
-  border-radius: 0.16em;
+  --sm-mark-h: 3px;
+  color: inherit;
+  padding-bottom: 0.14em; /* slight offset below the baseline */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 4' preserveAspectRatio='none'%3E%3Cpath d='M2.5 2.6C32 1.4 72 3.1 117.5 1.9' fill='none' stroke='%2399F5D0' stroke-width='3.1' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% var(--sm-mark-h);
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
+}
+@media (max-width: 639px) {
+  .v4-shell .sm-mark,
+  .sm-v5page .sm-mark {
+    --sm-mark-h: 2px;
+    padding-bottom: 0.12em;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-sm-motion="off"]) .v4-shell .sm-mark,
+  html:not([data-sm-motion="off"]) .sm-v5page .sm-mark {
+    animation: sm-mark-draw 700ms cubic-bezier(0.22, 0.9, 0.28, 1) 250ms both;
+  }
+}
+@keyframes sm-mark-draw {
+  from { background-size: 0% var(--sm-mark-h); }
+  to { background-size: 100% var(--sm-mark-h); }
 }
 
 /* Mint Signal corner ornament host. */
@@ -653,4 +685,92 @@ html[data-sm-motion="off"] .sm-home-v5 * {
 .v4-shell a:focus-visible,
 .v4-shell button:focus-visible {
   outline-color: var(--sm-mint-border, #80E9BE);
+}
+
+/* ── Unified public button family (final release directive, 2026-09-07):
+   every marketing-surface action reads from the signature system. Primary
+   = solid #99F5D0 + deep blue-charcoal text (8.8:1), subtle darker-mint
+   hover, restrained shadow, no gloss. Secondary = mint wash + mint border
+   + dark text. Tertiary = quiet text with a mint underline accent.
+   Semantic/destructive/status controls are NOT remapped, and disabled
+   states keep their muted, clearly-inactive treatment. The `.v4-btn`
+   family is restyled above; this block brings the `.v3-btn` vocabulary
+   (Services/About/Process/Work/Pricing/Start/footer) into the same family. */
+.v4-shell .v3-btn--primary {
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+.v4-shell .v3-btn--primary:hover {
+  background: var(--sm-mint-signature-hover, #7DEFC5);
+  box-shadow: 0 4px 16px -6px rgba(11, 107, 87, 0.35);
+}
+.v4-shell .v3-btn--primary:active {
+  background: var(--sm-mint-signature-press, #69E7B8);
+}
+
+/* Secondary on light tones: transparent mint wash + mint border. */
+.v4-shell [data-tone="white"] .v3-btn--outline,
+.v4-shell [data-tone="porcelain"] .v3-btn--outline,
+.v4-shell [data-tone="white"] .v4-btn--outline,
+.v4-shell [data-tone="porcelain"] .v4-btn--outline {
+  background: var(--sm-mint-wash, #ECFFF7);
+  border-color: var(--sm-mint-border, #80E9BE);
+  color: var(--sm-teal-900, #173642);
+}
+.v4-shell [data-tone="white"] .v3-btn--outline:hover,
+.v4-shell [data-tone="porcelain"] .v3-btn--outline:hover,
+.v4-shell [data-tone="white"] .v4-btn--outline:hover,
+.v4-shell [data-tone="porcelain"] .v4-btn--outline:hover {
+  background: var(--sm-mint-wash-strong, #D9FAEC);
+  border-color: var(--sm-mint-border, #80E9BE);
+}
+
+/* Secondary on dark tones: transparent, light text, mint-tinted border. */
+.v4-shell [data-tone="ink"] .v3-btn--outline,
+.v4-shell [data-tone="charcoal"] .v3-btn--outline,
+.v4-shell [data-tone="ink"] .v4-btn--outline,
+.v4-shell [data-tone="charcoal"] .v4-btn--outline,
+.v4-shell .v4-on-dark .v4-btn--outline {
+  border-color: rgba(153, 245, 208, 0.45);
+}
+.v4-shell [data-tone="ink"] .v3-btn--outline:hover,
+.v4-shell [data-tone="charcoal"] .v3-btn--outline:hover,
+.v4-shell [data-tone="ink"] .v4-btn--outline:hover,
+.v4-shell [data-tone="charcoal"] .v4-btn--outline:hover,
+.v4-shell .v4-on-dark .v4-btn--outline:hover {
+  border-color: var(--sm-mint-signature, #99F5D0);
+  background: rgba(153, 245, 208, 0.08);
+}
+
+/* Tertiary (quiet): text action with a mint directional underline. */
+.v4-shell .v3-btn--quiet {
+  text-decoration: underline;
+  text-decoration-color: var(--sm-mint-border, #80E9BE);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.v4-shell .v3-btn--quiet:hover {
+  color: var(--sm-mint-ink, #0B6B57);
+  text-decoration-color: var(--sm-mint-signature, #99F5D0);
+}
+
+/* ── Mint graphic-design details (final release directive): authored,
+   non-random accents. 1 · Chapter numbers carry a short signal dash. */
+.v4-shell .v3m-sechead__no::after {
+  content: "";
+  display: inline-block;
+  width: 30px;
+  height: 3px;
+  margin-left: 10px;
+  vertical-align: middle;
+  border-radius: 999px;
+  background: var(--sm-mint-signature, #99F5D0);
+}
+
+/* 2 · Editorial media frames: support/texture figures and portfolio
+   captures close on a thin signature edge — the mint "frame edge" from the
+   brand system, doubling as a grounded baseline for the image. */
+.v4-shell .sm-about-texture img,
+.v4-shell .sm-portfolio-card__img {
+  border-bottom: 3px solid var(--sm-mint-signature, #99F5D0);
 }

@@ -93,3 +93,42 @@ particles TOP → transparent floating copy → cinematic film BOTTOM.
 | Responsive matrix | 264-combo six-width sweep (0 overflow, expected 401 noise only) + 54-combo extra matrix: 320/412/430 phones, 820 tablet, 1280 laptop, 844×390 + 932×430 landscape, 720×450 (200%-zoom equivalent), 1920 | 0 failures; key captures visually reviewed. Chromium + Edge tested; Firefox/WebKit not installed in this environment — reported as untested |
 | Media pass | 4 purposeful Magnific illustrations placed (Process planning band, AI-systems diagram band, Growth workspace figure, Websites responsive-devices band); 600 credits; ledger auth-3 | Frame gate per image; pages re-captured |
 | Live voice demo | Flag-gated (`VITE_RECEPTIONIST_LIVE_VOICE_ENABLED`), consent-first, real-event-driven 17-state call UI, 90s cap, mute/end, per-tab single call; @vapi-ai/web only via dynamic import in vapiLoader.ts; committed bundle verified to contain zero SDK bytes; contract test amended accordingly (private-key ban unchanged) | Full gates: chain 2126 PASS, 1055/1055 tests; bundle grep 0 |
+
+## 10. Final UI-quality analysis + production-release pass (owner directive, 2026-09-07 final)
+
+Full-page captures of all 17 public routes at 1440 and 390 were taken from the
+release candidate and visually graded against the ten criteria (hierarchy,
+rhythm, brand, content, interaction, credibility, responsiveness,
+accessibility, resilience, conversion). Grades:
+
+| Surface | Grade | Notes |
+|---|---|---|
+| Home (15 sections) | **Approved** | Underline emphasis on the key phrase (thick highlight retired); signature-mint primary CTAs; blueprint-grid watermark on the final CTA band; rail/eyebrow/ornaments intact |
+| Services capability spine | **Approved** | Mint chapter dashes, chips, outline buttons in the wash family; growth figure verified painting in real viewport |
+| Work / Portfolio | **Approved** | Simply Save Solar added as the first supporting card (real desktop+mobile captures, owner copy verbatim, CTA to the live site); mint frame edges on all captures |
+| Process | **Approved** | Underline on "runs."; accordion stages; standing-rules band |
+| About | **Approved** | Underline on "an operator."; real team photos + tag chips; believe cards with mint backplates |
+| Pricing | **Approved** | Recommended-tier emphasis; configurator selections mint; honesty band retained |
+| AI Receptionist | **Approved** | Simulated-preview honesty intact; mint action family; dashboard illustration |
+| Discovery | **Approved** | Signature-mint primary; brand header; per-route meta corrected (canonical was "/") |
+| Start/Contact, Insights, Legal ×2, 404 | **Approved** | Legal pages footer-linked; 404 now prerendered and served with a real 404 status |
+| Rejects checklist | **Clear** | No empty mockups (the one "blank tile" finding was a capture artifact of a non-active tab panel — asset verified), no repeated card walls, no unreadable text over media, no fabricated results |
+
+**Button system (unified 2026-09-07):** primary = solid `#99F5D0` + ink-950
+text (8.8:1), hover `#7DEFC5`, press `#69E7B8`, restrained mint-ink shadow —
+applied to `.v4-btn--primary`, `.v3-btn--primary`, `.smv5-btn--primary`,
+Discovery `.pp-btn-primary`. Secondary = `#ECFFF7` wash + `#80E9BE` border +
+dark text (transparent + mint-tinted border on ink). Tertiary = quiet text
+with mint underline accent. Semantic/destructive/status colors and disabled
+treatments untouched.
+
+**Prerender workstream:** `artifacts/web-agency/scripts/prerender.mjs`
+snapshots all 17 public routes + 404 post-build (reveal state stripped —
+nothing hidden pre-JS; per-route title/description/canonical/OG baked; auth
+surfaces excluded). Client boot is a replacement render (no hydration, no
+mismatch). Verified by a fetch-level gate (route-specific titles, ≥4KB real
+content in #root, canonicals, og:url, noindex retained, 404 status).
+
+**Cross-browser:** genuine Firefox 155 + WebKit 26.6 (Playwright 1.63 in the
+WSL runner) — 88/88 checks across 16 routes × overflow/console/buttons/
+underline/video/nav-sheet/discovery/login at 1440, 390, and 844×390.
