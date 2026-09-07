@@ -300,87 +300,79 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Tier 1 — headings: unclip upward from the baseline. */
-  .sm-v5page [data-reveal-ready] .reveal-clip,
-  .sm-v5page .reveal-clip[data-reveal-ready] {
-    opacity: 0;
-    clip-path: inset(100% 0 0 0);
-    transform: translateY(6px);
+  /* Entrance transitions live on the BASE variant class, not the armed
+     state — same contract as `v5-home.css` (see its banner: the 2026-09-08
+     mobile clipping regression came from an armed max-width override
+     out-cascading the revealed rule). Base class = final state + the
+     transition that plays it; armed state = `:not([data-revealed])` so it
+     can never win after reveal, with `transition: none` so arming is
+     instant while the reveal still animates via this rule. */
+  .sm-v5page .reveal-clip {
     transition:
       clip-path var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
       opacity var(--sm-dur-base, 240ms) ease,
       transform var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
     transition-delay: 0ms;
   }
-  .sm-v5page [data-revealed] .reveal-clip,
-  .sm-v5page .reveal-clip[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    clip-path: inset(0 0 0 0);
-    transform: none;
-  }
-
-  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
-  .sm-v5page [data-reveal-ready] .reveal-fade-up,
-  .sm-v5page .reveal-fade-up[data-reveal-ready] {
-    opacity: 0;
-    transform: translateY(16px);
+  .sm-v5page .reveal-fade-up {
     transition:
       opacity var(--sm-dur-base, 240ms) var(--sm-ease, ease),
       transform var(--sm-dur-base, 240ms) var(--sm-ease, ease);
     transition-delay: 110ms;
   }
-  .sm-v5page [data-revealed] .reveal-fade-up,
-  .sm-v5page .reveal-fade-up[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
-  }
-
-  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
-  .sm-v5page [data-reveal-ready] .reveal-scale-settle,
-  .sm-v5page .reveal-scale-settle[data-reveal-ready] {
-    opacity: 0;
-    transform: scale(0.97) translateY(10px);
+  .sm-v5page .reveal-scale-settle {
     transition:
       opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
       transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
     transition-delay: 190ms;
   }
-  .sm-v5page [data-revealed] .reveal-scale-settle,
-  .sm-v5page .reveal-scale-settle[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
+  .sm-v5page .reveal-h-left,
+  .sm-v5page .reveal-h-right {
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+
+  /* Tier 1 — headings: unclip upward from the baseline. */
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-clip,
+  .sm-v5page .reveal-clip[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(6px);
+    transition: none;
+  }
+
+  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-fade-up,
+  .sm-v5page .reveal-fade-up[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: none;
+  }
+
+  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-scale-settle,
+  .sm-v5page .reveal-scale-settle[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+    transition: none;
   }
 
   /* Tier 4 — horizontal reveal, used only where direction carries meaning
      (a split section's copy sliding in from the side it visually occupies —
      e.g. the AI Systems workflow strip, which reads left-to-right). */
-  .sm-v5page [data-reveal-ready] .reveal-h-left,
-  .sm-v5page .reveal-h-left[data-reveal-ready] {
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-h-left,
+  .sm-v5page .reveal-h-left[data-reveal-ready]:not([data-revealed]) {
     opacity: 0;
     transform: translateX(-24px);
-    transition:
-      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
-      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-    transition-delay: 80ms;
+    transition: none;
   }
-  .sm-v5page [data-revealed] .reveal-h-left,
-  .sm-v5page .reveal-h-left[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
-  }
-  .sm-v5page [data-reveal-ready] .reveal-h-right,
-  .sm-v5page .reveal-h-right[data-reveal-ready] {
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-h-right,
+  .sm-v5page .reveal-h-right[data-reveal-ready]:not([data-revealed]) {
     opacity: 0;
     transform: translateX(24px);
-    transition:
-      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
-      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-    transition-delay: 80ms;
-  }
-  .sm-v5page [data-revealed] .reveal-h-right,
-  .sm-v5page .reveal-h-right[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
+    transition: none;
   }
 
   /* Diagram / path progression — SVG stroke-dashoffset draw-on, owner §11
@@ -626,28 +618,33 @@
    fallback and by `prefers-reduced-motion`, since this lives inside the
    existing no-preference query's cascade. ───────────────────────────────── */
 @media (prefers-reduced-motion: no-preference) and (max-width: 767px) {
-  .sm-v5page [data-reveal-ready] .reveal-clip,
-  .sm-v5page .reveal-clip[data-reveal-ready] {
-    clip-path: inset(60% 0 0 0);
-    transform: translateY(3px);
-    transition-duration: 280ms;
+  /* Durations shorten on the BASE class (where the transition now lives). */
+  .sm-v5page .reveal-clip { transition-duration: 280ms; }
+  .sm-v5page .reveal-fade-up,
+  .sm-v5page .reveal-scale-settle,
+  .sm-v5page .reveal-h-left,
+  .sm-v5page .reveal-h-right { transition-duration: 180ms; }
+  /* Narrow viewports never clip headings (owner work order 2026-09-08 §1:
+     no clip-path/mask reveals on small screens) — the armed state is a
+     plain fade + short rise instead. */
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-clip,
+  .sm-v5page .reveal-clip[data-reveal-ready]:not([data-revealed]) {
+    clip-path: none;
+    transform: translateY(10px);
   }
-  .sm-v5page [data-reveal-ready] .reveal-fade-up,
-  .sm-v5page .reveal-fade-up[data-reveal-ready] {
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-fade-up,
+  .sm-v5page .reveal-fade-up[data-reveal-ready]:not([data-revealed]) {
     transform: translateY(8px);
-    transition-duration: 180ms;
   }
-  .sm-v5page [data-reveal-ready] .reveal-scale-settle,
-  .sm-v5page .reveal-scale-settle[data-reveal-ready] {
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-scale-settle,
+  .sm-v5page .reveal-scale-settle[data-reveal-ready]:not([data-revealed]) {
     transform: scale(0.99) translateY(5px);
-    transition-duration: 180ms;
   }
-  .sm-v5page [data-reveal-ready] .reveal-h-left,
-  .sm-v5page .reveal-h-left[data-reveal-ready],
-  .sm-v5page [data-reveal-ready] .reveal-h-right,
-  .sm-v5page .reveal-h-right[data-reveal-ready] {
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-h-left,
+  .sm-v5page .reveal-h-left[data-reveal-ready]:not([data-revealed]),
+  .sm-v5page [data-reveal-ready]:not([data-revealed]) .reveal-h-right,
+  .sm-v5page .reveal-h-right[data-reveal-ready]:not([data-revealed]) {
     transform: translateX(0) translateY(8px);
-    transition-duration: 180ms;
   }
   /* Flatten the stagger ladder to two short steps instead of up to seven —
      fewer staggers, per the mobile simplification rule. */

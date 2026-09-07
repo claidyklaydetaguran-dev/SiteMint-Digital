@@ -315,6 +315,15 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* The film only ever covers the poster once it is genuinely rendering
+     frames (`data-sm-playing`, set on the `playing` event). A mounted but
+     stalled/blocked video therefore never shows a blank frame — the
+     Glacier poster stays visible beneath it (owner work order §2). */
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+.sm-hero-media__video[data-sm-playing] {
+  opacity: 1;
 }
 .sm-hero-media__badge {
   position: absolute;
@@ -891,87 +900,83 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Tier 1 — headings: unclip upward from the baseline. */
-  .sm-home-v5 [data-reveal-ready] .reveal-clip,
-  .sm-home-v5 .reveal-clip[data-reveal-ready] {
-    opacity: 0;
-    clip-path: inset(100% 0 0 0);
-    transform: translateY(6px);
+  /* Entrance transitions live on the BASE variant class, not the armed
+     state. Root cause of the 2026-09-08 mobile clipping regression: armed
+     rules carried both the hidden state AND the transition, so they had to
+     keep matching after `data-revealed` landed — and the max-width armed
+     override at the end of this file then out-cascaded the revealed rule,
+     leaving every mobile heading permanently clipped to its bottom 40%.
+     New contract, immune to source order:
+       - base class (here): final state + the transition that plays it;
+       - armed state (below): `:not([data-revealed])` so it can NEVER win
+         after reveal, and `transition: none` so arming is instant while
+         the reveal still animates via this rule. */
+  .sm-home-v5 .reveal-clip {
     transition:
       clip-path var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
       opacity var(--sm-dur-base, 240ms) ease,
       transform var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
     transition-delay: 0ms;
   }
-  .sm-home-v5 [data-revealed] .reveal-clip,
-  .sm-home-v5 .reveal-clip[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    clip-path: inset(0 0 0 0);
-    transform: none;
-  }
-
-  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
-  .sm-home-v5 [data-reveal-ready] .reveal-fade-up,
-  .sm-home-v5 .reveal-fade-up[data-reveal-ready] {
-    opacity: 0;
-    transform: translateY(16px);
+  .sm-home-v5 .reveal-fade-up {
     transition:
       opacity var(--sm-dur-base, 240ms) var(--sm-ease, ease),
       transform var(--sm-dur-base, 240ms) var(--sm-ease, ease);
     transition-delay: 110ms;
   }
-  .sm-home-v5 [data-revealed] .reveal-fade-up,
-  .sm-home-v5 .reveal-fade-up[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
-  }
-
-  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
-  .sm-home-v5 [data-reveal-ready] .reveal-scale-settle,
-  .sm-home-v5 .reveal-scale-settle[data-reveal-ready] {
-    opacity: 0;
-    transform: scale(0.97) translateY(10px);
+  .sm-home-v5 .reveal-scale-settle {
     transition:
       opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
       transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
     transition-delay: 190ms;
   }
-  .sm-home-v5 [data-revealed] .reveal-scale-settle,
-  .sm-home-v5 .reveal-scale-settle[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
+  .sm-home-v5 .reveal-h-left,
+  .sm-home-v5 .reveal-h-right {
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+
+  /* Tier 1 — headings: unclip upward from the baseline. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(6px);
+    transition: none;
+  }
+
+  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: none;
+  }
+
+  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+    transition: none;
   }
 
   /* Tier 4 — horizontal reveal, used only where direction carries meaning:
      the split-section copy blocks slide in from the side they visually
      occupy (left copy from the left, right/reversed copy from the right). */
-  .sm-home-v5 [data-reveal-ready] .reveal-h-left,
-  .sm-home-v5 .reveal-h-left[data-reveal-ready] {
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready]:not([data-revealed]) {
     opacity: 0;
     transform: translateX(-24px);
-    transition:
-      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
-      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-    transition-delay: 80ms;
+    transition: none;
   }
-  .sm-home-v5 [data-revealed] .reveal-h-left,
-  .sm-home-v5 .reveal-h-left[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
-  }
-  .sm-home-v5 [data-reveal-ready] .reveal-h-right,
-  .sm-home-v5 .reveal-h-right[data-reveal-ready] {
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready]:not([data-revealed]) {
     opacity: 0;
     transform: translateX(24px);
-    transition:
-      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
-      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-    transition-delay: 80ms;
-  }
-  .sm-home-v5 [data-revealed] .reveal-h-right,
-  .sm-home-v5 .reveal-h-right[data-reveal-ready][data-revealed] {
-    opacity: 1;
-    transform: none;
+    transition: none;
   }
 
   /* Diagram / path progression — the AI Systems node diagram's connecting
@@ -1188,28 +1193,33 @@
    Shorter travel distances, faster settle, and a flattened stagger ladder —
    mirrors the same rule added to `v5-pages.css`. ─────────────────────────── */
 @media (prefers-reduced-motion: no-preference) and (max-width: 767px) {
-  .sm-home-v5 [data-reveal-ready] .reveal-clip,
-  .sm-home-v5 .reveal-clip[data-reveal-ready] {
-    clip-path: inset(60% 0 0 0);
-    transform: translateY(3px);
-    transition-duration: 280ms;
+  /* Durations shorten on the BASE class (where the transition now lives). */
+  .sm-home-v5 .reveal-clip { transition-duration: 280ms; }
+  .sm-home-v5 .reveal-fade-up,
+  .sm-home-v5 .reveal-scale-settle,
+  .sm-home-v5 .reveal-h-left,
+  .sm-home-v5 .reveal-h-right { transition-duration: 180ms; }
+  /* Narrow viewports never clip headings (owner work order 2026-09-08 §1:
+     no clip-path/mask reveals on small screens) — the armed state is a
+     plain fade + short rise instead. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready]:not([data-revealed]) {
+    clip-path: none;
+    transform: translateY(10px);
   }
-  .sm-home-v5 [data-reveal-ready] .reveal-fade-up,
-  .sm-home-v5 .reveal-fade-up[data-reveal-ready] {
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready]:not([data-revealed]) {
     transform: translateY(8px);
-    transition-duration: 180ms;
   }
-  .sm-home-v5 [data-reveal-ready] .reveal-scale-settle,
-  .sm-home-v5 .reveal-scale-settle[data-reveal-ready] {
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready]:not([data-revealed]) {
     transform: scale(0.99) translateY(5px);
-    transition-duration: 180ms;
   }
-  .sm-home-v5 [data-reveal-ready] .reveal-h-left,
-  .sm-home-v5 .reveal-h-left[data-reveal-ready],
-  .sm-home-v5 [data-reveal-ready] .reveal-h-right,
-  .sm-home-v5 .reveal-h-right[data-reveal-ready] {
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready]:not([data-revealed]),
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready]:not([data-revealed]) {
     transform: translateX(0) translateY(8px);
-    transition-duration: 180ms;
   }
   /* Flatten the stagger ladder to two short steps instead of up to seven —
      fewer staggers, per the mobile simplification rule. */
@@ -2115,6 +2125,20 @@
    what lets field + film split the full viewport without clipping. */
 .sm-home-v5 #hero .v4-hero__stage {
   position: sticky; /* restated so position:absolute children resolve here */
+}
+/* Short viewports — landscape phones, iPhone-SE-class screens, desktop at
+   200% zoom: the composition is taller than 100svh there, and the fixed
+   sticky stage clipped the phase ledger off the bottom (owner work order
+   2026-09-08 §1, caught by the clip gate at 375×667/568×320/844×390/
+   932×430/640×400). Below 700px of height the hero flows instead —
+   same treatment v4-home.css already applies under reduced motion. */
+@media (max-height: 700px) {
+  .sm-home-v5 #hero .v4-hero__stage {
+    position: relative;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+  }
 }
 .sm-home-v5 #hero .v4-hero__field {
   /* First child now — carries the fixed-header clearance. */

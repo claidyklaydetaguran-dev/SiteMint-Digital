@@ -22,7 +22,12 @@ export function useReveal() {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
+          // Reveal on intersection — and also for anything already ABOVE
+          // the viewport when observation starts (prerendered pages are
+          // readable before hydration, so a visitor can scroll past a
+          // section before it is armed; without this it would stay hidden
+          // until they scrolled back up to re-intersect it).
+          if (entry.isIntersecting || entry.boundingClientRect.bottom <= 0) {
             entry.target.setAttribute("data-revealed", "");
             observer.unobserve(entry.target);
           }
