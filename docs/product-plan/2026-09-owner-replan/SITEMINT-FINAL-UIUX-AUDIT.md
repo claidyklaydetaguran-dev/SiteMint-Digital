@@ -165,3 +165,32 @@ Featured stages read as an editorial composition (verified at 1440 and
 surfaces verified; mark/favicon mint; no remaining cyan interaction
 accents on public surfaces; CRM shell and customer dashboard primaries on
 the signature.
+
+## 12. Controlled client-review deployment record (2026-09-07, 15:00–15:30 UTC)
+
+**What is live.** `sitemintdigital.com` is served by the `SiteMint-Digital`
+Replit Autoscale deployment running `mkt/marketing-server.mjs` (release
+branch `release/marketing-dist-2026-09-07` @ `13ea56a`, 253-file manifest
+verified in-container with `sha256sum -c`; server source at `f6fb7ab`).
+Bundle identity on the live apex: `assets/index-B8qHQzvi.js`. Every
+non-marketing surface (`/api`, `/ai-receptionist/dashboard`, `/ai-toolkit`,
+`/admin`, `/app`, hashed assets that exist only upstream) is reverse-proxied
+unchanged to the previous deployment at `sitemintdigital.replit.app`, which
+was not modified.
+
+| Step | Result |
+|---|---|
+| Rollback snapshot | `Web Asset Builder` deployment "published about 1 month ago", bundle `index-CLo6olo-.js`; DNS zone captured (A 34.111.179.208, replit-verify TXT, `_dmarc`, `resend._domainkey`, `send` MX/SPF). Rollback = Domains → "Use a domain you already own" → `sitemintdigital.com` on Web Asset Builder (Replit moves it back atomically). |
+| Deploy attempt 1 (`a6891a11`) | FAILED at Promote: Replit switched into monorepo *artifact mode* (`artifacts/*/.replit-artifact/artifact.toml`) and started `api-server` instead of `[deployment].run`; `/api` healthcheck 500 → never promoted, nothing activated. Fix: `replit-deployment-config.mjs` now parks every `.replit-artifact` directory (`.off`) and puts the `8080 → 80` mapping first among `[[ports]]` (Autoscale waits on the first `localPort`). |
+| Deploy attempt 2 (`d846bf09`) | PROMOTED 15:43 local-equivalent (`/__health` 200 on `site-mint-digital.replit.app`). Smoke 24/25: file-shaped misses proxied to the upstream SPA came back as its `index.html` with 200. |
+| Deploy attempt 3 (current) | Server fix `f6fb7ab` (a `text/html` upstream answer to a file-shaped request becomes this site's real 404). Smoke 25/25 on the Replit host. |
+| Domain move | `sitemintdigital.com` connected on SiteMint-Digital ("Linking it here will move it from that project"): DNS checks ✓, routing ✓, certificate issued ≈6 min later; apex served the new bundle from 15:18 UTC. `www.sitemintdigital.com` attached to the same deployment (server 301s it to the apex). All email DNS records present after the move. |
+| Production smoke on the apex | 25/25 — 14 public routes 200 (prerendered), unknown → 404, dashboard login + deep link 200, `/admin` 200, old hashed asset proxied 200, `/api/v1/discovery-submissions` empty body → 503 (fail-closed upstream), no source maps (404), `noindex` retained, HSTS + nosniff + gzip. |
+| Backend reachability through the proxy | `/api/receptionist/auth/login` bad credentials → 401 (reachable, rejected). `/api/intake/sms-webhook` and `/api/crm/webhooks/twilio/sms` unsigned → 403 + empty TwiML (the documented fail-closed contract; signatures are rebuilt from `CRM_BASE_URL`, so the proxy hop is transparent to Twilio). |
+| Not deployed | Web Asset Builder was never republished (its workspace carries the un-activated modern backend). Replit's "Create production database" checkbox is Replit-controlled (disabled) — the marketing server uses no database either way. |
+
+Known caveats carried into the report: the Replit Security Center flags
+`orval 8.9.1` (workspace dev-only codegen; not part of the marketing
+artifact, which has zero dependencies); `/api/public/beta-requests` does
+not exist on the upstream, so the receptionist beta form shows its honest
+failure copy until the backend activation is approved.
