@@ -80,12 +80,17 @@ export function PublicShell({
     // `.v3m-*` page vocabulary inherits V4 without markup changes
     // (tokens-v4.css). V3 remains the rollback chrome.
     return (
+      // Professional redesign perf fix (2026-09-09): the shell stamps the
+      // header mode (data-header-mode) so CSS can size --v4-hdr-h without a
+      // `:has()` — the :has() variant cost ~3.2s of Style & Layout on the
+      // receptionist product page under Lighthouse.
       <div
         className="v4-shell"
         data-shell="public"
         data-chrome="v4"
         data-hero-tone={heroTone}
         data-tone={heroTone === "ink" ? "ink" : "porcelain"}
+        data-header-mode={headerMode}
       >
         <RouteScrollManager />
         <a className="v4-skip" href={`#${HOME_SECTIONS.main}`}>

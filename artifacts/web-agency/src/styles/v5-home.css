@@ -506,65 +506,279 @@
   color: var(--sm-text, #173642);
 }
 
-/* ── Section 6 — AI Systems node diagram ─────────────────────────────── */
-.sm-nodes-wrap {
+/* ── Section 6 — AI & Automation demonstration (owner correction
+   2026-09-09: replaces the too-subtle route-line node diagram). Three
+   readable stages, a signal line that visibly fills between them, one
+   restrained sequence; data-static (reduced motion) shows everything
+   expanded with no animation. ─────────────────────────────────────────── */
+.sm-autodemo-wrap {
   display: flex;
   justify-content: center;
+  min-width: 0;
 }
-.sm-nodes {
+.sm-autodemo {
   width: 100%;
-  max-width: 420px;
-  height: auto;
+  max-width: 460px;
+  background: color-mix(in oklab, var(--sm-dark-bg, #071C29) 72%, #0F3244);
+  border: 1px solid color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 14%, transparent);
+  border-radius: var(--sm-radius-card, 22px);
+  padding: clamp(1.1rem, 0.9rem + 0.8vw, 1.6rem);
 }
-
-/* ── Section 7 — AI Receptionist waveform ring ───────────────────────── */
-.sm-ring {
+.sm-autodemo__intro {
+  margin: 0 0 1rem;
+  font-family: var(--sm-font-display, inherit);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-autodemo__stages {
   position: relative;
-  width: 200px;
-  height: 200px;
-  margin: 0 auto;
-  display: flex;
+  display: grid;
+  gap: 0.7rem;
+  padding-left: 1.9rem;
+}
+.sm-autodemo__line {
+  position: absolute;
+  left: 13px;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 18%, transparent);
+  overflow: hidden;
+}
+.sm-autodemo__line-fill {
+  display: block;
+  width: 100%;
+  height: 33%;
+  border-radius: inherit;
+  background: var(--sm-mint-signature, #99F5D0);
+  transition: height 500ms var(--sm-ease-out, ease);
+}
+.sm-autodemo[data-stage="1"] .sm-autodemo__line-fill { height: 66%; }
+.sm-autodemo[data-stage="2"] .sm-autodemo__line-fill,
+.sm-autodemo[data-static] .sm-autodemo__line-fill { height: 100%; transition: none; }
+.sm-autodemo__stage {
+  position: relative;
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0.35rem 0.4rem 0.35rem 0;
+  font: inherit;
+  color: var(--sm-dark-muted, #9FC2CC);
+  cursor: pointer;
+  border-radius: 10px;
+}
+.sm-autodemo__dot {
+  position: absolute;
+  left: -1.9rem;
+  top: 0.45rem;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-.sm-ring__core {
-  width: 24px;
-  height: 24px;
   border-radius: 50%;
-  background: var(--sm-mint-500, #32C5D2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--sm-dark-muted, #9FC2CC);
+  background: color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 10%, transparent);
+  border: 1.5px solid color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 22%, transparent);
+  transition: background 300ms ease, color 300ms ease, border-color 300ms ease;
 }
-.sm-ring__pulse {
+.sm-autodemo__stage[data-active] .sm-autodemo__dot {
+  background: var(--sm-mint-signature, #99F5D0);
+  border-color: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+.sm-autodemo__title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-autodemo__plain {
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.sm-autodemo__card {
+  display: grid;
+  gap: 2px;
+  margin-top: 0.45rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--sm-white, #fff);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+  box-shadow: 0 8px 24px rgb(0 20 30 / 0.35);
+}
+.sm-autodemo__card-line {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--sm-text, #173642);
+}
+.sm-autodemo__card-line:first-child {
+  font-weight: 700;
+}
+/* display:grid above would defeat the UA's [hidden] rule — restate it. */
+.sm-autodemo__card[hidden] {
+  display: none;
+}
+.sm-autodemo__stage:focus-visible {
+  outline: 2px solid var(--sm-mint-signature, #99F5D0);
+  outline-offset: 3px;
+}
+.sm-autodemo__note {
+  margin: 0.9rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sm-dark-muted, #9FC2CC);
+}
+
+/* ── Section 7 — AI Receptionist call signal (owner correction 2026-09-09:
+   replaces the faint concentric rings). One controlled pulse, a defined
+   waveform, three outcome rows, and a visible thread into the dashboard
+   preview underneath. ─────────────────────────────────────────────────── */
+.sm-callsignal {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  background: var(--sm-white, #fff);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+  border-radius: var(--sm-radius-card, 22px);
+  padding: 1.15rem 1.25rem 0.9rem;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  position: relative;
+}
+.sm-callsignal__head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-callsignal__pulse {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sm-mint-ink, #0B6B57);
+  flex: none;
+}
+.sm-callsignal__pulse::after {
+  content: "";
   position: absolute;
-  inset: 0;
+  inset: -6px;
   border-radius: 50%;
-  border: 1.5px solid var(--sm-mint-400, #56D2CF);
-  opacity: 0;
+  border: 2px solid var(--sm-mint-ink, #0B6B57);
+  opacity: 0.45;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .sm-ring__pulse {
-    animation: sm-ring-pulse 3.2s var(--sm-ease, ease) infinite;
-  }
-  .sm-ring__pulse--2 {
-    animation-delay: 1.05s;
-  }
-  .sm-ring__pulse--3 {
-    animation-delay: 2.1s;
+  html:not([data-sm-motion="off"]) .sm-callsignal__pulse::after {
+    animation: sm-call-pulse 2.6s var(--sm-ease, ease) infinite;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .sm-ring__pulse {
-    opacity: 0.35;
-  }
+@keyframes sm-call-pulse {
+  0% { transform: scale(0.6); opacity: 0.55; }
+  70% { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
-@keyframes sm-ring-pulse {
-  0% {
-    transform: scale(0.3);
-    opacity: 0.65;
+.sm-callsignal__wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  flex: none;
+}
+.sm-callsignal__wave i {
+  display: block;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--sm-mint-ink, #0B6B57);
+  height: 30%;
+}
+/* A defined, static-legible waveform shape; motion only adds shimmer. */
+.sm-callsignal__wave i:nth-child(2n) { height: 65%; }
+.sm-callsignal__wave i:nth-child(3n) { height: 90%; }
+.sm-callsignal__wave i:nth-child(5n) { height: 45%; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-sm-motion="off"]) .sm-callsignal__wave i {
+    animation: sm-callwave 1.6s ease-in-out infinite alternate;
   }
-  100% {
-    transform: scale(1);
-    opacity: 0;
-  }
+  html:not([data-sm-motion="off"]) .sm-callsignal__wave i:nth-child(2n) { animation-delay: 0.18s; }
+  html:not([data-sm-motion="off"]) .sm-callsignal__wave i:nth-child(3n) { animation-delay: 0.32s; }
+}
+@keyframes sm-callwave {
+  from { transform: scaleY(0.75); }
+  to { transform: scaleY(1.12); }
+}
+.sm-callsignal__status {
+  font-family: var(--sm-font-display, inherit);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--sm-text, #173642);
+}
+.sm-callsignal__steps {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.sm-callsignal__step {
+  display: grid;
+  gap: 1px;
+  padding-left: 1.55rem;
+  position: relative;
+}
+.sm-callsignal__step::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--sm-mint-wash-strong, #D9FAEC);
+  color: var(--sm-mint-ink, #0B6B57);
+}
+.sm-callsignal__step[data-next]::before {
+  content: "→";
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+.sm-callsignal__step-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--sm-text, #173642);
+}
+.sm-callsignal__step-sub {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--sm-text-muted, #4A6472);
+}
+/* The visible handoff into the dashboard preview below. */
+.sm-callsignal__thread {
+  position: absolute;
+  left: 50%;
+  bottom: -1.35rem;
+  width: 3px;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: var(--sm-mint-signature, #99F5D0);
+}
+.sm-callsignal__note {
+  margin: 0.8rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-visual-stack .sm-shot-frame {
+  margin-top: 1.5rem;
 }
 .sm-badge {
   display: inline-block;

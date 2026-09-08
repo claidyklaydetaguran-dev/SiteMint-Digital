@@ -25,6 +25,7 @@ import { HeroMedia } from "@/components/v5/HeroMedia";
 import { MintSignalCorner } from "@/components/v5/MintSignal";
 import { Reveal } from "@/components/v5/Reveal";
 import { BuildPreview } from "@/components/v5/BuildPreview";
+import { AutomationDemo } from "@/components/v5/AutomationDemo";
 import { ConnectedOpsMap } from "@/components/v5/ConnectedOpsMap";
 import {
   pricingTiersV5,
@@ -266,60 +267,34 @@ function CrmSystemsSection() {
 
 /* ── Section 6 — AI Systems & Automation (connected node sequence) ──────── */
 
+/* Owner correction (2026-09-09): the small route line with three nodes was
+   "incomplete, too subtle, visually empty". The section now leads with the
+   owner-approved plain heading and a working three-stage demonstration
+   (AutomationDemo) a business owner can read and click. */
 function AiSystemsSection() {
   const reveal = useReveal();
   return (
     <section className="v4-section" id="ai-systems" data-tone="ink">
       <div className="v4-container sm-split">
         <div className="sm-split__copy reveal-h-left" ref={reveal} data-v4-reveal>
-          <span className="v4-kicker">05 — AI Systems &amp; Automation</span>
-          <h2 className="v4-h2 reveal-clip">Evaluate, route, follow up, draft — where it's allowed to act.</h2>
+          <span className="v4-kicker">05 — AI &amp; Automation</span>
+          <h2 className="v4-h2 reveal-clip">Let routine work move forward automatically.</h2>
           <p className="v4-lede reveal-fade-up">
-            For operators whose growth is capped by follow-through, not
-            demand: automation handles the mechanical steps; anything
-            requiring judgment lands as a task for a person, with context
-            attached. Every automated action is logged and stoppable.
+            SiteMint can organize new inquiries, prepare follow-up, create
+            reminders, and send the right task to the right person — while
+            important decisions stay with your team.
           </p>
           <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
-            AI-assisted development is how we build every SiteMint system
-            faster, with the same human review and testing on everything that
-            ships; AI automation inside your own system — the kind pictured
-            here — is scoped and turned on only where it's actually in scope.
+            Everything automated is set up with you, works by your rules,
+            and can be paused any time. Anything that needs judgment lands
+            with a person — never handled silently.
           </p>
           <Link href={ROUTES.aiSystems} className="v3-btn v3-btn--outline">
-            Explore AI Systems &amp; Automation →
+            See How Automation Can Help →
           </Link>
         </div>
-        <div className="sm-nodes-wrap reveal-scale-settle" ref={reveal} data-v4-reveal>
-          <svg
-            className="sm-nodes"
-            viewBox="0 0 420 160"
-            role="img"
-            aria-label="Diagram: an inquiry moves through evaluation, routing, and follow-up nodes"
-          >
-            <path
-              className="sm-nodes__path"
-              d="M30 130 C 100 60, 150 150, 210 90 S 320 40, 390 60"
-              fill="none"
-              stroke="var(--sm-mint-500, #32C5D2)"
-              strokeWidth="2"
-              opacity="0.7"
-              pathLength={1}
-            />
-            {[
-              { x: 30, y: 130, label: "Evaluate" },
-              { x: 210, y: 90, label: "Route" },
-              { x: 390, y: 60, label: "Follow up" },
-            ].map((n) => (
-              <g key={n.label} transform={`translate(${n.x} ${n.y})`}>
-                <circle r="20" fill="none" stroke="var(--sm-mint-400, #56D2CF)" strokeWidth="1.6" />
-                <circle r="4" fill="var(--sm-mint-500, #32C5D2)" />
-                <text y="38" textAnchor="middle" fill="var(--sm-dark-text, #E8F5F7)" fontSize="12">
-                  {n.label}
-                </text>
-              </g>
-            ))}
-          </svg>
+        <div className="sm-autodemo-wrap reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <AutomationDemo />
         </div>
       </div>
     </section>
@@ -352,11 +327,44 @@ function ReceptionistSpotlight() {
           </Link>
         </div>
         <div className="sm-visual-stack reveal-scale-settle" ref={reveal} data-v4-reveal>
-          <div className="sm-ring" aria-hidden="true">
-            <span className="sm-ring__pulse sm-ring__pulse--1" />
-            <span className="sm-ring__pulse sm-ring__pulse--2" />
-            <span className="sm-ring__pulse sm-ring__pulse--3" />
-            <span className="sm-ring__core" />
+          {/* Owner correction (2026-09-09): the pale concentric rings were
+              "too subtle and unnoticeable". The signal now tells the story
+              in three outcomes, with one controlled pulse and a visible
+              handoff into the dashboard preview below. */}
+          <div
+            className="sm-callsignal"
+            role="img"
+            aria-label="Illustration: an incoming call is answered, the caller's details are captured, and a next step is ready in the dashboard"
+          >
+            <div className="sm-callsignal__head">
+              <span className="sm-callsignal__pulse" aria-hidden="true" />
+              <span className="sm-callsignal__wave" aria-hidden="true">
+                <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
+              </span>
+              <span className="sm-callsignal__status">Incoming call — answered</span>
+            </div>
+            <ul className="sm-callsignal__steps">
+              <li className="sm-callsignal__step" data-done>
+                <span className="sm-callsignal__step-title">Call answered</span>
+                <span className="sm-callsignal__step-sub">
+                  Greeted with your business's own information
+                </span>
+              </li>
+              <li className="sm-callsignal__step" data-done>
+                <span className="sm-callsignal__step-title">Details captured</span>
+                <span className="sm-callsignal__step-sub">
+                  Name, number, and the reason they called
+                </span>
+              </li>
+              <li className="sm-callsignal__step" data-next>
+                <span className="sm-callsignal__step-title">Next step ready</span>
+                <span className="sm-callsignal__step-sub">
+                  Summary and follow-up waiting in your dashboard
+                </span>
+              </li>
+            </ul>
+            <span className="sm-callsignal__thread" aria-hidden="true" />
+            <p className="sm-callsignal__note">Simulated preview — private beta</p>
           </div>
           <ShotFrame
             src={hdCallsShot}
@@ -609,7 +617,14 @@ function TeamSection() {
               }}
             >
               <span className="sm-team-card__avatar">
-                <img src={member.photo} alt={`Portrait of ${member.name}`} loading="lazy" />
+                {/* Per-person focal point (owner correction 2026-09-09):
+                    the crop window, never a zoom — see teamV5.ts. */}
+                <img
+                  src={member.photo}
+                  alt={`Portrait of ${member.name}`}
+                  loading="lazy"
+                  style={{ objectPosition: member.portraitPosition }}
+                />
               </span>
               <span className="sm-team-card__name">{member.name}</span>
               <span className="sm-team-card__role">{member.role}</span>

@@ -125,7 +125,11 @@ export function TeamMemberDialog({ member, onClose }: TeamMemberDialogProps) {
           </button>
           <div className="sm-team-dialog__header">
             <span className="sm-team-dialog__avatar">
-              <img src={person.photo} alt={`Portrait of ${person.name}`} />
+              <img
+                src={person.photo}
+                alt={`Portrait of ${person.name}`}
+                style={{ objectPosition: person.portraitPosition }}
+              />
             </span>
             <div>
               <h2 id={titleId} className="sm-team-dialog__name">

@@ -14,6 +14,16 @@ export interface TeamMemberV5 {
   role: string;
   /** Public-root path to the real, owner-supplied portrait photograph. */
   photo: string;
+  /**
+   * Per-person focal point for the shared 4:3 portrait viewport (owner
+   * correction, 2026-09-09): Shasta's source is 4:3 landscape and fills the
+   * frame exactly; Claidy's and Saisa's are 3:4 portrait sources, so
+   * `object-fit: cover` shows only a horizontal band — centered, it cut
+   * their heads. The focal point moves each person's crop window (never a
+   * zoom, never an edit of the photograph) so the full head, hair, and
+   * comfortable headroom stay visible. Consumed as `object-position`.
+   */
+  portraitPosition: string;
   /** One-sentence intro composed from the first responsibility below — no
    *  invented credentials, history, or biography. */
   intro: string;
@@ -34,6 +44,7 @@ export const teamV5: TeamMemberV5[] = [
     name: "Shasta Greene",
     role: "Head of Strategy",
     photo: "/team-shasta.jpg",
+    portraitPosition: "50% 50%", /* 4:3 source == 4:3 frame; approved as-is */
     intro:
       "Shasta leads discovery and translates each client's vision into a practical business and digital strategy.",
     responsibilities: [
@@ -52,6 +63,7 @@ export const teamV5: TeamMemberV5[] = [
     name: "Claidy Taguran",
     role: "Technical Director",
     photo: "/team-claidy.png",
+    portraitPosition: "50% 12%", /* 3:4 source: hold the crop window near the top — full head + headroom */
     intro:
       "Claidy leads technical planning, architecture, engineering, and implementation for every SiteMint system.",
     responsibilities: [
@@ -70,6 +82,7 @@ export const teamV5: TeamMemberV5[] = [
     name: "Saisa Lorraigne",
     role: "Project & Admin Manager",
     photo: "/team-saisa.jpg",
+    portraitPosition: "50% 10%", /* 3:4 source: same treatment, tuned to her framing */
     intro:
       "Saisa organizes timelines, files, requirements, deliverables, meetings, approvals, and follow-ups for every project.",
     responsibilities: [

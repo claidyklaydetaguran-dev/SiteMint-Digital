@@ -33,9 +33,13 @@ export interface V4PanelItem {
 /* Business-owner communication redesign (owner directive 2026-09-08): the
  * panel leads with what improves in the business; the delivery vocabulary
  * moves into descriptions written for an owner, not a developer. */
+/* Owner correction (2026-09-09): AI Receptionist leaves the top-level nav
+ * (it competed with the company categories) and lives here in Services,
+ * where every other service already lives. The dropdown carries the
+ * owner's recommended six categories. */
 export const whatWeBuildV4: V4PanelItem[] = [
   {
-    label: "Websites & Web Apps",
+    label: "Websites & Web Applications",
     outcome: "Turn attention into action",
     description:
       "A website that wins customers, plus custom tools shaped to how your business runs.",
@@ -43,7 +47,7 @@ export const whatWeBuildV4: V4PanelItem[] = [
     glyph: "site",
   },
   {
-    label: "Business Systems",
+    label: "CRM & Business Systems",
     outcome: "Keep everything in one place",
     description:
       "Customer details, tasks, and follow-up organized where the whole team can see them.",
@@ -67,12 +71,20 @@ export const whatWeBuildV4: V4PanelItem[] = [
     glyph: "voice",
   },
   {
-    label: "Growth & Advertising",
+    label: "SEO, Advertising & Growth",
     outcome: "Know what's working",
     description:
       "See which marketing brings customers, and put your budget where it earns.",
     href: `${ROUTES.services}#growth-infrastructure`,
     glyph: "growth",
+  },
+  {
+    label: "Ongoing Support",
+    outcome: "Improve over time",
+    description:
+      "The system tuned after launch — monitoring, updates, and help when you need it.",
+    href: ROUTES.automation,
+    glyph: "discovery",
   },
 ];
 
@@ -89,7 +101,10 @@ export const primaryNavV4: V4NavLink[] = [
   { label: "About", href: ROUTES.about },
 ];
 
-/** Distinct product entry — outlined pill with the live signal dot. */
+/** RETIRED from the primary nav (owner correction 2026-09-09): AI
+ *  Receptionist is reached through the Services dropdown, the homepage
+ *  featured section, service cross-links, and the footer. Kept for any
+ *  future surface that needs the canonical label + route pair. */
 export const productNavV4: V4NavLink = {
   label: "AI Receptionist",
   href: ROUTES.aiReceptionist,

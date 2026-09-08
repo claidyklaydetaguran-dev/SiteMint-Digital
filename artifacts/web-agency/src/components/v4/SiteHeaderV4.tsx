@@ -59,7 +59,6 @@ import { BrandWordmark } from "@/components/v5/BrandWordmark";
 import { SignalGlyphV4 } from "./SignalGlyphsV4";
 import {
   primaryNavV4,
-  productNavV4,
   signInHrefV4,
   signInLabelV4,
   startHrefV4,
@@ -83,13 +82,16 @@ import { applyMotionAttr, motionOff, setMotionOff } from "@/components/v5/motion
  * in-page link. Kept local to the header rather than in `publicNavV4.ts`
  * since this component is the only consumer.
  */
+/* Owner correction (2026-09-09): the seven-link rail was too crowded for
+ * business owners. Four anchors now carry the journey — Capabilities and
+ * Business Uses read as one "How It Helps" story (the sections themselves
+ * all remain on the page in order; nothing was removed), and Setup &
+ * Integrations stays discoverable by scroll and inside the FAQ/onboarding
+ * content rather than the nav. */
 const productSubNavV4: { id: string; label: string; href: string }[] = [
   { id: "hero", label: "Overview", href: `#hero` },
   { id: "hero-theater", label: "Try the Demo", href: `#hero-theater` },
-  { id: "scheduling", label: "How It Works", href: `#scheduling` },
-  { id: "what-it-does", label: "Capabilities", href: `#what-it-does` },
-  { id: "setup", label: "Setup & Integrations", href: `#setup` },
-  { id: "use-cases", label: "Business Uses", href: `#use-cases` },
+  { id: "what-it-does", label: "How It Helps", href: `#what-it-does` },
   { id: "faq", label: "FAQ", href: `#faq` },
 ];
 
@@ -441,7 +443,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                       ))}
                     </div>
                     <div className="v4-panel__foot">
-                      <span>Five ways in. One connected system.</span>
+                      <span>Six ways in. One connected system.</span>
                       <Link href="/services">
                         See how the systems connect →
                       </Link>
@@ -471,21 +473,9 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
               );
             })}
 
-            <li>
-              <Link
-                href={productNavV4.href}
-                className="v4-nav__link v4-nav__prod"
-                aria-current={
-                  isActive(location, productNavV4.href) ? "page" : undefined
-                }
-                onClick={(e) =>
-                  handleActiveNavClick(e, isActive(location, productNavV4.href))
-                }
-              >
-                <span className="v4-nav__prod-dot" aria-hidden="true" />
-                {productNavV4.label}
-              </Link>
-            </li>
+            {/* Owner correction (2026-09-09): AI Receptionist no longer
+                competes as a top-level item — it lives inside the Services
+                dropdown with every other service. */}
 
             <li className="v4-header__sep" role="presentation" aria-hidden="true" />
 
@@ -600,22 +590,8 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                         </li>
                       );
                     })}
-                    <li>
-                      <Link
-                        href={productNavV4.href}
-                        className="v4-sheet__link"
-                        aria-current={
-                          isActive(location, productNavV4.href) ? "page" : undefined
-                        }
-                        onClick={(e) =>
-                          handleActiveNavClick(e, isActive(location, productNavV4.href), () =>
-                            setMenuOpen(false),
-                          )
-                        }
-                      >
-                        {productNavV4.label}
-                      </Link>
-                    </li>
+                    {/* AI Receptionist lives inside the Services group
+                        (owner correction 2026-09-09). */}
                   </>
                 )}
               </ul>

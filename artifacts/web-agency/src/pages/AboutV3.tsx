@@ -75,7 +75,12 @@ export default function AboutV3() {
                     final owner directive 2026-09-05) — never a generated
                     face or stock photo. */}
                 <span className="sm-person-avatar">
-                  <img src={member.photo} alt={`Portrait of ${member.name}`} loading="lazy" />
+                  <img
+                    src={member.photo}
+                    alt={`Portrait of ${member.name}`}
+                    loading="lazy"
+                    style={{ objectPosition: member.portraitPosition }}
+                  />
                 </span>
                 <h3 className="v3m-pillar__title">{member.name}</h3>
                 <p className="v3m-pillar__desc sm-person-card__role">{member.role}</p>

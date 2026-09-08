@@ -212,73 +212,11 @@
   }
 }
 
-/* 1024–1359px cannot hold brand + product name + seven section links +
-   Sign in + the full beta CTA on one line (measured ~230px over at 1024).
-   Extend the designed second-row scrollable rail (the <1024 pattern from
-   v5-remap.css) through this band, so nothing truncates and the full
-   "Request Private Beta" label survives. --v4-hdr-h drives the fixed-
-   header offset contract, so hero clearance and scroll-margin follow. */
-@media (min-width: 1024px) and (max-width: 1359px) {
-  .v4-shell:has(.v4-header[data-mode="product"]) {
-    --v4-hdr-h: 108px;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-header__inner {
-    flex-wrap: wrap;
-    row-gap: 0;
-    align-content: start;
-    padding-top: 10px;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-product-nav {
-    display: block;
-    order: 10;
-    flex: 1 1 100%;
-    margin-left: 0;
-    overflow: hidden;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__list {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 0.1rem;
-    padding-bottom: 2px;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__list::-webkit-scrollbar {
-    display: none;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link {
-    min-height: 40px;
-    white-space: nowrap;
-    scroll-snap-align: start;
-    font-size: 0.85rem;
-  }
-  .v4-shell .v4-header[data-mode="product"][data-surface="dark"] .v4-product-nav__link[aria-current="true"] {
-    color: var(--sm-mint-signature, #99F5D0);
-    background: rgb(153 245 208 / 0.14);
-  }
-  .v4-shell .v4-header[data-mode="product"]:not([data-surface="dark"]) .v4-product-nav__link[aria-current="true"] {
-    color: var(--sm-mint-ink, #0B6B57);
-    background: var(--sm-mint-wash-deep, #D9FAEC);
-  }
-}
-
-/* From 1360px the single row fits with quieter link padding. */
-@media (min-width: 1360px) and (max-width: 1499px) {
-  .v4-shell .v4-header[data-mode="product"] .v4-header__inner {
-    gap: 0.8rem;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link {
-    padding-inline: 0.5rem;
-    font-size: 0.9rem;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-header__product-name {
-    font-size: 0.9rem;
-  }
-  .v4-shell .v4-header[data-mode="product"] .v4-header__cta {
-    padding-inline: 1rem;
-  }
-}
+/* Owner correction (2026-09-09): the product nav is four links now
+   (Overview / Try the Demo / How It Helps / FAQ), so a single quiet row
+   fits from 1024px up — no wrapping, no clipped labels (verified by the
+   CTA-right-edge probe at 1024/1100/1280/1348/1440/1500). Below 1024 the
+   designed scrollable rail from v5-remap.css still applies. */
 
 /* Product mode <480px used to fall back to the (now retired) icon; keep the
    compact word alone instead so the brand link is never empty. */
@@ -345,6 +283,11 @@
 }
 .v4-shell .v4-panel__card {
   border-radius: 14px;
+}
+.v4-shell .v4-panel__outcome {
+  font-family: var(--sm-font-display);
+  font-weight: 700;
+  letter-spacing: 0.12em;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
