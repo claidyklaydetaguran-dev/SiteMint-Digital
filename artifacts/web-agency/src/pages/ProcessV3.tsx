@@ -88,7 +88,7 @@ export default function ProcessV3() {
           </p>
           <div className="v3m-hero__actions reveal-fade-up">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
             <Link href={ROUTES.pricing} className="v3-btn v3-btn--outline">
               See pricing
@@ -219,7 +219,7 @@ export default function ProcessV3() {
           </p>
           <div className="v3m-cta__actions">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
             <Link href={ROUTES.pricing} className="v3-btn v3-btn--outline reveal-fade-up">
               See pricing

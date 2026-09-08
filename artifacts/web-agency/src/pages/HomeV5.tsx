@@ -715,8 +715,9 @@ function FinalCtaSection() {
           the system that catches it.
         </h2>
         <div className="v4-cta-band__actions">
+          {/* Professional redesign: one consistent conversion phrase. */}
           <Link href={ROUTES.start} className="v4-btn v4-btn--primary">
-            Build Your SiteMint System
+            Plan My Project
           </Link>
           <Link href={ROUTES.aiReceptionist} className="v4-btn v4-btn--outline">
             Explore the AI Receptionist
@@ -748,9 +749,14 @@ export default function HomeV5() {
           page's own stylesheet (`styles/v5-home.css`); SignalHeroV4 itself
           carries no layout logic for it. */}
       <div id="hero">
+        {/* Professional redesign (2026-09-09): fewer labels above the fold —
+            the header wordmark now establishes "SiteMint Digital", so the
+            hero eyebrow speaks the reference's category line instead, and
+            the extra brand line is retired. One primary + one secondary CTA;
+            the secondary goes to real work (owner-approved label). */}
         <SignalHeroV4
           hideKicker
-          brandEyebrow="SiteMint Digital"
+          brandEyebrow="Websites · Systems · Automation"
           showServiceRail
           title={
             <>
@@ -766,11 +772,10 @@ export default function HomeV5() {
               carefully planned digital experience.
             </>
           }
-          brandLine="Capture. Organize. Connect. Resolve."
           primaryHref={ROUTES.start}
           primaryLabel="Plan My Project"
-          secondaryHref={ROUTES.services}
-          secondaryLabel="See What We Build"
+          secondaryHref={ROUTES.workV3}
+          secondaryLabel="See Our Work"
           secondaryIsRoute
           showFilm
         />

@@ -92,7 +92,7 @@ export function ServicePage({
           <p className="v3-lede reveal-fade-up">{content.lede}</p>
           <div className="v3m-hero__actions reveal-scale-settle">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
           </div>
         </div>
@@ -272,7 +272,7 @@ export function ServicePage({
           <p className="v3-lede">{content.cta.body}</p>
           <div className="v3m-cta__actions">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
             <Link href={ROUTES.workV3} className="v3-btn v3-btn--outline">
               See our work

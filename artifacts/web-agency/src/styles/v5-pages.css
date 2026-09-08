@@ -991,7 +991,7 @@
 .sm-v5page .sm-portfolio-card {
   display: grid;
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   background: var(--sm-surface, #fff);
   overflow: hidden;
 }
@@ -1026,7 +1026,7 @@
 .sm-v5page .sm-portfolio-empty {
   grid-column: 1 / -1;
   border: 1px dashed var(--sm-line-strong, #A9CFD6);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   padding: 2.5rem 1.5rem;
   text-align: center;
   color: var(--sm-text-muted, #4A6472);
@@ -1086,7 +1086,7 @@
   overflow-y: auto;
   background: var(--sm-surface, #fff);
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   padding: 2rem;
   box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
 }
@@ -1221,7 +1221,7 @@
   }
   .sm-v5page .sm-team-dialog__panel {
     max-height: 85vh;
-    border-radius: var(--sm-radius-l, 16px) var(--sm-radius-l, 16px) 0 0;
+    border-radius: var(--sm-radius-card, 22px) var(--sm-radius-card, 22px) 0 0;
     padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
   }
   .sm-v5page .sm-team-dialog[open] .sm-team-dialog__panel {
@@ -1372,7 +1372,7 @@
   gap: 1rem;
   padding: 1.5rem;
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   background: var(--sm-surface, #fff);
   box-shadow: var(--sm-shadow-1, 0 1px 2px rgb(11 58 62 / .06), 0 6px 20px rgb(11 58 62 / .06));
 }
@@ -1617,7 +1617,7 @@
 /* ── Purposeful service figure (owner responsive-first media pass) ─────── */
 .sm-v5page .sm-service-figure {
   margin: 1.2rem 0 0.4rem;
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   overflow: hidden;
   border: 1px solid var(--sm-mint-border, #80E9BE);
   box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
@@ -1913,7 +1913,7 @@
   flex-direction: column;
   max-height: min(760px, calc(100vh - 2rem));
   background: var(--sm-white, #fff);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.2));
   overflow: hidden;
 }

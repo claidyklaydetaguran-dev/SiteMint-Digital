@@ -108,12 +108,16 @@ check(
     homeV5Src,
   ),
 );
+// Professional redesign (owner directive 2026-09-09): the extra hero brand
+// line was retired ("fewer labels competing above the fold" — the header
+// wordmark establishes the brand), and the secondary CTA is the approved
+// "See Our Work". The hero eyebrow speaks the category line instead.
 check(
-  "brand line",
-  /Capture\. Organize\. Connect\. Resolve\./.test(homeV5Src),
+  "hero eyebrow (category line)",
+  /Websites · Systems · Automation/.test(homeV5Src),
 );
 check("primary CTA label", /Plan My Project/.test(homeV5Src));
-check("secondary CTA label", /See What We Build/.test(homeV5Src));
+check("secondary CTA label", /See Our Work/.test(homeV5Src));
 
 console.log("4. Reveal used at most twice per section");
 {

@@ -679,8 +679,8 @@
 }
 .sm-work-card {
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
-  padding: 1.5rem;
+  border-radius: var(--sm-radius-card, 22px);
+  padding: var(--sm-card-pad, 1.5rem);
   background: var(--sm-surface, #fff);
 }
 .sm-work-card__title {
@@ -740,8 +740,9 @@
 }
 .sm-pricing-card {
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
-  padding: 1.5rem;
+  border-radius: var(--sm-radius-card, 22px);
+  padding: var(--sm-card-pad, 1.5rem);
+  background: var(--sm-surface, #fff);
 }
 .sm-pricing-card.is-recommended {
   border-color: var(--sm-mint-500, #32C5D2);
@@ -801,9 +802,10 @@
   display: grid;
   justify-items: start;
   gap: 0.3rem;
-  padding: 1.25rem;
+  padding: var(--sm-card-pad, 1.25rem);
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
+  background: var(--sm-surface, #fff);
 }
 /* Team avatar (owner directive, 2026-09-05: named team, no stock/generated
    photos yet). A CSS-only initials monogram on a mint→ink disc — a fixed
@@ -2318,9 +2320,13 @@
   box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
   transform: translateY(-2px);
 }
+/* Professional redesign (2026-09-09): the reference's editorial team card —
+   the portrait carries the card (full-width, gently rounded) rather than a
+   small inset thumbnail. */
 .sm-home-v5 .sm-team-card__avatar {
-  width: 116px;
-  border-radius: 18px;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
   overflow: hidden;
 }
 .sm-home-v5 .sm-team-card__avatar img {
@@ -2577,10 +2583,12 @@
   }
 }
 .sm-capgroup {
+  /* Professional redesign (2026-09-09): the reference card language —
+     22px radius, ~34px desktop padding, quiet border, polished white. */
   border: 1px solid var(--sm-line, #CFE7EA);
-  border-radius: var(--sm-radius-l, 16px);
+  border-radius: var(--sm-radius-card, 22px);
   background: var(--sm-surface, #fff);
-  padding: 1.4rem 1.5rem 1.25rem;
+  padding: var(--sm-card-pad, 1.5rem);
   display: grid;
   gap: 0.9rem;
   align-content: start;
@@ -2606,9 +2614,9 @@
 }
 .sm-capgroup__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .sm-capgroup__promise {
   grid-column: 2;

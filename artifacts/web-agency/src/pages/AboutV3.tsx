@@ -217,7 +217,7 @@ export default function AboutV3() {
           </p>
           <div className="v3m-cta__actions">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
             <Link href={ROUTES.workV3} className="v3-btn v3-btn--outline reveal-fade-up">
               Inspect our work first

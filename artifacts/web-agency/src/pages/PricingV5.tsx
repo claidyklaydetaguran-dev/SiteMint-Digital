@@ -223,7 +223,7 @@ export default function PricingV5() {
               Configure Your Scope
             </a>
             <Link href={ROUTES.start} className="v3-btn v3-btn--outline">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
           </div>
         </div>
@@ -324,7 +324,7 @@ export default function PricingV5() {
           </p>
           <div className="v3m-cta__actions">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary reveal-fade-up">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
           </div>
         </div>

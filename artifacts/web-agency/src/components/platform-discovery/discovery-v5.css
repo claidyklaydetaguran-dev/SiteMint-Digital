@@ -544,3 +544,69 @@
 .discovery-v5 [data-selected="true"] {
   box-shadow: var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client-approved professional redesign (owner directive 2026-09-09).
+   Discovery adopts the reference system used across the public site:
+   Manrope display headings, porcelain page ground with the guided planner
+   on a clean white 22px-radius surface, quiet borders, 48px/10px-radius
+   primary actions. The guided questionnaire, branching, and draft
+   behaviour are untouched — this is presentation only.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Page ground: porcelain, so the form surface reads as a polished white
+   card the way the reference's content surfaces do. */
+.discovery-v5 {
+  --sm-color-bg-canvas: 168 33% 98%; /* porcelain #F9FCFB-class ground */
+}
+
+/* Display voice: Manrope for every heading in the planner (the shared
+   platform tokens keep the system stack for body/UI text). */
+.discovery-v5 h1,
+.discovery-v5 h2,
+.discovery-v5 h3,
+.discovery-v5 .dv5-rail-title {
+  font-family: "Manrope", "Manrope Fallback", ui-sans-serif, system-ui,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* The working column becomes the clean white form surface. */
+.dv5-workspace {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(var(--sm-color-border-subtle));
+  border-radius: 22px;
+  padding: clamp(1.1rem, 0.8rem + 1.2vw, 2rem);
+}
+@media (max-width: 639px) {
+  .dv5-workspace {
+    /* Full-bleed comfort on phones — the card chrome would crowd 320px. */
+    border-radius: 16px;
+    padding: 1rem;
+  }
+}
+
+/* Rail eyebrow joins the Manrope-caps eyebrow voice. */
+.dv5-rail-eyebrow {
+  font-family: "Manrope", "Manrope Fallback", ui-sans-serif, system-ui,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+/* Actions: the reference's 48px-tall, 10px-radius bold buttons. */
+.discovery-v5 .pp-btn {
+  border-radius: 10px;
+  font-weight: 700;
+}
+.discovery-v5 .pp-btn.pp-btn-primary {
+  min-height: 48px;
+}
+
+/* The sticky mobile nav bar sits on the porcelain ground now. */
+@media (max-width: 767px) {
+  .dv5-nav {
+    background: hsl(var(--sm-color-bg-canvas) / 0.96);
+  }
+}
