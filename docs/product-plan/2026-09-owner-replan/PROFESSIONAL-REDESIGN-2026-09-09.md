@@ -102,6 +102,40 @@ the internal ops/auth stacks.
 - **Operations CRM** — not part of this pass (staff-only; mint
   normalization already certified). The ops chrome keeps `--sm-ink-950`.
 
+## 4a · Owner corrections (same day, applied before the preview checkpoint)
+
+1. **Team portraits** — per-person focal points (`teamV5.portraitPosition`):
+   Claidy's and Saisa's 3:4 sources were center-cropped by the shared 4:3
+   viewport, cutting their heads; their crop windows now hold the top of
+   frame (full head + headroom + shoulders). Shasta's 4:3 source fills the
+   frame exactly and is untouched. No photograph was edited, stretched, or
+   regenerated. Documented visual check: team-section captures at 1348 /
+   820 / 390 in the owner pack.
+2. **Main navigation** — AI Receptionist left the top level; the Services
+   dropdown carries the six recommended categories (Websites & Web
+   Applications · CRM & Business Systems · AI & Automation · AI
+   Receptionist · SEO, Advertising & Growth · Ongoing Support) on desktop
+   (3×2) and in the mobile Services accordion. Route and landing page
+   unchanged; homepage featured section, cross-links, and footer still
+   link it.
+3. **AI Receptionist product nav** — simplified to Overview / Try the Demo
+   / How It Helps / FAQ (+ Sign in + one beta CTA). All page sections
+   remain in order; single row fits from 1024px (CTA-edge probed),
+   scrollable rail below. The `:has()` header-height selector was replaced
+   by a PublicShell-stamped `data-header-mode` (the `:has()` measured
+   ~3.2s of Style & Layout on this page under Lighthouse).
+4. **AI & Automation homepage section** — "Let routine work move forward
+   automatically." + `AutomationDemo`: three readable stages (Inquiry
+   received / Information organized / Follow-up ready), auto-advancing,
+   clickable, filling signal line, HTML-text sample cards, reduced-motion
+   static state, illustration disclosure. CTA "See How Automation Can
+   Help".
+5. **AI Receptionist homepage signal** — the faint rings became a
+   call-signal card: one controlled pulse, defined waveform, "Incoming
+   call — answered", three outcome rows (Call answered / Details captured
+   / Next step ready), a visible thread into the dashboard preview, and
+   the simulated/private-beta note.
+
 ## 5 · Discovery production repair — status: PENDING, NOT APPLIED
 
 Carried unchanged from the prior checkpoint, isolated in commit `8e4e78e`
