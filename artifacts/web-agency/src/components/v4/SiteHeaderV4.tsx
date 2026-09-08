@@ -331,10 +331,13 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
       data-mode={headerMode}
     >
       <div className="v4-header__inner">
+        {/* No aria-label: the wordmark's own text ("SiteMint. Digital") is
+            the accessible name — an override can never contain the visible
+            text exactly once axe normalizes the two-line wordmark (WCAG
+            2.5.3 label-in-name). */}
         <Link
           href="/"
           className="v4-header__brand"
-          aria-label="SiteMint. Digital — home"
           onClick={(e) => handleActiveNavClick(e, location === ROUTES.home)}
         >
           {/* Product mode hides the wordmark below ~480px to protect the

@@ -51,7 +51,9 @@ export default function DiscoveryPage() {
         }}
       >
         <div className="mx-auto flex max-w-[76rem] items-center justify-between px-4 py-3 sm:px-6">
-          <a href="/" aria-label="SiteMint. Digital — back to home" className="dsc-brand">
+          {/* No aria-label — the wordmark text is the accessible name; the
+              adjacent "← Back to home" link carries the going-home context. */}
+          <a href="/" className="dsc-brand">
             <BrandWordmark />
           </a>
           <a

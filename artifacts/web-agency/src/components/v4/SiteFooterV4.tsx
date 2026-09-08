@@ -22,11 +22,9 @@ export function SiteFooterV4() {
     <footer className="v4-footer">
       <div className="v4-footer__inner">
         <div>
-          <Link
-            href="/"
-            className="v4-footer__brand"
-            aria-label="SiteMint. Digital — home"
-          >
+          {/* No aria-label — see SiteHeaderV4: the wordmark text is the
+              accessible name (WCAG 2.5.3 label-in-name). */}
+          <Link href="/" className="v4-footer__brand">
             <BrandWordmark />
           </Link>
           <p className="v4-footer__tag">
