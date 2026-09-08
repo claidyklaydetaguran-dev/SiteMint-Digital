@@ -136,13 +136,41 @@ Dead-control audit: nav 10/10, interactions 8/8, routing 9/9, access
 26/26 (real-click, not source presence) — re-run on the fixed build in
 the final battery below.
 
-## 5. Gates (final battery, this build)
+## 4b. Further defects the new gate found (fixed in this program)
 
-See §12/§13 of SITEMINT-FINAL-UIUX-AUDIT.md for the release history. This
-program's build: typecheck 0 errors · opsContract all-pass (incl. new
-decorative-accent ban) · clip gate 171 cells · media gate 12/12 ·
-prerender 22 docs · plus the pre-existing battery (contract chain, tests,
-scans, FF/WebKit, a11y, CWV medians) re-run before any publish.
+- **R4 — hero clipped/mis-stacked on short viewports** (three stages of
+  the same family): fixed 100svh sticky stage clipped the phase ledger →
+  flow mode below 700px height; then the flow mode's first copy line sat
+  under the fixed header → header clearance moved onto the stage; then
+  the ≥768px absolute-copy formula (64px + usable×0.4 − clamp(150px…))
+  landed the copy ABOVE the header at 844×390 → in flow mode the copy is
+  static, ordered first, field capped at 30svh (end-of-file rule so it
+  out-cascades the absolute composition).
+- **R5 — Build Preview widened every sibling at 320px**: the stage
+  stepper's min-content (~328px) sized the `.sm-bp` grid's shared column
+  track past the 280px container, pushing the mock device frame 28px
+  through the clipped corner-host section edge. All `.sm-bp` children and
+  `.sm-split` children now carry `min-width: 0`; the stepper/control rows
+  scroll in their own boxes when they genuinely cannot fit.
+- Two checker refinements recorded for honesty: stretched-link overlays
+  (transparent whole-card controls) are not "occlusion", and sub-pixel
+  transition residue (<0.75px) is not "stuck".
+
+## 5. Gates (final build `assets/index-XkHjYFRf.js`, prerendered, 2026-09-08)
+
+| Gate | Result |
+|---|---|
+| WSL battery (source tar of this program) | contract chain green · tsc 0 errors · 1055/1055 tests · wa + hd + hd-voice + wa-live builds · built-output scans 0 leaks · voice-boundary greps 0 |
+| opsContract (incl. NEW decorative-accent ban) | all pass |
+| Prerender | 22 documents + spa-fallback.json, gate CLEAN |
+| **Clip gate (new)** — 171 route×viewport cells incl. 320×568, 844×390, 932×430, 640×400 (200%-zoom class) | **0 failures** |
+| **Media gate (new)** — films advance in-view desktop+mobile, 200/206 URL probes, blocked-autoplay poster check | **12/12** |
+| Access / overlay / errors / nav / matrix / mobile-video / live-voice | 26/26 · 19/19 · CLEAN · 10/10 · 66/66 · 4/4 · 2/2 |
+| Routing / interactions / forms / motion | 9/9 · 8/8 · 7/7 · 12 routes 0 stuck |
+| Decorative-video chrome (Chrome + Edge) | 6/6 + 6/6 |
+| Firefox 155 + WebKit 26.6 (incl. landscape no-overflow) | 88/88 |
+| Accessibility (18 public routes, corrected list) | 100 × 18 |
+| Perf (3-run throttled-mobile medians, local preview) | home 3.88–4.05s LCP / CLS 0.000 / TBT ≤91ms · receptionist 3.37s / 0.000 / 12ms — production-edge equivalents measured 2.91s/2.55s on 2026-09-07 (gzip + HTTP/3); CLS 0 everywhere |
 
 ## 6. Remaining owner-decision items (unchanged)
 
