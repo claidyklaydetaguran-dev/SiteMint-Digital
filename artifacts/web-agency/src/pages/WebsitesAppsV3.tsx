@@ -52,7 +52,7 @@ const content: ServicePageContent = {
       },
       {
         title: "Build the system behind it",
-        body: "Forms become structured intake; intake becomes records; records trigger follow-up. The site is the visible tip of a working pipeline.",
+        body: "Forms become structured intake; intake becomes customer records; each record kicks off the right follow-up. The site is the visible tip of a working follow-up system.",
       },
       {
         title: "Launch, measure, refine",

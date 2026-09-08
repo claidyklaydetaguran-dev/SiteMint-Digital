@@ -240,7 +240,7 @@ function CrmSystemsSection() {
         <h2 className="v4-h2 reveal-clip">Where the business runs, in one place.</h2>
         <p className="v4-lede reveal-fade-up">
           For teams whose leads live in a spreadsheet, an inbox, and
-          someone's memory: pipeline, tasks, and records the owner actually
+          someone's memory: the customer list, tasks, and follow-up the owner actually
           looks at — built around how the business already works instead of
           forcing a generic template onto it. The map below walks the same
           seven steps a real project moves through — every name in it is
@@ -248,10 +248,10 @@ function CrmSystemsSection() {
           publicly.
         </p>
         <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
-          A CRM connection is part of the Growth and Custom systems above,
-          configured to your pipeline during discovery — it's the record
-          every website form, automated follow-up, and receptionist call
-          below writes to, so nothing lives in two places.
+          A customer-records connection is part of the Growth and Custom
+          systems above, set up around how you work during discovery — it's
+          the record every website form, automated follow-up, and
+          receptionist call below writes to, so nothing lives in two places.
         </p>
         <ConnectedOpsMap />
         <div className="sm-crm-cta">
@@ -343,9 +343,9 @@ function ReceptionistSpotlight() {
             using the business's actual rules and availability.
           </p>
           <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
-            Every call it handles becomes a CRM record and, where automation
-            is in scope, a follow-up — the same connected pipeline the rest
-            of this page describes, by phone instead of by form.
+            Every call it handles becomes a customer record and, where
+            automation is in scope, a follow-up — the same connected system
+            the rest of this page describes, by phone instead of by form.
           </p>
           <Link href={ROUTES.aiReceptionist} className="v3-btn v3-btn--primary">
             See the AI Receptionist →

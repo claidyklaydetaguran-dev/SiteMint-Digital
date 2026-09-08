@@ -167,7 +167,7 @@ const content: ServicePageContent = {
     {
       kicker: "In production",
       title: "SiteMint's own operations",
-      desc: "Our pipeline, campaigns, and delivery run on the automation engine we build with.",
+      desc: "Our own follow-up, campaigns, and delivery run on the same automation we build for clients.",
       href: ROUTES.workV3,
     },
     {
@@ -193,10 +193,10 @@ function CrmSystemsSection() {
           <span className="v3m-sechead__no">04b · CRM &amp; internal systems</span>
           <h2 className="v3-h2 reveal-clip">Where the business runs, in one place.</h2>
           <p className="v3-lede reveal-fade-up">
-            There is no separate CRM route yet — CRM &amp; internal systems is
-            part of this service, because the CRM is where automation's
-            output actually lives: the pipeline, the tasks, and the records
-            your team looks at every day.
+            There is no separate CRM route yet — your customer-and-follow-up
+            hub is part of this service, because it's where the automated
+            work actually lands: the customer list, the tasks, and the
+            records your team looks at every day.
           </p>
           <p className="v3-body reveal-fade-up">
             It's the record every website form, AI Receptionist call, and
@@ -255,8 +255,8 @@ const GROWTH_INFRA_ITEMS = [
   },
   {
     icon: Webhook,
-    title: "Webhooks",
-    desc: "Events from the site or CRM pushed to the ad platforms and tools that need them.",
+    title: "Connected tools",
+    desc: "Activity on your site or in your customer list is shared automatically with the ad platforms and tools that need it.",
   },
   {
     icon: Layers,

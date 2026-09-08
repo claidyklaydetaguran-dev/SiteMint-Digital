@@ -149,7 +149,7 @@ const content: ServicePageContent = {
     {
       kicker: "In production",
       title: "SiteMint's own operations",
-      desc: "Our pipeline, campaigns, and delivery run on the automation engine we build with.",
+      desc: "Our own follow-up, campaigns, and delivery run on the same automation we build for clients.",
       href: ROUTES.workV3,
     },
     {
