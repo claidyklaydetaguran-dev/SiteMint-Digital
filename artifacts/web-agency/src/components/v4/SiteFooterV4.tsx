@@ -36,7 +36,7 @@ export function SiteFooterV4() {
 
         <div className="v4-footer__cols">
           <div className="v4-footer__col">
-            <span className="v4-footer__col-title">What We Build</span>
+            <span className="v4-footer__col-title">Services</span>
             {whatWeBuildV4.map((item) => (
               <Link key={item.label} href={item.href}>
                 {item.label}

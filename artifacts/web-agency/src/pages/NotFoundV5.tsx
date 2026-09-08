@@ -14,7 +14,7 @@ import "@/styles/v5-pages.css";
 const EXITS = [
   { label: "Home", href: ROUTES.home, isRoute: true },
   { label: "Build Your SiteMint System", href: ROUTES.start, isRoute: true },
-  { label: "What We Build", href: ROUTES.services, isRoute: true },
+  { label: "Services", href: ROUTES.services, isRoute: true },
   { label: "AI Receptionist", href: ROUTES.aiReceptionist, isRoute: true },
   { label: "Client Sign In", href: dashboardUrl("/login"), isRoute: false },
 ] as const;

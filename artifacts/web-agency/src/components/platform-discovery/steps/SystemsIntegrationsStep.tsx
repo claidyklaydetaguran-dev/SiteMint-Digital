@@ -42,7 +42,7 @@ export function SystemsIntegrationsStep() {
         name="readiness.integrations"
         render={({ field }) => (
           <div className="space-y-2">
-            <Label>Current tools and data you'd like connected (optional, comma separated)</Label>
+            <Label>Tools you already use that we should connect to (optional, comma separated — just name them; we'll figure out the how)</Label>
             <Input
               value={(field.value ?? []).join(", ")}
               onChange={(event) => {
@@ -52,7 +52,7 @@ export function SystemsIntegrationsStep() {
                   .filter((item) => item.length > 0);
                 field.onChange(items);
               }}
-              placeholder="e.g. QuickBooks, Mailchimp, Calendly, webhooks to your CRM"
+              placeholder="e.g. QuickBooks, Mailchimp, Calendly, Google Calendar"
             />
           </div>
         )}

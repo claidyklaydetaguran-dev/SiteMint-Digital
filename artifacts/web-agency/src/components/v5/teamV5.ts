@@ -63,7 +63,7 @@ export const teamV5: TeamMemberV5[] = [
     support:
       "Claidy reviews technical decisions and launch readiness so your project ships secure, maintainable, and ready to run.",
     summary:
-      "Leads the architecture and engineering that turn approved ideas into reliable digital products.",
+      "Leads the design and engineering that turn approved ideas into reliable digital products.",
     tags: ["Engineering", "Systems", "AI & Automation"],
   },
   {

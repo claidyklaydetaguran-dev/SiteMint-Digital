@@ -54,9 +54,10 @@ export const HERO_COPY = {
   eyebrow: "SiteMint AI Receptionist",
   /** Private-beta status indicator, shown as its own badge (not the eyebrow). */
   betaStatus: "Private beta — invite only",
-  title: "Missed calls shouldn't mean missed opportunities.",
+  /* Business-first outcome (owner directive 2026-09-08). */
+  title: "Help every caller, even when your team is busy.",
   supporting:
-    "Give callers a helpful next step—even when your team cannot answer—using your business information, availability, and appointment rules.",
+    "It answers routine calls with your approved business information, collects the caller's details and why they're calling, helps schedule where you've set that up, and sends you a useful summary.",
   /** Filled/primary action — anchors to the Interactive Preview section. */
   primaryCta: "Explore the Interactive Preview",
   /** Outline/secondary action — anchors to Request Beta Access. */

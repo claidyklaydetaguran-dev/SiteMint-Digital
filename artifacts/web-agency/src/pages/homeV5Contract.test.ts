@@ -92,20 +92,19 @@ console.log("2. Brand hygiene (W-1) — no visible 'Signal' copy");
   );
 }
 
-console.log("3. Amended hero copy literals (W-1) are present verbatim");
-// Mint-brand directive (2026-09-07): the key phrase carries the signature
-// highlight (`.sm-mark`), so the VISIBLE text is unchanged but the source
-// splits it across the mark markup — the check asserts both halves in
-// order, with exactly the approved highlight span between them.
+console.log("3. Business-owner hero copy (owner directive 2026-09-08) is present verbatim");
+// The key phrase carries the signature highlight (`.sm-mark`), so the
+// VISIBLE text splits across the mark markup — the check asserts both
+// halves in order, with exactly the approved highlight span between them.
 check(
   "headline",
-  /Digital systems built to\{" "\}[\s\S]{0,40}<span className="sm-mark">move your business forward\.<\/span>/.test(
+  /Websites and business systems built to\{" "\}[\s\S]{0,40}<span className="sm-mark">help you grow\.<\/span>/.test(
     homeV5Src,
   ),
 );
 check(
   "supporting copy",
-  /SiteMint designs websites, web applications, CRM systems, AI[\s\S]*automation, and custom software that work together/.test(
+  /SiteMint helps you attract customers, organize inquiries,[\s\S]*follow up faster, and reduce repetitive work/.test(
     homeV5Src,
   ),
 );
@@ -113,8 +112,8 @@ check(
   "brand line",
   /Capture\. Organize\. Connect\. Resolve\./.test(homeV5Src),
 );
-check("primary CTA label", /Build Your SiteMint System/.test(homeV5Src));
-check("secondary CTA label", /Explore What We Build/.test(homeV5Src));
+check("primary CTA label", /Plan My Project/.test(homeV5Src));
+check("secondary CTA label", /See What We Build/.test(homeV5Src));
 
 console.log("4. Reveal used at most twice per section");
 {
@@ -134,29 +133,41 @@ console.log("4. Reveal used at most twice per section");
   check("no section exceeds two <Reveal> uses", !anyOverLimit);
 }
 
-console.log("5. Nine-capability ledger expansion is present verbatim");
+console.log("5. Four business-owner capability groups (owner directive 2026-09-08)");
 check(
-  "ledger heading says 'Nine capabilities'",
-  /Nine capabilities\. One connected system\./.test(homeV5Src),
+  "grouped heading",
+  /Everything your business needs to grow and stay organized\./.test(homeV5Src),
 );
 check(
-  "ledger lede says 'nine capabilities'",
-  /the same nine capabilities/.test(homeV5Src),
+  "supporting explanation",
+  /Start with one service or connect everything/.test(homeV5Src),
 );
-const NINE_CAPABILITY_LABELS = [
-  "Strategy & Discovery",
-  "Websites",
-  "Web Applications",
-  "CRM & Business Systems",
-  "AI Systems & Automation",
-  "Growth Infrastructure",
-  "Advertising Services",
-  "AI Receptionist",
-  "Ongoing Support & Optimization",
+const CAPABILITY_GROUP_TITLES = [
+  "Attract customers",
+  "Organize the business",
+  "Follow up consistently",
+  "Improve over time",
 ];
-for (const label of NINE_CAPABILITY_LABELS) {
-  check(`ledger row present: "${label}"`, homeV5Src.includes(label));
+for (const title of CAPABILITY_GROUP_TITLES) {
+  check(`capability group present: "${title}"`, homeV5Src.includes(title));
 }
+// The regrouping must not LOSE capabilities — each former ledger entry
+// survives inside a group (some renamed into owner language; the mapping
+// is documented on CAPABILITY_GROUPS).
+const PRESERVED_CAPABILITIES = [
+  "Websites",
+  "Custom internal tools",
+  "Customer information",
+  "Advertising & campaigns",
+  "AI Receptionist",
+  "Ongoing support",
+  "Forms & inquiry handling",
+  "Reporting",
+];
+for (const label of PRESERVED_CAPABILITIES) {
+  check(`capability preserved: "${label}"`, homeV5Src.includes(label));
+}
+check("every group offers View details", (homeV5Src.match(/detailsLabel: "View /g) ?? []).length === 4);
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed.`);

@@ -43,7 +43,7 @@ export default function AboutV3() {
             SiteMint Digital designs, builds, and runs business systems —
             including our own. The discovery flow on this site is the same
             structured intake we build for clients. The automation and CRM
-            we recommend runs our own pipeline. Our AI Receptionist product is
+            we recommend runs our own follow-up. Our AI Receptionist product is
             in private, invite-only beta. We use what we build, which keeps
             us honest about what works and what's still in progress.
           </p>

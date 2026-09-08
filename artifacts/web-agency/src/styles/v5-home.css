@@ -2561,3 +2561,120 @@
     padding-bottom: 0.6rem;
   }
 }
+
+/* ── Business-owner capability groups (owner directive 2026-09-08) — the
+   ledger's nine capabilities, regrouped into the four things an owner is
+   trying to do. Reuses the ledger row typography tokens. ─────────────── */
+.sm-capgroups {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+@media (min-width: 900px) {
+  .sm-capgroups {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+}
+.sm-capgroup {
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-l, 16px);
+  background: var(--sm-surface, #fff);
+  padding: 1.4rem 1.5rem 1.25rem;
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .sm-capgroup:hover,
+  .sm-capgroup:focus-within {
+    transform: translateY(-3px);
+    box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+    border-color: var(--sm-mint-border, #80E9BE);
+  }
+}
+.sm-capgroup__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.8rem;
+  row-gap: 0.3rem;
+  align-items: baseline;
+}
+.sm-capgroup__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.sm-capgroup__promise {
+  grid-column: 2;
+  margin: 0;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.sm-capgroup__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.sm-capgroup__item {
+  display: grid;
+  gap: 0.15rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--sm-mint-signature, #99F5D0);
+}
+.sm-capgroup__item .sm-ledger__outcome {
+  font-size: 0.9rem;
+}
+.sm-capgroup__details {
+  justify-self: start;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--sm-mint-ink, #0B7487);
+  text-decoration: none;
+  border-bottom: 2px solid var(--sm-mint-signature, #99F5D0);
+  padding-bottom: 1px;
+}
+.sm-capgroup__details:hover,
+.sm-capgroup__details:focus-visible {
+  border-bottom-color: var(--sm-mint-ink, #0B7487);
+}
+
+/* ── "What happens behind the scenes" disclosure — the optional technical
+   layer (progressive disclosure per the language hierarchy). ──────────── */
+.sm-tech-detail {
+  margin-top: 1.75rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface-alt, #EDF9FA);
+  padding: 0.35rem 1rem;
+}
+.sm-tech-detail summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.6rem 0;
+  color: var(--sm-mint-ink, #0B7487);
+  list-style-position: inside;
+}
+.sm-tech-detail summary:hover {
+  text-decoration: underline;
+}
+.sm-tech-detail__list {
+  margin: 0.25rem 0 0.9rem;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: 0.5rem;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+.sm-tech-detail__list strong {
+  color: var(--sm-text, #173642);
+}

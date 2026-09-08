@@ -41,8 +41,8 @@ export const SyncAssistantButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, S
 
     if (!eligible || pending) {
       const reason = pending
-        ? "Sending this configuration to the voice provider."
-        : (disabledReason ?? "There is nothing to send to the voice provider right now.");
+        ? "Applying your receptionist settings to the phone system."
+        : (disabledReason ?? "Your receptionist settings are already up to date.");
       const guardedNoop = (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
         e.preventDefault();
       };

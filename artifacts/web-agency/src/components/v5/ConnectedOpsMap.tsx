@@ -70,7 +70,7 @@ export const OPS_MAP_NODES: OpsMapNode[] = [
     organizes:
       "SiteMint creates a new project record and a contact record the moment the brief lands, tagged with its source and every intake answer attached as notes.",
     automation:
-      "A webhook pushes the submission into the pipeline and fires an acknowledgment email within a minute. No automation touches pricing or scope.",
+      "The submission lands in the follow-up system automatically, and an acknowledgment email goes out within a minute. No automation touches pricing or scope.",
     teamSees:
       "A new card in the Discovery column with the full brief attached, visible to the assigned reviewer — nothing is client-facing yet.",
     nextAction:

@@ -40,11 +40,13 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
 
       {/* Headline */}
       <h1 className="pp-font-display text-3xl font-semibold text-[hsl(var(--sm-color-text-primary))] leading-tight">
-        Tell us what you're building
+        Let's plan your project together
       </h1>
       <p className="mt-3 text-base leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">
-        This form helps us understand your project, your situation, and what success looks like for your team.
-        We'll use your answers to prepare a personalized scope of work and proposal — at no cost.
+        This guided planner helps us understand your business, your customers,
+        and what success looks like for you. You describe the outcome you
+        want — we choose the right way to build it — and your answers become
+        a personalized plan and proposal, at no cost.
       </p>
 
       {/* Time estimate chip */}

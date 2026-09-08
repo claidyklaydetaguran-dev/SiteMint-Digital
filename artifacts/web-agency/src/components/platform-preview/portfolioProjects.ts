@@ -114,7 +114,7 @@ export const portfolioProjects: PortfolioProject[] = [
     contribution: [
       "Website strategy",
       "Responsive design",
-      "Conversion architecture",
+      "Conversion-focused design",
       "Service education",
       "Estimate journey",
     ],
@@ -147,7 +147,7 @@ export const portfolioProjects: PortfolioProject[] = [
         "Responsive design across the education journey",
         "Solar, storage, roofing, and financing content structure",
         "A step-by-step estimate journey with a no-obligation entry point",
-        "Conversion architecture serving residential and business visitors",
+        "Conversion-focused design serving residential and business visitors",
       ],
       outcome:
         "A clear estimate pathway that lets a homeowner learn at their own pace and move confidently toward a personalized estimate, with legal, accessibility, and contact routes kept usable throughout.",

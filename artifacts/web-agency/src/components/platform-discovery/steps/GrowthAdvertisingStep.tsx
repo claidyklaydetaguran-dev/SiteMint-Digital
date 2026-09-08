@@ -213,8 +213,8 @@ export function GrowthAdvertisingStep() {
             </div>
           )}
 
-          <YesNoUnsureField name="growth.hasPixelsConfigured" label="Do you have ad pixels or conversion tracking configured? (optional)" />
-          <YesNoUnsureField name="growth.analyticsConsentReady" label="Do you have analytics and cookie-consent set up? (optional)" />
+          <YesNoUnsureField name="growth.hasPixelsConfigured" label="Can you already see which ads bring you customers? (optional — this is what 'conversion tracking' does; 'unsure' is a perfectly good answer)" />
+          <YesNoUnsureField name="growth.analyticsConsentReady" label="Does your site already measure visitors and ask for cookie consent? (optional — we can set this up properly if not)" />
 
           <div className="space-y-2">
             <Label>Creative assets (images, video, copy) — where do things stand? (optional)</Label>

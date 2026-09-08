@@ -30,44 +30,47 @@ export interface V4PanelItem {
  * dropdown is a complete map of what SiteMint builds. Every href is a
  * completed destination (routes or real section anchors — no placeholders).
  */
+/* Business-owner communication redesign (owner directive 2026-09-08): the
+ * panel leads with what improves in the business; the delivery vocabulary
+ * moves into descriptions written for an owner, not a developer. */
 export const whatWeBuildV4: V4PanelItem[] = [
   {
     label: "Websites & Web Apps",
-    outcome: "Turn visits into inquiries",
+    outcome: "Turn attention into action",
     description:
-      "Marketing sites and custom software built around how the business runs.",
+      "A website that wins customers, plus custom tools shaped to how your business runs.",
     href: ROUTES.websitesApps,
     glyph: "site",
   },
   {
-    label: "CRM & Internal Systems",
-    outcome: "See every deal in one place",
+    label: "Business Systems",
+    outcome: "Keep everything in one place",
     description:
-      "Records, pipelines, tasks, and permissions — the operating view behind the website.",
+      "Customer details, tasks, and follow-up organized where the whole team can see them.",
     href: "/#crm-systems",
     glyph: "crm",
   },
   {
-    label: "AI Systems & Automation",
-    outcome: "Never lose a follow-up",
+    label: "AI & Automation",
+    outcome: "Less repetitive work",
     description:
-      "Automation, AI-assisted workflows, and the connections that carry work forward.",
+      "Routine work handled automatically — reminders, follow-ups, and busywork off your plate.",
     href: ROUTES.aiSystems,
     glyph: "automation",
   },
   {
     label: "AI Receptionist",
-    outcome: "Answer every call usefully",
+    outcome: "Help every caller",
     description:
-      "A voice product that handles routine calls by your business rules. Private beta.",
+      "Answers routine calls, collects details, and sends you a useful summary. Private beta.",
     href: ROUTES.aiReceptionist,
     glyph: "voice",
   },
   {
-    label: "SEO, Analytics & Growth",
-    outcome: "Know what actually converts",
+    label: "Growth & Advertising",
+    outcome: "Know what's working",
     description:
-      "Technical SEO, analytics, pixels, and campaign-ready infrastructure under it all.",
+      "See which marketing brings customers, and put your budget where it earns.",
     href: `${ROUTES.services}#growth-infrastructure`,
     glyph: "growth",
   },
@@ -78,10 +81,12 @@ export interface V4NavLink {
   href: string;
 }
 
+/* Audience-oriented labels (owner directive 2026-09-08): Our Work /
+ * How It Works / About read like a business, not a build system. */
 export const primaryNavV4: V4NavLink[] = [
-  { label: "Work", href: ROUTES.workV3 },
-  { label: "Process", href: ROUTES.process },
-  { label: "Company", href: ROUTES.about },
+  { label: "Our Work", href: ROUTES.workV3 },
+  { label: "How It Works", href: ROUTES.process },
+  { label: "About", href: ROUTES.about },
 ];
 
 /** Distinct product entry — outlined pill with the live signal dot. */

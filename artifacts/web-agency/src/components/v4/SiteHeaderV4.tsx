@@ -400,7 +400,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                 aria-current={isPillarActive(location) ? "page" : undefined}
                 onClick={() => setPanelOpen((v) => !v)}
               >
-                What We Build
+                Services
                 <ChevronDown aria-hidden="true" className="v4-nav__chevron" />
               </button>
 
@@ -410,7 +410,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                   ref={panelRef}
                   className="v4-panel"
                   role="region"
-                  aria-label="What We Build"
+                  aria-label="Services"
                 >
                   <div className="v4-panel__inner">
                     <div className="v4-panel__grid">
@@ -570,7 +570,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                 ) : (
                   <>
                     <MobileGroup
-                      title="What We Build"
+                      title="Services"
                       location={location}
                       onCloseMenu={() => setMenuOpen(false)}
                     >

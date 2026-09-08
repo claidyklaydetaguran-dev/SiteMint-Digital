@@ -23,8 +23,8 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 const content: ServicePageContent = {
   eyebrow: "Websites & Web Apps",
   eyebrowIcon: Globe,
-  headline: "A website that knows what happens next.",
-  lede: "Most sites end at the contact form. Ours are the front door of a working system: they capture the inquiry, qualify it, route it, and make sure a real person follows up.",
+  headline: "A website that turns attention into action.",
+  lede: "Most sites end at the contact form. Ours make sure every inquiry is received, organized, and followed up by a real person — so interest becomes customers instead of unread email.",
   problem: {
     title: "A pretty site that goes nowhere is a dead end with good lighting.",
     body: "Businesses pay for redesigns that change the paint but not the plumbing. Visitors still land on a generic form, the inquiry still arrives as a two-line email, and follow-up still depends on whoever checks the inbox. The problem was never the design — it was that the site had no idea what should happen after the click.",

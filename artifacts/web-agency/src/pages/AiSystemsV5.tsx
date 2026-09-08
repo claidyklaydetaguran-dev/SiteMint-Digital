@@ -36,8 +36,8 @@ import "@/styles/v5-pages.css";
 const content: ServicePageContent = {
   eyebrow: "AI Systems & Automation",
   eyebrowIcon: Workflow,
-  headline: "Less handoff. Less busywork. More momentum.",
-  lede: "The work between the work — follow-ups, reminders, record updates, routing, and the CRM that holds it all — is where opportunities quietly die. We automate it, with a person kept in the loop and an audit trail on every step.",
+  headline: "Keep your customers, tasks, and team in one organized place.",
+  lede: "The work between the work — follow-ups, reminders, keeping customer details current, sending each inquiry to the right next step — is where opportunities quietly die. We handle the routine parts automatically, with a person kept in the loop and a record of every step.",
   problem: {
     title: "Your team's memory is not a workflow engine.",
     body: "Every business runs invisible processes: reply to the inquiry, update the record, chase the quote, confirm the appointment. When those live in people's heads — or in a CRM nobody trusts — busy weeks break them, and nobody notices until the customer does.",

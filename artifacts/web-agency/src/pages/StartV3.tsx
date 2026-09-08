@@ -40,7 +40,7 @@ export default function StartV3() {
           </h1>
           <p className="v3-lede reveal-fade-up">
             Every SiteMint project starts with a short discovery brief. It's
-            structured, it saves as you go, and a person — not a pipeline —
+            structured, it saves as you go, and a person — not a machine —
             reads every word.
           </p>
           <div className="v3m-hero__actions reveal-fade-up">

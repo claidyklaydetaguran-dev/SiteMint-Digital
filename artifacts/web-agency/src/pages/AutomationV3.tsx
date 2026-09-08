@@ -18,8 +18,8 @@ import { ServicePage, type ServicePageContent } from "@/components/v3/ServicePag
 const content: ServicePageContent = {
   eyebrow: "Workflow Automation",
   eyebrowIcon: Workflow,
-  headline: "Less handoff. Less busywork. More momentum.",
-  lede: "The work between the work — follow-ups, reminders, record updates, routing — is where opportunities quietly die. We automate it, with a person kept in the loop and an audit trail on every step.",
+  headline: "Spend less time on repetitive work.",
+  lede: "The work between the work — follow-ups, reminders, updating customer details, sending each inquiry to the right next step — is where opportunities quietly die. We handle it automatically, with a person kept in the loop and a record of every step.",
   problem: {
     title: "Your team's memory is not a workflow engine.",
     body: "Every business runs invisible processes: reply to the inquiry, update the record, chase the quote, confirm the appointment. When those live in people's heads, busy weeks break them — and nobody notices until the customer does.",

@@ -49,7 +49,7 @@ const productionWork = [
     icon: Workflow,
     kicker: capabilityLabelsV5["in-development"],
     title: "SiteMint operations engine",
-    body: "The internal CRM and automation system that runs SiteMint's own pipeline: lead scoring, campaign sequences with stop-on-reply, task routing, and delivery tracking — the working proof behind our automation service.",
+    body: "The internal CRM and automation system that runs SiteMint's own follow-up: lead scoring, campaign sequences with stop-on-reply, task routing, and delivery tracking — the working proof behind our automation service.",
     detail:
       "Internal by design; we demonstrate the patterns, not customer data.",
     href: ROUTES.aiSystems,

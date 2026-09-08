@@ -11,7 +11,7 @@ const PRIMARY_TYPE_LABELS: Record<(typeof PROJECT_PRIMARY_TYPES)[number], string
   redesign: "A redesign of an existing website",
   web_application: "A custom web application",
   customer_portal: "A customer portal or account area",
-  internal_crm: "An internal CRM or lead management system",
+  internal_crm: "One place to track customers and follow-up (a CRM)",
   business_operations_system: "A business operations system",
   ai_receptionist: "An AI receptionist / call handling system",
   workflow_automation: "Workflow automation",

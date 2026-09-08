@@ -24,37 +24,52 @@ interface Stage {
   outcome: string;
 }
 
+/* Business-owner communication redesign (owner directive 2026-09-08): the
+   visible journey speaks in customer moments, not system components. The
+   original component vocabulary lives on in the "What happens behind the
+   scenes" panel below the diagram. */
 const STAGES: Stage[] = [
   {
-    title: "Website",
-    desc: "Your site is the front door — built so every visit that matters becomes an inquiry, not a bounce.",
-    outcome: "Outcome: no inquiry goes unnoticed",
+    title: "Customer visits",
+    desc: "Someone finds your business, and your website makes it easy to take the next step instead of bouncing away.",
+    outcome: "Outcome: no visit goes to waste",
   },
   {
-    title: "Capture",
-    desc: "The inquiry gets an immediate, useful reply — a form, a receptionist, or a site that responds — in your voice, with your rules.",
+    title: "Inquiry received",
+    desc: "They call or send an inquiry and get an immediate, useful reply — in your voice, with your rules.",
     outcome: "Outcome: every inquiry gets answered",
   },
   {
-    title: "CRM record",
-    desc: "Every detail lands in the CRM automatically: who they are, what they need, how warm the lead is.",
+    title: "Details organized",
+    desc: "Their details are saved automatically in one place: who they are, what they need, and how soon they need it.",
     outcome: "Outcome: nothing lives in someone's inbox",
   },
   {
-    title: "Automation",
-    desc: "Workflows follow up, remind, and route the next step to the right person — before the lead goes cold.",
+    title: "Follow-up assigned",
+    desc: "The right person gets the next step, and reminders go out on time — before the lead goes cold.",
     outcome: "Outcome: follow-up happens on time, every time",
   },
   {
-    title: "AI conversation",
-    desc: "Where it's in scope, an AI system handles the routine parts of the conversation — qualifying, scheduling, answering — and hands off to a person for judgment calls.",
-    outcome: "Outcome: routine work stops waiting on a person",
+    title: "Routine handled",
+    desc: "Where you've turned it on, routine questions and scheduling are handled automatically — anything needing judgment goes straight to a person.",
+    outcome: "Outcome: routine work stops waiting on someone",
   },
   {
-    title: "Resolved outcome",
-    desc: "The inquiry ends as a scheduled appointment, a completed task, or a real customer — and the record reflects it.",
-    outcome: "Outcome: attention became a resolved outcome",
+    title: "Customer helped",
+    desc: "The inquiry ends as a booking, a completed job, or a new customer — recorded where the whole team can see it.",
+    outcome: "Outcome: attention became a customer",
   },
+];
+
+/** The engineering view of the same six moments — shown only inside the
+ * optional "What happens behind the scenes" disclosure. */
+const BEHIND_THE_SCENES: ReadonlyArray<{ label: string; detail: string }> = [
+  { label: "Website", detail: "Pages built around one clear next action, with visit-to-inquiry tracking wired in." },
+  { label: "Capture", detail: "Forms and call handling write structured inquiries — no retyping from an inbox." },
+  { label: "CRM record", detail: "Each inquiry becomes a customer record with contact details, interest, and priority." },
+  { label: "Workflow automation", detail: "Rules assign owners, schedule reminders, and send follow-up sequences that stop when a human replies." },
+  { label: "AI conversation", detail: "The AI receptionist answers from approved business information only, and hands off with a summary." },
+  { label: "Resolution", detail: "Bookings, tasks, and outcomes update the same record, so reporting reflects reality." },
 ];
 
 /** Node anchors on the fixed 640×300 diagram. */
@@ -179,7 +194,7 @@ export function SignalJourneyV4({ reveal }: SignalJourneyV4Props) {
         <div className="v4-journey">
           <div className="v4-journey__copy" ref={reveal} data-v4-reveal>
             <h2 className="v4-h2">
-              One connected system, from first click to resolved outcome.
+              One connected system, from first visit to a customer helped.
             </h2>
             <p className="v4-lede">
               A missed call, a form no one answers, a lead that never gets a
@@ -188,7 +203,7 @@ export function SignalJourneyV4({ reveal }: SignalJourneyV4Props) {
               moving instead.
             </p>
             <p className="v4-pull-quote">
-              One thread, from first click to resolved outcome.
+              One thread, from first visit to customer.
             </p>
           </div>
 
@@ -201,7 +216,7 @@ export function SignalJourneyV4({ reveal }: SignalJourneyV4Props) {
             <svg
               viewBox="0 0 640 300"
               role="img"
-              aria-label="Diagram: an inquiry travels from the website through capture, the CRM record, automation, and an AI conversation to a resolved outcome"
+              aria-label="Diagram: a customer's inquiry travels from their first visit through being received, organized, and followed up until the customer is helped"
             >
               <defs>
                 <linearGradient id="v4-journey-grad" x1="0" y1="0" x2="1" y2="0">
@@ -272,6 +287,22 @@ export function SignalJourneyV4({ reveal }: SignalJourneyV4Props) {
             </div>
           </div>
         </div>
+
+        {/* Optional technical depth (owner directive 2026-09-08): the
+            engineering vocabulary stays available, but only behind an
+            explicit disclosure — never as the primary message. The
+            data-tech-detail attribute allowlists this content for the
+            plain-language guard. */}
+        <details className="sm-tech-detail" data-tech-detail ref={reveal} data-v4-reveal>
+          <summary>What happens behind the scenes</summary>
+          <ol className="sm-tech-detail__list">
+            {BEHIND_THE_SCENES.map((row) => (
+              <li key={row.label}>
+                <strong>{row.label}.</strong> {row.detail}
+              </li>
+            ))}
+          </ol>
+        </details>
       </div>
     </section>
   );

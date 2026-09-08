@@ -56,16 +56,67 @@ interface LedgerRow {
   outcome: string;
 }
 
-const LEDGER_ROWS: LedgerRow[] = [
-  { label: "Strategy & Discovery", outcome: "A structured brief before a single page gets built." },
-  { label: "Websites", outcome: "A credible, converting front door." },
-  { label: "Web Applications", outcome: "Custom software for how the business actually works." },
-  { label: "CRM & Business Systems", outcome: "One place the team trusts, instead of five." },
-  { label: "AI Systems & Automation", outcome: "Routine work handled; judgment stays human." },
-  { label: "Growth Infrastructure", outcome: "Tracking, pixels, and consent working before a dollar is spent." },
-  { label: "Advertising Services", outcome: "Meta and Google campaigns planned, launched, and reported on honestly." },
-  { label: "AI Receptionist", outcome: "Every call answered, qualified, and logged — private beta." },
-  { label: "Ongoing Support & Optimization", outcome: "The system tuned after launch, not abandoned at it." },
+/* Business-owner communication redesign (owner directive 2026-09-08): the
+   nine delivery capabilities are grouped into the four things a business
+   owner is actually trying to do. Nothing was removed — every capability
+   sits inside its group, and "View details" opens the full service page. */
+interface CapabilityGroup {
+  title: string;
+  promise: string;
+  items: LedgerRow[];
+  detailsHref: string;
+  detailsLabel: string;
+}
+
+const CAPABILITY_GROUPS: CapabilityGroup[] = [
+  {
+    title: "Attract customers",
+    promise: "Bring the right people to your business, and make it easy for them to act.",
+    items: [
+      { label: "Websites", outcome: "A credible front door that turns attention into inquiries." },
+      { label: "Search foundations", outcome: "Show up when people look for what you do." },
+      { label: "Advertising & campaigns", outcome: "Meta and Google campaigns planned, launched, and reported on honestly — separately scoped, never bundled by default." },
+      { label: "Know what's working", outcome: "See which marketing actually brings customers, before you spend more on it." },
+    ],
+    detailsHref: "/websites-apps",
+    detailsLabel: "View website & application details",
+  },
+  {
+    title: "Organize the business",
+    promise: "One place for customer details, work in progress, and what happens next.",
+    items: [
+      { label: "Customer information", outcome: "Every customer's details and follow-up in one place the team trusts, instead of five." },
+      { label: "Projects & tasks", outcome: "Who's doing what, by when — visible at a glance." },
+      { label: "Custom internal tools", outcome: "Software shaped to how your business actually works." },
+      { label: "Reporting", outcome: "Honest numbers on inquiries, follow-ups, and wins." },
+    ],
+    detailsHref: "/ai-systems",
+    detailsLabel: "View business-system details",
+  },
+  {
+    title: "Follow up consistently",
+    promise: "Every inquiry gets a next step — even when your team is busy.",
+    items: [
+      { label: "Forms & inquiry handling", outcome: "A structured brief instead of a two-line email — read properly before anyone calls you back." },
+      { label: "Reminders", outcome: "Follow-up happens on time, every time — and stops when a human replies." },
+      { label: "Customer communication", outcome: "Messages in your voice, with your rules." },
+      { label: "AI Receptionist", outcome: "Help every caller, even when your team is busy — private beta." },
+    ],
+    detailsHref: "/discovery-systems",
+    detailsLabel: "View follow-up system details",
+  },
+  {
+    title: "Improve over time",
+    promise: "Launch is the start — the system keeps getting tuned to reality.",
+    items: [
+      { label: "Performance monitoring", outcome: "Know when something needs attention before customers tell you." },
+      { label: "Marketing insights", outcome: "Learn which channels deserve more of your budget." },
+      { label: "Website optimization", outcome: "Pages improved from real visitor behaviour, not guesses." },
+      { label: "Ongoing support", outcome: "The system tuned after launch, not abandoned at it." },
+    ],
+    detailsHref: "/automation",
+    detailsLabel: "View improvement & support details",
+  },
 ];
 
 function WhatWeBuildLedger() {
@@ -78,23 +129,35 @@ function WhatWeBuildLedger() {
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
         <Reveal as="h2" className="v4-h2" words>
-          Nine capabilities. One connected system.
+          Everything your business needs to grow and stay organized.
         </Reveal>
         <p className="v4-lede reveal-fade-up" ref={reveal} data-v4-reveal>
-          Every SiteMint engagement draws from the same nine capabilities —
-          alone or combined into one system, depending on what the business
-          actually needs. Advertising services are a separately scoped,
-          recurring engagement, never bundled by default.
+          Start with one service or connect everything—from your website and
+          customer inquiries to follow-up, daily operations, and AI-assisted
+          support.
         </p>
-        <ol className="sm-ledger__list" ref={reveal} data-v4-reveal>
-          {LEDGER_ROWS.map((row, i) => (
-            <li className="sm-ledger__row reveal-scale-settle" key={row.label}>
-              <span className="sm-ledger__no">{String(i + 1).padStart(2, "0")}</span>
-              <span className="sm-ledger__label">{row.label}</span>
-              <span className="sm-ledger__outcome">{row.outcome}</span>
-            </li>
+        <div className="sm-capgroups" ref={reveal} data-v4-reveal>
+          {CAPABILITY_GROUPS.map((group, gi) => (
+            <section className="sm-capgroup reveal-scale-settle" key={group.title} aria-label={group.title}>
+              <header className="sm-capgroup__head">
+                <span className="sm-ledger__no">{String(gi + 1).padStart(2, "0")}</span>
+                <h3 className="sm-capgroup__title">{group.title}</h3>
+                <p className="sm-capgroup__promise">{group.promise}</p>
+              </header>
+              <ul className="sm-capgroup__items">
+                {group.items.map((row) => (
+                  <li className="sm-capgroup__item" key={row.label}>
+                    <span className="sm-ledger__label">{row.label}</span>
+                    <span className="sm-ledger__outcome">{row.outcome}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href={group.detailsHref} className="sm-capgroup__details">
+                {group.detailsLabel} →
+              </Link>
+            </section>
           ))}
-        </ol>
+        </div>
       </div>
     </section>
   );
@@ -369,7 +432,7 @@ const SELECTED_WORK: WorkItem[] = [
   },
   {
     title: "SiteMint operations engine",
-    desc: "The internal CRM and automation system that runs SiteMint's own pipeline — lead scoring, sequences, task routing.",
+    desc: "The internal CRM and automation system that runs SiteMint's own follow-up — lead scoring, sequences, task routing.",
     status: "in-development",
   },
 ];
@@ -691,23 +754,23 @@ export default function HomeV5() {
           showServiceRail
           title={
             <>
-              Digital systems built to{" "}
-              <span className="sm-mark">move your business forward.</span>
+              Websites and business systems built to{" "}
+              <span className="sm-mark">help you grow.</span>
             </>
           }
           hideSub1
           sub={
             <>
-              SiteMint designs websites, web applications, CRM systems, AI
-              automation, and custom software that work together—from the
-              first interaction to the next meaningful action.
+              SiteMint helps you attract customers, organize inquiries,
+              follow up faster, and reduce repetitive work—all through one
+              carefully planned digital experience.
             </>
           }
           brandLine="Capture. Organize. Connect. Resolve."
           primaryHref={ROUTES.start}
-          primaryLabel="Build Your SiteMint System"
+          primaryLabel="Plan My Project"
           secondaryHref={ROUTES.services}
-          secondaryLabel="Explore What We Build"
+          secondaryLabel="See What We Build"
           secondaryIsRoute
           showFilm
         />

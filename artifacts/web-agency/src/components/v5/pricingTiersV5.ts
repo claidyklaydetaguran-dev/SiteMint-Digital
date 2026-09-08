@@ -82,7 +82,7 @@ export const pricingTiersV5: PricingTierV5[] = [
       "Growth infrastructure setup (scoped per project)",
       "Advanced permissions & dashboards",
       "Implementation planning",
-      "Testing + deployment support",
+      "Testing + launch support",
     ],
     honestyNote:
       "“AI-assisted workflow” means AI-assisted automation inside your system (drafting, routing, evaluation) — it does not include the AI Receptionist product, which is priced separately during private-beta onboarding.",

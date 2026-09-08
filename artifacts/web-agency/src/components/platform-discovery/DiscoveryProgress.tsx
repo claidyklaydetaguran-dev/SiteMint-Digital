@@ -5,16 +5,20 @@ import { cn } from "@/lib/utils";
 // STEP_FIELD_PATHS (discoveryFormModel.ts) and STEP_WHY_COPY
 // (discoveryStepCopy.ts): index 0-7 are the eight answer steps, index 8 is
 // the review step.
+/* Guided project planner (owner directive 2026-09-08): the same nine
+ * steps, named the way a business owner would ask them — never like a
+ * technical requirements form. Presentation only: validation, field names,
+ * and submission behavior are untouched. */
 export const STEP_LABELS = [
-  "Project Starting Point",
-  "System or Service Needed",
-  "Business and Audience",
-  "Brand and Visual Direction",
-  "Content and Functionality",
-  "Systems and Integrations",
-  "Growth, Advertising, and Tracking",
-  "Delivery, Budget, and Contact",
-  "Review",
+  "Where are you starting?",
+  "What would you like us to build?",
+  "Tell us about your business and customers",
+  "How should it look and feel?",
+  "What should customers be able to do?",
+  "What tools do you already use?",
+  "Would you like help attracting more customers?",
+  "Timeline, investment, and contact",
+  "Review your project plan",
 ] as const;
 
 export const TOTAL_STEPS = STEP_LABELS.length;

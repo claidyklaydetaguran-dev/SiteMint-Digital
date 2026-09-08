@@ -647,9 +647,9 @@ export default function AiReceptionistV5() {
             <span className="smv5__eyebrow">Try the AI</span>
             <h2 className="smv5__h2">Two ways to try it</h2>
             <p className="smv5__lede">
-              The Interactive Preview above is the default: a simulated conversation with no
-              provider call and no marginal cost, available to everyone. A short, consent-based
-              live demo is planned for after the browser call passes end-to-end certification.
+              The Interactive Preview above is the default: a simulated conversation — no
+              live phone call, no cost — available to everyone. A short, consent-based live
+              demo is planned once browser calling passes our full testing.
             </p>
             <div className="smv5-grid">
               <div className="smv5-card">

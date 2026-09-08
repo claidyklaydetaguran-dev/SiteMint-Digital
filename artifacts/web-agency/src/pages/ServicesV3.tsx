@@ -51,7 +51,7 @@ const pillars: Pillar[] = [
     id: "websites-apps",
     icon: Globe,
     title: "Websites & Web Apps",
-    headline: "A website that knows what happens next.",
+    headline: "A website that turns attention into action.",
     desc: "Editorial-grade marketing sites and custom applications, designed backwards from the action a real customer should take. Starter Site System covers the core pages most businesses need as-is; a custom application is scoped to your workflow.",
     href: ROUTES.websitesApps,
     mapPos: { x: 70, y: 140 },
@@ -70,9 +70,9 @@ const pillars: Pillar[] = [
   {
     id: "ai-systems",
     icon: Workflow,
-    title: "AI Systems & Automation",
-    headline: "Less handoff. Less busywork. More momentum.",
-    desc: "Follow-ups, routing, evaluation, and record-keeping handled automatically — with people kept in the loop and an audit trail on every step. Included from the Growth tier up; scoped to your process during discovery.",
+    title: "AI & Automation",
+    headline: "Spend less time on repetitive work.",
+    desc: "Follow-ups, reminders, and record-keeping handled automatically — with people kept in the loop and a record of every step. Included from the Growth tier up; scoped to your process during discovery.",
     href: ROUTES.aiSystems,
     mapPos: { x: 390, y: 140 },
     connectsTo: ["Discovery Systems", "CRM & Internal Systems"],
@@ -80,9 +80,9 @@ const pillars: Pillar[] = [
   {
     id: "crm-systems",
     icon: Database,
-    title: "CRM & Internal Systems",
-    headline: "Where the business runs, in one place.",
-    desc: "Pipeline, tasks, and records the team actually looks at — connected to the rest of the system, not a fifth disconnected tool.",
+    title: "Business Systems",
+    headline: "Keep your customers, tasks, and team in one organized place.",
+    desc: "Customer details, tasks, and work in progress where the team actually looks — connected to the rest of the system, not a fifth disconnected tool.",
     href: `${ROUTES.aiSystems}#crm-systems`,
     mapPos: { x: 390, y: 240 },
     connectsTo: ["AI Systems & Automation", "Websites & Web Apps"],
@@ -120,9 +120,9 @@ const expandedServices: ExpandedService[] = [
   {
     id: "growth-infrastructure",
     icon: TrendingUp,
-    title: "Growth Infrastructure",
-    headline: "The tracking that has to work before ad spend does.",
-    desc: "Technical SEO, analytics, conversion tracking, cookie-consent implementation, Meta/Google/TikTok pixels, webhooks, and campaign-ready landing pages, plus attribution and event instrumentation — offered on its own or as the foundation under an advertising engagement.",
+    title: "Growth & Measurement",
+    headline: "Know where your leads come from and what is working.",
+    desc: "Search-engine basics, honest visitor measurement, conversion tracking for Meta and Google ads, cookie consent done properly, and campaign-ready landing pages — so you can see which marketing actually brings customers before spending more on it. Offered on its own or as the foundation under an advertising engagement.",
     href: `${ROUTES.aiSystems}#growth-infrastructure`,
     connectsTo: ["Websites & Web Apps", "Advertising Services"],
     image: {
@@ -254,25 +254,24 @@ export default function ServicesV3() {
               first paint isn't delayed; eyebrow/lede/actions/map carry the
               motion. */}
           <h1 className="v3-display">
-            Nine capabilities. One <span className="sm-mark">connected</span> SiteMint build.
+            Everything your business needs to <span className="sm-mark">grow</span> and stay organized.
           </h1>
           <p className="v3-lede reveal-fade-up">
-            Each system stands on its own. Together they form the SiteMint
-            system: attention arrives at the website, discovery turns it into
-            a brief, AI systems and automation carry the work, and the CRM is
-            where your team sees it all.
+            Each service stands on its own. Together they work as one system:
+            your website brings the inquiry in, a guided form turns it into a
+            clear request, follow-up happens on time, and your team sees it
+            all in one organized place.
           </p>
           <p className="v3-body reveal-fade-up">
-            Growth infrastructure, advertising services, and ongoing support
-            &amp; optimization extend that core system — scoped separately,
-            on their own or layered on top of it.
+            Marketing measurement, advertising, and ongoing support extend
+            that core — scoped separately, on their own or layered on top.
           </p>
           <div className="v3m-hero__actions reveal-fade-up">
             <Link href={ROUTES.start} className="v3-btn v3-btn--primary">
-              Build Your SiteMint System
+              Plan My Project
             </Link>
             <a href="#websites-apps" className="v3-btn v3-btn--outline">
-              Explore each pillar
+              See each service
             </a>
           </div>
           <div className="reveal-scale-settle">

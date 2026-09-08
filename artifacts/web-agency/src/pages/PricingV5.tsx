@@ -41,7 +41,7 @@ const PRICE_FACTORS = [
   },
   {
     title: "Automation complexity",
-    desc: "A single follow-up sequence is a different scope than routing, reminders, and record-keeping across a whole pipeline.",
+    desc: "A single follow-up sequence is a different scope than routing, reminders, and record-keeping across your whole follow-up flow.",
   },
   {
     title: "Content & design readiness",
