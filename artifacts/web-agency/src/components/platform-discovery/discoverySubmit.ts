@@ -25,6 +25,57 @@ import {
 export const DISCOVERY_SUBMIT_ENDPOINT = "/api/v1/discovery-submissions";
 export const DISCOVERY_SUBMIT_METHOD = "POST";
 
+/**
+ * Production bridge (owner P0, 2026-09-08). The deployed production backend
+ * is the pre-2C.2E snapshot: its `/api/v1/discovery-submissions` route
+ * fail-closes with 503 because `DISCOVERY_FINGERPRINT_HMAC_KEY` was never
+ * provisioned, and even provisioned it only queues delivery jobs for a
+ * worker that was never built — no acknowledgment email, no CRM lead, and
+ * the deployed Operations views read the legacy tables. The legacy
+ * `POST /api/discovery/submit` on that same snapshot is the complete,
+ * WORKING pipeline (validate → lead score → tags → discovery + form
+ * records → team AND client acknowledgment emails, inline) — so until the
+ * modern backend (v1 + delivery worker) is owner-approved for deployment,
+ * the planner submits through the legacy route. The full structured
+ * `answers` object rides along in the body and is preserved verbatim in
+ * the record's `formData`, so nothing the visitor wrote is lost.
+ */
+export const DISCOVERY_LEGACY_SUBMIT_ENDPOINT = "/api/discovery/submit";
+
+/** Flattens the v1 `{meta, answers}` body onto the legacy route's fields.
+ * Everything not named here still reaches the record via `formData` (the
+ * legacy route stores its entire request body). */
+export function buildLegacyDiscoverySubmitBody(
+  body: DiscoverySubmitRequestBody,
+): Record<string, unknown> {
+  const { answers, meta } = body;
+  const services = [
+    answers.projectDirection.primaryType,
+    ...(answers.projectDirection.secondaryInterests ?? []),
+  ];
+  const timeline = [
+    answers.commercial.launchWindow,
+    answers.commercial.targetDate ? `target ${answers.commercial.targetDate}` : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+  return {
+    contactName: answers.contact.name,
+    companyName: answers.business.organizationName,
+    email: answers.contact.email,
+    phone: answers.contact.phone ?? null,
+    industry: answers.business.industry,
+    services,
+    budget: answers.commercial.investmentRange,
+    timeline,
+    decisionMaker: answers.commercial.decisionMakers,
+    // Full structured planner payload + transport meta — preserved in the
+    // record's formData for staff review and a later v1 backfill.
+    plannerAnswers: answers,
+    plannerMeta: { ...meta, transport: "legacy-bridge" },
+  };
+}
+
 export interface DiscoverySubmitRequestBody {
   meta: {
     idempotencyKey: string;
@@ -115,7 +166,14 @@ export async function mapDiscoverySubmitResponse(
     };
   }
   if (res.status === 200 || res.status === 201) {
-    const reference = typeof body.reference === "string" ? body.reference : "";
+    // v1 returns `reference` (string); the legacy bridge returns `id`
+    // (number) — accept either so the same mapping serves both backends.
+    const reference =
+      typeof body.reference === "string"
+        ? body.reference
+        : typeof body.id === "number" || typeof body.id === "string"
+          ? String(body.id)
+          : "";
     return res.status === 200
       ? { kind: "duplicate", reference }
       : { kind: "success", reference };
@@ -132,10 +190,14 @@ export async function submitDiscoveryBrief(
   body: DiscoverySubmitRequestBody,
 ): Promise<DiscoverySubmitOutcome> {
   try {
-    const res = await fetch(DISCOVERY_SUBMIT_ENDPOINT, {
+    // Legacy bridge (see DISCOVERY_LEGACY_SUBMIT_ENDPOINT above): the
+    // deployed backend's complete pipeline. Switch back to
+    // DISCOVERY_SUBMIT_ENDPOINT + the raw `body` once the modern backend
+    // (v1 + delivery worker) is deployed with owner approval.
+    const res = await fetch(DISCOVERY_LEGACY_SUBMIT_ENDPOINT, {
       method: DISCOVERY_SUBMIT_METHOD,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(buildLegacyDiscoverySubmitBody(body)),
     });
     return await mapDiscoverySubmitResponse(res);
   } catch {
