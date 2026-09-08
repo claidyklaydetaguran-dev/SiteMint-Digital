@@ -334,7 +334,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
         <Link
           href="/"
           className="v4-header__brand"
-          aria-label="SiteMint Digital — home"
+          aria-label="SiteMint. Digital — home"
           onClick={(e) => handleActiveNavClick(e, location === ROUTES.home)}
         >
           {/* Product mode hides the wordmark below ~480px to protect the

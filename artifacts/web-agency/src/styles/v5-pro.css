@@ -72,6 +72,23 @@
   max-width: 38em;
 }
 
+/* The V3 marketing vocabulary (Work/Process/About/Services inner pages)
+   joins the same scale so every route reads as one system. */
+.v4-shell .v3-h2 {
+  font-size: var(--sm-display-2);
+  font-weight: 700;
+}
+.v4-shell .v3-lede {
+  font-size: var(--sm-lead, 1.125rem);
+  line-height: var(--sm-lh-body, 1.55);
+  max-width: 38em;
+}
+.v4-shell .v3-eyebrow {
+  font-family: var(--sm-font-display);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
 /* Section rhythm: generous, intentional (≈68px mobile → 110px desktop). */
 .v4-shell .v4-section {
   padding-block: var(--sm-section-y);

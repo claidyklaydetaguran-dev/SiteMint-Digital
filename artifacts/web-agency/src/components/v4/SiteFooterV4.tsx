@@ -25,7 +25,7 @@ export function SiteFooterV4() {
           <Link
             href="/"
             className="v4-footer__brand"
-            aria-label="SiteMint Digital — home"
+            aria-label="SiteMint. Digital — home"
           >
             <BrandWordmark />
           </Link>

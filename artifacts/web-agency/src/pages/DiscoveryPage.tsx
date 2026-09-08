@@ -51,7 +51,7 @@ export default function DiscoveryPage() {
         }}
       >
         <div className="mx-auto flex max-w-[76rem] items-center justify-between px-4 py-3 sm:px-6">
-          <a href="/" aria-label="SiteMint Digital — back to home" className="dsc-brand">
+          <a href="/" aria-label="SiteMint. Digital — back to home" className="dsc-brand">
             <BrandWordmark />
           </a>
           <a

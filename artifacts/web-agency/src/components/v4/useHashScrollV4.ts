@@ -47,6 +47,27 @@ export function useHashScrollV4(): void {
         target.setAttribute("tabindex", "-1");
       }
       target.focus({ preventScroll: true });
+
+      // Settle correction (professional redesign, 2026-09-09): content above
+      // the anchor can keep sizing briefly after the first scroll (media
+      // posters, interactive containers), which strands the section below
+      // the intended line. Two bounded re-checks re-align the anchor —
+      // instantly, and only while the visitor is still at the landing zone,
+      // so a visitor who has scrolled away is never yanked back.
+      for (const delay of [500, 1400]) {
+        window.setTimeout(() => {
+          if (cancelled) return;
+          if (window.location.hash.replace(/^#/, "") !== hash) return;
+          // scrollIntoView honours scroll-margin-top, so the settled line
+          // for the anchor is that margin — not zero.
+          const intended =
+            parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+          const drift = target.getBoundingClientRect().top - intended;
+          if (Math.abs(drift) > 24 && Math.abs(drift) < 600) {
+            target.scrollIntoView({ behavior: "auto", block: "start" });
+          }
+        }, delay);
+      }
     }
 
     attempt();
