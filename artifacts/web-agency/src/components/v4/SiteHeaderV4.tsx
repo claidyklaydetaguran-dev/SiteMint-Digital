@@ -52,7 +52,10 @@ import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { dispatchIntroReplay, scrollToTop } from "@/lib/scrollBehavior";
-import { SignalMarkV4 } from "./SignalMarkV4";
+/* Client-approved professional redesign (2026-09-09): the tilted-diamond
+   SignalMarkV4 is retired from every public surface — the client rejected
+   icon marks outright. The typography-only BrandWordmark replaces it. */
+import { BrandWordmark } from "@/components/v5/BrandWordmark";
 import { SignalGlyphV4 } from "./SignalGlyphsV4";
 import {
   primaryNavV4,
@@ -334,11 +337,11 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
           aria-label="SiteMint Digital — home"
           onClick={(e) => handleActiveNavClick(e, location === ROUTES.home)}
         >
-          <SignalMarkV4 size={22} />
           {/* Product mode hides the wordmark below ~480px to protect the
-              product name + primary CTA from crowding (v4-chrome.css). The
-              span is inert for company mode — no visual change there. */}
-          <span className="v4-header__brand-word">SiteMint</span>
+              product name + primary CTA from crowding (v4-chrome.css). */}
+          <span className="v4-header__brand-word">
+            <BrandWordmark />
+          </span>
         </Link>
 
         {headerMode === "product" ? (
@@ -529,10 +532,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                   directive): mark + "SiteMint Digital" wordmark, not the
                   bare mark. */}
               <span className="v4-sheet__brand">
-                <SignalMarkV4 size={24} />
-                <span>
-                  SiteMint <b>Digital</b>
-                </span>
+                <BrandWordmark />
               </span>
               <button
                 type="button"

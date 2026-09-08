@@ -1,0 +1,316 @@
+/**
+ * SiteMint V5 — the client-approved professional redesign layer
+ * (owner directive 2026-09-09, "SITEMINT CLIENT-APPROVED PROFESSIONAL
+ * REDESIGN"). Reference: the approved rendering at
+ * sitemint-professional-render.shastagreene.chatgpt.site — its typography,
+ * spacing, hierarchy, and business-owner communication character, rebuilt
+ * inside the existing SiteMint system (never its markup or source).
+ *
+ * Mechanism: the same override-only technique as v5-remap.css, one layer
+ * later — this file redefines tokens the pinned V3/V4 sheets read and
+ * restates the small set of rules whose pinned declarations are literal.
+ * No pinned file is edited. Page-owned sheets (v5-home.css, v5-pages.css,
+ * discovery-v5.css) are edited in place instead, since this program owns
+ * them and they load after this file in their page chunks.
+ *
+ * The measured reference system (1348px viewport):
+ *   Manrope 700/800 headings, −0.04em, line-height 1.08 · DM Sans body
+ *   16px/1.55 · lead 18px/1.55 · hero H1 68px · section H2 ~54px ·
+ *   1180px content column · 82px navigation · white cards r22/p34 with
+ *   quiet #D7E4E8-class borders · 48px-tall r10 bold CTAs · 110px section
+ *   rhythm · dark blue-charcoal (#071C29) hero and band fields · porcelain
+ *   #F1F8F8 alternating bands. Fluid tokens live in tokens-v5.css.
+ *
+ * ROLLBACK: remove this file's import from index.css.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   1 · Foundations: display voice + deep hero ink for the public shell.
+   ───────────────────────────────────────────────────────────────────────── */
+.v4-shell {
+  /* Every pinned V4 heading/eyebrow that reads --v4-font-display flips to
+     Manrope; the V4 ops/auth shells keep Space Grotesk (their own scopes). */
+  --v4-font-display: var(--sm-font-display);
+  /* The hero field, ink sections, sheet, and footer all resolve through
+     --v4-ink → deep blue-charcoal. --sm-ink-950 itself is unchanged. */
+  --v4-ink: var(--sm-ink-hero, #071C29);
+  /* Editorial column: the reference reads at 1180px, not 1280px. */
+}
+
+.v4-shell .v4-container,
+.v4-shell .v4-header__inner,
+.v4-shell .v4-footer__inner {
+  max-width: var(--sm-container, 1180px);
+}
+
+/* Headings across every public surface carry the display voice with the
+   reference's controlled tracking. h4+ keeps default tracking (small UI). */
+.v4-shell h1,
+.v4-shell h2,
+.v4-shell h3 {
+  font-family: var(--sm-font-display);
+}
+.v4-shell h1,
+.v4-shell h2 {
+  letter-spacing: var(--sm-track-display, -0.04em);
+  line-height: var(--sm-lh-display, 1.08);
+}
+.v4-shell h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Section scale: H2 to the reference's ~54px ceiling; leads to 18px/1.55
+   with the reference's shorter readable measure. */
+.v4-shell .v4-h2 {
+  font-size: var(--sm-display-2);
+  font-weight: 700;
+  max-width: 15em;
+}
+.v4-shell .v4-lede {
+  font-size: var(--sm-lead, 1.125rem);
+  line-height: var(--sm-lh-body, 1.55);
+  max-width: 38em;
+}
+
+/* Section rhythm: generous, intentional (≈68px mobile → 110px desktop). */
+.v4-shell .v4-section {
+  padding-block: var(--sm-section-y);
+}
+
+/* Eyebrows/kickers: the reference speaks Manrope caps, not monospace —
+   monospace stays only for small decorative labels that are not primary
+   section voice. Mint-ink on light comes from v5-remap; on dark they read
+   the light signature. */
+.v4-shell .v4-kicker {
+  font-family: var(--sm-font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+}
+.v4-shell [data-tone="ink"] .v4-kicker,
+.v4-shell [data-tone="charcoal"] .v4-kicker {
+  color: #91F2DF; /* reference light-mint eyebrow on charcoal */
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   2 · The typography wordmark (BrandWordmark.tsx) — every public surface.
+   Light surfaces: ink word, text-safe mint "Mint."; dark surfaces:
+   white word, signature "Mint.". "DIGITAL" is small, widely tracked caps.
+   ───────────────────────────────────────────────────────────────────────── */
+.sm-wordmark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  font-family: var(--sm-font-display);
+}
+.sm-wordmark__word {
+  font-weight: 800;
+  font-size: 1.45rem;
+  letter-spacing: -0.055em;
+  color: var(--sm-teal-900, #173642);
+}
+.sm-wordmark__mint {
+  font-weight: 600;
+  color: var(--sm-mint-ink, #0B6B57);
+}
+.sm-wordmark__dot {
+  font-weight: 800;
+  color: var(--sm-mint-ink, #0B6B57);
+}
+.sm-wordmark__sub {
+  margin-top: 3px;
+  font-weight: 700;
+  font-size: 0.5rem;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--sm-slate-600, #4A6472);
+  /* optically align under "SiteMint" despite the wide tracking */
+  padding-left: 2px;
+}
+
+/* Dark-surface variants: transparent-dark header, mobile sheet, footer,
+   ink-toned sections, and the Discovery shell's own dark contexts. */
+.v4-header[data-surface="dark"] .sm-wordmark .sm-wordmark__word,
+.v4-sheet .sm-wordmark .sm-wordmark__word,
+.v4-footer .sm-wordmark .sm-wordmark__word,
+[data-tone="ink"] .sm-wordmark .sm-wordmark__word,
+[data-tone="charcoal"] .sm-wordmark .sm-wordmark__word {
+  color: #FFFFFF;
+}
+.v4-header[data-surface="dark"] .sm-wordmark :is(.sm-wordmark__mint, .sm-wordmark__dot),
+.v4-sheet .sm-wordmark :is(.sm-wordmark__mint, .sm-wordmark__dot),
+.v4-footer .sm-wordmark :is(.sm-wordmark__mint, .sm-wordmark__dot),
+[data-tone="ink"] .sm-wordmark :is(.sm-wordmark__mint, .sm-wordmark__dot),
+[data-tone="charcoal"] .sm-wordmark :is(.sm-wordmark__mint, .sm-wordmark__dot) {
+  color: var(--sm-mint-signature, #99F5D0);
+}
+.v4-header[data-surface="dark"] .sm-wordmark .sm-wordmark__sub,
+.v4-sheet .sm-wordmark .sm-wordmark__sub,
+.v4-footer .sm-wordmark .sm-wordmark__sub,
+[data-tone="ink"] .sm-wordmark .sm-wordmark__sub,
+[data-tone="charcoal"] .sm-wordmark .sm-wordmark__sub {
+  color: var(--sm-dark-muted, #9FC2CC);
+}
+
+/* The scrolled (light) header must win over the shell's own ink tone —
+   heroTone="ink" pages put data-tone on the shell root, which would
+   otherwise keep the wordmark white on the light bar. */
+.v4-header[data-surface="light"] .sm-wordmark .sm-wordmark__word {
+  color: var(--sm-teal-900, #173642);
+}
+.v4-header[data-surface="light"] .sm-wordmark :is(.sm-wordmark__mint, .sm-wordmark__dot) {
+  color: var(--sm-mint-ink, #0B6B57);
+}
+.v4-header[data-surface="light"] .sm-wordmark .sm-wordmark__sub {
+  color: var(--sm-slate-600, #4A6472);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   3 · Quiet professional header — the reference's 82px bar, one filled CTA,
+   no competing pills.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .v4-shell {
+    --v4-hdr-h: 82px;
+  }
+}
+
+/* The transparent-dark bar tint follows the deep hero ink (the v5-remap
+   literal referenced the previous #153E52 ink). */
+.v4-shell .v4-header[data-surface="dark"] {
+  background: rgba(7, 28, 41, 0.72);
+  border-bottom-color: rgba(232, 245, 247, 0.14);
+}
+
+/* Product mode: the taller two-line wordmark + seven sub-nav links + CTA
+   need every pixel — run the compact one-line wordmark below 1480px so
+   "Request Private Beta" never clips. */
+@media (max-width: 1479px) {
+  .v4-shell .v4-header[data-mode="product"] .sm-wordmark__sub {
+    display: none;
+  }
+  .v4-shell .v4-header[data-mode="product"] .sm-wordmark__word {
+    font-size: 1.2rem;
+  }
+}
+
+/* Product mode <480px used to fall back to the (now retired) icon; keep the
+   compact word alone instead so the brand link is never empty. */
+@media (max-width: 479px) {
+  .v4-shell .v4-header[data-mode="product"] .v4-header__brand-word {
+    display: inline-flex;
+  }
+  .v4-shell .v4-header[data-mode="product"] .sm-wordmark__word {
+    font-size: 1.05rem;
+  }
+  .v4-shell .v4-header[data-mode="product"] .sm-wordmark__sub {
+    display: none;
+  }
+}
+
+/* The AI Receptionist nav entry becomes a quiet link like its siblings —
+   the outlined pill + pulsing dot read as competing badges. The live dot
+   survives, minimal and static-calm, as a small prefix. */
+.v4-shell .v4-nav__prod {
+  border-color: transparent;
+  border-radius: 6px;
+  padding-inline: 0.75rem;
+  color: var(--v4-mute);
+}
+.v4-shell .v4-header[data-surface="dark"] .v4-nav__prod {
+  border-color: transparent;
+  color: var(--v4-mute-dark);
+}
+.v4-shell .v4-nav__prod:hover {
+  color: var(--v4-text);
+}
+.v4-shell .v4-header[data-surface="dark"] .v4-nav__prod:hover {
+  color: var(--v4-cloud);
+}
+.v4-shell .v4-nav__prod-dot {
+  width: 6px;
+  height: 6px;
+  animation: none;
+  opacity: 0.9;
+  background: var(--sm-mint-signature, #99F5D0);
+}
+
+/* Header CTA + all public buttons: the reference's 48px-tall, 10px-radius,
+   bold DM Sans buttons. */
+.v4-shell .v4-btn,
+.v4-shell .v3-btn {
+  min-height: var(--sm-cta-h, 48px);
+  border-radius: var(--sm-radius-cta, 10px);
+  font-weight: 700;
+  padding-inline: 1.4rem;
+}
+/* Keep the fixed header comfortable: its CTA stays a touch shorter. */
+.v4-shell .v4-header__cta {
+  min-height: 44px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   4 · Card language: white surfaces, 22px radius, quiet borders, soft
+   restrained hover lift. Page-owned cards adopt the tokens in their own
+   sheets; the shared V3 card primitive is restated here.
+   ───────────────────────────────────────────────────────────────────────── */
+.v4-shell .v3-card {
+  border-radius: var(--sm-radius-card, 22px);
+}
+.v4-shell .v4-panel__card {
+  border-radius: 14px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   5 · Hero quieting (reference character): controlled copy width, calmer
+   annotation, eyebrow in the reference voice. Structure (particles, film,
+   HUD, rail) is untouched — only visual treatment changes.
+   ───────────────────────────────────────────────────────────────────────── */
+.v4-shell .v4-hero__title {
+  font-size: var(--sm-display-1);
+  line-height: var(--sm-lh-display, 1.08);
+  letter-spacing: var(--sm-track-display, -0.04em);
+  max-width: 12.5em;
+}
+.v4-shell .v4-hero__sub {
+  font-size: var(--sm-lead, 1.125rem);
+  line-height: var(--sm-lh-body, 1.55);
+  max-width: 34em;
+}
+/* Brand eyebrow: small Manrope caps with the signal dash — the reference's
+   "— WEBSITES · SYSTEMS · AUTOMATION" register. */
+.v4-shell .v4-hero__brand-eyebrow {
+  font-family: var(--sm-font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #91F2DF;
+}
+/* The phase HUD, service rail, and field node labels become quieter
+   supporting texture — one dominant message per section. */
+.v4-shell .v4-hero__hud {
+  opacity: 0.72;
+}
+.v4-shell .v4-hero__rail {
+  opacity: 0.85;
+}
+.v4-shell .v4-hero__node-label {
+  opacity: 0.55;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   6 · Footer: wordmark spacing + calmer legal row.
+   ───────────────────────────────────────────────────────────────────────── */
+.v4-shell .v4-footer__brand {
+  display: inline-flex;
+}
+.v4-shell .v4-footer__brand .sm-wordmark__word {
+  font-size: 1.3rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   7 · Reduced motion: nothing in this layer animates on its own; the static
+   prod-dot and hover states already respect the global motion contract.
+   ───────────────────────────────────────────────────────────────────────── */

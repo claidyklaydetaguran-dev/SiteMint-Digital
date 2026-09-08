@@ -19,6 +19,11 @@
 
 @import "@fontsource/space-grotesk/500.css";
 @import "@fontsource/space-grotesk/700.css";
+/* Client-approved professional redesign (2026-09-09): Manrope joins as the
+   shared display voice (tokens-v5.css --sm-font-display reads it). */
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/manrope/700.css";
+@import "@fontsource/manrope/800.css";
 @import "@fontsource/dm-sans/400.css";
 @import "@fontsource/dm-sans/500.css";
 @import "@fontsource/dm-sans/700.css";

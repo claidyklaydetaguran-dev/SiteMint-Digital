@@ -70,7 +70,11 @@
   --sm-accent: var(--sm-mint-500);
   --sm-accent-ink: var(--sm-teal-900);
   --sm-focus: 0 0 0 3px color-mix(in oklab, var(--sm-mint-500) 45%, transparent);
-  --sm-dark-bg: var(--sm-ink-950);
+  /* Professional redesign (2026-09-09): public dark bands read the deeper
+     blue-charcoal hero ink; --sm-ink-950 itself is unchanged for the ops
+     chrome and existing structural uses. --sm-ink-hero is declared in the
+     redesign block below. */
+  --sm-dark-bg: var(--sm-ink-hero, var(--sm-ink-950));
   --sm-dark-text: #E8F5F7;
   --sm-dark-muted: #9FC2CC;
   --sm-dark-accent: var(--sm-mint-500);
@@ -112,8 +116,14 @@
 
   /* ── type — the approved D5 voices (already self-hosted via @fontsource);
      each stack falls through the metric-matched local face the V4 layer
-     defines, so swap-in stays CLS-free. ─────────────────────────────── */
-  --sm-font-display: "Space Grotesk", "Space Grotesk Fallback", ui-sans-serif,
+     defines, so swap-in stays CLS-free.
+     Client-approved professional redesign (2026-09-09): the display voice
+     moves from Space Grotesk to Manrope — the reference typography the
+     client approved ("more professional, less technical"). Bold headings,
+     restrained negative tracking; the metric-matched "Manrope Fallback"
+     face is declared at the end of this file. Space Grotesk remains only
+     in the internal V4 ops/auth stacks that read --v4-font-display. ──── */
+  --sm-font-display: "Manrope", "Manrope Fallback", ui-sans-serif,
     system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sm-font-body: "DM Sans", "DM Sans Fallback", ui-sans-serif, system-ui,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -145,6 +155,26 @@
   --sm-space-64: 64px;
   --sm-space-96: 96px;
   --sm-space-128: 128px;
+
+  /* ── professional-render system (client-approved redesign, 2026-09-09) ─
+     Derived from the approved reference at 1348px — hero H1 68px/1.08/
+     −0.04em, section H2 ~54px, lead 18px/1.55, 1180px content column,
+     22px/34px cards, 48px-tall 10px-radius CTAs, 110px section rhythm —
+     translated into fluid clamp() tokens so mobile keeps its own scale. */
+  --sm-ink-hero: #071C29; /* dark blue-charcoal hero/dark-band field */
+  --sm-band: #F1F8F8; /* porcelain section band between white surfaces */
+  --sm-display-1: clamp(2.35rem, 1.28rem + 3.45vw, 4.25rem); /* ~38→68px */
+  --sm-display-2: clamp(1.9rem, 1.12rem + 2.55vw, 3.4rem); /* ~30→54px */
+  --sm-lead: clamp(1.0625rem, 1rem + 0.2vw, 1.125rem); /* 17→18px */
+  --sm-track-display: -0.04em;
+  --sm-lh-display: 1.08;
+  --sm-lh-body: 1.55;
+  --sm-container: 1180px;
+  --sm-radius-card: 22px;
+  --sm-card-pad: clamp(1.4rem, 1rem + 1.3vw, 2.125rem); /* ~22→34px */
+  --sm-cta-h: 48px;
+  --sm-radius-cta: 10px;
+  --sm-section-y: clamp(4.25rem, 2.8rem + 4.5vw, 6.875rem); /* ~68→110px */
 
   /* ── motion ────────────────────────────────────────────────────────── */
   --sm-dur-fast: 160ms;
@@ -235,4 +265,18 @@
     transform: none;
     transition: none;
   }
+}
+
+/* ── Metric-matched fallback for the redesign display voice (same
+   technique as the V4 fallback faces): text set in the local fallback
+   occupies approximately the box Manrope will, so any swap-in causes
+   near-zero reflow. The critical 700/800 subsets use font-display:
+   optional (index.html), so this face mostly serves the 600 weight. */
+@font-face {
+  font-family: "Manrope Fallback";
+  src: local("Arial");
+  size-adjust: 106.4%;
+  ascent-override: 100.94%;
+  descent-override: 27.44%;
+  line-gap-override: 0%;
 }

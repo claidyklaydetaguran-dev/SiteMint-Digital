@@ -20,11 +20,11 @@ import "@/styles/platform-preview.css";
 import "@/components/platform-discovery/discovery-v5.css";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { PlatformDiscoveryShell } from "@/components/platform-discovery/PlatformDiscoveryShell";
-// Owner final polish (2026-09-06, Discovery brand repair): Discovery now
-// carries the SAME canonical brand as the public site chrome — the
-// SignalMarkV4 mark + "SiteMint" wordmark — instead of the legacy generic
-// slate/emerald SiteMintLogo, so the form unmistakably belongs to SiteMint.
-import { SignalMarkV4 } from "@/components/v4/SignalMarkV4";
+// Owner final polish (2026-09-06, Discovery brand repair): Discovery carries
+// the SAME canonical brand as the public site chrome. Client-approved
+// professional redesign (2026-09-09): that brand is now the typography-only
+// BrandWordmark — the diamond mark is retired from public surfaces.
+import { BrandWordmark } from "@/components/v5/BrandWordmark";
 
 const PAGE_TITLE = "Start a Project — SiteMint Digital";
 const PAGE_DESCRIPTION =
@@ -52,8 +52,7 @@ export default function DiscoveryPage() {
       >
         <div className="mx-auto flex max-w-[76rem] items-center justify-between px-4 py-3 sm:px-6">
           <a href="/" aria-label="SiteMint Digital — back to home" className="dsc-brand">
-            <SignalMarkV4 size={20} />
-            SiteMint
+            <BrandWordmark />
           </a>
           <a
             href="/"

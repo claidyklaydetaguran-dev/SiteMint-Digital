@@ -6,7 +6,9 @@
 
 import { Link } from "wouter";
 import { ROUTES } from "@/lib/routes";
-import { SignalMarkV4 } from "./SignalMarkV4";
+/* Client-approved professional redesign (2026-09-09): typography-only
+   wordmark — the diamond mark is retired from public surfaces. */
+import { BrandWordmark } from "@/components/v5/BrandWordmark";
 import {
   primaryNavV4,
   signInHrefV4,
@@ -25,8 +27,7 @@ export function SiteFooterV4() {
             className="v4-footer__brand"
             aria-label="SiteMint Digital — home"
           >
-            <SignalMarkV4 size={20} />
-            SiteMint
+            <BrandWordmark />
           </Link>
           <p className="v4-footer__tag">
             Websites, web apps, CRM systems, AI automation, and custom
