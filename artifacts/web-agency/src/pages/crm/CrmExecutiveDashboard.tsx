@@ -487,7 +487,7 @@ export default function CrmExecutiveDashboard() {
               <Link key={href} href={href}>
                 <div className="relative bg-white rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-card-border transition-all group">
                   {badge !== null && badge !== undefined && (
-                    <span className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeColor ?? "bg-blue-500"} text-white text-[10px] font-bold flex items-center justify-center leading-none`}>
+                    <span className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full ${badgeColor ?? "bg-teal-600"} text-white text-[10px] font-bold flex items-center justify-center leading-none`}>
                       {(badge as number) > 99 ? "99+" : badge}
                     </span>
                   )}

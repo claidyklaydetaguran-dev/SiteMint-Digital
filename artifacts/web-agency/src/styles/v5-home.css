@@ -1279,6 +1279,19 @@
   display: grid;
   gap: 0.9rem;
 }
+/* No child may size the shared column track past the container: at a
+   320px viewport the stage stepper's min-content (~328px) was widening
+   EVERY sibling — frame included — 28px through the clipped section edge
+   (clip gate, / @320×568). Children shrink (work order §1); the stepper
+   and control rows scroll inside their own boxes when they genuinely
+   cannot fit. */
+.sm-bp > * {
+  min-width: 0;
+}
+.sm-bp__stages,
+.sm-bp__control-row {
+  overflow-x: auto;
+}
 .sm-bp__controls {
   display: grid;
   gap: 0.6rem;
@@ -1444,9 +1457,22 @@
   display: grid;
   justify-items: center;
   gap: 0.5rem;
+  /* As a grid child of `.sm-bp`, min-width:auto let the mock site's
+     intrinsic min-content (≈326px) stretch this wrap past the 280px
+     column at a 320px viewport, pushing the frame 28px through the
+     clipped section edge (clip gate, / @320×568). The frame's own
+     overflow:hidden owns any residual internal excess. */
+  min-width: 0;
+  max-width: 100%;
 }
 .sm-bp__frame {
   width: 100%;
+  /* Grid-item min-width:auto let the mock site's min-content (~326px)
+     size this frame past a 280px column at a 320px viewport and escape
+     the clipped section edge; the mock layout is fully fluid, so letting
+     the frame shrink renders everything correctly at narrow widths. */
+  min-width: 0;
+  max-width: 100%;
   border-radius: var(--sm-radius-m, 10px);
   border: 1px solid var(--sm-line, #CFE7EA);
   background: var(--sm-surface, #fff);
@@ -1593,11 +1619,21 @@
   gap: 0.5rem;
   padding: 0.5rem 0;
 }
+/* Every mock-site module shrinks with the frame (min-width:auto on grid
+   items otherwise re-propagates a wide min-content upward). */
+.sm-bp__site > * {
+  min-width: 0;
+}
 .sm-bp__headline {
   font-family: var(--sm-font-display, inherit);
-  font-size: 1rem;
+  /* Fluid below ~360px so the mock headline can never widen the device
+     frame past a clipped section edge (work order §1; the 320px cell of
+     the clip gate). */
+  font-size: clamp(0.82rem, 0.45rem + 1.8vw, 1rem);
   margin: 0;
   color: var(--sm-text, #173642);
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 .sm-bp__sub {
   font-size: 0.78rem;
