@@ -2538,3 +2538,26 @@
     linear-gradient(90deg, rgba(153, 245, 208, 0.055) 1px, transparent 1px);
   background-size: 44px 44px;
 }
+
+/* ── Short-viewport hero copy (end-of-file on purpose: this MUST
+   out-cascade the ≥768px absolute-copy rule above, which places the copy
+   at 64px + usable×0.4 − clamp(150px,19vh,190px) — on a short viewport
+   that lands ABOVE the fixed header (44px at 844×390) and the eyebrow
+   disappears under it. In the max-height flow mode the copy stacks
+   normally inside the padded stage instead.) ─────────────────────────── */
+@media (max-height: 700px) {
+  .sm-home-v5 #hero .v4-hero__copy {
+    position: static;
+    top: auto;
+    order: -1; /* flex column stage: copy reads first, field/film follow */
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+  .sm-home-v5 #hero .v4-hero__field {
+    max-height: 30svh;
+  }
+  .sm-home-v5 #hero .v4-hero__hud {
+    position: static;
+    padding-bottom: 0.6rem;
+  }
+}
