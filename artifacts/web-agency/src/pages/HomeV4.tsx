@@ -51,6 +51,32 @@ const HERO_NODES: HeroNode[] = [
   { x: 0.88, y: 0.46, label: "Booked customer", glyph: "check", terminus: true },
 ];
 
+/**
+ * The same five waypoints, recomposed for a narrow screen.
+ *
+ * The desktop set runs nearly flat (x 0.12 -> 0.88, y 0.46 -> 0.74) because
+ * the desktop field is a wide 4:1 band. Squeezing that same shape into a
+ * phone gave every waypoint about 78px of width, so the labels shrank to
+ * 9px and collided with each other and with the capability rail — the scene
+ * read as dust with unreadable captions rather than a journey.
+ *
+ * Portrait keeps the journey and its order; it just runs DOWN instead of
+ * across, with the rings held to the left half so each label has room to sit
+ * beside its ring at a readable size. The signal still enters from outside
+ * the frame, still threads every waypoint in sequence, and still ends on the
+ * booked customer.
+ */
+const HERO_NODES_NARROW: HeroNode[] = [
+  { x: 0.2, y: 0.12, label: "Websites & web apps", glyph: "site" },
+  { x: 0.42, y: 0.31, label: "Discovery systems", glyph: "discovery" },
+  { x: 0.22, y: 0.5, label: "Workflow automation", glyph: "automation" },
+  { x: 0.44, y: 0.69, label: "AI Receptionist", glyph: "voice" },
+  { x: 0.24, y: 0.88, label: "Booked customer", glyph: "check", terminus: true },
+];
+
+/** Where the thread enters the frame, per composition. */
+const HERO_ENTRY = { wide: { x: 0.02, y: 0.34 }, narrow: { x: 0.06, y: -0.04 } };
+
 const PHASES = ["Scatter", "Capture", "Organize", "Connect", "Resolve"] as const;
 /** Progress thresholds between the five phases. */
 const PHASE_EDGES = [0.18, 0.38, 0.62, 0.85];
@@ -106,11 +132,16 @@ function makeParticles(count: number = N_PARTS): Particle[] {
 }
 
 /** Catmull-Rom polyline through the node route, in field pixels. */
-function buildPolyline(w: number, h: number): Array<{ x: number; y: number }> {
-  const ctrl = [
-    { x: 0.02, y: 0.34 },
-    ...HERO_NODES.map((n) => ({ x: n.x, y: n.y })),
-  ].map((p) => ({ x: p.x * w, y: p.y * h }));
+function buildPolyline(
+  w: number,
+  h: number,
+  nodes: HeroNode[] = HERO_NODES,
+  entry: { x: number; y: number } = HERO_ENTRY.wide,
+): Array<{ x: number; y: number }> {
+  const ctrl = [entry, ...nodes.map((n) => ({ x: n.x, y: n.y }))].map((p) => ({
+    x: p.x * w,
+    y: p.y * h,
+  }));
   const out: Array<{ x: number; y: number }> = [];
   const cr = (
     p0: { x: number; y: number },
@@ -585,6 +616,19 @@ export function SignalHeroV4({
   // from scratch without unmounting this component or any page state.
   const introReplayKey = useIntroReplayKey();
 
+  /* Which composition the scene is drawn in. Matched on the same 767px
+     breakpoint the stylesheet uses, so the DOM waypoints and the canvas
+     path never disagree about where a node is. */
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const heroNodes = narrow ? HERO_NODES_NARROW : HERO_NODES;
+
   useEffect(() => {
     const rootMaybe = rootRef.current;
     const fieldMaybe = fieldRef.current;
@@ -629,7 +673,7 @@ export function SignalHeroV4({
       canvas.width = W * dpr;
       canvas.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      poly = buildPolyline(W, H);
+      poly = buildPolyline(W, H, heroNodes, narrow ? HERO_ENTRY.narrow : HERO_ENTRY.wide);
     }
 
     function pos(t: number): [number, number] {
@@ -841,7 +885,7 @@ export function SignalHeroV4({
       window.removeEventListener("orientationchange", onResize);
       if (finePointer) root.removeEventListener("pointermove", onPointer);
     };
-  }, [introReplayKey]);
+  }, [introReplayKey, narrow, heroNodes]);
 
   return (
     <div className="v4-hero" ref={rootRef} data-tone="ink">
@@ -855,12 +899,12 @@ export function SignalHeroV4({
         {/* Region 1 — the Signal field. */}
         <div className="v4-hero__field" ref={fieldRef} aria-hidden="true">
           <canvas className="v4-hero__canvas" ref={canvasRef} />
-          {HERO_NODES.map((node, i) => (
+          {heroNodes.map((node, i) => (
             <div
               key={node.label}
               className={`v4-hero__node${node.terminus ? " v4-hero__node--terminus" : ""}`}
               data-v4-hero-node
-              data-t={(0.04 + ((i + 1) / HERO_NODES.length) * 0.93).toFixed(3)}
+              data-t={(0.04 + ((i + 1) / heroNodes.length) * 0.93).toFixed(3)}
               style={{ left: `${node.x * 100}%`, top: `${node.y * 100}%` }}
             >
               <span className="v4-hero__node-ring">

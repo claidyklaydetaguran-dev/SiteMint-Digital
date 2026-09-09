@@ -2495,10 +2495,53 @@
 @media (max-width: 767px) {
   /* Mobile: particles first, copy near the transition, dedicated poster
      band after — all inside one phone viewport, no overlap gymnastics. */
+  /* Mobile hero parity (owner directive 2026-09-10).
+     The scene used to be capped at 20svh — a 169px band, 20% of the screen,
+     against desktop's 36% — so the journey read as a shallow strip of dust
+     with 9px captions, while 162px of the stage sat empty under the film.
+     The cap now matches desktop's share of the viewport and the scene takes
+     that dead space back. `flex: 1 1 auto` still shrinks it on short
+     phones, so this only ever raises the ceiling. */
   .sm-home-v5 #hero .v4-hero__field {
     order: 0;
-    min-height: 104px;
-    max-height: 20svh;
+    min-height: 180px;
+    max-height: 36svh;
+  }
+
+  /* Portrait waypoints: the ring keeps its place on the path and the label
+     sits BESIDE it rather than beneath, so five captions can be legible at
+     once on a 390px screen instead of stacking into each other. `left` now
+     anchors the ring's left edge, which is why the x coordinates in
+     HERO_NODES_NARROW stay in the left half of the field. */
+  .sm-home-v5 #hero .v4-hero__node {
+    grid-auto-flow: column;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+    transform: translate(0, -50%);
+    width: max-content;
+    max-width: calc(100% - 1.5rem);
+    opacity: 0.62;
+  }
+  .sm-home-v5 #hero .v4-hero__node-ring {
+    width: 40px;
+    height: 40px;
+  }
+  .sm-home-v5 #hero .v4-hero__node-ring svg {
+    width: 19px;
+    height: 19px;
+  }
+  /* 9px captions at 42% opacity were the least readable text on the site.
+     11px at a stronger tint clears both the size and the contrast floor. */
+  .sm-home-v5 #hero .v4-hero__node-label {
+    font-size: 0.6875rem;
+    line-height: 1.25;
+    letter-spacing: 0.04em;
+    color: rgb(213 233 238 / 0.92);
+    text-shadow: 0 1px 6px rgb(7 19 36 / 0.85);
+    white-space: normal;
   }
   .sm-home-v5 #hero .v4-hero__copy {
     padding-top: clamp(0.9rem, 2vh, 1.3rem);
