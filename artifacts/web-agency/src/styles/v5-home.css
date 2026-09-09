@@ -2721,7 +2721,14 @@
      obvious and the page starts moving again quickly. `svh` (not `vh`)
      keeps the runway stable while the browser toolbar hides and shows —
      the JS measures the sticky stage for the same reason. */
-  .sm-home-v5 #hero .v4-hero { height: 170svh; }
+  /* Only where the stage actually PINS. Below 701px of viewport height the
+     rule further down flows the stage (position:relative; height:auto), and a
+     hero shorter than its own flowed content overflows it — at 568x320 the
+     HUD spilled out and covered the next section heading. Nothing is pinned
+     in flow mode, so there is no frozen-scroll problem to solve there. */
+  @media (min-height: 701px) {
+    .sm-home-v5 #hero .v4-hero { height: 170svh; }
+  }
 
   .sm-home-v5 #hero .v4-hero__field { order: 0; min-height: 88px; }
   .sm-home-v5 #hero .v4-hero__copy { order: 1; }
