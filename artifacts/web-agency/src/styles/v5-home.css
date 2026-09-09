@@ -2829,19 +2829,69 @@
    disappears under it. In the max-height flow mode the copy stacks
    normally inside the padded stage instead.) ─────────────────────────── */
 @media (max-height: 700px) {
+  /* Short screens — iPhone SE/8 at 667, and ANY iPhone whose Safari toolbars
+     shrink the visual viewport under 700px (owner recording, 2026-09-10).
+
+     This block flows the stage so the copy and film are not crushed into one
+     screen, which is right. What was wrong is that nothing pinned afterwards:
+     measured at 375x667 the scene left the viewport entirely at p≈0.58, so the
+     visitor scrolled the back half of the transformation with nothing to look
+     at, and then scrolled ~40% more hero with the animation already finished.
+
+     So the SCENE pins on its own — under the navigation, where it stays
+     watchable for the whole sequence — while the copy and film flow past it,
+     exactly as they should on a small screen. It carries the ink background
+     because content now passes beneath it. */
   .sm-home-v5 #hero .v4-hero__copy {
     position: static;
     top: auto;
-    order: -1; /* flex column stage: copy reads first, field/film follow */
+    order: 1;
     padding-top: 0.9rem;
     padding-bottom: 0.9rem;
   }
   .sm-home-v5 #hero .v4-hero__field {
-    max-height: 30svh;
+    order: 0;
+    position: sticky;
+    top: var(--v4-hdr-h, 64px);
+    /* Above the flowing copy and film — both are positioned at z-index 2, so
+       at the same level the later DOM node won and the copy scrolled THROUGH
+       the pinned scene, text and particle path interleaved. The scene owns
+       this band; content passes cleanly behind it. */
+    z-index: 6;
+    flex: 0 0 auto;
+    /* Sized so the transformation FINISHES close to where the scene releases.
+       The pinned span is (stage content - header - scene height); the progress
+       runway is (hero - viewport). At 55svh those land within a third of a
+       screen of each other, so there is no long stretch of pinned-but-finished
+       scrolling — and the headline still starts above the fold at rest. */
+    height: 55svh;
+    min-height: 200px;
+    max-height: 55svh;
+    background: var(--v4-ink, #071324);
+    margin-top: 0;
   }
   .sm-home-v5 #hero .v4-hero__hud {
     position: static;
     padding-bottom: 0.6rem;
+  }
+  /* The runway is the scroll the transformation needs — no more. The hero
+     used to run a fixed 260vh here, which finished the animation with about
+     40% of the hero still to scroll: the "large empty area". */
+  .sm-home-v5 #hero .v4-hero {
+    height: auto;
+  }
+  /* The stage clips (), and a clipping ancestor confines a
+     sticky child to its own box — which is why pinning the scene did nothing
+     until this line: the field stuck inside an 846px stage and left with it.
+     The runway lives on the stage too, so the sticky span and the scroll the
+     transformation needs are the same distance. */
+  .sm-home-v5 #hero .v4-hero__stage {
+    overflow: visible;
+    /* The runway must extend the stage CONTENT box, not its padding: a sticky
+       child is bounded by its containing block content edge, so padding-bottom
+       here left the scene unsticking with ~20% of the transformation still to
+       run. min-height keeps the scene pinned for the whole sequence. */
+    min-height: 148svh;
   }
 }
 
