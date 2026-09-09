@@ -25,7 +25,7 @@ import "@/styles/v5-pages.css";
 
 const ADVERTISING_BOUNDARIES = [
   "Client ad spend is always separate from SiteMint's service fee.",
-  "We never guarantee leads, revenue, ROAS, platform approval, or rankings.",
+  "We never guarantee leads, revenue, return on ad spend, platform approval, or rankings.",
   "Not every website package includes ongoing campaign management.",
   "Offered as a recurring or separately scoped engagement — never bundled by default.",
 ];

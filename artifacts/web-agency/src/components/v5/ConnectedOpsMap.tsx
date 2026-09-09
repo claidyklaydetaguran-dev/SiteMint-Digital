@@ -29,7 +29,7 @@
  *    action — plus a small synthetic record/task card.
  */
 
-import { useId, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { useReveal } from "@/components/v3/useReveal";
 
 export type OpsCardTone = "mint" | "amber" | "done" | "muted";
@@ -271,6 +271,43 @@ export function ConnectedOpsMap({ className, defaultActiveId }: ConnectedOpsMapP
   const reveal = useReveal();
   const instanceId = useId();
   const [activeId, setActiveId] = useState(defaultActiveId ?? OPS_MAP_NODES[0].id);
+
+  /* Keep the tapped step where the thumb left it (owner audit, 2026-09-09).
+   *
+   * Below 768px the detail panel renders INLINE, immediately after the
+   * selected step — the desktop side-slot is display:none. So choosing a step
+   * further down the list deletes the ~900px panel that was sitting above the
+   * tap point, the document collapses upward, and because the scroll offset
+   * does not move the tapped step is thrown roughly 930px off the top of the
+   * screen. Measured every forward transition doing this; backward ones were
+   * fine, which is why it reads as random. The visitor taps "Tasks" and lands
+   * in the middle of someone else's paragraph.
+   *
+   * Record where the step sits before the swap, then put it back afterwards.
+   * useLayoutEffect runs after the DOM changes but before paint, so the
+   * correction is never visible as a jump. */
+  const railRef = useRef<HTMLOListElement>(null);
+  const anchorRef = useRef<{ id: string; top: number } | null>(null);
+
+  const selectNode = useCallback((id: string) => {
+    const rail = railRef.current;
+    const el = rail?.querySelector<HTMLElement>(`[data-opsmap-node="${id}"]`);
+    anchorRef.current = el ? { id, top: el.getBoundingClientRect().top } : null;
+    setActiveId(id);
+  }, []);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    anchorRef.current = null;
+    if (!anchor) return;
+    const el = railRef.current?.querySelector<HTMLElement>(
+      `[data-opsmap-node="${anchor.id}"]`,
+    );
+    if (!el) return;
+    const delta = el.getBoundingClientRect().top - anchor.top;
+    // Sub-pixel reflow is not worth a scroll write.
+    if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+  }, [activeId]);
   const activeNode = OPS_MAP_NODES.find((n) => n.id === activeId) ?? OPS_MAP_NODES[0];
   const desktopPanelId = `opsmap-${instanceId}-panel-desktop`;
   const desktopHeadingId = `opsmap-${instanceId}-heading-desktop`;
@@ -294,7 +331,7 @@ export function ConnectedOpsMap({ className, defaultActiveId }: ConnectedOpsMapP
             pathLength={1}
           />
         </svg>
-        <ol className="opsmap__rail" role="list">
+        <ol className="opsmap__rail" role="list" ref={railRef}>
           {OPS_MAP_NODES.map((node) => {
             const isActive = node.id === activeId;
             const mobilePanelId = `opsmap-${instanceId}-panel-${node.id}`;
@@ -306,7 +343,8 @@ export function ConnectedOpsMap({ className, defaultActiveId }: ConnectedOpsMapP
                   className="opsmap__node"
                   aria-current={isActive ? "step" : undefined}
                   aria-controls={isActive ? `${mobilePanelId} ${desktopPanelId}` : undefined}
-                  onClick={() => setActiveId(node.id)}
+                  data-opsmap-node={node.id}
+                  onClick={() => selectNode(node.id)}
                 >
                   <span className="opsmap__node-no">{node.no}</span>
                   <span className="opsmap__node-label">{node.railLabel}</span>

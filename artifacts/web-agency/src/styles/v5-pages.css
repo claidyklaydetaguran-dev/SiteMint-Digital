@@ -549,11 +549,32 @@
 .sm-v5page .v3-btn:focus-visible svg {
   transform: translateX(3px);
 }
+/* Body links must LOOK like links (owner audit, 2026-09-09).
+   These rules used to set only `text-underline-offset` — an offset for an
+   underline that was never drawn. Tailwind's preflight reset
+   (`a { color: inherit; text-decoration: inherit }`) had already stripped
+   both the colour and the underline, so /start#contact rendered the phone
+   number and the email address in exactly the same grey as the plain
+   "Expected response time" line beside them: nothing but the cursor said
+   they could be tapped. That is the site's only non-form contact route.
+   --sm-mint-ink is the text-safe brand accent (6.4:1 on white). */
 .sm-v5page .v3-body a,
 .sm-v5page .v3-lede a,
 .sm-v5page .v3m-checks a {
+  color: var(--sm-mint-ink, #0B6B57);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-underline-offset: 2px;
-  transition: text-underline-offset 180ms ease;
+  transition: text-underline-offset 180ms ease, color 180ms ease;
+}
+
+/* Contact rows are a tap target, not a sentence: 44px minimum height per
+   WCAG 2.5.8, without disturbing the icon/text baseline of the row. */
+.sm-v5page .v3m-checks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
 }
 .sm-v5page .v3-body a:hover,
 .sm-v5page .v3-lede a:hover,
@@ -852,9 +873,14 @@
   outline-offset: 4px;
   border-radius: 4px;
 }
+/* The open stage used the bright teal (#32C5D2) for its heading: 2.09:1 on
+   the light surface, below the 3:1 floor even for large text, so the ONE
+   heading meant to stand out was the hardest to read. --sm-mint-ink (#0B6B57)
+   is the text-safe brand green at 6.45:1 and still reads clearly as active
+   against the deep-teal inactive headings. */
 .sm-v5page .v3m-step--active .v3m-step__no,
 .sm-v5page .v3m-step--active .v3m-step__title {
-  color: var(--sm-mint-500, #32c5d2);
+  color: var(--sm-mint-ink, #0B6B57);
 }
 .sm-v5page .v3m-step--active::before {
   opacity: 1;

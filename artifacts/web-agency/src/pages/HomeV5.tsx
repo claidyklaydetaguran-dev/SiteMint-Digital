@@ -126,7 +126,7 @@ function WhatWeBuildLedger() {
     <section className="v4-section sm-ledger" id="what-we-build" data-tone="white">
       <div className="v4-container">
         <div className="v4-chapter-head" ref={reveal} data-v4-reveal>
-          <span className="v4-kicker">02 — What we build</span>
+          <span className="v4-kicker">01 — What we build</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
         <Reveal as="h2" className="v4-h2" words>

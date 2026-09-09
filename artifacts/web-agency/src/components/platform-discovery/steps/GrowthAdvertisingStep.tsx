@@ -105,7 +105,7 @@ export function GrowthAdvertisingStep() {
 
       <p className="text-sm text-[hsl(var(--sm-color-text-secondary))]">
         Ad spend is separate from SiteMint's service fee, and advertising management is a recurring or
-        separately-scoped service — we don't guarantee leads, revenue, ROAS, or ad-platform approval. Answering
+        separately-scoped service — we don't guarantee leads, revenue, return on ad spend, or ad-platform approval. Answering
         below just helps us scope that conversation; it's never required to move forward with your build.
       </p>
 

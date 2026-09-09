@@ -534,8 +534,23 @@ for (const route of ROUTES) {
   }
 }
 // The 404 page becomes a real static document for unknown paths.
+//
+// The probe path is a build-time implementation detail: it must never survive
+// into the shipped document. Before this strip, a shared broken link previewed
+// as sitemintdigital.com/__prerender-404-probe__ in Slack/iMessage/social
+// unfurls, and the page advertised a canonical URL for a route that does not
+// exist. A 404 should carry no canonical and no og:url at all.
 try {
   await snapshot(NOT_FOUND_PROBE, join(DIST, "404.html"));
+  const notFoundFile = join(DIST, "404.html");
+  const notFoundHtml = await readFile(notFoundFile, "utf8");
+  const cleaned = notFoundHtml
+    .replace(/s*<link[^>]+rel="canonical"[^>]*>/gi, "")
+    .replace(/s*<meta[^>]+property="og:url"[^>]*>/gi, "");
+  if (cleaned !== notFoundHtml) {
+    await writeFile(notFoundFile, cleaned, "utf8");
+    console.log("  404.html: stripped build-probe canonical/og:url");
+  }
 } catch (e) {
   failed++;
   console.error(String(e));

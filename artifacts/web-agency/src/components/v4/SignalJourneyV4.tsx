@@ -187,7 +187,7 @@ export function SignalJourneyV4({ reveal }: SignalJourneyV4Props) {
     >
       <div className="v4-container">
         <div className="v4-chapter-head" ref={reveal} data-v4-reveal>
-          <span className="v4-kicker">01 — How it connects</span>
+          <span className="v4-kicker">02 — How it connects</span>
           <span className="v4-chapter-rule" aria-hidden="true" />
         </div>
 
@@ -213,8 +213,12 @@ export function SignalJourneyV4({ reveal }: SignalJourneyV4Props) {
             ref={reveal}
             data-v4-reveal
           >
+            {/* The end labels are centred on their nodes at x=40 and x=596,
+                so at 640 wide the first and last captions ran off both edges
+                and were cut mid-word on every phone. 40px of horizontal bleed
+                gives them room without moving a single node or the path. */}
             <svg
-              viewBox="0 0 640 300"
+              viewBox="-40 0 720 300"
               role="img"
               aria-label="Diagram: a customer's inquiry travels from their first visit through being received, organized, and followed up until the customer is helped"
             >

@@ -96,7 +96,7 @@ export const pricingTiersV5: PricingTierV5[] = [
  * never assumed to be included, and never sold with an invented number.
  */
 export const ADVERTISING_SERVICES_NOTE_V5 =
-  "Advertising services (Meta Ads and Google Ads) are a separately scoped, usually recurring engagement — never included by default in any tier above, and never priced with a fixed number here. Client ad spend is always separate from SiteMint's service fee, and we don't guarantee leads, revenue, ROAS, or platform approval.";
+  "Advertising services (Meta Ads and Google Ads) are a separately scoped, usually recurring engagement — never included by default in any tier above, and never priced with a fixed number here. Client ad spend is always separate from SiteMint's service fee, and we don't guarantee leads, revenue, return on ad spend, or platform approval.";
 
 /** Mandatory disclaimer — verbatim, V5-BLUEPRINT §9. */
 export const PRICING_DISCLAIMER_V5 =
