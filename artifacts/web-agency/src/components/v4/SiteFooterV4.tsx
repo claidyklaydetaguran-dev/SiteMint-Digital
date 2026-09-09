@@ -68,8 +68,6 @@ export function SiteFooterV4() {
           <span>© {new Date().getFullYear()} SiteMint Digital</span>
           {/* W-1 amended brand line — "From first click to booked customer"
               is reserved for lead-generation / AI Receptionist contexts. */}
-          {/* The Motion preference moved into the navigation sheet's
-              Preferences area (owner responsive-first directive). */}
           <span>Capture. Organize. Connect. Resolve.</span>
         </div>
       </div>

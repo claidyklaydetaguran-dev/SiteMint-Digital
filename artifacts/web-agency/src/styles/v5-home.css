@@ -2710,6 +2710,19 @@
      the poster band (flex `order`), never a compressed vertical rail. */
   /* The rail adds ~46px to the fixed-height mobile stage; the field's
      floor drops a notch so nothing clips on short phones. */
+  /* Mobile particle transition — owner hotfix 2026-09-09.
+     The hero pinned for 260vh: about 2.6 screens of scrolling during which
+     the ONLY thing that changed was the ~169px particle strip at the top,
+     while the headline, buttons and film stayed perfectly still. Measured
+     on production, progress did advance 0 -> 1, but across so much dead
+     scroll that it read as "scrolling does nothing".
+     A shorter runway couples the journey tightly to the thumb: the same
+     five stages now play across ~0.7 of a screen, so the movement is
+     obvious and the page starts moving again quickly. `svh` (not `vh`)
+     keeps the runway stable while the browser toolbar hides and shows —
+     the JS measures the sticky stage for the same reason. */
+  .sm-home-v5 #hero .v4-hero { height: 170svh; }
+
   .sm-home-v5 #hero .v4-hero__field { order: 0; min-height: 88px; }
   .sm-home-v5 #hero .v4-hero__copy { order: 1; }
   .sm-home-v5 #hero .v4-hero__rail { order: 2; }

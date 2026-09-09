@@ -66,7 +66,6 @@ import {
   whatWeBuildV4,
   requestBetaHrefV4,
 } from "./publicNavV4";
-import { applyMotionAttr, motionOff, setMotionOff } from "@/components/v5/motionPref";
 
 /**
  * Product sub-navigation (owner review fix, 2026-09-06 — "the nav bar on
@@ -447,10 +446,6 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                       <Link href="/services">
                         See how the systems connect →
                       </Link>
-                      {/* Desktop home of the global Motion preference — the
-                          <1024px sheet carries the same control in its
-                          Preferences group. */}
-                      <SheetMotionPref />
                     </div>
                   </div>
                 </div>
@@ -623,12 +618,6 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
               </>
             )}
 
-            {/* Preferences — the single global Motion setting lives here now
-                (owner responsive-first directive: removed from the footer). */}
-            <div className="v4-sheet__prefs">
-              <span className="v4-sheet__prefs-title">Preferences</span>
-              <SheetMotionPref />
-            </div>
           </div>
         </div>
       )}
@@ -636,40 +625,12 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
   );
 }
 
-/**
- * The global "Reduce animation" preference (mint-brand release directive,
- * 2026-09-07 — renamed from "Motion: On/Off"), living in the navigation's
- * Preferences area on every breakpoint. Switch semantics: checked = reduce
- * animation ON. When on, every decorative film unmounts (posters remain),
- * ambient CSS animation pauses, and the hero particle drift freezes;
- * `prefers-reduced-motion` is always honored independently.
- */
-function SheetMotionPref() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    setReduced(motionOff());
-    applyMotionAttr();
-  }, []);
-  return (
-    <button
-      type="button"
-      className="v4-sheet__pref-toggle"
-      role="switch"
-      aria-checked={reduced}
-      onClick={() => {
-        const next = !reduced;
-        setReduced(next);
-        setMotionOff(next);
-      }}
-    >
-      <span>Reduce animation</span>
-      <span className="v4-sheet__pref-state" data-on={reduced || undefined}>
-        <span className="v4-sheet__pref-knob" aria-hidden="true" />
-        {reduced ? "On" : "Off"}
-      </span>
-    </button>
-  );
-}
+/* The visitor-facing motion switch was removed on 2026-09-09
+ * (owner directive). It gave visitors a control whose only honest job the
+ * operating system already does through `prefers-reduced-motion`, and a
+ * value left "off" in one browser silently froze the hero for that visitor
+ * forever with no clue why. Accessibility is unchanged and automatic —
+ * see components/v5/motionPref.ts. */
 
 interface MobileGroupProps {
   title: string;

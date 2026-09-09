@@ -71,19 +71,30 @@ interface Particle {
   phase: number;
 }
 
-function makeParticles(): Particle[] {
+/** Mobile gets a lighter field: fewer drifting particles for the same
+ *  composition. This thins the drift, never the story — every node and
+ *  every stage of the journey still renders. */
+function particleCount(): number {
+  if (typeof window === "undefined") return N_PARTS;
+  const conn = (navigator as unknown as { connection?: { saveData?: boolean } })
+    .connection;
+  if (conn?.saveData === true) return 55;
+  return window.matchMedia("(max-width: 767px)").matches ? 85 : N_PARTS;
+}
+
+function makeParticles(count: number = N_PARTS): Particle[] {
   // Deterministic field: same composition every visit and every capture.
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const parts: Particle[] = [];
-  for (let i = 0; i < N_PARTS; i++) {
+  for (let i = 0; i < count; i++) {
     parts.push({
       fx: rnd(),
       fy: rnd(),
       dx: (rnd() - 0.5) * 0.016,
       dy: (rnd() - 0.5) * 0.012,
-      t: 0.04 + (i / (N_PARTS - 1)) * 0.93,
-      gate: 0.16 + (i / (N_PARTS - 1)) * 0.64,
+      t: 0.04 + (i / (count - 1)) * 0.93,
+      gate: 0.16 + (i / (count - 1)) * 0.64,
       amber: rnd() < 0.38,
       dash: rnd() < 0.18,
       ang: rnd() * 6.28,
@@ -447,6 +458,40 @@ export interface SignalHeroV4Props {
  *   the whole rail is aria-hidden; the capabilities are announced by the
  *   real content below.
  */
+/* ── Hero scroll progress — ONE source of truth ──────────────────────────
+ * The pinned element is `.v4-hero__stage` (height: 100svh), so the real
+ * runway is hero.offsetHeight - stage.offsetHeight.
+ *
+ * Before 2026-09-09 both readers measured against `window.innerHeight`
+ * instead. On phones that is the *visual* viewport, which grows and shrinks
+ * as the browser toolbar hides — so the denominator moved while the stage
+ * stayed at 100svh, and the two readers disagreed: the rail clamped to 0
+ * when the runway degenerated while the canvas jumped to 1. Measuring the
+ * stage keeps progress stable across toolbar resizes and orientation
+ * changes, and makes both readers agree.
+ *
+ * Degenerate runway (reduced motion flows the hero to `height:auto`) shows
+ * the story COMPLETE — matching the reduced-motion styles — never pinned
+ * at the start on an empty-looking field.
+ */
+function heroProgress(hero: HTMLElement, stage: HTMLElement | null): number {
+  // The pinned region is whichever is SHORTER: the sticky stage or the
+  // visual viewport.
+  //  - Normal phones/desktop: the stage (100svh) is the shorter one, so the
+  //    denominator ignores the browser toolbar growing and shrinking
+  //    `window.innerHeight` underneath us.
+  //  - Short landscape (max-height:700px) flows the stage to auto height, so
+  //    it is no longer pinned and is TALLER than the hero — there the
+  //    viewport is the right denominator, and taking the minimum picks it
+  //    automatically without probing computed styles on every scroll.
+  const pinned = stage
+    ? Math.min(stage.offsetHeight, window.innerHeight)
+    : window.innerHeight;
+  const runway = hero.offsetHeight - pinned;
+  if (runway <= 8) return 1;
+  return Math.min(1, Math.max(0, -hero.getBoundingClientRect().top / runway));
+}
+
 const RAIL_SERVICES = ["Websites", "Web Apps", "CRM", "AI Systems", "Automation", "SEO & Growth"];
 
 function HeroServiceRail() {
@@ -460,14 +505,13 @@ function HeroServiceRail() {
       return;
     }
     const hero = el.closest<HTMLElement>(".v4-hero");
+    const stage = hero ? hero.querySelector<HTMLElement>(".v4-hero__stage") : null;
     let raf = 0;
     let pending = false;
     function update() {
       pending = false;
       if (!hero) return;
-      const runway = hero.offsetHeight - window.innerHeight;
-      const top = hero.getBoundingClientRect().top;
-      const p = Math.min(1, Math.max(0, runway > 0 ? -top / runway : 0));
+      const p = heroProgress(hero, stage);
       el!.style.setProperty("--sm-rail-p", p.toFixed(4));
       el!.dataset.active = String(
         Math.min(RAIL_SERVICES.length - 1, Math.floor(p * RAIL_SERVICES.length)),
@@ -481,10 +525,17 @@ function HeroServiceRail() {
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+    // Orientation changes resize the stage; re-measure once the new layout
+    // settles so progress never maps to a stale runway.
+    window.addEventListener("orientationchange", onScroll);
+    const ro = hero ? new ResizeObserver(onScroll) : null;
+    if (ro && hero) ro.observe(hero);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
+      window.removeEventListener("orientationchange", onScroll);
+      if (ro) ro.disconnect();
     };
   }, []);
   return (
@@ -551,7 +602,7 @@ export function SignalHeroV4({
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const finePointer = window.matchMedia("(pointer: fine)").matches;
 
-    const parts = makeParticles();
+    const parts = makeParticles(particleCount());
     let W = 0;
     let H = 0;
     let poly: Array<{ x: number; y: number }> = [];
@@ -589,10 +640,10 @@ export function SignalHeroV4({
       return [a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f];
     }
 
+    const stageEl = root.querySelector<HTMLElement>(".v4-hero__stage");
+
     function progress(): number {
-      const r = root.getBoundingClientRect();
-      const total = r.height - window.innerHeight;
-      return total <= 0 ? 1 : Math.min(1, Math.max(0, -r.top / total));
+      return heroProgress(root, stageEl);
     }
 
     const drawTo = (p: number) => Math.min(1, Math.max(0, (p - 0.22) / 0.7));
@@ -710,14 +761,6 @@ export function SignalHeroV4({
 
     function frame(now: number) {
       if (!running) return;
-      // Global "Reduce animation" preference (nav Preferences): freeze the
-      // particle drift — hold the last painted frame, keep the loop armed
-      // so flipping the preference back resumes instantly.
-      if (document.documentElement.dataset.smMotion === "off") {
-        raf = requestAnimationFrame(frame);
-        return;
-      }
-      if (canvas.clientWidth !== W || canvas.clientHeight !== H) resize();
       parX += (tgX - parX) * 0.06;
       parY += (tgY - parY) * 0.06;
       paint(progress(), now);
@@ -733,11 +776,22 @@ export function SignalHeroV4({
 
     resize();
 
+    // Size changes arrive through a ResizeObserver rather than a
+    // clientWidth/clientHeight probe inside every rAF frame — that probe
+    // forced a synchronous layout on each of the ~60 frames per second.
+    const canvasRO = new ResizeObserver(() => resize());
+    canvasRO.observe(canvas);
+
     if (reduced) {
       paintFinal();
       const onResize = () => paintFinal();
       window.addEventListener("resize", onResize);
-      return () => window.removeEventListener("resize", onResize);
+      window.addEventListener("orientationchange", onResize);
+      return () => {
+        canvasRO.disconnect();
+        window.removeEventListener("resize", onResize);
+        window.removeEventListener("orientationchange", onResize);
+      };
     }
 
     // The loop runs only while the hero is BOTH on-screen and the page is
@@ -775,13 +829,16 @@ export function SignalHeroV4({
 
     const onResize = () => resize();
     window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
 
     return () => {
       running = false;
       cancelAnimationFrame(raf);
       vis.disconnect();
+      canvasRO.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
       if (finePointer) root.removeEventListener("pointermove", onPointer);
     };
   }, [introReplayKey]);

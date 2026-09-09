@@ -173,6 +173,48 @@ for (const label of PRESERVED_CAPABILITIES) {
 }
 check("every group offers View details", (homeV5Src.match(/detailsLabel: "View /g) ?? []).length === 4);
 
+/* ── Mobile particle journey + retired motion preference ────────────────
+ * Owner hotfix 2026-09-09. Static companions to the rendered gate in
+ * `scripts/qa-hero-particles.mjs` — these catch a regression at typecheck
+ * time, before anyone has to start a browser.
+ */
+const homeV4Src = read("src/pages/HomeV4.tsx");
+const headerSrc = read("src/components/v4/SiteHeaderV4.tsx");
+const motionSrc = read("src/components/v5/motionPref.ts");
+const mainSrc = read("src/main.tsx");
+const homeCssSrc = read("src/styles/v5-home.css");
+
+// One progress function, measured against the pinned stage — not the visual
+// viewport, which a phone's toolbar resizes mid-scroll.
+check("hero progress has a single shared implementation", homeV4Src.includes("function heroProgress("));
+check(
+  "hero progress measures the sticky stage, not the visual viewport alone",
+  homeV4Src.includes("Math.min(stage.offsetHeight, window.innerHeight)"),
+);
+check("the rail reads the shared progress helper", homeV4Src.includes("const p = heroProgress(hero, stage);"));
+check("the canvas reads the shared progress helper", homeV4Src.includes("return heroProgress(root, stageEl);"));
+// A degenerate runway must show the story COMPLETE, never pinned at 0 — the
+// old rail clamped to 0 exactly where the canvas jumped to 1.
+check("degenerate runway resolves to the complete story", homeV4Src.includes("if (runway <= 8) return 1;"));
+
+// No forced layout inside the animation frame.
+check("no per-frame canvas size probe", !homeV4Src.includes("if (canvas.clientWidth !== W"));
+check("canvas resizes via ResizeObserver", homeV4Src.includes("new ResizeObserver(() => resize())"));
+
+// Mobile gets a shorter pin so the journey stays coupled to the thumb.
+check("mobile hero runway is shortened", homeCssSrc.includes(".sm-home-v5 #hero .v4-hero { height: 170svh; }"));
+check("mobile keeps a lighter particle count", homeV4Src.includes("function particleCount()"));
+
+// The visitor-facing motion switch is gone from every surface.
+for (const gone of ["SheetMotionPref", "Reduce animation", "v4-sheet__prefs", "setMotionOff", "Preferences"]) {
+  check(`retired motion control absent from the header: "${gone}"`, !headerSrc.includes(gone));
+}
+
+// A stale stored value must never be able to suppress motion again.
+check("motionOff() is inert", motionSrc.includes("export function motionOff(): boolean {") && motionSrc.includes("return false;"));
+check("legacy key is purged, not merely ignored", motionSrc.includes("localStorage.removeItem(LEGACY_KEY)"));
+check("the purge runs at boot", mainSrc.includes("purgeLegacyMotionPref()"));
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed.`);
   process.exit(1);

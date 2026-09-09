@@ -1,46 +1,61 @@
 /**
- * Global Motion preference (owner final polish directive, 2026-09-06).
+ * Motion policy (owner directive 2026-09-09 — the visible switch is gone).
  *
- * Decorative films no longer carry per-video pause buttons — WCAG 2.2.2's
- * pause/stop/hide requirement is met instead by (a) the reduced-motion
- * media query, which keeps every decorative video from mounting at all,
- * and (b) this single discreet site-wide Motion preference, surfaced in
- * the footer, well away from any film surface.
+ * SiteMint used to surface a "Reduce animation" switch in the navigation,
+ * persisted as localStorage["sm-motion"]. It was removed because:
+ *  - the operating system's `prefers-reduced-motion` already expresses the
+ *    same intent, is honoured automatically, and travels with the visitor;
+ *  - a value left at "off" in one browser silently froze the hero film and
+ *    the particle journey on every later visit, with nothing on screen to
+ *    explain why or undo it.
  *
- * "Off" means: every `video[data-sm-decorative-film]` is unmounted by its
- * eligibility gate (posters remain), and `html[data-sm-motion="off"]`
- * pauses CSS animations (rule in v5-remap.css). The preference persists in
- * localStorage and applies before the gates evaluate on later visits.
+ * Accessibility is unchanged: every decorative film and the particle drift
+ * still stand down under `prefers-reduced-motion: reduce`, and the hero
+ * renders its complete static composition instead of an empty field.
+ *
+ * These exports remain so the eligibility gates keep one shared vocabulary,
+ * but the preference is now always "on": motion is governed solely by the
+ * media query. `purgeLegacyMotionPref()` runs once at boot to delete any
+ * stored "off" left over from the old switch, so no returning visitor is
+ * stuck with a frozen hero.
  */
 
-const KEY = "sm-motion";
+const LEGACY_KEY = "sm-motion";
 export const MOTION_EVENT = "sm-motion-change";
 
+/** Always false — motion is governed by `prefers-reduced-motion` alone. */
 export function motionOff(): boolean {
+  return false;
+}
+
+/**
+ * One-time cleanup of the retired preference: removes the stored value and
+ * clears the attribute it used to drive, so a stale "off" can never keep
+ * animation suppressed. Safe to call repeatedly; touches nothing else.
+ */
+export function purgeLegacyMotionPref(): void {
   try {
-    return localStorage.getItem(KEY) === "off";
+    if (localStorage.getItem(LEGACY_KEY) !== null) {
+      localStorage.removeItem(LEGACY_KEY);
+    }
   } catch {
-    return false;
+    /* private mode / storage disabled — the attribute reset below still applies */
+  }
+  if (typeof document !== "undefined") {
+    delete document.documentElement.dataset.smMotion;
   }
 }
 
-export function setMotionOff(off: boolean): void {
-  try {
-    localStorage.setItem(KEY, off ? "off" : "on");
-  } catch {
-    /* private mode — the in-page state still applies below */
-  }
-  applyMotionAttr(off);
-  window.dispatchEvent(new CustomEvent(MOTION_EVENT, { detail: { off } }));
+/** Retained for call-site compatibility; motion is never suppressed now. */
+export function applyMotionAttr(): void {
+  purgeLegacyMotionPref();
 }
 
-export function applyMotionAttr(off: boolean = motionOff()): void {
-  document.documentElement.dataset.smMotion = off ? "off" : "on";
-}
-
-/** Subscribe an eligibility gate to live preference flips. */
-export function onMotionChange(cb: (off: boolean) => void): () => void {
-  const handler = (e: Event) => cb(Boolean((e as CustomEvent).detail?.off));
-  window.addEventListener(MOTION_EVENT, handler);
-  return () => window.removeEventListener(MOTION_EVENT, handler);
+/**
+ * Retained so eligibility gates can keep their subscribe/unsubscribe shape.
+ * No user-facing control emits this event any more, so the callback never
+ * fires; the returned unsubscribe is still safe to call.
+ */
+export function onMotionChange(_cb: (off: boolean) => void): () => void {
+  return () => {};
 }
