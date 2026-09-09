@@ -204,6 +204,49 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  /* Keep the bar dark for as long as it is actually OVER the dark hero
+   * (owner audit, 2026-09-09).
+   *
+   * The surface used to flip on `scrolled` — 24px of movement — while the
+   * ink hero behind it is well over a thousand pixels tall. The result was a
+   * pale grey slab sitting on the dark field for the entire hero, which is
+   * exactly what the comment above says must NOT happen. Measure the hero
+   * instead: stay dark until its bottom edge passes under the bar. */
+  const [overInk, setOverInk] = useState(tone === "ink");
+  useEffect(() => {
+    if (tone !== "ink") {
+      setOverInk(false);
+      return undefined;
+    }
+    let raf = 0;
+    let pending = false;
+    function measure() {
+      pending = false;
+      const ink = document.querySelector<HTMLElement>('.v4-hero, [data-tone="ink"]');
+      if (!ink) {
+        setOverInk(window.scrollY <= 24);
+        return;
+      }
+      const barHeight = headerRef.current?.offsetHeight ?? 72;
+      setOverInk(ink.getBoundingClientRect().bottom > barHeight);
+    }
+    function onScroll() {
+      if (pending) return;
+      pending = true;
+      raf = requestAnimationFrame(measure);
+    }
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    window.addEventListener("orientationchange", onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("orientationchange", onScroll);
+    };
+  }, [tone, location]);
+
   // Close overlays whenever the route changes.
   useEffect(() => {
     setPanelOpen(false);
@@ -321,7 +364,7 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
     sheetWasOpen.current = menuOpen;
   }, [menuOpen]);
 
-  const surface = tone === "ink" && !scrolled ? "dark" : "light";
+  const surface = tone === "ink" && overInk ? "dark" : "light";
 
   return (
     <header

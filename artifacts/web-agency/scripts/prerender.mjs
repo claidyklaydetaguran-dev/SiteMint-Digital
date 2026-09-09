@@ -541,15 +541,19 @@ for (const route of ROUTES) {
 // unfurls, and the page advertised a canonical URL for a route that does not
 // exist. A 404 should carry no canonical and no og:url at all.
 try {
-  await snapshot(NOT_FOUND_PROBE, join(DIST, "404.html"));
   const notFoundFile = join(DIST, "404.html");
-  const notFoundHtml = await readFile(notFoundFile, "utf8");
-  const cleaned = notFoundHtml
-    .replace(/s*<link[^>]+rel="canonical"[^>]*>/gi, "")
-    .replace(/s*<meta[^>]+property="og:url"[^>]*>/gi, "");
-  if (cleaned !== notFoundHtml) {
-    await writeFile(notFoundFile, cleaned, "utf8");
-    console.log("  404.html: stripped build-probe canonical/og:url");
+  await snapshot(NOT_FOUND_PROBE, notFoundFile);
+  // snapshot() STAGES its html and every file is written together at the end,
+  // so the fix edits the staged entry rather than a file that does not exist yet.
+  const staged404 = staged.find((entry) => entry.outFile === notFoundFile);
+  if (staged404) {
+    const cleaned = staged404.html
+      .replace(/s*<link[^>]+rel="canonical"[^>]*>/gi, "")
+      .replace(/s*<meta[^>]+property="og:url"[^>]*>/gi, "");
+    if (cleaned !== staged404.html) {
+      staged404.html = cleaned;
+      console.log("  404.html: stripped build-probe canonical/og:url");
+    }
   }
 } catch (e) {
   failed++;
