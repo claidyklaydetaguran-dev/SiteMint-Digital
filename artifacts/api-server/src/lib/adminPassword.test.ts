@@ -139,7 +139,10 @@ describe("no literal password fallback survives in source", () => {
 
   it("reads the secret in exactly one module", () => {
     const readers = collectSourceFiles(srcRoot).filter((file) => {
-      if (file.endsWith("adminPassword.test.ts")) return false;
+      // Test files may SET the variable as a fixture (e.g. the CRM journey
+      // suite boots the real app with a known password); the contract guards
+      // production sources, where only lib/adminPassword.ts may touch it.
+      if (file.endsWith(".test.ts")) return false;
       return /process\.env(\.|\[")ADMIN_PASSWORD/.test(readFileSync(file, "utf8"));
     });
     expect(readers).toEqual([]);
