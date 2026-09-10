@@ -505,16 +505,57 @@ export interface SignalHeroV4Props {
  * the story COMPLETE — matching the reduced-motion styles — never pinned
  * at the start on an empty-looking field.
  */
-function heroProgress(hero: HTMLElement, stage: HTMLElement | null): number {
+const SHORT_STAGE_MQ =
+  typeof window !== "undefined" ? window.matchMedia("(max-height: 700px)") : null;
+
+function heroProgress(
+  hero: HTMLElement,
+  stage: HTMLElement | null,
+  field?: HTMLElement | null,
+  copy?: HTMLElement | null,
+): number {
+  // Short screens pin the SCENE, not the stage (v5-home.css
+  // @media (max-height: 700px)): the copy reads first and scrolls away, then
+  // the field sticks under the header. There the hero's own top is the wrong
+  // origin — measured at 844x390 it ran the first HALF of the transformation
+  // while the scene was still entirely off-screen, and at 320x568 it started
+  // with the scene 13% visible.
+  //
+  // So drive it from the scene's own sticky travel: how far the field has been
+  // HELD BACK from where it was laid out. That displacement is 0 at the exact
+  // moment the scene settles under the navigation and equals its full travel
+  // the moment before it releases — which is precisely "starts when the scene
+  // is visible, completes before release", with no computed-style read in the
+  // frame loop.
+  if (
+    SHORT_STAGE_MQ?.matches &&
+    stage &&
+    field &&
+    copy &&
+    field.offsetParent === stage &&
+    copy.offsetParent === stage
+  ) {
+    // The scene is laid out directly after the copy (see the ordering rules in
+    // v5-home.css). The copy is position:static, so ITS offsetTop is stable —
+    // unlike the sticky scene's, which tracks the shifted position and would
+    // cancel the measurement to zero.
+    const natural = copy.offsetTop + copy.offsetHeight;
+    const stageTop = stage.getBoundingClientRect().top;
+    const held = field.getBoundingClientRect().top - (stageTop + natural);
+    const travel = stage.offsetHeight - natural - field.offsetHeight;
+    if (travel <= 8) return 1;
+    return Math.min(1, Math.max(0, held / travel));
+  }
   // The pinned region is whichever is SHORTER: the sticky stage or the
   // visual viewport.
   //  - Normal phones/desktop: the stage (100svh) is the shorter one, so the
   //    denominator ignores the browser toolbar growing and shrinking
   //    `window.innerHeight` underneath us.
-  //  - Short landscape (max-height:700px) flows the stage to auto height, so
-  //    it is no longer pinned and is TALLER than the hero — there the
-  //    viewport is the right denominator, and taking the minimum picks it
-  //    automatically without probing computed styles on every scroll.
+  //  - Anything else that flows the stage to auto height leaves it TALLER
+  //    than the hero; there the viewport is the right denominator, and taking
+  //    the minimum picks it without probing computed styles on every scroll.
+  //    (Short screens no longer reach here — the sticky-scene branch above
+  //    owns them.)
   const pinned = stage
     ? Math.min(stage.offsetHeight, window.innerHeight)
     : window.innerHeight;
@@ -537,12 +578,14 @@ function HeroServiceRail() {
     }
     const hero = el.closest<HTMLElement>(".v4-hero");
     const stage = hero ? hero.querySelector<HTMLElement>(".v4-hero__stage") : null;
+    const field = hero ? hero.querySelector<HTMLElement>(".v4-hero__field") : null;
+    const copy = hero ? hero.querySelector<HTMLElement>(".v4-hero__copy") : null;
     let raf = 0;
     let pending = false;
     function update() {
       pending = false;
       if (!hero) return;
-      const p = heroProgress(hero, stage);
+      const p = heroProgress(hero, stage, field, copy);
       el!.style.setProperty("--sm-rail-p", p.toFixed(4));
       el!.dataset.active = String(
         Math.min(RAIL_SERVICES.length - 1, Math.floor(p * RAIL_SERVICES.length)),
@@ -685,9 +728,11 @@ export function SignalHeroV4({
     }
 
     const stageEl = root.querySelector<HTMLElement>(".v4-hero__stage");
+    const fieldEl = root.querySelector<HTMLElement>(".v4-hero__field");
+    const copyEl = root.querySelector<HTMLElement>(".v4-hero__copy");
 
     function progress(): number {
-      return heroProgress(root, stageEl);
+      return heroProgress(root, stageEl, fieldEl, copyEl);
     }
 
     const drawTo = (p: number) => Math.min(1, Math.max(0, (p - 0.22) / 0.7));

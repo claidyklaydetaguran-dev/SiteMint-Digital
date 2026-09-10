@@ -191,11 +191,43 @@ check(
   "hero progress measures the sticky stage, not the visual viewport alone",
   homeV4Src.includes("Math.min(stage.offsetHeight, window.innerHeight)"),
 );
-check("the rail reads the shared progress helper", homeV4Src.includes("const p = heroProgress(hero, stage);"));
-check("the canvas reads the shared progress helper", homeV4Src.includes("return heroProgress(root, stageEl);"));
+check("the rail reads the shared progress helper", homeV4Src.includes("const p = heroProgress(hero, stage, field, copy);"));
+check("the canvas reads the shared progress helper", homeV4Src.includes("return heroProgress(root, stageEl, fieldEl, copyEl);"));
+// offsetTop on a sticky element reports the SHIFTED position, so the scene
+// cannot measure its own travel — the static copy is the reference.
+check(
+  "sticky travel is measured from the static copy, never the sticky scene",
+  homeV4Src.includes("const natural = copy.offsetTop + copy.offsetHeight;") &&
+    !homeV4Src.includes("stage.offsetHeight - field.offsetTop - field.offsetHeight"),
+);
+// On short screens the scene itself is the pinned element, so progress has to
+// track ITS travel — otherwise the transformation plays before the scene has
+// scrolled into view (measured 0% visible for the first half at 844x390).
+check(
+  "short screens drive progress from the pinned scene",
+  homeV4Src.includes("field.offsetParent === stage") &&
+    homeV4Src.includes("stage.offsetHeight - natural - field.offsetHeight"),
+);
+check(
+  "the short-screen branch reads no computed style in the frame loop",
+  !/SHORT_STAGE_MQ[\s\S]{0,600}getComputedStyle/.test(homeV4Src),
+);
 // A degenerate runway must show the story COMPLETE, never pinned at 0 — the
 // old rail clamped to 0 exactly where the canvas jumped to 1.
 check("degenerate runway resolves to the complete story", homeV4Src.includes("if (runway <= 8) return 1;"));
+check(
+  "the short-screen stage orders every child, not just the swapped pair",
+  (() => {
+    const m = /@media \(max-height: 700px\) \{[\s\S]*?\n\}/g;
+    const blocks = homeCssSrc.match(m) || [];
+    const b = blocks.find((x) => x.includes("v4-hero__field") && x.includes("position: sticky"));
+    if (!b) return false;
+    return ["__copy", "__field", "__rail", "__film", "__hud"].every((c) => {
+      const i = b.indexOf("v4-hero" + c);
+      return i > -1 && /order:\s*\d/.test(b.slice(i, i + 400));
+    });
+  })(),
+);
 
 // No forced layout inside the animation frame.
 check("no per-frame canvas size probe", !homeV4Src.includes("if (canvas.clientWidth !== W"));

@@ -2845,12 +2845,16 @@
   .sm-home-v5 #hero .v4-hero__copy {
     position: static;
     top: auto;
-    order: 1;
+    /* Reads FIRST and scrolls away cleanly. It must not be ordered after the
+       pinned scene: an opaque panel fixed across the middle of a short screen
+       occludes any heading scrolled to centre, and the headline is the one
+       piece of the hero that has to stay readable. */
+    order: 0;
     padding-top: 0.9rem;
     padding-bottom: 0.9rem;
   }
   .sm-home-v5 #hero .v4-hero__field {
-    order: 0;
+    order: 1;
     position: sticky;
     top: var(--v4-hdr-h, 64px);
     /* Above the flowing copy and film — both are positioned at z-index 2, so
@@ -2870,7 +2874,18 @@
     background: var(--v4-ink, #071324);
     margin-top: 0;
   }
+  /* Every child is numbered here, not just the two being swapped: at widths
+     above 767px the narrow block that numbers rail/film/hud does not apply, so
+     a bare "order: 1" on the scene sent it past them to the end of the stage
+     and left it with no room to stick. */
+  .sm-home-v5 #hero .v4-hero__rail {
+    order: 2;
+  }
+  .sm-home-v5 #hero .v4-hero__film {
+    order: 3;
+  }
   .sm-home-v5 #hero .v4-hero__hud {
+    order: 4;
     position: static;
     padding-bottom: 0.6rem;
   }
