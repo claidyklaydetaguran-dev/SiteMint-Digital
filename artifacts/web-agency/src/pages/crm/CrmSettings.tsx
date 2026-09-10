@@ -46,8 +46,8 @@ interface PhoneStatus {
 type HStatus = "healthy" | "warning" | "action";
 
 export default function CrmSettings() {
-  const [testMode, setTestMode] = useState(true);
-  const [saved, setSaved] = useState(false);
+  // Server truth for CRM_EMAIL_TEST_MODE (null while loading / unavailable).
+  const [testMode, setTestMode] = useState<boolean | null>(null);
   const [phoneStatus, setPhoneStatus] = useState<PhoneStatus | null>(null);
   const [loadingPhone, setLoadingPhone] = useState(true);
   const [testSmsTo, setTestSmsTo] = useState("");
@@ -64,14 +64,19 @@ export default function CrmSettings() {
   const [normalizing, setNormalizing] = useState(false);
   const [normalizeResult, setNormalizeResult] = useState<NormalizeResult | null>(null);
 
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 3000); };
-
   const loadPhoneStatus = useCallback(async () => {
     setLoadingPhone(true);
     try {
       const r = await adminFetch("/api/crm/phone/status");
       if (r.ok) setPhoneStatus(await r.json() as PhoneStatus);
     } catch { /* ignore */ }
+    try {
+      const r = await adminFetch("/api/crm/settings/status");
+      if (r.ok) {
+        const d = await r.json() as { emailTestMode?: boolean };
+        setTestMode(typeof d.emailTestMode === "boolean" ? d.emailTestMode : null);
+      }
+    } catch { /* older backend — leave unknown */ }
     setLoadingPhone(false);
   }, []);
 
@@ -193,7 +198,7 @@ export default function CrmSettings() {
     : auditRows.length === 0 ? "healthy"
     : auditRows.length <= 3 ? "warning" : "action";
 
-  const hEmail: HStatus = testMode ? "warning" : "healthy";
+  const hEmail: HStatus = testMode === false ? "healthy" : "warning";
 
   const healthCards: { title: string; status: HStatus; desc: string; action?: string }[] = [
     {
@@ -241,10 +246,12 @@ export default function CrmSettings() {
     {
       title: "Email Mode",
       status: hEmail,
-      desc: testMode
-        ? "Test mode on — emails are simulated, not sent to leads."
-        : "Live mode — emails deliver via Resend.",
-      action: testMode ? "Disable test mode in Email Settings when ready" : undefined,
+      desc: testMode === false
+        ? "Live mode — emails deliver via Resend."
+        : testMode === true
+          ? "Test mode on — emails are simulated, not sent to leads."
+          : "Email mode unknown — the server did not report it.",
+      action: testMode !== false ? "Set CRM_EMAIL_TEST_MODE=false when ready to send" : undefined,
     },
   ];
 
@@ -372,20 +379,27 @@ export default function CrmSettings() {
             <h2 className="font-semibold text-sm text-foreground">Email Settings</h2>
           </div>
           <div className="space-y-4">
-            <div className="flex items-start justify-between gap-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className={`flex items-start justify-between gap-4 p-3 rounded-lg border ${testMode === false ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}>
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${testMode === false ? "text-green-600" : "text-yellow-600"}`} />
                 <div>
-                  <p className="text-sm font-semibold text-yellow-900">Email Test Mode</p>
-                  <p className="text-xs text-yellow-700 mt-0.5">
-                    When enabled, emails are logged in the activity timeline but NOT actually sent.
+                  <p className={`text-sm font-semibold ${testMode === false ? "text-green-900" : "text-yellow-900"}`}>Email Test Mode</p>
+                  <p className={`text-xs mt-0.5 ${testMode === false ? "text-green-700" : "text-yellow-700"}`}>
+                    {testMode === false
+                      ? "Off — emails deliver to leads via Resend."
+                      : testMode === true
+                        ? "On — emails are logged in the activity timeline but NOT actually sent."
+                        : "Unknown — this backend does not report the email mode."}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Controlled by the server's <code className="bg-muted px-1 rounded">CRM_EMAIL_TEST_MODE</code> environment
+                    variable — it cannot be changed from this page.
                   </p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input type="checkbox" className="sr-only peer" checked={testMode} onChange={e => setTestMode(e.target.checked)} />
-                <div className="w-10 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:bg-yellow-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
-              </label>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${testMode === false ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                {testMode === false ? "LIVE" : testMode === true ? "TEST" : "UNKNOWN"}
+              </span>
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">From Email Address</label>
@@ -818,7 +832,8 @@ export default function CrmSettings() {
             {[
               { color: "bg-green-500", title: "CRM is protected behind admin authentication", sub: "All /api/crm/* endpoints require a valid Bearer token." },
               { color: "bg-green-500", title: "API keys are stored as environment variables", sub: "Resend, Twilio and session secrets are never exposed to the frontend." },
-              { color: "bg-yellow-500", title: "Admin password", sub: 'Change the default by setting the ADMIN_PASSWORD environment variable.' },
+              { color: "bg-green-500", title: "Admin password is fail-closed", sub: "There is no default password. If ADMIN_PASSWORD is unset, admin login is unavailable (503) rather than guessable." },
+              { color: "bg-yellow-500", title: "One shared staff identity", sub: "Everyone signs in with the same password — per-staff accounts, roles, and password recovery are not built yet." },
             ].map(({ color, title, sub }) => (
               <div key={title} className="flex items-start gap-3">
                 <div className={`w-2 h-2 rounded-full ${color} mt-1.5 shrink-0`} />
@@ -837,6 +852,10 @@ export default function CrmSettings() {
             <Bell className="w-4 h-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-foreground">Team Members</h2>
           </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Static directory. Team members do not have individual logins yet — task and lead
+            "Assigned" fields reference these names as plain text.
+          </p>
           <div className="space-y-2">
             {[
               { name: "Claidy Taguran", role: "Technical Director" },
@@ -856,10 +875,6 @@ export default function CrmSettings() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button onClick={save}>Save Settings</Button>
-          {saved && <span className="text-sm text-green-600">Settings saved!</span>}
-        </div>
       </div>
     </CrmLayout>
   );

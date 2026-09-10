@@ -28,20 +28,28 @@ export default function CrmPipeline() {
   const [pipeline, setPipeline] = useState<Record<string,Lead[]>>({});
   const [loading, setLoading] = useState(true);
   const [movingId, setMovingId] = useState<number|null>(null);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
-    const r = await adminFetch("/api/crm/pipeline");
-    if (r.status === 401) return;
-    const d = await r.json() as { pipeline: Record<string,Lead[]> };
-    // O-3: the API buckets by raw stored status; fold legacy keys into the
-    // canonical taxonomy so every lead lands in exactly one visible column.
-    const merged: Record<string, Lead[]> = {};
-    for (const [rawStatus, leads] of Object.entries(d.pipeline || {})) {
-      const key = normalizeLeadStatus(rawStatus);
-      merged[key] = [...(merged[key] ?? []), ...(Array.isArray(leads) ? leads : [])];
+    setLoadError("");
+    try {
+      const r = await adminFetch("/api/crm/pipeline");
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const d = await r.json() as { pipeline: Record<string,Lead[]> };
+      // O-3: the API buckets by raw stored status; fold legacy keys into the
+      // canonical taxonomy so every lead lands in exactly one visible column.
+      const merged: Record<string, Lead[]> = {};
+      for (const [rawStatus, leads] of Object.entries(d.pipeline || {})) {
+        const key = normalizeLeadStatus(rawStatus);
+        merged[key] = [...(merged[key] ?? []), ...(Array.isArray(leads) ? leads : [])];
+      }
+      setPipeline(merged);
+    } catch {
+      setLoadError("Couldn't load the pipeline. Check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
-    setPipeline(merged);
-    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -62,6 +70,15 @@ export default function CrmPipeline() {
     <CrmLayout>
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+      </div>
+    </CrmLayout>
+  );
+
+  if (loadError) return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground font-medium">{loadError}</p>
+        <button onClick={load} className="text-sm border border-input rounded-lg px-4 py-1.5 hover:bg-accent transition-colors">Retry</button>
       </div>
     </CrmLayout>
   );

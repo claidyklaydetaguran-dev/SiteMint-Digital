@@ -28,7 +28,6 @@ interface CalEvent { id: string; date: string; title: string; type: string; lead
 export default function CrmCalendar() {
   const [today] = useState(new Date());
   const [current, setCurrent] = useState(new Date());
-  const [view, setView] = useState<"month" | "week" | "day">("month");
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -186,14 +185,6 @@ export default function CrmCalendar() {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              {(["day","week","month"] as const).map(v => (
-                <button key={v} onClick={() => setView(v)}
-                  className={`px-3 py-1 text-xs font-medium rounded-lg capitalize transition-colors ${
-                    view === v ? "bg-blue-600 text-white" : "border border-border text-foreground hover:bg-accent"
-                  }`}>
-                  {v}
-                </button>
-              ))}
               <button onClick={goToday}
                 className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-accent transition-colors text-foreground">
                 Today

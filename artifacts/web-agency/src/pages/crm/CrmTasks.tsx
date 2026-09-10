@@ -30,14 +30,22 @@ export default function CrmTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabFilter>("due-today");
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await adminFetch("/api/crm/tasks");
-    if (r.status === 401) return;
-    const d = await r.json() as { tasks: Task[] };
-    setTasks(d.tasks || []);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const r = await adminFetch("/api/crm/tasks");
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const d = await r.json() as { tasks: Task[] };
+      setTasks(d.tasks || []);
+    } catch {
+      setLoadError("Couldn't load tasks. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -75,6 +83,15 @@ export default function CrmTasks() {
     <CrmLayout>
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+      </div>
+    </CrmLayout>
+  );
+
+  if (loadError) return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground font-medium">{loadError}</p>
+        <button onClick={load} className="text-sm border border-input rounded-lg px-4 py-1.5 hover:bg-accent transition-colors">Retry</button>
       </div>
     </CrmLayout>
   );
