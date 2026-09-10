@@ -6,9 +6,7 @@ import {
   CheckCircle, AlertCircle, Eye, FolderOpen, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const API = (path: string) => `/api${path}`;
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -115,9 +113,8 @@ function DiscoveryDrawer({
     setGeneratingProposal(true);
     setError("");
     try {
-      const r = await fetch(API(`/crm/discovery-submissions/${sub.id}/generate-proposal`), {
+      const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}/generate-proposal`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok()}` },
       });
       if (!r.ok) throw new Error((await r.json() as { error?: string }).error || "Failed");
       const { submission } = await r.json() as { submission: Submission };
@@ -137,9 +134,8 @@ function DiscoveryDrawer({
     setConvertingProject(true);
     setError("");
     try {
-      const r = await fetch(API(`/crm/discovery-submissions/${sub.id}/convert-to-project`), {
+      const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}/convert-to-project`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ force: !!sub.convertedProjectId }),
       });
       if (!r.ok) throw new Error((await r.json() as { error?: string }).error || "Failed");
@@ -156,9 +152,8 @@ function DiscoveryDrawer({
   const patchStatus = async (newStatus: string) => {
     setUpdatingStatus(true);
     try {
-      const r = await fetch(API(`/crm/discovery-submissions/${sub.id}`), {
+      const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ crmStatus: newStatus }),
       });
       if (r.ok) {
@@ -174,9 +169,8 @@ function DiscoveryDrawer({
   const saveNotes = async () => {
     setSavingNotes(true);
     try {
-      await fetch(API(`/crm/discovery-submissions/${sub.id}`), {
+      await adminFetch(`/api/crm/discovery-submissions/${sub.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ internalNotes: notes }),
       });
     } finally {
@@ -407,9 +401,7 @@ export default function CrmDiscovery() {
       if (budgetFilter) params.set("budget", budgetFilter);
       if (timelineFilter) params.set("timeline", timelineFilter);
       params.set("limit", "200");
-      const r = await fetch(API(`/crm/discovery-submissions?${params}`), {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
+      const r = await adminFetch(`/api/crm/discovery-submissions?${params}`);
       if (r.ok) {
         const data = await r.json() as { submissions: Submission[]; total: number };
         setSubmissions(data.submissions);
@@ -425,9 +417,8 @@ export default function CrmDiscovery() {
   const handleDelete = async (id: number) => {
     if (!window.confirm("Delete this discovery submission?")) return;
     setDeletingId(id);
-    await fetch(API(`/crm/discovery-submissions/${id}`), {
+    await adminFetch(`/api/crm/discovery-submissions/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${tok()}` },
     });
     setDeletingId(null);
     setSubmissions(prev => prev.filter(s => s.id !== id));

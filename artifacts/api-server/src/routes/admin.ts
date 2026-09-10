@@ -134,6 +134,45 @@ router.get("/admin/submissions", requireAdmin, async (req: Request, res: Respons
   }
 });
 
+// ── CSV Export ────────────────────────────────────────────────────────────────
+// Registered before /admin/submissions/:id — Express matches top-to-bottom, so
+// behind :id this path resolved to id="export" and 400'd (unreachable route).
+
+router.get("/admin/submissions/export/csv", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select()
+      .from(discoverySubmissions)
+      .orderBy(desc(discoverySubmissions.createdAt));
+
+    const headers = [
+      "ID", "Submitted At", "Contact Name", "Company", "Email", "Phone",
+      "Industry", "Service Interest", "Budget", "Timeline", "Lead Score",
+      "Recommended Package", "Status", "Tags",
+    ];
+
+    const escape = (v: unknown): string => {
+      const s = v === null || v === undefined ? "" : Array.isArray(v) ? v.join("; ") : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const csvRows = rows.map(r => [
+      r.id, r.createdAt.toISOString(), r.contactName, r.companyName, r.email,
+      r.phone, r.industry, r.serviceInterest, r.budget, r.timeline,
+      r.leadScore, r.recommendedPackage, r.status, r.tags,
+    ].map(escape).join(","));
+
+    const csv = [headers.map(escape).join(","), ...csvRows].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="sitemint-submissions-${Date.now()}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    req.log.error({ err }, "Error exporting CSV");
+    res.status(500).json({ error: "Failed to export" });
+  }
+});
+
 // ── Single submission ─────────────────────────────────────────────────────────
 
 router.get("/admin/submissions/:id", requireAdmin, async (req: Request, res: Response) => {
@@ -235,43 +274,6 @@ router.post("/admin/submissions/:id/sow", requireAdmin, async (req: Request, res
   } catch (err) {
     req.log.error({ err }, "Error generating SOW");
     res.status(500).json({ error: "Failed to generate SOW" });
-  }
-});
-
-// ── CSV Export ────────────────────────────────────────────────────────────────
-
-router.get("/admin/submissions/export/csv", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const rows = await db
-      .select()
-      .from(discoverySubmissions)
-      .orderBy(desc(discoverySubmissions.createdAt));
-
-    const headers = [
-      "ID", "Submitted At", "Contact Name", "Company", "Email", "Phone",
-      "Industry", "Service Interest", "Budget", "Timeline", "Lead Score",
-      "Recommended Package", "Status", "Tags",
-    ];
-
-    const escape = (v: unknown): string => {
-      const s = v === null || v === undefined ? "" : Array.isArray(v) ? v.join("; ") : String(v);
-      return `"${s.replace(/"/g, '""')}"`;
-    };
-
-    const csvRows = rows.map(r => [
-      r.id, r.createdAt.toISOString(), r.contactName, r.companyName, r.email,
-      r.phone, r.industry, r.serviceInterest, r.budget, r.timeline,
-      r.leadScore, r.recommendedPackage, r.status, r.tags,
-    ].map(escape).join(","));
-
-    const csv = [headers.map(escape).join(","), ...csvRows].join("\n");
-
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="sitemint-submissions-${Date.now()}.csv"`);
-    res.send(csv);
-  } catch (err) {
-    req.log.error({ err }, "Error exporting CSV");
-    res.status(500).json({ error: "Failed to export" });
   }
 });
 
