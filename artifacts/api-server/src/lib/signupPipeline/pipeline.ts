@@ -34,6 +34,13 @@ const CRM_SOURCE = "AI Receptionist Signup";
 const CLAIM_BATCH = 5;
 const BASE_BACKOFF_MS = 30_000;
 const MAX_BACKOFF_MS = 60 * 60_000;
+// A job left "processing" past this window is presumed abandoned by a crashed
+// worker and reclaimed. This makes the pipeline at-least-once: a worker that had
+// an email accepted by the provider and died before recording completion resends
+// on reclaim. That trade is deliberate and stated honestly — a missing
+// verification email locks a customer out, a duplicate is a minor annoyance, and
+// the mail provider exposes no cross-request idempotency key here.
+const LEASE_MS = 2 * 60_000;
 
 // ── enqueue ──────────────────────────────────────────────────────────────────
 
@@ -195,13 +202,20 @@ export function backoffDelayMs(attempts: number): number {
 
 async function claimDueJobs(now: Date): Promise<VoiceSignupJob[]> {
   return db.transaction(async (tx) => {
+    const leaseDeadline = new Date(now.getTime() - LEASE_MS);
     const due = await tx
       .select({ id: voiceSignupJobs.id })
       .from(voiceSignupJobs)
       .where(
-        and(
-          inArray(voiceSignupJobs.status, ["pending", "retry_scheduled"]),
-          or(isNull(voiceSignupJobs.nextAttemptAt), lte(voiceSignupJobs.nextAttemptAt, now)),
+        or(
+          and(
+            inArray(voiceSignupJobs.status, ["pending", "retry_scheduled"]),
+            or(isNull(voiceSignupJobs.nextAttemptAt), lte(voiceSignupJobs.nextAttemptAt, now)),
+          ),
+          // Crash recovery: a lease that expired while "processing". SKIP LOCKED
+          // keeps a still-running worker's row locked, so only a genuinely
+          // abandoned job (its transaction gone) is reclaimed here.
+          and(eq(voiceSignupJobs.status, "processing"), lte(voiceSignupJobs.updatedAt, leaseDeadline)),
         ),
       )
       .orderBy(voiceSignupJobs.id)
@@ -264,7 +278,64 @@ export async function processDueSignupJobs(deps?: SignupJobDeps): Promise<Proces
   return { claimed: jobs.length, completed, failed };
 }
 
+// ── reconciliation ───────────────────────────────────────────────────────────
+// The durable-recovery half of directive §4. The inline enqueue in the signup
+// handler is a fast path wrapped in a catch so it can never fail the account —
+// which by itself would mean a rare enqueue failure silently loses the CRM and
+// verification work. This sweep is the guarantee that it cannot: every
+// receptionist account (a firm WITH a password_hash — the column is null for
+// the legacy SMS-intake firms that were never dashboard customers) must have a
+// crm_link job, and any firm missing one has its work created here. The enqueue
+// is unique per firm × kind with ON CONFLICT DO NOTHING, so this creates
+// EXACTLY the missing work and never a duplicate, however many times it runs.
+
+const RECONCILE_BATCH = 25;
+
+export interface ReconcileDeps {
+  findAccountsMissingCrmLink: (limit: number) => Promise<Array<{ id: number; email: string | null; name: string; industry: string | null }>>;
+  enqueue?: typeof enqueueSignupJobs;
+}
+
+async function productionReconcileDeps(): Promise<ReconcileDeps> {
+  return {
+    findAccountsMissingCrmLink: async (limit) => {
+      // Receptionist accounts (password_hash set) with no crm_link job row.
+      const rows = await db
+        .select({ id: intakeFirms.id, email: intakeFirms.email, name: intakeFirms.name, industry: intakeFirms.industry })
+        .from(intakeFirms)
+        .where(
+          and(
+            sql`${intakeFirms.passwordHash} is not null`,
+            sql`${intakeFirms.email} is not null`,
+            sql`not exists (select 1 from ${voiceSignupJobs} j where j.firm_id = ${intakeFirms.id} and j.kind = 'crm_link')`,
+          ),
+        )
+        .orderBy(intakeFirms.id)
+        .limit(limit);
+      return rows;
+    },
+  };
+}
+
+export async function reconcileMissingSignupJobs(deps?: ReconcileDeps): Promise<{ enqueued: number }> {
+  const resolved = deps ?? (await productionReconcileDeps());
+  const enqueue = resolved.enqueue ?? enqueueSignupJobs;
+  const accounts = await resolved.findAccountsMissingCrmLink(RECONCILE_BATCH);
+  let enqueued = 0;
+  for (const acc of accounts) {
+    if (!acc.email) continue;
+    await enqueue(
+      acc.id,
+      { businessName: acc.name, email: acc.email, industry: acc.industry ?? undefined },
+      ["crm_link", "verification_email"],
+    );
+    enqueued += 1;
+  }
+  return { enqueued };
+}
+
 const WORKER_TICK_MS = 15_000;
+const RECONCILE_TICK_MS = 60_000;
 let workerStarted = false;
 
 /**
@@ -285,7 +356,18 @@ export function startSignupJobWorker(log: { info: (o: object, m: string) => void
       log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[signup-pipeline] tick failed");
     }
   };
+  const reconcileTick = async () => {
+    try {
+      const { enqueued } = await reconcileMissingSignupJobs();
+      if (enqueued > 0) log.info({ enqueued }, "[signup-pipeline] reconciled accounts missing signup jobs");
+    } catch (err) {
+      log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[signup-pipeline] reconcile failed");
+    }
+  };
   setInterval(tick, WORKER_TICK_MS).unref?.();
-  // One immediate pass so a fresh deploy drains anything queued while down.
+  setInterval(reconcileTick, RECONCILE_TICK_MS).unref?.();
+  // Immediate passes: drain the queue and backfill any account whose enqueue was
+  // lost while the worker was down.
   void tick();
+  void reconcileTick();
 }

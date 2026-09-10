@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runSignupJob, backoffDelayMs, type SignupJobDeps } from "./pipeline.js";
+import { runSignupJob, backoffDelayMs, reconcileMissingSignupJobs, type SignupJobDeps } from "./pipeline.js";
 import type { VoiceSignupJob } from "@workspace/db/schema/voice";
 
 // The pipeline's job handlers, exercised against injected fakes. The durable
@@ -137,6 +137,37 @@ describe("welcome_email", () => {
       deps({ sendWelcomeEmail: async () => ({ ok: false, reason: "alerts_disabled" }) }),
     );
     expect(out).toEqual({ ok: false, retryable: true, error: "alerts_disabled" });
+  });
+});
+
+describe("reconciliation", () => {
+  it("creates exactly the missing work — one enqueue per account lacking a crm_link job", async () => {
+    const calls: unknown[] = [];
+    const out = await reconcileMissingSignupJobs({
+      findAccountsMissingCrmLink: async () => [
+        { id: 7, email: "a@b.com", name: "A Co", industry: "hvac" },
+        { id: 9, email: null, name: "No Email LLC", industry: null },
+        { id: 11, email: "c@d.com", name: "C Co", industry: null },
+      ],
+      enqueue: async (firmId, payload, kinds) => {
+        calls.push({ firmId, payload, kinds });
+      },
+    });
+    // The no-email account is skipped (nothing useful can be created for it);
+    // both real accounts get crm_link + verification_email and nothing else.
+    expect(out).toEqual({ enqueued: 2 });
+    expect(calls).toEqual([
+      { firmId: 7, payload: { businessName: "A Co", email: "a@b.com", industry: "hvac" }, kinds: ["crm_link", "verification_email"] },
+      { firmId: 11, payload: { businessName: "C Co", email: "c@d.com", industry: undefined }, kinds: ["crm_link", "verification_email"] },
+    ]);
+  });
+
+  it("is a no-op when nothing is missing", async () => {
+    const out = await reconcileMissingSignupJobs({
+      findAccountsMissingCrmLink: async () => [],
+      enqueue: async () => { throw new Error("must not enqueue"); },
+    });
+    expect(out).toEqual({ enqueued: 0 });
   });
 });
 
