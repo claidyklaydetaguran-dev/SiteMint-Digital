@@ -200,16 +200,16 @@ console.log("\n--- hero copy matches the owner-specified exact copy hierarchy (2
   check("HERO_COPY.eyebrow matches the approved wording", HERO_COPY.eyebrow === "SiteMint AI Receptionist");
   check(
     "HERO_COPY.betaStatus matches the approved wording",
-    HERO_COPY.betaStatus === "Private beta — invite only",
+    HERO_COPY.betaStatus === "Early access",
   );
   check(
     "HERO_COPY.title matches the approved wording",
-    HERO_COPY.title === "Missed calls shouldn't mean missed opportunities.",
+    HERO_COPY.title === "Help every caller, even when your team is busy.",
   );
   check(
     "HERO_COPY.supporting matches the approved wording",
     HERO_COPY.supporting ===
-      "Give callers a helpful next step—even when your team cannot answer—using your business information, availability, and appointment rules.",
+      "It answers routine calls with your approved business information, collects the caller's details and why they're calling, helps schedule where you've set that up, and sends you a useful summary.",
   );
   check(
     "HERO_COPY.primaryCta matches the approved wording",
@@ -217,7 +217,7 @@ console.log("\n--- hero copy matches the owner-specified exact copy hierarchy (2
   );
   check(
     "HERO_COPY.secondaryCta matches the approved wording",
-    HERO_COPY.secondaryCta === "Request Beta Access",
+    HERO_COPY.secondaryCta === "Create Account",
   );
   check(
     "HERO_COPY.signInPrompt + signInCta read \"Already a client? Sign in\"",
@@ -243,11 +243,11 @@ console.log("\n--- hero copy matches the owner-specified exact copy hierarchy (2
     primaryWiring.test(pageSrc),
   );
 
-  const secondaryWiring =
-    /href=\{`#\$\{SECTION_ID\.beta\}`\}\s+className="smv5-btn smv5-btn--outline">\s*\{HERO_COPY\.secondaryCta\}/;
+  const secondaryOpenTag =
+    '<Link href={ROUTES.aiReceptionistSignup} className="smv5-btn smv5-btn--outline">';
   check(
-    'secondary hero action ("Request Beta Access") is the outline button, anchored to the Request Beta Access section',
-    secondaryWiring.test(pageSrc),
+    'secondary hero action ("Create Account") is the outline button, routed to the signup page (2026-09-11 §5)',
+    pageSrc.includes(secondaryOpenTag),
   );
 }
 
