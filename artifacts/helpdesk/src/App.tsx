@@ -37,6 +37,7 @@ const Login = lazy(() => import("@/pages/Login"));
 const PublicSchedule = lazy(() => import("@/pages/PublicSchedule"));
 const PasswordReset = lazy(() => import("@/pages/PasswordReset"));
 const PasswordResetComplete = lazy(() => import("@/pages/PasswordResetComplete"));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
 
 const Overview = lazy(() => import("@/pages/Overview"));
 const Setup = lazy(() => import("@/pages/Setup"));
@@ -132,6 +133,13 @@ function Router() {
         {() => (
           <AuthShell routeLabel="Password reset">
             <PasswordResetComplete />
+          </AuthShell>
+        )}
+      </Route>
+      <Route path={ROUTES.verifyEmail}>
+        {() => (
+          <AuthShell routeLabel="Email verification">
+            <VerifyEmail />
           </AuthShell>
         )}
       </Route>

@@ -490,6 +490,16 @@
   text-decoration-color: var(--v2-color-action);
 }
 
+/* A <button> that reads as the inline link (verify-email resend, 2026-09-11):
+   strips UA button chrome; every other property comes from .si-alt__link. */
+.si-alt__link--button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .si-alt__link:hover {
   text-decoration-color: var(--v2-color-text);
 }
