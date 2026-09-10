@@ -242,7 +242,7 @@ export default function ServicesV3() {
   usePageMeta({
     title: "What We Build — SiteMint Digital",
     description:
-      "Websites & web apps, discovery systems, AI systems & automation, CRM & internal systems, growth infrastructure, advertising services, and ongoing support — the full SiteMint service architecture, plus pricing estimates.",
+      "Websites, web apps, discovery systems, AI automation, CRM and ongoing support — everything SiteMint builds for growing service businesses, with pricing.",
   });
 
   return (

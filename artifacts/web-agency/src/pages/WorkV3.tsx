@@ -363,6 +363,8 @@ function SelectedProjectsSection({ reveal }: { reveal: ReturnType<typeof useReve
 export default function WorkV3() {
   const reveal = useReveal();
   usePageMeta({
+    // Also served at the legacy /portfolio path; /work is the sitemap URL.
+    canonicalPath: "/work",
     title: "Work — SiteMint Digital",
     description:
       "What SiteMint has actually built and run, labelled honestly: available now, private beta, in development, or planned.",

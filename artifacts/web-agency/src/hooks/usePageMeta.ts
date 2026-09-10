@@ -10,12 +10,18 @@ export interface PageMeta {
   /** Full `<title>` text, e.g. "Pricing — SiteMint Digital". */
   title: string;
   description: string;
+  /**
+   * Canonical path when it is NOT the current URL — for a page reachable at
+   * more than one path. `/work` is also served at the legacy `/portfolio`;
+   * without this both claimed themselves and duplicated each other.
+   */
+  canonicalPath?: string;
 }
 
 /** Production origin — the canonical host (release directive 2026-09-07). */
 const CANONICAL_ORIGIN = "https://sitemintdigital.com";
 
-export function usePageMeta({ title, description }: PageMeta): void {
+export function usePageMeta({ title, description, canonicalPath }: PageMeta): void {
   useEffect(() => {
     const prevTitle = document.title;
     document.title = title;
@@ -34,7 +40,7 @@ export function usePageMeta({ title, description }: PageMeta): void {
     );
     const prevCanonical = canonical?.getAttribute("href") ?? "";
     if (canonical) {
-      const path = window.location.pathname.replace(/\/$/, "");
+      const path = (canonicalPath ?? window.location.pathname).replace(/\/$/, "");
       canonical.setAttribute("href", `${CANONICAL_ORIGIN}${path || "/"}`);
     }
 
@@ -64,7 +70,7 @@ export function usePageMeta({ title, description }: PageMeta): void {
       if (canonical && prevCanonical) canonical.setAttribute("href", prevCanonical);
       for (const restore of restores) restore();
     };
-  }, [title, description]);
+  }, [title, description, canonicalPath]);
 }
 
 export default usePageMeta;

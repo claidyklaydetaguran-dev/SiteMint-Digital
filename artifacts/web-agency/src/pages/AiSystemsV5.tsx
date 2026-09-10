@@ -311,7 +311,7 @@ export default function AiSystemsV5() {
   usePageMeta({
     title: "AI Systems & Automation — SiteMint Digital",
     description:
-      "Automation, CRM & internal systems, growth infrastructure, and AI-assisted workflows — evaluation, routing, follow-up, tracking, and record-keeping handled automatically, with people kept in the loop.",
+      "Automation, CRM and AI-assisted workflows that handle follow-up, routing and record-keeping for you, with your team still deciding what matters.",
   });
   return (
     <div id="integrations-scope" className="sm-v5page sm-v5page--ai-systems">

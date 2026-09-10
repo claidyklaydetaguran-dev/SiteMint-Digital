@@ -36,6 +36,33 @@ const WA_DIST = process.env.WA_DIST || join(here, "wa-dist");
 const UPSTREAM = process.env.UPSTREAM || "sitemintdigital.replit.app";
 const APEX = "https://sitemintdigital.com";
 
+/**
+ * Surfaces that must never appear in search results.
+ *
+ * These are proxied from the previous deployment, which serves
+ * `<meta name="robots" content="index, follow">` in its own HTML — measured
+ * on production 2026-09-10 at /admin and /admin/crm/dashboard. That directly
+ * contradicts robots.txt's `Disallow: /admin`. The upstream application is
+ * out of scope for this release, but the edge is not, so the directive is
+ * applied here.
+ *
+ * This is a search-visibility control, NOT an access control: authentication
+ * is what protects the CRM and the customer dashboard, and it is unchanged.
+ *
+ * `/ai-toolkit` is deliberately absent — it is a public product microsite.
+ */
+const PRIVATE_PREFIXES = ["/admin", "/ai-receptionist/dashboard", "/app"];
+const isPrivateSurface = (pathname) =>
+  PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+/**
+ * The only hostnames that are public addresses of this site. Anything else —
+ * a Replit dev/preview URL, *.replit.app, an IP, a smoke-test on localhost —
+ * is a copy, and a copy must not compete with the apex in search once
+ * indexing is switched on.
+ */
+const CANONICAL_HOSTS = new Set(["sitemintdigital.com", "www.sitemintdigital.com"]);
+
 /** Path prefixes owned by the existing production application. */
 const PROXY_PREFIXES = [
   "/api",
@@ -163,6 +190,13 @@ createServer(async (req, res) => {
   try {
     const host = String(req.headers.host || "").toLowerCase();
     const url = new URL(req.url, "http://x");
+
+    // Applied before every response path (static, prerendered, proxied, 404)
+    // so no surface can miss it. Set via setHeader so it survives the
+    // writeHead calls further down.
+    if (isPrivateSurface(url.pathname) || !CANONICAL_HOSTS.has(host.split(":")[0])) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
 
     if (url.pathname === "/__health") {
       res.writeHead(200, { "content-type": "application/json" });

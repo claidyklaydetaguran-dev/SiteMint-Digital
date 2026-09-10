@@ -48,7 +48,7 @@ import "@/styles/v5-pages.css";
 
 const PAGE_TITLE = "SiteMint Digital | Websites, CRM, and AI Systems Built to Connect";
 const PAGE_DESCRIPTION =
-  "SiteMint designs websites, web applications, CRM systems, AI automation, and custom software that work together — from the first interaction to the next meaningful action.";
+  "SiteMint builds websites, web apps and AI systems that work together, so customer inquiries get answered, followed up and turned into booked work.";
 
 /* ── Section 2 — What SiteMint builds (typographic ledger, not cards) ──── */
 
