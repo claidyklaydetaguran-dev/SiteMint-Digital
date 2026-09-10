@@ -214,9 +214,15 @@ for (const vp of VIEWPORTS) {
   );
 
   const heroH = first.heroH;
-  const runway = Math.max(0, heroH - vp.h);
+  // The hero's FULL scroll extent. Not `heroH - vp.h`: that is the distance
+  // after which the hero's bottom meets the viewport bottom, which bounds the
+  // story only while the STAGE is the sticky element. Where the SCENE is
+  // sticky (short screens) its pin window ends later — measured 411..582 at
+  // 375x667 against a 346px `heroH - vp.h`, so the old range stopped short of
+  // the animation entirely and reported 0.00 across every sample.
+  const runway = Math.max(0, heroH);
   const seen = [];
-  for (const frac of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
+  for (const frac of [0, 1 / 12, 2 / 12, 3 / 12, 4 / 12, 5 / 12, 6 / 12, 7 / 12, 8 / 12, 9 / 12, 10 / 12, 11 / 12, 1]) {
     await js(`window.scrollTo(0, ${Math.round(frac * runway)})`);
     await sleep(650);
     seen.push(JSON.parse(await js(STATE)));

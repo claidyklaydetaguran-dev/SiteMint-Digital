@@ -2889,6 +2889,14 @@
     position: static;
     padding-bottom: 0.6rem;
   }
+  /* On short PORTRAIT screens the film sits below the pinned scene, far below
+     the fold, so the 12svh text-LCP cap does not apply to it here — and the
+     film is most of the scene's sticky runway. See the note on travel above. */
+  @media (max-width: 767px) {
+    .sm-home-v5 #hero .v4-hero__film {
+      height: clamp(200px, 34svh, 300px);
+    }
+  }
   /* The runway is the scroll the transformation needs — no more. The hero
      used to run a fixed 260vh here, which finished the animation with about
      40% of the hero still to scroll: the "large empty area". */
