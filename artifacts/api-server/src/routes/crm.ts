@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms } from "@workspace/db";
+import { voiceSignupJobs } from "@workspace/db/schema/voice";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
@@ -26,6 +27,57 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
   await db.insert(crmActivities).values({ leadId, type, title, description, metadata });
 }
+
+// ── Settings status ───────────────────────────────────────────────────────────
+// Read-only truth for the Settings page. Email test mode lives only in the
+// CRM_EMAIL_TEST_MODE env var (every send path checks it directly); the UI
+// must display the server's value, never a client-side toggle.
+router.get("/crm/settings/status", requireAdmin, (_req: Request, res: Response) => {
+  res.json({ emailTestMode: process.env.CRM_EMAIL_TEST_MODE !== "false" });
+});
+
+// ── Receptionist signup-job visibility (read-only) ───────────────────────────
+// The registration → CRM pipeline (integration-owned, lib/signupPipeline) can
+// permanently fail a job after 5 attempts, and until now nothing surfaced
+// that: a firm whose CRM link failed simply never appeared in the CRM. This
+// route only SELECTs — retrying/fixing jobs stays with the pipeline owner.
+router.get("/crm/receptionist-signup-jobs", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: voiceSignupJobs.id,
+        firmId: voiceSignupJobs.firmId,
+        firmName: intakeFirms.name,
+        kind: voiceSignupJobs.kind,
+        status: voiceSignupJobs.status,
+        attempts: voiceSignupJobs.attempts,
+        maxAttempts: voiceSignupJobs.maxAttempts,
+        lastError: voiceSignupJobs.lastError,
+        nextAttemptAt: voiceSignupJobs.nextAttemptAt,
+        createdAt: voiceSignupJobs.createdAt,
+        updatedAt: voiceSignupJobs.updatedAt,
+        crmLeadId: sql<number | null>`(${voiceSignupJobs.result} ->> 'crmLeadId')::int`,
+      })
+      .from(voiceSignupJobs)
+      .leftJoin(intakeFirms, eq(voiceSignupJobs.firmId, intakeFirms.id))
+      .orderBy(desc(voiceSignupJobs.updatedAt))
+      .limit(200);
+
+    const failed = rows.filter(r => r.status === "permanently_failed");
+    res.json({
+      jobs: rows,
+      summary: {
+        total: rows.length,
+        permanentlyFailed: failed.length,
+        retryScheduled: rows.filter(r => r.status === "retry_scheduled").length,
+        pending: rows.filter(r => r.status === "pending" || r.status === "processing").length,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching receptionist signup jobs");
+    res.status(500).json({ error: "Failed to fetch signup jobs" });
+  }
+});
 
 // ── Dashboard Stats ───────────────────────────────────────────────────────────
 router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {

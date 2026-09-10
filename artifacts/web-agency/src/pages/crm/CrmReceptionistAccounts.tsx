@@ -16,6 +16,23 @@ interface Account {
   createdAt: string;
 }
 
+interface SignupJob {
+  id: number;
+  firmId: number;
+  firmName: string | null;
+  kind: string;
+  status: string;
+  attempts: number;
+  maxAttempts: number;
+  lastError: string | null;
+  updatedAt: string;
+  crmLeadId: number | null;
+}
+interface SignupJobsResponse {
+  jobs: SignupJob[];
+  summary: { total: number; permanentlyFailed: number; retryScheduled: number; pending: number };
+}
+
 type SortKey = "createdAt" | "name" | "conversationCount" | "planTier";
 type SortDir = "asc" | "desc";
 
@@ -53,6 +70,9 @@ export default function CrmReceptionistAccounts() {
   const [sortKey,  setSortKey]  = useState<SortKey>("createdAt");
   const [sortDir,  setSortDir]  = useState<SortDir>("desc");
 
+  // Registration → CRM pipeline health — best-effort (older backends 404).
+  const [signupJobs, setSignupJobs] = useState<SignupJobsResponse | null>(null);
+
   useEffect(() => {
     adminFetch("/api/admin/receptionist-accounts")
       .then(async (r) => {
@@ -62,6 +82,14 @@ export default function CrmReceptionistAccounts() {
       .then((d) => setAccounts(d.accounts))
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setLoading(false));
+
+    adminFetch("/api/crm/receptionist-signup-jobs")
+      .then(async (r) => {
+        if (!r.ok) return null;
+        return r.json() as Promise<SignupJobsResponse>;
+      })
+      .then((d) => setSignupJobs(d))
+      .catch(() => setSignupJobs(null));
   }, []);
 
   const sorted = useMemo(() => {
@@ -161,6 +189,36 @@ export default function CrmReceptionistAccounts() {
 
       {/* ── Body ── */}
       <div style={{ padding: "24px 32px" }}>
+        {/* Registration → CRM pipeline health */}
+        {signupJobs && signupJobs.summary.permanentlyFailed > 0 && (
+          <div style={{
+            background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)",
+            borderRadius: 10, padding: "14px 18px", marginBottom: 18,
+          }}>
+            <p style={{ fontSize: 13.5, fontWeight: 700, color: "#b91c1c", margin: 0 }}>
+              {signupJobs.summary.permanentlyFailed} signup job{signupJobs.summary.permanentlyFailed !== 1 ? "s" : ""} permanently failed
+            </p>
+            <p style={{ fontSize: 12, color: "#b91c1c", margin: "3px 0 8px" }}>
+              These accounts signed up but their CRM record or email was never completed. The
+              signup pipeline owns retries — flag these to the integration owner.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {signupJobs.jobs.filter(j => j.status === "permanently_failed").slice(0, 8).map(j => (
+                <div key={j.id} style={{ fontSize: 12, color: "var(--sm-teal-900)" }}>
+                  <strong>{j.firmName ?? `Firm #${j.firmId}`}</strong> · {j.kind} ·
+                  {" "}{j.attempts}/{j.maxAttempts} attempts{j.lastError ? ` · ${j.lastError.slice(0, 120)}` : ""}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {signupJobs && signupJobs.summary.permanentlyFailed === 0 && signupJobs.summary.total > 0 && (
+          <p style={{ fontSize: 12, color: "var(--sm-slate-600)", margin: "0 0 16px" }}>
+            Registration → CRM pipeline healthy: {signupJobs.summary.total} job{signupJobs.summary.total !== 1 ? "s" : ""} tracked,
+            {" "}none permanently failed{signupJobs.summary.retryScheduled > 0 ? `, ${signupJobs.summary.retryScheduled} retrying` : ""}.
+          </p>
+        )}
+
         {loading && (
           <div className="flex items-center justify-center py-16">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />

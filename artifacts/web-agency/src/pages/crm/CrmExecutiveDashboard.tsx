@@ -9,7 +9,7 @@ import {
   TrendingUp, Users, Trophy, DollarSign, Target, XCircle, Plus, ArrowRight,
   UserPlus, MessageSquare, CheckSquare, Upload, Phone, AlertTriangle,
   CheckCircle2, RefreshCw, Flame, ChevronRight, GitBranch, LayoutGrid,
-  UserCheck, Headphones, AlertOctagon, Briefcase,
+  UserCheck, Headphones, AlertOctagon, Briefcase, Inbox, CalendarClock,
 } from "lucide-react";
 import { adminFetch, adminGet } from "@/lib/adminFetch";
 
@@ -69,6 +69,14 @@ interface ReceptionistAccount {
 }
 interface VoiceIssue {
   id: string | number; level?: string; message?: string; firmName?: string;
+}
+interface InquirySubmission {
+  id: number; createdAt: string; contactName: string; companyName?: string | null;
+  crmStatus?: string | null; status?: string | null; leadScore?: number | null;
+}
+interface DashProject {
+  id: number; name: string; stage: string;
+  targetLaunchDate?: string | null; assignedTo?: string | null;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -189,6 +197,8 @@ export default function CrmExecutiveDashboard() {
   // O-2 additive sections — best-effort, never block the main dashboard.
   const [receptionistAccounts, setReceptionistAccounts] = useState<ReceptionistAccount[] | null>(null);
   const [issuesCount, setIssuesCount] = useState<number | null>(null);
+  const [inquiries, setInquiries] = useState<InquirySubmission[] | null>(null);
+  const [projects, setProjects] = useState<DashProject[] | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true); else setLoading(true);
@@ -236,6 +246,22 @@ export default function CrmExecutiveDashboard() {
       setIssuesCount(r.count ?? r.items?.length ?? 0);
     } catch {
       setIssuesCount(null);
+    }
+
+    // New inquiries awaiting a first response — additive, best-effort.
+    try {
+      const r = await adminGet<{ submissions: InquirySubmission[] }>("/api/crm/discovery-submissions?limit=200");
+      setInquiries(r.submissions ?? []);
+    } catch {
+      setInquiries(null);
+    }
+
+    // Projects with an upcoming or missed target launch date — additive, best-effort.
+    try {
+      const r = await adminGet<{ projects: DashProject[] }>("/api/crm/projects");
+      setProjects(r.projects ?? []);
+    } catch {
+      setProjects(null);
     }
 
     if (silent) setRefreshing(false); else setLoading(false);
@@ -364,6 +390,28 @@ export default function CrmExecutiveDashboard() {
 
     return items.slice(0, 5);
   }, [tasks, leads, conversations]);
+
+  // New inquiries still awaiting a first response, newest first.
+  const newInquiries = useMemo(() => {
+    if (!inquiries) return null;
+    return inquiries
+      .filter(s => (s.crmStatus ?? s.status ?? "New") === "New")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [inquiries]);
+
+  // Projects whose target launch date is missed or within the next 14 days.
+  const deadlineProjects = useMemo(() => {
+    if (!projects) return null;
+    const TERMINAL = new Set(["Launched", "Maintenance", "Completed"]);
+    const now = Date.now();
+    const horizon = now + 14 * 86_400_000;
+    return projects
+      .filter(p => p.targetLaunchDate && !TERMINAL.has(p.stage))
+      .map(p => ({ ...p, dueMs: new Date(p.targetLaunchDate!).getTime() }))
+      .filter(p => p.dueMs <= horizon)
+      .sort((a, b) => a.dueMs - b.dueMs)
+      .slice(0, 5);
+  }, [projects]);
 
   const hotLeads = useMemo((): Lead[] => {
     const now = Date.now();
@@ -552,6 +600,104 @@ export default function CrmExecutiveDashboard() {
             </div>
           )}
         </div>
+
+        {/* ── 1b. New Inquiries + Approaching Deadlines ───────────────────────── */}
+        {(newInquiries !== null || deadlineProjects !== null) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {newInquiries !== null && (
+              <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <Inbox className="w-4 h-4 text-teal-600" />
+                    <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Inquiries Needing a Response</h2>
+                    {newInquiries.length > 0 && (
+                      <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">{newInquiries.length}</span>
+                    )}
+                  </div>
+                  <Link href="/admin/crm/discovery">
+                    <button className="text-xs text-primary hover:underline flex items-center gap-1">
+                      All inquiries <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </Link>
+                </div>
+                {newInquiries.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <CheckCircle2 className="w-9 h-9 text-green-300 mx-auto mb-2.5" />
+                    <p className="text-sm font-medium text-foreground">No new inquiries waiting.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Every discovery submission has been reviewed.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {newInquiries.slice(0, 4).map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => navigate("/admin/crm/discovery")}
+                        className="w-full flex items-start gap-3 px-5 py-3.5 hover:bg-accent transition-colors text-left"
+                      >
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 bg-sky-100 text-sky-700">New</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground leading-snug truncate">{s.contactName}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {[s.companyName, `received ${timeAgo(s.createdAt)}`].filter(Boolean).join(" · ")}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {deadlineProjects !== null && (
+              <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4 text-orange-500" />
+                    <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Approaching Deadlines</h2>
+                  </div>
+                  <Link href="/admin/crm/projects">
+                    <button className="text-xs text-primary hover:underline flex items-center gap-1">
+                      All projects <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </Link>
+                </div>
+                {deadlineProjects.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <CheckCircle2 className="w-9 h-9 text-green-300 mx-auto mb-2.5" />
+                    <p className="text-sm font-medium text-foreground">No launch dates in the next 14 days.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Active projects are on schedule.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {deadlineProjects.map(p => {
+                      const missed = p.dueMs < Date.now();
+                      const days = Math.ceil((p.dueMs - Date.now()) / 86_400_000);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => navigate("/admin/crm/projects")}
+                          className={`w-full flex items-start gap-3 px-5 py-3.5 hover:bg-accent transition-colors text-left ${missed ? "border-l-2 border-red-400" : ""}`}
+                        >
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${missed ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                            {missed ? "Missed" : days === 0 ? "Today" : `${days}d left`}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium leading-snug truncate ${missed ? "text-red-700" : "text-foreground"}`}>{p.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {[p.stage, p.assignedTo ? `owner: ${p.assignedTo}` : null].filter(Boolean).join(" · ")}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── 2. Active Clients + 3. Receptionist Health ──────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
