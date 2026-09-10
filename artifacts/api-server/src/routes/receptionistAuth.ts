@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import bcrypt from "bcryptjs";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
@@ -119,6 +120,29 @@ router.post("/receptionist/auth/signup", async (req: Request, res: Response) => 
 
     const token = await createSession(firm.id, firm.email!);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+
+    // Owner directive 2026-09-10 §3 — the one explicitly authorized edit to
+    // this protected route: durably enqueue the post-registration work (one
+    // private-CRM record, one verification email; the welcome email follows
+    // confirmation). The jobs table is unique per firm × kind, so a retried
+    // or double-submitted signup cannot duplicate either. An enqueue failure
+    // must never lose the account that was just created — it logs loudly and
+    // the signup still succeeds.
+    try {
+      await enqueueSignupJobs(
+        firm.id,
+        {
+          fullName: fullName.trim(),
+          businessName: businessName?.trim() || undefined,
+          phone: phone?.trim() || undefined,
+          industry: industry?.trim() || undefined,
+          email: firm.email ?? undefined,
+        },
+        ["crm_link", "verification_email"],
+      );
+    } catch (enqueueErr) {
+      req.log.error({ err: enqueueErr, firmId: firm.id }, "[receptionist] signup pipeline enqueue failed");
+    }
 
     res.status(201).json({ firm });
   } catch (err) {

@@ -7,6 +7,7 @@
 // use the shared cookie-or-bearer requireAdmin from lib/admin-session.ts.
 
 import { Router, type Request, type Response } from "express";
+import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import { createSession, COOKIE_NAME, COOKIE_OPTIONS } from "../lib/receptionistAuth.js";
 import { requireAdmin } from "../lib/admin-session.js";
 import { isInviteSignupEnabled, INVITE_SIGNUP_DISABLED_MESSAGE } from "../lib/publicWriteFlags.js";
@@ -82,6 +83,19 @@ router.post("/receptionist/auth/invite-signup", async (req: Request, res: Respon
 
     const token = await createSession(created.firm.id, created.firm.email);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+
+    // Same post-registration pipeline as the public signup route (owner
+    // directive 2026-09-10 §3): CRM record + verification email, durable,
+    // duplicate-proof, never account-losing.
+    try {
+      await enqueueSignupJobs(
+        created.firm.id,
+        { fullName: ownerName, businessName, email: created.firm.email ?? undefined },
+        ["crm_link", "verification_email"],
+      );
+    } catch (enqueueErr) {
+      req.log.error({ err: enqueueErr, firmId: created.firm.id }, "[invite-signup] pipeline enqueue failed");
+    }
 
     // Same response shape as the normal signup route.
     res.status(201).json({ firm: created.firm });

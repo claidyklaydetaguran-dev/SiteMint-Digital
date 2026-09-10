@@ -29,3 +29,7 @@ export * from "../voiceAccounts";
 export * from "./voiceOnboarding";
 export * from "./voiceBetaRequests";
 export * from "./voiceInvites";
+// V6 (migration 0008): durable registration -> CRM -> email jobs (owner
+// directive 2026-09-10 §3). Rollback committed at
+// drizzle/voice-rollback/0008_rollback.sql.
+export * from "./voiceSignupJobs";

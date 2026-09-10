@@ -3,6 +3,7 @@ import { runMigrations } from "stripe-replit-sync";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
+import { startSignupJobWorker } from "./lib/signupPipeline/pipeline.js";
 import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
 import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
 import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
@@ -55,6 +56,14 @@ if (Number.isNaN(port) || port <= 0) {
 function startBackgroundWorkers(): void {
   // Campaign auto-send scheduler (60-second tick)
   startScheduler(60_000);
+
+  // Registration -> CRM -> email pipeline worker (15-second tick). Always on:
+  // an idle tick is one indexed SELECT, and rows only exist after a signup
+  // route has run — which is itself flag-gated.
+  startSignupJobWorker({
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
+  });
 
   // P2: voice call-state reconciliation sweep (5-minute tick). Inert unless
   // VOICE_RECONCILIATION_ENABLED="true" — the starter itself checks the flag

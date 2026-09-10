@@ -5,6 +5,7 @@
 // imported from, never modified.
 
 import { Router, type IRouter, type Request, type Response } from "express";
+import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import {
   completePasswordReset,
@@ -119,6 +120,14 @@ router.post("/receptionist/account/verify-email/confirm", async (req: Request, r
     if (!result.ok) {
       res.status(401).json({ error: "That code is invalid or expired." });
       return;
+    }
+    // The welcome message is timed to the moment the address is PROVEN, and
+    // the unique firm × kind job row means a re-confirmed or replayed token
+    // can never send it twice.
+    try {
+      await enqueueSignupJobs(result.firmId, {}, ["welcome_email"]);
+    } catch (enqueueErr) {
+      req.log.error({ err: enqueueErr, firmId: result.firmId }, "[account] welcome enqueue failed");
     }
     res.json({ ok: true });
   } catch (err) {
