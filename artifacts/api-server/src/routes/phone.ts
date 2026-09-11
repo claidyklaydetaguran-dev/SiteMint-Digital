@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { db, crmLeads, crmActivities, crmMessages } from "@workspace/db";
 import { eq, desc, or, and, isNotNull } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth } from "../lib/staffAuth.js";
 import {
   isTwilioConfigured, getTwilio, getTwilioPhone, getForwardPhone, getCrmBaseUrl,
   normalizePhone, isOptOutMessage, isOptInMessage,
@@ -30,12 +31,19 @@ function checkSmsRate(toNumber: string): boolean {
 }
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  if (!validateToken(auth.substring(7))) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+//
+// Owner-authorized change (2026-09-11), naming this file: the CRM-facing admin
+// routes below move to the shared staff-session authentication so the three
+// Super Admin accounts reach Inbox, Communications and the phone tools as
+// themselves, with per-person audit attribution, and so restricted roles are
+// actually enforced here too.
+//
+// Scope is deliberately the guard and nothing else. The five Twilio webhook
+// routes are NOT touched: they keep `validateTwilioWebhook` signature
+// validation, and no SMS, voice, consent or messaging behaviour changes.
+// `requireCrmAuth` still accepts the legacy shared bearer until
+// CRM_LEGACY_BEARER_ENABLED=false, so this deploys without a flag day.
+const requireAdmin = requireCrmAuth();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
@@ -56,7 +64,7 @@ async function findLeadByPhone(phone: string) {
 }
 
 // ── GET /crm/phone/status ──────────────────────────────────────────────────────
-router.get("/crm/phone/status", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/phone/status", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
   const configured = isTwilioConfigured();
   const baseUrl = getCrmBaseUrl();
   const businessNumber = process.env.TWILIO_PHONE_NUMBER ?? "";
@@ -102,7 +110,7 @@ router.get("/crm/phone/status", requireAdmin, async (req: Request, res: Response
 });
 
 // ── POST /crm/phone/test-sms ───────────────────────────────────────────────────
-router.post("/crm/phone/test-sms", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/phone/test-sms", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   if (!isTwilioConfigured()) { res.status(400).json({ error: "Twilio is not configured." }); return; }
   const { to } = req.body as { to?: string };
   if (!to) { res.status(400).json({ error: "Destination number required." }); return; }
@@ -122,7 +130,7 @@ router.post("/crm/phone/test-sms", requireAdmin, async (req: Request, res: Respo
 });
 
 // ── GET /crm/conversations ─────────────────────────────────────────────────────
-router.get("/crm/conversations", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/conversations", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   try {
     const messages = await db.select().from(crmMessages)
       .orderBy(desc(crmMessages.createdAt))
@@ -156,7 +164,7 @@ router.get("/crm/conversations", requireAdmin, async (req: Request, res: Respons
 });
 
 // ── GET /crm/leads/:id/messages ───────────────────────────────────────────────
-router.get("/crm/leads/:id/messages", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id/messages", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
   try {
@@ -171,7 +179,7 @@ router.get("/crm/leads/:id/messages", requireAdmin, async (req: Request, res: Re
 });
 
 // ── POST /crm/leads/:id/sms ───────────────────────────────────────────────────
-router.post("/crm/leads/:id/sms", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/sms", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   if (!isTwilioConfigured()) { res.status(400).json({ error: "Twilio is not configured." }); return; }
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -218,7 +226,7 @@ router.post("/crm/leads/:id/sms", requireAdmin, async (req: Request, res: Respon
 });
 
 // ── POST /crm/leads/:id/call ──────────────────────────────────────────────────
-router.post("/crm/leads/:id/call", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/call", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   if (!isTwilioConfigured()) { res.status(400).json({ error: "Twilio is not configured." }); return; }
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -269,7 +277,7 @@ router.post("/crm/leads/:id/call", requireAdmin, async (req: Request, res: Respo
 });
 
 // ── PATCH /crm/leads/:id/sms-consent ─────────────────────────────────────────
-router.patch("/crm/leads/:id/sms-consent", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/sms-consent", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
   const { smsConsent, smsOptOut } = req.body as { smsConsent?: boolean; smsOptOut?: boolean };
@@ -503,7 +511,7 @@ router.post("/crm/webhooks/twilio/voice/status", validateTwilioWebhook, async (r
 });
 
 // ── GET /crm/phone/audit ──────────────────────────────────────────────────────
-router.get("/crm/phone/audit", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/phone/audit", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db
       .select({ id: crmLeads.id, name: crmLeads.name, phone: crmLeads.phone })
@@ -545,7 +553,7 @@ router.get("/crm/phone/audit", requireAdmin, async (req: Request, res: Response)
 });
 
 // ── POST /crm/phone/normalize ─────────────────────────────────────────────────
-router.post("/crm/phone/normalize", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/phone/normalize", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const { leadIds } = req.body as { leadIds?: number[] };
     if (!Array.isArray(leadIds) || leadIds.length === 0) {

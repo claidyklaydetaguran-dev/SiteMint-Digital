@@ -5,7 +5,7 @@ import {
 import type { DiscoverySubmission } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
-import { requireCrmAuth } from "../lib/staffAuth.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
@@ -285,6 +285,7 @@ router.delete("/crm/discovery-submissions/:id", requireCrmAuth("leads.delete"), 
     .returning();
 
   if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+  await auditAction(req, "discovery_submission.deleted", `submission:${id} ${deleted.companyName ?? ""}`.trim());
   res.json({ ok: true });
 });
 

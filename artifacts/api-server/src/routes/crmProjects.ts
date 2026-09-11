@@ -3,7 +3,7 @@ import { db, crmProjects, crmTasks, crmLeads, crmActivities, PROJECT_STAGES } fr
 import type { ChecklistItem, ProjectLink } from "@workspace/db";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
-import { requireCrmAuth } from "../lib/staffAuth.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 
 const router: IRouter = Router();
 
@@ -245,6 +245,7 @@ router.delete("/crm/projects/:id", requireCrmAuth("projects.delete"), async (req
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
     await db.delete(crmTasks).where(eq(crmTasks.projectId, id));
     await db.delete(crmProjects).where(eq(crmProjects.id, id));
+    await auditAction(req, "project.deleted", `project:${id}`);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete project" });

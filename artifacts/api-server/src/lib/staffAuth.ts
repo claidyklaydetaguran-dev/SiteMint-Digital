@@ -330,6 +330,25 @@ export function requireStaff(permission?: Permission) {
   };
 }
 
+/**
+ * Audit a destructive or otherwise sensitive action with the real actor.
+ *
+ * Full access does not mean unlogged access: an owner deleting a client record
+ * is exactly the event the trail exists for. Falls back to a legacy-bearer
+ * label when the request came in on the shared token, so the gap is visible in
+ * the log rather than silently attributed to nobody.
+ */
+export async function auditAction(req: Request, action: string, target: string): Promise<void> {
+  const who = req.staffAuth?.staff;
+  await recordStaffAudit({
+    actorStaffId: who?.id ?? null,
+    actorLabel: who?.email ?? "legacy-shared-bearer",
+    action,
+    target,
+    ip: deriveClientIp(req),
+  });
+}
+
 /** Convenience for route bodies that need a second, record-level check. */
 export function staffCan(req: Request, permission: Permission): boolean {
   const resolved = req.staffAuth;

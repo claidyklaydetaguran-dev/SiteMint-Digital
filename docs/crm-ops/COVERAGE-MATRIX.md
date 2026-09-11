@@ -15,7 +15,7 @@ Status vocabulary — deliberately conservative:
 | 1 | Contacts / customer records | **Pre-existing** | `crm_leads` + `CrmLeadDetail`. A "customer" is still a lead with status `Client`; no separate account entity. Duplicate review and import/export unbuilt. |
 | 2 | Leads: capture, assignment, scoring | **Pre-existing** | Discovery intake → lead, 18 smart lists, locked `leadScore` engine. Assignment is now permission-gated but `assignedTo` is still free text (M1b). |
 | 3 | Pipeline, deals, forecasting | **Pre-existing** | Kanban, deals, transactions. Transactions still N+1 and unpaginated. No weighted forecast. |
-| 4 | Email / SMS / calls | **Partial + Blocked** | Reads and sends exist via `phone.ts`/Resend. **Blocked:** `phone.ts` is CLAUDE.md-protected and accepts only the legacy bearer, so those routes reject staff sessions (see Handoff §Protected). No inbound email/mailbox integration. |
+| 4 | Email / SMS / calls | **Partial** | Reads and sends exist via `phone.ts`/Resend, now on staff sessions with per-route permissions (owner-authorized 2026-09-11; webhooks untouched). No inbound email/mailbox integration — that remains the real gap. |
 | 5 | Tasks, activities, follow-ups, reminders | **Partial** | Tasks/activities persist. **No reminder engine** — dates exist, nothing fires. M2. |
 | 6 | Support tickets / knowledge base | **Pre-existing** | `helpdesk_*` tables and routes live but unlinked to `crm_leads`; SLA columns evaluated by nothing; no agent login. |
 | 7 | Segments, campaigns, automation | **Pre-existing** | The most complete subsystem: sequences, queue, scheduler, branch gates. `campaigns.send` is now a distinct permission. No visual email designer, no AI drafting. |
@@ -50,11 +50,32 @@ Status vocabulary — deliberately conservative:
 | Throttling suitable for multiple instances | `crm_staff_login_attempts` in the database, not process memory |
 | Client address from real proxy topology | `TRUSTED_PROXY_HOPS`, default 0 = trust no forwarded header; spoof test included |
 
-## Open questions for the owner (blocking real accounts only)
+## Confirmed access policy (owner directive, 2026-09-11)
 
-1. **Name spellings differ between sources and must not be guessed.** The brief says *Saisa Lorraine, Clyde Taguran, Shasta Green*; the CRM's existing hardcoded roster says *Saisa Lorraigne, Claidy Taguran, Shasta Greene*. Which spelling is each person's, and are these the same three people?
-2. **Email addresses.** None were invented. Real accounts need one verified address each.
-3. **Proposed role assignment** — confirm or amend: Shasta = owner; Clyde/Claidy = technical administrator; Saisa = operations manager.
-4. **Two defaults worth a decision:** operations managers currently cannot send bulk campaigns (`campaigns.send`) or delete records; both are owner-grantable per person. Technical administrators cannot assign roles, disable people, or delete records.
+Decisions received and implemented:
 
-Nothing above blocks further implementation — M2 continues meanwhile.
+1. **Name spellings — use the CRM's existing roster:** Shasta Greene, Claidy
+   Taguran, Saisa Lorraigne.
+2. **All three hold a separate full-access Owner / Super Admin account with
+   equal access.** Job titles are organizational labels, not access
+   restrictions. Verified: each account resolves to all 31 permissions, and all
+   three reach every previously-restricted screen.
+3. **Future team members get role-based access.** Invitations default to
+   `operations_manager` and can never silently create an Owner — proven by test
+   and by live API check.
+4. **All three may manage staff and permissions**; restricted users cannot
+   elevate themselves or anyone else.
+5. **Full access does not bypass** authentication, per-person audit, or the
+   existing confirmation prompts on destructive actions.
+6. **Protected files authorized and migrated:** `phone.ts` and `intakeAgent.ts`
+   now use the shared staff-session gate with permission checks. Webhook
+   signature validation and all Twilio/SMS/voice/intake behaviour are untouched.
+
+**Still needed before REAL accounts exist:** one verified email address per
+person. None was invented. The owner creates their own account at `/admin`
+(first-run screen, using the server's `ADMIN_PASSWORD`) and invites the other
+two as Owners from `/admin/crm/people` — no code change required.
+
+**Legacy shared token:** still accepted, by design. Retire it by setting
+`CRM_LEGACY_BEARER_ENABLED=false` only after the three real accounts are created
+and the affected screens are confirmed working, per the owner's instruction.

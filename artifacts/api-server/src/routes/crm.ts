@@ -5,7 +5,7 @@ import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
-import { requireCrmAuth } from "../lib/staffAuth.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
@@ -316,6 +316,8 @@ router.delete("/crm/leads/:id", requireCrmAuth("leads.delete"), async (req: Requ
     await db.delete(crmActivities).where(eq(crmActivities.leadId, id));
     const [deleted] = await db.delete(crmLeads).where(eq(crmLeads.id, id)).returning();
     if (!deleted) { res.status(404).json({ error: "Lead not found" }); return; }
+    // Full access is still logged access: record who destroyed the record.
+    await auditAction(req, "lead.deleted", `lead:${id} ${deleted.name ?? ""}`.trim());
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error deleting lead");
@@ -1778,6 +1780,7 @@ router.delete("/crm/deals/:id", requireCrmAuth("deals.delete"), async (req: Requ
   try {
     const id = Number(req.params.id);
     await db.delete(crmDeals).where(eq(crmDeals.id, id));
+    await auditAction(req, "deal.deleted", `deal:${id}`);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error deleting deal");

@@ -75,6 +75,17 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
 
   const ids: Record<string, number> = {};
 
+  /**
+   * Every agent in this file shares one loopback address, so the IP limiter —
+   * which is doing its job — eventually refuses legitimate test sign-ins after
+   * the deliberate brute-force case. Clearing the ledger between blocks keeps
+   * that from masquerading as an auth failure.
+   */
+  async function resetThrottle() {
+    const { db, crmStaffLoginAttempts } = await import("@workspace/db");
+    await db.delete(crmStaffLoginAttempts);
+  }
+
   beforeAll(async () => {
     const { setBootState } = await import("../lib/bootState.js");
     setBootState("ready");
@@ -533,6 +544,120 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
   it("refuses an unauthenticated call to an existing CRM route", async () => {
     expect((await anon.call("GET", "/api/crm/leads")).status).toBe(401);
   });
+
+  // ── Confirmed access policy (owner directive, 2026-09-11) ────────────────
+  //
+  // Shasta, Claidy and Saisa each hold a separate full-access Owner account
+  // with EQUAL access; their job titles are labels, not restrictions. Future
+  // team members get role-based access and invitations never default to Owner.
+
+  it("three separate owner accounts hold identical, complete permissions", async () => {
+    await resetThrottle();
+    await owner.login(OWNER);
+    // Promote both other accounts to owner, as the directive requires.
+    for (const key of ["tech", "ops"] as const) {
+      const r = await owner.call("PATCH", `/api/crm/staff/${ids[key]}`, { role: "owner" });
+      expect(r.status).toBe(200);
+    }
+    await tech.login(TECH);
+    await ops.login(OPS);
+
+    const sets = await Promise.all([owner, tech, ops].map(async (agent) => {
+      const me = await agent.call("GET", "/api/crm/staff/me");
+      expect(me.status).toBe(200);
+      return (me.json["staff"].permissions as string[]).slice().sort();
+    }));
+    expect(sets[1]).toEqual(sets[0]);
+    expect(sets[2]).toEqual(sets[0]);
+    // Equal access means genuinely everything, not a large subset.
+    for (const p of ["billing.manage", "data.export", "staff.role.assign",
+      "staff.disable", "leads.delete", "campaigns.send"]) {
+      expect(sets[0]).toContain(p);
+    }
+  }, 30_000);
+
+  it("full access still runs through authentication and per-person audit", async () => {
+    // Each owner deletes a lead they created; the trail must name which one.
+    await resetThrottle();
+    const actors: string[] = [];
+    for (const [agent, who] of [[owner, OWNER], [tech, TECH], [ops, OPS]] as const) {
+      await agent.login(who);
+      const created = await agent.call("POST", "/api/crm/leads", {
+        name: "[CRM-TEST] audit probe", email: `audit-${who.email}`,
+      });
+      expect(created.status).toBe(201);
+      const leadId = created.json["lead"].id as number;
+      const removed = await agent.call("DELETE", `/api/crm/leads/${leadId}`);
+      expect(removed.status).toBe(200);
+      actors.push(who.email);
+    }
+
+    await owner.login(OWNER);
+    const audit = await owner.call("GET", "/api/crm/staff/audit?limit=200");
+    expect(audit.status).toBe(200);
+    const deletions = (audit.json["entries"] as { actor: string; action: string }[])
+      .filter((e) => e.action === "lead.deleted");
+    // Three deletions, three DIFFERENT actors — not one shared "admin".
+    const mine = deletions.filter((d) => actors.some((email) => d.actor.includes(email)));
+    for (const email of actors) {
+      expect(mine.some((d) => d.actor.includes(email))).toBe(true);
+    }
+    expect(new Set(mine.map((d) => d.actor)).size).toBe(3);
+    // Each carries the staff id, so the trail names a person, not a role.
+    expect(mine.every((d) => /^staff:\d+ /.test(d.actor))).toBe(true);
+    // And a deletion made on the legacy shared bearer is labelled as such
+    // rather than silently attributed to nobody — the journey suite makes some
+    // against this same database, which is exactly the gap worth seeing.
+    expect(deletions.every((d) => /^staff:\d+ /.test(d.actor) || d.actor === "legacy-shared-bearer")).toBe(true);
+  }, 60_000);
+
+  it("an invitation never defaults to owner", async () => {
+    await resetThrottle();
+    await owner.login(OWNER);
+    const r = await owner.call("POST", "/api/crm/staff", {
+      email: `future-hire-${STAMP}@example.test`, displayName: "[CRM-TEST] Future Hire",
+      // role deliberately omitted
+    });
+    expect(r.status).toBe(201);
+    expect(r.json["staff"].role).toBe("operations_manager");
+    expect(r.json["staff"].permissions).not.toContain("staff.role.assign");
+    expect(r.json["staff"].permissions).not.toContain("billing.manage");
+    ids["future"] = r.json["staff"].id;
+  });
+
+  it("a restricted future hire is refused at the API even with a valid session", async () => {
+    await resetThrottle();
+    const activation = await owner.call("POST", `/api/crm/staff/${ids["future"]}/invite`);
+    const hire = new Agent();
+    await anon.call("POST", "/api/crm/staff/activation", {
+      token: activation.json["activationToken"], password: "future-hire-cinder-31",
+    });
+    await hire.login({ email: `future-hire-${STAMP}@example.test`, password: "future-hire-cinder-31" });
+
+    // Record access, not just screen access.
+    expect((await hire.call("GET", "/api/crm/staff")).status).toBe(403);
+    expect((await hire.call("DELETE", "/api/crm/leads/999999")).status).toBe(403);
+    expect((await hire.call("PATCH", `/api/crm/staff/${ids["ops"]}`, { role: "owner" })).status).toBe(403);
+    // ...including elevating themselves.
+    expect((await hire.call("PATCH", `/api/crm/staff/${ids["future"]}`, { role: "owner" })).status).toBe(403);
+    expect((await hire.call("PATCH", `/api/crm/staff/${ids["future"]}`,
+      { extraPermissions: ["billing.manage"] })).status).toBe(403);
+  }, 30_000);
+
+  it("protects the last active full-access administrator", async () => {
+    await resetThrottle();
+    await owner.login(OWNER);
+    // Demote the other two owners back, leaving exactly one.
+    for (const key of ["tech", "ops"] as const) {
+      const r = await owner.call("PATCH", `/api/crm/staff/${ids[key]}`, { role: "operations_manager" });
+      expect(r.status).toBe(200);
+    }
+    await owner.login(OWNER);
+    const demote = await owner.call("PATCH", `/api/crm/staff/${ids["owner"]}`, { role: "operations_manager" });
+    expect(demote.status).toBe(403);
+    const disable = await owner.call("PATCH", `/api/crm/staff/${ids["owner"]}`, { status: "disabled" });
+    expect(disable.status).toBe(403);
+  }, 30_000);
 
   // ── Source pin: the step-up routes keep their session guard ───────────────
 
