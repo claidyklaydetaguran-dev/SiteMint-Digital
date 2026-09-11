@@ -13,6 +13,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, asc, desc, eq, gte, inArray, isNull, isNotNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   db, crmLeads, crmTasks, crmProjects, crmDeals, crmTransactions, crmMessages,
+  TRANSACTION_RECEIVED_STATUS,
   crmCampaignEvents, crmCampaignRecipients, crmStaff, crmProjectMilestones,
   discoverySubmissions, crmActivities, crmAppointments, crmAppointmentAttendees,
   crmDocumentRequests,
@@ -389,12 +390,12 @@ router.get("/crm/command-center", requireCrmAuth(), async (req: Request, res: Re
   const [received] = await db.select({
     total: sql<string>`coalesce(sum(${crmTransactions.amount}), 0)`,
     count: sql<number>`count(*)`,
-  }).from(crmTransactions).where(eq(crmTransactions.status, "received"));
+  }).from(crmTransactions).where(eq(crmTransactions.status, TRANSACTION_RECEIVED_STATUS));
 
   const [receivedInPeriod] = await db.select({
     total: sql<string>`coalesce(sum(${crmTransactions.amount}), 0)`,
   }).from(crmTransactions).where(and(
-    eq(crmTransactions.status, "received"), gte(crmTransactions.receivedAt, since),
+    eq(crmTransactions.status, TRANSACTION_RECEIVED_STATUS), gte(crmTransactions.receivedAt, since),
   ));
 
   const decided = Number(dealAgg?.wonCount ?? 0) + Number(dealAgg?.lostCount ?? 0);
@@ -437,7 +438,7 @@ router.get("/crm/command-center", requireCrmAuth(), async (req: Request, res: Re
         wonDeals: "crm_deals at stage Won. Contracted value; money is only counted as received when a transaction says so.",
         winRate: "Won / (Won + Lost), all time. Null when nothing has been decided yet — a rate with no denominator is meaningless.",
         weightedForecast: "Open pipeline value weighted by stage (Lead 10%, Qualified 30%, Proposal 60%). A stated assumption, not a prediction.",
-        moneyReceived: "Sum of crm_transactions with status 'received'. This is actual cash, distinct from pipeline and contracted value.",
+        moneyReceived: `Sum of crm_transactions with status '${TRANSACTION_RECEIVED_STATUS}' — the status every payment path actually writes. This is actual cash, distinct from pipeline and contracted value.`,
       },
     },
   });

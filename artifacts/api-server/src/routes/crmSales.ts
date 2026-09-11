@@ -14,7 +14,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   db, crmDeals, crmProjects, crmLeads, crmStaff, crmTransactions, crmActivities,
-  DEAL_LOST_REASONS, PROJECT_STAGES,
+  DEAL_LOST_REASONS, PROJECT_STAGES, TRANSACTION_RECEIVED_STATUS,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 
@@ -233,7 +233,7 @@ router.get("/crm/sales/forecast", requireCrmAuth("reports.read"), async (req: Re
 
   const [received] = await db.select({
     total: sql<string>`coalesce(sum(${crmTransactions.amount}), 0)`,
-  }).from(crmTransactions);
+  }).from(crmTransactions).where(eq(crmTransactions.status, TRANSACTION_RECEIVED_STATUS));
 
   const decided = won.length + lost.length;
   const judged = open.filter((d) => d.probability != null).length;
@@ -319,7 +319,8 @@ router.get("/crm/sales/chain/:leadId", requireCrmAuth("leads.read"), async (req:
       ownerName: d.ownerStaffId ? ownerById.get(d.ownerStaffId) ?? null : null,
       project: d.convertedProjectId ? projectById.get(d.convertedProjectId) ?? null : null,
       transactions: transactions.filter((t) => t.dealId === d.id),
-      received: transactions.filter((t) => t.dealId === d.id)
+      received: transactions
+        .filter((t) => t.dealId === d.id && t.status === TRANSACTION_RECEIVED_STATUS)
         .reduce((s, t) => s + (Number(t.amount ?? 0) || 0), 0),
     })),
     // Stated because the two are not the same thing and the difference is the
@@ -327,7 +328,9 @@ router.get("/crm/sales/chain/:leadId", requireCrmAuth("leads.read"), async (req:
     totals: {
       contracted: deals.filter((d) => d.stage === "Won")
         .reduce((s, d) => s + (Number(d.value ?? 0) || 0), 0),
-      received: transactions.reduce((s, t) => s + (Number(t.amount ?? 0) || 0), 0),
+      received: transactions
+        .filter((t) => t.status === TRANSACTION_RECEIVED_STATUS)
+        .reduce((s, t) => s + (Number(t.amount ?? 0) || 0), 0),
     },
   });
 });

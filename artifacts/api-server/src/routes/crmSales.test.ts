@@ -286,7 +286,10 @@ suite("the sales chain (real DB)", () => {
 
   it("shows the whole chain for one contact, with contracted and received apart", async () => {
     await db.insert(schema.crmTransactions).values({
-      dealId: wonDealId, leadId, amount: "4000.00", method: "manual", status: "received",
+      dealId: wonDealId, leadId, amount: "4000.00", method: "manual_transfer",
+      // The status the application actually writes when money arrives. Seeding
+      // "received" here would have been seeding a value nothing produces.
+      status: schema.TRANSACTION_RECEIVED_STATUS,
     });
 
     const chain = await owner.call("GET", `/api/crm/sales/chain/${leadId}`);

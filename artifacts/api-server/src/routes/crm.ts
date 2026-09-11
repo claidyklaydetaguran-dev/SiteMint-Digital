@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms } from "@workspace/db";
 import { voiceSignupJobs } from "@workspace/db/schema/voice";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
@@ -1857,7 +1857,7 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
 
     // Total Revenue reflects real money in (crm_transactions), not the deal
     // stage flip — a deal marked "Won" with no completed transaction contributes $0.
-    const completedTxns = await db.select().from(crmTransactions).where(eq(crmTransactions.status, "completed"));
+    const completedTxns = await db.select().from(crmTransactions).where(eq(crmTransactions.status, TRANSACTION_RECEIVED_STATUS));
     const totalRevenue = completedTxns.reduce((s, t) => s + Number(t.amount), 0);
 
     const stageOrder = ["Lead", "Qualified", "Proposal", "Won", "Lost"];
@@ -2005,7 +2005,7 @@ router.get("/crm/transactions", requireCrmAuth("deals.read"), async (req: Reques
       // Totals are computed across the whole filtered set, not just this page —
       // a page total would be a different and misleading number.
       db.select({
-        received: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = 'received'), 0)`,
+        received: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = ${TRANSACTION_RECEIVED_STATUS}), 0)`,
         pending: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = 'pending'), 0)`,
       }).from(crmTransactions).where(where),
     ]);
