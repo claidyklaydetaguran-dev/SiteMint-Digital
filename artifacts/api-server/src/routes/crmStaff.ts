@@ -58,6 +58,12 @@ function publicStaff(staff: CrmStaff) {
     mfaEnrolled: !!staff.mfaEnrolledAt,
     lastLoginAt: staff.lastLoginAt,
     createdAt: staff.createdAt,
+    // M2: the reminder preferences the My Day settings panel needs to seed
+    // itself. Without these it had to guess defaults and say so.
+    timezone: staff.timezone,
+    reminderEmailEnabled: staff.reminderEmailEnabled,
+    dailyDigestEnabled: staff.dailyDigestEnabled,
+    dailyDigestHour: staff.dailyDigestHour,
     legacyNames: staff.legacyNames,
     extraPermissions: staff.extraPermissions,
     revokedPermissions: staff.revokedPermissions,

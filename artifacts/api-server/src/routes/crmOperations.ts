@@ -31,7 +31,16 @@ function actorTimezone(req: Request): string {
   return req.staffAuth?.staff.timezone ?? "UTC";
 }
 
+/**
+ * Number or undefined — and critically, `null` and `""` are undefined here.
+ *
+ * `Number(null)` is 0 and `Number("")` is 0, both finite, so a naive
+ * implementation turned `{assignedToStaffId: null}` into staff id 0: clearing
+ * an assignee silently pointed the task at a person who does not exist rather
+ * than unassigning it.
+ */
 const num = (v: unknown): number | undefined => {
+  if (v === null || v === undefined || v === "") return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 };
@@ -217,7 +226,8 @@ router.patch("/crm/operations/tasks/:id", requireCrmAuth("tasks.write"), async (
   }
 
   if ("assignedToStaffId" in b) {
-    const next = num(b["assignedToStaffId"]) ?? null;
+    // An explicit null unassigns; `num` no longer collapses that to 0.
+    const next = b["assignedToStaffId"] === null ? null : num(b["assignedToStaffId"]) ?? null;
     if (next !== existing.assignedToStaffId && !req.staffAuth?.permissions.has("tasks.assign")) {
       res.status(403).json({ error: "You may not reassign work.", permission: "tasks.assign" });
       return;

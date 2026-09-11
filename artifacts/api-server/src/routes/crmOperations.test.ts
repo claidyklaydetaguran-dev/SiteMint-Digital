@@ -406,6 +406,38 @@ suite("M2 operations, reminders and command center (real DB)", () => {
     void db; void crmStaff; void eq;
   }, 30_000);
 
+  it("unassigning a task clears the assignee instead of writing staff id 0", async () => {
+    const created = await owner.call("POST", "/api/crm/operations/tasks", {
+      title: "[CRM-TEST] unassign me", assignedToStaffId: ids["owner"],
+    });
+    const taskId = created.json["task"].id as number;
+
+    const cleared = await owner.call("PATCH", `/api/crm/operations/tasks/${taskId}`,
+      { assignedToStaffId: null });
+    expect(cleared.status).toBe(200);
+    // Number(null) is 0 and finite — the trap this guards.
+    expect(cleared.json["task"].assignedToStaffId).toBeNull();
+
+    // And an unassigned task must not sit in anybody's My Day.
+    const day = await owner.call("GET", "/api/crm/my-day");
+    const allTitles = ["overdue", "dueToday", "upcoming", "unscheduled", "blocked"]
+      .flatMap((k) => (day.json[k] as { title: string }[]).map((t) => t.title));
+    expect(allTitles).not.toContain("[CRM-TEST] unassign me");
+  }, 30_000);
+
+  it("exposes reminder preferences on the staff record so the UI can seed them", async () => {
+    const me = await owner.call("GET", "/api/crm/staff/me");
+    expect(me.status).toBe(200);
+    const staff = me.json["staff"];
+    expect(typeof staff.timezone).toBe("string");
+    expect(typeof staff.reminderEmailEnabled).toBe("boolean");
+    expect(typeof staff.dailyDigestEnabled).toBe("boolean");
+    expect(typeof staff.dailyDigestHour).toBe("number");
+    // Still no credential material.
+    expect(JSON.stringify(staff)).not.toContain("passwordHash");
+    expect(JSON.stringify(staff)).not.toContain("mfaSecret");
+  });
+
   // ── Operations ────────────────────────────────────────────────────────────
 
   it("runs a project through milestones, dependencies, updates, comments and approval", async () => {
