@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   AlertCircle, AlertTriangle, Bell, CalendarClock, Check, CheckCircle2,
   ChevronDown, ChevronRight, Clock, ListTodo, PauseCircle, Plus,
-  RefreshCw, Settings2, Sun, UserCircle2,
+  RefreshCw, Settings, Sun, UserCheck,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
 
@@ -308,9 +308,11 @@ export default function CrmMyDay() {
       const r = await adminFetch(`/api/crm/my-day?scope=${scope}`);
       if (r.status === 403) {
         const d = await r.json().catch(() => ({})) as { error?: string; permission?: string };
-        if (d.permission === "tasks.read.team" || scope === "team") {
+        if (scope === "team") {
+          // Not allowed to see everyone's work: say so, disable the toggle and
+          // fall back to this person's own day (the effect re-runs the read).
           setTeamDenied(d.error ?? "You do not have permission to see the team's work.");
-          setScope("mine");   // this re-runs the effect and loads "mine"
+          setScope("mine");
           return;
         }
         setError(d.error ?? "You do not have access to My Day.");
@@ -512,7 +514,7 @@ export default function CrmMyDay() {
                 ))}
               </Section>
 
-              <Section title="Follow-ups" tone="plain" icon={UserCircle2} count={followUps.length}
+              <Section title="Follow-ups" tone="plain" icon={UserCheck} count={followUps.length}
                 hint="People waiting to hear back." emptyText="No follow-ups due.">
                 {followUps.map(f => (
                   <div key={f.id} className="rounded-lg border border-border bg-white p-3">
@@ -610,14 +612,24 @@ function byDueDateAsc(a: DayTask, b: DayTask): number {
 
 /** Optimistic removal: drop a task from every bucket and fix the counts. */
 function withoutTask(payload: MyDayPayload, id: number): MyDayPayload {
-  const buckets: TaskBucket[] = ["overdue", "dueToday", "upcoming", "blocked", "unscheduled"];
-  const next: MyDayPayload = { ...payload, counts: { ...payload.counts } };
-  for (const key of buckets) {
-    const filtered = payload[key].filter(t => t.id !== id);
-    next[key] = filtered;
-    next.counts[key] = filtered.length;
-  }
-  return next;
+  const drop = (rows: DayTask[]) => rows.filter(t => t.id !== id);
+  const overdue = drop(payload.overdue);
+  const dueToday = drop(payload.dueToday);
+  const upcoming = drop(payload.upcoming);
+  const blocked = drop(payload.blocked);
+  const unscheduled = drop(payload.unscheduled);
+  return {
+    ...payload,
+    overdue, dueToday, upcoming, blocked, unscheduled,
+    counts: {
+      ...payload.counts,
+      overdue: overdue.length,
+      dueToday: dueToday.length,
+      upcoming: upcoming.length,
+      blocked: blocked.length,
+      unscheduled: unscheduled.length,
+    },
+  };
 }
 
 // ── Section ──────────────────────────────────────────────────────────────────
@@ -674,6 +686,17 @@ type EditorValues = {
   assignedToStaffId: string; blockedReason: string;
 };
 
+/** Explicit per-field copy — no computed keys, so the shape stays checked. */
+function withField(values: EditorValues, field: keyof EditorValues, raw: string): EditorValues {
+  switch (field) {
+    case "dueDate": return { ...values, dueDate: raw };
+    case "remindAt": return { ...values, remindAt: raw };
+    case "priority": return { ...values, priority: raw };
+    case "assignedToStaffId": return { ...values, assignedToStaffId: raw };
+    default: return { ...values, blockedReason: raw };
+  }
+}
+
 function seedValues(task: DayTask, zone: string): EditorValues {
   return {
     dueDate: toInputValue(task.dueDate, zone),
@@ -721,6 +744,13 @@ function TaskRow({
 
   async function save(field: keyof EditorValues, raw: string) {
     if (raw === base[field]) return;          // nothing actually changed
+    if (savingField === field) return;        // a commit for this field is already in flight
+    // Never send an empty assignee: the API coerces a null id to 0, which is
+    // nobody. Unassigning is not offered here for exactly that reason.
+    if (field === "assignedToStaffId" && !raw) {
+      setValues(v => withField(v, field, base.assignedToStaffId));
+      return;
+    }
     setSavingField(field);
     setRowError("");
 
@@ -735,16 +765,30 @@ function TaskRow({
     setSavingField(null);
 
     if (!res.ok) {
-      setValues(v => ({ ...v, [field]: base[field] }));   // refused — show the truth
+      setValues(v => withField(v, field, base[field]));   // refused — show the truth
       setRowError(res.error);
       return;
     }
-    const seeded = res.task ? seedValues(res.task, zone) : { ...values, [field]: raw };
+    const seeded = res.task ? seedValues(res.task, zone) : withField(values, field, raw);
     setValues(seeded);
     setBase(seeded);
     setSavedField(field);
     window.setTimeout(() => setSavedField(null), 1800);
     onSaved();
+  }
+
+  /**
+   * A half-typed date reads back as an empty string, which would otherwise
+   * save as "no date" and quietly lose the one that was there. The browser
+   * flags that case as `badInput`, so put the stored value back instead.
+   */
+  async function commitDate(field: "dueDate" | "remindAt", el: HTMLInputElement) {
+    if (el.validity.badInput) {
+      setValues(v => withField(v, field, base[field]));
+      setRowError("That date could not be read, so it was left as it was.");
+      return;
+    }
+    await save(field, el.value);
   }
 
   const edge = accent === "urgent" ? "border-red-200" : accent === "warm" ? "border-amber-200" : "border-border";
@@ -757,9 +801,9 @@ function TaskRow({
           onClick={onComplete}
           aria-label={`Mark "${task.title}" complete`}
           title="Mark complete"
-          className="mt-0.5 w-5 h-5 rounded border-2 border-input hover:border-green-500 hover:bg-green-50 flex items-center justify-center shrink-0 transition-colors"
+          className="group mt-0.5 w-5 h-5 rounded border-2 border-input hover:border-green-500 hover:bg-green-50 flex items-center justify-center shrink-0 transition-colors"
         >
-          <Check className="w-3 h-3 text-green-600 opacity-0 hover:opacity-100" />
+          <Check className="w-3 h-3 text-green-600 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
         <div className="flex-1 min-w-0">
@@ -814,7 +858,7 @@ function TaskRow({
               </Link>
             )}
             {task.project && (
-              <Link href={`/admin/crm/projects`}
+              <Link href="/admin/crm/projects"
                 className="inline-flex items-center gap-0.5 text-[11px] text-primary hover:underline">
                 {task.project.name}{task.project.stage ? ` · ${task.project.stage}` : ""}
                 <ChevronRight className="w-3 h-3" />
@@ -850,9 +894,9 @@ function TaskRow({
                 className={INPUT}
                 value={values.dueDate}
                 disabled={savingField === "dueDate"}
-                onChange={e => setValues(v => ({ ...v, dueDate: e.target.value }))}
-                onBlur={e => void save("dueDate", e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") void save("dueDate", values.dueDate); }}
+                onChange={e => setValues(v => withField(v, "dueDate", e.target.value))}
+                onBlur={e => void commitDate("dueDate", e.target)}
+                onKeyDown={e => { if (e.key === "Enter") void commitDate("dueDate", e.currentTarget); }}
               />
             </div>
 
@@ -865,9 +909,9 @@ function TaskRow({
                 className={INPUT}
                 value={values.remindAt}
                 disabled={savingField === "remindAt"}
-                onChange={e => setValues(v => ({ ...v, remindAt: e.target.value }))}
-                onBlur={e => void save("remindAt", e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") void save("remindAt", values.remindAt); }}
+                onChange={e => setValues(v => withField(v, "remindAt", e.target.value))}
+                onBlur={e => void commitDate("remindAt", e.target)}
+                onKeyDown={e => { if (e.key === "Enter") void commitDate("remindAt", e.currentTarget); }}
               />
             </div>
 
@@ -906,7 +950,7 @@ function TaskRow({
                   void save("assignedToStaffId", next);
                 }}
               >
-                <option value="">Unassigned</option>
+                <option value="" disabled>Unassigned</option>
                 {assignees.map(a => (
                   <option key={a.id} value={String(a.id)}>{a.displayName}</option>
                 ))}
@@ -989,9 +1033,10 @@ function AddTaskComposer({ zone, assignees, signedInId, onCreated }: {
     setBusy(false);
 
     if (!r.ok) {
+      const message = d.error ?? "That task could not be created.";
       setError(d.permission === "tasks.assign"
-        ? `${d.error ?? "You may only create tasks for yourself."}`
-        : d.error ?? "That task could not be created.");
+        ? `${message} Choose yourself as the assignee.`
+        : message);
       return;
     }
     setTitle(""); setDueDate(""); setRemindAt(""); setPriority("Medium"); setAssignedTo("");
@@ -1213,7 +1258,7 @@ function ReminderSettings({ zone, hasAccount, onSaved }: {
         aria-expanded={open}
         className="w-full flex items-center gap-2.5 px-3 sm:px-4 py-3 text-left hover:bg-accent/60 transition-colors"
       >
-        <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
+        <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-semibold text-foreground">Reminder settings</span>
         <span className="hidden sm:inline text-[11px] text-muted-foreground truncate ml-1">
           Timezone, reminder emails and the daily digest.
@@ -1290,8 +1335,10 @@ function ReminderSettings({ zone, hasAccount, onSaved }: {
           )}
 
           <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
-            <p className="text-[11px] text-muted-foreground">
-              The saved values are read back from the server and shown above after saving.
+            <p className="text-[11px] text-muted-foreground max-w-sm">
+              The timezone above is the one the server holds for you. The two switches can be set
+              here but not read back, so they start at their defaults — saving shows exactly what
+              the server stored.
             </p>
             <Button size="sm" disabled={busy || !hasAccount} onClick={() => void save()}>
               {busy ? "Saving…" : "Save settings"}

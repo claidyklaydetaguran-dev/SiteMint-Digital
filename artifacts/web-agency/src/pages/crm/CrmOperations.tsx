@@ -164,7 +164,11 @@ const DRAWER_TABS = [
 
 type DrawerTab = typeof DRAWER_TABS[number]["id"];
 
+// Two separate class strings rather than `INPUT + "w-auto text-xs"`: Tailwind
+// resolves same-property utilities by stylesheet order, not by the order they
+// appear in the attribute, so `w-full`/`text-sm` would silently win.
 const INPUT = "w-full px-3 py-2 border border-input rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-foreground/20";
+const INPUT_COMPACT = "px-2 py-1 border border-input rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-foreground/20";
 const LABEL = "text-[11px] font-bold text-muted-foreground uppercase tracking-wide block mb-1";
 
 function stageStyle(stage: string) {
@@ -816,19 +820,34 @@ function ProjectDrawer({ projectId, assignees, templates, onClose, onChanged }: 
   const [templateBusy, setTemplateBusy] = useState(false);
   const [templateError, setTemplateError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  /**
+   * `showSkeleton: false` is the re-read after a write — the tab, the scroll
+   * position and the form stay put while the persisted values land.
+   */
+  const load = useCallback(async (showSkeleton = true) => {
+    if (showSkeleton) setLoading(true);
     setError("");
     try {
       const res = await adminFetch(`/api/crm/operations/projects/${projectId}`);
       if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json() as ProjectDetail;
-      setDetail(data);
+      const data = await res.json() as Partial<ProjectDetail>;
+      if (!data.project) throw new Error("malformed");
+      // Normalise every collection: one missing array must not white-screen
+      // the drawer.
+      setDetail({
+        project: data.project,
+        lead: data.lead ?? null,
+        tasks: data.tasks ?? [],
+        milestones: data.milestones ?? [],
+        updates: data.updates ?? [],
+        comments: data.comments ?? [],
+        approvals: data.approvals ?? [],
+      });
       setForm(formFrom(data.project));
     } catch {
       setError("Couldn't load this project. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (showSkeleton) setLoading(false);
     }
   }, [projectId]);
 
@@ -842,7 +861,7 @@ function ProjectDrawer({ projectId, assignees, templates, onClose, onChanged }: 
 
   /** Every write ends here: re-read the record, then refresh the list behind it. */
   const afterWrite = useCallback(async () => {
-    await load();
+    await load(false);
     onChanged();
   }, [load, onChanged]);
 
@@ -1376,7 +1395,7 @@ function MilestonesTab({ projectId, milestones, afterWrite }: {
 
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       <select
-                        className={`${INPUT} w-auto py-1 text-xs`}
+                        className={INPUT_COMPACT}
                         value={m.status}
                         disabled={busyId === m.id}
                         aria-label={`Status for ${m.title}`}
@@ -1388,7 +1407,7 @@ function MilestonesTab({ projectId, milestones, afterWrite }: {
                       </select>
                       <input
                         type="date"
-                        className={`${INPUT} w-auto py-1 text-xs tabular-nums`}
+                        className={`${INPUT_COMPACT} tabular-nums`}
                         value={isoDay(m.dueDate)}
                         disabled={busyId === m.id}
                         aria-label={`Due date for ${m.title}`}
@@ -1588,7 +1607,7 @@ function TasksTab({ projectId, tasks, assignees, nameOf, afterWrite }: {
                       {t.description && <p className="text-xs text-muted-foreground mt-1">{t.description}</p>}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <select
-                          className={`${INPUT} w-auto py-1 text-xs`}
+                          className={INPUT_COMPACT}
                           value={t.assignedToStaffId == null ? "" : String(t.assignedToStaffId)}
                           disabled={busyId === t.id}
                           aria-label={`Assignee for ${t.title}`}

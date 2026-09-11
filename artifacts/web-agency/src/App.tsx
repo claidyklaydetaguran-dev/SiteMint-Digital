@@ -94,6 +94,8 @@ const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 const StaffActivation = lazy(() => import("@/pages/StaffActivation"));
 const CrmStaffAdmin = lazy(() => import("@/pages/crm/CrmStaffAdmin"));
 const CrmMyAccount = lazy(() => import("@/pages/crm/CrmMyAccount"));
+const CrmOperationsPage = lazy(() => import("@/pages/crm/CrmOperations"));
+const CrmMyDayPage = lazy(() => import("@/pages/crm/CrmMyDay"));
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 const AdminSubmissionDetail = lazy(() => import("@/pages/AdminSubmissionDetail"));
 
@@ -194,6 +196,8 @@ function AdminRoutes() {
       <Route path="/admin/crm/settings" component={CrmSettings} />
       <Route path="/admin/crm/people" component={CrmStaffAdmin} />
       <Route path="/admin/crm/account" component={CrmMyAccount} />
+      <Route path="/admin/crm/operations" component={CrmOperationsPage} />
+      <Route path="/admin/crm/my-day" component={CrmMyDayPage} />
 
       {/* Receptionist Ops (Operations owner) — firm detail registered before
           the firms list is irrelevant here since these are distinct paths,
