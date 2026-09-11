@@ -16,7 +16,7 @@ Status vocabulary — deliberately conservative:
 | 2 | Leads: capture, assignment, scoring | **Pre-existing** | Discovery intake → lead, 18 smart lists, locked `leadScore` engine. Assignment is now permission-gated but `assignedTo` is still free text (M1b). |
 | 3 | Pipeline, deals, forecasting | **Pre-existing** | Kanban, deals, transactions. Transactions still N+1 and unpaginated. No weighted forecast. |
 | 4 | Email / SMS / calls | **Partial** | Reads and sends exist via `phone.ts`/Resend, now on staff sessions with per-route permissions (owner-authorized 2026-09-11; webhooks untouched). No inbound email/mailbox integration — that remains the real gap. |
-| 5 | Tasks, activities, follow-ups, reminders | **Partial** | Tasks/activities persist. **No reminder engine** — dates exist, nothing fires. M2. |
+| 5 | Tasks, activities, follow-ups, reminders | **Done (M2)** | One task system across Operations/Sales/leads with real staff assignment, priorities, recurrence, checklists and blocked reasons. Durable reminder engine (`crm_scheduled_jobs`): timezone-correct, deduped, claim-once, cancel-on-change, retry-with-backoff, visible permanent failures. 22 tests. |
 | 6 | Support tickets / knowledge base | **Pre-existing** | `helpdesk_*` tables and routes live but unlinked to `crm_leads`; SLA columns evaluated by nothing; no agent login. |
 | 7 | Segments, campaigns, automation | **Pre-existing** | The most complete subsystem: sequences, queue, scheduler, branch gates. `campaigns.send` is now a distinct permission. No visual email designer, no AI drafting. |
 | 8 | Reporting and KPIs | **Pre-existing** | `CrmReporting` charts from live endpoints. No traceable KPI definitions or denominators yet. |
@@ -29,7 +29,7 @@ Status vocabulary — deliberately conservative:
 | 15 | Responsive / mobile / offline / push | **Partial** | Shell responsive; leads list verified at 375px this pass. Inbox/Calendar/Pipeline/Communications remain desktop-only. No PWA, offline or push. |
 | 16 | Customer portal | **Not started** | Explicitly the final, separately gated milestone. |
 | 17 | Encryption, backups, MFA, security logging | **Partial** | MFA and security logging **Done** (M1). Transport/at-rest encryption and backups are hosting properties not yet evidenced; no restore rehearsal. |
-| 18 | Live dashboard / activities / priorities | **Partial** | Command Center answers all five operating questions and has a Refresh. Not yet live-polling, no date range, no Mine/Team scope, no clickable activity buttons. M2. |
+| 18 | Live dashboard / activities / priorities | **Partial** | Backend complete (M2): `/crm/command-center` serves 11 activity panels where each count comes from the same function as its list, plus a traceable sales summary and an activity feed. Uninstrumented metrics return `available:false` with a reason, never a zero. **Frontend wiring of the clickable buttons is the next step.** |
 
 ## Milestone 1 — delivered and proven
 
