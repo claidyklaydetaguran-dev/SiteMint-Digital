@@ -83,6 +83,7 @@ have ever had the CRM.
 | `schema/M3-conversations.sql` | `crm_conversations`, `crm_conversation_participants`, `crm_message_drafts`, `crm_conversation_reads` + 6 columns on `crm_messages` |
 | `schema/M3-inbound-email.sql` | `crm_inbound_email_events`, `crm_email_suppressions`, `crm_unmatched_emails`, `crm_email_send_counters` + 2 columns on `crm_conversations` |
 | `schema/M3-sales-chain.sql` | 9 nullable columns on `crm_deals` (owner, probability, outcome, conversion link) |
+| `schema/M4-crm-first-install.sql` | **First installation only.** The complete 46-table `crm_*` schema, guarded and idempotent. Not for an environment that already has the CRM. |
 
 ### 3d. Columns added to existing tables
 
@@ -142,22 +143,86 @@ dump you proved.
 
 ## 5. Application order
 
+Two paths. Take exactly one of them at step 3 — running both is not harmful,
+but it invites the belief that a first install is an upgrade, and it is not.
+
+### Common steps
+
 1. Confirm the target `DATABASE_URL`. Do not print it.
 2. Take the backup and run the restore drill (§4).
-3. Apply M1 + M2 + M3 documents/calendar schema. If the environment has never
-   had the CRM, this is the whole `crm_*` set.
-4. Apply `docs/crm-ops/schema/M3-conversations.sql`.
-5. Apply `docs/crm-ops/schema/M3-inbound-email.sql` — **after** step 4, which
-   creates `crm_conversations`.
-5a. Apply `docs/crm-ops/schema/M3-sales-chain.sql`. Order-independent; it
-   touches only `crm_deals`.
-6. Deploy the application at `cf98858`.
-7. Run the conversation backfill: `POST /api/crm/inbox/backfill` as an owner.
-   It is idempotent, resumable, and reports `scanned / linked / quarantined`.
-   A non-zero `quarantined` is not a failure — it is history that named
-   neither a contact nor a counterparty, preserved for review rather than
-   guessed.
-8. Bootstrap the first owner, then invite the others (§8).
+
+### 3. Schema — path A: the environment has NEVER had the CRM
+
+One reviewed artifact, one command:
+
+```bash
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-crm-first-install.sql
+```
+
+46 `crm_*` tables, schema only, no rows. It already contains every column the
+M3 and M4 upgrade files add, so **do not also run those**. Verified idempotent:
+applied three times in succession to a virgin database, each run exited 0 and
+left identical counts (46 tables, 118 indexes, 422 constraints).
+
+Verify:
+
+```bash
+psql "$DATABASE_URL" -tAc "select count(*) from information_schema.tables where table_schema='public' and table_name like 'crm\_%'"
+```
+
+Expect `46`.
+
+**This artifact installs the CRM only.** It contains no `intake_*`, `voice_*`,
+`discovery_*`, `scheduling_*` or `helpdesk_*` table. If the receptionist or
+voice products are deployed in the same database, their migrations are a
+separate, prior concern — coordinate with the integration owner. A CRM-only
+database boots and serves the CRM, but the signup-pipeline tick logs a
+reconcile error every interval because `intake_*` is absent. That is expected
+in a CRM-only environment and is not a CRM fault.
+
+### 3. Schema — path B: the environment ALREADY has the CRM
+
+Apply the upgrade artifacts in this order. Each is additive, idempotent, and
+carries its own rollback block at the foot.
+
+```bash
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M3-conversations.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M3-inbound-email.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M3-sales-chain.sql
+```
+
+`M3-inbound-email.sql` must follow `M3-conversations.sql`, which creates
+`crm_conversations`. `M3-sales-chain.sql` is order-independent; it touches only
+`crm_deals`. Apply any `M4-*.sql` artifacts present after these, in filename
+order; each states its own prerequisites in its header.
+
+### Remaining steps (both paths)
+
+4. Deploy the application at the candidate commit in §1.
+5. `GET /api/readyz` → 200 before going further.
+6. **Bootstrap the first owner.** `POST /api/crm/staff/bootstrap` with
+   `adminPassword` set to the environment's `ADMIN_PASSWORD`. This route only
+   works while zero staff rows exist, and it is the only way to create the
+   first account.
+7. **Sign in as that owner.** `POST /api/crm/staff/login` → session cookie plus
+   a CSRF token. Keep both; every step below is authenticated.
+8. **Now** run the conversation backfill, as that signed-in owner:
+   `POST /api/crm/inbox/backfill` with the session cookie and
+   `X-CSRF-Token`. It is idempotent, resumable, and reports
+   `scanned / linked / quarantined`. A non-zero `quarantined` is not a failure
+   — it is history that named neither a contact nor a counterparty, preserved
+   for review rather than guessed.
+9. Invite the other owners (§8).
+
+> **Ordering, and why it changed.** An earlier version of this runbook ran the
+> backfill at step 7 and bootstrapped the first owner at step 8. The backfill
+> route is behind `requireCrmAuth("settings.write")`, so at that point no
+> account existed that could call it and the sequence could not execute.
+> Confirmed against a real deployment of this candidate: calling the backfill
+> with no session returns **401 Unauthorized**; bootstrapping, signing in, and
+> then calling it returns **200** with a real
+> `{scanned, linked, quarantined}` result. Bootstrap and sign-in must precede
+> the backfill.
 
 ### Rollback and compatibility
 
@@ -385,8 +450,10 @@ Run in order, against the deployed environment, as a real signed-in owner.
    why it is unavailable. No panel should report 0 where it means "unknown".
 4. `GET /api/crm/inbox/conversations?limit=5` → 200, and `readStateAvailable`
    is `true` (it is `false` on the legacy shared token).
-5. `POST /api/crm/inbox/backfill` → `scanned`/`linked`/`quarantined` reported.
-   Re-run it; the second run must report `scanned: 0`.
+5. `POST /api/crm/inbox/backfill`, sending the session cookie and
+   `X-CSRF-Token` from step 2 → `scanned`/`linked`/`quarantined` reported.
+   Without them it returns 401, which is the route working correctly, not a
+   deployment fault. Re-run it; the second run must report `scanned: 0`.
 6. Create an appointment 30 minutes out with a reminder. Confirm a row appears
    in `crm_scheduled_jobs` at the right instant, then cancel it and confirm the
    job moves to `cancelled`.
