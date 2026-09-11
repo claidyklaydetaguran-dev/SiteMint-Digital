@@ -17,6 +17,7 @@ import {
   DEAL_LOST_REASONS, PROJECT_STAGES, TRANSACTION_RECEIVED_STATUS,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
+import { fireAutomation } from "../lib/automationTriggers.js";
 
 const router: IRouter = Router();
 
@@ -97,6 +98,17 @@ router.post("/crm/deals/:id/close", requireCrmAuth("deals.write"), async (req: R
   }
 
   await auditAction(req, `deal.${outcome}`, `deal:${id}`);
+
+  // A decided deal is the event most rules care about. Best-effort by
+  // design — see automationTriggers.ts; a misbehaving rule must never
+  // fail the close itself.
+  fireAutomation(outcome === "won"
+    ? { trigger: "deal_won", payload: { recordId: id, leadId: deal.leadId } }
+    : {
+        trigger: "deal_lost",
+        payload: { recordId: id, leadId: deal.leadId, lostReason: updated.lostReason ?? null },
+      });
+
   res.json({
     deal: updated,
     nextStep: outcome === "won"

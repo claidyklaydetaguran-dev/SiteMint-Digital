@@ -13,23 +13,31 @@
 //    external side effect happen once, because a worker can die after the
 //    provider has already accepted a message. Nothing here claims exactly-once
 //    external delivery: see `docs/crm-ops/DELIVERY-GUARANTEE.md` and the
-//    delivery-state section below for what is actually true.
+//    external-delivery section below for what is actually true.
 //  - Timezone-correct. `run_at` is absolute UTC computed from the recipient's
 //    IANA zone, so "9am" means 9am where that person actually is.
 //  - Cancels and reschedules truthfully. Completing, reassigning or moving a
 //    task cancels its pending reminder instead of letting a stale one fire.
 //  - Failures are visible. Permanent failures stay queryable rather than
 //    vanishing into logs.
+//  - Delivery is a separate lifecycle from the job. A message handed to the
+//    mail provider gets its own row in `crm_reminder_deliveries`, with its own
+//    clock (`next_attempt_at`) and its own recovery actions — so a retry never
+//    has to move a job's `run_at`, which is the occurrence identity.
 
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, isNotNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import {
   db, crmScheduledJobs, crmNotifications, crmTasks, crmStaff,
   crmProjects, crmProjectMilestones, crmAppointments, crmAppointmentAttendees,
-  type CrmScheduledJob,
+  crmReminderDeliveries, crmDeliveryRecoveryActions,
+  type CrmScheduledJob, type CrmReminderDelivery, type CrmDeliveryState,
+  type CrmDeliveryRecoveryAction, type CrmDeliveryRecoveryActionRow,
 } from "@workspace/db";
 import {
   trySendStaffMail, staffMailBlockedReason, RESEND_IDEMPOTENCY_WINDOW_MS,
+  type MailOutcome,
 } from "./staffMail.js";
+import { AUTOMATION_JOB_KIND, runAutomationJob } from "./automationEngine.js";
 
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -175,277 +183,582 @@ export async function syncTaskReminder(taskId: number): Promise<void> {
 
 // ── Delivery ────────────────────────────────────────────────────────────────
 
+/**
+ * The identity of one in-app notification: the OCCURRENCE and the PERSON.
+ *
+ * Not the job id — a recurring reminder is one job row across many
+ * occurrences — and not "has this job run", which is precisely what an
+ * operator retry undoes. Two attempts at the same occurrence for the same
+ * person are the same notification; next week's is a different one.
+ */
+export function notificationOccurrenceKey(job: CrmScheduledJob, staffId: number, kind: string): string {
+  return `${job.dedupeKey}:${job.runAt.toISOString()}:${staffId}:${kind}`;
+}
+
+/**
+ * Writes one in-app notification.
+ *
+ * With an `occurrenceKey`, a second write for the same occurrence and person
+ * is dropped by the database (partial unique index) rather than by whichever
+ * caller happened to remember. Without one — a notification that is not a
+ * scheduled reminder — nothing is deduplicated, which is correct: two
+ * assignments really are two events.
+ */
 async function notify(args: {
   staffId: number; kind: string; title: string; body?: string | null;
   href?: string | null; entityType?: string | null; entityId?: number | null;
+  occurrenceKey?: string | null;
 }): Promise<void> {
   await db.insert(crmNotifications).values({
     staffId: args.staffId, kind: args.kind, title: args.title,
     body: args.body ?? null, href: args.href ?? null,
     entityType: args.entityType ?? null, entityId: args.entityId ?? null,
-  });
+    occurrenceKey: args.occurrenceKey ?? null,
+  }).onConflictDoNothing();
 }
 
-// ── External delivery state ─────────────────────────────────────────────────
+// ── External delivery ───────────────────────────────────────────────────────
 //
-// The bug this replaces: the old code wrote `external_dispatched_at` BEFORE
-// calling Resend and treated that marker as proof of delivery. A marker
-// written before the request suppresses every future attempt even when the
-// provider never accepted anything — so a 500, a dropped connection or a
-// timeout silently lost the reminder forever. Preventing duplicates had
-// created silent message loss.
+// The bug this replaces, in two parts.
 //
-// The fix is to stop conflating "we tried" with "it went". A delivery attempt
-// is written as an ATTEMPTING record before the call and RESOLVED after it,
-// and only a resolved success suppresses a later attempt:
+// FIRST: the original code wrote `external_dispatched_at` BEFORE calling Resend
+// and treated that marker as proof of delivery. A marker written before a
+// request proves only that a request was started, so a 500, a dropped
+// connection or a timeout silently lost the reminder forever. Preventing
+// duplicates had created silent message loss.
 //
-//   none         nothing has been attempted for this recipient and occurrence
-//   attempting   a request is in flight (or its worker was lost mid-call)
-//   accepted     the provider took the message — the only state the machine
-//                itself may treat as settled
-//   rejected     the provider refused it; deterministic, nothing was delivered
-//   failed       the provider definitively did not take it, for a passing
-//                reason; retrying cannot duplicate, because nothing was taken
-//   uncertain    bytes went out and we never learned the answer. May or may
-//                not have been delivered. Never retried automatically; stays
-//                visible until a human resolves it
-//   acknowledged a human looked at an uncertain record and closed it
+// SECOND: the fix for that packed one record per (occurrence, recipient) into
+// `crm_scheduled_jobs.external_ref` as newline-separated text. The state
+// machine was right; the storage was not. Per-recipient queries became
+// substring matches, every write became a read-modify-write of one column, and
+// the column had to be capped — which meant unresolved history could be
+// discarded to make room. A record nobody can find is a record that was lost.
 //
-// Where it is stored: `crm_scheduled_jobs.external_ref`, a text column, as one
-// newline-separated record per (occurrence, recipient):
+// Delivery state now lives in `crm_reminder_deliveries`, one row per
+// (occurrence, recipient), UNIQUE on exactly that. `external_ref` and
+// `external_dispatched_at` are read once to migrate what they hold and are
+// never written again; they are not cleared, so the original text survives.
+//
+// The identity rule that everything else hangs off: `occurrence_at` is the
+// job's ORIGINAL `run_at` and NEVER changes. `next_attempt_at` is the separate
+// thing a retry moves. The old operator retry moved `run_at`, which silently
+// made a different occurrence with a different idempotency key — an
+// unprotected duplicate send wearing the word "retry".
+
+/** How long an `attempting` row may sit before it is presumed worker-lost. */
+const DELIVERY_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * Waits between AUTOMATIC attempts, and the cap on them.
+ *
+ * These are durable (`next_attempt_at`), not an in-process sleep: a worker that
+ * dies between attempts loses nothing, and a retry does not hold a job handler
+ * open. Only the one failure class that PROVES nothing was sent ever gets here.
+ */
+const DELIVERY_RETRY_BACKOFF_MS = [30_000, 120_000, 600_000];
+const MAX_AUTO_ATTEMPTS = 3;
+
+/** How many due deliveries one worker pass claims. */
+const DELIVERY_BATCH = 50;
+
+// ── Classifying an outcome, conservatively ──────────────────────────────────
+//
+// This is the most consequential judgement in the whole path: read an unknown
+// outcome as "not sent" and you duplicate somebody's mail; read a real failure
+// as "sent" and you lose it silently.
+//
+// `staffMail.ts` classifies into four `MailFailure` classes, and its `failed`
+// class lumps together two things this layer must keep apart:
+//
+//   * a connection that never opened — the request was never written to a
+//     socket, so no message can exist anywhere; and
+//   * a 5xx or a rate-limit ANSWER — which means the request was written, the
+//     provider received it, and only then something went wrong on its side.
+//
+// A 5xx does NOT prove no side effect occurred. The provider may have taken
+// the message and failed to answer about it. So this layer re-reads `failed`
+// and only calls it "provably not sent" when the reason names a transport code
+// that rules the request out. Everything else the provider had a chance to see
+// is UNKNOWN, and unknown is never retried automatically.
+//
+// The cost of being wrong in this direction is an operator row; the cost of
+// being wrong the other way is a duplicate in somebody's inbox. A follow-up
+// worth doing: have `trySendStaffMail` carry the provider `statusCode` and the
+// transport `code` on its outcome, so this becomes exact rather than a match
+// on the reason text. Where the evidence is absent, `uncertain` is chosen.
+
+/**
+ * Transport codes that prove the request never reached the provider's server.
+ * Mirrors `NEVER_LEFT_CODES` in `staffMail.ts`; kept here because the outcome
+ * this layer receives has already been collapsed to a class and a string.
+ */
+const NEVER_LEFT_CODES = [
+  "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH",
+  "ERR_INVALID_URL", "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID",
+] as const;
+
+/** Does this reason name a transport failure that rules out any side effect? */
+export function provesNothingWasSent(reason: string): boolean {
+  const upper = reason.toUpperCase();
+  return NEVER_LEFT_CODES.some((code) => upper.includes(code));
+}
+
+/** Short machine reasons, so the UI and the tests agree on one vocabulary. */
+export const DELIVERY_FAILURE_REASONS = {
+  notConfigured: "mail_not_configured",
+  neverLeft: "never_left_this_server",
+  refused: "provider_refused",
+  answeredUnknown: "provider_answered_but_outcome_unknown",
+  noAnswer: "no_answer_from_provider",
+  workerLost: "worker_lost_mid_send",
+  recipientUnavailable: "recipient_unavailable",
+  legacyUnparsed: "unparsed_legacy_record",
+  legacyMarker: "pre_2026_09_dispatch_marker",
+} as const;
+
+export type DeliveryClassification = {
+  state: CrmDeliveryState;
+  reason: string;
+  detail: string;
+  providerRef: string | null;
+  /** May the worker try this again by itself, without a person deciding? */
+  autoRetryable: boolean;
+};
+
+/**
+ * The exact mapping, stated once:
+ *
+ * | outcome                                   | state       | auto-retry |
+ * |-------------------------------------------|-------------|------------|
+ * | sent                                      | `accepted`  | n/a        |
+ * | `not_configured`                          | `pending`   | yes        |
+ * | `rejected` (the provider answered "no")   | `refused`   | no         |
+ * | `failed`, reason names a never-left code  | `pending`   | yes        |
+ * | `failed`, anything else (5xx, rate limit) | `uncertain` | **no**     |
+ * | `uncertain` (timeout, hang-up, 409 race)  | `uncertain` | no         |
+ */
+export function classifyDeliveryOutcome(outcome: MailOutcome): DeliveryClassification {
+  if (outcome.sent) {
+    return {
+      state: "accepted", reason: "", providerRef: outcome.providerId,
+      detail: outcome.providerId ?? "accepted without a provider id",
+      autoRetryable: false,
+    };
+  }
+
+  if (outcome.failure === "not_configured") {
+    // `trySendStaffMail` returns this before it constructs a request, so
+    // nothing was handed over and a retry cannot duplicate.
+    return {
+      state: "pending", reason: DELIVERY_FAILURE_REASONS.notConfigured,
+      detail: outcome.reason, providerRef: null, autoRetryable: true,
+    };
+  }
+
+  if (outcome.failure === "rejected") {
+    return {
+      state: "refused", reason: DELIVERY_FAILURE_REASONS.refused,
+      detail: outcome.reason, providerRef: null, autoRetryable: false,
+    };
+  }
+
+  if (outcome.failure === "failed" && provesNothingWasSent(outcome.reason)) {
+    return {
+      state: "pending", reason: DELIVERY_FAILURE_REASONS.neverLeft,
+      detail: outcome.reason, providerRef: null, autoRetryable: true,
+    };
+  }
+
+  // Everything the provider had a chance to see. A 5xx arrives here: the
+  // request WAS written, so "it did not go" is a guess, not a fact.
+  return {
+    state: "uncertain",
+    reason: outcome.failure === "failed"
+      ? DELIVERY_FAILURE_REASONS.answeredUnknown
+      : DELIVERY_FAILURE_REASONS.noAnswer,
+    detail: outcome.reason, providerRef: null, autoRetryable: false,
+  };
+}
+
+// ── Identity ────────────────────────────────────────────────────────────────
+
+/**
+ * The provider idempotency key for one recipient's copy of one occurrence.
+ *
+ * Per occurrence AND per recipient: two attendees of the same appointment get
+ * different messages, and reusing one key across them is exactly the "same key,
+ * different payload" that Resend answers with `invalid_idempotent_request`.
+ *
+ * Stable across every retry of this delivery. A deliberate re-send appends a
+ * suffix, because a re-send is a request for a second copy and must not be
+ * collapsed into the first.
+ */
+export function deliveryIdempotencyKey(dedupeKey: string, occurrence: Date, recipient: string): string {
+  return `${dedupeKey}:${occurrence.toISOString()}:${recipient}`;
+}
+
+const nonce = () => Math.random().toString(36).slice(2, 8);
+
+// ── Reading what was there before ───────────────────────────────────────────
+//
+// The packed format, for migration only. Nothing writes it any more.
 //
 //     <state>|<runAt ISO>#<staffId>|<attemptId>|<detail>
 //
-// One record per RECIPIENT, because one job row can email several people: an
-// appointment reminder fans out to every staff attendee, and attendee three's
-// message must not be suppressed by attendee one's success.
-//
-// Naming the occurrence is what lets one row carry a recurring reminder:
-// yesterday's record cannot suppress today's message, and today's cannot be
-// mistaken for yesterday's. `attemptId` is `<n>.<nonce>`, unique per attempt,
-// so a worker can only ever resolve the attempt it made itself. `detail` is
-// the provider id on success, or a short reason otherwise; `|` and newlines
-// are stripped from it, so `|` only ever separates fields and a record always
-// parses.
-//
-// `external_dispatched_at` keeps its old meaning — the instant of the most
-// recent hand-off — and is still stamped before the call. It is no longer
-// evidence of delivery on its own.
-//
-// Every write is a read-modify-write with a compare-and-set on the exact
-// column value that was read, so two workers can never both believe they own
-// an occurrence. See `docs/crm-ops/DELIVERY-GUARANTEE.md`.
+// A record with no `#` is unattributed: pre-2026-09 markers were written that
+// way because the old marker never recorded who it was for.
 
-/** Every state a delivery record can be in, as written into `external_ref`. */
-export const DELIVERY_STATES = [
-  "attempting", "accepted", "rejected", "failed", "uncertain", "acknowledged",
-] as const;
-export type DeliveryState = (typeof DELIVERY_STATES)[number];
+const LEGACY_STATES = ["attempting", "accepted", "rejected", "failed", "uncertain", "acknowledged"] as const;
+type LegacyState = (typeof LEGACY_STATES)[number];
 
-export type DeliveryRecord = {
-  state: DeliveryState;
-  /** The job's `run_at` in ISO form. */
+export type LegacyDeliveryRecord = {
+  state: LegacyState;
   occurrence: string;
-  /** Who the message was for. Null only on rows written before this scheme. */
   staffId: number | null;
   attempt: number;
-  attemptId: string | null;
   detail: string;
+  /** The line exactly as it was stored. */
+  raw: string;
 };
 
 /**
- * The two states that mean "do not hand this occurrence to the provider again
- * for this recipient". `accepted` is the machine's own verdict; `acknowledged`
- * is a human's. Nothing else suppresses — that is the whole point.
+ * Parses `external_ref`. A line that does not parse is NOT skipped and NOT
+ * guessed at — it comes back as `unparsed` so the migration can preserve it
+ * and mark it for a person. Dropping an unreadable delivery record is the same
+ * silent loss this whole scheme exists to stop.
  */
-const SETTLED_STATES = new Set<DeliveryState>(["accepted", "acknowledged"]);
+export function parseLegacyDeliveryRecords(
+  ref: string | null | undefined,
+): { parsed: LegacyDeliveryRecord[]; unparsed: string[] } {
+  const parsed: LegacyDeliveryRecord[] = [];
+  const unparsed: string[] = [];
+  if (!ref) return { parsed, unparsed };
 
-/** States that still need somebody to look at them. */
-const UNRESOLVED_STATES = new Set<DeliveryState>(["attempting", "uncertain", "failed", "rejected"]);
-
-/** In-run retries for the one failure class where a retry cannot duplicate. */
-const DELIVERY_RETRY_DELAYS_MS = [250, 1000];
-
-/** How many attempts a read-modify-write makes before giving up its turn. */
-const CAS_ATTEMPTS = 4;
-
-/**
- * How many records for OTHER occurrences a row carries. Unresolved records are
- * kept so nothing ambiguous is ever dropped silently; settled ones are pruned
- * because they are answered. Ten is far more than a human will let accumulate,
- * and it bounds the column for a recurring job that fails every day.
- */
-const MAX_CARRIED_RECORDS = 10;
-
-const RECORD_SEPARATOR = "\n";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
-
-function sanitiseDetail(detail: string): string {
-  return detail.replace(/[|\r\n]+/g, " ").trim().slice(0, 200);
-}
-
-export function formatDeliveryRecord(record: Omit<DeliveryRecord, "attempt">): string {
-  const target = record.staffId === null ? record.occurrence : `${record.occurrence}#${record.staffId}`;
-  return [record.state, target, record.attemptId ?? "-", sanitiseDetail(record.detail)].join("|");
-}
-
-/** Parses `external_ref`. Unrecognisable lines are skipped, never guessed at. */
-export function parseDeliveryRecords(ref: string | null | undefined): DeliveryRecord[] {
-  if (!ref) return [];
-  const records: DeliveryRecord[] = [];
-  for (const line of ref.split(RECORD_SEPARATOR)) {
+  for (const line of ref.split("\n")) {
+    if (line.trim() === "") continue;
     const parts = line.split("|");
-    if (parts.length < 4) continue;
-    const state = parts[0] as DeliveryState;
-    if (!DELIVERY_STATES.includes(state)) continue;
+    const state = parts[0] as LegacyState;
+    if (parts.length < 4 || !LEGACY_STATES.includes(state)) { unparsed.push(line); continue; }
 
-    const hash = (parts[1] ?? "").lastIndexOf("#");
-    const occurrence = hash === -1 ? (parts[1] ?? "") : (parts[1] ?? "").slice(0, hash);
-    const staffText = hash === -1 ? null : (parts[1] ?? "").slice(hash + 1);
-    const staffId = staffText === null ? null : Number.parseInt(staffText, 10);
+    const target = parts[1] ?? "";
+    const hash = target.lastIndexOf("#");
+    const occurrence = hash === -1 ? target : target.slice(0, hash);
+    const staffText = hash === -1 ? null : target.slice(hash + 1);
+    const staffId = staffText === null ? Number.NaN : Number.parseInt(staffText, 10);
+    const attempt = Number.parseInt((parts[2] ?? "").split(".")[0] ?? "", 10);
 
-    const attemptId = parts[2] === "-" ? null : (parts[2] ?? null);
-    const attempt = Number.parseInt((attemptId ?? "").split(".")[0] ?? "", 10);
+    if (occurrence === "" || Number.isNaN(Date.parse(occurrence))) { unparsed.push(line); continue; }
 
-    records.push({
+    parsed.push({
       state, occurrence,
-      staffId: staffId !== null && Number.isFinite(staffId) ? staffId : null,
-      attemptId,
-      attempt: Number.isFinite(attempt) ? attempt : 0,
+      staffId: Number.isFinite(staffId) ? staffId : null,
+      attempt: Number.isFinite(attempt) ? attempt : 1,
       detail: parts.slice(3).join("|"),
+      raw: line,
     });
   }
-  return records;
-}
-
-function serialiseDeliveryRecords(records: DeliveryRecord[]): string | null {
-  if (records.length === 0) return null;
-  return records.map(formatDeliveryRecord).join(RECORD_SEPARATOR);
+  return { parsed, unparsed };
 }
 
 /**
- * Replaces (or adds) one recipient's record, then prunes.
+ * How a legacy record reads under the current, conservative rules.
  *
- * Answered records for other occurrences are dropped — they are history.
- * Unanswered ones are kept, because dropping an ambiguous record is exactly
- * the silent loss this whole scheme exists to stop.
+ * The interesting one is legacy `failed`. The old classifier called a 5xx
+ * "definitely not taken"; this one does not, because a 5xx is an answer from a
+ * server that had already received the request. So a legacy `failed` is put
+ * through the SAME test as a live outcome — if its detail names a transport
+ * code that rules the request out it stays retryable, and otherwise it becomes
+ * `uncertain`. One rule, applied to old records and new ones alike.
  */
-function withRecord(records: DeliveryRecord[], next: DeliveryRecord): DeliveryRecord[] {
-  const isSame = (r: DeliveryRecord) => r.occurrence === next.occurrence && r.staffId === next.staffId;
-  const current = records.filter(isSame).length > 0
-    ? records.map((r) => (isSame(r) ? next : r))
-    : [...records, next];
-
-  const thisOccurrence = current.filter((r) => r.occurrence === next.occurrence);
-  const carried = current
-    .filter((r) => r.occurrence !== next.occurrence && UNRESOLVED_STATES.has(r.state))
-    .sort((a, b) => b.occurrence.localeCompare(a.occurrence))
-    .slice(0, MAX_CARRIED_RECORDS);
-  return [...carried, ...thisOccurrence];
-}
-
-/**
- * This recipient's record, falling back to an UNATTRIBUTED record for the same
- * occurrence. The fallback matters for inherited rows: a pre-2026-09 marker
- * says "we called and do not know the answer" without saying for whom, so it
- * has to cover every recipient of that occurrence rather than none of them.
- */
-function findRecord(
-  records: DeliveryRecord[], occurrence: string, staffId: number | null,
-): DeliveryRecord | undefined {
-  return records.find((r) => r.occurrence === occurrence && r.staffId === staffId)
-    ?? records.find((r) => r.occurrence === occurrence && r.staffId === null);
-}
-
-export type ReadDeliveryResult = { state: DeliveryState | "none"; legacy: boolean } & Omit<DeliveryRecord, "state">;
-
-/**
- * What we know about delivery to `staffId` for this row's occurrence.
- *
- * Rows written before this scheme are read honestly rather than
- * optimistically. The old code stamped `external_dispatched_at` before the
- * call and wrote `external_ref` only on success, so for an occurrence that
- * marker already covers:
- *   marker + provider id  → the provider accepted it       (`accepted`)
- *   marker, no id         → we called and never wrote down an answer
- *                           (`uncertain`) — exactly the case the old code
- *                           silently treated as delivered.
- */
-export function readDeliveryState(
-  job: { externalRef: string | null; externalDispatchedAt: Date | null; runAt: Date },
-  staffId: number | null,
-): ReadDeliveryResult {
-  const occurrence = job.runAt.toISOString();
-  const records = parseDeliveryRecords(job.externalRef);
-  const found = findRecord(records, occurrence, staffId);
-  if (found) return { ...found, legacy: false };
-
-  // The column already speaks this language; there is simply no record for
-  // this recipient yet.
-  if (records.length > 0) {
-    return { state: "none", occurrence, staffId, attempt: 0, attemptId: null, detail: "", legacy: false };
+function legacyToState(record: LegacyDeliveryRecord): { state: CrmDeliveryState; reason: string } {
+  switch (record.state) {
+    case "accepted":
+      return { state: "accepted", reason: "" };
+    case "rejected":
+      return { state: "refused", reason: DELIVERY_FAILURE_REASONS.refused };
+    case "attempting":
+      // Any attempt still in flight at migration time belongs to a process
+      // that is gone.
+      return { state: "uncertain", reason: DELIVERY_FAILURE_REASONS.workerLost };
+    case "failed":
+      return provesNothingWasSent(record.detail)
+        ? { state: "pending", reason: DELIVERY_FAILURE_REASONS.neverLeft }
+        : { state: "uncertain", reason: DELIVERY_FAILURE_REASONS.answeredUnknown };
+    case "acknowledged":
+    case "uncertain":
+    default:
+      return { state: "uncertain", reason: DELIVERY_FAILURE_REASONS.noAnswer };
   }
-
-  const dispatched = job.externalDispatchedAt;
-  if (dispatched && dispatched.getTime() >= job.runAt.getTime()) {
-    return job.externalRef
-      ? {
-          state: "accepted", occurrence, staffId, attempt: 1, attemptId: null,
-          detail: job.externalRef, legacy: true,
-        }
-      : {
-          state: "uncertain", occurrence, staffId, attempt: 1, attemptId: null, legacy: true,
-          detail: "a pre-2026-09 dispatch marker with no recorded provider answer",
-        };
-  }
-  return { state: "none", occurrence, staffId, attempt: 0, attemptId: null, detail: "", legacy: false };
 }
 
-type DeliveryWritePlan = {
-  records: DeliveryRecord[];
-  lastError?: string | null;
-  stampDispatch?: boolean;
+type LegacySeed = {
+  state: CrmDeliveryState;
+  attempt: number;
+  reason: string;
+  detail: string;
+  providerRef: string | null;
+  origin: "migrated" | "migrated_unattributed";
+  legacyRaw: string | null;
+  resolution: "acknowledged" | null;
 };
 
 /**
- * Read-modify-write on the delivery column, compare-and-set on the exact value
- * that was read. `plan` returns the records to write, or null to stand down —
- * which is how a worker that has lost its claim declines to act.
+ * What the packed column says about ONE recipient of ONE occurrence, or null
+ * when it says nothing.
  *
- * A lost compare-and-set means somebody else wrote in between, so the plan is
- * recomputed against the new value rather than applied blindly on top of it.
+ * An unattributed record falls through to every recipient of its occurrence,
+ * because that is all the old marker ever meant. A pre-2026-09 marker with a
+ * provider id beside it is read as `accepted`; one with no id is read as
+ * `uncertain`, which is exactly the case the old code silently treated as
+ * delivered.
  */
-async function updateDeliveryRecords(
-  jobId: number,
-  plan: (records: DeliveryRecord[]) => DeliveryWritePlan | null,
-): Promise<boolean> {
-  for (let round = 0; round < CAS_ATTEMPTS; round += 1) {
-    const [row] = await db.select().from(crmScheduledJobs).where(eq(crmScheduledJobs.id, jobId)).limit(1);
-    if (!row) return false;
+function legacySeedFor(
+  job: Pick<CrmScheduledJob, "externalRef" | "externalDispatchedAt" | "runAt">,
+  staffId: number | null,
+): LegacySeed | null {
+  const occurrence = job.runAt.toISOString();
+  const { parsed } = parseLegacyDeliveryRecords(job.externalRef);
 
-    const decided = plan(parseDeliveryRecords(row.externalRef));
-    if (!decided) return false;
+  const match = parsed.find((r) => r.occurrence === occurrence && r.staffId === staffId)
+    ?? parsed.find((r) => r.occurrence === occurrence && r.staffId === null);
 
-    // Built explicitly rather than with a bound null, so PostgreSQL never has
-    // to infer the type of a NULL parameter.
-    const guard: SQL = row.externalRef === null
-      ? sql`${crmScheduledJobs.externalRef} IS NULL`
-      : sql`${crmScheduledJobs.externalRef} = ${row.externalRef}`;
-
-    const updated = await db.update(crmScheduledJobs)
-      .set({
-        externalRef: serialiseDeliveryRecords(decided.records),
-        updatedAt: new Date(),
-        ...(decided.stampDispatch ? { externalDispatchedAt: new Date() } : {}),
-        ...(decided.lastError !== undefined ? { lastError: decided.lastError?.slice(0, 500) ?? null } : {}),
-      })
-      .where(and(eq(crmScheduledJobs.id, jobId), guard))
-      .returning({ id: crmScheduledJobs.id });
-
-    if (updated.length > 0) return true;
+  if (match) {
+    const mapped = legacyToState(match);
+    return {
+      state: mapped.state,
+      attempt: match.attempt,
+      reason: mapped.reason,
+      detail: match.detail,
+      providerRef: match.state === "accepted" ? match.detail || null : null,
+      origin: match.staffId === null ? "migrated_unattributed" : "migrated",
+      legacyRaw: match.raw,
+      resolution: match.state === "acknowledged" ? "acknowledged" : null,
+    };
   }
-  return false;
+
+  // The column speaks the packed language but has nothing for this occurrence.
+  if (parsed.length > 0) return null;
+
+  const dispatched = job.externalDispatchedAt;
+  if (!dispatched || dispatched.getTime() < job.runAt.getTime()) return null;
+
+  const bareId = (job.externalRef ?? "").trim();
+  return bareId
+    ? {
+        state: "accepted", attempt: 1, reason: "", detail: bareId, providerRef: bareId,
+        origin: "migrated_unattributed", legacyRaw: bareId, resolution: null,
+      }
+    : {
+        state: "uncertain", attempt: 1, reason: DELIVERY_FAILURE_REASONS.legacyMarker,
+        detail: "a pre-2026-09 dispatch marker with no recorded provider answer",
+        providerRef: null, origin: "migrated_unattributed", legacyRaw: null, resolution: null,
+      };
+}
+
+// ── The delivery row ────────────────────────────────────────────────────────
+
+const WORKER_LOST_DETAIL =
+  "an attempt started and never resolved; the worker that made it is gone";
+
+/**
+ * The delivery record for one recipient of this occurrence, creating it if it
+ * does not exist.
+ *
+ * Two things make this safe to call from anywhere:
+ *  - the insert is guarded by the UNIQUE (job, occurrence, recipient) index,
+ *    so two workers racing to create the same record produce one row; and
+ *  - a brand-new record is SEEDED from whatever the packed column said about
+ *    this occurrence, so a message the old scheme already sent is never sent
+ *    again, whether or not the bulk migration has run yet.
+ *
+ * An UNATTRIBUTED inherited record for this occurrence is returned in place of
+ * a per-recipient one: the old marker never said who it was for, so it has to
+ * cover everybody rather than nobody.
+ */
+async function ensureDeliveryRow(
+  job: CrmScheduledJob, staffId: number, subject: string, body: string,
+): Promise<CrmReminderDelivery | undefined> {
+  const occurrence = job.runAt;
+
+  const existing = await db.select().from(crmReminderDeliveries).where(and(
+    eq(crmReminderDeliveries.jobId, job.id),
+    eq(crmReminderDeliveries.occurrenceAt, occurrence),
+    or(
+      eq(crmReminderDeliveries.recipientStaffId, staffId),
+      and(isNull(crmReminderDeliveries.recipientStaffId), isNull(crmReminderDeliveries.recipientAddress)),
+    ),
+  )).limit(2);
+
+  // Prefer this recipient's own record; fall back to an unattributed one.
+  const mine = existing.find((r) => r.recipientStaffId === staffId) ?? existing[0];
+  if (mine) return mine;
+
+  const seed = legacySeedFor(job, staffId);
+  const key = deliveryIdempotencyKey(job.dedupeKey, occurrence, String(staffId));
+
+  await db.insert(crmReminderDeliveries).values({
+    jobId: job.id,
+    occurrenceAt: occurrence,
+    // A seeded unattributed record keeps its "we do not know who" honestly.
+    recipientStaffId: seed?.origin === "migrated_unattributed" ? null : staffId,
+    subject, body,
+    idempotencyKey: key,
+    state: seed?.state ?? "pending",
+    attempt: seed?.attempt ?? 0,
+    // Only a pending row may carry a scheduled attempt.
+    nextAttemptAt: (seed?.state ?? "pending") === "pending" ? new Date() : null,
+    providerRef: seed?.providerRef ?? null,
+    failureReason: seed?.reason || null,
+    failureDetail: seed?.detail || null,
+    origin: seed?.origin ?? "live",
+    legacyRaw: seed?.legacyRaw ?? null,
+    ...(seed?.resolution
+      ? {
+          resolution: seed.resolution,
+          resolvedAt: new Date(),
+          resolutionNote:
+            "migrated from the packed external_ref column; the original acknowledgement recorded no actor",
+        }
+      : {}),
+  }).onConflictDoNothing();
+
+  const [row] = await db.select().from(crmReminderDeliveries).where(and(
+    eq(crmReminderDeliveries.jobId, job.id),
+    eq(crmReminderDeliveries.occurrenceAt, occurrence),
+    or(
+      eq(crmReminderDeliveries.recipientStaffId, staffId),
+      and(isNull(crmReminderDeliveries.recipientStaffId), isNull(crmReminderDeliveries.recipientAddress)),
+    ),
+  )).limit(1);
+  return row;
+}
+
+/**
+ * Takes this delivery, or does not.
+ *
+ * One conditional UPDATE, so two workers cannot both take it: PostgreSQL
+ * serialises the row, the loser re-evaluates its WHERE against the winner's
+ * committed state, matches nothing, and returns empty. There is no window
+ * between checking and claiming because there is no separate check.
+ */
+async function claimDelivery(id: number): Promise<CrmReminderDelivery | undefined> {
+  const [row] = await db.update(crmReminderDeliveries).set({
+    state: "attempting",
+    attempt: sql`${crmReminderDeliveries.attempt} + 1`,
+    attemptStartedAt: new Date(),
+    attemptWorker: WORKER_ID,
+    nextAttemptAt: null,
+    updatedAt: new Date(),
+  }).where(and(
+    eq(crmReminderDeliveries.id, id),
+    eq(crmReminderDeliveries.state, "pending"),
+    isNull(crmReminderDeliveries.resolvedAt),
+    isNotNull(crmReminderDeliveries.nextAttemptAt),
+    lte(crmReminderDeliveries.nextAttemptAt, new Date()),
+  )).returning();
+  return row;
+}
+
+/**
+ * Writes down what the provider actually said, for the attempt THIS worker
+ * made and no other.
+ *
+ * The guard matches on the attempt number and worker id, so a worker whose
+ * lease expired — and whose in-flight record another worker has already
+ * promoted to `uncertain` — may still improve its own guess to the real
+ * answer, and may never touch a different attempt's verdict.
+ */
+async function settleDelivery(claimed: CrmReminderDelivery, outcome: MailOutcome): Promise<void> {
+  const verdict = classifyDeliveryOutcome(outcome);
+  const now = new Date();
+
+  const nextAttemptAt = verdict.state === "pending" && verdict.autoRetryable
+    && claimed.attempt < MAX_AUTO_ATTEMPTS
+    ? new Date(now.getTime() + (DELIVERY_RETRY_BACKOFF_MS[claimed.attempt - 1] ?? 0))
+    : null;
+
+  // A recovery a person asked for, which then succeeded, closes the case and is
+  // attributed to them. An ordinary first-time success closes nothing, because
+  // nobody had to do anything.
+  const closes = verdict.state === "accepted"
+    && claimed.resolvedAt === null
+    && (claimed.lastRecoveryAction === "retry" || claimed.lastRecoveryAction === "resend");
+
+  await db.update(crmReminderDeliveries).set({
+    state: verdict.state,
+    nextAttemptAt,
+    attemptStartedAt: null,
+    attemptWorker: null,
+    providerRef: verdict.providerRef ?? claimed.providerRef,
+    failureReason: verdict.state === "accepted" ? null : verdict.reason,
+    failureDetail: verdict.state === "accepted" ? null : verdict.detail.slice(0, 500),
+    updatedAt: now,
+    ...(closes
+      ? {
+          resolution: claimed.lastRecoveryAction === "resend" ? "resent" as const : "accepted" as const,
+          resolvedAt: now,
+          resolvedByStaffId: claimed.lastRecoveryByStaffId,
+          resolutionNote: claimed.lastRecoveryAction === "resend"
+            ? "a deliberate new copy was accepted by the provider"
+            : "a retry carrying the original idempotency key was accepted by the provider",
+        }
+      : {}),
+  }).where(and(
+    eq(crmReminderDeliveries.id, claimed.id),
+    eq(crmReminderDeliveries.attempt, claimed.attempt),
+    eq(crmReminderDeliveries.attemptWorker, WORKER_ID),
+    or(eq(crmReminderDeliveries.state, "attempting"), eq(crmReminderDeliveries.state, "uncertain")),
+  ));
+
+  // Surface the outcome where operators already look. Only for this job's most
+  // recent word on the matter; it is a convenience, not the record.
+  await db.update(crmScheduledJobs).set({
+    lastError: verdict.state === "accepted" ? null : `delivery ${verdict.state}: ${verdict.detail}`.slice(0, 500),
+    updatedAt: now,
+  }).where(eq(crmScheduledJobs.id, claimed.jobId));
+}
+
+/** The address a delivery goes to right now, or why it cannot go anywhere. */
+async function resolveRecipient(
+  row: CrmReminderDelivery,
+): Promise<{ to: string } | { blocked: string }> {
+  if (row.recipientAddress) return { to: row.recipientAddress };
+  if (row.recipientStaffId === null) {
+    return { blocked: "this record was inherited from a marker that never recorded a recipient" };
+  }
+  const [staff] = await db.select().from(crmStaff)
+    .where(eq(crmStaff.id, row.recipientStaffId)).limit(1);
+  if (!staff) return { blocked: "the staff account this was for no longer exists" };
+  if (staff.status !== "active") return { blocked: "the staff account this was for is not active" };
+  return { to: staff.email };
+}
+
+/** Claims, sends and settles one delivery. Never throws. */
+async function attemptDelivery(row: CrmReminderDelivery): Promise<"sent" | "skipped"> {
+  if (staffMailBlockedReason()) return "skipped";
+
+  const claimed = await claimDelivery(row.id);
+  if (!claimed) return "skipped";
+
+  const recipient = await resolveRecipient(claimed);
+  if ("blocked" in recipient) {
+    // Nothing was handed over, and nothing can be. `refused` is the honest
+    // state: this message is not going to arrive and no retry changes that.
+    await db.update(crmReminderDeliveries).set({
+      state: "refused", nextAttemptAt: null, attemptStartedAt: null, attemptWorker: null,
+      failureReason: DELIVERY_FAILURE_REASONS.recipientUnavailable,
+      failureDetail: recipient.blocked, updatedAt: new Date(),
+    }).where(eq(crmReminderDeliveries.id, claimed.id));
+    return "skipped";
+  }
+
+  const outcome = await trySendStaffMail({
+    to: recipient.to, subject: claimed.subject, text: claimed.body,
+    idempotencyKey: claimed.idempotencyKey,
+  });
+  await settleDelivery(claimed, outcome);
+  return "sent";
 }
 
 /**
@@ -453,15 +766,9 @@ async function updateDeliveryRecords(
  * or test mode is on — a reminder must never fail because mail is not set up,
  * and a test run must never reach a real inbox.
  *
- * Sends this occurrence's reminder to one recipient and records what actually
+ * Hands this occurrence's reminder to one recipient and records what actually
  * happened. Never throws: a mail problem must not fail the job, which would
- * re-run the handler and duplicate the in-app notification.
- *
- * The guarantee, stated plainly: a recipient receives AT MOST ONE copy per
- * occurrence unless a human deliberately retries an `uncertain` one, and
- * receives AT LEAST ONE copy unless the record is left in `rejected`, `failed`
- * or `uncertain` — all three of which are visible to an operator. It is not
- * exactly-once, and `docs/crm-ops/DELIVERY-GUARANTEE.md` says so in full.
+ * re-run the handler.
  */
 async function maybeEmail(
   job: CrmScheduledJob, staffId: number, subject: string, text: string,
@@ -470,250 +777,536 @@ async function maybeEmail(
   if (!staff?.reminderEmailEnabled || staff.status !== "active") return;
 
   // Nothing can reach a provider in this environment. Deliberately records
-  // NOTHING: a marker here would burn the occurrence, and the reminder would
-  // never be sent once mail is configured. This is the "failed before the
-  // provider call" case, and it must leave no trace.
+  // NOTHING — not even a delivery row: a row here would claim the occurrence
+  // had been handled, and the reminder would never go out once mail is
+  // configured. This is the "failed before the provider call" case, and it
+  // must leave no trace.
   if (staffMailBlockedReason()) return;
 
-  const occurrence = job.runAt.toISOString();
-  const idempotencyKey = `${job.dedupeKey}:${occurrence}:${staffId}`;
+  const row = await ensureDeliveryRow(job, staffId, subject, text);
+  if (!row) return;
 
-  // The row in hand was read when the batch was claimed. Re-read it: a worker
-  // whose lease expired may have written to it since, and so may this job's
-  // own previous recipient.
-  const [fresh] = await db.select().from(crmScheduledJobs)
-    .where(eq(crmScheduledJobs.id, job.id)).limit(1);
-  if (!fresh) return;
+  // Anything that is not a due `pending` row is left exactly where it is:
+  // `accepted` is settled, `refused` needs a fix first, `uncertain` is never
+  // retried by a machine, `attempting` belongs to another worker, and a
+  // resolved row has been closed by a person.
+  await attemptDelivery(row);
+}
 
-  const current = readDeliveryState(
-    { externalRef: fresh.externalRef, externalDispatchedAt: fresh.externalDispatchedAt, runAt: job.runAt },
-    staffId,
-  );
+// ── The delivery worker ─────────────────────────────────────────────────────
 
-  if (current.state !== "none" && SETTLED_STATES.has(current.state)) return;
+/**
+ * Promotes attempts whose worker is gone.
+ *
+ * A row left `attempting` by a killed process is the one genuinely ambiguous
+ * case: bytes may or may not have reached the provider. It is NOT re-sent and
+ * NOT dropped — it becomes a visible `uncertain` row that a person can retry,
+ * re-send or acknowledge.
+ */
+export async function recoverStaleAttempts(): Promise<number> {
+  const cutoff = new Date(Date.now() - DELIVERY_LEASE_MS);
+  const rows = await db.update(crmReminderDeliveries).set({
+    state: "uncertain",
+    nextAttemptAt: null,
+    attemptStartedAt: null,
+    attemptWorker: null,
+    failureReason: DELIVERY_FAILURE_REASONS.workerLost,
+    failureDetail: WORKER_LOST_DETAIL,
+    updatedAt: new Date(),
+  }).where(and(
+    eq(crmReminderDeliveries.state, "attempting"),
+    isNotNull(crmReminderDeliveries.attemptStartedAt),
+    lte(crmReminderDeliveries.attemptStartedAt, cutoff),
+  )).returning({ id: crmReminderDeliveries.id });
+  return rows.length;
+}
 
-  if (current.state === "attempting") {
-    // An attempt on this occurrence started and never resolved: the worker was
-    // killed between handing the message over and writing down the answer, or
-    // its lease expired while it was still talking to Resend. We do not know
-    // whether a message exists, so we do not create a second one — we make the
-    // ambiguity a fact an operator can find.
-    const detail = "an attempt started and never resolved (worker lost mid-send)";
-    await updateDeliveryRecords(job.id, (records) => {
-      const mine = records.find(
-        (r) => r.occurrence === occurrence && r.staffId === staffId && r.state === "attempting",
-      );
-      if (!mine) return null;   // somebody resolved it properly in the meantime
-      return {
-        records: withRecord(records, { ...mine, state: "uncertain", detail }),
-        lastError: `delivery uncertain: ${detail}`,
-      };
-    });
-    return;
+/**
+ * One pass over deliveries that are due.
+ *
+ * This is what makes an operator retry durable: the action moves
+ * `next_attempt_at` and nothing else, and the send happens here — so a retry
+ * survives the request that asked for it, and never touches the job's `run_at`.
+ */
+export async function processDueDeliveries(limit = DELIVERY_BATCH): Promise<{
+  recovered: number; attempted: number;
+}> {
+  const recovered = await recoverStaleAttempts();
+
+  const due = await db.select().from(crmReminderDeliveries).where(and(
+    eq(crmReminderDeliveries.state, "pending"),
+    isNull(crmReminderDeliveries.resolvedAt),
+    isNotNull(crmReminderDeliveries.nextAttemptAt),
+    lte(crmReminderDeliveries.nextAttemptAt, new Date()),
+  )).orderBy(asc(crmReminderDeliveries.nextAttemptAt)).limit(Math.min(Math.max(limit, 1), 500));
+
+  let attempted = 0;
+  for (const row of due) {
+    if (await attemptDelivery(row) === "sent") attempted += 1;
   }
+  return { recovered, attempted };
+}
 
-  if (current.state === "uncertain") {
-    // Never retried automatically. Past Resend's 24h idempotency window a
-    // retry genuinely duplicates, and inside it we would still be guessing;
-    // either way the decision belongs to a person, not to a timer.
-    if (current.legacy) {
-      // Promote the inherited marker to a real record so it is queryable. It
-      // is written UNATTRIBUTED (`staffId: null`), because the old marker
-      // never said who it was for — so it covers every recipient of this
-      // occurrence rather than just the first one processed.
-      await updateDeliveryRecords(job.id, (records) => {
-        if (records.length > 0) return null;
-        return {
-          records: [{
-            state: "uncertain", occurrence, staffId: null, attempt: 1,
-            attemptId: null, detail: current.detail,
-          }],
-          lastError: `delivery uncertain: ${current.detail}`,
-        };
+// ── Migrating the packed column ─────────────────────────────────────────────
+
+/**
+ * Moves every record out of `crm_scheduled_jobs.external_ref` into real rows.
+ *
+ * Three rules, and the third is the point:
+ *  - idempotent — every insert is guarded by the UNIQUE index, so re-running
+ *    it changes nothing;
+ *  - non-destructive — `external_ref` is never cleared, so the source text
+ *    survives even a rollback of the new tables;
+ *  - nothing is dropped. A line this scheme cannot confidently read is stored
+ *    verbatim as an `uncertain` row with origin `migrated_unparsed`, which
+ *    keeps it on the operator list until a person decides what it was. Guessing
+ *    at it, or skipping it, is how history disappears.
+ */
+export async function migratePackedDeliveryRecords(): Promise<{
+  jobsScanned: number; migrated: number; unparsed: number;
+}> {
+  const jobs = await db.select().from(crmScheduledJobs).where(or(
+    isNotNull(crmScheduledJobs.externalRef),
+    isNotNull(crmScheduledJobs.externalDispatchedAt),
+  )!);
+
+  let migrated = 0;
+  let unparsed = 0;
+
+  for (const job of jobs) {
+    const rows: (typeof crmReminderDeliveries.$inferInsert)[] = [];
+    const { parsed, unparsed: bad } = parseLegacyDeliveryRecords(job.externalRef);
+
+    for (const record of parsed) {
+      const mapped = legacyToState(record);
+      const occurrence = new Date(record.occurrence);
+      rows.push({
+        jobId: job.id,
+        occurrenceAt: occurrence,
+        recipientStaffId: record.staffId,
+        subject: "(migrated from a packed delivery record)",
+        body: "(migrated from a packed delivery record; the original message body was never stored)",
+        idempotencyKey: deliveryIdempotencyKey(
+          job.dedupeKey, occurrence, record.staffId === null ? "unattributed" : String(record.staffId),
+        ),
+        state: mapped.state,
+        attempt: record.attempt,
+        nextAttemptAt: null,   // a person decides; nothing inherited is auto-sent
+        providerRef: record.state === "accepted" ? record.detail || null : null,
+        failureReason: mapped.reason || null,
+        failureDetail: record.detail || null,
+        origin: record.staffId === null ? "migrated_unattributed" : "migrated",
+        legacyRaw: record.raw,
+        ...(record.state === "acknowledged"
+          ? {
+              resolution: "acknowledged" as const,
+              resolvedAt: job.updatedAt,
+              resolutionNote:
+                "migrated from the packed external_ref column; the original acknowledgement recorded no actor",
+            }
+          : {}),
       });
     }
-    return;
+
+    for (const [index, line] of bad.entries()) {
+      rows.push({
+        jobId: job.id,
+        // No occurrence could be read, so the job's own run_at is used as the
+        // anchor and the raw line is kept beside it. Offsetting by a
+        // millisecond per line keeps two unreadable lines on one job from
+        // colliding on the UNIQUE index and silently becoming one.
+        occurrenceAt: new Date(job.runAt.getTime() + index),
+        recipientStaffId: null,
+        subject: "(unreadable packed delivery record)",
+        body: "(unreadable packed delivery record; see legacy_raw)",
+        idempotencyKey: deliveryIdempotencyKey(job.dedupeKey, job.runAt, `unparsed-${index}`),
+        state: "uncertain",
+        attempt: 0,
+        nextAttemptAt: null,
+        failureReason: DELIVERY_FAILURE_REASONS.legacyUnparsed,
+        failureDetail:
+          "this line could not be read as a delivery record and has been preserved verbatim for review",
+        origin: "migrated_unparsed",
+        legacyRaw: line,
+      });
+      unparsed += 1;
+    }
+
+    // A row with only the old marker: no packed records at all.
+    if (parsed.length === 0 && bad.length === 0) {
+      const seed = legacySeedFor(job, null);
+      if (seed) {
+        rows.push({
+          jobId: job.id,
+          occurrenceAt: job.runAt,
+          recipientStaffId: null,
+          subject: "(migrated from a pre-2026-09 dispatch marker)",
+          body: "(migrated from a pre-2026-09 dispatch marker; no message was ever stored)",
+          idempotencyKey: deliveryIdempotencyKey(job.dedupeKey, job.runAt, "unattributed"),
+          state: seed.state,
+          attempt: seed.attempt,
+          nextAttemptAt: null,
+          providerRef: seed.providerRef,
+          failureReason: seed.reason || null,
+          failureDetail: seed.detail || null,
+          origin: "migrated_unattributed",
+          legacyRaw: seed.legacyRaw,
+        });
+      }
+    }
+
+    if (rows.length === 0) continue;
+    const inserted = await db.insert(crmReminderDeliveries).values(rows)
+      .onConflictDoNothing().returning({ id: crmReminderDeliveries.id });
+    migrated += inserted.length;
   }
 
-  // Remaining states — `none`, `failed`, `rejected` — all mean the provider
-  // demonstrably does not hold a copy of this message, so attempting is safe.
-  let attemptNumber = current.attempt;
-
-  for (let round = 0; round <= DELIVERY_RETRY_DELAYS_MS.length; round += 1) {
-    attemptNumber += 1;
-    const attemptId = `${attemptNumber}.${Math.random().toString(36).slice(2, 8)}`;
-
-    const claimed = await updateDeliveryRecords(job.id, (records) => {
-      const mine = findRecord(records, occurrence, staffId);
-      // Only an untouched recipient, or one whose last attempt is known not to
-      // have reached the provider, may be claimed. Anything else means that
-      // between deciding to attempt and claiming, somebody else took this
-      // recipient's occurrence over — and sending now would be the double-send
-      // this whole scheme exists to prevent.
-      const claimable = !mine
-        || ((mine.state === "failed" || mine.state === "rejected") && mine.attempt < attemptNumber);
-      if (!claimable) return null;
-      return {
-        records: withRecord(records, {
-          state: "attempting", occurrence, staffId, attempt: attemptNumber, attemptId, detail: "",
-        }),
-        stampDispatch: true,
-      };
-    });
-    if (!claimed) return;
-
-    const outcome = await trySendStaffMail({ to: staff.email, subject, text, idempotencyKey });
-
-    // `not_configured` this late means the environment changed under us. No
-    // message was handed over, so it is recorded as a retryable failure rather
-    // than as an in-flight attempt.
-    const state: DeliveryState = outcome.sent
-      ? "accepted"
-      : (outcome.failure === "not_configured" ? "failed" : outcome.failure);
-    const detail = outcome.sent
-      ? (outcome.providerId ?? "accepted without a provider id")
-      : outcome.reason;
-
-    // Resolve MY attempt, wherever it currently stands. Another worker whose
-    // lease overlapped mine may already have promoted my in-flight record to
-    // `uncertain`. That worker was guessing; this one has the answer, so it is
-    // allowed to improve its OWN attempt's record — and only its own. A
-    // different attempt's verdict, and any settled verdict, is untouchable.
-    const wrote = await updateDeliveryRecords(job.id, (records) => {
-      const mine = records.find(
-        (r) => r.attemptId === attemptId && (r.state === "attempting" || r.state === "uncertain"),
-      );
-      if (!mine) return null;
-      return {
-        records: withRecord(records, { ...mine, state, detail }),
-        lastError: outcome.sent ? null : `delivery ${state}: ${outcome.reason}`,
-      };
-    });
-    if (!wrote || state !== "failed") return;
-
-    // Only `failed` is retried here, and only because it is the one class
-    // where the provider is known NOT to hold the message — so a retry cannot
-    // duplicate, and does not lean on Resend's 24h key window at all.
-    const delay = DELIVERY_RETRY_DELAYS_MS[round];
-    if (delay === undefined) return;
-    await sleep(delay);
-  }
+  return { jobsScanned: jobs.length, migrated, unparsed };
 }
 
 // ── Delivery visibility ─────────────────────────────────────────────────────
 //
-// An ambiguous delivery that nobody can find is the same as a lost one.
+// An ambiguous delivery that nobody can find is the same as a lost one. There
+// is deliberately NO cap on how many unresolved records exist: a display limit
+// pages, it never discards.
 
 /**
- * Rows holding at least one delivery record that is not a recorded success.
+ * Deliveries a person still has to deal with.
  *
- * Matching on `<state>|` is exact rather than approximate: `|` separates
- * fields and is stripped from every detail, so a state name immediately
- * followed by `|` can only ever be a record's first field.
+ * `pending` with an attempt behind it counts — something already went wrong,
+ * even though the worker will try again. `pending` with no attempt yet is
+ * simply queued and is nobody's problem.
  */
-function deliveryNeedsAttention(): SQL {
-  return or(
-    ...[...UNRESOLVED_STATES].map((state) => sql`${crmScheduledJobs.externalRef} LIKE ${`%${state}|%`}`),
-    // Pre-2026-09 rows: a dispatch marker for this occurrence with no provider
-    // answer recorded beside it.
-    sql`${crmScheduledJobs.externalRef} IS NULL
-        AND ${crmScheduledJobs.externalDispatchedAt} IS NOT NULL
-        AND ${crmScheduledJobs.externalDispatchedAt} >= ${crmScheduledJobs.runAt}`,
+export function deliveryNeedsAttention(): SQL {
+  return and(
+    isNull(crmReminderDeliveries.resolvedAt),
+    or(
+      inArray(crmReminderDeliveries.state, ["attempting", "refused", "uncertain"]),
+      and(eq(crmReminderDeliveries.state, "pending"), sql`${crmReminderDeliveries.attempt} > 0`),
+    ),
   )!;
 }
 
-export type DeliveryAttentionRow = {
-  jobId: number; kind: string; dedupeKey: string; runAt: Date;
-  jobStatus: string; dispatchedAt: Date | null;
-  /** Who the message was for. Null on rows written before this scheme. */
-  staffId: number | null;
-  occurrence: string;
-  state: DeliveryState | "none"; attempt: number; detail: string; legacy: boolean;
-  /** Would Resend still collapse a retry of this exact message? */
-  idempotencyProtected: boolean;
-  /** What retrying would actually mean right now, in words an operator can act on. */
-  guidance: string;
-};
+/** Would the provider still collapse a retry of this exact message? */
+export function idempotencyProtected(row: CrmReminderDelivery, now = Date.now()): boolean {
+  const since = row.attemptStartedAt?.getTime() ?? row.updatedAt.getTime();
+  return row.attempt > 0 && now - since <= RESEND_IDEMPOTENCY_WINDOW_MS;
+}
 
-function retryGuidance(state: DeliveryState | "none", protectedByKey: boolean): string {
-  switch (state) {
+/**
+ * A retry re-uses the original idempotency key, so it can only duplicate in
+ * one situation: the outcome is unknown AND the provider has forgotten the key.
+ * Everywhere else the provider either demonstrably never took the message, or
+ * still holds the key and collapses the repeat.
+ */
+export function retryCouldDuplicate(row: CrmReminderDelivery, now = Date.now()): boolean {
+  return row.state === "uncertain" && !idempotencyProtected(row, now);
+}
+
+/** What retrying or re-sending this row would actually mean, in operator words. */
+export function deliveryGuidance(row: CrmReminderDelivery, now = Date.now()): string {
+  switch (row.state) {
     case "attempting":
-      return "A send is in flight, or the worker that started it was lost. Wait one worker tick; "
-        + "it becomes 'uncertain' if nobody resolves it.";
+      return "A send is in flight, or the worker that started it was lost. Wait one worker tick — "
+        + "it becomes 'unknown' by itself if nobody resolves it.";
+    case "accepted":
+      return "The provider took this message. Nothing further is needed.";
+    case "refused":
+      return "The provider refused the message (address, sending domain or API key), so nothing was "
+        + "delivered. Fix the cause first; retrying it unchanged will be refused the same way.";
     case "uncertain":
-      return protectedByKey
-        ? "The message may or may not have been delivered. A retry within 24 hours of the attempt "
-          + "carries the same idempotency key, so Resend collapses it into the original send."
-        : "The message may or may not have been delivered, and Resend's 24-hour idempotency window "
-          + "has closed — a retry WILL deliver a second copy. Confirm with the recipient first.";
-    case "failed":
-      return "The provider never took the message, so nothing was delivered and a retry cannot duplicate.";
-    case "rejected":
-      return "The provider refused the message (address, sending domain or API key). "
-        + "Fix the cause; retrying it unchanged will be refused the same way.";
+      return idempotencyProtected(row, now)
+        ? "This may or may not have been delivered. A retry carries the SAME idempotency key and the "
+          + "last attempt was under 24 hours ago, so the provider collapses it into the original — "
+          + "a retry here cannot produce a second copy."
+        : "This may or may not have been delivered, and the provider's 24-hour idempotency window has "
+          + "closed, so a retry is no longer protected. Ask the recipient whether it arrived, then "
+          + "either re-send deliberately or acknowledge it.";
     default:
-      return "No provider answer was ever recorded for this occurrence. Treat it as undelivered but unconfirmed.";
+      return row.attempt === 0
+        ? "Queued. Nothing has been handed to the provider yet."
+        : "The last attempt never reached the provider, so nothing was delivered and another attempt "
+          + "cannot duplicate.";
   }
 }
 
 /**
- * Every reminder delivery that is unresolved or unsuccessful, one entry per
- * recipient, newest row first. `state === "uncertain"` is the answer to
- * "which reminders are in an unknown delivery state?".
+ * What a person may do to this row right now.
+ *
+ * `retry` is absent exactly when it could duplicate — an unknown outcome past
+ * the idempotency window — so "retry cannot duplicate" stays a guarantee
+ * rather than a hope. The deliberate second copy is `resend`, which says so.
+ */
+export function availableRecoveryActions(
+  row: CrmReminderDelivery, now = Date.now(),
+): CrmDeliveryRecoveryAction[] {
+  if (row.state === "attempting") return [];
+  const actions: CrmDeliveryRecoveryAction[] = [];
+  if (row.state !== "accepted" && !retryCouldDuplicate(row, now)) actions.push("retry");
+  actions.push("resend");
+  if (row.state !== "accepted" && row.resolvedAt === null) actions.push("acknowledge");
+  return actions;
+}
+
+/** The duplicate risk of a deliberate re-send, in the words the operator sees. */
+export function resendDuplicateRisk(row: CrmReminderDelivery): string {
+  if (row.attempt === 0) {
+    return "Nothing has been handed to the provider for this delivery yet, so a new copy cannot "
+      + "duplicate anything.";
+  }
+  if (row.state === "accepted") {
+    return "The provider ALREADY accepted a copy of this message. A re-send carries a new idempotency "
+      + "key, so it will not be collapsed: the recipient will receive a second copy.";
+  }
+  if (row.state === "refused" || row.failureReason === DELIVERY_FAILURE_REASONS.neverLeft) {
+    return "The last attempt demonstrably did not reach the recipient, so a new copy is very unlikely "
+      + "to duplicate — but it carries a NEW idempotency key, so the provider will not collapse it if "
+      + "that reading is wrong.";
+  }
+  return "This delivery's outcome is unknown: the message may already have arrived. A re-send carries "
+    + "a NEW idempotency key precisely so the provider does NOT collapse it, which is what makes it a "
+    + "second copy. If the first one arrived, the recipient gets two.";
+}
+
+export type DeliveryAttentionRow = {
+  deliveryId: number;
+  jobId: number; kind: string; dedupeKey: string; jobStatus: string;
+  /** Who the message was for. Null on records inherited from a bare marker. */
+  staffId: number | null;
+  recipientAddress: string | null;
+  /** The ORIGINAL run_at. Never moves. */
+  occurrence: string;
+  state: CrmDeliveryState;
+  attempt: number;
+  nextAttemptAt: string | null;
+  providerRef: string | null;
+  failureReason: string | null;
+  failureDetail: string | null;
+  /** One human-readable line: the provider's id on success, otherwise the reason. */
+  detail: string;
+  origin: string;
+  legacyRaw: string | null;
+  resolvedAt: string | null;
+  resolution: string | null;
+  idempotencyProtected: boolean;
+  availableActions: CrmDeliveryRecoveryAction[];
+  guidance: string;
+};
+
+export function deliveryAttentionShape(
+  row: CrmReminderDelivery,
+  job: { kind: string; dedupeKey: string; status: string } | undefined,
+  now = Date.now(),
+): DeliveryAttentionRow {
+  return {
+    deliveryId: row.id,
+    jobId: row.jobId,
+    kind: job?.kind ?? "unknown",
+    dedupeKey: job?.dedupeKey ?? "",
+    jobStatus: job?.status ?? "unknown",
+    staffId: row.recipientStaffId,
+    recipientAddress: row.recipientAddress,
+    occurrence: row.occurrenceAt.toISOString(),
+    state: row.state as CrmDeliveryState,
+    attempt: row.attempt,
+    nextAttemptAt: row.nextAttemptAt?.toISOString() ?? null,
+    providerRef: row.providerRef,
+    failureReason: row.failureReason,
+    failureDetail: row.failureDetail,
+    detail: row.providerRef ?? row.failureDetail ?? "",
+    origin: row.origin,
+    legacyRaw: row.legacyRaw,
+    resolvedAt: row.resolvedAt?.toISOString() ?? null,
+    resolution: row.resolution,
+    idempotencyProtected: idempotencyProtected(row, now),
+    availableActions: availableRecoveryActions(row, now),
+    guidance: deliveryGuidance(row, now),
+  };
+}
+
+/**
+ * Every delivery that is unresolved or unsuccessful, newest first.
+ *
+ * `limit` is a DISPLAY limit and nothing else — the operator route pages
+ * through the whole set on the immutable id, so no unresolved record can be
+ * hidden by there being too many of them.
  */
 export async function listDeliveriesNeedingAttention(limit = 50): Promise<DeliveryAttentionRow[]> {
-  const rows = await db.select().from(crmScheduledJobs)
+  const rows = await db.select().from(crmReminderDeliveries)
     .where(deliveryNeedsAttention())
-    .orderBy(desc(crmScheduledJobs.updatedAt))
+    .orderBy(desc(crmReminderDeliveries.id))
     .limit(Math.min(Math.max(limit, 1), 500));
+  if (rows.length === 0) return [];
+
+  const jobs = await db.select({
+    id: crmScheduledJobs.id, kind: crmScheduledJobs.kind,
+    dedupeKey: crmScheduledJobs.dedupeKey, status: crmScheduledJobs.status,
+  }).from(crmScheduledJobs).where(inArray(crmScheduledJobs.id, [...new Set(rows.map((r) => r.jobId))]));
+  const jobById = new Map(jobs.map((j) => [j.id, j]));
 
   const now = Date.now();
-  // The window runs from the attempt, which is what `external_dispatched_at`
-  // records. With no attempt time we cannot claim protection.
-  const out: DeliveryAttentionRow[] = [];
-  for (const row of rows) {
-    const since = row.externalDispatchedAt?.getTime();
-    const idempotencyProtected = since !== undefined && now - since <= RESEND_IDEMPOTENCY_WINDOW_MS;
-    const base = {
-      jobId: row.id, kind: row.kind, dedupeKey: row.dedupeKey, runAt: row.runAt,
-      jobStatus: row.status, dispatchedAt: row.externalDispatchedAt, idempotencyProtected,
-    };
-
-    const records = parseDeliveryRecords(row.externalRef);
-    if (records.length > 0) {
-      for (const record of records) {
-        if (!UNRESOLVED_STATES.has(record.state)) continue;
-        out.push({
-          ...base,
-          staffId: record.staffId, occurrence: record.occurrence, state: record.state,
-          attempt: record.attempt, detail: record.detail, legacy: false,
-          guidance: retryGuidance(record.state, idempotencyProtected),
-        });
-      }
-      continue;
-    }
-
-    // A row matched only by the legacy clause.
-    const legacy = readDeliveryState(
-      { externalRef: row.externalRef, externalDispatchedAt: row.externalDispatchedAt, runAt: row.runAt },
-      null,
-    );
-    if (legacy.state === "none" || !UNRESOLVED_STATES.has(legacy.state)) continue;
-    out.push({
-      ...base,
-      staffId: null, occurrence: legacy.occurrence, state: legacy.state,
-      attempt: legacy.attempt, detail: legacy.detail, legacy: true,
-      guidance: retryGuidance(legacy.state, idempotencyProtected),
-    });
-  }
-  return out;
+  return rows.map((row) => deliveryAttentionShape(row, jobById.get(row.jobId), now));
 }
 
 /** How many deliveries need a human, for the operator dashboard's health line. */
 export async function countDeliveriesNeedingAttention(): Promise<number> {
-  return (await listDeliveriesNeedingAttention(500)).length;
+  const [row] = await db.select({ n: sql<number>`count(*)::int` })
+    .from(crmReminderDeliveries).where(deliveryNeedsAttention());
+  return Number(row?.n ?? 0);
 }
 
+// ── Operator recovery ───────────────────────────────────────────────────────
+//
+// Three genuinely different things, not one button:
+//
+//   retry      — the SAME occurrence, recipient, payload and idempotency key.
+//                Only `next_attempt_at` moves. It is offered only where it
+//                cannot duplicate.
+//   resend     — a deliberate NEW copy with a NEW idempotency key. Requires an
+//                explicit confirmation and records what the operator was told
+//                about the duplicate risk. Never the default.
+//   acknowledge— closes an unknown outcome without sending anything. Requires
+//                a reason.
+//
+// Every one of them writes a `crm_delivery_recovery_actions` row in the same
+// flow, with the staff id, the action, the reason and the timestamp.
+
+export type RecoveryResult =
+  | { ok: true; delivery: CrmReminderDelivery; action: CrmDeliveryRecoveryActionRow }
+  | { ok: false; status: number; error: string; duplicateRisk?: string };
+
+export async function recoverDelivery(args: {
+  deliveryId: number;
+  action: CrmDeliveryRecoveryAction;
+  reason: string;
+  actorStaffId: number | null;
+  actorLabel: string;
+  confirmDuplicateRisk?: boolean;
+}): Promise<RecoveryResult> {
+  const reason = args.reason.trim();
+  if (reason.length < 3) {
+    return { ok: false, status: 400, error: "Say why you are doing this — it is recorded against the delivery." };
+  }
+
+  const [row] = await db.select().from(crmReminderDeliveries)
+    .where(eq(crmReminderDeliveries.id, args.deliveryId)).limit(1);
+  if (!row) return { ok: false, status: 404, error: "No delivery with that id." };
+
+  if (row.state === "attempting") {
+    return {
+      ok: false, status: 409,
+      error: "A send is in flight for this delivery. Wait one worker tick — it resolves itself into an "
+        + "unknown outcome if the worker is gone.",
+    };
+  }
+
+  const now = new Date();
+  const audit = {
+    deliveryId: row.id,
+    action: args.action,
+    reason,
+    actorStaffId: args.actorStaffId,
+    actorLabel: args.actorLabel,
+    previousState: row.state,
+    previousIdempotencyKey: row.idempotencyKey,
+  };
+
+  if (args.action === "acknowledge") {
+    if (row.state === "accepted") {
+      return { ok: false, status: 409, error: "This delivery was accepted by the provider; there is nothing to acknowledge." };
+    }
+    if (row.resolvedAt !== null) {
+      return { ok: false, status: 409, error: "This delivery has already been resolved." };
+    }
+    const [delivery] = await db.update(crmReminderDeliveries).set({
+      resolution: "acknowledged", resolvedAt: now, resolvedByStaffId: args.actorStaffId,
+      resolutionNote: reason,
+      // A resolved row is already skipped by the worker, but leaving a time
+      // here would tell an operator an attempt is coming that never will.
+      // `next_attempt_at IS NULL` means exactly "nothing is scheduled", and
+      // acknowledging is how that becomes true.
+      nextAttemptAt: null,
+      lastRecoveryAction: "acknowledge", lastRecoveryByStaffId: args.actorStaffId, lastRecoveryAt: now,
+      updatedAt: now,
+    }).where(and(
+      eq(crmReminderDeliveries.id, row.id),
+      isNull(crmReminderDeliveries.resolvedAt),
+      ne(crmReminderDeliveries.state, "attempting"),
+    )).returning();
+    if (!delivery) return { ok: false, status: 409, error: "The delivery changed while you were looking at it. Reload and try again." };
+    const [action] = await db.insert(crmDeliveryRecoveryActions)
+      .values({ ...audit, newIdempotencyKey: null, duplicateRisk: null }).returning();
+    return { ok: true, delivery, action };
+  }
+
+  if (args.action === "retry") {
+    if (row.state === "accepted") {
+      return {
+        ok: false, status: 409,
+        error: "The provider already accepted this message. If the recipient says it never arrived, "
+          + "use Re-send — it deliberately creates a second copy.",
+      };
+    }
+    if (retryCouldDuplicate(row)) {
+      return {
+        ok: false, status: 409,
+        error: "This delivery's outcome is unknown and the provider's 24-hour idempotency window has "
+          + "closed, so a retry is no longer collapsed into the original and could deliver a second "
+          + "copy. Use Re-send (which says so explicitly) or Acknowledge.",
+        duplicateRisk: resendDuplicateRisk(row),
+      };
+    }
+    // The occurrence, the recipient, the payload and the key are untouched.
+    // Only when the next attempt may happen moves.
+    const [delivery] = await db.update(crmReminderDeliveries).set({
+      state: "pending", nextAttemptAt: now,
+      resolution: null, resolvedAt: null, resolvedByStaffId: null, resolutionNote: null,
+      lastRecoveryAction: "retry", lastRecoveryByStaffId: args.actorStaffId, lastRecoveryAt: now,
+      updatedAt: now,
+    }).where(and(
+      eq(crmReminderDeliveries.id, row.id),
+      ne(crmReminderDeliveries.state, "attempting"),
+      ne(crmReminderDeliveries.state, "accepted"),
+    )).returning();
+    if (!delivery) return { ok: false, status: 409, error: "The delivery changed while you were looking at it. Reload and try again." };
+    const [action] = await db.insert(crmDeliveryRecoveryActions).values({
+      ...audit, newIdempotencyKey: delivery.idempotencyKey,
+      duplicateRisk: "Retry re-uses the original idempotency key and was offered only because it "
+        + "cannot produce a second copy.",
+    }).returning();
+    return { ok: true, delivery, action };
+  }
+
+  // ── resend ────────────────────────────────────────────────────────────────
+  const risk = resendDuplicateRisk(row);
+  if (args.confirmDuplicateRisk !== true) {
+    return {
+      ok: false, status: 400,
+      error: "Re-sending creates a NEW copy. Confirm you intend that by sending "
+        + "\"confirmDuplicateRisk\": true.",
+      duplicateRisk: risk,
+    };
+  }
+
+  const nextKey = `${row.idempotencyKey}#resend${row.resendCount + 1}.${nonce()}`;
+  const [delivery] = await db.update(crmReminderDeliveries).set({
+    state: "pending", nextAttemptAt: now,
+    idempotencyKey: nextKey,
+    resendCount: row.resendCount + 1,
+    resolution: null, resolvedAt: null, resolvedByStaffId: null, resolutionNote: null,
+    lastRecoveryAction: "resend", lastRecoveryByStaffId: args.actorStaffId, lastRecoveryAt: now,
+    updatedAt: now,
+  }).where(and(
+    eq(crmReminderDeliveries.id, row.id),
+    eq(crmReminderDeliveries.idempotencyKey, row.idempotencyKey),
+    ne(crmReminderDeliveries.state, "attempting"),
+  )).returning();
+  if (!delivery) return { ok: false, status: 409, error: "The delivery changed while you were looking at it. Reload and try again." };
+
+  const [action] = await db.insert(crmDeliveryRecoveryActions)
+    .values({ ...audit, newIdempotencyKey: nextKey, duplicateRisk: risk }).returning();
+  return { ok: true, delivery, action };
+}
 
 async function runTaskReminder(job: CrmScheduledJob): Promise<void> {
   const taskId = Number(job.payload["taskId"]);
@@ -729,6 +1322,9 @@ async function runTaskReminder(job: CrmScheduledJob): Promise<void> {
     body: `Reminder for your task${due}.`,
     href: "/admin/crm/my-day",
     entityType: "task", entityId: task.id,
+    // A re-run of this job — an operator retry, a reclaimed lease — must not
+    // write a second notification for the same occurrence and person.
+    occurrenceKey: notificationOccurrenceKey(job, task.assignedToStaffId, "task_reminder"),
   });
   await maybeEmail(job, task.assignedToStaffId, `Reminder: ${task.title}`,
     `This is your SiteMint CRM reminder for "${task.title}"${due}.`);
@@ -761,6 +1357,7 @@ async function runMilestoneReminder(job: CrmScheduledJob): Promise<void> {
     staffId, kind: "milestone_reminder", title: `Milestone due: ${m.title}`,
     body: project ? `On ${project.name}.` : null,
     href: "/admin/crm/operations", entityType: "project", entityId: m.projectId,
+    occurrenceKey: notificationOccurrenceKey(job, staffId, "milestone_reminder"),
   });
 }
 
@@ -784,6 +1381,7 @@ async function runDailyDigest(job: CrmScheduledJob): Promise<void> {
     title: `${open.length} task${open.length === 1 ? "" : "s"} for today`,
     body: overdue > 0 ? `${overdue} overdue.` : "Nothing overdue.",
     href: "/admin/crm/my-day",
+    occurrenceKey: notificationOccurrenceKey(job, staffId, "daily_digest"),
   });
   await maybeEmail(job, staffId, "Your SiteMint CRM day",
     `${open.length} task(s) due today or earlier${overdue > 0 ? `, ${overdue} overdue` : ""}.`);
@@ -836,6 +1434,7 @@ async function runAppointmentReminder(job: CrmScheduledJob): Promise<void> {
       staffId, kind: "appointment_reminder", title: appt.title,
       body: `Starts at ${when} UTC${appt.location ? ` · ${appt.location}` : ""}.`,
       href: "/admin/crm/calendar", entityType: "appointment", entityId: appt.id,
+      occurrenceKey: notificationOccurrenceKey(job, staffId, "appointment_reminder"),
     });
     await maybeEmail(job, staffId, `Reminder: ${appt.title}`,
       `${appt.title} starts at ${when} UTC.${appt.location ? ` Location: ${appt.location}.` : ""}`);
@@ -847,6 +1446,9 @@ const HANDLERS: Record<string, (job: CrmScheduledJob) => Promise<void>> = {
   task_reminder: runTaskReminder,
   milestone_reminder: runMilestoneReminder,
   daily_digest: runDailyDigest,
+  // Automation executions ride this same runner — same lease, same settle,
+  // same visibility — rather than a second timer nobody watches.
+  [AUTOMATION_JOB_KIND]: runAutomationJob,
 };
 
 // ── The worker ──────────────────────────────────────────────────────────────
@@ -917,7 +1519,9 @@ async function settle(job: CrmScheduledJob, error?: unknown): Promise<void> {
 }
 
 /** One pass. Exported so tests can drive the queue deterministically. */
-export async function processDueJobs(): Promise<{ processed: number; failed: number }> {
+export async function processDueJobs(): Promise<{
+  processed: number; failed: number; deliveriesAttempted: number; deliveriesRecovered: number;
+}> {
   const jobs = await claimDueJobs();
   let failed = 0;
   for (const job of jobs) {
@@ -931,7 +1535,22 @@ export async function processDueJobs(): Promise<{ processed: number; failed: num
       await settle(job, err);
     }
   }
-  return { processed: jobs.length, failed };
+
+  // Deliveries have their own clock. A retry an operator asked for, and an
+  // automatic attempt after a failure that provably never reached the
+  // provider, both happen here — so neither has to move a job's `run_at`, and
+  // neither depends on the request or the handler that started it still being
+  // alive. A delivery problem must never fail the job pass.
+  let deliveries = { recovered: 0, attempted: 0 };
+  try {
+    deliveries = await processDueDeliveries();
+  } catch { /* the queue's own health is reported separately */ }
+
+  return {
+    processed: jobs.length, failed,
+    deliveriesAttempted: deliveries.attempted,
+    deliveriesRecovered: deliveries.recovered,
+  };
 }
 
 let timer: NodeJS.Timeout | undefined;
@@ -953,10 +1572,27 @@ export function getSchedulerStatus() {
   return { ...status, running: timer !== undefined, workerId: WORKER_ID, tickMs: TICK_MS };
 }
 
+/**
+ * The one-time move out of the packed `external_ref` column, run at most once
+ * per process and never allowed to stop the scheduler starting.
+ *
+ * It is idempotent (every insert is guarded by the UNIQUE index), so a restart
+ * costs a scan and changes nothing. Per-recipient seeding in
+ * `ensureDeliveryRow` means correctness does not depend on this having run —
+ * this is what makes inherited UNRESOLVED records visible on the operator list
+ * rather than only discoverable at send time.
+ */
+let legacyMigration: Promise<unknown> | undefined;
+function migrateLegacyDeliveriesOnce(): Promise<unknown> {
+  legacyMigration ??= migratePackedDeliveryRecords().catch(() => undefined);
+  return legacyMigration;
+}
+
 export function startCrmScheduler(intervalMs = TICK_MS): void {
   if (timer) return;
   const tick = async () => {
     try {
+      await migrateLegacyDeliveriesOnce();
       const r = await processDueJobs();
       status.processed += r.processed;
       status.lastError = null;

@@ -1,614 +1,484 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+/**
+ * Reporting.
+ *
+ * The previous version of this page computed its own numbers in the browser
+ * from four endpoints that could not say what they meant. "Win Rate 0%" sat
+ * next to "Won / (Won + Lost)" whether the denominator was forty deals or
+ * none, and "Total Msgs" was whatever the last two hundred rows happened to
+ * contain. A figure with no definition and no denominator is decoration.
+ *
+ * Every number here now comes from `/api/crm/reports/summary`, which returns
+ * each figure with:
+ *
+ *   - what it means,
+ *   - what it is a share OF,
+ *   - which of your filters it could and could not honour,
+ *   - and a link to the exact rows it counted.
+ *
+ * Three rules are visible in the UI on purpose, because they are the reason to
+ * trust it: a rate over an empty denominator shows "no rate yet" rather than
+ * 0%; a figure nothing is measuring shows "Not tracked" with the reason; and
+ * the timezone days were counted in is stated at the top rather than assumed.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrmLayout } from "./CrmLayout";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area, Cell,
-} from "recharts";
-import {
-  Users, DollarSign, TrendingUp, Target, Zap, MessageSquare, Phone,
-  CheckSquare, Award, Lightbulb, AlertTriangle, BarChart2, RefreshCw,
+  AlertTriangle, RefreshCw, Info, ChevronDown, ChevronRight, Ban, Clock,
 } from "lucide-react";
-import { normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Shape ─────────────────────────────────────────────────────────────────────
 
-interface CrmStats {
-  total: number; newLeads: number; hotLeads: number;
-  won: number; lost: number; followUpToday: number; overdue: number;
-}
-interface DealStats {
-  totalRevenue: number; winRate: number; activeLeads: number;
-  openDeals: number; wonDeals: number; lostDeals: number;
-  pipeline: { stage: string; count: number; total: number }[];
-  monthly: { month: string; revenue: number }[];
-}
-interface Lead {
-  id: number; name: string; source?: string | null; status: string;
-  priority: string; createdAt: string;
-}
-interface CrmTask {
-  id: number; status: string; dueDate?: string | null; createdAt: string;
-}
-interface MsgItem { direction: string; channel: string; }
-interface ConvThread {
-  leadId: number | null;
-  messages: MsgItem[];
-  lastAt: string;
-  unread: number;
+interface Figure {
+  key: string;
+  area: string;
+  label: string;
+  unit: "count" | "currency" | "percent" | "days" | "minutes";
+  available: boolean;
+  value: number | null;
+  definition: string;
+  denominator: { label: string; value: number | null } | null;
+  sources: string[];
+  honoursFilters: string[];
+  ignoredFilters: string[];
+  traceable: boolean;
+  detail: string | null;
+  limitations: string[];
+  unavailableReason?: string;
+  wouldRequire?: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmt(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toLocaleString()}`;
+interface Summary {
+  window: { from: string; to: string; timezone: string; definition: string };
+  filters: { ownerStaffId: number | null; source: string | null; stage: string | null; status: string | null; note: string };
+  areas: Record<string, Figure[]>;
+  unavailable: { key: string; label: string; reason: string; wouldRequire: string | null }[];
+  contract: Record<string, string>;
 }
 
-function filterByRange<T extends { createdAt: string }>(items: T[], range: string): T[] {
-  if (range === "all") return items;
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-  const cutoff = new Date(Date.now() - days * 86_400_000);
-  return items.filter(i => new Date(i.createdAt) >= cutoff);
+interface DetailRow {
+  id: number; occurredAt: string | null; label: string; amount: number | null; href: string | null;
 }
 
-// ── Reusable components ───────────────────────────────────────────────────────
-
-function KpiSkeleton() {
-  return (
-    <div className="bg-white rounded-xl border border-border shadow-sm p-4 animate-pulse">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <div className="h-2.5 w-20 bg-border rounded mb-2" />
-          <div className="h-7 w-12 bg-border rounded mb-2" />
-          <div className="h-2 w-14 bg-muted rounded" />
-        </div>
-        <div className="w-9 h-9 rounded-lg bg-border shrink-0" />
-      </div>
-    </div>
-  );
+interface DetailResponse {
+  key: string; label: string; definition: string;
+  value: number | null; count: number; sum: number | null; median: number | null;
+  rows: DetailRow[]; truncated: boolean; guarantee: string;
 }
 
-function KpiCard({ label, value, sub, icon: Icon, bg, fg, warn }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ElementType; bg: string; fg: string; warn?: boolean;
-}) {
-  return (
-    <div className={`bg-white rounded-xl border shadow-sm p-4 ${warn ? "border-red-200" : "border-border"}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
-          <p className="text-2xl font-bold text-foreground mt-1 leading-tight">{value}</p>
-          {sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{sub}</p>}
-        </div>
-        <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
-          <Icon className={`w-4 h-4 ${fg}`} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChartCard({ title, sub, children, height = 220 }: {
-  title: string; sub?: string; children: React.ReactNode; height?: number;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-border shadow-sm p-5">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
-      </div>
-      <div style={{ height }}>{children}</div>
-    </div>
-  );
-}
-
-function EmptyChart({ label }: { label?: string }) {
-  return (
-    <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
-      <BarChart2 className="w-7 h-7 opacity-20" />
-      <p className="text-xs">{label ?? "No data yet"}</p>
-    </div>
-  );
-}
-
-const BarTip = ({ active, payload, label }: {
-  active?: boolean;
-  payload?: { value: number; name: string }[];
-  label?: string;
-}) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} className="text-muted-foreground">
-          {p.name}: <span className="font-medium text-foreground">{p.value}</span>
-        </p>
-      ))}
-    </div>
-  );
+const AREA_ORDER = ["acquisition", "sales", "revenue", "operations", "support", "campaigns", "communications"] as const;
+const AREA_LABEL: Record<string, string> = {
+  acquisition: "Acquisition",
+  sales: "Sales",
+  revenue: "Revenue",
+  operations: "Operations",
+  support: "Support",
+  campaigns: "Campaigns",
+  communications: "Communications",
 };
 
-const AreaTip = ({ active, payload, label }: {
-  active?: boolean;
-  payload?: { value: number }[];
-  label?: string;
-}) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      <p className="text-emerald-600 font-medium">{fmt(payload[0]?.value ?? 0)}</p>
-    </div>
-  );
-};
+// A short list of common zones, plus whatever the server reports back, so the
+// owner can ask "what did last Tuesday look like where the client is".
+const TIMEZONES = ["UTC", "Asia/Manila", "America/New_York", "America/Los_Angeles", "Europe/London", "Australia/Sydney"];
 
-// Chart hues follow the ops mint ramp (crmTaxonomy.ts) — mint/ocean for
-// progress, amber for pending, green/red semantic; source slices stay in
-// the same tonal family so reports read as one product.
-const DEAL_STAGE_COLORS: Record<string, string> = {
-  Lead: "#0ea5e9", Qualified: "#14b8a6", Proposal: "#f59e0b", Won: "#10b981", Lost: "#ef4444",
-};
-const SOURCE_COLORS = [
-  "#14b8a6", "#0ea5e9", "#10b981", "#f59e0b", "#0891b2", "#0d9488", "#06b6d4", "#84cc16",
-];
+function isoDay(offsetDays: number): string {
+  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+}
 
-const RANGE_OPTIONS = [
-  { key: "7d", label: "7 days" },
-  { key: "30d", label: "30 days" },
-  { key: "90d", label: "90 days" },
-  { key: "all", label: "All time" },
+const RANGE_PRESETS = [
+  { key: "7d", label: "7 days", from: () => isoDay(-6) },
+  { key: "30d", label: "30 days", from: () => isoDay(-29) },
+  { key: "90d", label: "90 days", from: () => isoDay(-89) },
+  { key: "365d", label: "12 months", from: () => isoDay(-364) },
 ] as const;
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+function formatValue(f: Figure): string {
+  if (!f.available) return "Not tracked";
+  if (f.value === null) return "No rate yet";
+  switch (f.unit) {
+    case "currency":
+      return `$${f.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    case "percent": return `${f.value}%`;
+    case "days": return `${f.value} d`;
+    case "minutes": return `${f.value} min`;
+    default: return f.value.toLocaleString();
+  }
+}
+
+// ── Pieces ────────────────────────────────────────────────────────────────────
+
+function Evidence({ figure }: { figure: Figure }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<DetailResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const fetchRows = useCallback(async () => {
+    if (!figure.detail) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await adminFetch(figure.detail);
+      if (!res.ok) { setError(`Could not load the rows behind this figure (${res.status}).`); return; }
+      setRows(await res.json() as DetailResponse);
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setLoading(false);
+    }
+  }, [figure.detail]);
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !rows && !loading) void fetchRows();
+  };
+
+  if (!figure.detail) return null;
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={toggle}
+        className="inline-flex items-center gap-1 text-[11px] font-medium text-teal-700 hover:underline"
+      >
+        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {open ? "Hide the rows behind this" : "Show the rows behind this"}
+      </button>
+
+      {open && (
+        <div className="mt-2 border border-border rounded-lg overflow-hidden">
+          {error && (
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs text-red-700 bg-red-50">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="min-w-0 flex-1">{error}</span>
+              <button onClick={fetchRows} className="font-medium underline hover:no-underline">Retry</button>
+            </div>
+          )}
+          {loading && <p className="px-3 py-3 text-xs text-muted-foreground">Loading the evidence…</p>}
+          {rows && (
+            <>
+              <p className="px-3 py-2 text-[11px] text-muted-foreground bg-muted border-b border-border">
+                {rows.count} row{rows.count === 1 ? "" : "s"} · {rows.guarantee}
+              </p>
+              {rows.rows.length === 0 ? (
+                <p className="px-3 py-3 text-xs text-muted-foreground">Nothing matched. The figure is zero because there is nothing here, not because nothing was measured.</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {rows.rows.map((r) => (
+                        <tr key={`${rows.key}-${r.id}`} className="border-b border-border last:border-b-0">
+                          <td className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
+                            {r.occurredAt ? new Date(r.occurredAt).toLocaleDateString() : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-foreground">
+                            {r.href
+                              ? <a href={r.href} className="text-teal-700 hover:underline">{r.label || `#${r.id}`}</a>
+                              : (r.label || `#${r.id}`)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-foreground whitespace-nowrap">
+                            {r.amount != null ? r.amount.toLocaleString(undefined, { maximumFractionDigits: 2 }) : ""}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FigureCard({ figure }: { figure: Figure }) {
+  const [why, setWhy] = useState(false);
+  const noRate = figure.available && figure.value === null;
+
+  return (
+    <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground font-medium">{figure.label}</p>
+          <p className={`mt-1 leading-tight font-bold ${
+            figure.available && !noRate ? "text-2xl text-foreground" : "text-base text-muted-foreground"
+          }`}>
+            {formatValue(figure)}
+          </p>
+          {figure.denominator && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              out of {figure.denominator.value ?? "—"} · {figure.denominator.label}
+            </p>
+          )}
+        </div>
+        {!figure.available && <Ban className="w-4 h-4 text-amber-500 shrink-0" aria-label="Not tracked" />}
+      </div>
+
+      <button
+        onClick={() => setWhy((v) => !v)}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        <Info className="w-3 h-3" />
+        {why ? "Hide definition" : "What does this mean?"}
+      </button>
+
+      {why && (
+        <div className="mt-2 space-y-2">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{figure.definition}</p>
+
+          {!figure.available && figure.unavailableReason && (
+            <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 leading-relaxed">
+              <p className="font-medium mb-0.5">Why there is no number here</p>
+              <p>{figure.unavailableReason}</p>
+              {figure.wouldRequire && (
+                <p className="mt-1"><span className="font-medium">To measure it:</span> {figure.wouldRequire}</p>
+              )}
+            </div>
+          )}
+
+          {figure.limitations.length > 0 && (
+            <ul className="text-[11px] text-muted-foreground list-disc pl-4 space-y-0.5">
+              {figure.limitations.map((l, i) => <li key={i}>{l}</li>)}
+            </ul>
+          )}
+
+          <p className="text-[11px] text-muted-foreground">
+            <span className="font-medium">Counted from:</span> {figure.sources.join("; ")}
+          </p>
+
+          {figure.ignoredFilters.length > 0 && (
+            <p className="text-[11px] text-amber-800">
+              This figure cannot use: {figure.ignoredFilters.join(", ")}.
+            </p>
+          )}
+        </div>
+      )}
+
+      <Evidence figure={figure} />
+    </div>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border border-border shadow-sm p-4 animate-pulse">
+      <div className="h-2.5 w-24 bg-border rounded mb-2" />
+      <div className="h-7 w-16 bg-border rounded mb-2" />
+      <div className="h-2 w-32 bg-muted rounded" />
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CrmReporting() {
-  const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
-  const [dealStats, setDealStats] = useState<DealStats | null>(null);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [pipelineMap, setPipelineMap] = useState<Record<string, number>>({});
-  const [tasks, setTasks] = useState<CrmTask[]>([]);
-  const [conversations, setConversations] = useState<ConvThread[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [range, setRange] = useState<"7d" | "30d" | "90d" | "all">("all");
+
+  const [from, setFrom] = useState(() => isoDay(-29));
+  const [to, setTo] = useState(() => isoDay(0));
+  const [timezone, setTimezone] = useState("UTC");
+  const [source, setSource] = useState("");
+  const [stage, setStage] = useState("");
+
+  const query = useMemo(() => {
+    const p = new URLSearchParams({ from, to, timezone });
+    if (source) p.set("source", source);
+    if (stage) p.set("stage", stage);
+    return p.toString();
+  }, [from, to, timezone, source, stage]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [statsRes, dealRes, leadsRes, pipeRes, tasksRes, convsRes] = await Promise.allSettled([
-        adminFetch("/api/crm/stats"),
-        adminFetch("/api/crm/deals/stats"),
-        adminFetch("/api/crm/leads"),
-        adminFetch("/api/crm/pipeline"),
-        adminFetch("/api/crm/tasks"),
-        adminFetch("/api/crm/conversations"),
-      ]);
-
-      if (statsRes.status === "fulfilled" && statsRes.value.ok) {
-        const d = await statsRes.value.json() as { stats: CrmStats };
-        setCrmStats(d.stats ?? null);
+      const res = await adminFetch(`/api/crm/reports/summary?${query}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setError(
+          res.status === 403
+            ? "You do not have permission to read reports."
+            : body.error ?? `Could not load reporting (${res.status}).`,
+        );
+        setSummary(null);
+        return;
       }
-      if (dealRes.status === "fulfilled" && dealRes.value.ok) {
-        const d = await dealRes.value.json() as DealStats;
-        setDealStats(d ?? null);
-      }
-      if (leadsRes.status === "fulfilled" && leadsRes.value.ok) {
-        const d = await leadsRes.value.json() as { leads: Lead[] };
-        setLeads(d.leads ?? []);
-      }
-      if (pipeRes.status === "fulfilled" && pipeRes.value.ok) {
-        const d = await pipeRes.value.json() as { pipeline: Record<string, unknown[]> };
-        // The API buckets by raw stored status; fold legacy keys into the
-        // canonical taxonomy so every lead is counted under exactly one stage.
-        const map: Record<string, number> = {};
-        for (const [rawStage, items] of Object.entries(d.pipeline ?? {})) {
-          const key = normalizeLeadStatus(rawStage);
-          const count = Array.isArray(items) ? items.length : 0;
-          map[key] = (map[key] ?? 0) + count;
-        }
-        setPipelineMap(map);
-      }
-      if (tasksRes.status === "fulfilled" && tasksRes.value.ok) {
-        const d = await tasksRes.value.json() as { tasks: CrmTask[] };
-        setTasks(d.tasks ?? []);
-      }
-      if (convsRes.status === "fulfilled" && convsRes.value.ok) {
-        const d = await convsRes.value.json() as { conversations: ConvThread[] };
-        setConversations(d.conversations ?? []);
-      }
+      setSummary(await res.json() as Summary);
     } catch {
-      setError("Failed to load reporting data. Please try again.");
+      setError("Could not reach the server. Check your connection and try again.");
+      setSummary(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [query]);
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Derived / computed data ─────────────────────────────────────────────────
-
-  const filteredLeads = useMemo(() => filterByRange(leads, range), [leads, range]);
-  const filteredTasks = useMemo(() => filterByRange(tasks, range), [tasks, range]);
-
-  const sourceData = useMemo(() => {
-    const map: Record<string, number> = {};
-    filteredLeads.forEach(l => {
-      const s = l.source?.trim() || "Unknown";
-      map[s] = (map[s] || 0) + 1;
-    });
-    return Object.entries(map)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [filteredLeads]);
-
-  const pipelineData = useMemo(
-    () => Object.entries(pipelineMap).map(([stage, count]) => ({ stage, count })),
-    [pipelineMap],
-  );
-
-  const taskData = useMemo(() => {
-    const map: Record<string, number> = { Pending: 0, Completed: 0, Overdue: 0 };
-    filteredTasks.forEach(t => {
-      const key = t.status.charAt(0).toUpperCase() + t.status.slice(1);
-      if (key in map) map[key]++;
-    });
-    return Object.entries(map).map(([status, count]) => ({ status, count }));
-  }, [filteredTasks]);
-
-  const commStats = useMemo(() => {
-    let inbound = 0, outbound = 0, sms = 0, calls = 0;
-    conversations.forEach(c =>
-      c.messages.forEach(m => {
-        if (m.direction === "inbound") inbound++; else outbound++;
-        if (m.channel === "sms") sms++; else calls++;
-      })
-    );
-    return { total: conversations.length, inbound, outbound, sms, calls, totalMsgs: inbound + outbound };
-  }, [conversations]);
-
-  const overdueCount = useMemo(
-    () => filteredTasks.filter(t => t.status === "overdue").length,
-    [filteredTasks],
-  );
-
-  const insights = useMemo(() => {
-    const list: { text: string; warn: boolean }[] = [];
-
-    const topStage = [...pipelineData].sort((a, b) => b.count - a.count)[0];
-    if (topStage && topStage.count > 0) {
-      list.push({ text: `Most leads are currently in the "${topStage.stage}" stage (${topStage.count} lead${topStage.count !== 1 ? "s" : ""}).`, warn: false });
-    }
-    if (sourceData.length > 0) {
-      list.push({ text: `Top lead source is "${sourceData[0].name}" with ${sourceData[0].value} lead${sourceData[0].value !== 1 ? "s" : ""}.`, warn: false });
-    }
-    if (overdueCount > 0) {
-      list.push({ text: `You have ${overdueCount} overdue task${overdueCount !== 1 ? "s" : ""} requiring immediate attention.`, warn: true });
-    }
-    if (dealStats && dealStats.totalRevenue > 0) {
-      list.push({ text: `Won revenue is ${fmt(dealStats.totalRevenue)} with a ${dealStats.winRate}% win rate.`, warn: false });
-    }
-    if (commStats.inbound > 0) {
-      list.push({ text: `Inbox has ${commStats.inbound} inbound message${commStats.inbound !== 1 ? "s" : ""} that may need a reply.`, warn: commStats.inbound > 3 });
-    }
-    if (list.length === 0 && !loading) {
-      list.push({ text: "No leads yet — import from the Discovery Portal or add leads manually to see insights.", warn: false });
-    }
-    return list;
-  }, [pipelineData, sourceData, overdueCount, dealStats, commStats, loading]);
-
-  const commCards = [
-    { label: "Conversations", value: commStats.total, bg: "bg-teal-50", fg: "text-teal-600", icon: MessageSquare },
-    { label: "Inbound", value: commStats.inbound, bg: "bg-emerald-50", fg: "text-emerald-600", icon: TrendingUp },
-    { label: "Outbound", value: commStats.outbound, bg: "bg-blue-50", fg: "text-blue-600", icon: Zap },
-    { label: "SMS", value: commStats.sms, bg: "bg-sky-50", fg: "text-sky-600", icon: MessageSquare },
-    { label: "Calls", value: commStats.calls, bg: "bg-green-50", fg: "text-green-600", icon: Phone },
-    { label: "Total Msgs", value: commStats.totalMsgs, bg: "bg-muted", fg: "text-muted-foreground", icon: Users },
-  ];
+  const applyPreset = (preset: typeof RANGE_PRESETS[number]) => {
+    setFrom(preset.from());
+    setTo(isoDay(0));
+  };
 
   return (
     <CrmLayout>
-      <div className="max-w-screen-xl mx-auto px-5 py-5">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-5 py-5">
 
-        {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <div>
+        {/* ── Header ───────────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold text-foreground">Reporting</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Live analytics from your CRM data</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Every figure carries its definition, its denominator, and the rows behind it.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={load}
-              disabled={loading}
-              className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            </button>
-            {/* Time range filter */}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        {/* ── Filters ──────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-border shadow-sm p-4 mb-5">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-              {RANGE_OPTIONS.map(r => (
+              {RANGE_PRESETS.map((p) => (
                 <button
-                  key={r.key}
-                  onClick={() => setRange(r.key)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    range === r.key
-                      ? "bg-white text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                  key={p.key}
+                  onClick={() => applyPreset(p)}
+                  className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    from === p.from() ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {r.label}
+                  {p.label}
                 </button>
               ))}
             </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">From</span>
+              <input
+                type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+                className="px-2.5 py-1.5 text-xs border border-input rounded-lg bg-white text-foreground"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">To</span>
+              <input
+                type="date" value={to} onChange={(e) => setTo(e.target.value)}
+                className="px-2.5 py-1.5 text-xs border border-input rounded-lg bg-white text-foreground"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Days counted in</span>
+              <select
+                value={timezone} onChange={(e) => setTimezone(e.target.value)}
+                className="px-2.5 py-1.5 text-xs border border-input rounded-lg bg-white text-foreground"
+              >
+                {TIMEZONES.map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Contact source</span>
+              <input
+                type="text" value={source} onChange={(e) => setSource(e.target.value)}
+                placeholder="Any" spellCheck={false}
+                className="px-2.5 py-1.5 text-xs border border-input rounded-lg bg-white text-foreground w-32"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Deal stage</span>
+              <input
+                type="text" value={stage} onChange={(e) => setStage(e.target.value)}
+                placeholder="Any" spellCheck={false}
+                className="px-2.5 py-1.5 text-xs border border-input rounded-lg bg-white text-foreground w-32"
+              />
+            </label>
           </div>
+
+          {summary && (
+            <p className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+              <Clock className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>{summary.window.definition}</span>
+            </p>
+          )}
         </div>
 
-        {/* ── Error banner ────────────────────────────────────────────────────── */}
-        {error && !loading && (
-          <div className="mb-5 flex items-center gap-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+        {/* ── Error ────────────────────────────────────────────────────────── */}
+        {error && (
+          <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-            <button onClick={load} className="ml-auto text-xs font-medium underline hover:no-underline">
+            <span className="min-w-0 flex-1">{error}</span>
+            <button onClick={load} className="text-xs font-medium underline hover:no-underline">
               Retry
             </button>
           </div>
         )}
 
-        {/* ── KPI Grid ────────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {loading ? (
-            Array.from<unknown>({ length: 8 }).map((_, i) => <KpiSkeleton key={i} />)
-          ) : (
-            <>
-              <KpiCard
-                label="Total Leads" value={crmStats?.total ?? 0} sub="In CRM"
-                icon={Users} bg="bg-blue-50" fg="text-blue-600"
-              />
-              <KpiCard
-                label="New This Week" value={crmStats?.newLeads ?? 0} sub="Uncontacted"
-                icon={Zap} bg="bg-cyan-50" fg="text-cyan-600"
-              />
-              <KpiCard
-                label="Hot Leads" value={crmStats?.hotLeads ?? 0} sub="High priority"
-                icon={TrendingUp} bg="bg-orange-50" fg="text-orange-600"
-              />
-              <KpiCard
-                label="Open Deals" value={dealStats?.openDeals ?? 0} sub="Active pipeline"
-                icon={Target} bg="bg-sky-50" fg="text-sky-600"
-              />
-              <KpiCard
-                label="Won Revenue" value={fmt(dealStats?.totalRevenue ?? 0)} sub="From closed deals"
-                icon={DollarSign} bg="bg-emerald-50" fg="text-emerald-600"
-              />
-              <KpiCard
-                label="Win Rate" value={`${dealStats?.winRate ?? 0}%`} sub="Won / (Won + Lost)"
-                icon={Award} bg="bg-green-50" fg="text-green-600"
-              />
-              <KpiCard
-                label="Overdue Tasks" value={overdueCount} sub="Need action"
-                icon={CheckSquare} bg={overdueCount > 0 ? "bg-red-50" : "bg-muted"}
-                fg={overdueCount > 0 ? "text-red-500" : "text-muted-foreground/60"} warn={overdueCount > 0}
-              />
-              <KpiCard
-                label="Conversations" value={conversations.length}
-                sub={`${commStats.totalMsgs} total messages`}
-                icon={MessageSquare} bg="bg-teal-50" fg="text-teal-600"
-              />
-            </>
-          )}
-        </div>
-
-        {/* ── CRM Insights ────────────────────────────────────────────────────── */}
-        {!loading && insights.length > 0 && (
-          <div className="mb-6 bg-white rounded-xl border border-border shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="w-4 h-4 text-yellow-500" />
-              <h3 className="text-sm font-semibold text-foreground">CRM Insights</h3>
-              <span className="ml-1 text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
-                Rule-based
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {insights.map((ins, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2.5 ${
-                    ins.warn
-                      ? "bg-amber-50 border border-amber-200 text-amber-800"
-                      : "bg-blue-50 border border-blue-100 text-blue-800"
-                  }`}
-                >
-                  {ins.warn
-                    ? <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5 text-amber-500" />
-                    : <Lightbulb className="w-3 h-3 shrink-0 mt-0.5 text-blue-500" />
-                  }
-                  <span className="leading-relaxed">{ins.text}</span>
-                </div>
-              ))}
-            </div>
+        {/* ── Figures ──────────────────────────────────────────────────────── */}
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from<unknown>({ length: 9 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
         )}
 
-        {/* ── Charts Grid ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-          {/* Chart 1 — Lead Pipeline by Stage */}
-          <ChartCard
-            title="Lead Pipeline by Stage"
-            sub="Lead count per CRM status"
-          >
-            {pipelineData.length === 0 || pipelineData.every(d => d.count === 0) ? (
-              <EmptyChart label="No leads in pipeline yet" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pipelineData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip content={<BarTip />} />
-                  <Bar dataKey="count" name="Leads" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={60} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* Chart 2 — Lead Source Breakdown */}
-          <ChartCard
-            title="Lead Source Breakdown"
-            sub={`${filteredLeads.length} lead${filteredLeads.length !== 1 ? "s" : ""} in selected period`}
-          >
-            {sourceData.length === 0 ? (
-              <EmptyChart label="No leads to analyze" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={sourceData}
-                  layout="vertical"
-                  margin={{ top: 4, right: 16, left: 90, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-                  <Tooltip content={<BarTip />} />
-                  <Bar dataKey="value" name="Leads" radius={[0, 4, 4, 0]} maxBarSize={28}>
-                    {sourceData.map((_, idx) => (
-                      <Cell key={idx} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* Chart 3 — Deal Revenue Trend */}
-          <ChartCard
-            title="Deal Revenue Trend"
-            sub="Monthly won revenue (from closed deals)"
-          >
-            {!dealStats || dealStats.monthly.every(m => m.revenue === 0) ? (
-              <EmptyChart label="No deal revenue recorded yet" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dealStats.monthly} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.18} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
-                  />
-                  <Tooltip content={<AreaTip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name="Revenue"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    fill="url(#revGrad)"
-                    dot={{ fill: "#10b981", strokeWidth: 0, r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* Chart 4 — Deal Stage Distribution */}
-          <ChartCard
-            title="Deal Stage Distribution"
-            sub="Number of deals per stage"
-          >
-            {!dealStats || dealStats.pipeline.every(p => p.count === 0) ? (
-              <EmptyChart label="No deals created yet" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dealStats.pipeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip content={<BarTip />} />
-                  <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]} maxBarSize={60}>
-                    {dealStats.pipeline.map((entry, idx) => (
-                      <Cell key={idx} fill={DEAL_STAGE_COLORS[entry.stage] ?? "#9ca3af"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* Chart 5 — Task Overview */}
-          <ChartCard
-            title="Task Overview"
-            sub={`${filteredTasks.length} task${filteredTasks.length !== 1 ? "s" : ""} in selected period`}
-            height={190}
-          >
-            {filteredTasks.length === 0 ? (
-              <EmptyChart label="No tasks found for this period" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={taskData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="status" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip content={<BarTip />} />
-                  <Bar dataKey="count" name="Tasks" radius={[4, 4, 0, 0]} maxBarSize={80}>
-                    {taskData.map((entry, idx) => {
-                      const colors: Record<string, string> = {
-                        Pending: "#0ea5e9",
-                        Completed: "#10b981",
-                        Overdue: "#ef4444",
-                      };
-                      return <Cell key={idx} fill={colors[entry.status] ?? "#9ca3af"} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* Chart 6 — Communication Activity Summary */}
-          <ChartCard
-            title="Communication Activity"
-            sub="SMS &amp; call breakdown from your inbox"
-            height={190}
-          >
-            {commStats.totalMsgs === 0 ? (
-              <EmptyChart label="No SMS or call activity recorded yet" />
-            ) : (
-              <div className="h-full flex items-center">
-                <div className="grid grid-cols-3 gap-3 w-full">
-                  {commCards.map(({ label, value, bg, fg, icon: Icon }) => (
-                    <div
-                      key={label}
-                      className={`${bg} rounded-xl px-3 py-3 text-center border border-transparent`}
-                    >
-                      <Icon className={`w-4 h-4 mx-auto mb-1.5 ${fg}`} />
-                      <p className="text-xl font-bold text-foreground leading-tight">{value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{label}</p>
-                    </div>
-                  ))}
-                </div>
+        {!loading && summary && AREA_ORDER.map((area) => {
+          const figures = summary.areas[area] ?? [];
+          if (figures.length === 0) return null;
+          return (
+            <section key={area} className="mb-6">
+              <h2 className="text-sm font-semibold text-foreground mb-2">{AREA_LABEL[area] ?? area}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {figures.map((f) => <FigureCard key={f.key} figure={f} />)}
               </div>
-            )}
-          </ChartCard>
+            </section>
+          );
+        })}
 
-        </div>
+        {/* ── What we cannot measure ───────────────────────────────────────── */}
+        {!loading && summary && summary.unavailable.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-sm font-semibold text-foreground mb-1">What this CRM cannot measure yet</h2>
+            <p className="text-xs text-muted-foreground mb-2">
+              These are listed rather than hidden. A dashboard that quietly drops
+              what it cannot measure teaches you that everything shown is
+              everything there is.
+            </p>
+            <div className="bg-white rounded-xl border border-border shadow-sm divide-y divide-border">
+              {summary.unavailable.map((u) => (
+                <div key={u.key} className="p-4">
+                  <p className="text-xs font-semibold text-foreground">{u.label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{u.reason}</p>
+                  {u.wouldRequire && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      <span className="font-medium">To measure it:</span> {u.wouldRequire}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-        {/* ── Footer note ─────────────────────────────────────────────────────── */}
-        <p className="text-center text-xs text-muted-foreground mt-8 pb-4">
-          Data refreshes on page load. Use the ↻ button to reload. Time range filter applies to leads and tasks only.
-        </p>
+        {/* ── The contract ─────────────────────────────────────────────────── */}
+        {!loading && summary && (
+          <section className="pb-6">
+            <div className="bg-muted rounded-xl border border-border p-4">
+              <h2 className="text-xs font-semibold text-foreground mb-2">How to read this page</h2>
+              <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4">
+                {Object.entries(summary.contract).map(([k, v]) => <li key={k}>{v}</li>)}
+                <li>{summary.filters.note}</li>
+              </ul>
+            </div>
+          </section>
+        )}
       </div>
     </CrmLayout>
   );

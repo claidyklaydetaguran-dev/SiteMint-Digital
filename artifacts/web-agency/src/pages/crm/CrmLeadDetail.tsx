@@ -34,6 +34,7 @@ import {
   type RiLead, type RiActivity,
 } from "@/lib/relationshipIntelligence";
 import { adminFetch } from "@/lib/adminFetch";
+import CustomerTimeline from "@/components/crm/CustomerTimeline";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -274,7 +275,7 @@ export default function CrmLeadDetail() {
     );
   }, [lead, activities, health, ciStats, discProfile, momentum]);
 
-  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"communications"|"opportunity">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline"|"history"|"tasks"|"communications"|"opportunity">("timeline");
   const [commSubTab, setCommSubTab] = useState<"sms"|"calls"|"email">("sms");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
@@ -944,7 +945,7 @@ export default function CrmLeadDetail() {
             {/* Tab panel */}
             <div className="bg-white rounded-xl border border-border shadow-sm">
               <div className="flex border-b border-border px-4 overflow-x-auto">
-                {(["timeline","tasks","communications","opportunity"] as const).map(tab => (
+                {(["timeline","history","tasks","communications","opportunity"] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -954,7 +955,8 @@ export default function CrmLeadDetail() {
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "timeline" ? "Timeline"
+                    {tab === "timeline" ? "Activity Log"
+                      : tab === "history" ? "Full History"
                       : tab === "tasks" ? `Tasks${pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}`
                       : tab === "communications" ? "Communications"
                       : "Opportunity / Project"}
@@ -1015,6 +1017,12 @@ export default function CrmLeadDetail() {
                   )}
                 </div>
               )}
+
+              {/* ── Full history tab ───
+                  The activity log above is one stream. This is every stream —
+                  messages, notes, meetings, documents, deals, projects,
+                  payments and support — merged into one order. */}
+              {activeTab === "history" && <CustomerTimeline leadId={lead.id} />}
 
               {/* ── Tasks tab ─── */}
               {activeTab === "tasks" && (

@@ -7,8 +7,9 @@ import {
 } from "@/lib/crmTaxonomy";
 import {
   AlertCircle, Archive, ArchiveRestore, ArrowDown, ArrowUp, CalendarDays, Check,
-  ChevronLeft, ChevronRight, ClipboardList, FileText, Flag, LayoutGrid, List,
-  MessageSquare, Milestone as MilestoneIcon, Plus, RefreshCw, ShieldCheck, User, X,
+  CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Copy, FileText, Flag,
+  HelpCircle, LayoutGrid, List, Mail, MessageSquare, Milestone as MilestoneIcon,
+  Plus, RefreshCw, Send, ShieldCheck, User, X,
 } from "lucide-react";
 
 // ── M2: the delivery workspace ───────────────────────────────────────────────
@@ -118,6 +119,37 @@ interface ProjectDetail {
   updates: OpsUpdate[];
   comments: OpsComment[];
   approvals: OpsApproval[];
+}
+
+// ── Reminder delivery (mirrors routes/crmOperations.ts) ─────────────────────
+
+type DeliveryState = "pending" | "attempting" | "accepted" | "refused" | "uncertain";
+type RecoveryAction = "retry" | "resend" | "acknowledge";
+
+interface DeliveryRow {
+  deliveryId: number;
+  jobId: number;
+  kind: string;
+  dedupeKey: string;
+  staffId: number | null;
+  recipientName: string | null;
+  recipientEmail: string | null;
+  /** The reminder's ORIGINAL run time. It never moves. */
+  occurrence: string;
+  state: DeliveryState;
+  attempt: number;
+  nextAttemptAt: string | null;
+  providerRef: string | null;
+  failureReason: string | null;
+  failureDetail: string | null;
+  origin: string;
+  legacyRaw: string | null;
+  resolvedAt: string | null;
+  resolution: string | null;
+  idempotencyProtected: boolean;
+  availableActions: RecoveryAction[];
+  guidance: string;
+  resendDuplicateRisk: string;
 }
 
 // ── Small shared vocabulary ─────────────────────────────────────────────────
@@ -261,10 +293,423 @@ function SectionHeading({ icon: Icon, children, right }: {
   );
 }
 
+// ── Delivery issues ─────────────────────────────────────────────────────────
+//
+// The question this screen exists to answer is "did that reminder actually
+// reach anybody, and if nobody knows, what do I do about it?" — so the states
+// are labelled in those words rather than in the machine's.
+
+const DELIVERY_LABEL: Record<DeliveryState, string> = {
+  pending: "Will try again",
+  attempting: "Sending now",
+  accepted: "Handed over",
+  refused: "Refused",
+  uncertain: "Unknown",
+};
+
+const DELIVERY_PILL: Record<DeliveryState, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  attempting: "bg-amber-100 text-amber-700",
+  accepted: "bg-teal-100 text-teal-700",
+  refused: "bg-red-100 text-red-700",
+  // The one that needs a person. Ringed so it reads differently from the
+  // states a machine is still working on.
+  uncertain: "bg-amber-100 text-amber-800 ring-1 ring-amber-400",
+};
+
+const DELIVERY_STATE_FILTERS: { value: string; label: string }[] = [
+  { value: "", label: "Everything open" },
+  { value: "uncertain", label: "Unknown" },
+  { value: "refused", label: "Refused" },
+  { value: "pending", label: "Will try again" },
+  { value: "attempting", label: "Sending now" },
+];
+
+const ACTION_LABEL: Record<RecoveryAction, string> = {
+  retry: "Retry",
+  resend: "Re-send (new copy)",
+  acknowledge: "Acknowledge",
+};
+
+const ACTION_EXPLAINER: Record<RecoveryAction, string> = {
+  retry:
+    "Sends the same message again with the same idempotency key, so the provider collapses it into "
+    + "the original. Nothing about the reminder changes and the recipient cannot get two.",
+  resend:
+    "Creates a genuinely NEW copy with a new idempotency key, so the provider will NOT collapse it.",
+  acknowledge:
+    "Closes this without sending anything. Use it once you know what happened.",
+};
+
+const ACTION_ICON: Record<RecoveryAction, React.ElementType> = {
+  retry: RefreshCw,
+  resend: Copy,
+  acknowledge: CheckCircle2,
+};
+
+function deliveryRecipient(row: DeliveryRow): string {
+  if (row.recipientName) return row.recipientName;
+  if (row.recipientEmail) return row.recipientEmail;
+  return "Not recorded";
+}
+
+/** One row's recovery panel: pick an action, say why, do it. */
+function RecoveryPanel({ row, onDone, onCancel }: {
+  row: DeliveryRow;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  // Re-send is never what opens selected, even when it is the only thing that
+  // would work — it is the one action that can put a second copy in somebody's
+  // inbox, and a pre-selected destructive default is how that happens by
+  // accident.
+  const [action, setAction] = useState<RecoveryAction>(
+    row.availableActions.find(a => a !== "resend") ?? "acknowledge",
+  );
+  const [reason, setReason] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await adminFetch(`/api/crm/operations/deliveries/${row.deliveryId}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason,
+          ...(action === "resend" ? { confirmDuplicateRisk: confirmed } : {}),
+        }),
+      });
+      if (!res.ok) {
+        setError(await errorFrom(res, "That didn't work. Try again."));
+        return;
+      }
+      onDone();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const blocked = reason.trim().length < 3 || (action === "resend" && !confirmed);
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3 space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {(["retry", "resend", "acknowledge"] as RecoveryAction[]).map(a => {
+          const allowed = row.availableActions.includes(a);
+          const Icon = ACTION_ICON[a];
+          return (
+            <button
+              key={a}
+              type="button"
+              disabled={!allowed}
+              aria-pressed={action === a}
+              onClick={() => { setAction(a); setConfirmed(false); setError(""); }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                action === a
+                  ? a === "resend"
+                    ? "border-red-300 bg-red-50 text-red-700"
+                    : "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-white text-muted-foreground hover:bg-accent"
+              } ${allowed ? "" : "opacity-40 cursor-not-allowed"}`}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" /> {ACTION_LABEL[a]}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-muted-foreground">{ACTION_EXPLAINER[action]}</p>
+
+      {!row.availableActions.includes(action) && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+          {action === "retry"
+            ? "Retry isn't available here — it would no longer be collapsed into the original send, so it "
+              + "could deliver a second copy. Re-send says that out loud instead."
+            : "That isn't available for this delivery."}
+        </p>
+      )}
+
+      {action === "resend" && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 space-y-2">
+          <p className="flex items-start gap-1.5 text-xs text-red-700">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+            <span>{row.resendDuplicateRisk}</span>
+          </p>
+          <label className="flex items-start gap-2 text-xs text-red-700 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={confirmed}
+              onChange={e => setConfirmed(e.target.checked)}
+            />
+            <span>I understand this may put a second copy in their inbox, and I want that.</span>
+          </label>
+        </div>
+      )}
+
+      <div>
+        <label className={LABEL} htmlFor={`reason-${row.deliveryId}`}>
+          Why (recorded against this delivery)
+        </label>
+        <textarea
+          id={`reason-${row.deliveryId}`}
+          className={INPUT}
+          rows={2}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="e.g. Called them — the reminder never arrived."
+        />
+      </div>
+
+      {error && <InlineError message={error} />}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={blocked || busy || !row.availableActions.includes(action)}
+          onClick={() => void submit()}
+        >
+          {busy ? "Working…" : ACTION_LABEL[action]}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        {reason.trim().length < 3 && (
+          <span className="text-[11px] text-muted-foreground">A reason is required.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DeliveryCard({ row, open, onToggle, onDone }: {
+  row: DeliveryRow; open: boolean; onToggle: () => void; onDone: () => void;
+}) {
+  return (
+    <div className="bg-white border border-border rounded-xl p-3">
+      <div className="flex flex-wrap items-start gap-2">
+        <Pill className={DELIVERY_PILL[row.state]}>{DELIVERY_LABEL[row.state]}</Pill>
+        <span className="text-sm font-medium text-foreground min-w-0 break-words">
+          {deliveryRecipient(row)}
+        </span>
+        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+          Attempt {row.attempt}
+        </span>
+      </div>
+
+      <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Reminder</dt>
+          <dd className="text-foreground truncate">{row.kind.replace(/_/g, " ")}</dd>
+        </div>
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Sent for</dt>
+          <dd className="text-foreground tabular-nums">{fmtMoment(row.occurrence)}</dd>
+        </div>
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Email</dt>
+          <dd className="text-foreground truncate">{row.recipientEmail ?? "—"}</dd>
+        </div>
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Provider ref</dt>
+          <dd className="text-foreground truncate font-mono text-[11px]">{row.providerRef ?? "—"}</dd>
+        </div>
+        {row.nextAttemptAt && (
+          <div className="flex gap-1.5 min-w-0">
+            <dt className="text-muted-foreground shrink-0">Next attempt</dt>
+            <dd className="text-foreground tabular-nums">{fmtMoment(row.nextAttemptAt)}</dd>
+          </div>
+        )}
+        {row.origin !== "live" && (
+          <div className="flex gap-1.5 min-w-0">
+            <dt className="text-muted-foreground shrink-0">Origin</dt>
+            <dd className="text-amber-800">{row.origin.replace(/_/g, " ")}</dd>
+          </div>
+        )}
+      </dl>
+
+      {row.failureDetail && (
+        <p className="mt-2 text-xs text-foreground break-words">
+          <span className="text-muted-foreground">Reason: </span>{row.failureDetail}
+        </p>
+      )}
+      {row.legacyRaw && (
+        <p className="mt-1 text-[11px] text-muted-foreground font-mono break-all">{row.legacyRaw}</p>
+      )}
+
+      <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+        <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-px" /> <span>{row.guidance}</span>
+      </p>
+
+      {open
+        ? <RecoveryPanel row={row} onDone={onDone} onCancel={onToggle} />
+        : (
+          <div className="mt-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={onToggle}>
+              <Send className="w-3.5 h-3.5" /> What do you want to do?
+            </Button>
+          </div>
+        )}
+    </div>
+  );
+}
+
+/**
+ * The whole delivery queue, paged on the cursor the API returns.
+ *
+ * "Load more" walks the pages rather than jumping to one, because an unresolved
+ * delivery is a message somebody may never have received — a page that can drop
+ * one is worse than no page at all, since it looks complete.
+ */
+function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void }) {
+  const [state, setState] = useState("");
+  const [rows, setRows] = useState<DeliveryRow[]>([]);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [total, setTotal] = useState(0);
+  const [byState, setByState] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const [openId, setOpenId] = useState<number | null>(null);
+
+  const seq = useRef(0);
+
+  const load = useCallback(async (after: number | null = null) => {
+    const mine = ++seq.current;
+    if (after === null) setLoading(true); else setLoadingMore(true);
+    setError("");
+    try {
+      const p = new URLSearchParams({ limit: "25" });
+      if (state) p.set("state", state);
+      if (after !== null) p.set("cursor", String(after));
+      const res = await adminFetch(`/api/crm/operations/deliveries?${p.toString()}`);
+      if (mine !== seq.current) return;
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json() as {
+        deliveries?: DeliveryRow[];
+        nextCursor?: number | null;
+        counts?: { matchingFilters?: number; byState?: Record<string, number> };
+      };
+      const page = data.deliveries ?? [];
+      setRows(prev => (after === null ? page : [...prev, ...page]));
+      setCursor(data.nextCursor ?? null);
+      setTotal(Number(data.counts?.matchingFilters ?? 0));
+      setByState(data.counts?.byState ?? {});
+      if (!state) onCountChange(Number(data.counts?.matchingFilters ?? 0));
+    } catch {
+      if (mine === seq.current) {
+        setError("Couldn't load delivery issues. Check your connection and try again.");
+      }
+    } finally {
+      if (mine === seq.current) { setLoading(false); setLoadingMore(false); }
+    }
+  }, [state, onCountChange]);
+
+  useEffect(() => { void load(null); }, [load]);
+
+  const afterRecovery = () => { setOpenId(null); void load(null); };
+
+  return (
+    <div className="flex-1 p-4 space-y-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-full sm:w-56">
+          <label className={LABEL} htmlFor="delivery-state">Outcome</label>
+          <select
+            id="delivery-state"
+            className={INPUT}
+            value={state}
+            onChange={e => { setState(e.target.value); setCursor(null); }}
+          >
+            {DELIVERY_STATE_FILTERS.map(f => (
+              <option key={f.value} value={f.value}>
+                {f.label}{f.value && byState[f.value] !== undefined ? ` (${byState[f.value]})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-muted-foreground sm:pb-2.5 tabular-nums">
+          {total} open · showing {rows.length}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="px-2 sm:ml-auto sm:pb-2.5"
+          aria-label="Refresh delivery issues"
+          onClick={() => void load(null)}
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+          </div>
+          <p className="text-muted-foreground font-medium max-w-sm">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => void load(null)}>Retry</Button>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+          <Mail className="w-10 h-10 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-medium">Every reminder is accounted for.</p>
+          <p className="text-sm text-muted-foreground/70 max-w-md">
+            Nothing here means no reminder is sitting in an unknown or failed state. A reminder that
+            the mail provider took is not listed — only the ones somebody has to decide about.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {rows.map(row => (
+              <DeliveryCard
+                key={row.deliveryId}
+                row={row}
+                open={openId === row.deliveryId}
+                onToggle={() => setOpenId(id => (id === row.deliveryId ? null : row.deliveryId))}
+                onDone={afterRecovery}
+              />
+            ))}
+          </div>
+          {cursor !== null && (
+            <div className="flex justify-center pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loadingMore}
+                onClick={() => void load(cursor)}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
+          {cursor === null && rows.length > 0 && (
+            <p className="text-center text-xs text-muted-foreground pt-1">
+              That is all {rows.length} of them — nothing is hidden by the page size.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function CrmOperations() {
-  const [mode, setMode] = useState<"board" | "list">("board");
+  const [mode, setMode] = useState<"board" | "list" | "deliveries">("board");
+  /** Open delivery problems, so the badge is visible from the other two views. */
+  const [deliveryCount, setDeliveryCount] = useState<number | null>(null);
 
   const [stage, setStage] = useState("");
   const [ownerStaffId, setOwnerStaffId] = useState("");
@@ -338,6 +783,22 @@ export default function CrmOperations() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // One cheap read so the badge is honest from whichever view you land on. It
+  // asks for a single row and reads the whole-set count beside it, rather than
+  // counting what happens to be on a page.
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const res = await adminFetch("/api/crm/operations/deliveries?limit=1");
+        if (!live || !res.ok) return;
+        const data = await res.json() as { counts?: { matchingFilters?: number } };
+        setDeliveryCount(Number(data.counts?.matchingFilters ?? 0));
+      } catch { /* a missing badge must never hide the projects */ }
+    })();
+    return () => { live = false; };
+  }, []);
+
   const peopleById = useMemo(
     () => new Map(assignees.map(a => [a.id, a.displayName])),
     [assignees],
@@ -387,7 +848,7 @@ export default function CrmOperations() {
               </p>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-lg border border-input overflow-hidden" role="group" aria-label="View mode">
                 <button
                   type="button"
@@ -409,15 +870,49 @@ export default function CrmOperations() {
                 >
                   <List className="w-3.5 h-3.5" /> List
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("deliveries")}
+                  aria-pressed={mode === "deliveries"}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border-l border-input transition-colors ${
+                    mode === "deliveries" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Mail className="w-3.5 h-3.5" /> Delivery
+                  {deliveryCount !== null && deliveryCount > 0 && (
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
+                        mode === "deliveries" ? "bg-white/25 text-primary-foreground" : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {deliveryCount}
+                    </span>
+                  )}
+                </button>
               </div>
-              <Button variant="ghost" size="sm" className="px-2" aria-label="Refresh" onClick={() => void load()}>
+              <Button
+                variant="ghost" size="sm" className="px-2" aria-label="Refresh"
+                onClick={() => void load()}
+                disabled={mode === "deliveries"}
+              >
                 <RefreshCw className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
 
-          {/* Filters — stacked at 375px, inline from sm up. */}
-          <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2">
+          {mode === "deliveries" && (
+            <p className="mt-2 text-xs text-muted-foreground max-w-2xl">
+              Reminders whose delivery is not a recorded success. An <strong>unknown</strong> one may or
+              may not have reached the recipient — nothing retries those by itself, because a retry
+              could deliver a second copy. That decision is yours, and it is recorded.
+            </p>
+          )}
+
+          {/* Filters — stacked at 375px, inline from sm up. Project filters do
+              not apply to the delivery queue, which has its own. */}
+          <div className={`mt-3 flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 ${
+            mode === "deliveries" ? "hidden" : "flex"
+          }`}>
             <div className="sm:w-52">
               <label className={LABEL} htmlFor="ops-stage">Stage</label>
               <select
@@ -474,7 +969,9 @@ export default function CrmOperations() {
         </div>
 
         {/* ── Body ─────────────────────────────────────────────────────── */}
-        {loading ? (
+        {mode === "deliveries" ? (
+          <DeliveryIssues onCountChange={setDeliveryCount} />
+        ) : loading ? (
           mode === "board" ? (
             <div className="flex-1 flex gap-3 p-4 overflow-x-auto">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -635,8 +1132,8 @@ export default function CrmOperations() {
           </div>
         )}
 
-        {/* ── Pagination ───────────────────────────────────────────────── */}
-        {!loading && !error && (
+        {/* ── Pagination (projects only; the delivery queue pages itself) ── */}
+        {mode !== "deliveries" && !loading && !error && (
           <div className="bg-white border-t border-border px-4 md:px-6 py-2.5 flex flex-wrap items-center gap-3 shrink-0">
             <p className="text-xs text-muted-foreground tabular-nums">
               Showing {from}–{to} of {total}

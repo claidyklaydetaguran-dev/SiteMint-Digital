@@ -11,12 +11,15 @@ import {
   db, crmTasks, crmProjects, crmLeads, crmStaff,
   crmProjectMilestones, crmProjectUpdates, crmComments, crmApprovals,
   crmProjectTemplates, crmNotifications, crmScheduledJobs,
-  CRM_COMMENT_ENTITIES,
+  crmReminderDeliveries, crmDeliveryRecoveryActions,
+  CRM_COMMENT_ENTITIES, CRM_DELIVERY_STATES,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import {
   syncTaskReminder, cancelJob, taskReminderKey, milestoneReminderKey, scheduleJob,
   localDayBounds, getSchedulerStatus, processDueJobs, isValidTimezone, scheduleDailyDigest,
+  listDeliveriesNeedingAttention, deliveryNeedsAttention, deliveryAttentionShape,
+  resendDuplicateRisk, recoverDelivery,
 } from "../lib/crmScheduler.js";
 
 const router: IRouter = Router();
@@ -748,16 +751,16 @@ router.get("/crm/operations/jobs", requireCrmAuth("settings.read"), async (req: 
     .where(eq(crmScheduledJobs.status, "pending"))
     .orderBy(asc(crmScheduledJobs.runAt)).limit(10);
 
-  // Deliveries that are not a recorded success, one entry per recipient.
-  // The count already reaches the dashboard through getSchedulerStatus(); this
-  // is the detail behind it, which is what makes "did that reminder actually
-  // reach anybody?" answerable instead of merely countable. Filtering this to
-  // state === "uncertain" is the list of messages whose fate we genuinely do
-  // not know — the ones a person has to decide about.
-  const { listDeliveriesNeedingAttention } = await import("../lib/crmScheduler.js");
+  // A PREVIEW of the deliveries that need somebody, newest first. It is a
+  // preview and says so: `GET /crm/operations/deliveries` pages through the
+  // whole set on the immutable delivery id, so nothing unresolved is ever
+  // hidden by there being too many of them. This block exists so the jobs
+  // screen can show the problem without a second trip.
   const deliveriesNeedingAttention = await listDeliveriesNeedingAttention(
     clampLimit(req.query["limit"], 20, 100),
   );
+  const [deliveryCount] = await db.select({ n: sql<number>`count(*)::int` })
+    .from(crmReminderDeliveries).where(deliveryNeedsAttention());
 
   res.json({
     scheduler: getSchedulerStatus(),
@@ -767,11 +770,13 @@ router.get("/crm/operations/jobs", requireCrmAuth("settings.read"), async (req: 
     },
     failures, upcoming,
     deliveriesNeedingAttention,
+    deliveriesNeedingAttentionTotal: Number(deliveryCount?.n ?? 0),
     deliveryNote:
-      "An entry here is a message whose delivery is not a recorded success. "
-      + "`uncertain` means the provider may or may not have it — those are never "
-      + "retried automatically, because a retry could duplicate, and are left "
-      + "visible for a person instead. See docs/crm-ops/DELIVERY-GUARANTEE.md.",
+      "An entry here is a message whose delivery is not a recorded success. A state of `uncertain` "
+      + "means the provider may or may not have it — those are never retried automatically, because a "
+      + "retry could duplicate, and are left visible for a person instead. This list is capped for "
+      + "display; GET /api/crm/operations/deliveries pages through every one. "
+      + "See docs/crm-ops/DELIVERY-GUARANTEE.md.",
   });
 });
 
@@ -781,15 +786,256 @@ router.post("/crm/operations/jobs/run", requireCrmAuth("settings.write"), async 
   res.json(result);
 });
 
+/**
+ * Re-queues a job the worker gave up on.
+ *
+ * `run_at` is deliberately NOT moved. It used to be set to `now()`, which
+ * changed the OCCURRENCE — and the occurrence is the identity that delivery
+ * records and idempotency keys hang off, so a "retry" quietly became a new
+ * occurrence with no prior record and no protection from the provider: an
+ * unprotected duplicate send wearing the word retry. A failed job's `run_at`
+ * is already in the past, so leaving it alone re-runs it immediately and keeps
+ * every delivery record attached to the occurrence it belongs to.
+ *
+ * This is the JOB-level retry: it re-runs a job the queue could not run at all.
+ * A message the job handed over and that did not arrive is a DELIVERY problem
+ * and has its own three actions below — this route deliberately does not try
+ * to be both.
+ */
 router.post("/crm/operations/jobs/:id/retry", requireCrmAuth("settings.write"), async (req: Request, res: Response) => {
   const id = num(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
   const [job] = await db.update(crmScheduledJobs)
-    .set({ status: "pending", attempts: 0, runAt: new Date(), lastError: null, updatedAt: new Date() })
+    .set({ status: "pending", attempts: 0, lockedAt: null, lockedBy: null, lastError: null, updatedAt: new Date() })
     .where(and(eq(crmScheduledJobs.id, id), eq(crmScheduledJobs.status, "failed")))
     .returning();
   if (!job) { res.status(404).json({ error: "No failed job with that id." }); return; }
-  res.json({ job });
+  await auditAction(req, "operations.job.retried", `job:${id}`);
+  res.json({
+    job,
+    note: "The job is queued again at its original run time, so its delivery records and idempotency "
+      + "keys still belong to the same occurrence. In-app notifications for an occurrence that already "
+      + "produced one are not written twice.",
+  });
 });
+
+// ── Reminder delivery recovery ──────────────────────────────────────────────
+//
+// A reminder that was handed to the mail provider and did not demonstrably
+// arrive is a different problem from a job that failed to run, and it needs
+// three genuinely different answers rather than one "retry" button:
+//
+//   retry       same occurrence, recipient, message and idempotency key. Only
+//               when the next attempt may happen moves. Offered only where it
+//               cannot produce a second copy.
+//   resend      a deliberate NEW copy with a NEW key. Requires explicit
+//               confirmation and records the duplicate risk that was shown.
+//   acknowledge closes an unknown outcome without sending anything.
+//
+// Every one of them is recorded with the staff id, the action, the reason and
+// the time — see `crm_delivery_recovery_actions`.
+
+const DELIVERY_DEFINITIONS = {
+  occurrence:
+    "The reminder's original run time. It NEVER changes — not on a retry, not on a re-send — because "
+    + "it is the identity every delivery record and idempotency key is tied to.",
+  nextAttemptAt:
+    "When the worker may next attempt this. Null means no automatic attempt is scheduled: the delivery "
+    + "is settled, or it is waiting for a person.",
+  state:
+    "pending = nothing is in flight and nothing was taken by the provider; attempting = a request is "
+    + "in flight; accepted = the provider took it; refused = the provider looked at it and said no, so "
+    + "nothing was delivered; unknown = bytes went out and we never learned the answer.",
+  unknown:
+    "An unknown outcome may or may not have reached the recipient. It is NEVER retried automatically, "
+    + "because a retry could deliver a second copy. Only a person decides.",
+  idempotencyProtected:
+    "Whether the mail provider would still collapse a retry of this exact message into the original. "
+    + "The window is 24 hours from the last attempt; past it a retry is no longer protected, which is "
+    + "why retry is withdrawn there and only an explicit re-send remains.",
+  paging:
+    "Paged on the delivery id, newest first. The id never changes, so a cursor stays valid while "
+    + "deliveries are being worked. Nothing unresolved is ever hidden by a display limit — walk the "
+    + "pages and you see every one.",
+  unresolvedCount:
+    "Every unresolved delivery matching the state filter, counted over the whole set rather than the "
+    + "visible page.",
+} as const;
+
+/**
+ * The delivery queue: filtered, and paged on the immutable id.
+ *
+ * Keyset, not offset, and for a sharper reason than usual. An unresolved
+ * delivery is a message somebody may never have received; if paging can drop
+ * one, the list is worse than useless because it looks complete. `id` is a
+ * serial and never changes, so a cursor into it cannot skip a row while the
+ * queue is being worked.
+ */
+router.get("/crm/operations/deliveries", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
+  const q = req.query as Record<string, unknown>;
+  const limit = clampLimit(q["limit"], 25, 100);
+  const cursor = num(q["cursor"]);
+  const state = typeof q["state"] === "string" && (CRM_DELIVERY_STATES as readonly string[]).includes(q["state"])
+    ? q["state"] as string
+    : undefined;
+  // Resolved rows are history; the default view is what still needs somebody.
+  const includeResolved = q["includeResolved"] === "true";
+
+  const filters = [
+    ...(state ? [eq(crmReminderDeliveries.state, state)] : []),
+    ...(includeResolved ? [] : [deliveryNeedsAttention()]),
+  ];
+  const filtered = filters.length ? and(...filters) : undefined;
+  const paged = cursor !== undefined
+    ? (filters.length ? and(...filters, lt(crmReminderDeliveries.id, cursor)) : lt(crmReminderDeliveries.id, cursor))
+    : filtered;
+
+  // One extra row answers "is there another page?" without a second count that
+  // could disagree with the list.
+  const rows = await db.select().from(crmReminderDeliveries)
+    .where(paged).orderBy(desc(crmReminderDeliveries.id)).limit(limit + 1);
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+
+  const [matching] = await db.select({ n: sql<number>`count(*)::int` })
+    .from(crmReminderDeliveries).where(filtered);
+
+  // Counts over the whole unresolved set, so a state tab shows what picking it
+  // would return — never the page's own arithmetic.
+  const stateRows = await db.select({
+    state: crmReminderDeliveries.state, n: sql<number>`count(*)::int`,
+  }).from(crmReminderDeliveries)
+    .where(includeResolved ? undefined : deliveryNeedsAttention())
+    .groupBy(crmReminderDeliveries.state);
+  const byState: Record<string, number> = {};
+  for (const s of CRM_DELIVERY_STATES) byState[s] = 0;
+  for (const r of stateRows) byState[r.state] = r.n;
+
+  const jobIds = [...new Set(page.map((d) => d.jobId))];
+  const staffIds = [...new Set(page.map((d) => d.recipientStaffId).filter((v): v is number => v != null))];
+  const [jobs, people] = await Promise.all([
+    jobIds.length
+      ? db.select({
+          id: crmScheduledJobs.id, kind: crmScheduledJobs.kind,
+          dedupeKey: crmScheduledJobs.dedupeKey, status: crmScheduledJobs.status,
+        }).from(crmScheduledJobs).where(inArray(crmScheduledJobs.id, jobIds))
+      : [],
+    staffIds.length
+      ? db.select({ id: crmStaff.id, displayName: crmStaff.displayName, email: crmStaff.email })
+          .from(crmStaff).where(inArray(crmStaff.id, staffIds))
+      : [],
+  ]);
+  const jobById = new Map(jobs.map((j) => [j.id, j]));
+  const staffById = new Map(people.map((p) => [p.id, p]));
+
+  const now = Date.now();
+  res.json({
+    deliveries: page.map((row) => {
+      const staff = row.recipientStaffId != null ? staffById.get(row.recipientStaffId) : undefined;
+      return {
+        ...deliveryAttentionShape(row, jobById.get(row.jobId), now),
+        recipientName: staff?.displayName ?? null,
+        // The address is shown so an operator can tell the recipient apart
+        // without opening another screen; it is staff-internal, never a lead.
+        recipientEmail: staff?.email ?? row.recipientAddress ?? null,
+        resendDuplicateRisk: resendDuplicateRisk(row),
+      };
+    }),
+    nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+    counts: {
+      matchingFilters: matching?.n ?? 0,
+      byState,
+      returnedOnThisPage: page.length,
+    },
+    definitions: DELIVERY_DEFINITIONS,
+  });
+});
+
+/** The recovery history of one delivery: who did what to it, and why. */
+router.get("/crm/operations/deliveries/:id", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
+  const id = num(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
+  const [row] = await db.select().from(crmReminderDeliveries)
+    .where(eq(crmReminderDeliveries.id, id)).limit(1);
+  if (!row) { res.status(404).json({ error: "No delivery with that id." }); return; }
+
+  const [job] = await db.select({
+    id: crmScheduledJobs.id, kind: crmScheduledJobs.kind,
+    dedupeKey: crmScheduledJobs.dedupeKey, status: crmScheduledJobs.status,
+  }).from(crmScheduledJobs).where(eq(crmScheduledJobs.id, row.jobId)).limit(1);
+
+  const history = await db.select().from(crmDeliveryRecoveryActions)
+    .where(eq(crmDeliveryRecoveryActions.deliveryId, id))
+    .orderBy(desc(crmDeliveryRecoveryActions.id)).limit(100);
+
+  res.json({
+    delivery: {
+      ...deliveryAttentionShape(row, job),
+      resendDuplicateRisk: resendDuplicateRisk(row),
+    },
+    recoveryActions: history,
+    definitions: DELIVERY_DEFINITIONS,
+  });
+});
+
+/** Shared body handling for the three recovery actions. */
+async function runRecovery(
+  req: Request, res: Response, action: "retry" | "resend" | "acknowledge",
+): Promise<void> {
+  const id = num(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
+  const b = req.body as Record<string, unknown>;
+  const me = actor(req);
+
+  const result = await recoverDelivery({
+    deliveryId: id,
+    action,
+    reason: typeof b["reason"] === "string" ? b["reason"] : "",
+    actorStaffId: me.id,
+    actorLabel: me.label,
+    // Only the exact boolean counts. A truthy string from a form must not be
+    // able to agree to a duplicate on somebody's behalf.
+    confirmDuplicateRisk: b["confirmDuplicateRisk"] === true,
+  });
+
+  if (!result.ok) {
+    res.status(result.status).json({
+      error: result.error,
+      ...(result.duplicateRisk ? { duplicateRisk: result.duplicateRisk } : {}),
+    });
+    return;
+  }
+
+  await auditAction(req, `delivery.${action}`, `delivery:${id}`);
+  res.json({
+    delivery: {
+      ...deliveryAttentionShape(result.delivery, undefined),
+      resendDuplicateRisk: resendDuplicateRisk(result.delivery),
+    },
+    recoveryAction: result.action,
+    definitions: DELIVERY_DEFINITIONS,
+  });
+}
+
+/**
+ * Try this delivery again — the SAME occurrence, recipient, message and
+ * idempotency key. Only `next_attempt_at` moves, so it cannot become a
+ * different occurrence and cannot duplicate.
+ */
+router.post("/crm/operations/deliveries/:id/retry", requireCrmAuth("settings.write"),
+  (req: Request, res: Response) => runRecovery(req, res, "retry"));
+
+/**
+ * Send a deliberate NEW copy, with a NEW idempotency key so the provider does
+ * not collapse it. That is the whole point, and it is why this is never the
+ * default and why `confirmDuplicateRisk: true` is required in the body: the
+ * recipient may end up with two.
+ */
+router.post("/crm/operations/deliveries/:id/resend", requireCrmAuth("settings.write"),
+  (req: Request, res: Response) => runRecovery(req, res, "resend"));
+
+/** Close an unknown outcome without sending anything. Requires a reason. */
+router.post("/crm/operations/deliveries/:id/acknowledge", requireCrmAuth("settings.write"),
+  (req: Request, res: Response) => runRecovery(req, res, "acknowledge"));
 
 export default router;

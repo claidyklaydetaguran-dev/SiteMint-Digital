@@ -6,6 +6,7 @@ import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
+import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
@@ -266,6 +267,8 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
     }).returning();
 
     await logActivity(req, lead.id, "lead_created", `Lead created: ${lead.name}`, `Source: ${lead.source}`);
+    // Best-effort; a rule fault must never fail the capture itself.
+    fireAutomation({ trigger: "lead_created", payload: { recordId: lead.id } });
     res.status(201).json({ lead });
   } catch (err) {
     req.log.error({ err }, "Error creating lead");
@@ -322,6 +325,7 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
     if (data.status !== undefined && data.status !== prevStatus) {
       updates.status = data.status;
       await logActivity(req, id, "status_changed", `Status changed to ${data.status}`, `From: ${prevStatus} → To: ${data.status}`, { from: prevStatus, to: data.status });
+      fireAutomation({ trigger: "lead_status_changed", payload: { recordId: id, from: prevStatus ?? null, to: String(data.status) } });
     }
     if (data.nextFollowUpAt !== undefined && String(data.nextFollowUpAt) !== String(existing.nextFollowUpAt)) {
       await logActivity(req, id, "follow_up_changed", `Follow-up set for ${new Date(String(data.nextFollowUpAt)).toLocaleDateString()}`);

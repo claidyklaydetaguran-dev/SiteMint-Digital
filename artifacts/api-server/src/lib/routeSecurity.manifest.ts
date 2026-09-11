@@ -86,6 +86,25 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   //
   // Nothing here sends anything: a customer-visible message is RECORDED. The
   // route says so in its response.
+
+  // ── M4 Workflow automation ────────────────────────────────────────────
+  //
+  // Authoring a rule is an administrative act: a rule assigns work, creates
+  // tasks and notifies people on its own afterwards, so writing one is more
+  // consequential than any single record edit it performs. Running one by
+  // hand is the same act done once, and it goes through the same brakes as
+  // an automatic run rather than around them.
+  //
+  // Deciding an approval is gated by IDENTITY rather than permission — an
+  // owner is refused on an approval addressed to somebody else — which the
+  // route enforces and `crmAutomation.test.ts` asserts. "admin" here is the
+  // floor, not the whole check.
+  "POST /api/crm/automation/rules": "admin",
+  "PATCH /api/crm/automation/rules/:id": "admin",
+  "DELETE /api/crm/automation/rules/:id": "admin",
+  "POST /api/crm/automation/rules/:id/run": "admin",
+  "POST /api/crm/automation/approvals/:id/decide": "admin",
+
   "POST /api/crm/support/tickets": "admin",
   "POST /api/crm/support/service-requests": "admin",
   "POST /api/crm/support/tickets/:id/assign": "admin",

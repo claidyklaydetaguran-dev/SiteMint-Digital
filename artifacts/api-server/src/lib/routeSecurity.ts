@@ -25,6 +25,7 @@ export type Protection =
   | "admin" // CRM/admin bearer token middleware
   | "staff" // M1: per-person CRM staff session + CSRF + permission grant
   | "session" // receptionist httpOnly-cookie session
+  | "portal" // M4: customer portal httpOnly-cookie session, scoped to ONE contact
   | "signature" // provider webhook with a verified signature
   | "credential" // validates a credential presented in the request itself
   | "token-proven" // single-use emailed token proves the caller
@@ -65,6 +66,11 @@ const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
   [/\brequireCrmAuth\s*\(/, "admin"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
+  // `requirePortalAuth()` — resolves the `crm_portal_session` cookie, enforces
+  // CSRF on mutations, and narrows every query to the one contact the session
+  // belongs to. Its own class because it is neither of the other two: it is not
+  // a staff member with permissions, and it is not an intake_firms row.
+  [/\brequirePortalAuth\s*\(/, "portal"],
   [/\bvalidateTwilioWebhook\b/, "signature"],
   [/\bvalidateIntakeTwilioSignature\b/, "signature"],
 ];
@@ -75,6 +81,7 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\brequireCrmAuth\s*\(/, "admin"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
+  [/\brequirePortalAuth\s*\(/, "portal"],
   [/\bauthenticateVapiWebhook\b/, "signature"],
   [/\bverifyTwilioSignature\b/, "signature"],
   [/\bverifyStripeSignature\b/, "signature"],

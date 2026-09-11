@@ -189,9 +189,26 @@ export const crmNotifications = pgTable("crm_notifications", {
   entityType: text("entity_type"),
   entityId:   integer("entity_id"),
   readAt:     timestamp("read_at", { withTimezone: true }),
+  /**
+   * M4, additive and nullable: the reminder OCCURRENCE and RECIPIENT this
+   * notification is for, as `<dedupeKey>:<runAt ISO>:<staffId>:<kind>`.
+   *
+   * A re-run of a job used to write a second in-app notification, because the
+   * only thing stopping one was "the job has already run" — which an operator
+   * retry deliberately undoes. Job id is the wrong identity (a recurring
+   * reminder is one job row for many occurrences) and so is "has it run".
+   * The occurrence and the person are the identity, and the partial unique
+   * index below makes a duplicate impossible rather than unlikely.
+   *
+   * Null on every notification that is not a scheduled reminder, and on every
+   * row written before M4 — the index is partial so those are untouched.
+   */
+  occurrenceKey: text("occurrence_key"),
   createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("ix_crm_notifications_staff").on(table.staffId, table.readAt, table.createdAt),
+  uniqueIndex("uq_crm_notifications_occurrence").on(table.occurrenceKey)
+    .where(sql`${table.occurrenceKey} IS NOT NULL`),
 ]);
 
 export type CrmNotification = typeof crmNotifications.$inferSelect;
@@ -231,16 +248,23 @@ export const crmScheduledJobs = pgTable("crm_scheduled_jobs", {
   dedupeKey:    text("dedupe_key").notNull(),
 
   /**
-   * Set immediately BEFORE an external send is attempted, and committed on its
-   * own so it survives the process dying mid-send.
+   * HISTORY ONLY as of M4. Nothing writes these two columns any more.
    *
-   * Job locking alone cannot give exactly-once external delivery: if the
-   * provider accepts a message and the worker is killed before it records
-   * success, the lock expires, the job is reclaimed and the message goes out
-   * twice. This column makes that window visible, and `externalRef` records
-   * what the provider called the message so a duplicate can be reconciled.
-   * The send itself additionally carries a provider idempotency key derived
-   * from (dedupeKey, runAt), which is what actually collapses the duplicate.
+   * `externalDispatchedAt` was stamped immediately before an external send and
+   * was, wrongly, treated as proof of delivery — a marker written before a
+   * request proves only that a request was started, so a 500, a dropped
+   * connection or a timeout silently lost the reminder forever.
+   *
+   * `externalRef` then carried a packed, newline-separated delivery record per
+   * (occurrence, recipient). Both are superseded by `crm_reminder_deliveries`,
+   * which holds one row per (occurrence, recipient) with the occurrence, the
+   * attempt, the provider's answer and any operator recovery.
+   *
+   * They are deliberately NOT cleared. Every record they hold was migrated —
+   * including the ones that could not be parsed, which were preserved verbatim
+   * and marked for review rather than guessed at or dropped — and the original
+   * text stays here as the source it was read from. See
+   * `docs/crm-ops/DELIVERY-GUARANTEE.md`.
    */
   externalDispatchedAt: timestamp("external_dispatched_at", { withTimezone: true }),
   externalRef:  text("external_ref"),

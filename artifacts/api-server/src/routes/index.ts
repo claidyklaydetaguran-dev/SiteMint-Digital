@@ -20,6 +20,7 @@ import crmPortalRouter from "./crmPortal";
 import crmHistoryRouter from "./crmHistory";
 import crmReportsRouter from "./crmReports";
 import crmMarketingRouter from "./crmMarketing";
+import crmAutomationRouter from "./crmAutomation";
 import phoneRouter from "./phone";
 import copilotRouter from "./copilot";
 import aiCampaignGenerateRouter from "./aiCampaignGenerate";
@@ -81,6 +82,7 @@ router.use(crmReportsRouter);
 // Before crmRouter: /crm/marketing/* must match its own handlers rather than
 // falling into one of the legacy parameterised /crm/:something routes.
 router.use(crmMarketingRouter);
+router.use(crmAutomationRouter);
 router.use(crmRouter);
 router.use(crmProjectsRouter);
 router.use(crmDiscoveryRouter);

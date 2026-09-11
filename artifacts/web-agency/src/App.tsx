@@ -121,6 +121,20 @@ const CrmTransactions = lazyRoute(() => import("@/pages/crm/CrmTransactions"));
 const CrmProjects = lazyRoute(() => import("@/pages/crm/CrmProjects"));
 const CrmDocuments = lazyRoute(() => import("@/pages/crm/CrmDocuments"));
 const CrmSupport = lazyRoute(() => import("@/pages/crm/CrmSupport"));
+
+// ── Customer portal ─────────────────────────────────────────────────────────
+// A customer-facing subtree, deliberately OUTSIDE AdminRoutes and
+// DashboardShell: portal visitors hold a portal session, never a staff one,
+// and must never be shown the internal chrome. /portal/sign-in and
+// /portal/accept are reachable with no session by definition.
+const PortalSignIn    = lazyRoute(() => import("@/pages/portal/PortalSignIn"));
+const PortalAccept    = lazyRoute(() => import("@/pages/portal/PortalAccept"));
+const PortalHome      = lazyRoute(() => import("@/pages/portal/PortalHome"));
+const PortalProjects  = lazyRoute(() => import("@/pages/portal/PortalProjects"));
+const PortalDocuments = lazyRoute(() => import("@/pages/portal/PortalDocuments"));
+const PortalProposals = lazyRoute(() => import("@/pages/portal/PortalProposals"));
+const PortalInvoices  = lazyRoute(() => import("@/pages/portal/PortalInvoices"));
+const PortalSupport   = lazyRoute(() => import("@/pages/portal/PortalSupport"));
 const CrmReporting = lazyRoute(() => import("@/pages/crm/CrmReporting"));
 const CrmAdminSettings = lazyRoute(() => import("@/pages/crm/CrmAdminSettings"));
 const CrmCampaigns = lazyRoute(() => import("@/pages/crm/CrmCampaigns"));
@@ -253,6 +267,16 @@ function Router() {
           </DashboardShell>
         )}
       </Route>
+
+      {/* ── Customer portal — public subtree, portal session only ───────── */}
+      <Route path="/portal/sign-in"   component={PortalSignIn} />
+      <Route path="/portal/accept"    component={PortalAccept} />
+      <Route path="/portal/projects"  component={PortalProjects} />
+      <Route path="/portal/documents" component={PortalDocuments} />
+      <Route path="/portal/proposals" component={PortalProposals} />
+      <Route path="/portal/invoices"  component={PortalInvoices} />
+      <Route path="/portal/support"   component={PortalSupport} />
+      <Route path="/portal"           component={PortalHome} />
 
       {/* ── Discovery — the primary "Start Your Project" destination.
           Public, per owner decision 3. No main layout — self-contained with
