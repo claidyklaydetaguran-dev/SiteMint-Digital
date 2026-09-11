@@ -10,17 +10,20 @@ Written 2026-09-11. Supersedes nothing; read alongside `CONTINUATION.md` and
 | | |
 |---|---|
 | Branch | `claude/sitemint-crm-operations-124038` |
-| Tip commit | `2c4e54d` |
+| Tip commit | `5080d7b` |
 | Pushed? | **No.** The branch exists only in this working tree. |
 | Base | `b0a5f49`, with upstream `abfe8bb` merged in at `5eb4c0b` |
 
-Milestone 3 is three commits:
+Milestone 3 is six commits:
 
 - `f918be8` — document store, document requests, share links, internal calendar,
   mailbox verification, exactly-once external delivery
 - `d664dea` — the Documents and Calendar screens, plus three defects running it
   exposed
 - `2c4e54d` — tests for the last-active-owner guard, which nothing had executed
+- `059894f` — lead-timeline attribution, working CC/BCC, and the exactly-once
+  send guard that was written but never read
+- `5080d7b` — real per-person unread state for the shared customer inbox
 
 Nothing has been pushed, deployed, or run against staging or production. No
 email has been sent to anybody.
@@ -56,6 +59,9 @@ only in tests:
 - **Documents** (`/admin/crm/documents`) — upload with versioning, per-record
   listing, download, expiring share links with a download ceiling and
   revocation, and a register of what you are still waiting on from clients.
+- **Inbox / Communications** — unread counts that are real: they survive a
+  reload, they are yours rather than the team's, and you can see who else has
+  already opened a conversation before you reply to it.
 
 ### The acceptance scenario that was actually run
 
@@ -166,6 +172,24 @@ Saisa's accounts are unaffected by not having addresses yet.
    so an adapter has somewhere to hook in.
 7. **The legacy shared bearer token is still accepted.** It stays until the
    three owners have signed in on a deployed environment; see §5 step 6.
+8. **SMS and call messages still record no sender.** The lead timeline is now
+   attributed to the person who acted, but `crm_messages` has no sender column
+   and the code that would set one lives in `routes/phone.ts`, which CLAUDE.md
+   protects and which this session is only authorised to touch for the
+   authentication change already made. You cannot currently tell which of the
+   three of you sent a given SMS. Fixing it needs an owner instruction naming
+   that file.
+9. **There is no inbound email.** Nothing ingests mail. The Resend webhook
+   handles delivery events for campaign sends — opened, clicked, bounced — not
+   received messages. A client replying by email lands nowhere in the CRM.
+10. **There is no conversation table.** Threads are assembled in memory per
+    request from the latest 200 messages globally, so thread identity is
+    unstable and older conversations drop off a busy list. Unread state is
+    keyed on the lead, which is how that grouping already works.
+11. **Two near-duplicate inbox screens.** `CrmInbox` and the Conversations tab
+    of `CrmCommunications` call the same endpoints with the same polling, and
+    both sit in the sidebar. Delivery-status pills and SMS retry exist in only
+    one of them. Worth collapsing into one.
 
 ---
 
@@ -183,12 +207,18 @@ Every step below is for the integration owner. Nothing here has been performed.
    pnpm --filter @workspace/db run push
    ```
 
-   M3 adds five tables — `crm_attachment_blobs`, `crm_document_requests`,
-   `crm_document_shares`, `crm_appointments`, `crm_appointment_attendees` — and
-   four columns: `crm_staff.email_verified_at`, `crm_staff_tokens.delivery`,
-   and `crm_scheduled_jobs.external_dispatched_at` / `.external_ref`. All
-   additive. M1 and M2's `crm_staff*` and `crm_scheduled_jobs` tables must be
-   pushed first if the environment has never had them.
+   M3 adds six tables — `crm_attachment_blobs`, `crm_document_requests`,
+   `crm_document_shares`, `crm_appointments`, `crm_appointment_attendees` and
+   `crm_thread_reads` — and four columns: `crm_staff.email_verified_at`,
+   `crm_staff_tokens.delivery`, and `crm_scheduled_jobs.external_dispatched_at`
+   / `.external_ref`. All additive. M1 and M2's `crm_staff*` and
+   `crm_scheduled_jobs` tables must be pushed first if the environment has
+   never had them.
+
+   Do **not** add `tablesFilter: ["crm_*"]` to the push config. It narrows
+   introspection as well as the write set, so every non-CRM table looks absent
+   and push tries to re-create it — which is how a local attempt failed with
+   `relation "discovery_submissions" already exists`.
 
 3. **Set configuration:**
 
