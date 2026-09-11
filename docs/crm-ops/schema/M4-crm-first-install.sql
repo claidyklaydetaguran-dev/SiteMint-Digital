@@ -13,12 +13,12 @@
 -- during a deployment.
 --
 -- PROPERTIES
---   * 46 tables, all `crm_*`. No voice_*, intake_*, discovery_*,
+--   * 60 tables, all `crm_*`. No voice_*, intake_*, discovery_*,
 --     scheduling_*, helpdesk_* or stripe.* object is referenced.
 --   * Schema only. Contains no rows, no credentials, no customer data.
 --   * Idempotent, and this was verified by running it twice against a virgin
 --     database and comparing table, index and constraint counts. Every CREATE
---     is IF NOT EXISTS; each of the 68 named constraints is applied only
+--     is IF NOT EXISTS; each of the 82 named constraints is applied only
 --     when `pg_constraint` does not already hold it, because PostgreSQL has no
 --     `ADD CONSTRAINT IF NOT EXISTS`.
 --   * Safe inside one transaction.
@@ -35,7 +35,7 @@
 -- VERIFY AFTER RUNNING
 --   SELECT count(*) FROM information_schema.tables
 --    WHERE table_schema = 'public' AND table_name LIKE 'crm\_%';
---   -- expected: 46
+--   -- expected: 60
 --
 -- TABLES CREATED
 --   crm_activities
@@ -46,6 +46,10 @@
 --   crm_approvals
 --   crm_attachment_blobs
 --   crm_attachments
+--   crm_automation_action_runs
+--   crm_automation_approvals
+--   crm_automation_executions
+--   crm_automation_rules
 --   crm_behavioral_events
 --   crm_campaign_events
 --   crm_campaign_recipients
@@ -66,9 +70,19 @@
 --   crm_inbound_email_events
 --   crm_kb_articles
 --   crm_leads
+--   crm_marketing_campaigns
+--   crm_marketing_designs
+--   crm_marketing_exclusions
+--   crm_marketing_recipients
+--   crm_marketing_segments
 --   crm_message_drafts
 --   crm_messages
 --   crm_notifications
+--   crm_portal_accounts
+--   crm_portal_document_grants
+--   crm_portal_invitations
+--   crm_portal_proposal_acceptances
+--   crm_portal_sessions
 --   crm_project_milestones
 --   crm_project_templates
 --   crm_project_updates
@@ -268,6 +282,142 @@ CREATE SEQUENCE IF NOT EXISTS public.crm_attachments_id_seq
     CACHE 1;
 
 ALTER SEQUENCE public.crm_attachments_id_seq OWNED BY public.crm_attachments.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_automation_action_runs (
+    id integer NOT NULL,
+    execution_id integer NOT NULL,
+    action_index integer NOT NULL,
+    action_type text NOT NULL,
+    status text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    detail text,
+    affected_record_type text,
+    affected_record_id integer,
+    started_at timestamp with time zone,
+    finished_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_crm_automation_action_runs_attempts CHECK ((attempts >= 0)),
+    CONSTRAINT ck_crm_automation_action_runs_status CHECK ((status = ANY (ARRAY['succeeded'::text, 'skipped'::text, 'failed'::text, 'unknown'::text, 'awaiting_approval'::text, 'rejected'::text]))),
+    CONSTRAINT ck_crm_automation_action_runs_type CHECK ((action_type = ANY (ARRAY['assign_owner'::text, 'create_task'::text, 'notify'::text, 'set_field'::text, 'add_note'::text, 'schedule_follow_up'::text, 'request_approval'::text])))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_automation_action_runs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_automation_action_runs_id_seq OWNED BY public.crm_automation_action_runs.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_automation_approvals (
+    id integer NOT NULL,
+    execution_id integer NOT NULL,
+    rule_id integer NOT NULL,
+    action_index integer NOT NULL,
+    action_type text NOT NULL,
+    approver_staff_id integer NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    summary text NOT NULL,
+    record_type text NOT NULL,
+    record_id integer NOT NULL,
+    decided_by_staff_id integer,
+    decided_at timestamp with time zone,
+    decision_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_crm_automation_approvals_decided CHECK (((status = 'pending'::text) OR (decided_at IS NOT NULL))),
+    CONSTRAINT ck_crm_automation_approvals_reject_reason CHECK (((status <> 'rejected'::text) OR (decision_reason IS NOT NULL))),
+    CONSTRAINT ck_crm_automation_approvals_status CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_automation_approvals_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_automation_approvals_id_seq OWNED BY public.crm_automation_approvals.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_automation_executions (
+    id integer NOT NULL,
+    rule_id integer NOT NULL,
+    trigger text NOT NULL,
+    record_type text NOT NULL,
+    record_id integer NOT NULL,
+    occurrence_key text NOT NULL,
+    status text DEFAULT 'queued'::text NOT NULL,
+    condition_outcome text DEFAULT 'not_evaluated'::text NOT NULL,
+    stop_reason text,
+    detail text,
+    chain_depth integer DEFAULT 0 NOT NULL,
+    chain_rule_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    caused_by_execution_id integer,
+    trigger_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    next_attempt_at timestamp with time zone,
+    started_by_staff_id integer,
+    started_at timestamp with time zone,
+    finished_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_crm_automation_executions_condition CHECK ((condition_outcome = ANY (ARRAY['matched'::text, 'not_matched'::text, 'not_evaluated'::text]))),
+    CONSTRAINT ck_crm_automation_executions_depth CHECK ((chain_depth >= 0)),
+    CONSTRAINT ck_crm_automation_executions_record_type CHECK ((record_type = ANY (ARRAY['lead'::text, 'deal'::text, 'task'::text, 'appointment'::text, 'document_request'::text, 'message'::text]))),
+    CONSTRAINT ck_crm_automation_executions_status CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'completed'::text, 'failed'::text, 'stopped'::text, 'awaiting_approval'::text]))),
+    CONSTRAINT ck_crm_automation_executions_stop_needs_reason CHECK (((status <> 'stopped'::text) OR (stop_reason IS NOT NULL))),
+    CONSTRAINT ck_crm_automation_executions_stop_reason CHECK (((stop_reason IS NULL) OR (stop_reason = ANY (ARRAY['stop_condition'::text, 'approval_rejected'::text, 'chain_depth_exceeded'::text, 'rate_cap_exceeded'::text, 'rule_disabled'::text, 'record_missing'::text]))))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_automation_executions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_automation_executions_id_seq OWNED BY public.crm_automation_executions.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_automation_rules (
+    id integer NOT NULL,
+    name text NOT NULL,
+    description text,
+    trigger text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    conditions jsonb DEFAULT '{"combine": "and", "conditions": []}'::jsonb NOT NULL,
+    stop_conditions jsonb DEFAULT '{"combine": "or", "conditions": []}'::jsonb NOT NULL,
+    actions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    max_chain_depth integer DEFAULT 3 NOT NULL,
+    window_cap integer DEFAULT 5 NOT NULL,
+    window_minutes integer DEFAULT 60 NOT NULL,
+    max_action_attempts integer DEFAULT 3 NOT NULL,
+    created_by_staff_id integer,
+    created_by_label text,
+    updated_by_staff_id integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    archived_at timestamp with time zone,
+    CONSTRAINT ck_crm_automation_rules_attempts CHECK (((max_action_attempts >= 1) AND (max_action_attempts <= 10))),
+    CONSTRAINT ck_crm_automation_rules_depth CHECK (((max_chain_depth >= 1) AND (max_chain_depth <= 10))),
+    CONSTRAINT ck_crm_automation_rules_trigger CHECK ((trigger = ANY (ARRAY['lead_created'::text, 'lead_status_changed'::text, 'deal_stage_changed'::text, 'deal_won'::text, 'deal_lost'::text, 'task_overdue'::text, 'appointment_booked'::text, 'document_request_completed'::text, 'inbound_message_received'::text, 'no_activity_for_days'::text]))),
+    CONSTRAINT ck_crm_automation_rules_window_cap CHECK (((window_cap >= 1) AND (window_cap <= 500))),
+    CONSTRAINT ck_crm_automation_rules_window_minutes CHECK (((window_minutes >= 1) AND (window_minutes <= 10080)))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_automation_rules_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_automation_rules_id_seq OWNED BY public.crm_automation_rules.id;
 
 CREATE TABLE IF NOT EXISTS public.crm_behavioral_events (
     id integer NOT NULL,
@@ -798,6 +948,140 @@ CREATE SEQUENCE IF NOT EXISTS public.crm_leads_id_seq
 
 ALTER SEQUENCE public.crm_leads_id_seq OWNED BY public.crm_leads.id;
 
+CREATE TABLE IF NOT EXISTS public.crm_marketing_campaigns (
+    id integer NOT NULL,
+    name text NOT NULL,
+    subject text DEFAULT ''::text NOT NULL,
+    preheader text,
+    blocks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    segment_id integer,
+    design_id integer,
+    status text DEFAULT 'draft'::text NOT NULL,
+    scheduled_at timestamp with time zone,
+    started_at timestamp with time zone,
+    paused_at timestamp with time zone,
+    cancelled_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    ai_content_state text DEFAULT 'none'::text NOT NULL,
+    ai_drafted_at timestamp with time zone,
+    ai_grounding jsonb,
+    ai_approved_by_staff_id integer,
+    ai_approved_by_label text,
+    ai_approved_at timestamp with time zone,
+    created_by_staff_id integer,
+    created_by_label text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_crm_marketing_campaigns_ai_approval CHECK (((ai_content_state <> 'approved'::text) OR (ai_approved_at IS NOT NULL))),
+    CONSTRAINT ck_crm_marketing_campaigns_ai_state CHECK ((ai_content_state = ANY (ARRAY['none'::text, 'draft'::text, 'approved'::text]))),
+    CONSTRAINT ck_crm_marketing_campaigns_status CHECK ((status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'sending'::text, 'paused'::text, 'cancelled'::text, 'sent'::text])))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_marketing_campaigns_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_marketing_campaigns_id_seq OWNED BY public.crm_marketing_campaigns.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_marketing_designs (
+    id integer NOT NULL,
+    name text NOT NULL,
+    description text,
+    subject text,
+    preheader text,
+    blocks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_by_staff_id integer,
+    created_by_label text,
+    archived_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_marketing_designs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_marketing_designs_id_seq OWNED BY public.crm_marketing_designs.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_marketing_exclusions (
+    id integer NOT NULL,
+    campaign_id integer NOT NULL,
+    lead_id integer NOT NULL,
+    reason text,
+    excluded_by_staff_id integer,
+    excluded_by_label text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_marketing_exclusions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_marketing_exclusions_id_seq OWNED BY public.crm_marketing_exclusions.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_marketing_recipients (
+    id integer NOT NULL,
+    campaign_id integer NOT NULL,
+    lead_id integer NOT NULL,
+    address text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    exclusion_reason text,
+    exclusion_detail text,
+    rendered_subject text,
+    rendered_html text,
+    fallbacks_used jsonb,
+    provider_message_id text,
+    last_error text,
+    sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_crm_marketing_recipients_exclusion_reason CHECK (((status <> 'excluded'::text) OR (exclusion_reason IS NOT NULL))),
+    CONSTRAINT ck_crm_marketing_recipients_status CHECK ((status = ANY (ARRAY['pending'::text, 'sent'::text, 'failed'::text, 'excluded'::text, 'test'::text])))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_marketing_recipients_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_marketing_recipients_id_seq OWNED BY public.crm_marketing_recipients.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_marketing_segments (
+    id integer NOT NULL,
+    name text NOT NULL,
+    description text,
+    definition jsonb NOT NULL,
+    created_by_staff_id integer,
+    created_by_label text,
+    archived_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_marketing_segments_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_marketing_segments_id_seq OWNED BY public.crm_marketing_segments.id;
+
 CREATE TABLE IF NOT EXISTS public.crm_message_drafts (
     id integer NOT NULL,
     conversation_id integer NOT NULL,
@@ -874,6 +1158,123 @@ CREATE SEQUENCE IF NOT EXISTS public.crm_notifications_id_seq
     CACHE 1;
 
 ALTER SEQUENCE public.crm_notifications_id_seq OWNED BY public.crm_notifications.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_portal_accounts (
+    id integer NOT NULL,
+    lead_id integer NOT NULL,
+    email text NOT NULL,
+    password_hash text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    session_epoch integer DEFAULT 0 NOT NULL,
+    last_sign_in_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_crm_portal_accounts_status CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text])))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_portal_accounts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_portal_accounts_id_seq OWNED BY public.crm_portal_accounts.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_portal_document_grants (
+    id integer NOT NULL,
+    lead_id integer NOT NULL,
+    attachment_id integer NOT NULL,
+    granted_by_staff_id integer,
+    granted_by_label text NOT NULL,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_portal_document_grants_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_portal_document_grants_id_seq OWNED BY public.crm_portal_document_grants.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_portal_invitations (
+    id integer NOT NULL,
+    lead_id integer NOT NULL,
+    email text NOT NULL,
+    token_hash text NOT NULL,
+    created_by_staff_id integer,
+    created_by_label text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    accepted_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    revoked_by_staff_id integer,
+    delivery_state text,
+    delivery_detail text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_portal_invitations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_portal_invitations_id_seq OWNED BY public.crm_portal_invitations.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_portal_proposal_acceptances (
+    id integer NOT NULL,
+    lead_id integer NOT NULL,
+    deal_id integer NOT NULL,
+    portal_account_id integer,
+    accepted_at timestamp with time zone DEFAULT now() NOT NULL,
+    typed_name text NOT NULL,
+    accepted_from_ip text,
+    deal_value_at_acceptance numeric(10,2),
+    deal_name_at_acceptance text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_portal_proposal_acceptances_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_portal_proposal_acceptances_id_seq OWNED BY public.crm_portal_proposal_acceptances.id;
+
+CREATE TABLE IF NOT EXISTS public.crm_portal_sessions (
+    id integer NOT NULL,
+    portal_account_id integer NOT NULL,
+    lead_id integer NOT NULL,
+    token_hash text NOT NULL,
+    csrf_hash text NOT NULL,
+    epoch integer DEFAULT 0 NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
+    ip text,
+    user_agent text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.crm_portal_sessions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crm_portal_sessions_id_seq OWNED BY public.crm_portal_sessions.id;
 
 CREATE TABLE IF NOT EXISTS public.crm_project_milestones (
     id integer NOT NULL,
@@ -1341,6 +1742,14 @@ ALTER TABLE ONLY public.crm_approvals ALTER COLUMN id SET DEFAULT nextval('publi
 
 ALTER TABLE ONLY public.crm_attachments ALTER COLUMN id SET DEFAULT nextval('public.crm_attachments_id_seq'::regclass);
 
+ALTER TABLE ONLY public.crm_automation_action_runs ALTER COLUMN id SET DEFAULT nextval('public.crm_automation_action_runs_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_automation_approvals ALTER COLUMN id SET DEFAULT nextval('public.crm_automation_approvals_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_automation_executions ALTER COLUMN id SET DEFAULT nextval('public.crm_automation_executions_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_automation_rules ALTER COLUMN id SET DEFAULT nextval('public.crm_automation_rules_id_seq'::regclass);
+
 ALTER TABLE ONLY public.crm_behavioral_events ALTER COLUMN id SET DEFAULT nextval('public.crm_behavioral_events_id_seq'::regclass);
 
 ALTER TABLE ONLY public.crm_campaign_events ALTER COLUMN id SET DEFAULT nextval('public.crm_campaign_events_id_seq'::regclass);
@@ -1381,11 +1790,31 @@ ALTER TABLE ONLY public.crm_kb_articles ALTER COLUMN id SET DEFAULT nextval('pub
 
 ALTER TABLE ONLY public.crm_leads ALTER COLUMN id SET DEFAULT nextval('public.crm_leads_id_seq'::regclass);
 
+ALTER TABLE ONLY public.crm_marketing_campaigns ALTER COLUMN id SET DEFAULT nextval('public.crm_marketing_campaigns_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_marketing_designs ALTER COLUMN id SET DEFAULT nextval('public.crm_marketing_designs_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_marketing_exclusions ALTER COLUMN id SET DEFAULT nextval('public.crm_marketing_exclusions_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_marketing_recipients ALTER COLUMN id SET DEFAULT nextval('public.crm_marketing_recipients_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_marketing_segments ALTER COLUMN id SET DEFAULT nextval('public.crm_marketing_segments_id_seq'::regclass);
+
 ALTER TABLE ONLY public.crm_message_drafts ALTER COLUMN id SET DEFAULT nextval('public.crm_message_drafts_id_seq'::regclass);
 
 ALTER TABLE ONLY public.crm_messages ALTER COLUMN id SET DEFAULT nextval('public.crm_messages_id_seq'::regclass);
 
 ALTER TABLE ONLY public.crm_notifications ALTER COLUMN id SET DEFAULT nextval('public.crm_notifications_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_portal_accounts ALTER COLUMN id SET DEFAULT nextval('public.crm_portal_accounts_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_portal_document_grants ALTER COLUMN id SET DEFAULT nextval('public.crm_portal_document_grants_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_portal_invitations ALTER COLUMN id SET DEFAULT nextval('public.crm_portal_invitations_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_portal_proposal_acceptances ALTER COLUMN id SET DEFAULT nextval('public.crm_portal_proposal_acceptances_id_seq'::regclass);
+
+ALTER TABLE ONLY public.crm_portal_sessions ALTER COLUMN id SET DEFAULT nextval('public.crm_portal_sessions_id_seq'::regclass);
 
 ALTER TABLE ONLY public.crm_project_milestones ALTER COLUMN id SET DEFAULT nextval('public.crm_project_milestones_id_seq'::regclass);
 
@@ -1478,6 +1907,38 @@ DO $guard$ BEGIN
                   WHERE conname = 'crm_attachments_pkey'
                     AND conrelid = 'public.crm_attachments'::regclass) THEN
     ALTER TABLE ONLY public.crm_attachments ADD CONSTRAINT crm_attachments_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_automation_action_runs_pkey'
+                    AND conrelid = 'public.crm_automation_action_runs'::regclass) THEN
+    ALTER TABLE ONLY public.crm_automation_action_runs ADD CONSTRAINT crm_automation_action_runs_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_automation_approvals_pkey'
+                    AND conrelid = 'public.crm_automation_approvals'::regclass) THEN
+    ALTER TABLE ONLY public.crm_automation_approvals ADD CONSTRAINT crm_automation_approvals_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_automation_executions_pkey'
+                    AND conrelid = 'public.crm_automation_executions'::regclass) THEN
+    ALTER TABLE ONLY public.crm_automation_executions ADD CONSTRAINT crm_automation_executions_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_automation_rules_pkey'
+                    AND conrelid = 'public.crm_automation_rules'::regclass) THEN
+    ALTER TABLE ONLY public.crm_automation_rules ADD CONSTRAINT crm_automation_rules_pkey PRIMARY KEY (id);
   END IF;
 END $guard$;
 
@@ -1643,6 +2104,46 @@ END $guard$;
 
 DO $guard$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_marketing_campaigns_pkey'
+                    AND conrelid = 'public.crm_marketing_campaigns'::regclass) THEN
+    ALTER TABLE ONLY public.crm_marketing_campaigns ADD CONSTRAINT crm_marketing_campaigns_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_marketing_designs_pkey'
+                    AND conrelid = 'public.crm_marketing_designs'::regclass) THEN
+    ALTER TABLE ONLY public.crm_marketing_designs ADD CONSTRAINT crm_marketing_designs_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_marketing_exclusions_pkey'
+                    AND conrelid = 'public.crm_marketing_exclusions'::regclass) THEN
+    ALTER TABLE ONLY public.crm_marketing_exclusions ADD CONSTRAINT crm_marketing_exclusions_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_marketing_recipients_pkey'
+                    AND conrelid = 'public.crm_marketing_recipients'::regclass) THEN
+    ALTER TABLE ONLY public.crm_marketing_recipients ADD CONSTRAINT crm_marketing_recipients_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_marketing_segments_pkey'
+                    AND conrelid = 'public.crm_marketing_segments'::regclass) THEN
+    ALTER TABLE ONLY public.crm_marketing_segments ADD CONSTRAINT crm_marketing_segments_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
                   WHERE conname = 'crm_message_drafts_pkey'
                     AND conrelid = 'public.crm_message_drafts'::regclass) THEN
     ALTER TABLE ONLY public.crm_message_drafts ADD CONSTRAINT crm_message_drafts_pkey PRIMARY KEY (id);
@@ -1662,6 +2163,46 @@ DO $guard$ BEGIN
                   WHERE conname = 'crm_notifications_pkey'
                     AND conrelid = 'public.crm_notifications'::regclass) THEN
     ALTER TABLE ONLY public.crm_notifications ADD CONSTRAINT crm_notifications_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_portal_accounts_pkey'
+                    AND conrelid = 'public.crm_portal_accounts'::regclass) THEN
+    ALTER TABLE ONLY public.crm_portal_accounts ADD CONSTRAINT crm_portal_accounts_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_portal_document_grants_pkey'
+                    AND conrelid = 'public.crm_portal_document_grants'::regclass) THEN
+    ALTER TABLE ONLY public.crm_portal_document_grants ADD CONSTRAINT crm_portal_document_grants_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_portal_invitations_pkey'
+                    AND conrelid = 'public.crm_portal_invitations'::regclass) THEN
+    ALTER TABLE ONLY public.crm_portal_invitations ADD CONSTRAINT crm_portal_invitations_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_portal_proposal_acceptances_pkey'
+                    AND conrelid = 'public.crm_portal_proposal_acceptances'::regclass) THEN
+    ALTER TABLE ONLY public.crm_portal_proposal_acceptances ADD CONSTRAINT crm_portal_proposal_acceptances_pkey PRIMARY KEY (id);
+  END IF;
+END $guard$;
+
+DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'crm_portal_sessions_pkey'
+                    AND conrelid = 'public.crm_portal_sessions'::regclass) THEN
+    ALTER TABLE ONLY public.crm_portal_sessions ADD CONSTRAINT crm_portal_sessions_pkey PRIMARY KEY (id);
   END IF;
 END $guard$;
 
@@ -1861,6 +2402,26 @@ CREATE INDEX IF NOT EXISTS ix_crm_approvals_status ON public.crm_approvals USING
 
 CREATE INDEX IF NOT EXISTS ix_crm_attachments_entity ON public.crm_attachments USING btree (entity_type, entity_id);
 
+CREATE INDEX IF NOT EXISTS ix_crm_automation_action_runs_affected ON public.crm_automation_action_runs USING btree (affected_record_type, affected_record_id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_action_runs_execution ON public.crm_automation_action_runs USING btree (execution_id, action_index);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_approvals_pending ON public.crm_automation_approvals USING btree (status, approver_staff_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_approvals_rule ON public.crm_automation_approvals USING btree (rule_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_executions_record ON public.crm_automation_executions USING btree (record_type, record_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_executions_rule ON public.crm_automation_executions USING btree (rule_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_executions_status ON public.crm_automation_executions USING btree (status, next_attempt_at);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_executions_window ON public.crm_automation_executions USING btree (rule_id, record_id, created_at);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_rules_archived ON public.crm_automation_rules USING btree (archived_at);
+
+CREATE INDEX IF NOT EXISTS ix_crm_automation_rules_trigger ON public.crm_automation_rules USING btree (trigger, enabled);
+
 CREATE INDEX IF NOT EXISTS ix_crm_comments_entity ON public.crm_comments USING btree (entity_type, entity_id, created_at);
 
 CREATE INDEX IF NOT EXISTS ix_crm_conv_participants_conversation ON public.crm_conversation_participants USING btree (conversation_id);
@@ -1897,6 +2458,18 @@ CREATE INDEX IF NOT EXISTS ix_crm_kb_articles_category ON public.crm_kb_articles
 
 CREATE INDEX IF NOT EXISTS ix_crm_kb_articles_status_id ON public.crm_kb_articles USING btree (status, id);
 
+CREATE INDEX IF NOT EXISTS ix_crm_marketing_campaigns_segment ON public.crm_marketing_campaigns USING btree (segment_id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_marketing_campaigns_status ON public.crm_marketing_campaigns USING btree (status);
+
+CREATE INDEX IF NOT EXISTS ix_crm_marketing_designs_archived ON public.crm_marketing_designs USING btree (archived_at);
+
+CREATE INDEX IF NOT EXISTS ix_crm_marketing_exclusions_campaign ON public.crm_marketing_exclusions USING btree (campaign_id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_marketing_recipients_campaign_status ON public.crm_marketing_recipients USING btree (campaign_id, status);
+
+CREATE INDEX IF NOT EXISTS ix_crm_marketing_segments_archived ON public.crm_marketing_segments USING btree (archived_at);
+
 CREATE INDEX IF NOT EXISTS ix_crm_message_drafts_staff ON public.crm_message_drafts USING btree (staff_id);
 
 CREATE INDEX IF NOT EXISTS ix_crm_messages_conversation ON public.crm_messages USING btree (conversation_id, created_at);
@@ -1904,6 +2477,14 @@ CREATE INDEX IF NOT EXISTS ix_crm_messages_conversation ON public.crm_messages U
 CREATE INDEX IF NOT EXISTS ix_crm_messages_sent_by ON public.crm_messages USING btree (sent_by_staff_id);
 
 CREATE INDEX IF NOT EXISTS ix_crm_notifications_staff ON public.crm_notifications USING btree (staff_id, read_at, created_at);
+
+CREATE INDEX IF NOT EXISTS ix_crm_portal_document_grants_lead ON public.crm_portal_document_grants USING btree (lead_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_portal_invitations_lead ON public.crm_portal_invitations USING btree (lead_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_portal_proposal_acceptances_lead ON public.crm_portal_proposal_acceptances USING btree (lead_id, id);
+
+CREATE INDEX IF NOT EXISTS ix_crm_portal_sessions_account ON public.crm_portal_sessions USING btree (portal_account_id, id);
 
 CREATE INDEX IF NOT EXISTS ix_crm_project_milestones_due ON public.crm_project_milestones USING btree (due_date);
 
@@ -1953,11 +2534,37 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_admin_sessions_token_hash ON public.crm
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_appointment_attendees_staff ON public.crm_appointment_attendees USING btree (appointment_id, staff_id);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_automation_action_runs_step ON public.crm_automation_action_runs USING btree (execution_id, action_index);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_automation_approvals_step ON public.crm_automation_approvals USING btree (execution_id, action_index);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_automation_executions_occurrence ON public.crm_automation_executions USING btree (rule_id, trigger, record_type, record_id, occurrence_key);
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_document_shares_token_hash ON public.crm_document_shares USING btree (token_hash);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_kb_articles_slug ON public.crm_kb_articles USING btree (slug);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_marketing_designs_name ON public.crm_marketing_designs USING btree (name);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_marketing_exclusions ON public.crm_marketing_exclusions USING btree (campaign_id, lead_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_marketing_recipients ON public.crm_marketing_recipients USING btree (campaign_id, lead_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_marketing_segments_name ON public.crm_marketing_segments USING btree (name);
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_notifications_occurrence ON public.crm_notifications USING btree (occurrence_key) WHERE (occurrence_key IS NOT NULL);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_portal_accounts_email ON public.crm_portal_accounts USING btree (email);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_portal_accounts_lead ON public.crm_portal_accounts USING btree (lead_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_portal_document_grants ON public.crm_portal_document_grants USING btree (lead_id, attachment_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_portal_invitations_token_hash ON public.crm_portal_invitations USING btree (token_hash);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_portal_proposal_acceptances_deal ON public.crm_portal_proposal_acceptances USING btree (deal_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_portal_sessions_token_hash ON public.crm_portal_sessions USING btree (token_hash);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crm_project_templates_name ON public.crm_project_templates USING btree (name);
 
@@ -2123,9 +2730,19 @@ COMMIT;
 --   DROP TABLE IF EXISTS public.crm_project_updates CASCADE;
 --   DROP TABLE IF EXISTS public.crm_project_templates CASCADE;
 --   DROP TABLE IF EXISTS public.crm_project_milestones CASCADE;
+--   DROP TABLE IF EXISTS public.crm_portal_sessions CASCADE;
+--   DROP TABLE IF EXISTS public.crm_portal_proposal_acceptances CASCADE;
+--   DROP TABLE IF EXISTS public.crm_portal_invitations CASCADE;
+--   DROP TABLE IF EXISTS public.crm_portal_document_grants CASCADE;
+--   DROP TABLE IF EXISTS public.crm_portal_accounts CASCADE;
 --   DROP TABLE IF EXISTS public.crm_notifications CASCADE;
 --   DROP TABLE IF EXISTS public.crm_messages CASCADE;
 --   DROP TABLE IF EXISTS public.crm_message_drafts CASCADE;
+--   DROP TABLE IF EXISTS public.crm_marketing_segments CASCADE;
+--   DROP TABLE IF EXISTS public.crm_marketing_recipients CASCADE;
+--   DROP TABLE IF EXISTS public.crm_marketing_exclusions CASCADE;
+--   DROP TABLE IF EXISTS public.crm_marketing_designs CASCADE;
+--   DROP TABLE IF EXISTS public.crm_marketing_campaigns CASCADE;
 --   DROP TABLE IF EXISTS public.crm_leads CASCADE;
 --   DROP TABLE IF EXISTS public.crm_kb_articles CASCADE;
 --   DROP TABLE IF EXISTS public.crm_inbound_email_events CASCADE;
@@ -2146,6 +2763,10 @@ COMMIT;
 --   DROP TABLE IF EXISTS public.crm_campaign_recipients CASCADE;
 --   DROP TABLE IF EXISTS public.crm_campaign_events CASCADE;
 --   DROP TABLE IF EXISTS public.crm_behavioral_events CASCADE;
+--   DROP TABLE IF EXISTS public.crm_automation_rules CASCADE;
+--   DROP TABLE IF EXISTS public.crm_automation_executions CASCADE;
+--   DROP TABLE IF EXISTS public.crm_automation_approvals CASCADE;
+--   DROP TABLE IF EXISTS public.crm_automation_action_runs CASCADE;
 --   DROP TABLE IF EXISTS public.crm_attachments CASCADE;
 --   DROP TABLE IF EXISTS public.crm_attachment_blobs CASCADE;
 --   DROP TABLE IF EXISTS public.crm_approvals CASCADE;

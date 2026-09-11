@@ -15,7 +15,7 @@ deploys to shared environments or runs migrations anywhere.
 | | |
 |---|---|
 | Branch | `claude/sitemint-crm-operations-124038` |
-| Candidate commit | `cf98858` |
+| Candidate commit | The branch tip. Capture it once, at the start: `CANDIDATE=$(git rev-parse HEAD)`, and use `$CANDIDATE` for the deploy and the rollback so both name the same thing. The last commit whose change is application code is `87f787f`; anything after it is documentation and reviewed schema artifacts, which are applied by §5 rather than compiled. |
 | Pushed? | **No.** The branch exists only in the CRM session's worktree. |
 | Base | `b0a5f49`, with receptionist `abfe8bb` merged at `5eb4c0b` |
 | Contains `main`? | Yes — `main` (`57ea6c8`) is an ancestor. |
@@ -83,7 +83,12 @@ have ever had the CRM.
 | `schema/M3-conversations.sql` | `crm_conversations`, `crm_conversation_participants`, `crm_message_drafts`, `crm_conversation_reads` + 6 columns on `crm_messages` |
 | `schema/M3-inbound-email.sql` | `crm_inbound_email_events`, `crm_email_suppressions`, `crm_unmatched_emails`, `crm_email_send_counters` + 2 columns on `crm_conversations` |
 | `schema/M3-sales-chain.sql` | 9 nullable columns on `crm_deals` (owner, probability, outcome, conversion link) |
-| `schema/M4-crm-first-install.sql` | **First installation only.** The complete 46-table `crm_*` schema, guarded and idempotent. Not for an environment that already has the CRM. |
+| `schema/M4-support.sql` | `crm_support_tickets`, `crm_support_messages`, `crm_kb_articles` |
+| `schema/M4-marketing.sql` | `crm_marketing_segments`, `_designs`, `_campaigns`, `_exclusions`, `_recipients` |
+| `schema/M4-automation.sql` | `crm_automation_rules`, `_executions`, `_action_runs`, `_approvals` |
+| `schema/M4-deliveries.sql` | `crm_reminder_deliveries`, `crm_delivery_recovery_actions` + `occurrence_key` on `crm_notifications` |
+| `schema/M4-portal.sql` | `crm_portal_accounts`, `_invitations`, `_sessions`, `_document_grants`, `_proposal_acceptances` |
+| `schema/M4-crm-first-install.sql` | **First installation only.** The complete 60-table `crm_*` schema, guarded and idempotent. Not for an environment that already has the CRM. |
 
 ### 3d. Columns added to existing tables
 
@@ -159,10 +164,15 @@ One reviewed artifact, one command:
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-crm-first-install.sql
 ```
 
-46 `crm_*` tables, schema only, no rows. It already contains every column the
-M3 and M4 upgrade files add, so **do not also run those**. Verified idempotent:
+60 `crm_*` tables, schema only, no rows. It already contains everything the M3
+and M4 upgrade files add, so **do not also run those**. Verified idempotent:
 applied three times in succession to a virgin database, each run exited 0 and
-left identical counts (46 tables, 118 indexes, 422 constraints).
+left identical counts (60 tables, 165 indexes, 568 constraints).
+
+Also verified end to end on that virgin database: the application boots against
+it, the first owner bootstraps with the full owner permission set, and all six
+M4 surfaces (support, marketing, automation, deliveries, reports, history)
+answer 401 rather than 404 — mounted and gated rather than missing.
 
 Verify:
 
@@ -170,7 +180,7 @@ Verify:
 psql "$DATABASE_URL" -tAc "select count(*) from information_schema.tables where table_schema='public' and table_name like 'crm\_%'"
 ```
 
-Expect `46`.
+Expect `60`.
 
 **This artifact installs the CRM only.** It contains no `intake_*`, `voice_*`,
 `discovery_*`, `scheduling_*` or `helpdesk_*` table. If the receptionist or
@@ -189,16 +199,25 @@ carries its own rollback block at the foot.
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M3-conversations.sql
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M3-inbound-email.sql
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M3-sales-chain.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-support.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-marketing.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-automation.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-deliveries.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f docs/crm-ops/schema/M4-portal.sql
 ```
+
+The five M4 files are independent of each other and may run in any order; they
+are listed alphabetically so a partial run is easy to resume. Each is additive
+and idempotent. Afterwards the database holds 60 `crm_*` tables, the same
+number a first installation produces.
 
 `M3-inbound-email.sql` must follow `M3-conversations.sql`, which creates
 `crm_conversations`. `M3-sales-chain.sql` is order-independent; it touches only
-`crm_deals`. Apply any `M4-*.sql` artifacts present after these, in filename
-order; each states its own prerequisites in its header.
+`crm_deals`.
 
 ### Remaining steps (both paths)
 
-4. Deploy the application at the candidate commit in §1.
+4. Deploy the application at `$CANDIDATE` (§1).
 5. `GET /api/readyz` → 200 before going further.
 6. **Bootstrap the first owner.** `POST /api/crm/staff/bootstrap` with
    `adminPassword` set to the environment's `ADMIN_PASSWORD`. This route only
