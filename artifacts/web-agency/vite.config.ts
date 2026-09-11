@@ -87,5 +87,12 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    // Same opt-in as `server` above. Without this the *built* application
+    // cannot reach a backend locally, so the only thing verifiable outside
+    // Replit was the dev server — and a dev-server-only check cannot catch a
+    // defect that only appears in the built chunk graph.
+    ...(process.env.API_PROXY_TARGET
+      ? { proxy: { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: false } } }
+      : {}),
   },
 });

@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
-import { useEffect, lazy } from "react";
+import { lazyRoute } from "@/lib/lazyRoute";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,9 +16,14 @@ import { DashboardShell } from "@/shells/DashboardShell";
  * Previously this module had 35 direct page imports against 8 lazy ones, so a
  * public visitor downloaded the entire internal CRM (26 `/admin/crm/*` pages,
  * ~1.13 MB of source) before seeing the homepage. Every route component is now
- * `lazy()`, and each is imported *inline at its own call site* rather than
- * through a shared barrel — a barrel would make every page reachable from one
- * module and collapse the split straight back into a single chunk.
+ * `lazyRoute()`, and each is imported *inline at its own call site* rather
+ * than through a shared barrel — a barrel would make every page reachable from
+ * one module and collapse the split straight back into a single chunk.
+ *
+ * `lazyRoute()` is `React.lazy()` plus a retry. React memoises a *rejected*
+ * import and re-throws it forever, so a single dropped chunk request used to
+ * strand a route on the error panel with no working recovery. See
+ * `@/lib/lazyRoute` for the measurement behind that.
  *
  * Only the router, the three shells, the providers, and the token layer remain
  * eager.
@@ -42,45 +48,45 @@ import HomeV5 from "@/pages/HomeV5";
 // remaining consumer is `HomeV5.tsx` (`import { SignalHeroV4 } from
 // "@/pages/HomeV4"`), which is enough to keep it in the bundle and keep it
 // as a rollback reference. Re-add a lazy import + Route here to roll back.
-const ServicesV3 = lazy(() => import("@/pages/ServicesV3"));
-const WebsitesAppsV3 = lazy(() => import("@/pages/WebsitesAppsV3"));
-const DiscoverySystemsV3 = lazy(() => import("@/pages/DiscoverySystemsV3"));
+const ServicesV3 = lazyRoute(() => import("@/pages/ServicesV3"));
+const WebsitesAppsV3 = lazyRoute(() => import("@/pages/WebsitesAppsV3"));
+const DiscoverySystemsV3 = lazyRoute(() => import("@/pages/DiscoverySystemsV3"));
 // V5 (W-6): "AI Systems & Automation" replaces "Workflow Automation" and
 // folds in a substantial CRM & internal systems section. `AutomationV3`
 // stays in the repository, unrouted, as a rollback reference — the old
 // `/automation` path 301s to `aiSystems` below instead of rendering it.
-const AiReceptionistV5 = lazy(() => import("@/pages/AiReceptionistV5"));
-const AiReceptionistDemoV5 = lazy(() => import("@/pages/AiReceptionistDemoV5"));
-const AiSystemsV5 = lazy(() => import("@/pages/AiSystemsV5"));
-const WorkV3 = lazy(() => import("@/pages/WorkV3"));
-const ProcessV3 = lazy(() => import("@/pages/ProcessV3"));
-const AboutV3 = lazy(() => import("@/pages/AboutV3"));
-const InsightsV3 = lazy(() => import("@/pages/InsightsV3"));
-const StartV3 = lazy(() => import("@/pages/StartV3"));
-const LegalPrivacyV3 = lazy(() => import("@/pages/LegalPrivacyV3"));
-const LegalTermsV3 = lazy(() => import("@/pages/LegalTermsV3"));
+const AiReceptionistV5 = lazyRoute(() => import("@/pages/AiReceptionistV5"));
+const AiReceptionistDemoV5 = lazyRoute(() => import("@/pages/AiReceptionistDemoV5"));
+const AiSystemsV5 = lazyRoute(() => import("@/pages/AiSystemsV5"));
+const WorkV3 = lazyRoute(() => import("@/pages/WorkV3"));
+const ProcessV3 = lazyRoute(() => import("@/pages/ProcessV3"));
+const AboutV3 = lazyRoute(() => import("@/pages/AboutV3"));
+const InsightsV3 = lazyRoute(() => import("@/pages/InsightsV3"));
+const StartV3 = lazyRoute(() => import("@/pages/StartV3"));
+const LegalPrivacyV3 = lazyRoute(() => import("@/pages/LegalPrivacyV3"));
+const LegalTermsV3 = lazyRoute(() => import("@/pages/LegalTermsV3"));
 // V5 rebuilt pricing (amendment §10, supersedes the retired V2 pricing preview).
-const PricingV5 = lazy(() => import("@/pages/PricingV5"));
-const ThankYou = lazy(() => import("@/pages/ThankYou"));
+const PricingV5 = lazyRoute(() => import("@/pages/PricingV5"));
+const ThankYou = lazyRoute(() => import("@/pages/ThankYou"));
 // `NotFound` (V2) stays imported — AdminRoutes' own catch-all below still
 // uses it and that subtree is not this workstream's to change. The public
 // catch-all now uses `NotFoundV5` instead (W-12/W-16).
-const NotFound = lazy(() => import("@/pages/not-found"));
-const NotFoundV5 = lazy(() => import("@/pages/NotFoundV5"));
+const NotFound = lazyRoute(() => import("@/pages/not-found"));
+const NotFoundV5 = lazyRoute(() => import("@/pages/NotFoundV5"));
 
 // ── Discovery ───────────────────────────────────────────────────────────────
 // The active /discovery route is the guided structured form (DiscoveryPage).
 // Legacy discovery is kept for internal rollback only (/discovery/__legacy).
 // ROLLBACK: swap DiscoveryPage back to Discovery to revert instantly.
-const DiscoveryPage = lazy(() => import("@/pages/DiscoveryPage"));
-const Discovery = lazy(() => import("@/pages/Discovery"));
+const DiscoveryPage = lazyRoute(() => import("@/pages/DiscoveryPage"));
+const Discovery = lazyRoute(() => import("@/pages/Discovery"));
 
 // ── AI Receptionist public journey ──────────────────────────────────────────
 // Frontend V4: the capability-honest Signal landing (receptionist owner's
 // file — not edited by this workstream). `AiReceptionistV3` and
 // `AiReceptionist` (V2) are left exactly as the receptionist owner has them;
 // this workstream does not delete or otherwise touch `AiReceptionist*.tsx`.
-const LandingReceptionistSignup = lazy(() => import("@/pages/LandingReceptionistSignup"));
+const LandingReceptionistSignup = lazyRoute(() => import("@/pages/LandingReceptionistSignup"));
 
 // ── Retired verticals (W-18 / amendment §11) ────────────────────────────────
 // `/ai-for-lawyers` and `/ai-for-realtors` now redirect to the AI
@@ -90,50 +96,50 @@ const LandingReceptionistSignup = lazy(() => import("@/pages/LandingReceptionist
 // ── Internal admin / CRM ────────────────────────────────────────────────────
 // Everything below is reachable only from a matched `/admin*` route, behind
 // DashboardShell. This is what keeps the CRM out of the public entry graph.
-const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
-const StaffActivation = lazy(() => import("@/pages/StaffActivation"));
-const CrmStaffAdmin = lazy(() => import("@/pages/crm/CrmStaffAdmin"));
-const CrmMyAccount = lazy(() => import("@/pages/crm/CrmMyAccount"));
-const CrmOperationsPage = lazy(() => import("@/pages/crm/CrmOperations"));
-const CrmMyDayPage = lazy(() => import("@/pages/crm/CrmMyDay"));
-const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
-const AdminSubmissionDetail = lazy(() => import("@/pages/AdminSubmissionDetail"));
+const AdminLogin = lazyRoute(() => import("@/pages/AdminLogin"));
+const StaffActivation = lazyRoute(() => import("@/pages/StaffActivation"));
+const CrmStaffAdmin = lazyRoute(() => import("@/pages/crm/CrmStaffAdmin"));
+const CrmMyAccount = lazyRoute(() => import("@/pages/crm/CrmMyAccount"));
+const CrmOperationsPage = lazyRoute(() => import("@/pages/crm/CrmOperations"));
+const CrmMyDayPage = lazyRoute(() => import("@/pages/crm/CrmMyDay"));
+const AdminDashboard = lazyRoute(() => import("@/pages/AdminDashboard"));
+const AdminSubmissionDetail = lazyRoute(() => import("@/pages/AdminSubmissionDetail"));
 
-const CrmExecutiveDashboard = lazy(() => import("@/pages/crm/CrmExecutiveDashboard"));
-const CrmLeads = lazy(() => import("@/pages/crm/CrmLeads"));
-const CrmLeadDetail = lazy(() => import("@/pages/crm/CrmLeadDetail"));
-const CrmLeadDna = lazy(() => import("@/pages/crm/CrmLeadDna"));
-const CrmPipeline = lazy(() => import("@/pages/crm/CrmPipeline"));
-const CrmTasks = lazy(() => import("@/pages/crm/CrmTasks"));
-const CrmEmailTemplates = lazy(() => import("@/pages/crm/CrmEmailTemplates"));
-const CrmImport = lazy(() => import("@/pages/crm/CrmImport"));
-const CrmSettings = lazy(() => import("@/pages/crm/CrmSettings"));
-const CrmInbox = lazy(() => import("@/pages/crm/CrmInbox"));
-const CrmCalendar = lazy(() => import("@/pages/crm/CrmCalendar"));
-const CrmDeals = lazy(() => import("@/pages/crm/CrmDeals"));
-const CrmTransactions = lazy(() => import("@/pages/crm/CrmTransactions"));
-const CrmProjects = lazy(() => import("@/pages/crm/CrmProjects"));
-const CrmDocuments = lazy(() => import("@/pages/crm/CrmDocuments"));
-const CrmReporting = lazy(() => import("@/pages/crm/CrmReporting"));
-const CrmAdminSettings = lazy(() => import("@/pages/crm/CrmAdminSettings"));
-const CrmCampaigns = lazy(() => import("@/pages/crm/CrmCampaigns"));
-const CrmCampaignBuilderPage = lazy(() => import("@/pages/crm/CrmCampaignBuilderPage"));
-const CrmCampaignQueuePage = lazy(() => import("@/pages/crm/CrmCampaignQueuePage"));
-const CrmWorkspaceLanding = lazy(() => import("@/pages/crm/CrmWorkspaceLanding"));
-const CrmDiscovery = lazy(() => import("@/pages/crm/CrmDiscovery"));
-const CrmCommunications = lazy(() => import("@/pages/crm/CrmCommunications"));
-const CrmBehavioralIntelligence = lazy(() => import("@/pages/crm/CrmBehavioralIntelligence"));
-const CrmAutomationQueue = lazy(() => import("@/pages/crm/CrmAutomationQueue"));
-const CrmIntakeCases = lazy(() => import("@/pages/crm/CrmIntakeCases"));
-const CrmReceptionistAccounts = lazy(() => import("@/pages/crm/CrmReceptionistAccounts"));
-const CrmNotFound = lazy(() => import("@/pages/crm/CrmLayout").then(m => ({ default: m.CrmNotFound })));
+const CrmExecutiveDashboard = lazyRoute(() => import("@/pages/crm/CrmExecutiveDashboard"));
+const CrmLeads = lazyRoute(() => import("@/pages/crm/CrmLeads"));
+const CrmLeadDetail = lazyRoute(() => import("@/pages/crm/CrmLeadDetail"));
+const CrmLeadDna = lazyRoute(() => import("@/pages/crm/CrmLeadDna"));
+const CrmPipeline = lazyRoute(() => import("@/pages/crm/CrmPipeline"));
+const CrmTasks = lazyRoute(() => import("@/pages/crm/CrmTasks"));
+const CrmEmailTemplates = lazyRoute(() => import("@/pages/crm/CrmEmailTemplates"));
+const CrmImport = lazyRoute(() => import("@/pages/crm/CrmImport"));
+const CrmSettings = lazyRoute(() => import("@/pages/crm/CrmSettings"));
+const CrmInbox = lazyRoute(() => import("@/pages/crm/CrmInbox"));
+const CrmCalendar = lazyRoute(() => import("@/pages/crm/CrmCalendar"));
+const CrmDeals = lazyRoute(() => import("@/pages/crm/CrmDeals"));
+const CrmTransactions = lazyRoute(() => import("@/pages/crm/CrmTransactions"));
+const CrmProjects = lazyRoute(() => import("@/pages/crm/CrmProjects"));
+const CrmDocuments = lazyRoute(() => import("@/pages/crm/CrmDocuments"));
+const CrmReporting = lazyRoute(() => import("@/pages/crm/CrmReporting"));
+const CrmAdminSettings = lazyRoute(() => import("@/pages/crm/CrmAdminSettings"));
+const CrmCampaigns = lazyRoute(() => import("@/pages/crm/CrmCampaigns"));
+const CrmCampaignBuilderPage = lazyRoute(() => import("@/pages/crm/CrmCampaignBuilderPage"));
+const CrmCampaignQueuePage = lazyRoute(() => import("@/pages/crm/CrmCampaignQueuePage"));
+const CrmWorkspaceLanding = lazyRoute(() => import("@/pages/crm/CrmWorkspaceLanding"));
+const CrmDiscovery = lazyRoute(() => import("@/pages/crm/CrmDiscovery"));
+const CrmCommunications = lazyRoute(() => import("@/pages/crm/CrmCommunications"));
+const CrmBehavioralIntelligence = lazyRoute(() => import("@/pages/crm/CrmBehavioralIntelligence"));
+const CrmAutomationQueue = lazyRoute(() => import("@/pages/crm/CrmAutomationQueue"));
+const CrmIntakeCases = lazyRoute(() => import("@/pages/crm/CrmIntakeCases"));
+const CrmReceptionistAccounts = lazyRoute(() => import("@/pages/crm/CrmReceptionistAccounts"));
+const CrmNotFound = lazyRoute(() => import("@/pages/crm/CrmLayout").then(m => ({ default: m.CrmNotFound })));
 
 // ── Receptionist Ops (Operations owner, wp/operations) ──────────────────────
-const CrmOpsFirms = lazy(() => import("@/pages/ops/CrmOpsFirms"));
-const CrmOpsFirmDetail = lazy(() => import("@/pages/ops/CrmOpsFirmDetail"));
-const CrmOpsIssues = lazy(() => import("@/pages/ops/CrmOpsIssues"));
-const CrmOpsUsage = lazy(() => import("@/pages/ops/CrmOpsUsage"));
-const CrmOpsNumbers = lazy(() => import("@/pages/ops/CrmOpsNumbers"));
+const CrmOpsFirms = lazyRoute(() => import("@/pages/ops/CrmOpsFirms"));
+const CrmOpsFirmDetail = lazyRoute(() => import("@/pages/ops/CrmOpsFirmDetail"));
+const CrmOpsIssues = lazyRoute(() => import("@/pages/ops/CrmOpsIssues"));
+const CrmOpsUsage = lazyRoute(() => import("@/pages/ops/CrmOpsUsage"));
+const CrmOpsNumbers = lazyRoute(() => import("@/pages/ops/CrmOpsNumbers"));
 
 const queryClient = new QueryClient();
 
