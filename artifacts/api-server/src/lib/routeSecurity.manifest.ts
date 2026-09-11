@@ -14,6 +14,35 @@
 import type { Protection } from "./routeSecurity.js";
 
 export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
+  // ── M1: staff identity and authentication (routes/crmStaff.ts) ────────────
+  // "staff" = crm_staff_session cookie + CSRF header + permission grant.
+  // "credential" = a secret presented in the request itself (the deployment's
+  // ADMIN_PASSWORD, a staff password, or a TOTP/recovery code).
+  // "token-proven" = a single-use, expiring invite or reset token.
+  "POST /api/crm/staff/bootstrap": "credential",
+  "POST /api/crm/staff/recovery": "credential",
+  "POST /api/crm/staff/login": "credential",
+  "POST /api/crm/staff/login/mfa": "credential",
+  "POST /api/crm/staff/activation": "token-proven",
+  "POST /api/crm/staff/password-reset": "token-proven",
+  "POST /api/crm/staff/logout": "staff",
+  "PATCH /api/crm/staff/me": "staff",
+  "DELETE /api/crm/staff/me/sessions/:id": "staff",
+  "POST /api/crm/staff/me/sessions/revoke-all": "staff",
+  "POST /api/crm/staff/me/mfa/start": "staff",
+  // These three are step-up routes: `requireStaff()` in the chain AND a fresh
+  // password / TOTP code in the body. detectProtection returns both classes
+  // and the manifest records one, so they read as "credential" — the stronger
+  // statement. crmStaffContract.test.ts separately pins that each still
+  // carries requireStaff, so the session guard cannot vanish unnoticed.
+  "POST /api/crm/staff/me/password": "credential",
+  "POST /api/crm/staff/me/mfa/confirm": "credential",
+  "POST /api/crm/staff/me/mfa/disable": "credential",
+  "POST /api/crm/staff": "staff",
+  "POST /api/crm/staff/:id/invite": "staff",
+  "PATCH /api/crm/staff/:id": "staff",
+  "POST /api/crm/staff/:id/password-reset": "staff",
+
   "DELETE /api/crm/campaigns/:id": "admin",
   "DELETE /api/crm/campaigns/:id/steps/:stepId": "admin",
   "DELETE /api/crm/campaigns/queue/:messageId": "admin",

@@ -23,6 +23,7 @@ import { join } from "node:path";
 /** How a mutating route is allowed to be reachable. */
 export type Protection =
   | "admin" // CRM/admin bearer token middleware
+  | "staff" // M1: per-person CRM staff session + CSRF + permission grant
   | "session" // receptionist httpOnly-cookie session
   | "signature" // provider webhook with a verified signature
   | "credential" // validates a credential presented in the request itself
@@ -51,6 +52,11 @@ const ANY_ROUTE = /(?:router|app)\.(get|post|put|patch|delete|all|use)\(\s*(["'`
 
 /** Middleware names that establish protection when they appear in the chain. */
 const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
+  // `requireStaff()` / `requireStaff("projects.write")` — resolves the
+  // crm_staff_session cookie, enforces CSRF on mutations, enforces the MFA
+  // challenge, and enforces the named permission. Listed before requireAdmin
+  // so the stronger, per-person class is the one recorded.
+  [/\brequireStaff\s*\(/, "staff"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
   [/\bvalidateTwilioWebhook\b/, "signature"],
@@ -59,6 +65,7 @@ const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
 
 /** Guards applied inside the handler rather than as middleware. */
 const BODY_SIGNALS: Array<[RegExp, Protection]> = [
+  [/\brequireStaff\s*\(/, "staff"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
   [/\bauthenticateVapiWebhook\b/, "signature"],
@@ -73,6 +80,13 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\bvalidateToken\s*\(/, "credential"],
   [/\bverifyPassword\b|\bbcrypt\.compare\b/, "credential"],
   [/\bcompletePasswordReset\b|\bacceptInvitation\b|\bconfirmEmailVerification\b|\bconsumeAccountToken\b/, "token-proven"],
+  // M1 staff onboarding/reset: `consumeableToken` resolves a single-use,
+  // unexpired, unrevoked invite/reset token to its staff row, and the caller
+  // marks it consumed in the same request.
+  [/\bconsumeableToken\s*\(/, "token-proven"],
+  // M1 MFA challenge: a TOTP code (or a single-use recovery code) presented in
+  // the request completes authentication.
+  [/\bverifyTotp\s*\(/, "credential"],
   [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites|SchedulingRequests|BetaRequests|Demo)Enabled\b/, "feature-flag"],
   [/\bisAiToolkitCheckoutEnabled\b/, "feature-flag"],
   [/\bisPasswordResetRequestsEnabled\b/, "feature-flag"],

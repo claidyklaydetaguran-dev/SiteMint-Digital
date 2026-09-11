@@ -637,10 +637,11 @@ check(
   // P4 raised this from ten: scheduling 0001 adds calendar_connections
   // and calendar_oauth_states. V5 0007 raised it from twenty-six:
   // voice_onboarding_states, voice_beta_requests, voice_invites.
+  // Voice 0008 raised it from twenty-nine: voice_signup_jobs.
   // Update this pin ONLY alongside a reviewed migration that changes
   // the inventory.
-  "the committed migrations create exactly twenty-nine domain tables",
-  domainTables.length === 29,
+  "the committed migrations create exactly thirty domain tables",
+  domainTables.length === 30,
   domainTables.join(","),
 );
 check(

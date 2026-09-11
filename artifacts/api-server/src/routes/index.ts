@@ -7,6 +7,7 @@ import contactRouter from "./contact";
 import crmRouter from "./crm";
 import crmProjectsRouter from "./crmProjects";
 import crmDiscoveryRouter from "./crmDiscovery";
+import crmStaffRouter from "./crmStaff";
 import phoneRouter from "./phone";
 import copilotRouter from "./copilot";
 import aiCampaignGenerateRouter from "./aiCampaignGenerate";
@@ -46,6 +47,9 @@ router.use(discoveryRouter);
 router.use(discoveryV1Router);
 router.use(adminRouter);
 router.use(contactRouter);
+// Staff auth is registered BEFORE the CRM routers: /crm/staff/* must match its
+// own handlers rather than falling into a /crm/:something parameterised route.
+router.use(crmStaffRouter);
 router.use(crmRouter);
 router.use(crmProjectsRouter);
 router.use(crmDiscoveryRouter);
