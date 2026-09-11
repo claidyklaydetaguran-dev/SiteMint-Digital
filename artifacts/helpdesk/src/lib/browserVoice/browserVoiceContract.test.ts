@@ -44,7 +44,7 @@ import {
   safeBrowserVoiceErrorMessage,
   type BrowserVoiceErrorCategory,
 } from "./errors.js";
-import { classifyVapiError } from "./vapi/VapiBrowserVoiceClient.js";
+import { browserVoiceDiagnosticLine, classifyVapiError } from "./vapi/VapiBrowserVoiceClient.js";
 import {
   FakeBrowserVoiceClient,
   createFakeBrowserVoiceClientSource,
@@ -399,7 +399,7 @@ section("Production error copy — static, safe, and complete");
     "microphone_unavailable",
     "connection_failed",
     "connection_closed",
-    "provider_site_not_authorized",
+    "provider_not_authorized",
     "provider_refused",
     "provider_unavailable",
     "start_failed",
@@ -424,9 +424,10 @@ section("Production error copy — static, safe, and complete");
     /allow microphone access/i.test(safeBrowserVoiceErrorMessage("permission_denied")),
   );
   check(
-    "site-not-authorized copy names the administrator action, not the customer's microphone",
-    /allowed list/i.test(safeBrowserVoiceErrorMessage("provider_site_not_authorized")) &&
-      !/microphone/i.test(safeBrowserVoiceErrorMessage("provider_site_not_authorized")),
+    "authorization copy names BOTH restrictions an administrator should check, and not the microphone",
+    /website address/i.test(safeBrowserVoiceErrorMessage("provider_not_authorized")) &&
+      /assistant/i.test(safeBrowserVoiceErrorMessage("provider_not_authorized")) &&
+      !/microphone/i.test(safeBrowserVoiceErrorMessage("provider_not_authorized")),
   );
 }
 
@@ -440,17 +441,25 @@ section("Provider failure classification (AR-001V.2)");
 // of those collapsed to the generic message, which sent the investigation to
 // the customer's microphone and password instead of a settings screen.
 {
+  // Both of these were observed from the live provider on 2026-09-11, before
+  // and after the origin was corrected. Identical status, different cause —
+  // so neither may be classified as specifically an origin problem.
   eq(
-    "a provider 403 is classified as this site not being authorized",
+    "a 403 for a disallowed ORIGIN is an authorization failure",
     classifyVapiError({ message: "Key doesn't allow origin 'https://example.test'.", error: "Forbidden", statusCode: 403 }),
-    "provider_site_not_authorized",
+    "provider_not_authorized",
+  );
+  eq(
+    "a 403 for a disallowed ASSISTANT is the same authorization failure",
+    classifyVapiError({ message: "Key doesn't allow assistantId 'undefined'.", error: "Forbidden", statusCode: 403 }),
+    "provider_not_authorized",
   );
   eq(
     "a 403 nested under .error is classified the same way",
     classifyVapiError({ error: { statusCode: 403 } }),
-    "provider_site_not_authorized",
+    "provider_not_authorized",
   );
-  eq("a provider 401 is a refusal", classifyVapiError({ statusCode: 401 }), "provider_refused");
+  eq("a provider 401 is an authorization failure", classifyVapiError({ statusCode: 401 }), "provider_not_authorized");
   eq("a provider 400 is a refusal", classifyVapiError({ statusCode: 400 }), "provider_refused");
   eq("a provider 503 is unavailability", classifyVapiError({ statusCode: 503 }), "provider_unavailable");
   eq(
@@ -482,8 +491,27 @@ section("Provider failure classification (AR-001V.2)");
   check(
     "no support reference clutters a self-explanatory failure",
     !browserVoiceErrorNeedsSupportReference("permission_denied") &&
-      !browserVoiceErrorNeedsSupportReference("provider_site_not_authorized"),
+      !browserVoiceErrorNeedsSupportReference("microphone_unavailable"),
   );
+  check(
+    "an authorization failure DOES carry a reference — its cause is ambiguous by design",
+    browserVoiceErrorNeedsSupportReference("provider_not_authorized"),
+  );
+
+  // The sanitized diagnostic: enough to act on, nothing that leaks.
+  {
+    const line = browserVoiceDiagnosticLine(
+      "provider_not_authorized",
+      { message: "Key doesn't allow origin 'https://secret.example'.", statusCode: 403 },
+      "BVT-DEADBEEF",
+    );
+    check("the diagnostic records the classification and status", /category=provider_not_authorized/.test(line) && /providerStatus=403/.test(line));
+    check("the diagnostic quotes the support reference", /ref=BVT-DEADBEEF/.test(line));
+    check(
+      "the diagnostic leaks no provider message, host or identifier",
+      !/secret\.example/.test(line) && !/doesn't allow/i.test(line) && !/https?:/.test(line),
+    );
+  }
   const refA = newBrowserVoiceSupportReference();
   const refB = newBrowserVoiceSupportReference();
   check("a support reference is short, prefixed and opaque", /^BVT-[0-9A-F]{8}$/.test(refA));

@@ -12,6 +12,7 @@ import {
   safeBrowserVoiceErrorMessage,
 } from "@/lib/browserVoice/errors";
 import type { BrowserVoiceErrorCategory } from "@/lib/browserVoice/errors";
+import { browserVoiceDiagnosticLine } from "@/lib/browserVoice/vapi/VapiBrowserVoiceClient";
 
 const ACTIVE_STATES: ReadonlySet<BrowserVoiceTestState> = new Set([
   "preparing",
@@ -82,9 +83,20 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
    * plus a support reference when that copy cannot already tell the customer
    * what to do. Never stores or renders provider text.
    */
-  const recordFailure = useCallback((category: BrowserVoiceErrorCategory) => {
+  const recordFailure = useCallback((category: BrowserVoiceErrorCategory, providerStatus?: number) => {
     setErrorMessage(safeBrowserVoiceErrorMessage(category));
-    setSupportReference(browserVoiceErrorNeedsSupportReference(category) ? newBrowserVoiceSupportReference() : null);
+    const reference = browserVoiceErrorNeedsSupportReference(category) ? newBrowserVoiceSupportReference() : null;
+    setSupportReference(reference);
+    // One sanitized console line so a failure is diagnosable from a customer's
+    // browser without the provider's text ever being shown or stored. Carries
+    // the classification, the HTTP status and the reference — nothing else.
+    try {
+      console.warn(
+        browserVoiceDiagnosticLine(category, providerStatus === undefined ? null : { statusCode: providerStatus }, reference),
+      );
+    } catch {
+      // Diagnostics must never break the failure path.
+    }
   }, []);
 
   const clientRef = useRef<BrowserVoiceClient | null>(null);
@@ -167,7 +179,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
               prev === "permission_denied"
             )
               return prev;
-            recordFailure(event.category ?? "unexpected_browser_voice_error");
+            recordFailure(event.category ?? "unexpected_browser_voice_error", event.providerStatus);
             teardownClient();
             return "error";
           });

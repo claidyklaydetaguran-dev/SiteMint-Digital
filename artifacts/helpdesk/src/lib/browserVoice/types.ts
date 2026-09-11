@@ -33,7 +33,7 @@ export type BrowserVoiceEvent =
   // provider text and never becomes provider text — the consumer still looks
   // the displayed copy up in our own static table. Optional so a client that
   // cannot classify a failure stays valid.
-  | { type: "error"; category?: BrowserVoiceErrorCategory };
+  | { type: "error"; category?: BrowserVoiceErrorCategory; providerStatus?: number };
 
 /**
  * Only the opaque provider assistant id crosses this boundary — never

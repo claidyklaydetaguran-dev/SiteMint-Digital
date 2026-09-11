@@ -14,7 +14,7 @@ export type BrowserVoiceErrorCategory =
   // failure from one that never connected, and the customer's next action is
   // different too. Collapsing all three into the generic message is what made
   // the observed staging failure undiagnosable from the UI.
-  | "provider_site_not_authorized"
+  | "provider_not_authorized"
   | "provider_refused"
   | "provider_unavailable"
   | "start_failed"
@@ -28,8 +28,8 @@ const BROWSER_VOICE_ERROR_COPY: Record<BrowserVoiceErrorCategory, string> = {
   microphone_unavailable: "The microphone couldn't be accessed. Check your device and try again.",
   connection_failed: "The browser voice test couldn't connect. Please try again.",
   connection_closed: "The browser voice test connection closed unexpectedly.",
-  provider_site_not_authorized:
-    "This website isn't approved for browser calls yet. A SiteMint administrator needs to add this site's address to the voice service's allowed list, then you can try again.",
+  provider_not_authorized:
+    "The voice service refused this test for a configuration reason. A SiteMint administrator needs to check that the browser key allows this website address and this assistant.",
   provider_refused:
     "The voice service refused to start this test. The assistant may need to be published again before it can be tested.",
   provider_unavailable: "The voice service is temporarily unavailable. Please try again in a few minutes.",
@@ -63,7 +63,6 @@ export function newBrowserVoiceSupportReference(): string {
 const SELF_EXPLANATORY: ReadonlySet<BrowserVoiceErrorCategory> = new Set([
   "permission_denied",
   "microphone_unavailable",
-  "provider_site_not_authorized",
   "integration_unavailable",
 ]);
 
