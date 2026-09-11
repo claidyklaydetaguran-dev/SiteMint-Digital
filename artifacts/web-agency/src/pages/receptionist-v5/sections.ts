@@ -52,16 +52,22 @@ export const PREVIEW_LABEL =
 export const HERO_COPY = {
   /** Small caps label opening the hero's reveal sequence. */
   eyebrow: "SiteMint AI Receptionist",
-  /** Private-beta status indicator, shown as its own badge (not the eyebrow). */
-  betaStatus: "Private beta — invite only",
+  /** Product-status badge. Honest about the two separate states (owner
+   * directive 2026-09-11 §5): an account can exist before calling is
+   * activated, so the badge claims early access — never a working phone
+   * line out of the box. */
+  betaStatus: "Early access",
   /* Business-first outcome (owner directive 2026-09-08). */
   title: "Help every caller, even when your team is busy.",
   supporting:
     "It answers routine calls with your approved business information, collects the caller's details and why they're calling, helps schedule where you've set that up, and sends you a useful summary.",
   /** Filled/primary action — anchors to the Interactive Preview section. */
   primaryCta: "Explore the Interactive Preview",
-  /** Outline/secondary action — anchors to Request Beta Access. */
-  secondaryCta: "Request Beta Access",
+  /** Outline/secondary action — the working account journey (2026-09-11 §5).
+   * The beta-request section remains on the page as a secondary contact
+   * path, and the signup page itself falls back to it while registration
+   * is closed (503). */
+  secondaryCta: "Create Account",
   signInPrompt: "Already a client?",
   signInCta: "Sign in",
 } as const;

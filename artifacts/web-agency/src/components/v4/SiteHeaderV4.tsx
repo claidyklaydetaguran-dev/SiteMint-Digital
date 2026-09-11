@@ -60,11 +60,10 @@ import { SignalGlyphV4 } from "./SignalGlyphsV4";
 import {
   primaryNavV4,
   signInHrefV4,
-  signInLabelV4,
   startHrefV4,
   startLabelV4,
   whatWeBuildV4,
-  requestBetaHrefV4,
+  createAccountHrefV4,
 } from "./publicNavV4";
 
 /**
@@ -422,9 +421,9 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                 Sign in
               </a>
               <Link
-                href={requestBetaHrefV4}
+                href={createAccountHrefV4}
                 className="v4-btn v4-btn--primary v4-header__cta"
-                aria-label="Request Private Beta"
+                aria-label="Create Account"
               >
                 {/* Below ~480px the brand wordmark is already gone (CSS);
                     shortening "Request Private Beta" → "Beta" buys back the
@@ -432,8 +431,11 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                     is a substring of the constant aria-label above, so the
                     visible text is always contained in the accessible name
                     at both sizes. */}
-                <span className="v4-header__cta-full" aria-hidden="true">Request Private Beta</span>
-                <span className="v4-header__cta-short" aria-hidden="true">Beta</span>
+                {/* "Account" is a substring of the accessible name
+                    "Create Account", preserving label-in-name at the
+                    narrow size exactly like the previous CTA pair. */}
+                <span className="v4-header__cta-full" aria-hidden="true">Create Account</span>
+                <span className="v4-header__cta-short" aria-hidden="true">Account</span>
               </Link>
             </div>
           </>
@@ -517,12 +519,10 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
 
             <li className="v4-header__sep" role="presentation" aria-hidden="true" />
 
-            <li>
-              {/* Cross-application document navigation — never a <Link>. */}
-              <a href={signInHrefV4} className="v4-header__signin">
-                {signInLabelV4}
-              </a>
-            </li>
+            {/* Client Sign In left the marketing header (owner directive
+                2026-09-11 §5): it belongs to the AI Receptionist product
+                surfaces, and it remains reachable in the footer and on the
+                product pages. */}
             <li>
               <Link
                 href={startHrefV4}
@@ -641,17 +641,16 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                   Sign in
                 </a>
                 <Link
-                  href={requestBetaHrefV4}
+                  href={createAccountHrefV4}
                   className="v4-btn v4-btn--primary v4-sheet__cta"
                 >
-                  Request Private Beta
+                  Create Account
                 </Link>
               </>
             ) : (
               <>
-                <a href={signInHrefV4} className="v4-sheet__quiet">
-                  {signInLabelV4}
-                </a>
+                {/* Client Sign In removed here too (2026-09-11 §5) — the
+                    footer and product surfaces carry it. */}
                 <Link
                   href={startHrefV4}
                   className="v4-btn v4-btn--primary v4-sheet__cta"

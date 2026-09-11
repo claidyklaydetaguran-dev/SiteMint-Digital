@@ -46,6 +46,8 @@ export const ROUTES = {
   passwordReset: "/password-reset",
   /** S-2: complete a password reset (`?token=…`). Renders inside `AuthShell`. */
   passwordResetComplete: "/password-reset/complete",
+  /** Email-verification confirm page (2026-09-11 §5) — token-proven, public. */
+  verifyEmail: "/verify-email",
 
   overview: "/",
   /** S-3: the persistent Setup hub. */

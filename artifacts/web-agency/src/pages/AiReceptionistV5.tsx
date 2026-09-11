@@ -598,9 +598,11 @@ export default function AiReceptionistV5() {
                   <a href={`#${SECTION_ID.preview}`} className="smv5-btn smv5-btn--primary">
                     {HERO_COPY.primaryCta}
                   </a>
-                  <a href={`#${SECTION_ID.beta}`} className="smv5-btn smv5-btn--outline">
+                  {/* The working account journey (2026-09-11 §5). Wouter Link:
+                      this is an in-app route, not a section anchor. */}
+                  <Link href={ROUTES.aiReceptionistSignup} className="smv5-btn smv5-btn--outline">
                     {HERO_COPY.secondaryCta}
-                  </a>
+                  </Link>
                   <Link href={ROUTES.aiReceptionistDemo} className="smv5-btn smv5-btn--ghost">
                     Explore the dashboard demo
                   </Link>

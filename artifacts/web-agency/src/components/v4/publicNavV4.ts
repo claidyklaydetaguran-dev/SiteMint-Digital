@@ -123,6 +123,14 @@ export const startLabelV4 = "Start a Project";
  * "Start a Project" on this route — the general project journey leaves the
  * page entirely, per the approved IA.
  */
+/* Account-journey actions (owner directive 2026-09-11 §5): the product
+ * header acquires through the working account journey. Create Account is
+ * registration; Sign In is returning-user access — distinct on purpose.
+ * The beta-request section remains reachable on the page itself as a
+ * secondary contact path. */
+export const createAccountHrefV4 = ROUTES.aiReceptionistSignup;
+export const createAccountLabelV4 = "Create Account";
+
 export const requestBetaHrefV4 = `${ROUTES.aiReceptionist}#beta`;
 export const requestBetaLabelV4 = "Request Beta Access";
 export const explorePreviewHrefV4 = `${ROUTES.aiReceptionist}#preview`;
