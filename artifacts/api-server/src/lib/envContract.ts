@@ -41,6 +41,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["CALENDAR_WRITE_ENABLED", "P4", "Writing booked appointments into connected calendars"],
   ["VOICE_SMS_ENABLED", "P5", "Voice-side SMS sending (consent-gated outbox)"],
   ["VOICE_ALERTS_ENABLED", "P7", "Operator email alerts (critical issues)"],
+  ["VOICE_BROWSER_TOKEN_ORIGINS", "AR-001V.3", "Origins a scoped browser token may be used from; falls back to CORS_ALLOWED_ORIGINS"],
   ["VOICE_DIGEST_ENABLED", "P7", "Daily per-firm digest emails"],
   ["STRIPE_BOOT_SYNC_ENABLED", "core", "Stripe webhook registration/backfill at boot"],
   ["PUBLIC_REGISTRATION_ENABLED", "R4", "Unauthenticated self-registration (POST /receptionist/auth/signup)"],

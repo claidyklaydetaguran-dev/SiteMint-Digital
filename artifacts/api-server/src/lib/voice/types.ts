@@ -24,6 +24,25 @@ export type JsonObject = { [key: string]: JsonValue };
 export type VoiceProviderKey = string;
 
 /** Provider-neutral input for creating or updating a provider assistant. */
+/**
+ * AR-001V.3: request for a browser-call credential scoped to ONE assistant.
+ * `allowedOrigins` is defence in depth only — an Origin header is trivially
+ * set by any non-browser client, so it is never treated as authentication.
+ * The assistant restriction is the control that actually holds.
+ */
+export interface VoiceBrowserTokenInput {
+  providerAssistantId: string;
+  allowedOrigins: string[];
+  /** Operator-facing label at the provider. Never tenant-supplied free text. */
+  name: string;
+}
+
+/** The provider's browser credential. `tokenValue` is a secret. */
+export interface VoiceBrowserTokenResult {
+  tokenId: string;
+  tokenValue: string;
+}
+
 export interface VoiceAssistantInput {
   /** Non-empty display name for the assistant. */
   name: string;

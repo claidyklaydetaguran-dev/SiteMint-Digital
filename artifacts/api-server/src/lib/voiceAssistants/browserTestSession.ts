@@ -26,6 +26,7 @@ export type BrowserTestSessionErrorCode =
   | "assistant_not_published"
   | "provider_link_missing"
   | "unsupported_provider"
+  | "browser_token_unavailable"
   | "internal_error";
 
 export interface BrowserTestSessionError {
@@ -47,6 +48,13 @@ export interface BrowserTestSessionError {
 export interface BrowserTestSessionDto {
   provider: string;
   providerAssistantId: string;
+  /**
+   * AR-001V.3: a provider credential restricted to THIS assistant only. It
+   * replaces the build-time browser key, which could start any assistant in
+   * the organisation. Issued to the authenticated owner of this row and to
+   * nobody else; never present in a list response and never logged.
+   */
+  publicKey: string;
 }
 
 export type BrowserTestSessionResult =
@@ -60,6 +68,8 @@ const MESSAGE_BY_CODE: Record<BrowserTestSessionErrorCode, string> = {
   assistant_not_published: "This assistant has not been published yet.",
   provider_link_missing: "This assistant has no confirmed provider connection to test.",
   unsupported_provider: "Browser testing is not available for this assistant's provider.",
+  browser_token_unavailable:
+    "Browser testing could not be prepared for this assistant. Please try again, or contact SiteMint if it keeps happening.",
   internal_error: "An internal error occurred.",
 };
 
@@ -70,6 +80,7 @@ const STATUS_BY_CODE: Record<BrowserTestSessionErrorCode, number> = {
   assistant_not_published: 409,
   provider_link_missing: 409,
   unsupported_provider: 409,
+  browser_token_unavailable: 503,
   internal_error: 500,
 };
 
@@ -81,11 +92,29 @@ export interface BrowserTestSessionDependencies {
   /** Explicit server switch, never read at module import time. Authoritative over any client build flag. */
   isEnabled: () => boolean;
   findByIdForFirm: typeof voiceAssistantRepository.findByIdForFirm;
+  setBrowserToken: typeof voiceAssistantRepository.setBrowserToken;
+  /** Mints a scoped browser credential. Null when the provider offers none. */
+  mintBrowserToken: (
+    providerAssistantId: string,
+    name: string,
+  ) => Promise<{ tokenId: string; tokenValue: string } | null>;
 }
 
 export const defaultBrowserTestSessionDependencies: BrowserTestSessionDependencies = {
   isEnabled: isVoiceBrowserTestEnabled,
   findByIdForFirm: voiceAssistantRepository.findByIdForFirm,
+  setBrowserToken: voiceAssistantRepository.setBrowserToken,
+  mintBrowserToken: async (providerAssistantId, name) => {
+    // Lazy imports keep this module free of a provider construction at import
+    // time, exactly as the publish path does.
+    const { createProductionVoiceProvider } = await import("../voicePublishing/providerFactory.js");
+    const { loadBrowserTokenOrigins } = await import("./browserTokenOrigins.js");
+    const provider = createProductionVoiceProvider();
+    if (typeof provider.createBrowserToken !== "function") return null;
+    const origins = loadBrowserTokenOrigins();
+    if (origins.length === 0) return null;
+    return provider.createBrowserToken({ providerAssistantId, allowedOrigins: origins, name });
+  },
 };
 
 function failure(code: BrowserTestSessionErrorCode): BrowserTestSessionResult {
@@ -128,5 +157,35 @@ export async function getBrowserTestSession(
     return failure("provider_link_missing");
   }
 
-  return { ok: true, session: { provider: VAPI_PROVIDER_NAME, providerAssistantId: providerAssistantId.trim() } };
+  const providerId = providerAssistantId.trim();
+
+  // Reuse the token already minted for this assistant. Only an assistant that
+  // has never had one causes a provider call, so an ordinary publish, sync, or
+  // repeated browser test creates nothing new.
+  let publicKey = typeof row.browserTokenValue === "string" ? row.browserTokenValue.trim() : "";
+
+  if (publicKey.length === 0) {
+    let minted: { tokenId: string; tokenValue: string } | null = null;
+    try {
+      minted = await deps.mintBrowserToken(providerId, `sitemint-firm${firmId}-assistant${row.id}`);
+    } catch {
+      // A provider failure must not leak its text to the caller; the honest
+      // outcome is "could not prepare", not a generic internal error.
+      return failure("browser_token_unavailable");
+    }
+    if (minted === null) return failure("browser_token_unavailable");
+
+    // Conditional write: if a concurrent request already stored one, keep
+    // theirs and use it, so the two requests cannot diverge.
+    const stored = await deps.setBrowserToken(firmId, row.id, minted.tokenId, minted.tokenValue);
+    if (stored !== null) {
+      publicKey = minted.tokenValue;
+    } else {
+      const reread = await deps.findByIdForFirm(firmId, row.id);
+      publicKey = typeof reread?.browserTokenValue === "string" ? reread.browserTokenValue.trim() : "";
+      if (publicKey.length === 0) return failure("browser_token_unavailable");
+    }
+  }
+
+  return { ok: true, session: { provider: VAPI_PROVIDER_NAME, providerAssistantId: providerId, publicKey } };
 }

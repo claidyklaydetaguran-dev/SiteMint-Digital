@@ -531,6 +531,33 @@ export const voiceAssistantRepository = {
    * update can never make a divergent assistant look synchronized, and can
    * never erase the record of a previously proven agreement.
    */
+  /**
+   * Stores a freshly minted browser token for one firm-scoped assistant.
+   * Firm-scoped and conditional on the column still being empty, so two
+   * concurrent browser-test requests cannot overwrite each other's token —
+   * the loser simply re-reads the winner's row.
+   */
+  async setBrowserToken(
+    firmId: number,
+    id: number,
+    tokenId: string,
+    tokenValue: string,
+  ): Promise<VoiceAssistant | null> {
+    const now = new Date();
+    const [row] = await db
+      .update(voiceAssistants)
+      .set({ browserTokenId: tokenId, browserTokenValue: tokenValue, browserTokenIssuedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(voiceAssistants.id, id),
+          eq(voiceAssistants.firmId, firmId),
+          isNull(voiceAssistants.browserTokenValue),
+        ),
+      )
+      .returning();
+    return row ?? null;
+  },
+
   async recordProviderSyncError(
     firmId: number,
     id: number,

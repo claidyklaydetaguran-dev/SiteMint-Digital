@@ -632,7 +632,11 @@ export default function AssistantBuilder() {
               setTestSessionError(BROWSER_TEST_SESSION_ERROR);
               return;
             }
-            browserTest.start({ provider: "vapi", providerAssistantId: session.providerAssistantId });
+            browserTest.start({
+              provider: "vapi",
+              providerAssistantId: session.providerAssistantId,
+              publicKey: session.publicKey,
+            });
           })
           .catch(() => {
             // Never surfaces the response body: it could carry provider text.

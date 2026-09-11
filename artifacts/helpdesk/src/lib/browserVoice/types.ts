@@ -42,6 +42,14 @@ export type BrowserVoiceEvent =
 export interface BrowserVoiceStartInput {
   provider: "vapi";
   providerAssistantId: string;
+  /**
+   * AR-001V.3: the provider credential for THIS assistant, issued per session
+   * by the authenticated, firm-scoped browser-test-session endpoint. It
+   * replaces the build-time key, which could start any assistant in the
+   * organisation. There is deliberately no fallback to that shared key: if the
+   * server does not issue one, the test does not start.
+   */
+  publicKey: string;
 }
 
 export interface BrowserVoiceClient {

@@ -176,6 +176,11 @@ export class VapiBrowserVoiceClient implements BrowserVoiceClient {
     if (input.provider !== "vapi") throw new Error(safeBrowserVoiceErrorMessage("start_failed"));
     const providerAssistantId = input.providerAssistantId.trim();
     if (!providerAssistantId) throw new Error(safeBrowserVoiceErrorMessage("start_failed"));
+    // The per-session scoped credential. Absent means the server did not issue
+    // one, and starting anyway would mean reaching for a broader key — so this
+    // fails closed instead.
+    const sessionKey = typeof input.publicKey === "string" ? input.publicKey.trim() : "";
+    if (!sessionKey) throw new Error(safeBrowserVoiceErrorMessage("integration_unavailable"));
     // Idempotent guard, set synchronously before any async work: a second
     // start while loading/active is a no-op, not an error — this also
     // guarantees rapid repeated confirmation triggers exactly one SDK
@@ -194,7 +199,7 @@ export class VapiBrowserVoiceClient implements BrowserVoiceClient {
     // network/microphone. No retry; destroy() already handled cleanup.
     if (this.destroyed) return;
 
-    const sdk = new SdkCtor(this.publicKey);
+    const sdk = new SdkCtor(sessionKey);
     this.sdk = sdk;
     sdk.on("call-start", this.onCallStart);
     sdk.on("call-end", this.onCallEnd);
