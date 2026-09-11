@@ -7,8 +7,12 @@
 //    the worker ticks on the server.
 //  - Survives a restart. Jobs are rows, not timers. A process that dies
 //    mid-job leaves a `running` row whose lock expires and is reclaimed.
-//  - Never double-sends. `dedupe_key` is UNIQUE, and claiming uses
-//    `FOR UPDATE SKIP LOCKED` so two workers cannot take the same row.
+//  - Runs a job once at a time. `dedupe_key` is UNIQUE, and claiming uses
+//    `FOR UPDATE SKIP LOCKED` so two workers cannot take the same row. That is
+//    a statement about THIS database and nothing else: it does not make an
+//    external side effect happen once, because a worker can die after the
+//    provider has already accepted a message. See `maybeEmail` for what
+//    actually closes that window.
 //  - Timezone-correct. `run_at` is absolute UTC computed from the recipient's
 //    IANA zone, so "9am" means 9am where that person actually is.
 //  - Cancels and reschedules truthfully. Completing, reassigning or moving a
@@ -191,8 +195,12 @@ async function notify(args: {
  * happen once. The dangerous window is: provider accepts → worker is killed →
  * lock expires → job reclaimed → message sent again. Two things close it:
  *
- *  1. `external_dispatched_at` is written and committed BEFORE the send, so a
- *     reclaimed job can see that a message was already handed over.
+ *  1. `external_dispatched_at` is written and committed BEFORE the send, and
+ *     is READ on entry: a reclaimed job whose marker is at or after its own
+ *     run_at already handed this occurrence over and returns without sending.
+ *     Comparing against run_at rather than merely checking for a non-null
+ *     marker is what keeps a recurring job working — yesterday's dispatch must
+ *     not suppress today's message.
  *  2. The send carries a provider idempotency key derived from the job's
  *     dedupe key and its scheduled instant — stable across retries of this
  *     occurrence, different for the next one — so even a genuine double-send
@@ -209,6 +217,15 @@ async function maybeEmail(
 ): Promise<void> {
   const [staff] = await db.select().from(crmStaff).where(eq(crmStaff.id, staffId)).limit(1);
   if (!staff?.reminderEmailEnabled || staff.status !== "active") return;
+
+  // Has this OCCURRENCE already been handed to the provider? A dispatch that
+  // happened at or after this occurrence's run_at belongs to this occurrence;
+  // an earlier one belongs to a previous occurrence of the same recurring job,
+  // which must not suppress today's message. A job is only ever claimed once
+  // run_at has passed, so a dispatch for this occurrence cannot predate it.
+  if (job.externalDispatchedAt && job.externalDispatchedAt.getTime() >= job.runAt.getTime()) {
+    return;
+  }
 
   const key = `${job.dedupeKey}:${job.runAt.toISOString()}`;
   await db.update(crmScheduledJobs)

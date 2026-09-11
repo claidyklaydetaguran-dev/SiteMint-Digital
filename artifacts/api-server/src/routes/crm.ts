@@ -24,8 +24,35 @@ const router: IRouter = Router();
 const requireAdmin = requireCrmAuth();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
-  await db.insert(crmActivities).values({ leadId, type, title, description, metadata });
+/**
+ * The label a timeline entry is attributed to.
+ *
+ * A staff session names the person. The legacy shared bearer token genuinely
+ * is an anonymous administrator, so "admin" there is accurate rather than a
+ * placeholder — and it disappears on its own once the shared token is retired.
+ */
+function actorLabel(req: Request): string {
+  const s = req.staffAuth?.staff;
+  return s ? (s.displayName || s.email) : "admin";
+}
+
+/**
+ * Writes one lead-timeline entry, attributed to whoever is actually signed in.
+ *
+ * `created_by` has a column default of the literal string "admin" and nothing
+ * ever overrode it, so every note, status change, task and email on every lead
+ * was recorded as having been done by "admin". With three people sharing the
+ * CRM that makes the timeline unable to answer the one question it exists to
+ * answer. The request is a parameter for exactly this reason: there is no
+ * ambient actor, so it has to be passed.
+ */
+async function logActivity(
+  req: Request, leadId: number, type: string, title: string,
+  description?: string, metadata?: Record<string, unknown>,
+) {
+  await db.insert(crmActivities).values({
+    leadId, type, title, description, metadata, createdBy: actorLabel(req),
+  });
 }
 
 // ── Settings status ───────────────────────────────────────────────────────────
@@ -238,7 +265,7 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
       nextFollowUpAt: data.nextFollowUpAt ? new Date(String(data.nextFollowUpAt)) : undefined,
     }).returning();
 
-    await logActivity(lead.id, "lead_created", `Lead created: ${lead.name}`, `Source: ${lead.source}`);
+    await logActivity(req, lead.id, "lead_created", `Lead created: ${lead.name}`, `Source: ${lead.source}`);
     res.status(201).json({ lead });
   } catch (err) {
     req.log.error({ err }, "Error creating lead");
@@ -294,10 +321,10 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
     const prevStatus = existing.status;
     if (data.status !== undefined && data.status !== prevStatus) {
       updates.status = data.status;
-      await logActivity(id, "status_changed", `Status changed to ${data.status}`, `From: ${prevStatus} → To: ${data.status}`, { from: prevStatus, to: data.status });
+      await logActivity(req, id, "status_changed", `Status changed to ${data.status}`, `From: ${prevStatus} → To: ${data.status}`, { from: prevStatus, to: data.status });
     }
     if (data.nextFollowUpAt !== undefined && String(data.nextFollowUpAt) !== String(existing.nextFollowUpAt)) {
-      await logActivity(id, "follow_up_changed", `Follow-up set for ${new Date(String(data.nextFollowUpAt)).toLocaleDateString()}`);
+      await logActivity(req, id, "follow_up_changed", `Follow-up set for ${new Date(String(data.nextFollowUpAt)).toLocaleDateString()}`);
     }
 
     const [updated] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
@@ -340,7 +367,7 @@ router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Resp
     const timestamp = new Date().toLocaleString();
     const appended = existing.notes ? `${existing.notes}\n\n[${timestamp}] ${note}` : `[${timestamp}] ${note}`;
     await db.update(crmLeads).set({ notes: appended, updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "note_added", "Note added", note.substring(0, 120));
+    await logActivity(req, id, "note_added", "Note added", note.substring(0, 120));
     res.json({ ok: true, notes: appended });
   } catch (err) {
     req.log.error({ err }, "Error adding note");
@@ -408,7 +435,7 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
     }).returning();
 
     await syncTaskReminder(task.id);
-    await logActivity(id, "task_created", `Task created: ${task.title}`, `Type: ${task.type}`);
+    await logActivity(req, id, "task_created", `Task created: ${task.title}`, `Type: ${task.type}`);
     res.status(201).json({ task });
   } catch (err) {
     req.log.error({ err }, "Error creating task");
@@ -448,7 +475,7 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
     await syncTaskReminder(id);
 
     if (data.status === "completed" && updated.leadId != null) {
-      await logActivity(updated.leadId, "task_completed", `Task completed: ${updated.title}`);
+      await logActivity(req, updated.leadId, "task_completed", `Task completed: ${updated.title}`);
     }
     res.json({ task: updated });
   } catch (err) {
@@ -502,8 +529,27 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-    const { subject, body, testMode } = req.body as { subject?: string; body?: string; testMode?: boolean };
+    const { subject, body, testMode, cc, bcc } = req.body as {
+      subject?: string; body?: string; testMode?: boolean;
+      cc?: string | string[]; bcc?: string | string[];
+    };
     if (!subject || !body) { res.status(400).json({ error: "Subject and body are required" }); return; }
+
+    // The compose modal has had working CC and BCC inputs all along and posted
+    // what was typed into them. Nothing here read those fields, so the sender
+    // was told "Email sent!" while the people they copied were never on it.
+    // Honour them, and refuse an address that is not one rather than dropping
+    // it silently — which is the failure being fixed.
+    const parseRecipients = (v: string | string[] | undefined): string[] =>
+      (Array.isArray(v) ? v : String(v ?? "").split(/[,;]/))
+        .map((s) => s.trim()).filter(Boolean);
+    const ccList = parseRecipients(cc);
+    const bccList = parseRecipients(bcc);
+    const invalid = [...ccList, ...bccList].filter((a) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a));
+    if (invalid.length > 0) {
+      res.status(400).json({ error: `Not a valid email address: ${invalid.join(", ")}` });
+      return;
+    }
 
     const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
     if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
@@ -515,15 +561,30 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
         to: [lead.email],
+        ...(ccList.length ? { cc: ccList } : {}),
+        ...(bccList.length ? { bcc: bccList } : {}),
         subject,
         html: body.replace(/\n/g, "<br>"),
       });
     }
 
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "email_sent", `Email sent: ${subject}`, isTestMode ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`, { subject, testMode: isTestMode });
+    // The body used to be discarded, so the Email Activity tab could show that
+    // an email happened but never what it said. Keep it with the entry.
+    await logActivity(
+      req, id, "email_sent", `Email sent: ${subject}`,
+      isTestMode ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`,
+      {
+        subject, body, testMode: isTestMode,
+        to: lead.email,
+        // BCC is recorded internally because the team needs to know who was
+        // copied; it is never echoed to a recipient.
+        ...(ccList.length ? { cc: ccList } : {}),
+        ...(bccList.length ? { bcc: bccList } : {}),
+      },
+    );
 
-    res.json({ ok: true, testMode: isTestMode });
+    res.json({ ok: true, testMode: isTestMode, cc: ccList, bcc: bccList });
   } catch (err) {
     req.log.error({ err }, "Error sending email");
     res.status(500).json({ error: "Failed to send email" });
@@ -531,7 +592,7 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
 });
 
 // ── Email Templates ───────────────────────────────────────────────────────────
-router.get("/crm/email-templates", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/email-templates", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   try {
     const templates = await db.select().from(crmEmailTemplates).orderBy(crmEmailTemplates.name);
     res.json({ templates });
@@ -540,7 +601,7 @@ router.get("/crm/email-templates", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.post("/crm/email-templates", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/email-templates", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const { name, type, subject, body } = req.body as Record<string, string>;
     if (!name || !subject || !body) { res.status(400).json({ error: "Name, subject, and body are required" }); return; }
@@ -551,7 +612,7 @@ router.post("/crm/email-templates", requireAdmin, async (req: Request, res: Resp
   }
 });
 
-router.put("/crm/email-templates/:id", requireAdmin, async (req: Request, res: Response) => {
+router.put("/crm/email-templates/:id", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -566,7 +627,7 @@ router.put("/crm/email-templates/:id", requireAdmin, async (req: Request, res: R
   }
 });
 
-router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/email-templates/:id", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -578,7 +639,7 @@ router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res
 });
 
 // ── Communications — Email Activity ──────────────────────────────────────────
-router.get("/crm/communications/email-activity", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/communications/email-activity", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const activities = await db
@@ -1578,7 +1639,7 @@ router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, r
           tags,
           estimatedValue,
         }).returning();
-        await logActivity(lead.id, "lead_imported", `Imported from CSV: ${lead.name}`, "Lead imported through CRM Import page.");
+        await logActivity(req, lead.id, "lead_imported", `Imported from CSV: ${lead.name}`, "Lead imported through CRM Import page.");
         created++;
       } catch (e) {
         invalid++;
@@ -1623,7 +1684,7 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
         discoveryFormStatus: "Completed",
       }).returning();
 
-      await logActivity(lead.id, "lead_imported", `Imported from discovery form`, `Original submission ID: ${sub.id}`);
+      await logActivity(req, lead.id, "lead_imported", `Imported from discovery form`, `Original submission ID: ${sub.id}`);
       imported++;
     }
 
@@ -1680,6 +1741,7 @@ router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res:
     }).returning();
 
     await logActivity(
+      req,
       lead.id,
       "lead_imported",
       "Imported from Discovery Portal",
@@ -2059,7 +2121,7 @@ router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Reques
 
     const newStatus = lead.proposalStatus === "Not Started" ? "Draft" : lead.proposalStatus;
     await db.update(crmLeads).set({ generatedProposal: html, proposalStatus: newStatus, updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "proposal_generated", "Proposal generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
+    await logActivity(req, id, "proposal_generated", "Proposal generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
     req.log.info({ id }, "Proposal generated for CRM lead");
     res.json({ proposal: html });
   } catch (err) {
@@ -2103,7 +2165,7 @@ router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, re
 
     const newStatus = lead.sowStatus === "Not Started" ? "Draft" : lead.sowStatus;
     await db.update(crmLeads).set({ generatedSow: html, sowStatus: newStatus, updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "sow_generated", "Scope of Work generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
+    await logActivity(req, id, "sow_generated", "Scope of Work generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
     req.log.info({ id }, "SOW generated for CRM lead");
     res.json({ sow: html });
   } catch (err) {
