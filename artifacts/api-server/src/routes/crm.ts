@@ -6,6 +6,7 @@ import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
+import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
@@ -384,15 +385,29 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
     const data = req.body as Record<string, unknown>;
     if (!data.title) { res.status(400).json({ error: "Title is required" }); return; }
 
+    // M2: same task system as Operations/My Day — a task raised from a lead is
+    // assigned to a real person and gets a reminder, rather than landing in a
+    // queue nobody owns.
+    const staff = req.staffAuth?.staff;
+    const assignedToStaffId = Number.isFinite(Number(data.assignedToStaffId))
+      ? Number(data.assignedToStaffId)
+      : staff?.id ?? null;
+
     const [task] = await db.insert(crmTasks).values({
       leadId: id,
       type: data.type ? String(data.type) : "Follow Up",
       title: String(data.title),
       description: data.description ? String(data.description) : undefined,
       dueDate: data.dueDate ? new Date(String(data.dueDate)) : undefined,
+      remindAt: data.remindAt ? new Date(String(data.remindAt)) : undefined,
+      priority: data.priority ? String(data.priority) : undefined,
+      assignedToStaffId,
+      createdByStaffId: staff?.id ?? null,
+      createdBy: staff?.displayName ?? staff?.email ?? "admin",
       status: "pending",
     }).returning();
 
+    await syncTaskReminder(task.id);
     await logActivity(id, "task_created", `Task created: ${task.title}`, `Type: ${task.type}`);
     res.status(201).json({ task });
   } catch (err) {
@@ -409,15 +424,28 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (data.status !== undefined) {
       updates.status = data.status;
-      if (data.status === "completed") updates.completedAt = new Date();
+      if (data.status === "completed") {
+        updates.completedAt = new Date();
+        // M2: record WHO completed it, not just that it happened.
+        updates.completedByStaffId = req.staffAuth?.staff.id ?? null;
+      } else {
+        updates.completedAt = null;
+        updates.completedByStaffId = null;
+      }
     }
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
     if (data.dueDate !== undefined) updates.dueDate = data.dueDate ? new Date(String(data.dueDate)) : null;
+    if (data.remindAt !== undefined) updates.remindAt = data.remindAt ? new Date(String(data.remindAt)) : null;
     if (data.type !== undefined) updates.type = data.type;
 
     const [updated] = await db.update(crmTasks).set(updates).where(eq(crmTasks.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Task not found" }); return; }
+
+    // Completing or rescheduling here must cancel/move the pending reminder,
+    // exactly as it does on the Operations route — one task system, one
+    // reconcile.
+    await syncTaskReminder(id);
 
     if (data.status === "completed" && updated.leadId != null) {
       await logActivity(updated.leadId, "task_completed", `Task completed: ${updated.title}`);

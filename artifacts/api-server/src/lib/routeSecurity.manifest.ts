@@ -14,6 +14,25 @@
 import type { Protection } from "./routeSecurity.js";
 
 export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
+  // ── M2: Operations, My Day, reminders (routes/crmOperations.ts) ───────────
+  // All behind requireCrmAuth with a named permission, so they read "admin"
+  // while the legacy bearer fallback stands.
+  "POST /api/crm/operations/tasks": "admin",
+  "PATCH /api/crm/operations/tasks/:id": "admin",
+  "PATCH /api/crm/operations/projects/:id": "admin",
+  "POST /api/crm/operations/projects/:id/milestones": "admin",
+  "PATCH /api/crm/operations/milestones/:id": "admin",
+  "POST /api/crm/operations/projects/:id/updates": "admin",
+  "POST /api/crm/operations/comments": "admin",
+  "POST /api/crm/operations/approvals": "admin",
+  "POST /api/crm/operations/approvals/:id/decide": "admin",
+  "POST /api/crm/operations/templates": "admin",
+  "POST /api/crm/operations/projects/:id/apply-template": "admin",
+  "POST /api/crm/notifications/read": "admin",
+  "PATCH /api/crm/operations/reminder-preferences": "admin",
+  "POST /api/crm/operations/jobs/run": "admin",
+  "POST /api/crm/operations/jobs/:id/retry": "admin",
+
   // ── M1: staff identity and authentication (routes/crmStaff.ts) ────────────
   // "staff" = crm_staff_session cookie + CSRF header + permission grant.
   // "credential" = a secret presented in the request itself (the deployment's

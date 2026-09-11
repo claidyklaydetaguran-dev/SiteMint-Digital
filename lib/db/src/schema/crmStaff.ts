@@ -79,6 +79,17 @@ export const crmStaff = pgTable("crm_staff", {
   extraPermissions:   text("extra_permissions").array().notNull().default(sql`'{}'::text[]`),
   revokedPermissions: text("revoked_permissions").array().notNull().default(sql`'{}'::text[]`),
 
+  /**
+   * IANA zone, e.g. "Asia/Manila". Reminders are scheduled in absolute UTC but
+   * COMPUTED from this, so "remind me at 9am" means 9am where the person is.
+   */
+  timezone:        text("timezone").notNull().default("UTC"),
+  /** Per-person delivery preferences for the reminder engine. */
+  reminderEmailEnabled: boolean("reminder_email_enabled").notNull().default(false),
+  dailyDigestEnabled:   boolean("daily_digest_enabled").notNull().default(false),
+  /** Local hour (0-23) the daily digest should arrive. */
+  dailyDigestHour:      integer("daily_digest_hour").notNull().default(8),
+
   createdAt:       timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:       timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   lastLoginAt:     timestamp("last_login_at", { withTimezone: true }),

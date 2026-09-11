@@ -1,4 +1,5 @@
 import { pgTable, serial, text, integer, timestamp, decimal, date, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -34,6 +35,21 @@ export const crmProjects = pgTable("crm_projects", {
 
   // Ownership
   assignedTo: text("assigned_to"),
+
+  // ── M2 additive columns (nullable, push-mode; nothing above is altered) ────
+  // `assignedTo` above is free text and stays for historical rows.
+  /** The one person accountable for delivery. */
+  ownerStaffId: integer("owner_staff_id"),
+  /** Everyone else working on it; used for "my projects" and notifications. */
+  collaboratorStaffIds: integer("collaborator_staff_ids").array().default(sql`'{}'::integer[]`),
+  /** Free text: the single next thing that has to happen. */
+  nextAction: text("next_action"),
+  nextActionDueAt: timestamp("next_action_due_at", { withTimezone: true }),
+  /** Set when delivery cannot proceed; drives the Blocked view. */
+  blockedReason: text("blocked_reason"),
+  priority: text("priority"),
+  /** Archive rather than delete, so history and attribution survive. */
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
 
   // Notes & references
   notes: text("notes"),

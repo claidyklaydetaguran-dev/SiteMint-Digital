@@ -12,6 +12,7 @@ export * from "./crmCampaigns";
 export * from "./crmBehavioralEvents";
 export * from "./crmAdminSessions";
 export * from "./crmStaff";
+export * from "./crmOperations";
 export * from "./aiToolkitPurchases";
 export * from "./landingPageViews";
 export * from "./intakeAgent";
