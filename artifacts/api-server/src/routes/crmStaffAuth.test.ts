@@ -291,10 +291,15 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
     expect(String(r.json["error"])).toContain("your own role");
   });
 
-  it("refuses removing the last active owner", async () => {
-    // Owner tries to demote themselves via status instead of role.
+  it("refuses an owner disabling their own account", async () => {
+    // Renamed from "refuses removing the last active owner", which is not what
+    // this exercises: the actor is the target, so the self-protection rule
+    // answers first and the last-owner branch never runs. That branch is
+    // covered directly in lib/staffPermissions.test.ts, with an owner acting
+    // on a different owner.
     const disable = await owner.call("PATCH", `/api/crm/staff/${ids["owner"]}`, { status: "disabled" });
     expect(disable.status).toBe(403);
+    expect(String(disable.json["error"])).toContain("your own account status");
   });
 
   it("refuses a non-owner editing permission grants", async () => {
