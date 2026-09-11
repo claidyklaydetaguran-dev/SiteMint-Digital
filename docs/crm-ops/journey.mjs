@@ -7,6 +7,14 @@
  * Every step asserts the NEXT surface actually reflects it, because a step
  * that writes a row but never reaches the screen somebody works from is not
  * a working feature.
+ *
+ * RE-RUNNABLE. The owner preview is one persistent dataset, not a scratch
+ * database, so this script must not assume it starts empty. Setup is
+ * idempotent (an account that already exists is signed into, not re-created)
+ * and every money assertion is a DELTA against a baseline read at the start.
+ * An earlier version asserted absolute figures — "received is 0", "win rate
+ * is null" — which passed exactly once and then reported ten false failures
+ * on the second run against the same preview data.
  */
 
 const API = "http://localhost:8080/api";
@@ -49,11 +57,14 @@ async function loginAs(key) {
 (async () => {
   console.log("\n=== 1. Three separate owner accounts ===");
 
+  // 201 the first time; 409 on every later run because the account is still
+  // there. Both mean "this owner exists and can sign in", which is the thing
+  // the next step actually depends on.
   let r = await fetch(`${API}/crm/staff/bootstrap`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: owners[0].email, displayName: owners[0].name, password: PW, adminPassword: ADMIN }),
   });
-  check("the first owner bootstraps", r.status === 201, `status ${r.status}`);
+  check("the first owner account exists", r.status === 201 || r.status === 409, `status ${r.status}`);
 
   const lr = await fetch(`${API}/crm/staff/login`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -70,13 +81,25 @@ async function loginAs(key) {
   // The other two owners, created and activated so each can act as themselves.
   for (const who of owners.slice(1)) {
     const created = await call("POST", "/crm/staff", { email: who.email, displayName: who.name, role: "owner" });
-    check(`${who.name} is invited as an owner`, created.status === 201, `status ${created.status}`);
-    const token = created.json.activationToken;
-    const activated = await call("POST", "/crm/staff/activation", { token, password: PW });
-    check(`${who.name} sets her own password`, activated.status === 200);
-    // Verification is NOT granted by an operator-relayed token.
-    check(`${who.name}'s mailbox is not claimed as verified`, activated.json.emailVerified === false,
-      `emailVerified=${activated.json.emailVerified}`);
+    check(`${who.name} is an owner`, created.status === 201 || created.status === 409,
+      `status ${created.status}`);
+
+    // Only a freshly invited account has an activation token to spend. On a
+    // re-run the password is already set, so activation is skipped — but the
+    // mailbox-verification rule is still asserted, because that is the part
+    // worth protecting: an operator-relayed token must never confer it.
+    if (created.status === 201) {
+      const token = created.json.activationToken;
+      const activated = await call("POST", "/crm/staff/activation", { token, password: PW });
+      check(`${who.name} sets her own password`, activated.status === 200);
+      check(`${who.name}'s mailbox is not claimed as verified`, activated.json.emailVerified === false,
+        `emailVerified=${activated.json.emailVerified}`);
+    } else {
+      const existing = await call("GET", "/crm/staff");
+      const row = existing.json.staff?.find((x) => x.email === who.email);
+      check(`${who.name}'s mailbox is still not claimed as verified`,
+        !row?.emailVerifiedAt, `emailVerifiedAt=${row?.emailVerifiedAt ?? null}`);
+    }
 
     const s = await fetch(`${API}/crm/staff/login`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -89,6 +112,18 @@ async function loginAs(key) {
     };
   }
   await loginAs("shasta");
+
+  // Baseline every figure this run will move, so the assertions below can be
+  // about what THIS run did rather than about what the database happened to
+  // hold beforehand.
+  const baseline = (await call("GET", "/crm/sales/forecast")).json;
+  const base = {
+    pipeline: Number(baseline.pipelineValue ?? 0),
+    received: Number(baseline.moneyReceivedAllTime ?? 0),
+    contracted: Number(baseline.contractedValue ?? 0),
+    weighted: Number(baseline.weightedForecast ?? 0),
+  };
+  console.log(`  (baseline: pipeline ${base.pipeline}, contracted ${base.contracted}, received ${base.received})`);
 
   console.log("\n=== 2. Client and lead ===");
   const lead = await call("POST", "/crm/leads", {
@@ -113,14 +148,22 @@ async function loginAs(key) {
 
   await call("POST", `/crm/deals/${dealId}/probability`, { probability: 75 });
   const forecast1 = await call("GET", "/crm/sales/forecast");
-  check("the forecast separates pipeline from money received",
-    forecast1.json.pipelineValue === 12000 && forecast1.json.moneyReceivedAllTime === 0,
-    `pipeline ${forecast1.json.pipelineValue}, received ${forecast1.json.moneyReceivedAllTime}`);
+  const pipelineAdded = Number(forecast1.json.pipelineValue) - base.pipeline;
+  const receivedSoFar = Number(forecast1.json.moneyReceivedAllTime) - base.received;
+  check("the new deal lands in pipeline and not in money received",
+    pipelineAdded === 12000 && receivedSoFar === 0,
+    `pipeline +${pipelineAdded}, received +${receivedSoFar}`);
   check("the weighted forecast uses the deal's own 75%",
-    Math.round(forecast1.json.weightedForecast) === 9000,
-    `weighted ${forecast1.json.weightedForecast}`);
-  check("a win rate with no decided deals is null, not 0%",
-    forecast1.json.winRate === null && forecast1.json.winRateDenominator === 0);
+    Math.round(Number(forecast1.json.weightedForecast) - base.weighted) === 9000,
+    `weighted +${Number(forecast1.json.weightedForecast) - base.weighted}`);
+  // A win rate is a ratio, so it has no meaningful delta. What must always
+  // hold is that it is null when nothing has been decided, and never a
+  // fabricated 0% — assert whichever case this database is actually in.
+  check("a win rate is null when nothing is decided, never a fabricated 0%",
+    forecast1.json.winRateDenominator === 0
+      ? forecast1.json.winRate === null
+      : typeof forecast1.json.winRate === "number" && forecast1.json.winRate >= 0,
+    `winRate=${forecast1.json.winRate}, denominator=${forecast1.json.winRateDenominator}`);
 
   console.log("\n=== 4. Proposal ===");
   const proposal = await call("POST", `/crm/leads/${leadId}/proposal/generate`, {});
@@ -258,12 +301,21 @@ async function loginAs(key) {
   check("the chain shows the deal, its project and its money in one place",
     chain.json.deals?.[0]?.project?.id === projectId && chain.json.totals.received === 4000,
     `received ${chain.json.totals?.received}`);
+  // These totals are scoped to this lead's own chain, so they are unaffected
+  // by anything an earlier run left behind and stay absolute.
   check("contracted and received are kept apart",
-    chain.json.totals.contracted === 12000 && chain.json.totals.received === 4000);
+    chain.json.totals.contracted === 12000 && chain.json.totals.received === 4000,
+    `contracted ${chain.json.totals?.contracted}, received ${chain.json.totals?.received}`);
 
   const forecast2 = await call("GET", "/crm/sales/forecast");
-  check("the forecast now shows money actually received",
-    forecast2.json.moneyReceivedAllTime === 4000 && forecast2.json.contractedValue === 12000);
+  const receivedDelta = Number(forecast2.json.moneyReceivedAllTime) - base.received;
+  const contractedDelta = Number(forecast2.json.contractedValue) - base.contracted;
+  // The defect this guards against made "money received" structurally zero on
+  // every surface, because the readers filtered on a status no write path has
+  // ever produced. A delta of exactly the payment is the proof it is fixed.
+  check("the forecast now shows the money actually received",
+    receivedDelta === 4000 && contractedDelta === 12000,
+    `received +${receivedDelta}, contracted +${contractedDelta}`);
 
   console.log("\n=== 11. Who did what ===");
   const audit = await call("GET", "/crm/staff/audit?limit=50");
