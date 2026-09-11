@@ -41,7 +41,7 @@
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
-  and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, ne,
+  and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne,
   notInArray, or, sql, type SQL,
 } from "drizzle-orm";
 import {
@@ -1326,13 +1326,17 @@ router.post("/crm/marketing/campaigns/:id/schedule", requireCrmAuth("campaigns.s
   res.json({
     campaign: row,
     preflight: check,
-    autoStarts: false,
-    note:
-      "Scheduled. Two things to know. The audience is NOT fixed now — it is resolved again when the send "
-      + "actually starts, so anybody who unsubscribes or stops matching between now and then is excluded "
-      + "automatically. And nothing starts this send on its own: there is no background worker for marketing "
-      + "broadcasts yet, so at the scheduled time somebody has to open the campaign and press Send. The time "
-      + "is a reminder and a record of intent, not an alarm clock.",
+    autoStarts: marketingAutosendEnabled(),
+    note: marketingAutosendEnabled()
+      ? "Scheduled, and it will start on its own at that time. The audience is NOT fixed now — it is "
+        + "resolved again when the send actually starts, so anybody who unsubscribes or stops matching "
+        + "between now and then is excluded automatically. Readiness is re-checked at that moment too: if "
+        + "something has since blocked it, nothing goes out and the campaign stays scheduled."
+      : "Scheduled. Two things to know. The audience is NOT fixed now — it is resolved again when the "
+        + "send actually starts, so anybody who unsubscribes or stops matching between now and then is "
+        + "excluded automatically. And nothing starts this send on its own: automatic sending is switched "
+        + "off on this server, so at the scheduled time somebody has to open the campaign and press Send. "
+        + "The time is a reminder and a record of intent, not an alarm clock.",
   });
 });
 
@@ -1754,3 +1758,119 @@ router.post("/crm/marketing/campaigns/:id/ai-draft/approve", requireCrmAuth("cam
 });
 
 export default router;
+
+// ── Starting a scheduled campaign ───────────────────────────────────────────
+
+/**
+ * `CRM_MARKETING_AUTOSEND_ENABLED` — whether a scheduled campaign starts on its
+ * own. Fail-closed, matching `STRIPE_BOOT_SYNC_ENABLED`: only the exact string
+ * `"true"` enables it, and anything else — unset, empty, "1", "TRUE" — leaves
+ * it off.
+ *
+ * A worker that mails customers without anyone pressing a button is the most
+ * consequential thing in this module, so it does not arrive switched on with a
+ * deployment. Until it is enabled the scheduled time is a reminder, and the
+ * schedule response says exactly that rather than implying an alarm clock.
+ */
+export const MARKETING_AUTOSEND_ENV_VAR = "CRM_MARKETING_AUTOSEND_ENABLED";
+
+export function marketingAutosendEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[MARKETING_AUTOSEND_ENV_VAR] === "true";
+}
+
+export interface DueCampaignResult {
+  campaignId: number;
+  started: boolean;
+  /** Why it was not started, when it was not. */
+  reason?: string;
+  sent?: number;
+  failed?: number;
+  remaining?: number;
+}
+
+/**
+ * Starts campaigns whose scheduled moment has passed, and advances ones already
+ * under way.
+ *
+ * Deliberately the same path a person's Send takes — preflight, then a claim
+ * conditioned on the status that was read, then `materialiseAudience`, then
+ * batches. Two workers, or a worker and a person, cannot both resolve the
+ * audience: the conditional update means exactly one claim succeeds.
+ *
+ * Preflight is re-run at start rather than trusted from scheduling time. A
+ * campaign scheduled while it was ready can stop being ready — unapproved AI
+ * copy added, a merge field left without a fallback — and sending it anyway
+ * because it passed a check yesterday is how a broken email goes out.
+ *
+ * `paused` and `cancelled` are skipped, never resumed. Resuming is a person's
+ * decision, and a worker that un-paused a campaign somebody had stopped would
+ * be the worst possible behaviour here.
+ */
+export async function startDueCampaigns(
+  now: Date = new Date(),
+  batchSize = DEFAULT_BATCH,
+): Promise<DueCampaignResult[]> {
+  if (!marketingAutosendEnabled()) return [];
+
+  const due = await db.select().from(crmMarketingCampaigns)
+    .where(or(
+      and(
+        eq(crmMarketingCampaigns.status, "scheduled"),
+        lte(crmMarketingCampaigns.scheduledAt, now),
+      ),
+      eq(crmMarketingCampaigns.status, "sending"),
+    ))
+    .orderBy(asc(crmMarketingCampaigns.scheduledAt))
+    .limit(10);
+
+  const results: DueCampaignResult[] = [];
+
+  for (const campaign of due) {
+    if (campaign.status === "scheduled") {
+      const check = await preflight(campaign);
+      if (!check.canSend) {
+        results.push({
+          campaignId: campaign.id,
+          started: false,
+          reason: `not ready: ${check.blockers.join("; ")}`,
+        });
+        continue;
+      }
+
+      const claimed = await db.update(crmMarketingCampaigns)
+        .set({ status: "sending", startedAt: campaign.startedAt ?? now, pausedAt: null, updatedAt: now })
+        .where(and(
+          eq(crmMarketingCampaigns.id, campaign.id),
+          eq(crmMarketingCampaigns.status, "scheduled"),
+        ))
+        .returning();
+
+      if (claimed.length === 0) {
+        results.push({ campaignId: campaign.id, started: false, reason: "already claimed" });
+        continue;
+      }
+      await materialiseAudience(claimed[0]);
+    }
+
+    const progress = await sendBatch(campaign.id, batchSize);
+
+    if (progress.remaining === 0) {
+      await db.update(crmMarketingCampaigns)
+        .set({ status: "sent", completedAt: new Date(), updatedAt: new Date() })
+        .where(and(
+          eq(crmMarketingCampaigns.id, campaign.id),
+          eq(crmMarketingCampaigns.status, "sending"),
+        ));
+    }
+
+    results.push({
+      campaignId: campaign.id,
+      started: true,
+      sent: progress.sent,
+      failed: progress.failed,
+      remaining: progress.remaining,
+    });
+  }
+
+  return results;
+}

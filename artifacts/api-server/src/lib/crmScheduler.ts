@@ -38,6 +38,8 @@ import {
   type MailOutcome,
 } from "./staffMail.js";
 import { AUTOMATION_JOB_KIND, runAutomationJob } from "./automationEngine.js";
+import { startDueCampaigns, marketingAutosendEnabled } from "../routes/crmMarketing.js";
+import { logger } from "./logger.js";
 
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -1598,6 +1600,20 @@ export function startCrmScheduler(intervalMs = TICK_MS): void {
       status.lastError = null;
       status.deliveriesNeedingAttention = await countDeliveriesNeedingAttention();
       status.deliveriesCheckedAt = new Date();
+
+      // Scheduled marketing broadcasts. A no-op unless
+      // CRM_MARKETING_AUTOSEND_ENABLED is exactly "true" — a worker that
+      // mails customers with nobody pressing a button does not arrive
+      // switched on. Isolated from the reminder work above so a campaign
+      // fault cannot stop reminders going out.
+      if (marketingAutosendEnabled()) {
+        try {
+          const started = await startDueCampaigns();
+          if (started.length) logger.info({ started }, "marketing: scheduled campaigns advanced");
+        } catch (err) {
+          logger.error({ err }, "marketing: scheduled campaign tick failed; reminders are unaffected");
+        }
+      }
     } catch (err) {
       status.lastError = err instanceof Error ? err.message : String(err);
     } finally {
