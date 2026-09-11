@@ -179,10 +179,19 @@ async function tasksDue(staffId: number | null, scope: string, zone: string, lim
   const items = await db.select().from(crmTasks).where(and(...where))
     .orderBy(asc(crmTasks.dueDate)).limit(limit);
   const [c] = await db.select({ count: sql<number>`count(*)` }).from(crmTasks).where(and(...where));
+
+  // Say what was actually filtered. On the legacy shared bearer there is no
+  // person, so no assignee filter is applied — claiming "assigned to you"
+  // there would describe a query that did not run.
+  const filteredByPerson = scope === "mine" && staffId != null;
+  const who = filteredByPerson ? ", assigned to you"
+    : scope === "team" ? ", across the team"
+    : ", across everyone (this sign-in has no personal account)";
+
   return {
     key: "tasks_due", label: "Tasks due", available: true,
     count: Number(c?.count ?? 0), items,
-    definition: `Open tasks with a due date at or before the end of today in ${zone}${scope === "mine" ? ", assigned to you" : ", across the team"}.`,
+    definition: `Open tasks with a due date at or before the end of today in ${zone}${who}.`,
   };
 }
 
