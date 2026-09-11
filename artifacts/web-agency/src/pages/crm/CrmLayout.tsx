@@ -11,7 +11,7 @@ import {
   GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon,
   Layers, Activity, Download,
   ClipboardList, Briefcase, ListTodo, TrendingUp,
-  BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft,
+  BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft, LifeBuoy,
   ExternalLink, Building2, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Discovery Portal", href: "/admin/dashboard",      icon: Globe, exact: true },
       { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
       { label: "Documents",      href: "/admin/crm/documents",     icon: FileText },
+      { label: "Support",        href: "/admin/crm/support",       icon: LifeBuoy },
       { label: "AI Intake Scoring",      href: "/admin/crm/intake-cases",          icon: BotMessageSquare },
       { label: "Receptionist Accounts",  href: "/admin/crm/receptionist-accounts", icon: Building2 },
     ],

@@ -120,6 +120,7 @@ const CrmDeals = lazyRoute(() => import("@/pages/crm/CrmDeals"));
 const CrmTransactions = lazyRoute(() => import("@/pages/crm/CrmTransactions"));
 const CrmProjects = lazyRoute(() => import("@/pages/crm/CrmProjects"));
 const CrmDocuments = lazyRoute(() => import("@/pages/crm/CrmDocuments"));
+const CrmSupport = lazyRoute(() => import("@/pages/crm/CrmSupport"));
 const CrmReporting = lazyRoute(() => import("@/pages/crm/CrmReporting"));
 const CrmAdminSettings = lazyRoute(() => import("@/pages/crm/CrmAdminSettings"));
 const CrmCampaigns = lazyRoute(() => import("@/pages/crm/CrmCampaigns"));
@@ -189,6 +190,7 @@ function AdminRoutes() {
       <Route path="/admin/crm/transactions" component={CrmTransactions} />
       <Route path="/admin/crm/projects" component={CrmProjects} />
       <Route path="/admin/crm/documents" component={CrmDocuments} />
+      <Route path="/admin/crm/support" component={CrmSupport} />
       <Route path="/admin/crm/pipeline" component={CrmPipeline} />
       <Route path="/admin/crm/reporting" component={CrmReporting} />
       <Route path="/admin/crm/admin" component={CrmAdminSettings} />

@@ -70,6 +70,112 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "PATCH /api/crm/appointments/:id": "admin",
   "DELETE /api/crm/appointments/:id": "admin",
 
+  // ── M4: Support (routes/crmSupport.ts) ───────────────────────────────────
+  // All behind requireCrmAuth with a named permission — support.write for the
+  // ticket and thread writes, support.assign for ownership, kb.write for the
+  // knowledge base — so they read "admin" while the legacy bearer fallback
+  // stands.
+  //
+  // Two of these carry a SECOND check inside the handler, and the difference
+  // matters. `.../messages` asserts `communications.send` before it will record
+  // a customer-visible reply, because contacting a client is a different act
+  // from writing a note to yourself, and that boundary must already be right on
+  // the day delivery is wired in. `POST /api/crm/support/tickets` asserts
+  // `support.assign` when the create body also names an assignee, so creation
+  // cannot be used to hand somebody work you are not allowed to hand them.
+  //
+  // Nothing here sends anything: a customer-visible message is RECORDED. The
+  // route says so in its response.
+  "POST /api/crm/support/tickets": "admin",
+  "POST /api/crm/support/service-requests": "admin",
+  "POST /api/crm/support/tickets/:id/assign": "admin",
+  "POST /api/crm/support/tickets/:id/priority": "admin",
+  "POST /api/crm/support/tickets/:id/status": "admin",
+  "POST /api/crm/support/tickets/:id/messages": "admin",
+  "POST /api/crm/support/tickets/:id/customer-messages": "admin",
+  "POST /api/crm/support/tickets/:id/article": "admin",
+  "POST /api/crm/support/kb": "admin",
+  "PATCH /api/crm/support/kb/:id": "admin",
+  "POST /api/crm/support/kb/:id/publish": "admin",
+
+  // ── M4: Marketing (routes/crmMarketing.ts) ───────────────────────────────
+  // All behind requireCrmAuth with a named permission, so they read "admin"
+  // while the legacy bearer fallback stands. The permission is NOT uniform,
+  // and the split is the point:
+  //
+  //   campaigns.write  writes copy, audiences and templates, and approves an
+  //                    AI draft. None of it reaches a customer.
+  //   campaigns.send   schedules, sends, pauses, resumes, cancels, and tests.
+  //                    This is the line between composing a message and
+  //                    putting it in somebody's inbox, and `campaigns.send` is
+  //                    deliberately absent from the operations_manager role —
+  //                    bulk customer contact is granted per person by the
+  //                    owner.
+  //
+  // `POST /crm/marketing/segments/preview` is a POST that writes nothing: a
+  // segment definition is too large and too structured for a query string.
+  // It still requires campaigns.read.
+  //
+  // `POST /crm/marketing/unsubscribe` writes to the SHARED suppression list
+  // (`crm_email_suppressions`), which is why it is here and not treated as a
+  // marketing-local record.
+  "POST /api/crm/marketing/segments": "admin",
+  "POST /api/crm/marketing/segments/preview": "admin",
+  "PATCH /api/crm/marketing/segments/:id": "admin",
+  "DELETE /api/crm/marketing/segments/:id": "admin",
+  "POST /api/crm/marketing/designs": "admin",
+  "PATCH /api/crm/marketing/designs/:id": "admin",
+  "DELETE /api/crm/marketing/designs/:id": "admin",
+  "POST /api/crm/marketing/campaigns": "admin",
+  "PATCH /api/crm/marketing/campaigns/:id": "admin",
+  "POST /api/crm/marketing/campaigns/:id/exclusions": "admin",
+  "DELETE /api/crm/marketing/campaigns/:id/exclusions/:leadId": "admin",
+  "POST /api/crm/marketing/campaigns/:id/test-send": "admin",
+  "POST /api/crm/marketing/campaigns/:id/schedule": "admin",
+  "POST /api/crm/marketing/campaigns/:id/send": "admin",
+  "POST /api/crm/marketing/campaigns/:id/pause": "admin",
+  "POST /api/crm/marketing/campaigns/:id/resume": "admin",
+  "POST /api/crm/marketing/campaigns/:id/cancel": "admin",
+  "POST /api/crm/marketing/campaigns/:id/ai-draft": "admin",
+  "POST /api/crm/marketing/campaigns/:id/ai-draft/approve": "admin",
+  "POST /api/crm/marketing/unsubscribe": "admin",
+
+  // ── M4: Customer portal (routes/crmPortal.ts) ────────────────────────────
+  // Two families, and the split is the security model rather than a naming
+  // convention.
+  //
+  // `/api/crm/portal/*` are STAFF routes: requireCrmAuth with a named
+  // permission, audited. They grant and revoke a customer's access and decide
+  // which documents that customer may see. They read "admin" while the legacy
+  // bearer fallback stands, like every other CRM route.
+  //
+  // `/api/portal/*` are CUSTOMER routes and carry a THIRD protection class,
+  // "portal": the `crm_portal_session` cookie, its own CSRF header, and a
+  // session that resolves to exactly ONE `crm_leads` row. It is deliberately
+  // not "session" — that class means the receptionist product's firm-scoped
+  // cookie, and conflating a customer of this agency with a customer of that
+  // product is precisely the confusion this contract exists to prevent. A
+  // portal holder cannot reach any route above: those resolve
+  // `crm_staff_session`, which a customer does not have.
+  //
+  // The two open-by-necessity entries are the way in, and each is proven by
+  // something the caller presents:
+  //   accept → a single-use, expiring, hashed, revocable invitation token
+  //            ("token-proven", via `acceptInvitation`)
+  //   login  → the account's own password ("credential", via `verifyPassword`)
+  "POST /api/crm/portal/invitations": "admin",
+  "POST /api/crm/portal/invitations/:id/revoke": "admin",
+  "POST /api/crm/portal/accounts/:leadId/revoke": "admin",
+  "POST /api/crm/portal/document-grants": "admin",
+  "DELETE /api/crm/portal/document-grants/:id": "admin",
+  "POST /api/portal/invitations/accept": "token-proven",
+  "POST /api/portal/login": "credential",
+  "POST /api/portal/logout": "portal",
+  "POST /api/portal/documents": "portal",
+  "POST /api/portal/proposals/:dealId/accept": "portal",
+  "POST /api/portal/tickets": "portal",
+  "POST /api/portal/tickets/:id/messages": "portal",
+
   // ── M2: Operations, My Day, reminders (routes/crmOperations.ts) ───────────
   // All behind requireCrmAuth with a named permission, so they read "admin"
   // while the legacy bearer fallback stands.
@@ -88,6 +194,16 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "PATCH /api/crm/operations/reminder-preferences": "admin",
   "POST /api/crm/operations/jobs/run": "admin",
   "POST /api/crm/operations/jobs/:id/retry": "admin",
+
+  // ── M4: reminder delivery recovery ───────────────────────────────────────
+  // All three require settings.write, because all three decide what a person
+  // outside this system does or does not receive. `resend` additionally
+  // requires an explicit confirmation in the body — it is the one that can put
+  // a second copy in somebody's inbox — and every one of them writes a
+  // crm_delivery_recovery_actions row naming the actor and the reason.
+  "POST /api/crm/operations/deliveries/:id/retry": "admin",
+  "POST /api/crm/operations/deliveries/:id/resend": "admin",
+  "POST /api/crm/operations/deliveries/:id/acknowledge": "admin",
 
   // ── M1: staff identity and authentication (routes/crmStaff.ts) ────────────
   // "staff" = crm_staff_session cookie + CSRF header + permission grant.

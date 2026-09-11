@@ -1894,6 +1894,16 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {/* M4 — the broadcast workspace is a separate page with its own
+                  tables. Sequences on this screen are unaffected by it, and it
+                  is linked rather than merged so neither engine writes the
+                  other's status column. */}
+              <button
+                onClick={() => navigate("/admin/crm/campaign-builder")}
+                className="flex items-center gap-2 px-3 py-2 border border-teal-300 bg-teal-50 text-sm font-semibold rounded-lg hover:bg-teal-100 text-teal-800 transition-colors"
+              >
+                <Mail className="w-4 h-4" /> <span className="hidden sm:inline">Marketing</span>
+              </button>
               <button
                 onClick={() => navigate("/admin/crm/campaign-queue")}
                 className="flex items-center gap-2 px-3 py-2 border border-border text-sm font-semibold rounded-lg hover:bg-accent text-muted-foreground transition-colors"

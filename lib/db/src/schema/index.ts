@@ -14,6 +14,8 @@ export * from "./crmAdminSessions";
 export * from "./crmStaff";
 export * from "./crmOperations";
 export * from "./crmDocuments";
+export * from "./crmSupport";
+export * from "./crmMarketing";
 export * from "./aiToolkitPurchases";
 export * from "./landingPageViews";
 export * from "./crmConversations";

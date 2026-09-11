@@ -39,6 +39,21 @@ export const PERMISSIONS = [
   // record deletes — an owner can hand it to a specific person. It is simply
   // not something a role grants by default.
   "documents.read", "documents.write", "documents.delete",
+
+  // M4: Support.
+  //
+  // `support.assign` is separate from `support.write` for the same reason
+  // `tasks.assign` is separate from `tasks.write`: working a ticket and
+  // deciding who is answerable for it are different acts, and the second one
+  // puts an obligation on somebody else's day.
+  //
+  // Replying to a customer is NOT granted by `support.write`. That line is
+  // already drawn by `communications.send`, and the message route asserts it —
+  // so the boundary is correct on the day Support starts actually sending,
+  // rather than retrofitted onto a live route.
+  "support.read", "support.write", "support.assign",
+  "kb.read", "kb.write",
+
   "reports.read",
   "data.export",            // bulk egress of customer data — deliberately scarce
   "settings.read", "settings.write",
@@ -69,6 +84,8 @@ const OPERATIONS: Permission[] = [
   "communications.read", "communications.send",
   "campaigns.read", "campaigns.write",
   "documents.read", "documents.write",
+  "support.read", "support.write", "support.assign",
+  "kb.read", "kb.write",
   "reports.read",
   "settings.read",
 ];

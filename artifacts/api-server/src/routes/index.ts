@@ -15,6 +15,11 @@ import crmCalendarRouter from "./crmCalendar";
 import crmInboxRouter from "./crmInbox";
 import crmEmailInboundRouter from "./crmEmailInbound";
 import crmSalesRouter from "./crmSales";
+import crmSupportRouter from "./crmSupport";
+import crmPortalRouter from "./crmPortal";
+import crmHistoryRouter from "./crmHistory";
+import crmReportsRouter from "./crmReports";
+import crmMarketingRouter from "./crmMarketing";
 import phoneRouter from "./phone";
 import copilotRouter from "./copilot";
 import aiCampaignGenerateRouter from "./aiCampaignGenerate";
@@ -64,6 +69,18 @@ router.use(crmCalendarRouter);
 router.use(crmInboxRouter);
 router.use(crmEmailInboundRouter);
 router.use(crmSalesRouter);
+router.use(crmSupportRouter);
+// Before crmRouter: /crm/portal/* must match its own handlers rather than
+// falling into one of the legacy parameterised /crm/:something routes.
+router.use(crmPortalRouter);
+// Before crmRouter for the same reason as the others: /crm/history/* and
+// /crm/reports/* must reach their own handlers rather than a legacy
+// parameterised /crm/:something route.
+router.use(crmHistoryRouter);
+router.use(crmReportsRouter);
+// Before crmRouter: /crm/marketing/* must match its own handlers rather than
+// falling into one of the legacy parameterised /crm/:something routes.
+router.use(crmMarketingRouter);
 router.use(crmRouter);
 router.use(crmProjectsRouter);
 router.use(crmDiscoveryRouter);
