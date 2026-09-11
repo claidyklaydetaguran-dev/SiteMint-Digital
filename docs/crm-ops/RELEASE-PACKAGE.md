@@ -15,7 +15,7 @@ deploys to shared environments or runs migrations anywhere.
 | | |
 |---|---|
 | Branch | `claude/sitemint-crm-operations-124038` |
-| Candidate commit | `51e5baf` |
+| Candidate commit | `cf98858` |
 | Pushed? | **No.** The branch exists only in the CRM session's worktree. |
 | Base | `b0a5f49`, with receptionist `abfe8bb` merged at `5eb4c0b` |
 | Contains `main`? | Yes — `main` (`57ea6c8`) is an ancestor. |
@@ -82,6 +82,7 @@ have ever had the CRM.
 | *(documents/calendar — pushed with the rest of M3)* | `crm_attachment_blobs`, `crm_document_requests`, `crm_document_shares`, `crm_appointments`, `crm_appointment_attendees` |
 | `schema/M3-conversations.sql` | `crm_conversations`, `crm_conversation_participants`, `crm_message_drafts`, `crm_conversation_reads` + 6 columns on `crm_messages` |
 | `schema/M3-inbound-email.sql` | `crm_inbound_email_events`, `crm_email_suppressions`, `crm_unmatched_emails`, `crm_email_send_counters` + 2 columns on `crm_conversations` |
+| `schema/M3-sales-chain.sql` | 9 nullable columns on `crm_deals` (owner, probability, outcome, conversion link) |
 
 ### 3d. Columns added to existing tables
 
@@ -148,6 +149,8 @@ dump you proved.
 4. Apply `docs/crm-ops/schema/M3-conversations.sql`.
 5. Apply `docs/crm-ops/schema/M3-inbound-email.sql` — **after** step 4, which
    creates `crm_conversations`.
+5a. Apply `docs/crm-ops/schema/M3-sales-chain.sql`. Order-independent; it
+   touches only `crm_deals`.
 6. Deploy the application at `51e5baf`.
 7. Run the conversation backfill: `POST /api/crm/inbox/backfill` as an owner.
    It is idempotent, resumable, and reports `scanned / linked / quarantined`.
@@ -399,6 +402,10 @@ Run in order, against the deployed environment, as a real signed-in owner.
     proves two-way email end to end.
 11. Confirm the three owners produce three distinct `sent_by_staff_id` values
     on outbound messages, and that `crm_admin_audit_log` names each of them.
+
+12. Record a payment against a won deal and confirm "Money received" on the
+    Command Center moves. It was structurally $0 before `cf98858`, so a zero
+    here means the fix did not deploy — not that nobody has paid.
 
 ### What must NOT be done during smoke testing
 

@@ -7,19 +7,42 @@
 ## Where things stand
 
 **Branch:** `claude/sitemint-crm-operations-124038` (NOT pushed)
-**HEAD:** `eca5ed8` — clean tree
+**HEAD:** `cf98858` — clean tree
 **Merged:** receptionist `83ff869`, then `abfe8bb` at `5eb4c0b`.
 **Upstream:** `main` is `57ea6c8` and is already contained in this branch.
 Newer voice commits (`6adf786`, `46864d8`) live on
 `feature/ai-receptionist-private-beta-readiness`, which the integration owner
 merges — they add no tables, so they do not move the barrel pins.
 
-**Milestone 3 status:** Documents and Calendar are implemented and tested
-locally. Communications is unfinished (no durable conversation identity, no
-inbound email, no sender recorded on SMS or calls). Sales is not started. M3 is
-partially complete; do not report it as done.
+**Milestone 3 status: complete.** All four areas are implemented and tested
+locally — Documents, Calendar, Communications and Sales.
+
+A connected journey runs end to end against the owner-preview database and
+passes 53 of 53 checks: three separate owner accounts, contact → lead → deal
+→ proposal → won → project → tasks → appointment → documents →
+communications → reminders → completion → money → history, with a restricted
+new hire refused at every boundary. The script is
+`scratchpad/journey.mjs` in the session directory; the assertions are
+mirrored by committed tests.
+
+**Use a separate preview database.** `crm_preview` holds the owner demo;
+`crm_test` is what the suites truncate. Running `pnpm run test` against the
+preview database wipes it mid-demo, which happened repeatedly before they were
+split.
+
+What M3 does NOT include, and is the honest next work: support tickets and
+knowledge base, campaign segmentation and the visual email designer, AI
+drafting, triggered workflows, a single merged customer timeline, reporting
+beyond the sales figures, the mobile surfaces beyond Calendar and Documents,
+third-party integrations, and the customer portal.
 
 ```
+cf98858 fix(crm): "Money received" was structurally zero on every surface
+9c18aba fix(crm): a real delivery state machine, and an honest guarantee
+96773b6 feat(crm): close the sales chain — outcome, conversion, honest forecast
+d2e0012 docs(crm): release package for the integration owner
+51e5baf feat(crm): genuine two-way email — inbound, suppression, loop protection
+7637bf8 feat(crm): durable conversations, one inbox, SMS sender attribution
 eca5ed8 docs(crm): fold the communications findings into the handoff and matrix
 5080d7b feat(crm): real per-person unread state for the shared customer inbox
 059894f fix(crm): attribute the lead timeline, honour CC/BCC, close the send-crash window
