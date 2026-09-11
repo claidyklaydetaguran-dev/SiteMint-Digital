@@ -96,11 +96,16 @@ export default function CrmInbox() {
   const [smsError, setSmsError] = useState("");
   const [toast, setToast] = useState("");
 
-  // TASK 4 — Session-based unread: tracked per session only (not persisted)
-  // When a thread is selected it's marked "viewed"; badge hides.
-  // If new messages arrive for a viewed thread, it's removed from viewedLeads
-  // and the unread badge reappears. Resets on page reload by design.
-  const [viewedLeads, setViewedLeads] = useState<Set<number>>(new Set());
+  // Unread comes from the server, per person (`/api/crm/inbox/unread`).
+  //
+  // It used to be a Set of threads clicked since page load, which meant it
+  // reset on every refresh and lived in one browser — so Shasta reading a
+  // message did nothing for the badge Claidy saw, and both could think it was
+  // still unhandled. `unreadByLead` is this person's real count: inbound
+  // messages that arrived after they last opened the conversation.
+  const [unreadByLead, setUnreadByLead] = useState<Map<number, number>>(new Map());
+  const [unreadAvailable, setUnreadAvailable] = useState(true);
+  const [unreadReason, setUnreadReason] = useState<string | null>(null);
 
   // TASK 5 — Highlight rows that just received new messages
   const [newlyUpdated, setNewlyUpdated] = useState<Set<number>>(new Set());
@@ -144,12 +149,32 @@ export default function CrmInbox() {
     return () => el.removeEventListener("scroll", handleThreadScroll);
   }, [handleThreadScroll, selected]); // re-attach when thread changes
 
-  // ── Session unread helper ────────────────────────────────────────────────────
+  // ── Unread, from the server ──────────────────────────────────────────────────
+
+  /**
+   * Refreshes this person's unread counts. Called on load, after every poll,
+   * and after opening a thread, so the badge matches the server rather than
+   * drifting from it.
+   */
+  const refreshUnread = useCallback(async () => {
+    const r = await adminFetch("/api/crm/inbox/unread").catch(() => null);
+    if (!r?.ok) return;
+    const d = await r.json().catch(() => null) as
+      | { available?: boolean; reason?: string; threads?: { leadId: number; unread: number }[] }
+      | null;
+    if (!d) return;
+    setUnreadAvailable(d.available !== false);
+    setUnreadReason(d.available === false ? d.reason ?? null : null);
+    setUnreadByLead(new Map((d.threads ?? []).map(t => [t.leadId, t.unread])));
+  }, []);
 
   const effectiveUnread = useCallback((thread: ConversationThread): number => {
-    if (thread.leadId == null) return thread.unread;
-    return viewedLeads.has(thread.leadId) ? 0 : thread.unread;
-  }, [viewedLeads]);
+    // A thread with no lead is an unknown number that has not been turned into
+    // a contact yet; there is nothing to key read state on, so it has no badge
+    // rather than a made-up one.
+    if (thread.leadId == null || !unreadAvailable) return 0;
+    return unreadByLead.get(thread.leadId) ?? 0;
+  }, [unreadByLead, unreadAvailable]);
 
   // ── Data fetch helpers ───────────────────────────────────────────────────────
 
@@ -202,7 +227,12 @@ export default function CrmInbox() {
         setMessages(first.messages.slice().reverse());
         scrollToBottom();
         if (first.leadId) {
-          setViewedLeads(new Set([first.leadId]));
+          // The first thread is auto-opened and its messages are on screen, so
+          // recording it as read is accurate. It is a server write like any
+          // other read, not a local flag.
+          void adminFetch(`/api/crm/inbox/threads/${first.leadId}/read`, { method: "POST" })
+            .then(() => refreshUnread())
+            .catch(() => { /* the next poll re-reads it */ });
           loadMessages(first.leadId);
           loadFullLead(first.leadId);
         }
@@ -212,9 +242,9 @@ export default function CrmInbox() {
     } finally {
       setLoading(false);
     }
-  }, [scrollToBottom, loadMessages, loadFullLead]);
+  }, [scrollToBottom, loadMessages, loadFullLead, refreshUnread]);
 
-  useEffect(() => { loadThreads(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadThreads(); void refreshUnread(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── TASK 2 — Silent poll refresh ─────────────────────────────────────────────
   // Fetches conversations silently (no full-page loading, no thread reset,
@@ -264,14 +294,10 @@ export default function CrmInbox() {
         }
       }
 
-      // TASK 4 — Remove newly-updated threads from viewedLeads so
-      // unread badge reappears for threads that got new inbound messages
+      // New messages change what is unread, so re-read it from the server
+      // instead of guessing locally.
       if (updatedLeadIds.length > 0) {
-        setViewedLeads(prev => {
-          const next = new Set(prev);
-          updatedLeadIds.forEach(lid => next.delete(lid));
-          return next;
-        });
+        void refreshUnread();
 
         // TASK 5 — Highlight newly updated rows briefly
         setNewlyUpdated(prev => {
@@ -321,12 +347,21 @@ export default function CrmInbox() {
     scrollToBottom();
 
     if (thread.leadId != null) {
-      // TASK 4 — Mark thread as viewed this session
-      setViewedLeads(prev => new Set(prev).add(thread.leadId!));
-      loadMessages(thread.leadId);
-      loadFullLead(thread.leadId);
+      const leadId = thread.leadId;
+      // Clear the badge immediately so opening a thread feels instant, then
+      // record the read on the server and take its answer as the truth.
+      setUnreadByLead(prev => {
+        const next = new Map(prev);
+        next.delete(leadId);
+        return next;
+      });
+      void adminFetch(`/api/crm/inbox/threads/${leadId}/read`, { method: "POST" })
+        .then(() => refreshUnread())
+        .catch(() => { /* the next poll re-reads it */ });
+      loadMessages(leadId);
+      loadFullLead(leadId);
     }
-  }, [scrollToBottom, loadMessages, loadFullLead]);
+  }, [scrollToBottom, loadMessages, loadFullLead, refreshUnread]);
 
   // ── SMS send ─────────────────────────────────────────────────────────────────
 
@@ -412,7 +447,8 @@ export default function CrmInbox() {
                   <span className="text-muted-foreground font-normal">({threads.length})</span>
                 )}
                 {totalUnread > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span title="Messages that arrived since you last opened the conversation. This count is yours, not the team's."
+                    className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     {totalUnread > 99 ? "99+" : totalUnread}
                   </span>
                 )}
@@ -432,6 +468,15 @@ export default function CrmInbox() {
                 </button>
               </div>
             </div>
+
+            {/* Unread is per person, so a shared-token session has none to show.
+                Say that rather than displaying zero, which would read as
+                "nothing waiting". */}
+            {unreadReason && (
+              <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-1">
+                {unreadReason}
+              </p>
+            )}
 
             {/* TASK 5 — Live indicator + last updated */}
             {!loading && (
@@ -482,7 +527,7 @@ export default function CrmInbox() {
               threads.map((thread, idx) => {
                 const name = displayName(thread);
                 const last = lastMsg(thread);
-                const unread = effectiveUnread(thread); // TASK 4 — session-based
+                const unread = effectiveUnread(thread);
                 const isActive = thread.leadId != null
                   ? selected?.leadId === thread.leadId
                   : selected === thread;

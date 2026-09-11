@@ -28,6 +28,14 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/documents/shares/:shareId/revoke": "admin",
   "POST /api/crm/document-requests": "admin",
   "PATCH /api/crm/document-requests/:id": "admin",
+
+  // ── Inbox read state ────────────────────────────────────────────────────
+  // These record which conversations a person has opened. They send nothing
+  // and reveal no message content — the worst a caller can do is mark their
+  // own badge read — but they are still writes, so they are listed.
+  "POST /api/crm/inbox/threads/:leadId/read": "admin",
+  "POST /api/crm/inbox/threads/:leadId/unread": "admin",
+  "POST /api/crm/inbox/read": "admin",
   "POST /api/crm/appointments": "admin",
   "PATCH /api/crm/appointments/:id": "admin",
   "DELETE /api/crm/appointments/:id": "admin",

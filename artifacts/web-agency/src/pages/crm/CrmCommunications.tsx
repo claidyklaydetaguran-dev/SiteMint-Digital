@@ -97,7 +97,11 @@ export default function CrmCommunications() {
   const [smsBody, setSmsBody] = useState("");
   const [sending, setSending] = useState(false);
   const [smsError, setSmsError] = useState("");
-  const [viewedLeads, setViewedLeads] = useState<Set<number>>(new Set());
+  // Unread comes from the server, per person — see CrmInbox for the full
+  // note. The Set this replaces reset on reload and lived in one browser, so
+  // two people could both believe a message was still unhandled.
+  const [unreadByLead, setUnreadByLead] = useState<Map<number, number>>(new Map());
+  const [unreadAvailable, setUnreadAvailable] = useState(true);
   const [newlyUpdated, setNewlyUpdated] = useState<Set<number>>(new Set());
   const threadRef = useRef<HTMLDivElement>(null);
   const knownLastAt = useRef<Map<number, string>>(new Map());
@@ -185,7 +189,7 @@ export default function CrmCommunications() {
         setMessages(first.messages.slice().reverse());
         scrollToBottom();
         if (first.leadId) {
-          setViewedLeads(new Set([first.leadId]));
+          markRead(first.leadId);
           loadMessages(first.leadId);
           loadFullLead(first.leadId);
         }
@@ -220,7 +224,7 @@ export default function CrmCommunications() {
         }
       }
       if (updatedIds.length > 0) {
-        setViewedLeads(prev => { const n = new Set(prev); updatedIds.forEach(id => n.delete(id)); return n; });
+        void refreshUnread();
         setNewlyUpdated(prev => { const n = new Set(prev); updatedIds.forEach(id => n.add(id)); return n; });
         setTimeout(() => setNewlyUpdated(prev => { const n = new Set(prev); updatedIds.forEach(id => n.delete(id)); return n; }), 3000);
       }
@@ -244,7 +248,7 @@ export default function CrmCommunications() {
     setMessages(thread.messages.slice().reverse());
     scrollToBottom();
     if (thread.leadId != null) {
-      setViewedLeads(prev => new Set(prev).add(thread.leadId!));
+      markRead(thread.leadId!);
       loadMessages(thread.leadId);
       loadFullLead(thread.leadId);
     }
@@ -265,8 +269,26 @@ export default function CrmCommunications() {
     finally { setSending(false); }
   };
 
+  const refreshUnread = useCallback(async () => {
+    const r = await adminFetch("/api/crm/inbox/unread").catch(() => null);
+    if (!r?.ok) return;
+    const d = await r.json().catch(() => null) as
+      | { available?: boolean; threads?: { leadId: number; unread: number }[] } | null;
+    if (!d) return;
+    setUnreadAvailable(d.available !== false);
+    setUnreadByLead(new Map((d.threads ?? []).map(t => [t.leadId, t.unread])));
+  }, []);
+
+  /** Clears the badge at once, then records the read and trusts the server. */
+  const markRead = useCallback((leadId: number) => {
+    setUnreadByLead(prev => { const n = new Map(prev); n.delete(leadId); return n; });
+    void adminFetch(`/api/crm/inbox/threads/${leadId}/read`, { method: "POST" })
+      .then(() => refreshUnread())
+      .catch(() => { /* the next poll re-reads it */ });
+  }, [refreshUnread]);
+
   const effectiveUnread = (t: Thread) =>
-    t.leadId != null && viewedLeads.has(t.leadId) ? 0 : t.unread;
+    t.leadId == null || !unreadAvailable ? 0 : unreadByLead.get(t.leadId) ?? 0;
 
   const totalUnread = threads.reduce((s, t) => s + effectiveUnread(t), 0);
 
