@@ -29,7 +29,7 @@ Status vocabulary — deliberately conservative:
 | 15 | Responsive / mobile / offline / push | **Partial** | Shell responsive; leads list verified at 375px this pass. Inbox/Calendar/Pipeline/Communications remain desktop-only. No PWA, offline or push. |
 | 16 | Customer portal | **Not started** | Explicitly the final, separately gated milestone. |
 | 17 | Encryption, backups, MFA, security logging | **Partial** | MFA and security logging **Done** (M1). Transport/at-rest encryption and backups are hosting properties not yet evidenced; no restore rehearsal. |
-| 18 | Live dashboard / activities / priorities | **Partial** | Backend complete (M2): `/crm/command-center` serves 11 activity panels where each count comes from the same function as its list, plus a traceable sales summary and an activity feed. Uninstrumented metrics return `available:false` with a reason, never a zero. **Frontend wiring of the clickable buttons is the next step.** |
+| 18 | Live dashboard / activities / priorities | **Done (M2)** | 11 clickable activity panels rendering their records inline; each count and list come from one server function. Range + Mine/Team filters, 60s polling that pauses when hidden, stale indicator, refresh preserving all state. Uninstrumented metrics say why, never zero. Money kept distinct: pipeline / contracted / received. |
 
 ## Milestone 1 — delivered and proven
 

@@ -6,7 +6,7 @@
 ## Where things stand
 
 **Branch:** `claude/sitemint-crm-operations-124038` (NOT pushed)
-**HEAD:** `4a03d19` — clean tree
+**HEAD:** `9f82485` — clean tree
 **Merged:** receptionist `83ff869`; no newer integration work exists upstream.
 
 ```
@@ -23,7 +23,7 @@ f2a39b1 feat(crm): individual staff accounts, durable sessions, permission matri
 ## Verification state (all local; nothing deployed)
 
 - `pnpm run typecheck` — clean.
-- api-server vitest — **1146/1146** with `CRM_TEST_DATABASE_URL` set.
+- api-server vitest — **1150/1150** with `CRM_TEST_DATABASE_URL` set.
 - `pnpm run test` — exits 0 with `DATABASE_URL` + `CRM_TEST_DATABASE_URL` set.
   **Always redirect to a file and check `$?`** — piping to `tail` reports tail's
   exit code and has already hidden a real failure once.
@@ -45,24 +45,18 @@ MSYS_NO_PATHCONV=1 PORT=22065 BASE_PATH=/ API_PROXY_TARGET=http://localhost:8080
 
 ## Immediate next step
 
-**Wire the Command Center frontend to the M2 backend.** The API is finished and
-tested; `CrmExecutiveDashboard.tsx` has not been rewritten yet.
+**Milestone 3 — Sales, Communications, Documents, Calendar** (areas C, D, I, M).
+The Command Center is finished and verified; M2 is complete.
 
-Endpoints ready to consume:
-- `GET /api/crm/command-center?days=&scope=mine|team&limit=` → `{generatedAt, range, scope, scopeDenied, timezone, signedInAs, panels[], sales{}}`
-- `GET /api/crm/command-center/panel/:key?days=&limit=` → `{panel}` — one panel, same count as the dashboard
-- `GET /api/crm/command-center/activity?limit=` → `{generatedAt, activity[]}`
-
-Panel keys: `new_leads, inquiries, email_replies, opened_emails, return_visits,
-tasks_due, deadlines, appointments, documents_signed, waiting_documents,
-videos_watched`.
-
-Required behaviour: clickable buttons that reveal the filtered list **directly
-below the buttons**, a row opening a detail panel/sheet, a visible Refresh with
-"last updated", date-range and Mine/Team filters, bounded polling that pauses
-when hidden and never resets filters or drafts, and — critically — a panel with
-`available:false` must render its `reason` as "Not configured / Unavailable",
-never as a zero.
+Highest-value first:
+1. **Documents** — `crm_attachments` exists (versions, content hash, private
+   storage key) but has no upload/download endpoints or UI. Needs authenticated
+   upload, size/type validation, private storage, permission-checked download.
+2. **Communications** — unify Inbox/SMS/calls into one threaded model with
+   ownership, unread state and drafts. Inbound email needs a provider decision.
+3. **Calendar** — an internal team calendar does not exist; the Command Center
+   `appointments` panel is unavailable until it does.
+4. **Contacts** — import/export, duplicate review, richer fields.
 
 ## Then, in order
 
