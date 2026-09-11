@@ -44,6 +44,19 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "PUT /api/crm/inbox/conversations/:id/draft": "admin",
   "DELETE /api/crm/inbox/conversations/:id/draft": "admin",
   "POST /api/crm/inbox/backfill": "admin",
+
+  // ── Inbound email ───────────────────────────────────────────────────────
+  // The webhook is authenticated by its svix signature, not by a session —
+  // the signature IS the credential, and it is verified against the raw body
+  // before anything is recorded. The operator surfaces are permission-gated;
+  // releasing a suppression additionally requires settings.write, because
+  // mailing somebody who reported us as spam affects every client.
+  "POST /api/crm/webhooks/resend/inbound": "signature",
+  "POST /api/crm/email/unmatched/:id/attach": "admin",
+  "POST /api/crm/email/unmatched/:id/discard": "admin",
+  "POST /api/crm/email/suppressions": "admin",
+  "POST /api/crm/email/suppressions/release": "admin",
+  "POST /api/crm/email/inbound/events/:id/retry": "admin",
   "POST /api/crm/appointments": "admin",
   "PATCH /api/crm/appointments/:id": "admin",
   "DELETE /api/crm/appointments/:id": "admin",

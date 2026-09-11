@@ -554,18 +554,80 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
     const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
     if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
 
+    const {
+      isSuppressed, replyToAddress, recordOutboundForLoopControl,
+    } = await import("../lib/inboundEmail.js");
+    const { ensureConversation, refreshConversationRollups } = await import("../lib/conversations.js");
+
+    // Somebody who hard-bounced or reported us as spam must not be mailed
+    // again. Continuing to send to a complainer damages deliverability for
+    // every other client, so this is refused rather than warned about.
+    const blocked = await isSuppressed(lead.email);
+    if (blocked.suppressed) {
+      res.status(409).json({ error: blocked.reason, suppressed: true });
+      return;
+    }
+
+    // The conversation this belongs to, so the sent message is part of a
+    // thread rather than a loose activity row, and so the reply has somewhere
+    // to come back to.
+    const conversation = await ensureConversation({
+      channel: "email", provider: "resend",
+      contactId: lead.id, externalAddress: lead.email, externalName: lead.name,
+      subject,
+    });
+
+    if (conversation) {
+      const loop = await recordOutboundForLoopControl(conversation.id);
+      if (!loop.allowed) {
+        res.status(429).json({ error: loop.reason, loopProtection: true });
+        return;
+      }
+    }
+
+    // Replies come back to an address carrying this conversation's token,
+    // which is what makes an inbound reply attributable to a thread without
+    // trusting the sender header.
+    const replyTo = conversation ? await replyToAddress(conversation.id) : null;
+
     const isTestMode = testMode !== false && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    let providerMessageId: string | null = null;
 
     if (!isTestMode) {
       const resend = getResend();
-      await resend.emails.send({
+      const sent = await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
         to: [lead.email],
         ...(ccList.length ? { cc: ccList } : {}),
         ...(bccList.length ? { bcc: bccList } : {}),
+        ...(replyTo ? { replyTo } : {}),
         subject,
         html: body.replace(/\n/g, "<br>"),
       });
+      providerMessageId = sent?.data?.id ?? null;
+    }
+
+    // Recorded as a message on the thread, not only as an activity. The
+    // activity timeline says an email happened; this is the email.
+    if (conversation) {
+      const who = actorLabel(req);
+      await db.insert(crmMessages).values({
+        leadId: lead.id,
+        conversationId: conversation.id,
+        direction: "outbound",
+        channel: "email",
+        subject,
+        body,
+        fromNumber: process.env.RESEND_FROM_EMAIL ?? null,
+        toNumber: lead.email,
+        providerMessageId,
+        sentByStaffId: req.staffAuth?.staff.id ?? null,
+        sentByLabel: req.staffAuth?.staff ? who : null,
+        origin: req.staffAuth?.staff ? "staff" : "legacy",
+        status: isTestMode ? "test_mode" : "sent",
+        metadata: { testMode: isTestMode, cc: ccList, bcc: bccList, replyTo },
+      });
+      await refreshConversationRollups(conversation.id);
     }
 
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
@@ -1521,6 +1583,28 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
     if (!resendEmailId) {
       res.json({ ok: true, ignored: true, reason: "no_email_id" });
       return;
+    }
+
+    // Suppression is mirrored for EVERY bounce and complaint, before the
+    // campaign lookup below. It used to happen only for campaign recipients,
+    // so a hard bounce on a one-off email to a client suppressed nothing and
+    // the CRM would cheerfully keep writing to a dead mailbox — and a spam
+    // complaint from a non-campaign send was discarded entirely, which is the
+    // one that damages deliverability for every other client.
+    if (eventType === "bounced" || eventType === "complained") {
+      const { suppressAddress } = await import("../lib/inboundEmail.js");
+      const recipients = Array.isArray(data.to) ? (data.to as string[])
+        : typeof data.to === "string" ? [data.to] : [];
+      const bounce = (data.bounce as Record<string, unknown> | undefined) ?? {};
+      for (const address of recipients) {
+        await suppressAddress({
+          address,
+          reason: eventType === "complained" ? "complaint" : "bounce",
+          // Only a permanent bounce suppresses; a full mailbox empties again.
+          bounceType: typeof bounce.type === "string" ? bounce.type : "Permanent",
+          detail: typeof bounce.subType === "string" ? bounce.subType : null,
+        });
+      }
     }
 
     // Find matching recipient (include leadId so we can do sequence reply logic)

@@ -67,6 +67,33 @@ export const crmConversations = pgTable("crm_conversations", {
   providerThreadRef: text("provider_thread_ref"),
 
   /**
+   * The unguessable token that makes a reply findable.
+   *
+   * Outbound mail for this conversation carries
+   * `Reply-To: c-<token>@<inbound domain>`, so a reply comes back addressed to
+   * a mailbox that identifies the conversation exactly. This is the primary
+   * correlation key rather than a fallback, for two reasons:
+   *
+   *   - Resend's inbound API exposes no SPF/DKIM/spam verdict, so the `from`
+   *     address is an unauthenticated claim. Matching on it alone would let
+   *     anyone inject a message into a client's thread by spoofing a header.
+   *   - Resend generates the outbound Message-ID itself and it cannot be set,
+   *     so we cannot pre-compute our own thread anchor from the send side;
+   *     `In-Reply-To` correlation only works once the customer quotes it back,
+   *     which not every client does.
+   */
+  replyToken: text("reply_token"),
+
+  /**
+   * The `References` chain for this thread, oldest first.
+   *
+   * Resend does not thread automatically — its own documentation shows the
+   * application maintaining this array and passing it back on every send. Kept
+   * here so replies sit in the customer's mail client the way they expect.
+   */
+  referenceChain: text("reference_chain").array(),
+
+  /**
    * How the TEAM is handling this — deliberately separate from who has read
    * it. Opening a conversation says nothing about whether it was answered.
    *   unassigned | assigned | awaiting_customer | resolved
@@ -98,6 +125,7 @@ export const crmConversations = pgTable("crm_conversations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   unique("uq_crm_conversations_identity").on(table.identityKey),
+  unique("uq_crm_conversations_reply_token").on(table.replyToken),
   // The inbox's default ordering, and the one that has to stay fast as history
   // grows — the whole point of replacing a 200-row scan.
   index("ix_crm_conversations_last_message").on(table.lastMessageAt),

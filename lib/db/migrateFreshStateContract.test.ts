@@ -141,16 +141,17 @@ const INITIALIZED_DATABASE = {
 // M3 raises it to 46: crm_attachment_blobs, crm_document_requests,
 // crm_document_shares, crm_appointments, crm_appointment_attendees — the
 // document store, document requests, share links and internal calendar.
-// 50: crm_thread_reads was superseded by crm_conversation_reads, and the
-// conversation foundation adds conversations, participants and drafts.
-check("the shared barrel derives 50 base tables", BARREL.length === 50, `${BARREL.length}`);
+// 54: the conversation foundation (conversations, participants, drafts,
+// per-person reads) plus inbound email (webhook events, suppressions,
+// unmatched mail, the reply-loop counter).
+check("the shared barrel derives 54 base tables", BARREL.length === 54, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 check("the committed migrations derive 30 domain tables", DOMAIN.length === 30, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 80 public tables", // 30 domain + 50 barrel
-  APPLICATION.length === 80,
+  "the application owns exactly 84 public tables", // 30 domain + 54 barrel
+  APPLICATION.length === 84,
   `${APPLICATION.length}`,
 );
 check(
@@ -435,7 +436,7 @@ check(
     }
   }
   check(
-    "every one of the 50 barrel-owned tables is a required sentinel",
+    "every one of the 54 barrel-owned tables is a required sentinel",
     allFailClosed,
     survivors.join(","),
   );
