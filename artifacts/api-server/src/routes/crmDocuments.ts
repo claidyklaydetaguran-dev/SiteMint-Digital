@@ -245,7 +245,7 @@ function sendFile(res: Response, filename: string, mimeType: string, bytes: Buff
   res.end(bytes);
 }
 
-router.delete("/crm/documents/:id", requireCrmAuth("documents.write"), async (req: Request, res: Response) => {
+router.delete("/crm/documents/:id", requireCrmAuth("documents.delete"), async (req: Request, res: Response) => {
   const id = num(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
   // Soft delete: the metadata row stays so history and request links survive.
@@ -283,20 +283,31 @@ router.get("/crm/document-requests", requireCrmAuth("documents.read"), async (re
   // Resolve owners and the parent record's name in one pass each.
   const staffIds = [...new Set(rows.map((r) => r.ownerStaffId).filter((v): v is number => v != null))];
   const leadIds = [...new Set(rows.filter((r) => r.entityType === "lead").map((r) => r.entityId))];
-  const [people, leads] = await Promise.all([
+  const projectIds = [...new Set(rows.filter((r) => r.entityType === "project").map((r) => r.entityId))];
+  const [people, leads, projects] = await Promise.all([
     staffIds.length ? db.select({ id: crmStaff.id, displayName: crmStaff.displayName })
       .from(crmStaff).where(inArray(crmStaff.id, staffIds)) : [],
     leadIds.length ? db.select({ id: crmLeads.id, name: crmLeads.name, company: crmLeads.company })
       .from(crmLeads).where(inArray(crmLeads.id, leadIds)) : [],
+    projectIds.length ? db.select({ id: crmProjects.id, name: crmProjects.name })
+      .from(crmProjects).where(inArray(crmProjects.id, projectIds)) : [],
   ]);
   const peopleMap = new Map(people.map((p) => [p.id, p.displayName]));
   const leadMap = new Map(leads.map((l) => [l.id, l]));
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
 
   res.json({
     requests: rows.map((r) => ({
       ...r,
       ownerName: r.ownerStaffId ? peopleMap.get(r.ownerStaffId) ?? null : null,
-      subject: r.entityType === "lead" ? leadMap.get(r.entityId) ?? null : null,
+      // Name whatever the request hangs off. Without this a project request
+      // reads as "project #37" on screen, which tells the reader nothing and
+      // makes them go and look it up.
+      subject: r.entityType === "lead" ? leadMap.get(r.entityId) ?? null
+        : r.entityType === "project" ? projectMap.get(r.entityId) ?? null
+        : null,
+      subjectHref: r.entityType === "lead" ? `/admin/crm/leads/${r.entityId}`
+        : r.entityType === "project" ? `/admin/crm/projects` : null,
       overdue: r.status === "pending" && r.dueDate != null && r.dueDate.getTime() < Date.now(),
     })),
   });

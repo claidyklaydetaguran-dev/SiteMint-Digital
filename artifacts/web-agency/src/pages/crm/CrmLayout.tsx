@@ -12,7 +12,7 @@ import {
   Layers, Activity, Download,
   ClipboardList, Briefcase, ListTodo, TrendingUp,
   BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft,
-  ExternalLink, Building2,
+  ExternalLink, Building2, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminFetch, adminProbe, adminLogout, getAdminToken } from "@/lib/adminFetch";
@@ -127,6 +127,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Discovery CRM",  href: "/admin/crm/discovery",    icon: ClipboardList },
       { label: "Discovery Portal", href: "/admin/dashboard",      icon: Globe, exact: true },
       { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
+      { label: "Documents",      href: "/admin/crm/documents",     icon: FileText },
       { label: "AI Intake Scoring",      href: "/admin/crm/intake-cases",          icon: BotMessageSquare },
       { label: "Receptionist Accounts",  href: "/admin/crm/receptionist-accounts", icon: Building2 },
     ],

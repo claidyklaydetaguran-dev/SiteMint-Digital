@@ -496,4 +496,34 @@ suite("M3 documents, calendar and the connected journey (real DB)", () => {
     expect((await hire.call("GET", "/api/crm/my-day")).status).toBe(200);
     expect((await hire.call("GET", "/api/crm/appointments")).status).toBe(200);
   }, 60_000);
+
+  it("an operations manager files documents but cannot delete one", async () => {
+    await resetThrottle();
+    await hire.login(HIRE);
+
+    // The everyday half of the job is unobstructed.
+    const uploaded = await hire.call("POST", "/api/crm/documents", {
+      entityType: "lead", entityId: ids["lead"],
+      filename: "ops-manager-upload.txt", mimeType: "text/plain",
+      contentBase64: Buffer.from("scope notes").toString("base64"),
+    });
+    expect(uploaded.status).toBe(201);
+    expect((await hire.call("GET", `/api/crm/documents?entityType=lead&entityId=${ids["lead"]}`)).status).toBe(200);
+
+    // Removing a client's file is a different act from adding one. The role
+    // grants documents.write, not documents.delete, so this is refused — and
+    // the refusal names the permission rather than being an opaque 403.
+    const refused = await hire.call("DELETE", `/api/crm/documents/${uploaded.json["attachment"].id}`);
+    expect(refused.status).toBe(403);
+    expect(String(refused.json["permission"] ?? "")).toBe("documents.delete");
+
+    // The file is still there afterwards — the refusal was not a partial delete.
+    const still = await owner.call("GET", `/api/crm/documents?entityType=lead&entityId=${ids["lead"]}`);
+    expect((still.json["documents"] as any[]).some((d) => d.filename === "ops-manager-upload.txt")).toBe(true);
+
+    // An owner can delete it, which is what makes the refusal a permission
+    // boundary rather than a broken route.
+    const byOwner = await owner.call("DELETE", `/api/crm/documents/${uploaded.json["attachment"].id}`);
+    expect(byOwner.status).toBe(200);
+  }, 60_000);
 });

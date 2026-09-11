@@ -113,6 +113,7 @@ const CrmCalendar = lazy(() => import("@/pages/crm/CrmCalendar"));
 const CrmDeals = lazy(() => import("@/pages/crm/CrmDeals"));
 const CrmTransactions = lazy(() => import("@/pages/crm/CrmTransactions"));
 const CrmProjects = lazy(() => import("@/pages/crm/CrmProjects"));
+const CrmDocuments = lazy(() => import("@/pages/crm/CrmDocuments"));
 const CrmReporting = lazy(() => import("@/pages/crm/CrmReporting"));
 const CrmAdminSettings = lazy(() => import("@/pages/crm/CrmAdminSettings"));
 const CrmCampaigns = lazy(() => import("@/pages/crm/CrmCampaigns"));
@@ -181,6 +182,7 @@ function AdminRoutes() {
       <Route path="/admin/crm/deals" component={CrmDeals} />
       <Route path="/admin/crm/transactions" component={CrmTransactions} />
       <Route path="/admin/crm/projects" component={CrmProjects} />
+      <Route path="/admin/crm/documents" component={CrmDocuments} />
       <Route path="/admin/crm/pipeline" component={CrmPipeline} />
       <Route path="/admin/crm/reporting" component={CrmReporting} />
       <Route path="/admin/crm/admin" component={CrmAdminSettings} />

@@ -32,7 +32,13 @@ export const PERMISSIONS = [
   "campaigns.read", "campaigns.write", "campaigns.send",
 
   // Supporting surfaces.
-  "documents.read", "documents.write",
+  //
+  // `documents.delete` is separate from `documents.write` because removing a
+  // client's file is not the same act as adding one. It is a soft delete, so
+  // it is recoverable and does not belong in OWNER_ONLY alongside the hard
+  // record deletes — an owner can hand it to a specific person. It is simply
+  // not something a role grants by default.
+  "documents.read", "documents.write", "documents.delete",
   "reports.read",
   "data.export",            // bulk egress of customer data — deliberately scarce
   "settings.read", "settings.write",
