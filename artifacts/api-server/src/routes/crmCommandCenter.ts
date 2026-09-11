@@ -14,7 +14,8 @@ import { and, asc, desc, eq, gte, inArray, isNull, isNotNull, lt, lte, ne, or, s
 import {
   db, crmLeads, crmTasks, crmProjects, crmDeals, crmTransactions, crmMessages,
   crmCampaignEvents, crmCampaignRecipients, crmStaff, crmProjectMilestones,
-  discoverySubmissions, crmActivities,
+  discoverySubmissions, crmActivities, crmAppointments, crmAppointmentAttendees,
+  crmDocumentRequests,
 } from "@workspace/db";
 import { requireCrmAuth } from "../lib/staffAuth.js";
 import { localDayBounds } from "../lib/crmScheduler.js";
@@ -232,15 +233,46 @@ async function deadlines(limit: number): Promise<Panel> {
   };
 }
 
-function appointments(): Panel {
-  // The scheduling_* tables belong to the receptionist product and are not the
-  // agency's own calendar. Reporting them here as "our appointments" would be
-  // wrong, and there is no internal calendar store yet.
+async function appointments(staffId: number | null, scope: string, limit: number): Promise<Panel> {
+  // The internal team calendar (M3). The receptionist product's scheduling_*
+  // tables are a customer's bookings and are deliberately NOT counted here.
+  const horizon = new Date(Date.now() + 14 * 24 * 3600_000);
+
+  let mineIds: number[] = [];
+  if (scope === "mine" && staffId) {
+    const rows = await db.select({ appointmentId: crmAppointmentAttendees.appointmentId })
+      .from(crmAppointmentAttendees).where(eq(crmAppointmentAttendees.staffId, staffId));
+    mineIds = rows.map((r) => r.appointmentId);
+  }
+
+  const where = [
+    eq(crmAppointments.status, "scheduled"),
+    gte(crmAppointments.startAt, new Date()),
+    lte(crmAppointments.startAt, horizon),
+    ...(scope === "mine" && staffId
+      ? [or(
+          eq(crmAppointments.organizerStaffId, staffId),
+          ...(mineIds.length ? [inArray(crmAppointments.id, mineIds)] : []),
+        )!]
+      : []),
+  ];
+
+  const items = await db.select({
+    id: crmAppointments.id, title: crmAppointments.title,
+    startAt: crmAppointments.startAt, endAt: crmAppointments.endAt,
+    location: crmAppointments.location, timezone: crmAppointments.timezone,
+    leadId: crmAppointments.leadId, projectId: crmAppointments.projectId,
+    status: crmAppointments.status,
+  }).from(crmAppointments).where(and(...where))
+    .orderBy(asc(crmAppointments.startAt)).limit(limit);
+
+  const [c] = await db.select({ count: sql<number>`count(*)` })
+    .from(crmAppointments).where(and(...where));
+
   return {
-    key: "appointments", label: "Upcoming appointments", available: false,
-    reason: "The internal team calendar is not built yet (Milestone 3). Receptionist booking data belongs to the voice product and is not this team's diary.",
-    count: null, items: [],
-    definition: "Persisted internal calendar events with timezone and cancellation status.",
+    key: "appointments", label: "Upcoming appointments", available: true,
+    count: Number(c?.count ?? 0), items,
+    definition: `Scheduled internal appointments starting within 14 days${scope === "mine" && staffId ? ", that you organise or attend" : ", across the team"}. Cancelled ones are excluded.`,
   };
 }
 
@@ -259,18 +291,40 @@ async function documentsSigned(): Promise<Panel> {
 }
 
 async function waitingForDocuments(limit: number): Promise<Panel> {
-  // A real outstanding request: a proposal or SOW sent and not yet answered.
+  // M3: real outstanding requests — somebody actually asked a client for
+  // something and it has not arrived. Previously this inferred "waiting" from
+  // a proposal status, which is a different and weaker claim.
+  const where = eq(crmDocumentRequests.status, "pending");
+
   const items = await db.select({
-    id: crmLeads.id, name: crmLeads.name, company: crmLeads.company,
-    proposalStatus: crmLeads.proposalStatus, sowStatus: crmLeads.sowStatus,
-    updatedAt: crmLeads.updatedAt, assignedTo: crmLeads.assignedTo,
-  }).from(crmLeads).where(or(
-    eq(crmLeads.proposalStatus, "Sent"), eq(crmLeads.sowStatus, "Sent"),
-  )).orderBy(asc(crmLeads.updatedAt)).limit(limit);
+    id: crmDocumentRequests.id, title: crmDocumentRequests.title,
+    entityType: crmDocumentRequests.entityType, entityId: crmDocumentRequests.entityId,
+    requestedAt: crmDocumentRequests.requestedAt, dueDate: crmDocumentRequests.dueDate,
+    ownerStaffId: crmDocumentRequests.ownerStaffId,
+    requestedByLabel: crmDocumentRequests.requestedByLabel,
+  }).from(crmDocumentRequests).where(where)
+    .orderBy(asc(crmDocumentRequests.dueDate), asc(crmDocumentRequests.requestedAt))
+    .limit(limit);
+
+  const [c] = await db.select({ count: sql<number>`count(*)` })
+    .from(crmDocumentRequests).where(where);
+
+  const leadIds = [...new Set(items.filter((i) => i.entityType === "lead").map((i) => i.entityId))];
+  const leads = leadIds.length
+    ? await db.select({ id: crmLeads.id, name: crmLeads.name, company: crmLeads.company })
+        .from(crmLeads).where(inArray(crmLeads.id, leadIds))
+    : [];
+  const leadMap = new Map(leads.map((l) => [l.id, l]));
+
   return {
     key: "waiting_documents", label: "Waiting for documents", available: true,
-    count: items.length, items,
-    definition: "Leads whose proposal or SOW is marked Sent and has had no answer recorded. Oldest first.",
+    count: Number(c?.count ?? 0),
+    items: items.map((i) => ({
+      ...i,
+      subject: i.entityType === "lead" ? leadMap.get(i.entityId) ?? null : null,
+      overdue: i.dueDate != null && i.dueDate.getTime() < Date.now(),
+    })),
+    definition: "Open document requests — a specific document asked for and not yet received. Soonest due first.",
   };
 }
 
@@ -309,16 +363,17 @@ router.get("/crm/command-center", requireCrmAuth(), async (req: Request, res: Re
 
   const [
     leadsPanel, repliesPanel, opensPanel, tasksPanel, deadlinesPanel,
-    waitingPanel, signedPanel, inquiriesPanel,
+    waitingPanel, signedPanel, inquiriesPanel, appointmentsPanel,
   ] = await Promise.all([
     newLeads(since, limit), emailReplies(since, limit), openedEmails(since, limit),
     tasksDue(staffId, scope, zone, limit), deadlines(limit),
     waitingForDocuments(limit), documentsSigned(), inquiriesNeedingResponse(limit),
+    appointments(staffId, scope, limit),
   ]);
 
   const panels: Panel[] = [
     leadsPanel, inquiriesPanel, repliesPanel, opensPanel, returnVisits(),
-    tasksPanel, deadlinesPanel, appointments(), signedPanel, waitingPanel, videosWatched(),
+    tasksPanel, deadlinesPanel, appointmentsPanel, signedPanel, waitingPanel, videosWatched(),
   ];
 
   // ── Sales summary, with every figure's basis stated ───────────────────────
@@ -404,7 +459,7 @@ router.get("/crm/command-center/panel/:key", requireCrmAuth(), async (req: Reque
     return_visits: () => returnVisits(),
     tasks_due: () => tasksDue(staffId, scope, zone, limit),
     deadlines: () => deadlines(limit),
-    appointments: () => appointments(),
+    appointments: () => appointments(staffId, scope, limit),
     documents_signed: () => documentsSigned(),
     waiting_documents: () => waitingForDocuments(limit),
     videos_watched: () => videosWatched(),

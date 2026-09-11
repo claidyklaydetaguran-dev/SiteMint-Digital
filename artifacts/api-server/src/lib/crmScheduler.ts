@@ -19,10 +19,10 @@
 import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import {
   db, crmScheduledJobs, crmNotifications, crmTasks, crmStaff,
-  crmProjects, crmProjectMilestones,
+  crmProjects, crmProjectMilestones, crmAppointments, crmAppointmentAttendees,
   type CrmScheduledJob,
 } from "@workspace/db";
-import { getResend } from "./email.js";
+import { trySendStaffMail } from "./staffMail.js";
 
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -31,7 +31,7 @@ const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const BATCH_SIZE = 20;
 const TICK_MS = 30_000;
 
-export const JOB_KINDS = ["task_reminder", "milestone_reminder", "daily_digest"] as const;
+export const JOB_KINDS = ["task_reminder", "milestone_reminder", "daily_digest", "appointment_reminder"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 // ── Timezone helpers ────────────────────────────────────────────────────────
@@ -184,18 +184,47 @@ async function notify(args: {
  * or test mode is on — a reminder must never fail because mail is not set up,
  * and a test run must never reach a real inbox.
  */
-async function maybeEmail(staffId: number, subject: string, text: string): Promise<void> {
+/**
+ * Sends a reminder email for `job`, at most once per occurrence.
+ *
+ * Locking a job makes it run once; it does NOT make an external side effect
+ * happen once. The dangerous window is: provider accepts → worker is killed →
+ * lock expires → job reclaimed → message sent again. Two things close it:
+ *
+ *  1. `external_dispatched_at` is written and committed BEFORE the send, so a
+ *     reclaimed job can see that a message was already handed over.
+ *  2. The send carries a provider idempotency key derived from the job's
+ *     dedupe key and its scheduled instant — stable across retries of this
+ *     occurrence, different for the next one — so even a genuine double-send
+ *     is collapsed by Resend rather than delivered twice.
+ *
+ * Documented limitation: if the provider accepts and the crash happens before
+ * (1) commits, the retry re-sends with the same key and Resend still
+ * de-duplicates; if Resend's idempotency window has expired by then, a
+ * duplicate is possible. In-app notifications have no such window — they are
+ * written in the same database as the job.
+ */
+async function maybeEmail(
+  job: CrmScheduledJob, staffId: number, subject: string, text: string,
+): Promise<void> {
   const [staff] = await db.select().from(crmStaff).where(eq(crmStaff.id, staffId)).limit(1);
   if (!staff?.reminderEmailEnabled || staff.status !== "active") return;
-  if (process.env["CRM_EMAIL_TEST_MODE"] !== "false") return;
-  const resend = getResend();
-  if (!resend) return;
-  await resend.emails.send({
-    from: process.env["RESEND_FROM_EMAIL"] ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-    to: staff.email,
-    subject,
-    text,
-  });
+
+  const key = `${job.dedupeKey}:${job.runAt.toISOString()}`;
+  await db.update(crmScheduledJobs)
+    .set({ externalDispatchedAt: new Date() })
+    .where(eq(crmScheduledJobs.id, job.id));
+
+  // `trySendStaffMail` never throws and refuses to send while test mode is on.
+  // The previous code called getResend() directly, which THROWS when
+  // RESEND_API_KEY is unset — turning "this environment has no mail" into a
+  // failed job that burned all five retries and then reported a false alarm.
+  const outcome = await trySendStaffMail({ to: staff.email, subject, text, idempotencyKey: key });
+  if (outcome.sent && outcome.providerId) {
+    await db.update(crmScheduledJobs)
+      .set({ externalRef: outcome.providerId })
+      .where(eq(crmScheduledJobs.id, job.id));
+  }
 }
 
 async function runTaskReminder(job: CrmScheduledJob): Promise<void> {
@@ -213,7 +242,7 @@ async function runTaskReminder(job: CrmScheduledJob): Promise<void> {
     href: "/admin/crm/my-day",
     entityType: "task", entityId: task.id,
   });
-  await maybeEmail(task.assignedToStaffId, `Reminder: ${task.title}`,
+  await maybeEmail(job, task.assignedToStaffId, `Reminder: ${task.title}`,
     `This is your SiteMint CRM reminder for "${task.title}"${due}.`);
 
   // A recurring task schedules its next occurrence only after this one fires,
@@ -268,7 +297,7 @@ async function runDailyDigest(job: CrmScheduledJob): Promise<void> {
     body: overdue > 0 ? `${overdue} overdue.` : "Nothing overdue.",
     href: "/admin/crm/my-day",
   });
-  await maybeEmail(staffId, "Your SiteMint CRM day",
+  await maybeEmail(job, staffId, "Your SiteMint CRM day",
     `${open.length} task(s) due today or earlier${overdue > 0 ? `, ${overdue} overdue` : ""}.`);
 
   // Tomorrow's digest is scheduled once today's has run, so the chain cannot
@@ -302,7 +331,31 @@ export async function scheduleDailyDigest(staffId: number): Promise<void> {
   });
 }
 
+async function runAppointmentReminder(job: CrmScheduledJob): Promise<void> {
+  const appointmentId = Number(job.payload["appointmentId"]);
+  const [appt] = await db.select().from(crmAppointments)
+    .where(eq(crmAppointments.id, appointmentId)).limit(1);
+  // It may have been cancelled or completed between scheduling and now.
+  if (!appt || appt.status !== "scheduled") return;
+
+  const attendees = await db.select().from(crmAppointmentAttendees)
+    .where(eq(crmAppointmentAttendees.appointmentId, appointmentId));
+  const staffIds = [...new Set(attendees.map((a) => a.staffId).filter((v): v is number => v != null))];
+  const when = appt.startAt.toISOString().slice(11, 16);
+
+  for (const staffId of staffIds) {
+    await notify({
+      staffId, kind: "appointment_reminder", title: appt.title,
+      body: `Starts at ${when} UTC${appt.location ? ` · ${appt.location}` : ""}.`,
+      href: "/admin/crm/calendar", entityType: "appointment", entityId: appt.id,
+    });
+    await maybeEmail(job, staffId, `Reminder: ${appt.title}`,
+      `${appt.title} starts at ${when} UTC.${appt.location ? ` Location: ${appt.location}.` : ""}`);
+  }
+}
+
 const HANDLERS: Record<string, (job: CrmScheduledJob) => Promise<void>> = {
+  appointment_reminder: runAppointmentReminder,
   task_reminder: runTaskReminder,
   milestone_reminder: runMilestoneReminder,
   daily_digest: runDailyDigest,

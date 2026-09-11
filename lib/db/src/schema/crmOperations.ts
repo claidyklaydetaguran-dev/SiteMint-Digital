@@ -229,6 +229,21 @@ export const crmScheduledJobs = pgTable("crm_scheduled_jobs", {
   lockedBy:     text("locked_by"),
   lastError:    text("last_error"),
   dedupeKey:    text("dedupe_key").notNull(),
+
+  /**
+   * Set immediately BEFORE an external send is attempted, and committed on its
+   * own so it survives the process dying mid-send.
+   *
+   * Job locking alone cannot give exactly-once external delivery: if the
+   * provider accepts a message and the worker is killed before it records
+   * success, the lock expires, the job is reclaimed and the message goes out
+   * twice. This column makes that window visible, and `externalRef` records
+   * what the provider called the message so a duplicate can be reconciled.
+   * The send itself additionally carries a provider idempotency key derived
+   * from (dedupeKey, runAt), which is what actually collapses the duplicate.
+   */
+  externalDispatchedAt: timestamp("external_dispatched_at", { withTimezone: true }),
+  externalRef:  text("external_ref"),
   cancelledAt:  timestamp("cancelled_at", { withTimezone: true }),
   completedAt:  timestamp("completed_at", { withTimezone: true }),
   createdAt:    timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

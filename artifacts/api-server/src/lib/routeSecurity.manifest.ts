@@ -14,6 +14,24 @@
 import type { Protection } from "./routeSecurity.js";
 
 export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
+  // ── M3: documents and the internal calendar ──────────────────────────────
+  // All behind requireCrmAuth with a named permission.
+  //
+  // Note what is NOT here: `GET /api/crm/documents/shared/:token` is a read,
+  // so it is outside this mutating-route contract. It is the one deliberately
+  // unauthenticated document surface, and the token is its credential —
+  // high-entropy, stored only as a sha256, expiring, download-counted and
+  // revocable. See crmDocuments.ts.
+  "POST /api/crm/documents": "admin",
+  "DELETE /api/crm/documents/:id": "admin",
+  "POST /api/crm/documents/:id/share": "admin",
+  "POST /api/crm/documents/shares/:shareId/revoke": "admin",
+  "POST /api/crm/document-requests": "admin",
+  "PATCH /api/crm/document-requests/:id": "admin",
+  "POST /api/crm/appointments": "admin",
+  "PATCH /api/crm/appointments/:id": "admin",
+  "DELETE /api/crm/appointments/:id": "admin",
+
   // ── M2: Operations, My Day, reminders (routes/crmOperations.ts) ───────────
   // All behind requireCrmAuth with a named permission, so they read "admin"
   // while the legacy bearer fallback stands.

@@ -25,6 +25,10 @@ import {
   type Permission,
 } from "../lib/staffPermissions.js";
 import {
+  trySendStaffMail, staffMailConfigured, staffMailBlockedReason,
+  inviteMessage, resetMessage, activationUrl,
+} from "../lib/staffMail.js";
+import {
   STAFF_COOKIE_NAME, staffCookieOptions, requireStaff, resolveStaffSession,
   createStaffSession, revokeStaffSessionByToken, revokeStaffSessionById,
   revokeAllStaffSessions, recordStaffAudit, deriveClientIp,
@@ -56,6 +60,9 @@ function publicStaff(staff: CrmStaff) {
     role: staff.role,
     status: staff.status,
     mfaEnrolled: !!staff.mfaEnrolledAt,
+    /** True only when this mailbox proved itself — see completeTokenPasswordSet. */
+    emailVerified: !!staff.emailVerifiedAt,
+    emailVerifiedAt: staff.emailVerifiedAt,
     lastLoginAt: staff.lastLoginAt,
     createdAt: staff.createdAt,
     // M2: the reminder preferences the My Day settings panel needs to seed
@@ -75,6 +82,51 @@ async function activeOwnerCount(): Promise<number> {
   const [row] = await db.select({ count: sql<number>`count(*)` }).from(crmStaff)
     .where(and(eq(crmStaff.role, "owner"), eq(crmStaff.status, "active")));
   return Number(row?.count ?? 0);
+}
+
+/**
+ * Issues a token and tries to deliver it to the person's own mailbox.
+ *
+ * The delivery channel is recorded on the token, because it decides what
+ * consuming it can prove. A link the server emailed to an address demonstrates
+ * control of that address; a link handed to an operator to pass on does not.
+ */
+async function issueAndDeliver(args: {
+  staff: CrmStaff;
+  kind: "invite" | "password_reset";
+  ttlMs: number;
+  createdByStaffId: number | null;
+}): Promise<{
+  token: string; delivery: "email" | "manual"; emailed: boolean;
+  reason?: string; url: string | null;
+}> {
+  const token = await issueToken(args.staff.id, args.kind, args.ttlMs, args.createdByStaffId);
+  const url = activationUrl(token, args.kind);
+
+  // Without a configured public base URL there is no link to put in an email.
+  if (!url || !staffMailConfigured()) {
+    await db.update(crmStaffTokens).set({ delivery: "manual" })
+      .where(eq(crmStaffTokens.tokenHash, hashToken(token)));
+    return {
+      token, delivery: "manual", emailed: false, url,
+      reason: !url
+        ? "CRM_PUBLIC_BASE_URL is not set on this server, so no link can be built for an email."
+        : staffMailBlockedReason() ?? "Mail is not configured.",
+    };
+  }
+
+  const message = args.kind === "invite"
+    ? inviteMessage({ displayName: args.staff.displayName, url, expiresInHours: Math.round(args.ttlMs / 3_600_000) })
+    : resetMessage({ displayName: args.staff.displayName, url, expiresInMinutes: Math.round(args.ttlMs / 60_000) });
+
+  const outcome = await trySendStaffMail({ to: args.staff.email, ...message });
+  await db.update(crmStaffTokens)
+    .set({ delivery: outcome.sent ? "email" : "manual" })
+    .where(eq(crmStaffTokens.tokenHash, hashToken(token)));
+
+  return outcome.sent
+    ? { token, delivery: "email", emailed: true, url }
+    : { token, delivery: "manual", emailed: false, url, reason: outcome.reason };
 }
 
 async function issueToken(
@@ -470,19 +522,26 @@ router.post("/crm/staff", requireStaff("staff.invite"), async (req: Request, res
   const [created] = await db.insert(crmStaff).values({
     email, displayName, role, status: "invited", createdByStaffId: actor.id,
   }).returning();
-  const token = await issueToken(created.id, "invite", INVITE_TTL_MS, actor.id);
+  const sent = await issueAndDeliver({
+    staff: created, kind: "invite", ttlMs: INVITE_TTL_MS, createdByStaffId: actor.id,
+  });
 
   await recordStaffAudit({
     actorStaffId: actor.id, actorLabel: actor.email,
-    action: "staff.invited", target: `staff:${created.id} role:${role}`, ip: deriveClientIp(req),
+    action: "staff.invited", target: `staff:${created.id} role:${role} delivery:${sent.delivery}`,
+    ip: deriveClientIp(req),
   });
-  // Staff email delivery is not configured; the link is returned to the
-  // inviter to pass on out of band rather than pretending a mail was sent.
+
   res.status(201).json({
     staff: publicStaff(created),
-    activationToken: token,
+    // The raw token is returned ONLY when the server could not deliver it, so
+    // an operator can still pass the link on. When mail went out, the token
+    // stays server-side where it belongs.
+    activationToken: sent.emailed ? undefined : sent.token,
+    activationUrl: sent.emailed ? undefined : sent.url,
     expiresInHours: Math.round(INVITE_TTL_MS / 3_600_000),
-    delivery: "manual",
+    delivery: sent.delivery,
+    deliveryReason: sent.reason,
   });
 });
 
@@ -492,12 +551,17 @@ router.post("/crm/staff/:id/invite", requireStaff("staff.invite"), async (req: R
   const [staff] = await db.select().from(crmStaff).where(eq(crmStaff.id, id)).limit(1);
   if (!staff) { res.status(404).json({ error: "Not found." }); return; }
   if (staff.status === "disabled") { res.status(409).json({ error: "Reactivate the account first." }); return; }
-  const token = await issueToken(staff.id, "invite", INVITE_TTL_MS, actor.id);
+  const sent = await issueAndDeliver({ staff, kind: "invite", ttlMs: INVITE_TTL_MS, createdByStaffId: actor.id });
   await recordStaffAudit({
     actorStaffId: actor.id, actorLabel: actor.email,
-    action: "staff.invite.resent", target: `staff:${staff.id}`, ip: deriveClientIp(req),
+    action: "staff.invite.resent", target: `staff:${staff.id} delivery:${sent.delivery}`, ip: deriveClientIp(req),
   });
-  res.json({ activationToken: token, expiresInHours: Math.round(INVITE_TTL_MS / 3_600_000), delivery: "manual" });
+  res.json({
+    activationToken: sent.emailed ? undefined : sent.token,
+    activationUrl: sent.emailed ? undefined : sent.url,
+    expiresInHours: Math.round(INVITE_TTL_MS / 3_600_000),
+    delivery: sent.delivery, deliveryReason: sent.reason,
+  });
 });
 
 router.patch("/crm/staff/:id", requireStaff("staff.read"), async (req: Request, res: Response) => {
@@ -576,12 +640,17 @@ router.post("/crm/staff/:id/password-reset", requireStaff("staff.role.assign"), 
   const actor = req.staffAuth!.staff;
   const [staff] = await db.select().from(crmStaff).where(eq(crmStaff.id, id)).limit(1);
   if (!staff) { res.status(404).json({ error: "Not found." }); return; }
-  const token = await issueToken(staff.id, "password_reset", RESET_TTL_MS, actor.id);
+  const sent = await issueAndDeliver({ staff, kind: "password_reset", ttlMs: RESET_TTL_MS, createdByStaffId: actor.id });
   await recordStaffAudit({
     actorStaffId: actor.id, actorLabel: actor.email,
-    action: "staff.reset.issued", target: `staff:${staff.id}`, ip: deriveClientIp(req),
+    action: "staff.reset.issued", target: `staff:${staff.id} delivery:${sent.delivery}`, ip: deriveClientIp(req),
   });
-  res.json({ resetToken: token, expiresInMinutes: Math.round(RESET_TTL_MS / 60_000), delivery: "manual" });
+  res.json({
+    resetToken: sent.emailed ? undefined : sent.token,
+    activationUrl: sent.emailed ? undefined : sent.url,
+    expiresInMinutes: Math.round(RESET_TTL_MS / 60_000),
+    delivery: sent.delivery, deliveryReason: sent.reason,
+  });
 });
 
 // ── Activation and reset (unauthenticated, token-bearing) ───────────────────
@@ -621,10 +690,18 @@ async function completeTokenPasswordSet(req: Request, res: Response, kind: "invi
     return;
   }
 
+  // Mailbox verification is EARNED here, and only here. The token was
+  // delivered by the server to this address, so following it demonstrates
+  // control of the mailbox. A token an operator passed on by hand proves
+  // somebody received a link — not whose address it is — so it leaves
+  // emailVerifiedAt alone rather than quietly asserting something untrue.
+  const verifiesMailbox = row.token.delivery === "email";
+
   await db.update(crmStaff).set({
     passwordHash: await hashPassword(password),
     passwordUpdatedAt: new Date(),
     status: "active",
+    ...(verifiesMailbox && !row.staff.emailVerifiedAt ? { emailVerifiedAt: new Date() } : {}),
     updatedAt: new Date(),
   }).where(eq(crmStaff.id, row.staff.id));
   // Any session issued before the credential changed is now dead.
@@ -632,9 +709,10 @@ async function completeTokenPasswordSet(req: Request, res: Response, kind: "invi
 
   await recordStaffAudit({
     actorStaffId: row.staff.id, actorLabel: row.staff.email,
-    action: kind === "invite" ? "staff.activated" : "staff.password.reset", ip,
+    action: kind === "invite" ? "staff.activated" : "staff.password.reset",
+    target: `delivery:${row.token.delivery} mailboxVerified:${verifiesMailbox}`, ip,
   });
-  res.json({ ok: true, email: row.staff.email });
+  res.json({ ok: true, email: row.staff.email, emailVerified: verifiesMailbox });
 }
 
 router.post("/crm/staff/activation", (req, res) => completeTokenPasswordSet(req, res, "invite"));

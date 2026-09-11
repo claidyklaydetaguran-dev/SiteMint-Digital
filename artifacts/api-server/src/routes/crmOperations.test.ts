@@ -615,12 +615,29 @@ suite("M2 operations, reminders and command center (real DB)", () => {
     const dash = await owner.call("GET", "/api/crm/command-center");
     const panels = dash.json["panels"] as { key: string; available: boolean; count: number | null; reason?: string }[];
 
-    for (const key of ["return_visits", "appointments", "documents_signed", "videos_watched"]) {
+    // M3 moved `appointments` and `waiting_documents` onto real tables, so they
+    // are no longer in this list. What remains genuinely has no instrument.
+    for (const key of ["return_visits", "documents_signed", "videos_watched"]) {
       const p = panels.find((x) => x.key === key)!;
       expect(p.available).toBe(false);
       expect(p.count).toBeNull();          // NOT 0
       expect(typeof p.reason).toBe("string");
       expect(p.reason!.length).toBeGreaterThan(20);
+    }
+
+    // "Documents signed" must stay unavailable even though the CRM can now
+    // store uploads and record accepted proposals. Neither one is a signature:
+    // there is no signer identity, no document version and no audit trail. The
+    // reason has to say so, otherwise the panel quietly redefines the word.
+    const signed = panels.find((x) => x.key === "documents_signed")!;
+    expect(signed.reason).toMatch(/signature provider/i);
+    expect(signed.reason).toMatch(/not a signature/i);
+
+    // The two M3 panels report real counts, including a legitimate zero.
+    for (const key of ["appointments", "waiting_documents"]) {
+      const p = panels.find((x) => x.key === key)!;
+      expect(p.available).toBe(true);
+      expect(typeof p.count).toBe("number");
     }
   }, 30_000);
 

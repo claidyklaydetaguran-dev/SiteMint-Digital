@@ -50,6 +50,19 @@ export const crmStaff = pgTable("crm_staff", {
   passwordHash:    text("password_hash"),
   passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
 
+  /**
+   * Set ONLY when the person followed a link that was delivered to this
+   * mailbox and set their password with it — which is what actually proves
+   * they control the address.
+   *
+   * It is deliberately NOT set when an owner hands the activation link over by
+   * hand (the current fallback while staff mail is unconfigured): that flow
+   * proves somebody received a link, not that the mailbox is theirs. Treating
+   * those two as the same thing is how an address ends up "verified" because
+   * it was typed into a prompt.
+   */
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+
   /** base32 TOTP secret, set at enrolment. NULL when MFA is not enrolled. */
   mfaSecret:       text("mfa_secret"),
   mfaEnrolledAt:   timestamp("mfa_enrolled_at", { withTimezone: true }),
@@ -152,6 +165,12 @@ export const crmStaffTokens = pgTable("crm_staff_tokens", {
   staffId:          integer("staff_id").notNull().references(() => crmStaff.id, { onDelete: "cascade" }),
   kind:             text("kind").notNull(),
   tokenHash:        text("token_hash").notNull(),
+  /**
+   * How this token reached its recipient. "email" means the server handed it
+   * to the mail provider for that address; "manual" means it was shown to an
+   * operator to pass on. Only a token delivered by email can verify a mailbox.
+   */
+  delivery:         text("delivery").notNull().default("manual"),
   createdAt:        timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   expiresAt:        timestamp("expires_at", { withTimezone: true }).notNull(),
   consumedAt:       timestamp("consumed_at", { withTimezone: true }),
