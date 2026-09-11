@@ -45,9 +45,73 @@ function checkSmsRate(toNumber: string): boolean {
 // CRM_LEGACY_BEARER_ENABLED=false, so this deploys without a flag day.
 const requireAdmin = requireCrmAuth();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
-  await db.insert(crmActivities).values({ leadId, type, title, description, metadata });
+// ── Sender attribution ────────────────────────────────────────────────────────
+//
+// Owner-authorized change (2026-09-11), naming this file: record which
+// authenticated staff member initiated an SMS or call.
+//
+// Nothing recorded a sender before. With three Super Admins sharing the CRM,
+// "who texted this client?" had no answer, and the activity timeline credited
+// every message to the literal string "admin".
+//
+// Four origins are kept distinct, and none is ever inferred into another:
+//
+//   staff      a signed-in person pressed send; `sentByStaffId` names them
+//   automated  a sequence or reminder sent it; there is no person to name
+//   inbound    the customer sent it
+//   legacy     it predates attribution; the sender is genuinely unknown
+//
+// Historical rows are never given a sender. An unknown sender stays unknown.
+//
+// Scope is attribution and the conversation link. Webhook signature validation,
+// Twilio credentials, SMS/voice/consent behaviour and the receptionist system
+// are untouched.
+
+/** The person behind this request, or null on the legacy shared bearer token. */
+function actor(req: Request): { id: number | null; label: string | null } {
+  const s = req.staffAuth?.staff;
+  return s ? { id: s.id, label: s.displayName || s.email } : { id: null, label: null };
+}
+
+async function logActivity(
+  req: Request, leadId: number, type: string, title: string,
+  description?: string, metadata?: Record<string, unknown>,
+) {
+  const who = actor(req);
+  await db.insert(crmActivities).values({
+    leadId, type, title, description, metadata,
+    // Falls back to the column default ("admin") only for the shared token,
+    // where an anonymous administrator is the accurate description.
+    ...(who.label ? { createdBy: who.label } : {}),
+  });
+}
+
+/**
+ * Attaches a just-written message to its durable conversation.
+ *
+ * Never throws: a message that is already saved and sent must not be rolled
+ * back because the conversation index could not be updated. A failure here
+ * leaves `conversation_id` null, which the idempotent backfill repairs.
+ */
+async function linkToConversation(args: {
+  messageId: number;
+  contactId: number | null;
+  counterparty: string | null;
+  name?: string | null;
+}): Promise<number | null> {
+  try {
+    const { linkMessageToConversation } = await import("../lib/conversations.js");
+    return await linkMessageToConversation({
+      messageId: args.messageId,
+      channel: "phone",
+      provider: "twilio",
+      contactId: args.contactId,
+      externalAddress: args.counterparty,
+      externalName: args.name ?? null,
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function findLeadByPhone(phone: string) {
@@ -204,18 +268,30 @@ router.post("/crm/leads/:id/sms", requireCrmAuth("communications.send"), async (
       statusCallback: getCrmBaseUrl() ? `${getCrmBaseUrl()}/api/crm/webhooks/twilio/sms/status` : undefined,
     });
 
+    const who = actor(req);
     const [saved] = await db.insert(crmMessages).values({
       leadId: id,
       direction: "outbound",
       channel: "sms",
       body: body.trim(),
       twilioSid: msg.sid,
+      providerMessageId: msg.sid,
       fromNumber: getTwilioPhone(),
       toNumber: to,
       status: msg.status,
+      // Who actually pressed send. On the shared bearer token there is no
+      // person to name, so this stays null and `origin` says why.
+      sentByStaffId: who.id,
+      sentByLabel: who.label,
+      origin: who.id ? "staff" : "legacy",
     }).returning();
 
-    await logActivity(id, "sms_sent", `SMS sent to ${lead.name}`, body.trim().substring(0, 100), { twilioSid: msg.sid, to });
+    await linkToConversation({ messageId: saved.id, contactId: id, counterparty: to, name: lead.name });
+
+    await logActivity(req, id, "sms_sent",
+      `SMS sent to ${lead.name}${who.label ? ` by ${who.label}` : ""}`,
+      body.trim().substring(0, 100),
+      { twilioSid: msg.sid, to, sentByStaffId: who.id });
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
 
     res.json({ success: true, message: saved, sid: msg.sid });
@@ -255,18 +331,28 @@ router.post("/crm/leads/:id/call", requireCrmAuth("communications.send"), async 
       statusCallbackMethod: "POST",
     });
 
+    const who = actor(req);
     const [saved] = await db.insert(crmMessages).values({
       leadId: id,
       direction: "outbound",
       channel: "call",
       body: `Bridge call initiated to ${lead.name} (${leadPhone})`,
       twilioSid: call.sid,
+      providerMessageId: call.sid,
       fromNumber: getTwilioPhone(),
       toNumber: leadPhone,
       callStatus: "initiated",
+      sentByStaffId: who.id,
+      sentByLabel: who.label,
+      origin: who.id ? "staff" : "legacy",
     }).returning();
 
-    await logActivity(id, "call_initiated", `Outbound call initiated to ${lead.name}`, `Bridge: Twilio called ${forwardTo}, then connects to ${leadPhone}`, { twilioSid: call.sid });
+    await linkToConversation({ messageId: saved.id, contactId: id, counterparty: leadPhone, name: lead.name });
+
+    await logActivity(req, id, "call_initiated",
+      `Outbound call initiated to ${lead.name}${who.label ? ` by ${who.label}` : ""}`,
+      `Bridge: Twilio called ${forwardTo}, then connects to ${leadPhone}`,
+      { twilioSid: call.sid, sentByStaffId: who.id });
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
 
     res.json({ success: true, message: saved, sid: call.sid });
@@ -309,7 +395,7 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
       const lead = await findLeadByPhone(From ?? "");
       if (lead) {
         await db.update(crmLeads).set({ smsOptOut: true, updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
-        await logActivity(lead.id, "sms_opt_out", `${lead.name} sent STOP — SMS opt-out recorded`, Body);
+        await logActivity(req, lead.id, "sms_opt_out", `${lead.name} sent STOP — SMS opt-out recorded`, Body);
       }
       res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
       return;
@@ -319,7 +405,7 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
       const lead = await findLeadByPhone(From ?? "");
       if (lead) {
         await db.update(crmLeads).set({ smsOptOut: false, updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
-        await logActivity(lead.id, "sms_opt_in", `${lead.name} re-subscribed to SMS`, Body);
+        await logActivity(req, lead.id, "sms_opt_in", `${lead.name} re-subscribed to SMS`, Body);
       }
       res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
       return;
@@ -338,22 +424,30 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
         priority: "Medium",
       }).returning();
       lead = created;
-      await logActivity(lead.id, "lead_created", `New lead from inbound SMS`, `Phone: ${From}`);
+      await logActivity(req, lead.id, "lead_created", `New lead from inbound SMS`, `Phone: ${From}`);
     }
 
-    await db.insert(crmMessages).values({
+    const [inboundSms] = await db.insert(crmMessages).values({
       leadId: lead.id,
       direction: "inbound",
       channel: "sms",
       body: Body,
       twilioSid: MessageSid,
+      providerMessageId: MessageSid,
       fromNumber: From,
       toNumber: To,
       status: "received",
+      // The customer sent it. There is no staff sender, and recording that is
+      // accurate rather than leaving a gap somebody might later fill in.
+      origin: "inbound",
       metadata: NumMedia && Number(NumMedia) > 0 ? { hasMedia: true, numMedia: Number(NumMedia) } : undefined,
+    }).returning();
+
+    await linkToConversation({
+      messageId: inboundSms.id, contactId: lead.id, counterparty: From, name: lead.name,
     });
 
-    await logActivity(lead.id, "sms_received", `Inbound SMS from ${lead.name}`, Body?.substring(0, 100));
+    await logActivity(req, lead.id, "sms_received", `Inbound SMS from ${lead.name}`, Body?.substring(0, 100));
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
 
     // Stop any active sequence enrollments for this lead
@@ -381,7 +475,7 @@ router.post("/crm/webhooks/twilio/sms/status", validateTwilioWebhook, async (req
         updated[0]?.leadId != null
       ) {
         const errorSuffix = ErrorCode ? ` (error ${ErrorCode})` : "";
-        await logActivity(
+        await logActivity(req, 
           updated[0].leadId,
           "sms_failed",
           `SMS delivery failed${errorSuffix}`,
@@ -414,21 +508,27 @@ router.post("/crm/webhooks/twilio/voice", validateTwilioWebhook, async (req: Req
         priority: "Medium",
       }).returning();
       lead = created;
-      await logActivity(lead.id, "lead_created", `New lead from inbound call`, `Phone: ${From}`);
+      await logActivity(req, lead.id, "lead_created", `New lead from inbound call`, `Phone: ${From}`);
     }
 
-    await db.insert(crmMessages).values({
+    const [inboundCall] = await db.insert(crmMessages).values({
       leadId: lead.id,
       direction: "inbound",
       channel: "call",
       body: `Incoming call from ${From}`,
       twilioSid: CallSid,
+      providerMessageId: CallSid,
       fromNumber: From,
       toNumber: To,
       callStatus: "ringing",
+      origin: "inbound",
+    }).returning();
+
+    await linkToConversation({
+      messageId: inboundCall.id, contactId: lead.id, counterparty: From, name: lead.name,
     });
 
-    await logActivity(lead.id, "call_received", `Incoming call from ${lead.name}`, `From: ${From}`);
+    await logActivity(req, lead.id, "call_received", `Incoming call from ${lead.name}`, `From: ${From}`);
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
 
     const baseUrl = getCrmBaseUrl();
@@ -494,7 +594,7 @@ router.post("/crm/webhooks/twilio/voice/status", validateTwilioWebhook, async (r
 
         if (!alreadyLogged) {
           const durationLabel = CallDuration ? ` after ${CallDuration}s` : "";
-          await logActivity(
+          await logActivity(req, 
             existing.leadId,
             "call_missed",
             "Missed call",

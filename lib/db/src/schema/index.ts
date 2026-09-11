@@ -16,7 +16,7 @@ export * from "./crmOperations";
 export * from "./crmDocuments";
 export * from "./aiToolkitPurchases";
 export * from "./landingPageViews";
-export * from "./crmInbox";
+export * from "./crmConversations";
 export * from "./intakeAgent";
 export * from "./helpdeskContacts";
 export * from "./helpdeskAgents";

@@ -1,13 +1,37 @@
 # CRM implementation — continuation checkpoint
 
 > Resume here. Do not re-run discovery; everything below is verified.
-> Last updated: 2026-09-11, end of Milestone 2 backend + Operations/My Day frontend.
+> Last updated: 2026-09-11, during Milestone 3 (Documents and Calendar done,
+> Communications in progress, Sales not started).
 
 ## Where things stand
 
 **Branch:** `claude/sitemint-crm-operations-124038` (NOT pushed)
-**HEAD:** `9f82485` — clean tree
-**Merged:** receptionist `83ff869`; no newer integration work exists upstream.
+**HEAD:** `eca5ed8` — clean tree
+**Merged:** receptionist `83ff869`, then `abfe8bb` at `5eb4c0b`.
+**Upstream:** `main` is `57ea6c8` and is already contained in this branch.
+Newer voice commits (`6adf786`, `46864d8`) live on
+`feature/ai-receptionist-private-beta-readiness`, which the integration owner
+merges — they add no tables, so they do not move the barrel pins.
+
+**Milestone 3 status:** Documents and Calendar are implemented and tested
+locally. Communications is unfinished (no durable conversation identity, no
+inbound email, no sender recorded on SMS or calls). Sales is not started. M3 is
+partially complete; do not report it as done.
+
+```
+eca5ed8 docs(crm): fold the communications findings into the handoff and matrix
+5080d7b feat(crm): real per-person unread state for the shared customer inbox
+059894f fix(crm): attribute the lead timeline, honour CC/BCC, close the send-crash window
+7ee42d1 docs(crm): record that Calendar and Documents were verified at 375px
+bb85f7c docs(crm): M3 operational handoff, and matrix corrections
+2c4e54d test(crm): exercise the last-active-owner guard, which nothing had run
+d664dea feat(crm): Documents and Calendar screens, and a delete permission for files
+f918be8 feat(crm): document store, document requests, share links, internal calendar
+5eb4c0b Merge commit 'abfe8bb'
+```
+
+Earlier (M1–M2):
 
 ```
 4a03d19 feat(crm): M2 frontend — Operations workspace, My Day, and navigation

@@ -74,6 +74,12 @@ const crmFiles = walk(crmDir).filter(f => path.basename(f) !== "opsContract.test
 // "Receptionist Operations must share the same theme").
 const opsDir = path.join(repoRoot, "artifacts/web-agency/src/pages/ops");
 crmFiles.push(...walk(opsDir));
+// Shared CRM components are held to the same rules as the pages. The inbox
+// moved here when the two duplicate screens were collapsed into one component,
+// and a guard that only scanned `pages/` would have stopped covering the
+// single most-used CRM surface at exactly that moment.
+const crmComponentsDir = path.join(repoRoot, "artifacts/web-agency/src/components/crm");
+crmFiles.push(...walk(crmComponentsDir));
 
 console.log("\n--- O-10: no raw fetch(\"/api/...\") literal under src/pages/crm/** ---");
 {

@@ -10,11 +10,11 @@ Written 2026-09-11. Supersedes nothing; read alongside `CONTINUATION.md` and
 | | |
 |---|---|
 | Branch | `claude/sitemint-crm-operations-124038` |
-| Tip commit | `5080d7b` |
+| Tip commit | `eca5ed8` |
 | Pushed? | **No.** The branch exists only in this working tree. |
 | Base | `b0a5f49`, with upstream `abfe8bb` merged in at `5eb4c0b` |
 
-Milestone 3 is six commits:
+Milestone 3 is eight commits:
 
 - `f918be8` — document store, document requests, share links, internal calendar,
   mailbox verification, exactly-once external delivery
@@ -23,10 +23,28 @@ Milestone 3 is six commits:
 - `2c4e54d` — tests for the last-active-owner guard, which nothing had executed
 - `059894f` — lead-timeline attribution, working CC/BCC, and the exactly-once
   send guard that was written but never read
+- `bb85f7c` — this handoff, and coverage-matrix corrections
+- `7ee42d1` — Calendar and Documents verified at 375px
 - `5080d7b` — real per-person unread state for the shared customer inbox
+- `eca5ed8` — communications findings folded into the handoff and matrix
 
 Nothing has been pushed, deployed, or run against staging or production. No
 email has been sent to anybody.
+
+### Milestone 3 is NOT complete
+
+M3 was scoped as Sales, Communications, Documents and Calendar. Two of those
+four are done:
+
+| Area | State |
+|---|---|
+| Documents | implemented and tested locally |
+| Calendar | implemented and tested locally |
+| Communications | **unfinished** — no durable conversation identity, no inbound email, no sender on SMS or calls |
+| Sales | **not started** — the Contacts → Lead → Deal → Proposal → Project → Invoice chain is not closed |
+
+Calling M3 complete because two screens work would misreport the milestone.
+It is partially complete, and §4 lists what is actually in the way.
 
 ---
 

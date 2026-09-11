@@ -29,13 +29,21 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/document-requests": "admin",
   "PATCH /api/crm/document-requests/:id": "admin",
 
-  // ── Inbox read state ────────────────────────────────────────────────────
-  // These record which conversations a person has opened. They send nothing
-  // and reveal no message content — the worst a caller can do is mark their
-  // own badge read — but they are still writes, so they are listed.
-  "POST /api/crm/inbox/threads/:leadId/read": "admin",
-  "POST /api/crm/inbox/threads/:leadId/unread": "admin",
+  // ── The inbox ───────────────────────────────────────────────────────────
+  // Read position records which conversations a person has opened; it sends
+  // nothing, and the worst a caller can do is clear their own badge. Assign,
+  // status and attach are heavier — they change who is answerable for a
+  // customer, or which contact a conversation belongs to — and each is
+  // audited.
+  "POST /api/crm/inbox/conversations/:id/read": "admin",
+  "POST /api/crm/inbox/conversations/:id/unread": "admin",
   "POST /api/crm/inbox/read": "admin",
+  "POST /api/crm/inbox/conversations/:id/assign": "admin",
+  "PATCH /api/crm/inbox/conversations/:id": "admin",
+  "POST /api/crm/inbox/conversations/:id/attach": "admin",
+  "PUT /api/crm/inbox/conversations/:id/draft": "admin",
+  "DELETE /api/crm/inbox/conversations/:id/draft": "admin",
+  "POST /api/crm/inbox/backfill": "admin",
   "POST /api/crm/appointments": "admin",
   "PATCH /api/crm/appointments/:id": "admin",
   "DELETE /api/crm/appointments/:id": "admin",
