@@ -57,6 +57,12 @@ const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
   // challenge, and enforces the named permission. Listed before requireAdmin
   // so the stronger, per-person class is the one recorded.
   [/\brequireStaff\s*\(/, "staff"],
+  // `requireCrmAuth("leads.delete")` — the transitional CRM gate: a staff
+  // session (with CSRF, MFA and the named permission) or, until
+  // CRM_LEGACY_BEARER_ENABLED=false, the legacy shared bearer. Classified
+  // "admin" because that bearer is still accepted; it becomes strictly
+  // stronger than the old guard the moment the flag is flipped.
+  [/\brequireCrmAuth\s*\(/, "admin"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
   [/\bvalidateTwilioWebhook\b/, "signature"],
@@ -66,6 +72,7 @@ const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
 /** Guards applied inside the handler rather than as middleware. */
 const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\brequireStaff\s*\(/, "staff"],
+  [/\brequireCrmAuth\s*\(/, "admin"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
   [/\bauthenticateVapiWebhook\b/, "signature"],

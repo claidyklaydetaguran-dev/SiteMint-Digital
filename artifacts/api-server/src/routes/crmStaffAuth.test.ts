@@ -504,6 +504,36 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
     expect(deriveClientIp(fake, 5)).toBe("10.0.0.9");
   });
 
+  // ── Cutover: staff sessions reach the pre-existing CRM routes ────────────
+
+  it("a staff session authenticates the existing CRM routes, with no bearer token", async () => {
+    await ops.login(OPS);
+    const leads = await ops.call("GET", "/api/crm/leads");
+    expect(leads.status).toBe(200);
+    expect(Array.isArray(leads.json["leads"])).toBe(true);
+
+    const projects = await ops.call("GET", "/api/crm/projects");
+    expect(projects.status).toBe(200);
+  });
+
+  it("permissions are enforced on the existing CRM routes, not just the staff ones", async () => {
+    await ops.login(OPS);
+    // Operations may work the pipeline but may not destroy client records.
+    const forbidden = await ops.call("DELETE", "/api/crm/leads/999999");
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.json["permission"]).toBe("leads.delete");
+
+    // The owner clears the permission gate and reaches the handler, which then
+    // answers honestly that there is no such lead — 404, not 403.
+    await owner.login(OWNER);
+    const allowed = await owner.call("DELETE", "/api/crm/leads/999999");
+    expect(allowed.status).toBe(404);
+  });
+
+  it("refuses an unauthenticated call to an existing CRM route", async () => {
+    expect((await anon.call("GET", "/api/crm/leads")).status).toBe(401);
+  });
+
   // ── Source pin: the step-up routes keep their session guard ───────────────
 
   it("every mutating staff route except the credential exchanges carries requireStaff", () => {

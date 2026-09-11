@@ -5,6 +5,7 @@ import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth } from "../lib/staffAuth.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
@@ -15,13 +16,11 @@ import { getUncachableStripeClient } from "../lib/stripeClient.js";
 const router: IRouter = Router();
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const token = auth.substring(7);
-  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+// M1 cutover: the CRM gate now accepts a per-person staff session first and
+// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
+// is not "false". Keeping the name leaves every route below unchanged, and
+// the route-security manifest still reads "admin" for them.
+const requireAdmin = requireCrmAuth();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
@@ -309,7 +308,7 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
 });
 
 // ── Delete lead ───────────────────────────────────────────────────────────────
-router.delete("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/leads/:id", requireCrmAuth("leads.delete"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -469,7 +468,7 @@ router.get("/crm/tasks", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Send email ────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/email", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1223,7 +1222,7 @@ router.get("/crm/campaigns/:id/funnel", requireAdmin, async (req: Request, res: 
 
 // ── Campaign Send Execution ───────────────────────────────────────────────────
 // Sends to all selected recipients one at a time, tracks status per recipient.
-router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1495,7 +1494,7 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
 });
 
 // ── CSV Import ────────────────────────────────────────────────────────────────
-router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: "No rows provided" }); return; }
@@ -1775,7 +1774,7 @@ router.patch("/crm/deals/:id", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.delete("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/deals/:id", requireCrmAuth("deals.delete"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     await db.delete(crmDeals).where(eq(crmDeals.id, id));

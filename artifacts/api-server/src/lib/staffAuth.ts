@@ -335,3 +335,69 @@ export function staffCan(req: Request, permission: Permission): boolean {
   const resolved = req.staffAuth;
   return resolved ? hasPermission(resolved.staff, permission) : false;
 }
+
+// ── Transitional unified gate for the existing CRM routes ───────────────────
+//
+// The CRM's routes each carried their own bearer-only `requireAdmin`. Swapping
+// them straight to `requireStaff` would lock everyone out the moment this
+// deploys and before anybody has an account, so this gate accepts EITHER:
+//
+//   1. a real staff session (preferred — carries a person and their grants), or
+//   2. the legacy shared bearer token, while `CRM_LEGACY_BEARER_ENABLED` is
+//      not "false".
+//
+// The legacy holder is the shared-password admin, who already had unrestricted
+// access, so no permission check applies on that path — that is the status quo
+// being retired, not a new hole. Cutover is: create the staff accounts, sign
+// in, set CRM_LEGACY_BEARER_ENABLED=false, and the bearer stops working
+// everywhere at once. Only then are permissions actually enforced on these
+// routes, which is why the flag — not this function — is the finish line.
+
+export function legacyBearerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env["CRM_LEGACY_BEARER_ENABLED"] !== "false";
+}
+
+/** True when the request carries the legacy process-lifetime shared bearer. */
+function hasLegacyBearer(req: Request): boolean {
+  const auth = req.headers.authorization ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
+  return token.length > 0 && validateLegacyToken(token);
+}
+
+// Imported lazily-by-reference to avoid a cycle with admin-session.ts, which
+// imports nothing from here.
+import { validateToken as validateLegacyToken } from "./admin-session.js";
+
+export function requireCrmAuth(permission?: Permission) {
+  return async function crmGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const resolved = await resolveStaffSession(req);
+    if (resolved) {
+      if (csrfRejected(req, resolved)) {
+        res.status(403).json({ error: "Request could not be verified. Refresh the page and try again." });
+        return;
+      }
+      if (resolved.staff.mfaEnrolledAt && !resolved.mfaSatisfied) {
+        res.status(401).json({ error: "Multi-factor verification required.", mfaRequired: true });
+        return;
+      }
+      if (permission && !resolved.permissions.has(permission)) {
+        void recordStaffAudit({
+          actorStaffId: resolved.staff.id, actorLabel: resolved.staff.email,
+          action: "permission.denied", target: `${permission} ${req.method} ${req.path}`,
+          ip: deriveClientIp(req),
+        });
+        res.status(403).json({ error: "You do not have permission to do that.", permission });
+        return;
+      }
+      req.staffAuth = resolved;
+      next();
+      return;
+    }
+
+    if (legacyBearerEnabled() && hasLegacyBearer(req)) {
+      next();
+      return;
+    }
+    res.status(401).json({ error: "Unauthorized" });
+  };
+}
