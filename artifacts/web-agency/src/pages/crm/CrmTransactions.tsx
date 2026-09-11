@@ -7,6 +7,10 @@ import { adminFetch } from "@/lib/adminFetch";
 interface Transaction {
   id: number;
   dealId: number;
+  dealName?: string | null;
+  dealStage?: string | null;
+  clientName?: string | null;
+  clientCompany?: string | null;
   leadId: number | null;
   amount: string;
   method: string;
@@ -16,8 +20,6 @@ interface Transaction {
   notes: string | null;
   createdAt: string;
 }
-
-interface Deal { id: number; name: string; leadName?: string | null; }
 
 const STATUS_BADGE: Record<string, string> = {
   completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -43,9 +45,13 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+const PAGE_SIZE = 50;
+
 export default function CrmTransactionsPage() {
   const [, navigate] = useLocation();
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [totals, setTotals] = useState<{ received: number; pending: number; basis: string } | null>(null);
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -53,42 +59,40 @@ export default function CrmTransactionsPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
+  // One request, filtered and paged on the server. This used to fetch every
+  // deal and then issue a request per deal — a fan-out that grew with the
+  // business and re-sorted the whole payment history in the browser.
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const dealsRes = await adminFetch("/api/crm/deals");
-      if (dealsRes.status === 401) return;
-      const dealsData = await dealsRes.json() as { deals: Deal[] };
-      const dealList = dealsData.deals || [];
-      setDeals(dealList);
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (statusFilter) params.set("status", statusFilter);
+      if (fromDate) params.set("from", fromDate);
+      if (toDate) params.set("to", toDate);
 
-      const all = await Promise.all(dealList.map(async d => {
-        const r = await adminFetch(`/api/crm/deals/${d.id}/transactions`);
-        if (!r.ok) return [] as Transaction[];
-        const data = await r.json() as { transactions: Transaction[] };
-        return data.transactions || [];
-      }));
-      const merged = all.flat().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setTxns(merged);
+      const r = await adminFetch(`/api/crm/transactions?${params}`);
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(String(r.status));
+      const data = await r.json() as {
+        transactions: Transaction[]; total: number;
+        totals: { received: number; pending: number; basis: string };
+      };
+      setTxns(data.transactions || []);
+      setTotal(data.total ?? 0);
+      setTotals(data.totals ?? null);
     } catch {
-      setError("Failed to load transactions");
+      setError("Couldn't load transactions. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [offset, statusFilter, fromDate, toDate]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { setOffset(0); }, [statusFilter, fromDate, toDate]);
 
-  const dealById = (id: number) => deals.find(d => d.id === id);
-
-  const filtered = txns.filter(t => {
-    if (statusFilter && t.status !== statusFilter) return false;
-    const dateRef = t.receivedAt || t.createdAt;
-    if (fromDate && new Date(dateRef) < new Date(fromDate)) return false;
-    if (toDate && new Date(dateRef) > new Date(`${toDate}T23:59:59`)) return false;
-    return true;
-  });
+  // Filtering and paging happen on the server; this is the current page.
+  const filtered = txns;
 
   const STATUSES = ["completed", "pending", "failed", "refunded"];
 
@@ -175,7 +179,7 @@ export default function CrmTransactionsPage() {
               </thead>
               <tbody>
                 {filtered.map(t => {
-                  const deal = dealById(t.dealId);
+                  const deal = { name: t.dealName, stage: t.dealStage } as { name: string|null; stage: string|null };
                   return (
                     <tr key={t.id} className="border-b border-border/40 last:border-0 hover:bg-accent/60">
                       <td className="px-4 py-2.5">
@@ -186,7 +190,7 @@ export default function CrmTransactionsPage() {
                           {deal?.name || `Deal #${t.dealId}`}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{deal?.leadName || "—"}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{t.clientName || t.clientCompany || "—"}</td>
                       <td className="px-4 py-2.5 font-semibold text-foreground whitespace-nowrap">{fmtMoney(t.amount)}</td>
                       <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{METHOD_LABEL[t.method] || t.method}</td>
                       <td className="px-4 py-2.5">
@@ -206,9 +210,43 @@ export default function CrmTransactionsPage() {
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground text-center">
-          {filtered.length} transaction{filtered.length !== 1 ? "s" : ""} {statusFilter ? `with status "${statusFilter}"` : "total"}
-        </p>
+        {/* Totals cover the whole filtered set, not this page — a page-only
+            sum would be a different and misleading number, so the basis is
+            stated rather than left to be assumed. */}
+        {totals && (
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-xs">
+            <span className="text-foreground">
+              Received <strong className="tabular-nums">{fmtMoney(totals.received)}</strong>
+            </span>
+            <span className="text-muted-foreground">
+              Pending <strong className="tabular-nums">{fmtMoney(totals.pending)}</strong>
+            </span>
+            <span className="text-[10px] text-muted-foreground">{totals.basis}</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-[10px] text-muted-foreground tabular-nums">
+            {total === 0 ? "No transactions" : `Showing ${offset + 1}–${Math.min(offset + filtered.length, total)} of ${total}`}
+            {statusFilter ? ` with status "${statusFilter}"` : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOffset(Math.max(offset - PAGE_SIZE, 0))}
+              disabled={offset === 0 || loading}
+              className="text-xs border border-input rounded-lg px-3 py-1.5 hover:bg-accent transition-colors disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setOffset(offset + PAGE_SIZE)}
+              disabled={offset + filtered.length >= total || loading}
+              className="text-xs border border-input rounded-lg px-3 py-1.5 hover:bg-accent transition-colors disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     </CrmLayout>
   );

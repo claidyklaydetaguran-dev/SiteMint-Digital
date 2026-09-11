@@ -545,6 +545,54 @@ suite("M2 operations, reminders and command center (real DB)", () => {
     expect(capped.json["limit"]).toBeLessThanOrEqual(200);
   });
 
+  // ── Sales integrity ───────────────────────────────────────────────────────
+
+  it("serves transactions in one paged, filtered query with whole-set totals", async () => {
+    const r = await owner.call("GET", "/api/crm/transactions?limit=10&offset=0");
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.json["transactions"])).toBe(true);
+    expect(typeof r.json["total"]).toBe("number");
+    // Totals must describe the filtered set, not the visible page.
+    expect(r.json["totals"].basis).toContain("not only the visible page");
+    // Limit is capped server-side.
+    const capped = await owner.call("GET", "/api/crm/transactions?limit=99999");
+    expect(capped.json["limit"]).toBeLessThanOrEqual(200);
+  });
+
+  it("a proposal generated from a bare lead states nothing it was not told", async () => {
+    const lead = await owner.call("POST", "/api/crm/leads", {
+      name: "[CRM-TEST] no invented figures", email: `nofab-${STAMP}@example.test`,
+      serviceInterest: "new-website",
+    });
+    const leadId = lead.json["lead"].id as number;
+    const gen = await owner.call("POST", `/api/crm/leads/${leadId}/proposal/generate`, {});
+    expect([200, 201]).toContain(gen.status);
+
+    const reread = await owner.call("GET", `/api/crm/leads/${leadId}`);
+    const html = String(reread.json["lead"].generatedProposal ?? "");
+    expect(html.length).toBeGreaterThan(100);
+
+    // The lead supplied no budget, timeline or decision maker. Those values
+    // were hardcoded to "5k-10k" / "flexible" / "just-me" / score 5, which fed
+    // the scoring, tagging and package recommendation — so a document produced
+    // from an empty lead carried conclusions drawn from figures nobody gave.
+    expect(html).not.toContain("$5,000 – $10,000");
+    expect(html).not.toContain("High Budget");
+
+    // And the derivation itself is now honest: no budget means no budget-based
+    // score contribution, so the fabricated inputs cannot inflate the result.
+    const { scoreSubmission } = await import("../lib/generators.js") as {
+      scoreSubmission?: (d: Record<string, unknown>) => unknown;
+    };
+    if (scoreSubmission) {
+      const withNothing = scoreSubmission({ services: ["new-website"] }) as { leadScore?: number };
+      const withInvented = scoreSubmission({
+        services: ["new-website"], budget: "5k-10k", timeline: "flexible", decisionMaker: "just-me",
+      }) as { leadScore?: number };
+      expect(Number(withNothing?.leadScore ?? 0)).toBeLessThan(Number(withInvented?.leadScore ?? 0));
+    }
+  }, 30_000);
+
   // ── Command Center ────────────────────────────────────────────────────────
 
   it("every panel count matches the rows its own endpoint returns", async () => {

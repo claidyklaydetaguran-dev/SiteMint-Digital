@@ -131,19 +131,21 @@ const INITIALIZED_DATABASE = {
 
 // ── 0. The derived inventory is the one staging is expected to hold ──────────
 
-// V5 raised this to 29 (+crm_admin_sessions, +crm_admin_audit_log). M1 raises
-// it to 33: crm_staff, crm_staff_sessions, crm_staff_tokens and
-// crm_staff_login_attempts — the per-person identity, session, onboarding-token
-// and throttling tables. All four are push-mode barrel tables like every other
-// crm_*, and additive; no existing table was altered.
-check("the shared barrel derives 33 base tables", BARREL.length === 33, `${BARREL.length}`);
+// V5 raised this to 29 (+crm_admin_sessions, +crm_admin_audit_log). M1 raised
+// it to 33 (crm_staff, crm_staff_sessions, crm_staff_tokens,
+// crm_staff_login_attempts). M2 raises it to 41: crm_project_milestones,
+// crm_project_updates, crm_comments, crm_attachments, crm_approvals,
+// crm_project_templates, crm_notifications, crm_scheduled_jobs — the
+// Operations, My Day and reminder-engine tables. All push-mode barrel tables
+// like every other crm_*, and additive; no existing table was altered.
+check("the shared barrel derives 41 base tables", BARREL.length === 41, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 check("the committed migrations derive 30 domain tables", DOMAIN.length === 30, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 63 public tables", // 30 domain + 33 barrel
-  APPLICATION.length === 63,
+  "the application owns exactly 71 public tables", // 30 domain + 41 barrel
+  APPLICATION.length === 71,
   `${APPLICATION.length}`,
 );
 check(
@@ -428,7 +430,7 @@ check(
     }
   }
   check(
-    "every one of the 33 barrel-owned tables is a required sentinel",
+    "every one of the 41 barrel-owned tables is a required sentinel",
     allFailClosed,
     survivors.join(","),
   );

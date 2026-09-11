@@ -1817,6 +1817,73 @@ router.delete("/crm/deals/:id", requireCrmAuth("deals.delete"), async (req: Requ
 });
 
 // ── Deal Transactions (real money in — never inferred from stage) ────────────
+
+/**
+ * Every transaction in one query, with its deal and client joined and paged
+ * server-side.
+ *
+ * The Transactions screen previously fetched all deals and then issued one
+ * request per deal — a fan-out that grew with the business and re-sorted the
+ * whole history in the browser. Filtering and paging belong here.
+ */
+router.get("/crm/transactions", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const limit = Math.min(Math.max(Number(q["limit"]) || 50, 1), 200);
+    const offset = Math.max(Number(q["offset"]) || 0, 0);
+
+    const conditions = [
+      ...(q["status"] ? [eq(crmTransactions.status, q["status"])] : []),
+      ...(q["method"] ? [eq(crmTransactions.method, q["method"])] : []),
+      ...(q["from"] ? [gte(crmTransactions.receivedAt, new Date(q["from"]))] : []),
+      ...(q["to"] ? [lte(crmTransactions.receivedAt, new Date(`${q["to"]}T23:59:59.999Z`))] : []),
+    ];
+    const where = conditions.length ? and(...conditions) : undefined;
+
+    const [rows, [countRow], [totals]] = await Promise.all([
+      db.select({
+        transaction: crmTransactions,
+        dealName: crmDeals.name,
+        dealStage: crmDeals.stage,
+        leadId: crmDeals.leadId,
+        clientName: crmLeads.name,
+        clientCompany: crmLeads.company,
+      })
+        .from(crmTransactions)
+        .leftJoin(crmDeals, eq(crmTransactions.dealId, crmDeals.id))
+        .leftJoin(crmLeads, eq(crmDeals.leadId, crmLeads.id))
+        .where(where)
+        .orderBy(desc(crmTransactions.receivedAt), desc(crmTransactions.id))
+        .limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(crmTransactions).where(where),
+      // Totals are computed across the whole filtered set, not just this page —
+      // a page total would be a different and misleading number.
+      db.select({
+        received: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = 'received'), 0)`,
+        pending: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = 'pending'), 0)`,
+      }).from(crmTransactions).where(where),
+    ]);
+
+    res.json({
+      transactions: rows.map((r) => ({
+        ...r.transaction,
+        dealName: r.dealName, dealStage: r.dealStage, leadId: r.leadId,
+        clientName: r.clientName, clientCompany: r.clientCompany,
+      })),
+      total: Number(countRow?.count ?? 0),
+      totals: {
+        received: Number(totals?.received ?? 0),
+        pending: Number(totals?.pending ?? 0),
+        basis: "Sums cover every transaction matching the current filters, not only the visible page.",
+      },
+      limit, offset,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching transactions");
+    res.status(500).json({ error: "Failed to fetch transactions" });
+  }
+});
+
 const MANUAL_METHODS = TRANSACTION_METHODS.filter(m => m !== "stripe");
 
 router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Request, res: Response) => {
@@ -1941,10 +2008,15 @@ function crmLeadToSubmission(lead: CrmLead): DiscoverySubmission {
     phone: lead.phone ?? null,
     industry: null,
     serviceInterest: lead.serviceInterest ?? null,
-    budget: "5k-10k",
-    timeline: "flexible",
-    decisionMaker: "just-me",
-    leadScore: 5,
+    // These were hardcoded to "5k-10k" / "flexible" / "just-me" / 5, which put
+    // invented budget, timeline, decision-maker and lead-score figures into a
+    // document sent to a client. A lead carries none of that information, so it
+    // stays unspecified and the generator renders it as "Not specified" rather
+    // than guessing on the client's behalf.
+    budget: null,
+    timeline: null,
+    decisionMaker: null,
+    leadScore: 0,
     tags: lead.tags,
     status: "CRM Lead",
     recommendedPackage: lead.packageType ?? null,
