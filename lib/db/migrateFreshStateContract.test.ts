@@ -144,14 +144,29 @@ const INITIALIZED_DATABASE = {
 // 54: the conversation foundation (conversations, participants, drafts,
 // per-person reads) plus inbound email (webhook events, suppressions,
 // unmatched mail, the reply-loop counter).
-check("the shared barrel derives 54 base tables", BARREL.length === 54, `${BARREL.length}`);
+// M4 raises it to 73, adding exactly 19 across five areas — every one a new
+// `crm_*` barrel table, additive, with no existing table altered:
+//   support  (3): crm_support_tickets, crm_support_messages, crm_kb_articles
+//   marketing(5): crm_marketing_segments, crm_marketing_designs,
+//                 crm_marketing_campaigns, crm_marketing_exclusions,
+//                 crm_marketing_recipients
+//   automation(4): crm_automation_rules, crm_automation_executions,
+//                 crm_automation_action_runs, crm_automation_approvals
+//   delivery (2): crm_reminder_deliveries, crm_delivery_recovery_actions
+//   portal   (5): crm_portal_accounts, crm_portal_invitations,
+//                 crm_portal_sessions, crm_portal_document_grants,
+//                 crm_portal_proposal_acceptances
+// This number is a guard, not bookkeeping: it is what makes a table added
+// without review visible. Raise it only alongside the list above, so the
+// arithmetic can be checked rather than taken on trust.
+check("the shared barrel derives 73 base tables", BARREL.length === 73, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 check("the committed migrations derive 30 domain tables", DOMAIN.length === 30, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 84 public tables", // 30 domain + 54 barrel
-  APPLICATION.length === 84,
+  "the application owns exactly 103 public tables", // 30 domain + 73 barrel
+  APPLICATION.length === 103,
   `${APPLICATION.length}`,
 );
 check(
@@ -436,7 +451,9 @@ check(
     }
   }
   check(
-    "every one of the 54 barrel-owned tables is a required sentinel",
+    // Counted from BARREL rather than written in, so this label cannot go stale
+    // the way a hardcoded number does the next time the schema grows.
+    `every one of the ${BARREL.length} barrel-owned tables is a required sentinel`,
     allFailClosed,
     survivors.join(","),
   );

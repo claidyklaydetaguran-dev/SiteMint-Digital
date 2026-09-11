@@ -43,6 +43,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["VOICE_ALERTS_ENABLED", "P7", "Operator email alerts (critical issues)"],
   ["VOICE_DIGEST_ENABLED", "P7", "Daily per-firm digest emails"],
   ["STRIPE_BOOT_SYNC_ENABLED", "core", "Stripe webhook registration/backfill at boot"],
+  ["CRM_MARKETING_AUTOSEND_ENABLED", "M4", "Scheduled marketing broadcasts starting themselves on the CRM scheduler tick — the only worker that can email customers with nobody pressing Send"],
   ["PUBLIC_REGISTRATION_ENABLED", "R4", "Unauthenticated self-registration (POST /receptionist/auth/signup)"],
   ["PUBLIC_FORM_SUBMISSIONS_ENABLED", "R4", "Unauthenticated public lead forms (contact / discovery / landing-test submit)"],
   ["PUBLIC_ANALYTICS_WRITES_ENABLED", "R5", "Unauthenticated analytics/telemetry writes (POST /landing-test/view)"],
