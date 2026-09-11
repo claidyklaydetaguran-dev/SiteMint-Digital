@@ -151,7 +151,7 @@ dump you proved.
    creates `crm_conversations`.
 5a. Apply `docs/crm-ops/schema/M3-sales-chain.sql`. Order-independent; it
    touches only `crm_deals`.
-6. Deploy the application at `51e5baf`.
+6. Deploy the application at `cf98858`.
 7. Run the conversation backfill: `POST /api/crm/inbox/backfill` as an owner.
    It is idempotent, resumable, and reports `scanned / linked / quarantined`.
    A non-zero `quarantined` is not a failure — it is history that named
@@ -165,7 +165,7 @@ dump you proved.
   schema-first rollback breaks a running deployment.
 - Each `.sql` file carries its own rollback block at the foot.
 - The schema is forward-compatible with the *old* code: every addition is
-  nullable and unreferenced by pre-M3 code paths, so `51e5baf`'s schema running
+  nullable and unreferenced by pre-M3 code paths, so this schema running
   under the previous application is safe. The reverse is not true.
 - **One-way door:** rolling back `M3-inbound-email.sql` discards received mail
   stored there and nowhere else. Resend retains inbound content for only 30
