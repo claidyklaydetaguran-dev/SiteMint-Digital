@@ -639,8 +639,9 @@ check(
   // voice_onboarding_states, voice_beta_requests, voice_invites.
   // Update this pin ONLY alongside a reviewed migration that changes
   // the inventory.
-  "the committed migrations create exactly twenty-nine domain tables",
-  domainTables.length === 29,
+  // voice 0008 added voice_signup_jobs (durable registration -> CRM -> email).
+  "the committed migrations create exactly thirty domain tables",
+  domainTables.length === 30,
   domainTables.join(","),
 );
 check(

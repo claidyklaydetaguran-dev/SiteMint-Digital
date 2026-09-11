@@ -38,7 +38,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { UnavailableBrowserVoiceClient } from "./UnavailableBrowserVoiceClient.js";
-import { safeBrowserVoiceErrorMessage, type BrowserVoiceErrorCategory } from "./errors.js";
+import {
+  browserVoiceErrorNeedsSupportReference,
+  newBrowserVoiceSupportReference,
+  safeBrowserVoiceErrorMessage,
+  type BrowserVoiceErrorCategory,
+} from "./errors.js";
+import { classifyVapiError } from "./vapi/VapiBrowserVoiceClient.js";
 import {
   FakeBrowserVoiceClient,
   createFakeBrowserVoiceClientSource,
@@ -393,12 +399,15 @@ section("Production error copy — static, safe, and complete");
     "microphone_unavailable",
     "connection_failed",
     "connection_closed",
+    "provider_site_not_authorized",
+    "provider_refused",
+    "provider_unavailable",
     "start_failed",
     "end_failed",
     "unexpected_browser_voice_error",
   ];
 
-  eq("eight browser-voice error categories are defined", CATEGORIES.length, 8);
+  eq("eleven browser-voice error categories are defined", CATEGORIES.length, 11);
 
   for (const category of CATEGORIES) {
     const message = safeBrowserVoiceErrorMessage(category);
@@ -414,6 +423,71 @@ section("Production error copy — static, safe, and complete");
     "permission-denied copy tells the customer how to recover",
     /allow microphone access/i.test(safeBrowserVoiceErrorMessage("permission_denied")),
   );
+  check(
+    "site-not-authorized copy names the administrator action, not the customer's microphone",
+    /allowed list/i.test(safeBrowserVoiceErrorMessage("provider_site_not_authorized")) &&
+      !/microphone/i.test(safeBrowserVoiceErrorMessage("provider_site_not_authorized")),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+section("Provider failure classification (AR-001V.2)");
+// ═══════════════════════════════════════════════════════════════════════════
+
+// The 2026-09-11 staging failure: the provider answered the browser's call
+// creation with 403 because the site's origin was not on the browser key's
+// allowed list. The SDK surfaced it as an async `error` event and every one
+// of those collapsed to the generic message, which sent the investigation to
+// the customer's microphone and password instead of a settings screen.
+{
+  eq(
+    "a provider 403 is classified as this site not being authorized",
+    classifyVapiError({ message: "Key doesn't allow origin 'https://example.test'.", error: "Forbidden", statusCode: 403 }),
+    "provider_site_not_authorized",
+  );
+  eq(
+    "a 403 nested under .error is classified the same way",
+    classifyVapiError({ error: { statusCode: 403 } }),
+    "provider_site_not_authorized",
+  );
+  eq("a provider 401 is a refusal", classifyVapiError({ statusCode: 401 }), "provider_refused");
+  eq("a provider 400 is a refusal", classifyVapiError({ statusCode: 400 }), "provider_refused");
+  eq("a provider 503 is unavailability", classifyVapiError({ statusCode: 503 }), "provider_unavailable");
+  eq(
+    "a missing microphone is a device problem, not a provider problem",
+    classifyVapiError({ error: { name: "NotFoundError" } }),
+    "microphone_unavailable",
+  );
+  eq(
+    "a denied permission still classifies as permission_denied",
+    classifyVapiError({ error: { name: "NotAllowedError" } }),
+    "permission_denied",
+  );
+  eq(
+    "an unrecognizable payload stays generic rather than guessing",
+    classifyVapiError({ something: "else" }),
+    "unexpected_browser_voice_error",
+  );
+  eq("a null payload stays generic", classifyVapiError(null), "unexpected_browser_voice_error");
+  check(
+    "a nonsense status is ignored rather than classified",
+    classifyVapiError({ statusCode: 7 }) === "unexpected_browser_voice_error",
+  );
+
+  // The reference exists for failures our copy cannot explain — and only those.
+  check(
+    "a support reference is offered for an unexplained failure",
+    browserVoiceErrorNeedsSupportReference("unexpected_browser_voice_error"),
+  );
+  check(
+    "no support reference clutters a self-explanatory failure",
+    !browserVoiceErrorNeedsSupportReference("permission_denied") &&
+      !browserVoiceErrorNeedsSupportReference("provider_site_not_authorized"),
+  );
+  const refA = newBrowserVoiceSupportReference();
+  const refB = newBrowserVoiceSupportReference();
+  check("a support reference is short, prefixed and opaque", /^BVT-[0-9A-F]{8}$/.test(refA));
+  check("two references differ", refA !== refB);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

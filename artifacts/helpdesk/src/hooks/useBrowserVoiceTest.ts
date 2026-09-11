@@ -6,7 +6,12 @@ import type {
   BrowserVoiceTestState,
 } from "@/lib/browserVoice/types";
 import { useBrowserVoiceClientSource } from "@/lib/browserVoice/context";
-import { safeBrowserVoiceErrorMessage } from "@/lib/browserVoice/errors";
+import {
+  browserVoiceErrorNeedsSupportReference,
+  newBrowserVoiceSupportReference,
+  safeBrowserVoiceErrorMessage,
+} from "@/lib/browserVoice/errors";
+import type { BrowserVoiceErrorCategory } from "@/lib/browserVoice/errors";
 
 const ACTIVE_STATES: ReadonlySet<BrowserVoiceTestState> = new Set([
   "preparing",
@@ -40,6 +45,8 @@ function safelyDestroyClient(client: BrowserVoiceClient): void {
 export interface UseBrowserVoiceTestResult {
   state: BrowserVoiceTestState;
   errorMessage: string | null;
+  /** Present only for a failure our copy could not already explain. Safe to display. */
+  supportReference: string | null;
   elapsedSeconds: number;
   /** Whether the configured client can run a real browser voice test. */
   clientAvailable: boolean;
@@ -67,7 +74,18 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
   const source = useBrowserVoiceClientSource();
   const [state, setState] = useState<BrowserVoiceTestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [supportReference, setSupportReference] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  /**
+   * Records one failure: our own static copy for the classified category,
+   * plus a support reference when that copy cannot already tell the customer
+   * what to do. Never stores or renders provider text.
+   */
+  const recordFailure = useCallback((category: BrowserVoiceErrorCategory) => {
+    setErrorMessage(safeBrowserVoiceErrorMessage(category));
+    setSupportReference(browserVoiceErrorNeedsSupportReference(category) ? newBrowserVoiceSupportReference() : null);
+  }, []);
 
   const clientRef = useRef<BrowserVoiceClient | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -149,7 +167,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
               prev === "permission_denied"
             )
               return prev;
-            setErrorMessage(safeBrowserVoiceErrorMessage());
+            recordFailure(event.category ?? "unexpected_browser_voice_error");
             teardownClient();
             return "error";
           });
@@ -159,7 +177,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
           break;
       }
     },
-    [teardownClient],
+    [teardownClient, recordFailure],
   );
 
   const start = useCallback(
@@ -167,6 +185,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
       if (startGuardRef.current) return;
       startGuardRef.current = true;
       setErrorMessage(null);
+      setSupportReference(null);
       setState("preparing");
 
       const client = source.create();
@@ -177,12 +196,12 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
       setState("connecting");
       client.start(input).catch(() => {
         if (!liveRef.current || clientRef.current !== client) return;
-        setErrorMessage(safeBrowserVoiceErrorMessage("start_failed"));
+        recordFailure("start_failed");
         teardownClient();
         setState("error");
       });
     },
-    [source, handleEvent, teardownClient],
+    [source, handleEvent, teardownClient, recordFailure],
   );
 
   const end = useCallback(() => {
@@ -205,17 +224,18 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
       })
       .catch(() => {
         if (!liveRef.current || clientRef.current !== client) return;
-        setErrorMessage(safeBrowserVoiceErrorMessage("end_failed"));
+        recordFailure("end_failed");
         teardownClient();
         setState("error");
       });
-  }, [state, teardownClient]);
+  }, [state, teardownClient, recordFailure]);
 
   const dismiss = useCallback(() => {
     setState((prev) => {
       if (prev !== "ended" && prev !== "error" && prev !== "permission_denied")
         return prev;
       setErrorMessage(null);
+      setSupportReference(null);
       setElapsedSeconds(0);
       return "idle";
     });
@@ -224,6 +244,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
   const reset = useCallback(() => {
     teardownClient();
     setErrorMessage(null);
+    setSupportReference(null);
     setElapsedSeconds(0);
     setState("idle");
   }, [teardownClient]);
@@ -244,6 +265,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
   return {
     state,
     errorMessage,
+    supportReference,
     elapsedSeconds,
     clientAvailable,
     isActive,

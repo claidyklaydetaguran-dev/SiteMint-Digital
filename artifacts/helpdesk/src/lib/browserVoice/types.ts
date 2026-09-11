@@ -6,6 +6,8 @@
  * provider client landing in Checkpoint F2.
  */
 
+import type { BrowserVoiceErrorCategory } from "./errors";
+
 export type BrowserVoiceTestState =
   | "idle"
   | "preparing"
@@ -26,7 +28,12 @@ export type BrowserVoiceEvent =
   | { type: "call-start" }
   | { type: "call-end" }
   | { type: "permission-denied" }
-  | { type: "error" };
+  // AR-001V.2: `category` is a value from OUR closed enum, chosen by the
+  // provider client from the shape of the provider's failure. It is not
+  // provider text and never becomes provider text — the consumer still looks
+  // the displayed copy up in our own static table. Optional so a client that
+  // cannot classify a failure stays valid.
+  | { type: "error"; category?: BrowserVoiceErrorCategory };
 
 /**
  * Only the opaque provider assistant id crosses this boundary — never

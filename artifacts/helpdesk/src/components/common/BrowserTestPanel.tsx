@@ -13,6 +13,11 @@ interface BrowserTestPanelProps {
   assistantName: string;
   elapsedSeconds: number;
   errorMessage: string | null;
+  /**
+   * AR-001V.2: shown only for a failure whose copy cannot already tell the
+   * customer what to do. Opaque and random — never an identifier.
+   */
+  supportReference?: string | null;
   onEnd: () => void;
   onDismiss: () => void;
 }
@@ -24,7 +29,7 @@ interface BrowserTestPanelProps {
  * safe, static information — never a provider assistant id, provider call
  * id, request metadata, or a raw provider event/error.
  */
-export function BrowserTestPanel({ state, assistantName, elapsedSeconds, errorMessage, onEnd, onDismiss }: BrowserTestPanelProps) {
+export function BrowserTestPanel({ state, assistantName, elapsedSeconds, errorMessage, supportReference, onEnd, onDismiss }: BrowserTestPanelProps) {
   if (state === "idle") return null;
 
   const announcement: Record<Exclude<BrowserVoiceTestState, "idle">, string> = {
@@ -48,10 +53,19 @@ export function BrowserTestPanel({ state, assistantName, elapsedSeconds, errorMe
       </div>
 
       {(state === "preparing" || state === "connecting") && (
-        <div className="flex items-center gap-2 text-sm text-info">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          <span>{state === "preparing" ? "Preparing browser voice test…" : "Connecting to browser voice test…"}</span>
-        </div>
+        <>
+          <div className="flex items-center gap-2 text-sm text-info">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <span>{state === "preparing" ? "Preparing browser voice test…" : "Connecting to browser voice test…"}</span>
+          </div>
+          {/* AR-001V.2: a test always runs the configuration the provider last
+              confirmed, never the unsaved or unpublished draft in the builder.
+              Saying so here removes the only reasonable misreading of a test
+              result — that it exercised the changes on screen. */}
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            This tests the configuration last sent to the voice provider — not unpublished changes.
+          </p>
+        </>
       )}
 
       {state === "connected" && (
@@ -121,6 +135,13 @@ export function BrowserTestPanel({ state, assistantName, elapsedSeconds, errorMe
             Close
           </Button>
         </div>
+      )}
+
+      {state === "error" && supportReference && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          If this keeps happening, quote reference{" "}
+          <span className="font-mono font-medium">{supportReference}</span> to SiteMint support.
+        </p>
       )}
     </div>
   );

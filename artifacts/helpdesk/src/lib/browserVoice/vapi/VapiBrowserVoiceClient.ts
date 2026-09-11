@@ -1,8 +1,79 @@
 import type { BrowserVoiceClient, BrowserVoiceEvent, BrowserVoiceStartInput } from "../types";
-import { safeBrowserVoiceErrorMessage } from "../errors";
+import { safeBrowserVoiceErrorMessage, type BrowserVoiceErrorCategory } from "../errors";
 import type { VapiSdkEventListener, VapiSdkInstance, VapiSdkLoader } from "./sdkTypes";
 
 const PERMISSION_DENIED_ERROR_NAMES = new Set(["NotAllowedError", "PermissionDeniedError"]);
+
+/**
+ * Browser-standard DOMException names for "there is a microphone, but this
+ * browser cannot use it" — a different customer action from a denied
+ * permission prompt, so a different category.
+ */
+const DEVICE_ERROR_NAMES = new Set([
+  "NotFoundError",
+  "NotReadableError",
+  "OverconstrainedError",
+  "TrackStartError",
+]);
+
+function errorName(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const nested = (payload as { error?: { name?: unknown } }).error?.name;
+  if (typeof nested === "string") return nested;
+  const direct = (payload as { name?: unknown }).name;
+  return typeof direct === "string" ? direct : undefined;
+}
+
+/**
+ * Reads an HTTP status from the shapes the SDK actually surfaces when the
+ * provider's API refuses a web call. The provider's REST errors are
+ * `{ message, error, statusCode }`, and the SDK may hand that body over
+ * directly, wrapped in `{ error: … }`, or alongside a fetch `Response`.
+ *
+ * Only the NUMBER is read. The provider's `message` is deliberately never
+ * inspected and never rendered — classification is by status alone, which
+ * keeps the "no substring search over arbitrary error text" rule intact.
+ */
+function providerStatus(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates: unknown[] = [
+    (payload as { statusCode?: unknown }).statusCode,
+    (payload as { status?: unknown }).status,
+    (payload as { error?: { statusCode?: unknown } }).error?.statusCode,
+    (payload as { error?: { status?: unknown } }).error?.status,
+    (payload as { response?: { status?: unknown } }).response?.status,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "number" && Number.isFinite(c) && c >= 100 && c <= 599) return c;
+  }
+  return null;
+}
+
+/**
+ * Maps one provider failure onto our own closed category enum.
+ *
+ * The 403 rule is the important one. For a browser call the ONLY credential
+ * in play is the browser public key, and the only thing the provider checks
+ * it against is the calling site's origin — so a 403 here means "this site
+ * is not on the key's allowed list", which an administrator fixes in the
+ * provider's settings. That is worth saying plainly instead of "something
+ * went wrong": it was the exact cause of the 2026-09-11 staging failure, and
+ * the generic message sent the investigation to the customer's microphone and
+ * password instead of to a configuration screen.
+ */
+export function classifyVapiError(payload: unknown): BrowserVoiceErrorCategory {
+  const name = errorName(payload);
+  if (name && PERMISSION_DENIED_ERROR_NAMES.has(name)) return "permission_denied";
+  if (name && DEVICE_ERROR_NAMES.has(name)) return "microphone_unavailable";
+
+  const status = providerStatus(payload);
+  if (status === 403) return "provider_site_not_authorized";
+  if (status === 401 || status === 402) return "provider_refused";
+  if (status !== null && status >= 400 && status < 500) return "provider_refused";
+  if (status !== null && status >= 500) return "provider_unavailable";
+
+  return "unexpected_browser_voice_error";
+}
 
 /**
  * Reliable-only permission-denied detection: the installed SDK's `error`
@@ -58,7 +129,11 @@ export class VapiBrowserVoiceClient implements BrowserVoiceClient {
 
   private readonly onError: VapiSdkEventListener = (payload) => {
     if (this.destroyed) return;
-    this.emit(isPermissionDeniedError(payload) ? { type: "permission-denied" } : { type: "error" });
+    if (isPermissionDeniedError(payload)) {
+      this.emit({ type: "permission-denied" });
+      return;
+    }
+    this.emit({ type: "error", category: classifyVapiError(payload) });
   };
 
   constructor(publicKey: string, loadSdk: VapiSdkLoader) {

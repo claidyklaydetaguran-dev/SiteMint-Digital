@@ -42,6 +42,10 @@ export function BrowserTestConfirmDialog({ open, assistantName, onCancel, onConf
                 duration of the test.
               </p>
               <p>This is not a phone call — no phone number will be assigned.</p>
+              <p>
+                The test runs the configuration last sent to the voice provider. Anything you have saved but not
+                published yet is not part of it.
+              </p>
               <p>Ending or closing the test stops the browser voice session.</p>
               <p>
                 Whether audio or a transcript is recorded depends on the voice provider's configuration for this
