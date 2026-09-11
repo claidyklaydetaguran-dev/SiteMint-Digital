@@ -57,6 +57,15 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/email/suppressions": "admin",
   "POST /api/crm/email/suppressions/release": "admin",
   "POST /api/crm/email/inbound/events/:id/retry": "admin",
+
+  // ── The sales chain ─────────────────────────────────────────────────────
+  // Closing and converting a deal both change what the business believes it
+  // has sold, so both are permission-gated and audited. Conversion is
+  // idempotent on crm_deals.converted_project_id.
+  "POST /api/crm/deals/:id/close": "admin",
+  "POST /api/crm/deals/:id/convert": "admin",
+  "POST /api/crm/deals/:id/owner": "admin",
+  "POST /api/crm/deals/:id/probability": "admin",
   "POST /api/crm/appointments": "admin",
   "PATCH /api/crm/appointments/:id": "admin",
   "DELETE /api/crm/appointments/:id": "admin",
