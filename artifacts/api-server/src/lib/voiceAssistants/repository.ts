@@ -246,6 +246,16 @@ export const voiceAssistantRepository = {
     publishAttemptId: string,
     provider: string,
     providerAssistantId: string,
+    /**
+     * Digest of the payload this publish actually sent. Without it the column
+     * stays NULL, which deriveProviderSyncState reads as "never proven
+     * synchronized" — so a freshly published assistant reported
+     * `local_changes` and the dashboard showed "changes not published" on a
+     * config the provider had just accepted. Null is still allowed: if the
+     * digest cannot be computed we record nothing rather than assert an
+     * agreement we cannot prove.
+     */
+    providerConfigHash: string | null,
   ): Promise<VoiceAssistant | null> {
     const now = new Date();
     const [row] = await db
@@ -254,6 +264,7 @@ export const voiceAssistantRepository = {
         status: "published",
         provider,
         providerAssistantId,
+        providerConfigHash,
         lastSyncedAt: now,
         syncError: null,
         publishAttemptId: null,
