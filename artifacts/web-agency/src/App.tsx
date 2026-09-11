@@ -91,6 +91,9 @@ const LandingReceptionistSignup = lazy(() => import("@/pages/LandingReceptionist
 // Everything below is reachable only from a matched `/admin*` route, behind
 // DashboardShell. This is what keeps the CRM out of the public entry graph.
 const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
+const StaffActivation = lazy(() => import("@/pages/StaffActivation"));
+const CrmStaffAdmin = lazy(() => import("@/pages/crm/CrmStaffAdmin"));
+const CrmMyAccount = lazy(() => import("@/pages/crm/CrmMyAccount"));
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 const AdminSubmissionDetail = lazy(() => import("@/pages/AdminSubmissionDetail"));
 
@@ -154,6 +157,10 @@ function AdminRoutes() {
     <Switch>
       {/* Admin routes — no main layout */}
       <Route path={ROUTES.adminLogin} component={AdminLogin} />
+      {/* Invitation / password-reset landing. Deliberately OUTSIDE the guard:
+          the single-use token in the URL is the credential, and the person
+          following it has no session yet by definition. */}
+      <Route path="/admin/activate" component={StaffActivation} />
       <Route path={ROUTES.adminDashboard} component={AdminDashboard} />
       <Route path={ROUTES.adminSubmission} component={AdminSubmissionDetail} />
 
@@ -185,6 +192,8 @@ function AdminRoutes() {
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
+      <Route path="/admin/crm/people" component={CrmStaffAdmin} />
+      <Route path="/admin/crm/account" component={CrmMyAccount} />
 
       {/* Receptionist Ops (Operations owner) — firm detail registered before
           the firms list is irrelevant here since these are distinct paths,

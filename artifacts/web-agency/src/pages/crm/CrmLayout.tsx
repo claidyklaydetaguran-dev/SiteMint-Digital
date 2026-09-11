@@ -6,7 +6,7 @@ import {
   Search, Mail, Phone, MessageSquare, Bell, LogOut,
   ChevronDown, LayoutDashboard, X, UserPlus, Send,
   AlertCircle, ChevronRight, Check, Plus, Clock, AlertTriangle, UserCheck,
-  Home, Users, Megaphone, Share2, FolderOpen, BarChart2, Settings,
+  Home, Users, UserCog, Megaphone, Share2, FolderOpen, BarChart2, Settings,
   Menu, LayoutGrid, CheckSquare, Inbox, CalendarDays, Globe,
   GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon,
   Layers, Activity, Download,
@@ -15,7 +15,7 @@ import {
   ExternalLink, Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { adminFetch, adminLogout, getAdminToken } from "@/lib/adminFetch";
+import { adminFetch, adminProbe, adminLogout, getAdminToken } from "@/lib/adminFetch";
 import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
@@ -155,8 +155,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Settings",
     icon: Settings,
     items: [
-      { label: "Settings",  href: "/admin/crm/settings", icon: Wrench },
-      { label: "Admin Hub", href: "/admin/crm/admin",    icon: LayoutDashboard },
+      { label: "Settings",   href: "/admin/crm/settings", icon: Wrench },
+      { label: "People",     href: "/admin/crm/people",   icon: Users },
+      { label: "My Account", href: "/admin/crm/account",  icon: UserCog },
+      { label: "Admin Hub",  href: "/admin/crm/admin",    icon: LayoutDashboard },
     ],
   },
 ];
@@ -960,6 +962,25 @@ function SidebarContent({
 export function CrmLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [modal, setModal] = useState<"email" | "phone" | "sms" | "person" | "bell" | "profile" | null>(null);
+
+  // M1: show who is actually signed in. Falls back to the generic chip when
+  // the session is still the legacy shared admin, which has no person behind it.
+  const [signedIn, setSignedIn] = useState<{ displayName: string; email: string; role: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await adminProbe("/api/crm/staff/me");
+        if (!r.ok || cancelled) return;
+        const d = await r.json() as { staff?: { displayName: string; email: string; role: string } };
+        if (d.staff) setSignedIn(d.staff);
+      } catch { /* leave the generic chip */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const initials = signedIn
+    ? signedIn.displayName.replace(/\[[^\]]*\]/g, "").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?"
+    : "SM";
   const [allLeads, setAllLeads] = useState<CrmLead[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -1210,17 +1231,27 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
           <div className="relative ml-0.5" ref={profileRef}>
             <button onClick={() => setModal(m => m === "profile" ? null : "profile")}
               className="flex items-center gap-1 focus:outline-none">
-              <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-[11px] font-bold">SM</span>
+              <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center"
+                title={signedIn ? `${signedIn.displayName} (${signedIn.email})` : "Shared admin sign-in"}>
+                <span className="text-white text-[11px] font-bold">{initials}</span>
               </div>
               <ChevronDown className={`w-3 h-3 text-white/40 transition-transform ${modal === "profile" ? "rotate-180" : ""}`} />
             </button>
             {modal === "profile" && (
               <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-border z-[200] overflow-hidden py-1">
                 <div className="px-4 py-2.5 border-b border-border/60">
-                  <p className="text-xs font-semibold text-foreground">SiteMint Digital</p>
-                  <p className="text-xs text-muted-foreground">Admin</p>
+                  <p className="text-xs font-semibold text-foreground truncate">
+                    {signedIn?.displayName ?? "SiteMint Digital"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {signedIn ? signedIn.role.replace(/_/g, " ") : "Shared admin sign-in"}
+                  </p>
                 </div>
+                <Link href="/admin/crm/account">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
+                    <UserCog className="w-3.5 h-3.5 text-muted-foreground" /> My account
+                  </button>
+                </Link>
                 <Link href="/admin/crm/settings">
                   <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
                     <Settings className="w-3.5 h-3.5 text-muted-foreground" /> Settings

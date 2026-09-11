@@ -27,6 +27,31 @@ export const ADMIN_TOKEN_KEY = "adminToken";
 export const ADMIN_UNAUTHORIZED_EVENT = "admin:unauthorized";
 export const ADMIN_LOGIN_PATH = "/admin";
 
+/**
+ * M1 CSRF token for the per-person staff session.
+ *
+ * The session itself lives in an httpOnly cookie the browser sends
+ * automatically — which is exactly why a cross-site page could otherwise
+ * trigger authenticated writes. The server therefore also demands this value
+ * in a header on every mutating request. It is deliberately readable by our
+ * own JavaScript and useless to anybody who cannot run script on this origin.
+ */
+export const CSRF_TOKEN_KEY = "crmStaffCsrf";
+export const CSRF_HEADER = "X-CSRF-Token";
+
+export function getCsrfToken(): string | null {
+  return storage()?.getItem(CSRF_TOKEN_KEY) ?? null;
+}
+
+export function setCsrfToken(token: string): void {
+  storage()?.setItem(CSRF_TOKEN_KEY, token);
+  unauthorizedNotified = false;
+}
+
+export function clearCsrfToken(): void {
+  storage()?.removeItem(CSRF_TOKEN_KEY);
+}
+
 export class AdminApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -93,6 +118,7 @@ export function resetUnauthorizedNotice(): void {
 
 function notifyUnauthorized(): void {
   clearAdminToken();
+  clearCsrfToken();
   if (unauthorizedNotified) return;
   unauthorizedNotified = true;
   if (typeof window !== "undefined") {
@@ -102,6 +128,41 @@ function notifyUnauthorized(): void {
 
 // ── Core request ──────────────────────────────────────────────────────────────
 
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Routes whose 401 must NOT be read as "your session ended".
+ *
+ * Two groups, and neither is this workstream's to change:
+ *
+ *  - Receptionist-owned admin routes (`/api/admin/receptionist-accounts`,
+ *    `/api/admin/voice/*`), which still accept only the legacy shared bearer.
+ *  - CLAUDE.md-protected files: `routes/phone.ts` serves the CRM's SMS and
+ *    call reads (`/crm/conversations`, `/crm/phone/*`, a lead's messages and
+ *    send paths) and `routes/intakeAgent.ts` serves `/api/intake/*`. Both keep
+ *    their own bearer-only guard, so a staff session is refused there.
+ *
+ * Without this, signing in as a person and opening the Command Center — which
+ * asks for conversations, receptionist health and voice issues as optional
+ * extras — bounced straight back to the login page. Every caller already
+ * treats these as best-effort and renders an unavailable state instead.
+ *
+ * Remove an entry the moment its route accepts staff sessions. The protected
+ * files need an owner-named authorization first; see docs/crm-ops/.
+ */
+const TRANSITIONAL_FOREIGN_AUTH: RegExp[] = [
+  /^\/api\/admin\/receptionist-accounts/,
+  /^\/api\/admin\/voice\//,
+  /^\/api\/crm\/conversations/,
+  /^\/api\/crm\/phone\//,
+  /^\/api\/crm\/leads\/\d+\/(messages|sms|call|sms-consent)/,
+  /^\/api\/intake\//,
+];
+
+function ownsSessionSignal(path: string): boolean {
+  return !TRANSITIONAL_FOREIGN_AUTH.some((re) => re.test(path));
+}
+
 export async function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers ?? undefined);
   const token = getAdminToken();
@@ -109,9 +170,29 @@ export async function adminFetch(path: string, init: RequestInit = {}): Promise<
   if (typeof init.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+  const method = (init.method ?? "GET").toUpperCase();
+  const csrf = getCsrfToken();
+  if (csrf && MUTATING_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
+    headers.set(CSRF_HEADER, csrf);
+  }
   const res = await fetch(path, { ...init, headers, credentials: "include" });
-  if (res.status === 401) notifyUnauthorized();
+  if (res.status === 401 && ownsSessionSignal(path)) notifyUnauthorized();
   return res;
+}
+
+/**
+ * A read that must NOT be treated as a sign-out when it 401s.
+ *
+ * Used to ask "is there a staff session?" while a legacy shared-bearer session
+ * may still be the valid one. Routing that probe through `adminFetch` would
+ * clear the stored token and fire `admin:unauthorized`, bouncing a
+ * legitimately signed-in user to the login page.
+ */
+export async function adminProbe(path: string): Promise<Response> {
+  const headers = new Headers();
+  const token = getAdminToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(path, { method: "GET", headers, credentials: "include" });
 }
 
 // ── Typed JSON helpers ────────────────────────────────────────────────────────
@@ -164,12 +245,19 @@ export function adminDelete<T>(path: string, init: RequestInit = {}): Promise<T>
  * older backend is ignored), then clear the legacy token.
  */
 export async function adminLogout(): Promise<void> {
+  // M1: end the per-person staff session first (it is the real session now),
+  // then the legacy admin cookie. A 401/404 from either is fine — the point is
+  // that the server forgets the session, not just this browser.
+  try {
+    await adminFetch("/api/crm/staff/logout", { method: "POST" });
+  } catch { /* fall through */ }
   try {
     await fetch("/api/admin/logout", { method: "POST", credentials: "include", headers: authHeaderOnly() });
   } catch {
     // Network failure must never keep a user signed in client-side.
   } finally {
     clearAdminToken();
+    clearCsrfToken();
     unauthorizedNotified = false;
   }
 }
