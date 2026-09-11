@@ -748,6 +748,17 @@ router.get("/crm/operations/jobs", requireCrmAuth("settings.read"), async (req: 
     .where(eq(crmScheduledJobs.status, "pending"))
     .orderBy(asc(crmScheduledJobs.runAt)).limit(10);
 
+  // Deliveries that are not a recorded success, one entry per recipient.
+  // The count already reaches the dashboard through getSchedulerStatus(); this
+  // is the detail behind it, which is what makes "did that reminder actually
+  // reach anybody?" answerable instead of merely countable. Filtering this to
+  // state === "uncertain" is the list of messages whose fate we genuinely do
+  // not know — the ones a person has to decide about.
+  const { listDeliveriesNeedingAttention } = await import("../lib/crmScheduler.js");
+  const deliveriesNeedingAttention = await listDeliveriesNeedingAttention(
+    clampLimit(req.query["limit"], 20, 100),
+  );
+
   res.json({
     scheduler: getSchedulerStatus(),
     counts: {
@@ -755,6 +766,12 @@ router.get("/crm/operations/jobs", requireCrmAuth("settings.read"), async (req: 
       failed: Number(counts?.failed ?? 0), completed: Number(counts?.completed ?? 0),
     },
     failures, upcoming,
+    deliveriesNeedingAttention,
+    deliveryNote:
+      "An entry here is a message whose delivery is not a recorded success. "
+      + "`uncertain` means the provider may or may not have it — those are never "
+      + "retried automatically, because a retry could duplicate, and are left "
+      + "visible for a person instead. See docs/crm-ops/DELIVERY-GUARANTEE.md.",
   });
 });
 

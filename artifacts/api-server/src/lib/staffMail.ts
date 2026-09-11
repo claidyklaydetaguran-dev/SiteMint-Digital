@@ -15,9 +15,38 @@
 
 import { getResend } from "./email.js";
 
+/**
+ * How long Resend honours an `idempotencyKey`. Verified against Resend's
+ * documentation (https://resend.com/docs/dashboard/emails/idempotency-keys):
+ * **24 hours**, after which the same key sends again.
+ *
+ * It is therefore a short-horizon duplicate suppressor, not a permanent
+ * ledger, and nothing in this codebase may treat it as one. See
+ * `docs/crm-ops/DELIVERY-GUARANTEE.md`.
+ */
+export const RESEND_IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Why a send did not succeed — the distinction the caller needs in order to
+ * decide whether retrying is safe.
+ *
+ *  - `not_configured` — nothing was handed to the provider at all. No message
+ *    exists; the attempt may be forgotten entirely.
+ *  - `rejected`       — the provider looked at the message and refused it.
+ *    Deterministic: the identical message will be refused identically.
+ *  - `failed`         — the provider definitively did not accept it, for a
+ *    reason that may pass (5xx, rate limit, connection refused before the
+ *    request went out). Retrying cannot duplicate, because nothing was taken.
+ *  - `uncertain`      — bytes went out and we never learned the answer
+ *    (timeout, socket hang up, aborted read, a 409 saying an identical request
+ *    is already in flight). The message may or may not have been delivered.
+ *    Retrying may duplicate. This is the state a human has to resolve.
+ */
+export type MailFailure = "not_configured" | "rejected" | "failed" | "uncertain";
+
 export type MailOutcome =
   | { sent: true; providerId: string | null }
-  | { sent: false; reason: string; configured: boolean };
+  | { sent: false; failure: MailFailure; reason: string; configured: boolean };
 
 const FROM = () =>
   process.env["RESEND_FROM_EMAIL"] ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>";
@@ -36,6 +65,86 @@ export function staffMailBlockedReason(env: NodeJS.ProcessEnv = process.env): st
   return null;
 }
 
+// ── Classifying what went wrong ─────────────────────────────────────────────
+//
+// "It did not work" is not enough to decide whether a retry is safe. These two
+// functions turn a provider answer or a thrown transport error into one of the
+// four `MailFailure` classes, and they are pure so the mapping can be tested
+// without a network or a database.
+
+/** Transport-level codes meaning the request never reached Resend's server. */
+const NEVER_LEFT_CODES = new Set([
+  "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH",
+  "ERR_INVALID_URL", "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID",
+]);
+
+/** Provider error names that are worth trying again, unchanged. */
+const TRANSIENT_ERROR_NAMES = new Set([
+  "application_error", "internal_server_error", "rate_limit_exceeded",
+  "daily_quota_exceeded", "security_error",
+]);
+
+/** Every `code` on an error and its `cause` chain, upper-cased. */
+function errorCodes(err: unknown): string[] {
+  const codes: string[] = [];
+  let cursor: unknown = err;
+  for (let depth = 0; cursor && typeof cursor === "object" && depth < 6; depth += 1) {
+    const code = (cursor as { code?: unknown }).code;
+    if (typeof code === "string") codes.push(code.toUpperCase());
+    cursor = (cursor as { cause?: unknown }).cause;
+  }
+  return codes;
+}
+
+/**
+ * Classifies an error Resend put in the RESPONSE BODY — meaning the provider
+ * answered, so no message id exists and nothing was queued.
+ *
+ * The two 409s are the interesting ones, and they mean opposite things:
+ *  - `concurrent_idempotent_requests` — an identical request with this key is
+ *    already in flight. That is NOT a failure: the message is very likely on
+ *    its way. Retrying would race the request that is already running, so this
+ *    resolves to `uncertain` and waits for a human rather than re-sending.
+ *  - `invalid_idempotent_request` — this key was used before with a DIFFERENT
+ *    payload. That is our bug, not a transport problem, and no message was
+ *    sent. Deterministic, so `rejected`.
+ */
+export function classifyProviderError(
+  error: { name?: string | null; message?: string | null; statusCode?: number | null } | null | undefined,
+): MailFailure {
+  const name = (error?.name ?? "").toLowerCase();
+  const status = typeof error?.statusCode === "number" ? error.statusCode : null;
+  const text = `${name} ${error?.message ?? ""}`.toLowerCase();
+
+  if (name === "concurrent_idempotent_requests" || text.includes("concurrent_idempotent_requests")) {
+    return "uncertain";
+  }
+  if (name === "invalid_idempotent_request" || text.includes("invalid_idempotent_request")) {
+    return "rejected";
+  }
+  if (TRANSIENT_ERROR_NAMES.has(name)) return "failed";
+  if (status !== null && (status >= 500 || status === 429)) return "failed";
+  // Anything else the provider answered with is a refusal of this message:
+  // a bad address, an unverified domain, a key without permission. Repeating
+  // it unchanged produces the same refusal, so it is not retried automatically.
+  return "rejected";
+}
+
+/**
+ * Classifies a THROWN transport error. The question is only ever "could the
+ * request have reached Resend?" — if it could have, the outcome is unknown and
+ * must be recorded as such rather than optimistically retried.
+ */
+export function classifyThrownMailError(err: unknown): MailFailure {
+  const codes = errorCodes(err);
+  if (codes.some((c) => NEVER_LEFT_CODES.has(c))) return "failed";
+  // Timeouts, resets, aborted reads and bare `fetch failed` all mean the bytes
+  // may already be on Resend's side. Unknown is the honest answer, and it is
+  // also the safe default for anything unrecognised.
+  return "uncertain";
+}
+
 /**
  * Attempts a send. Never throws: a mail failure must not fail the action that
  * triggered it, and must never be mistaken for success.
@@ -46,16 +155,17 @@ export async function trySendStaffMail(args: {
   text: string;
   html?: string;
   /**
-   * Stable across retries of the SAME logical message. Resend collapses
-   * repeats of a key, which is what closes the crash-after-accept window that
-   * job locking cannot: if the worker dies between the provider accepting and
-   * the job recording success, the retry carries the same key and the
-   * recipient still receives one message.
+   * Stable across retries of the SAME logical message, so Resend collapses a
+   * repeat into the original send.
+   *
+   * It is a 24-hour window (`RESEND_IDEMPOTENCY_WINDOW_MS`), not a permanent
+   * ledger: past it the same key sends again. Callers must not build an
+   * exactly-once claim on top of it — see `docs/crm-ops/DELIVERY-GUARANTEE.md`.
    */
   idempotencyKey?: string;
 }): Promise<MailOutcome> {
   const blocked = staffMailBlockedReason();
-  if (blocked) return { sent: false, reason: blocked, configured: false };
+  if (blocked) return { sent: false, failure: "not_configured", reason: blocked, configured: false };
 
   try {
     const resend = getResend();
@@ -68,12 +178,22 @@ export async function trySendStaffMail(args: {
     );
     const providerId = (result as { data?: { id?: string } | null })?.data?.id ?? null;
     // Resend reports a rejection in the body rather than by throwing.
-    const error = (result as { error?: { message?: string } | null })?.error;
-    if (error) return { sent: false, reason: error.message ?? "The mail provider rejected the message.", configured: true };
+    const error = (result as {
+      error?: { message?: string; name?: string; statusCode?: number } | null;
+    })?.error;
+    if (error) {
+      return {
+        sent: false,
+        failure: classifyProviderError(error),
+        reason: error.message ?? error.name ?? "The mail provider rejected the message.",
+        configured: true,
+      };
+    }
     return { sent: true, providerId };
   } catch (err) {
     return {
       sent: false,
+      failure: classifyThrownMailError(err),
       configured: true,
       reason: err instanceof Error ? err.message.slice(0, 300) : "The mail provider could not be reached.",
     };
