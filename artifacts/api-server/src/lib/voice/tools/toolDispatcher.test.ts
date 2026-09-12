@@ -437,7 +437,14 @@ describe("toolsConfig", () => {
     });
     expect(validated.tools).toHaveLength(TOOL_NAMES.length);
     const body = buildVapiAssistantRequestBody("Front Desk", validated, { recordingEnabled: false });
-    expect(body.tools).toEqual(tools);
+
+    // Vapi puts function tools INSIDE the model. A top-level `tools` property
+    // is refused with "property tools should not exist" — verified against the
+    // live API on 2026-09-12. This assertion previously pinned the top-level
+    // placement, which no live request had ever exercised because the tools
+    // attachment had never been enabled.
+    expect(body.tools).toBeUndefined();
+    expect((body.model as Record<string, unknown>).tools).toEqual(tools);
   });
 
   it("rejects foreign names, missing server, extra keys, and oversized catalogs", () => {

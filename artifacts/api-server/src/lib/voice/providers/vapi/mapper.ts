@@ -44,6 +44,15 @@ export function buildVapiAssistantRequestBody(
     provider: config.model.provider,
     model: config.model.model,
     messages: [{ role: "system", content: config.systemInstructions }],
+    // Vapi puts function tools INSIDE the model, not beside it. A top-level
+    // `tools` property is refused outright with "property tools should not
+    // exist" — verified against the live API on 2026-09-12 by patching a
+    // throwaway assistant both ways: top-level 400, model.tools 200 with the
+    // tool present on read-back.
+    //
+    // This never surfaced before because the tools attachment had never been
+    // switched on; the payload was only ever built in tests.
+    ...(config.tools !== undefined ? { tools: config.tools } : {}),
   };
 
   const voice: JsonObject = {
@@ -69,7 +78,6 @@ export function buildVapiAssistantRequestBody(
     // P2: server-URL attachment rides through only when the validated config
     // carries it (VOICE_WEBHOOK_ATTACH_ENABLED at the publish/sync layer).
     ...(config.server !== undefined ? { server: { url: config.server.url, credentialId: config.server.credentialId } } : {}),
-    ...(config.tools !== undefined ? { tools: config.tools } : {}),
     ...(config.callPolicy?.silenceTimeoutSeconds !== undefined
       ? { silenceTimeoutSeconds: config.callPolicy.silenceTimeoutSeconds }
       : {}),
