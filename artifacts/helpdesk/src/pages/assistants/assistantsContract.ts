@@ -287,8 +287,12 @@ export const VOICE_MODEL = {
    shown for reference only; the customer edits them there. */
 
 export const CONFIGURATION = {
-  title: "Configuration",
-  detail: "The essentials — who this assistant is for, what it should do, and what it's allowed to do.",
+  // V8: named for what the owner is entering, and matching the section label in
+  // the rail. A panel headed "Configuration" inside a section called "Business
+  // information" is two names for one thing, which is how a screen starts
+  // reading like a settings file.
+  title: "Business information",
+  detail: "Who this assistant is for, and the facts it may rely on when answering callers.",
   businessFromWorkspace: "From Workspace Settings",
   editWorkspaceSettings: "Edit in Workspace Settings",
   permittedActionsLabel: "Permitted actions",

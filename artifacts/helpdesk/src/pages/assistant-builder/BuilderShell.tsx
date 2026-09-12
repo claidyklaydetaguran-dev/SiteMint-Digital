@@ -270,32 +270,22 @@ export function BuilderShell({
               {statusBadge}
             </Badge>
           </div>
+          {/* Publishing and testing live in their own section now. Repeating
+              them here is what made every screen look like a launch console.
+              The platform gate stays exactly as it was: a build with the voice
+              platform off renders no action affordance here at all. */}
           {voicePlatformEnabled && (
-            <div className="flex flex-shrink-0 items-center gap-2">
-              {browserTestInBuild ? (
-                testControl ?? (
-                  <UnavailableActionButton
-                    icon={PlayCircle}
-                    label="Test call"
-                    availability="Save and publish this assistant before testing."
-                  />
-                )
-              ) : (
-                <UnavailableActionButton icon={PlayCircle} label="Test call" availability={NOT_ENABLED_REASON} />
+            <>
+              {tab !== "testing" && (
+                <button
+                  type="button"
+                  onClick={() => onTabChange("testing")}
+                  className="flex-shrink-0 text-sm font-medium text-primary hover:underline"
+                >
+                  Test &amp; publish &rarr;
+                </button>
               )}
-              {publishInBuild ? (
-                publishControl ?? (
-                  <UnavailableActionButton
-                    icon={Rocket}
-                    label="Publish"
-                    availability="Save this assistant as a draft before publishing."
-                  />
-                )
-              ) : (
-                <UnavailableActionButton icon={Rocket} label="Publish" availability={NOT_ENABLED_REASON} />
-              )}
-              {syncInBuild && syncControl}
-            </div>
+            </>
           )}
         </div>
         {headerBanner && <div className="mt-3">{headerBanner}</div>}
