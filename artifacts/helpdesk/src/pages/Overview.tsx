@@ -28,6 +28,7 @@ import {
   useAssignedNumber,
   useAssistantPublished,
   useCalendarConnectedFlag,
+  useCanReceiveEmail,
   useOnboardingProgress,
   useOpenIssuesCount,
   usePendingAppointmentRequestsCount,
@@ -121,6 +122,7 @@ export default function Overview() {
   const { data: session, isLoading: sessionLoading } = useSession();
 
   const onboarding = useOnboardingProgress();
+  const canReceiveEmail = useCanReceiveEmail();
   const assistantPublished = useAssistantPublished();
   const { data: numbers, isLoading: numbersLoading } = useAssignedNumber();
   const calendarConnected = useCalendarConnectedFlag();
@@ -152,6 +154,7 @@ export default function Overview() {
         needsReviewCount: convs.filter((c) => c.tier === "Needs Review").length,
         openIssuesCount,
         pendingAppointmentRequestsCount: pendingRequests,
+        canReceiveEmail,
       });
 
   const figures = buildActivityFigures(convs);

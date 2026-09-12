@@ -113,6 +113,24 @@ export function useCalendarConnectedFlag(): boolean | null {
   return query.data?.connected ?? null;
 }
 
+/**
+ * Whether the account can actually receive email.
+ *
+ * `null` while loading or on failure: "we could not ask" must not be shown as
+ * a problem, and must not be shown as fine either.
+ */
+export function useCanReceiveEmail(): boolean | null {
+  const firmId = useAuthenticatedFirmId();
+  const query = useQuery({
+    queryKey: firmId !== undefined ? [ROOT, "email-status", firmId] : [ROOT, "email-status", "unresolved"],
+    queryFn: () => apiFetch<{ canReceiveEmail: boolean }>("/receptionist/account/email-status"),
+    enabled: firmId !== undefined,
+    retry: 1,
+  });
+  if (query.isLoading || query.isError) return null;
+  return query.data?.canReceiveEmail ?? null;
+}
+
 // ─── Open issues ────────────────────────────────────────────────────────
 
 export function useOpenIssuesCount(): number | null {

@@ -176,6 +176,12 @@ export interface NeedsAttentionInput {
   /** null when the voice platform is off/unavailable — an unknown count is never shown as zero problems. */
   openIssuesCount: number | null;
   pendingAppointmentRequestsCount: number | null;
+  /**
+   * Whether the account can actually receive email, per the server's own
+   * resolver. `null` when it could not be read — never shown as a problem,
+   * and never shown as fine.
+   */
+  canReceiveEmail: boolean | null;
 }
 
 /**
@@ -189,6 +195,20 @@ export interface NeedsAttentionInput {
  */
 export function buildNeedsAttention(input: NeedsAttentionInput): AttentionItem[] {
   const items: AttentionItem[] = [];
+
+  // First, because it is the one that silences everything else. Nothing is
+  // ever sent to an unconfirmed address, so a business in this state receives
+  // no call summary, no digest and no alert — and every other item on this
+  // list is something it would otherwise have been told about.
+  if (input.canReceiveEmail === false) {
+    items.push({
+      key: "email-unverified",
+      title: "Your email address isn't confirmed",
+      detail: "Nothing is sent to an unconfirmed address — no call summaries, no alerts, nothing.",
+      href: "/verify-email",
+      action: "Confirm email",
+    });
+  }
 
   if (input.openIssuesCount !== null && input.openIssuesCount > 0) {
     items.push({

@@ -209,35 +209,61 @@ check(
 
 section("needs-attention list");
 
-eq("a healthy trial account with everything known has nothing needing attention", buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0 }), []);
+eq("a healthy trial account with everything known has nothing needing attention", buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0, canReceiveEmail: true }), []);
 eq(
   "conversations past the trial cap are surfaced",
-  buildNeedsAttention({ overCapCount: 2, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0 }).map((a) => a.key),
+  buildNeedsAttention({ overCapCount: 2, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0, canReceiveEmail: true }).map((a) => a.key),
   ["over-cap"],
 );
 eq(
   "unscored conversations are surfaced",
-  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 1, openIssuesCount: 0, pendingAppointmentRequestsCount: 0 }).map((a) => a.key),
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 1, openIssuesCount: 0, pendingAppointmentRequestsCount: 0, canReceiveEmail: true }).map((a) => a.key),
   ["needs-review"],
 );
 eq(
   "open issues are surfaced",
-  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 3, pendingAppointmentRequestsCount: 0 }).map((a) => a.key),
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 3, pendingAppointmentRequestsCount: 0, canReceiveEmail: true }).map((a) => a.key),
   ["open-issues"],
 );
 eq(
   "pending appointment requests are surfaced",
-  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 4 }).map((a) => a.key),
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 4, canReceiveEmail: true }).map((a) => a.key),
   ["pending-requests"],
+);
+
+// An unconfirmed address silences everything else on this list: no call
+// summary, no digest, no alert. It is the one problem that hides the others,
+// so it is reported first rather than in list order.
+eq(
+  "an unconfirmed email address is surfaced",
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0, canReceiveEmail: false }).map((a) => a.key),
+  ["email-unverified"],
+);
+eq(
+  "and it is listed before problems it would otherwise have told you about",
+  buildNeedsAttention({ overCapCount: 1, needsReviewCount: 1, openIssuesCount: 2, pendingAppointmentRequestsCount: 3, canReceiveEmail: false }).map((a) => a.key)[0],
+  "email-unverified",
+);
+eq(
+  "a confirmed address is not a problem",
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0, canReceiveEmail: true }),
+  [],
+);
+// Same rule as every other count here: "we could not ask" is neither a problem
+// nor an all-clear.
+eq(
+  "an unreadable email status contributes nothing",
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: 0, pendingAppointmentRequestsCount: 0, canReceiveEmail: null }),
+  [],
 );
 eq(
   "a null (unknown) count never contributes an item — unknown is not shown as zero problems",
-  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: null, pendingAppointmentRequestsCount: null }),
+  buildNeedsAttention({ overCapCount: 0, needsReviewCount: 0, openIssuesCount: null, pendingAppointmentRequestsCount: null, canReceiveEmail: true }),
   [],
 );
 eq(
   "every attention item names a real destination, in a stable order (2026-09 owner replan D-2 paths — Issues now has its own live route)",
-  buildNeedsAttention({ overCapCount: 1, needsReviewCount: 1, openIssuesCount: 1, pendingAppointmentRequestsCount: 1 }).map((a) => a.href),
+  buildNeedsAttention({ overCapCount: 1, needsReviewCount: 1, openIssuesCount: 1, pendingAppointmentRequestsCount: 1, canReceiveEmail: true }).map((a) => a.href),
   ["/account/issues", "/account/billing", "/activity/conversations", "/scheduling/appointments"],
 );
 
