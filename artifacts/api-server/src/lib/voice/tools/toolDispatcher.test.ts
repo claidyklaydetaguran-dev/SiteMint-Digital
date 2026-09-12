@@ -74,6 +74,10 @@ function makeDeps(overrides: Partial<ToolSchedulingDeps> = {}): { deps: ToolSche
   const log: CallLog = { submits: [], cancels: [], issues: [] };
   const deps: ToolSchedulingDeps = {
     now: () => NOW,
+    // These cases exercise DISPATCH, so both capabilities are authorized here.
+    // The gate itself — including that an absent allowlist authorizes nothing —
+    // has its own cases below.
+    authorizedCapabilities: () => ["messages", "scheduling"],
     getSchedulingContext: async () => ({
       timezone: "America/New_York",
       types: [

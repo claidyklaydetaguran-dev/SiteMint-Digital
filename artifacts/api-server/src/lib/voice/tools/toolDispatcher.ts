@@ -29,6 +29,7 @@ import {
   type RescheduleAppointmentArgs,
   type SaveMessageArgs,
 } from "./toolCatalog.js";
+import { CAPABILITY_BY_TOOL, parseToolCapabilities, type VoiceToolCapability } from "./toolCapabilities.js";
 
 export interface ToolCallRequest {
   toolCallId: string;
@@ -114,6 +115,17 @@ export interface ToolSchedulingDeps {
     dedupeKey: string;
     context?: Record<string, unknown>;
   }) => Promise<unknown>;
+  /**
+   * V7: the capabilities this deployment has authorized. Defaults to reading
+   * VOICE_TOOLS_CAPABILITIES.
+   *
+   * The provider only advertises the authorized tools, so a model cannot ask
+   * for anything else — but "the model can't" is not the same as "we won't".
+   * An authenticated webhook carrying an unauthorized tool name previously
+   * executed it, because the catalog is closed but was not capability-checked.
+   * Checking here makes the gate hold on both sides of the wire.
+   */
+  authorizedCapabilities?: () => readonly VoiceToolCapability[];
   logger?: (event: string, meta: Record<string, unknown>) => void;
 }
 
@@ -366,6 +378,21 @@ async function executeOne(
 ): Promise<string> {
   if (!isVoiceToolName(call.name)) {
     deps.logger?.("voice_tool_unknown", { firmId, name: String(call.name).slice(0, 40) });
+    return SAFE_INVALID;
+  }
+
+  // Capability gate, fail-closed. An unparseable or absent allowlist authorizes
+  // NOTHING — the same rule the publish payload follows, so the two cannot
+  // disagree about what this deployment is allowed to do.
+  let authorized: readonly VoiceToolCapability[];
+  if (deps.authorizedCapabilities) {
+    authorized = deps.authorizedCapabilities();
+  } else {
+    const allowlist = parseToolCapabilities(process.env["VOICE_TOOLS_CAPABILITIES"]);
+    authorized = allowlist.ok ? allowlist.capabilities : [];
+  }
+  if (!authorized.includes(CAPABILITY_BY_TOOL[call.name])) {
+    deps.logger?.("voice_tool_capability_not_authorized", { firmId, tool: call.name });
     return SAFE_INVALID;
   }
 
