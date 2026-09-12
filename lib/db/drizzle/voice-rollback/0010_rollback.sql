@@ -1,4 +1,4 @@
--- Rollback for voice/0010_overrated_justice.sql
+-- Rollback for voice/0010_black_silver_fox.sql
 -- (saved caller requests, the notification outbox, business-managed transfer
 --  contact detail, and the browser-token mint lease).
 --

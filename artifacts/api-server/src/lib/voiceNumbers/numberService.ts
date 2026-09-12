@@ -124,6 +124,8 @@ export interface TransferResolutionDeps {
   listActiveDestinations: (firmId: number) => Promise<VoiceTransferDestination[]>;
   /** Business-hours check in the firm's own timezone/schedule. */
   isWithinBusinessHours: (firmId: number, now: Date) => Promise<boolean>;
+  /** Wall-clock parts in an arbitrary IANA zone, for a contact's own hours. */
+  zonedParts?: (timezone: string, at: Date) => { hour: number; minute: number };
   now?: () => Date;
 }
 
@@ -152,20 +154,62 @@ async function productionTransferDeps(): Promise<TransferResolutionDeps> {
       const minutesOfDay = parts.hour * 60 + parts.minute;
       return minutesOfDay >= toMinutes(hours.start) && minutesOfDay < toMinutes(hours.end);
     },
+    zonedParts: (timezone, at) => {
+      const parts = zoned.utcToZonedParts(timezone, at);
+      return { hour: parts.hour, minute: parts.minute };
+    },
   };
 }
 
 export type TransferResolution =
-  | { ok: true; destinationE164: string; label: string }
-  | { ok: false; reason: "no_destinations" | "after_hours" };
+  | { ok: true; destinationE164: string; label: string; destinationId: number }
+  | { ok: false; reason: "no_destinations" | "after_hours" | "no_consent" };
+
+/** Is `now` inside this contact's OWN hours window, in its own timezone? */
+function withinOwnHours(
+  destination: VoiceTransferDestination,
+  now: Date,
+  zonedParts: (timezone: string, at: Date) => { hour: number; minute: number },
+): boolean {
+  if (destination.hoursStartMinute === null || destination.hoursEndMinute === null) return true;
+  const timezone = destination.timezone;
+  if (timezone === null) return true;
+  let parts: { hour: number; minute: number };
+  try {
+    parts = zonedParts(timezone, now);
+  } catch {
+    // An unusable timezone must not silently widen availability.
+    return false;
+  }
+  const minutesOfDay = parts.hour * 60 + parts.minute;
+  const start = destination.hoursStartMinute;
+  const end = destination.hoursEndMinute;
+  // A window that wraps midnight (start > end) is inclusive of both ends of the day.
+  return start <= end
+    ? minutesOfDay >= start && minutesOfDay < end
+    : minutesOfDay >= start || minutesOfDay < end;
+}
 
 /**
- * Picks the transfer destination for an in-call escalation:
- * lowest-priority active destination whose hours policy admits `now`.
- * After-hours, destinations marked business_hours_only are skipped; if an
- * always-on destination exists it wins, otherwise the caller is told the
- * office is closed (the assistant takes a message instead — failure
- * behavior is a spoken outcome, never a dropped call).
+ * Picks the transfer destination for an in-call escalation.
+ *
+ * Order of precedence: the firm's marked default first, then ascending
+ * priority, then id — deterministic, so the same call state always resolves the
+ * same way.
+ *
+ * Three gates, and each one exists because skipping it would dial a person who
+ * has not agreed to be dialled:
+ *
+ *   CONSENT   a destination with no recorded authorization is never dialled, even
+ *             if it is active. The business asserts this in its own dashboard.
+ *   BUSINESS  business_hours_only destinations are skipped outside the firm's
+ *   HOURS     configured hours.
+ *   OWN HOURS a contact with its own window is skipped outside it, in its own
+ *             timezone. An unparseable timezone fails closed.
+ *
+ * Failure is always a spoken outcome (the assistant takes a message), never a
+ * dropped call — and `ok: true` means only that we RESOLVED a destination. It is
+ * emphatically not a claim that anyone answered.
  */
 export async function resolveTransferDestination(
   firmId: number,
@@ -176,11 +220,18 @@ export async function resolveTransferDestination(
   const destinations = await resolved.listActiveDestinations(firmId);
   if (destinations.length === 0) return { ok: false, reason: "no_destinations" };
 
+  const consented = destinations.filter((d) => d.consentConfirmedAt !== null);
+  if (consented.length === 0) return { ok: false, reason: "no_consent" };
+
   const withinHours = await resolved.isWithinBusinessHours(firmId, now);
-  const eligible = destinations.filter((d) => withinHours || !d.businessHoursOnly);
+  const zonedParts = resolved.zonedParts ?? (() => ({ hour: 0, minute: 0 }));
+  const eligible = consented
+    .filter((d) => withinHours || !d.businessHoursOnly)
+    .filter((d) => withinOwnHours(d, now, zonedParts));
   if (eligible.length === 0) return { ok: false, reason: "after_hours" };
-  const chosen = eligible[0]!;
-  return { ok: true, destinationE164: chosen.phoneE164, label: chosen.label };
+
+  const chosen = eligible.find((d) => d.isDefault) ?? eligible[0]!;
+  return { ok: true, destinationE164: chosen.phoneE164, label: chosen.label, destinationId: chosen.id };
 }
 
 // ── inbound-SMS tenant resolution ────────────────────────────────────────────

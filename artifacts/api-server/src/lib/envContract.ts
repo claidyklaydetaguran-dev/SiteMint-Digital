@@ -77,6 +77,7 @@ const CONFIGS: Array<[string, string, string]> = [
   ["VAPI_WEBHOOK_CREDENTIAL_ID", "P2", "Id of the Vapi HMAC Custom Credential attached to published assistants (identifier, not a secret)"],
   ["VOICE_CALL_POLICY_JSON", "P6", "Call behavior: silence/max-duration/end/voicemail lines"],
   ["VOICE_TOOLS_CAPABILITIES", "V7", "Which tool capabilities may attach: messages | scheduling (comma-separated). Required when VOICE_TOOLS_ATTACH_ENABLED=true — there is no default, so no capability attaches unless it is named"],
+  ["VOICE_DASHBOARD_BASE_URL", "V7", "Public origin used to build dashboard links in customer-facing email (unset = relative links, which are useless in an email)"],
   ["VOICE_USAGE_INCLUDED_MINUTES", "P7", "Flat included-minutes cap (metering-only when unset)"],
   ["VOICE_ALERTS_FROM", "P7", "Alert sender address"],
   ["VOICE_ALERTS_TO", "P7", "Operator alert inbox"],

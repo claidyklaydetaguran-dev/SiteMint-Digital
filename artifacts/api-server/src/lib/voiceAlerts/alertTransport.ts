@@ -57,7 +57,19 @@ export interface AlertMessage {
   to?: string;
 }
 
-export type AlertSendResult = { ok: true } | { ok: false; reason: string };
+/**
+ * `ok` means the provider ACCEPTED the message, which is the strongest thing we
+ * can observe — inbox delivery is not visible to us and nothing here claims it.
+ * `providerMessageId` is the provider's own receipt when it returns one; absent
+ * is normal, not an error.
+ *
+ * `reason` is one of OUR short codes (`provider_status_<n>`, `transport_error`,
+ * `alerts_disabled`). Provider response bodies never appear here, so a reason
+ * is always safe to persist and log.
+ */
+export type AlertSendResult =
+  | { ok: true; providerMessageId?: string }
+  | { ok: false; reason: string };
 
 export interface AlertTransport {
   send(message: AlertMessage): Promise<AlertSendResult>;
@@ -72,7 +84,10 @@ export function createDisabledAlertTransport(): AlertTransport {
   };
 }
 
-export type FetchLike = (url: string, init: Record<string, unknown>) => Promise<{ ok: boolean; status: number }>;
+export type FetchLike = (
+  url: string,
+  init: Record<string, unknown>,
+) => Promise<{ ok: boolean; status: number; json?: () => Promise<unknown> }>;
 
 export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?: FetchLike): AlertTransport {
   const doFetch: FetchLike = fetchImpl ?? (fetch as unknown as FetchLike);
@@ -93,7 +108,22 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
           }),
           signal: AbortSignal.timeout(10_000),
         });
-        if (response.ok) return { ok: true };
+        if (response.ok) {
+          // The provider's receipt id, when it gives one. Read defensively: a
+          // missing or unparseable body is not a failure — the message was
+          // accepted either way, and pretending otherwise would cause a
+          // duplicate send on the next retry.
+          let providerMessageId: string | undefined;
+          try {
+            const body = (await response.json?.()) as { id?: unknown } | undefined;
+            if (body && typeof body.id === "string" && body.id.trim().length > 0) {
+              providerMessageId = body.id.trim().slice(0, 120);
+            }
+          } catch {
+            // no receipt available; accepted is still accepted
+          }
+          return providerMessageId === undefined ? { ok: true } : { ok: true, providerMessageId };
+        }
         // Status only — response bodies never enter logs or issues.
         return { ok: false, reason: `provider_status_${response.status}` };
       } catch {

@@ -55,6 +55,20 @@ function destination(overrides: Partial<VoiceTransferDestination> = {}): VoiceTr
     priority: 100,
     active: true,
     businessHoursOnly: true,
+    contactRole: "other",
+    roleLabel: null,
+    timezone: null,
+    hoursStartMinute: null,
+    hoursEndMinute: null,
+    isDefault: false,
+    // V7: a destination is dialled only when the business has recorded that the
+    // person agreed to receive transferred calls. The fixture default is
+    // "confirmed" so existing routing tests keep testing routing; the consent
+    // gate has its own tests below.
+    consentConfirmedAt: NOW,
+    consentConfirmedBy: "owner@example.com",
+    lastTestAt: null,
+    lastTestOutcome: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
@@ -156,7 +170,7 @@ describe("resolveTransferDestination", () => {
         true,
       ),
     );
-    expect(result).toEqual({ ok: true, destinationE164: "+15550001111", label: "Urgent line" });
+    expect(result).toEqual({ ok: true, destinationE164: "+15550001111", label: "Urgent line", destinationId: 2 });
   });
 
   it("after hours, business-hours-only destinations are skipped and an always-on one wins", async () => {
@@ -170,7 +184,101 @@ describe("resolveTransferDestination", () => {
         false,
       ),
     );
-    expect(afterHours).toEqual({ ok: true, destinationE164: "+15550002222", label: "On-call" });
+    expect(afterHours).toEqual({ ok: true, destinationE164: "+15550002222", label: "On-call", destinationId: 2 });
+  });
+
+  // ── V7 gates ───────────────────────────────────────────────────────────────
+
+  it("never dials a destination whose authorization has not been recorded", async () => {
+    const result = await resolveTransferDestination(
+      7,
+      transfer([destination({ consentConfirmedAt: null, consentConfirmedBy: null })], true),
+    );
+    expect(result).toEqual({ ok: false, reason: "no_consent" });
+  });
+
+  it("prefers the marked default over a lower priority number", async () => {
+    const result = await resolveTransferDestination(
+      7,
+      transfer(
+        [
+          destination({ id: 1, priority: 10, label: "Urgent line", phoneE164: "+15550001111" }),
+          destination({ id: 2, priority: 50, isDefault: true, label: "Owner", phoneE164: "+15550003333" }),
+        ],
+        true,
+      ),
+    );
+    expect(result).toEqual({ ok: true, destinationE164: "+15550003333", label: "Owner", destinationId: 2 });
+  });
+
+  it("honours a contact's own hours window in its own timezone", async () => {
+    // NOW is 14:00Z. In America/New_York that is 10:00 (EDT).
+    const withZone = (destinations: VoiceTransferDestination[]): TransferResolutionDeps => ({
+      listActiveDestinations: async () => destinations,
+      isWithinBusinessHours: async () => true,
+      zonedParts: (timezone, at) => {
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: timezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(at);
+        const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+        return { hour: get("hour") % 24, minute: get("minute") };
+      },
+      now: () => NOW,
+    });
+
+    // 09:00-12:00 local includes 10:00 → eligible.
+    const inside = await resolveTransferDestination(
+      7,
+      withZone([
+        destination({
+          id: 3,
+          timezone: "America/New_York",
+          hoursStartMinute: 9 * 60,
+          hoursEndMinute: 12 * 60,
+          label: "Morning only",
+          phoneE164: "+15550004444",
+        }),
+      ]),
+    );
+    expect(inside).toEqual({
+      ok: true,
+      destinationE164: "+15550004444",
+      label: "Morning only",
+      destinationId: 3,
+    });
+
+    // 13:00-17:00 local excludes 10:00 → skipped, and with no other contact the
+    // caller is told nobody is reachable rather than being dialled anyway.
+    const outside = await resolveTransferDestination(
+      7,
+      withZone([
+        destination({
+          id: 3,
+          timezone: "America/New_York",
+          hoursStartMinute: 13 * 60,
+          hoursEndMinute: 17 * 60,
+        }),
+      ]),
+    );
+    expect(outside).toEqual({ ok: false, reason: "after_hours" });
+  });
+
+  it("fails closed on an unusable timezone rather than widening availability", async () => {
+    const result = await resolveTransferDestination(7, {
+      listActiveDestinations: async () => [
+        destination({ timezone: "Not/AZone", hoursStartMinute: 0, hoursEndMinute: 1440 }),
+      ],
+      isWithinBusinessHours: async () => true,
+      zonedParts: (timezone) => {
+        new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+        return { hour: 10, minute: 0 };
+      },
+      now: () => NOW,
+    });
+    expect(result).toEqual({ ok: false, reason: "after_hours" });
   });
 
   it("reports after_hours when only hours-bound destinations exist, and no_destinations when none do", async () => {

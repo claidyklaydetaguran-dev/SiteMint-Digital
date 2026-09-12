@@ -4,6 +4,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
 import { startSignupJobWorker } from "./lib/signupPipeline/pipeline.js";
+import { startVoiceNotificationWorker } from "./lib/voiceNotifications/notificationOutbox.js";
 import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
 import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
 import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
@@ -61,6 +62,16 @@ function startBackgroundWorkers(): void {
   // an idle tick is one indexed SELECT, and rows only exist after a signup
   // route has run — which is itself flag-gated.
   startSignupJobWorker({
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
+  });
+
+  // V7: post-call business notifications (15-second tick). Always on for the
+  // same reason as the signup worker: an idle tick is one indexed SELECT, and
+  // rows only exist after a real call ended. Crucially it is started even when
+  // email delivery is off, so a row queued while VOICE_ALERTS_ENABLED was false
+  // is delivered once it is turned on rather than silently discarded.
+  startVoiceNotificationWorker({
     info: (o, m) => logger.info(o, m),
     error: (o, m) => logger.error(o, m),
   });

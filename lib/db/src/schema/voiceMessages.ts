@@ -125,11 +125,18 @@ export const voiceNotifications = pgTable("voice_notifications", {
     "ck_voice_notifications_kind",
     sql`${table.kind} IN ('post_call_summary', 'caller_acknowledgement')`,
   ),
-  // 'accepted' is the only state that may carry a provider receipt, and it
-  // must carry one — otherwise "accepted" would be an unevidenced claim.
+  // 'accepted' must be timestamped, and only 'accepted' may be: the state and
+  // the evidence for it cannot drift apart.
   check(
-    "ck_voice_notifications_accepted_has_receipt",
-    sql`(${table.state} = 'accepted') = (${table.providerMessageId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL)`,
+    "ck_voice_notifications_accepted_is_stamped",
+    sql`(${table.state} = 'accepted') = (${table.acceptedAt} IS NOT NULL)`,
+  ),
+  // The provider's own id is stronger evidence but not every provider returns
+  // one, so it is optional — and meaningless on any other state, which this
+  // forbids rather than merely discourages.
+  check(
+    "ck_voice_notifications_receipt_only_when_accepted",
+    sql`${table.providerMessageId} IS NULL OR ${table.state} = 'accepted'`,
   ),
 ]);
 

@@ -166,12 +166,15 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
         });
       } else {
         req.log.info({ firmId, reason: resolution.reason }, "[voice webhook] transfer unavailable");
-        res.status(200).json({
-          error:
-            resolution.reason === "after_hours"
-              ? "The office is closed right now, but I can take a detailed message."
-              : "No one is available for a transfer right now, but I can take a detailed message.",
-        });
+        // Each reason gets its own truthful line. "No one is available" would be
+        // wrong for a business that simply has not set a contact up yet, and
+        // "the office is closed" would be wrong for one whose contact has not
+        // agreed to receive transfers.
+        const spoken =
+          resolution.reason === "after_hours"
+            ? "The office is closed right now, but I can take a detailed message."
+            : "I'm not able to put you through from here, but I can take a detailed message and someone will get back to you.";
+        res.status(200).json({ error: spoken });
       }
     } catch (err) {
       req.log.error({ firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[voice webhook] transfer resolution failed");
@@ -208,6 +211,21 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
         assistantRowId: owner.assistantRowId,
       });
       await storeToolCallResults(firmId, eventKey, results);
+      // Out-of-order repair: if this batch saved a message AFTER the call's
+      // announcement was already queued, recompose that pending email so the
+      // business is not told "no message taken" about a call that produced one.
+      // Update-only — it can never cause a mid-call email, and an announcement
+      // already accepted is deliberately left alone rather than re-sent.
+      if (calls.some((c) => c.name === "save_message")) {
+        try {
+          const { refreshQueuedPostCallNotification } = await import(
+            "../lib/voiceNotifications/notificationOutbox.js"
+          );
+          await refreshQueuedPostCallNotification(firmId, message.call.id);
+        } catch {
+          // Best-effort repair; the dashboard remains the complete record.
+        }
+      }
       req.log.info(
         { firmId, callId: message.call.id, count: results.length, authMode: auth.mode },
         "[voice webhook] tool-calls executed",
@@ -277,6 +295,28 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
         req.log.warn(
           { firmId, callId: message.call.id, errorClass: linkErr instanceof Error ? linkErr.name : "unknown" },
           "[voice webhook] contact linking failed",
+        );
+      }
+    }
+    // V7: tell the business about the finished call. The call's facts are final
+    // at end-of-call, so this is the event that announces it — exactly once per
+    // call, whatever order events arrive in, because the outbox row is unique
+    // per call. Best-effort: an outbox failure must not turn a stored event into
+    // a provider retry loop, and the queued row would be retried anyway.
+    if (message.type === "end-of-call-report") {
+      try {
+        const { announceFinishedCall } = await import("../lib/voiceNotifications/notificationOutbox.js");
+        const announced = await announceFinishedCall(firmId, message.call.id);
+        if (!announced.ok) {
+          req.log.info(
+            { firmId, callId: message.call.id, reason: announced.reason },
+            "[voice webhook] post-call notification not queued",
+          );
+        }
+      } catch (notifyErr) {
+        req.log.warn(
+          { firmId, callId: message.call.id, errorClass: notifyErr instanceof Error ? notifyErr.name : "unknown" },
+          "[voice webhook] post-call notification enqueue failed",
         );
       }
     }

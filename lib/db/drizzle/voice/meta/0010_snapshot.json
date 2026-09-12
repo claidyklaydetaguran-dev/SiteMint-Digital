@@ -1,5 +1,5 @@
 {
-  "id": "f7b38197-e7f8-412f-9125-66516ba8261e",
+  "id": "e13e4924-a185-4459-9e39-3bae6c4c8ade",
   "prevId": "4d811672-1056-4344-bc6b-0ee4bce26153",
   "version": "7",
   "dialect": "postgresql",
@@ -3518,9 +3518,13 @@
           "name": "ck_voice_notifications_kind",
           "value": "\"voice_notifications\".\"kind\" IN ('post_call_summary', 'caller_acknowledgement')"
         },
-        "ck_voice_notifications_accepted_has_receipt": {
-          "name": "ck_voice_notifications_accepted_has_receipt",
-          "value": "(\"voice_notifications\".\"state\" = 'accepted') = (\"voice_notifications\".\"provider_message_id\" IS NOT NULL AND \"voice_notifications\".\"accepted_at\" IS NOT NULL)"
+        "ck_voice_notifications_accepted_is_stamped": {
+          "name": "ck_voice_notifications_accepted_is_stamped",
+          "value": "(\"voice_notifications\".\"state\" = 'accepted') = (\"voice_notifications\".\"accepted_at\" IS NOT NULL)"
+        },
+        "ck_voice_notifications_receipt_only_when_accepted": {
+          "name": "ck_voice_notifications_receipt_only_when_accepted",
+          "value": "\"voice_notifications\".\"provider_message_id\" IS NULL OR \"voice_notifications\".\"state\" = 'accepted'"
         }
       },
       "isRLSEnabled": false

@@ -43,7 +43,8 @@ CREATE TABLE "voice_notifications" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "ck_voice_notifications_state" CHECK ("voice_notifications"."state" IN ('queued', 'sending', 'accepted', 'failed', 'abandoned')),
 	CONSTRAINT "ck_voice_notifications_kind" CHECK ("voice_notifications"."kind" IN ('post_call_summary', 'caller_acknowledgement')),
-	CONSTRAINT "ck_voice_notifications_accepted_has_receipt" CHECK (("voice_notifications"."state" = 'accepted') = ("voice_notifications"."provider_message_id" IS NOT NULL AND "voice_notifications"."accepted_at" IS NOT NULL))
+	CONSTRAINT "ck_voice_notifications_accepted_is_stamped" CHECK (("voice_notifications"."state" = 'accepted') = ("voice_notifications"."accepted_at" IS NOT NULL)),
+	CONSTRAINT "ck_voice_notifications_receipt_only_when_accepted" CHECK ("voice_notifications"."provider_message_id" IS NULL OR "voice_notifications"."state" = 'accepted')
 );
 --> statement-breakpoint
 ALTER TABLE "voice_assistants" ADD COLUMN "browser_token_mint_lease_at" timestamp with time zone;--> statement-breakpoint
