@@ -505,7 +505,12 @@ export default function CrmDiscovery() {
               <p className="text-xs">Submissions appear here when the discovery form is submitted.</p>
             </div>
           ) : (
-            <table className="w-full">
+            // Ten columns will never fit 375px. Without a scroll container the
+            // table overflowed its card and the right-hand columns could not be
+            // reached at all — the page itself does not scroll sideways.
+            // Scrolling inside this container keeps that true.
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[56rem]">
               <thead className="sticky top-0 bg-white border-b border-border/60 z-10">
                 <tr className="text-left">
                   <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
@@ -583,6 +588,7 @@ export default function CrmDiscovery() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

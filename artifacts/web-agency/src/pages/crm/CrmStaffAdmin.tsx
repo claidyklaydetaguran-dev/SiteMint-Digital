@@ -156,7 +156,7 @@ export default function CrmStaffAdmin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => void load()} className="px-2 h-9">
+            <Button variant="ghost" size="sm" onClick={() => void load()} className="px-3 h-11 [@media(hover:hover)]:px-2 [@media(hover:hover)]:h-9">
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
             {canInvite && (

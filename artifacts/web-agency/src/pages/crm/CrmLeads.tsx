@@ -373,11 +373,11 @@ export default function CrmLeads() {
                   {importMsg}
                 </span>
               )}
-              <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-8">
+              <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
                 <Download className="w-3.5 h-3.5" />
                 {importingDiscovery ? "Importing…" : "Import"}
               </Button>
-              <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => setShowCreate(true)}>
+              <Button size="sm" className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8" onClick={() => setShowCreate(true)}>
                 <Plus className="w-3.5 h-3.5" /> + New Lead
               </Button>
             </div>
@@ -410,7 +410,7 @@ export default function CrmLeads() {
               <option value="">All Priorities</option>
               {PRIORITIES.map(p => <option key={p}>{p}</option>)}
             </select>
-            <Button variant="ghost" size="sm" onClick={load} className="px-2 h-8">
+            <Button variant="ghost" size="sm" onClick={load} className="px-3 h-11 [@media(hover:hover)]:px-2 [@media(hover:hover)]:h-8">
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
           </div>

@@ -354,7 +354,7 @@ export default function CrmImport() {
                   <p className="text-xs text-muted-foreground mt-0.5">{rows.length} row{rows.length !== 1 ? "s" : ""} parsed</p>
                 </div>
               </div>
-              <button onClick={resetFile} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground">
+              <button onClick={resetFile} className="w-11 h-11 [@media(hover:hover)]:w-7 [@media(hover:hover)]:h-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground">
                 <X className="w-4 h-4" />
               </button>
             </div>

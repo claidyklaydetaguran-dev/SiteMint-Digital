@@ -747,8 +747,12 @@ export default function CrmSettings() {
                 )}
               </div>
 
-              <div className="border border-border rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
+              {/* `overflow-hidden` clipped this table rather than letting it
+                  scroll, so on a narrow screen the right-hand columns were cut
+                  off with no way to reach them. `overflow-x-auto` keeps the
+                  rounded corners and makes the content reachable. */}
+              <div className="border border-border rounded-lg overflow-x-auto">
+                <table className="w-full text-xs min-w-[34rem]">
                   <thead>
                     <tr className="bg-muted border-b border-border">
                       <th className="w-8 px-3 py-2 text-left">

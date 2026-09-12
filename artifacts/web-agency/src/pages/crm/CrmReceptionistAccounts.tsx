@@ -250,7 +250,10 @@ export default function CrmReceptionistAccounts() {
         {!loading && !error && accounts.length > 0 && (
           <div style={{
             background: "#fff", border: "1px solid color-mix(in oklab, var(--sm-teal-900) 9%, transparent)",
-            borderRadius: 12, overflow: "hidden",
+            // Was overflow:hidden, which clipped the table on a narrow screen rather
+            // than letting it scroll. auto keeps the rounded corners and makes the
+            // right-hand columns reachable.
+            borderRadius: 12, overflowX: "auto",
           }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
