@@ -1,6 +1,6 @@
 /**
  * V5 customer-shell foundation — the Setup hub's facts, as pure functions
- * (S-3: persistent guided onboarding, ten steps, one next action, no
+ * (S-3: persistent guided onboarding, one next action, no
  * automatic activation).
  *
  * Status for each step comes from two places, and they are combined
@@ -9,10 +9,11 @@
  *  1. **The saved onboarding state** (`GET/PUT /api/receptionist/onboarding`,
  *     `lib/onboardingApi.ts`) — the backend's own record of `pending` /
  *     `done` / `blocked` per step. This is authoritative once it exists.
- *  2. **Real-data inference**, for exactly the four steps the task brief
- *     names: business (firm name + industry present), availability (a
- *     config row exists), calendar (connected) and phone number (a number is
- *     assigned). A step already saved `blocked` stays `blocked` — inference
+ *  2. **Real-data inference**, for the steps real data can actually settle:
+ *     business (firm name + industry present), email confirmation (the server
+ *     says mail would be delivered), availability (a config row exists),
+ *     calendar (connected) and phone number (a number is assigned). A step
+ *     already saved `blocked` stays `blocked` — inference
  *     only ever upgrades `pending` toward `done`, never invents a block and
  *     never overrides one the backend recorded.
  *
@@ -26,6 +27,10 @@
 
 export const SETUP_STEP_KEYS = [
   "business",
+  // Added because setup could be completed in full and the business would still
+  // never hear anything: every message SiteMint sends goes only to a VERIFIED
+  // address, and nothing on this checklist mentioned it.
+  "email_verified",
   "assistant",
   "prompt",
   "voice",
@@ -50,13 +55,19 @@ export interface SetupStepMeta {
   href: string | null;
 }
 
-/** Order and copy for the ten steps, exactly as specified in S-3. */
+/** Order and copy for the steps: the ten from S-3, plus email confirmation. */
 export const SETUP_STEPS: SetupStepMeta[] = [
   {
     key: "business",
     title: "Business information",
     detail: "Tell SiteMint about your business so the receptionist can speak accurately about it.",
     href: "/account/settings",
+  },
+  {
+    key: "email_verified",
+    title: "Confirm your email address",
+    detail: "Nothing is sent to an address nobody has confirmed — no call summaries, no alerts, nothing.",
+    href: "/verify-email",
   },
   {
     key: "assistant",
@@ -116,10 +127,16 @@ export const SETUP_STEPS: SetupStepMeta[] = [
 
 export const BLOCKED_FALLBACK_REASON = "Complete the previous steps first.";
 
-/** The four steps the brief authorises inferring from real, already-loaded data. */
+/** The steps inferable from real, already-loaded data — never from a guess. */
 export interface SetupSignals {
   /** From agent-config: firm name and industry both present. */
   businessComplete: boolean | null;
+  /**
+   * From the account email-status read, which asks the SAME resolver the
+   * sender uses — so this tick means mail would actually be delivered, not
+   * that a column somewhere looks right.
+   */
+  emailVerified: boolean | null;
   /** From the availability config query: a config row exists. */
   availabilityConfigured: boolean | null;
   /** From the calendar-status query. */
@@ -130,6 +147,7 @@ export interface SetupSignals {
 
 const NO_SIGNAL: SetupSignals = {
   businessComplete: null,
+  emailVerified: null,
   availabilityConfigured: null,
   calendarConnected: null,
   phoneAssigned: null,
@@ -141,6 +159,8 @@ function inferredDone(key: SetupStepKey, signals: SetupSignals): boolean {
   switch (key) {
     case "business":
       return signals.businessComplete === true;
+    case "email_verified":
+      return signals.emailVerified === true;
     case "availability":
       return signals.availabilityConfigured === true;
     case "calendar":
@@ -180,13 +200,13 @@ export function deriveStepStatuses(
 }
 
 /**
- * Which of the four inferable steps newly resolved to "done" by inference
+ * Which of the inferable steps newly resolved to "done" by inference
  * alone (i.e. the server had not yet recorded them done). The caller `PUT`s
  * exactly these back — never the steps that were already saved done, so a
  * page load never issues a write when nothing changed.
  */
 export function newlyInferredDone(saved: SavedSteps, signals: SetupSignals): SetupStepKey[] {
-  const keys: SetupStepKey[] = ["business", "availability", "calendar", "phone_number"];
+  const keys: SetupStepKey[] = ["business", "email_verified", "availability", "calendar", "phone_number"];
   return keys.filter((key) => saved[key]?.status !== "done" && inferredDone(key, signals));
 }
 

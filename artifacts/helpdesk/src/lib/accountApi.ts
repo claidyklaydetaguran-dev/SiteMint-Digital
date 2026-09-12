@@ -99,6 +99,30 @@ export function updateAccountProfile(patch: AccountProfilePatch): Promise<AgentC
   });
 }
 
+// ─── Can this business actually be emailed? ──────────────────────────────
+
+export const EMAIL_STATUS_ENDPOINT = "/api/receptionist/account/email-status";
+
+export interface EmailStatus {
+  canReceiveEmail: boolean;
+  email: string | null;
+  reason: "no_account_email" | "email_not_verified" | null;
+}
+
+/**
+ * `GET /account/email-status`.
+ *
+ * The server answers from the same resolver the SENDER uses, so a `true` here
+ * means mail would actually be delivered — not that a column looks right.
+ * Throws on failure so the caller can tell "not verified" apart from "could not
+ * ask", which are different things to show a business.
+ */
+export async function fetchEmailStatus(): Promise<EmailStatus> {
+  const res = await fetch(EMAIL_STATUS_ENDPOINT, { credentials: "include" });
+  if (!res.ok) throw new Error("email-status unavailable");
+  return (await res.json()) as EmailStatus;
+}
+
 // ─── Team ────────────────────────────────────────────────────────────────
 
 export const MEMBERS_ENDPOINT = "/api/receptionist/account/members";

@@ -254,12 +254,29 @@ class RecordingProvider implements VoiceProvider {
   }
 }
 
+/**
+ * Every dependency is injected, including the three attachment loaders.
+ *
+ * They used to be left out, so the service fell back to reading `process.env`
+ * — and the suite quietly tested the machine it ran on rather than the code.
+ * On a bare development machine no voice flags are set, the payload carries no
+ * attachments, and every case passed; in the deployment container, where
+ * VOICE_TOOLS_ATTACH_ENABLED and friends are on, the payload carried tools, no
+ * longer matched the digest `hashOf` computes, and eleven cases failed.
+ *
+ * `() => null` matches what `hashOf` builds, so expectation and behaviour are
+ * derived from the same shape by construction. Cases that are ABOUT the
+ * attachments override them explicitly.
+ */
 function deps(overrides: {
   repository: SyncRepositoryDependency;
   provider?: VoiceProvider;
   isEnabled?: () => boolean;
   loadCatalog?: () => RuntimeCatalog;
   loadArtifactPolicy?: () => VoiceArtifactPolicy;
+  loadServerConfig?: SyncServiceDependencies["loadServerConfig"];
+  loadToolsConfig?: SyncServiceDependencies["loadToolsConfig"];
+  loadCallPolicy?: SyncServiceDependencies["loadCallPolicy"];
   clock?: Clock;
 }): SyncServiceDependencies {
   const provider = overrides.provider ?? new RecordingProvider();
@@ -267,6 +284,9 @@ function deps(overrides: {
     isEnabled: overrides.isEnabled ?? (() => true),
     loadCatalog: overrides.loadCatalog ?? catalog,
     loadArtifactPolicy: overrides.loadArtifactPolicy ?? ((): VoiceArtifactPolicy => "none"),
+    loadServerConfig: overrides.loadServerConfig ?? (() => null),
+    loadToolsConfig: overrides.loadToolsConfig ?? (() => null),
+    loadCallPolicy: overrides.loadCallPolicy ?? (() => null),
     createProvider: () => provider,
     repository: overrides.repository,
     clock: overrides.clock ?? fixedClock,

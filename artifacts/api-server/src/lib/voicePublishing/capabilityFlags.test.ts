@@ -196,11 +196,22 @@ function spyRepository() {
   };
 }
 
+// The three ATTACHMENT loaders are injected as null.
+//
+// This suite is about the publish and sync FLAGS, which it clears and restores
+// itself. It does not control VOICE_TOOLS_ATTACH_ENABLED or
+// VOICE_WEBHOOK_ATTACH_ENABLED — and where those are genuinely on (the
+// deployment container), the real loaders demand a webhook credential no unit
+// test supplies, so both paths failed on configuration before reaching the
+// claim assertions these cases are actually about.
 function publishDeps(repo: PublishServiceDependencies["repository"], provider: VoiceProvider): PublishServiceDependencies {
   return {
     isEnabled: isVoicePublishEnabled,
     loadCatalog: catalog,
     loadArtifactPolicy: (): VoiceArtifactPolicy => "none",
+    loadServerConfig: () => null,
+    loadToolsConfig: () => null,
+    loadCallPolicy: () => null,
     createProvider: () => provider,
     repository: repo,
     clock: fixedClock,
@@ -212,6 +223,9 @@ function syncDeps(repo: SyncServiceDependencies["repository"], provider: VoicePr
     isEnabled: isVoiceSyncEnabled,
     loadCatalog: catalog,
     loadArtifactPolicy: (): VoiceArtifactPolicy => "none",
+    loadServerConfig: () => null,
+    loadToolsConfig: () => null,
+    loadCallPolicy: () => null,
     createProvider: () => provider,
     repository: repo,
     clock: fixedClock,

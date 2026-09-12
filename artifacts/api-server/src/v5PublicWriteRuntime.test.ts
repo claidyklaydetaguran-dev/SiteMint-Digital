@@ -12,7 +12,7 @@
 
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 process.env["DATABASE_URL"] ??= "postgresql://127.0.0.1:1/guard_never_connected";
 process.env["CORS_ALLOWED_ORIGINS"] ??= "https://example.test";
@@ -57,9 +57,37 @@ afterAll(async () => {
 
 const FLAGS = ["INVITE_SIGNUP_ENABLED", "PUBLIC_BETA_REQUESTS_ENABLED", "PUBLIC_DEMO_ENABLED", "PUBLIC_DEMO_MAX_CONCURRENT", "PUBLIC_DEMO_DAILY_CAP_CENTS"] as const;
 
-afterEach(() => {
+/**
+ * The flags are cleared BEFORE each case, not only after.
+ *
+ * Clearing only afterwards left the FIRST case reading whatever the machine
+ * already had. On a bare development machine that is nothing and the "refused
+ * when the flag is absent" case passes; in the deployment container, where
+ * INVITE_SIGNUP_ENABLED is genuinely on, the flag was present and the case
+ * failed — a suite asserting about the machine it ran on rather than about the
+ * behaviour under test.
+ *
+ * The ambient values are captured once and restored at the end, so this suite
+ * cannot change what a later one sees.
+ */
+const AMBIENT_FLAGS = new Map(FLAGS.map((f) => [f, process.env[f]] as const));
+
+function clearFlags(): void {
   for (const f of FLAGS) delete process.env[f];
+}
+
+beforeEach(clearFlags);
+
+afterEach(() => {
+  clearFlags();
   dbHits.length = 0;
+});
+
+afterAll(() => {
+  for (const [flag, value] of AMBIENT_FLAGS) {
+    if (value === undefined) delete process.env[flag];
+    else process.env[flag] = value;
+  }
 });
 
 interface HttpResult {

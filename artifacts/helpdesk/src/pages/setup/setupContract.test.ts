@@ -43,12 +43,16 @@ function check(name: string, condition: boolean, detail?: string): void {
 
 console.log("\n--- the ten steps are in the approved order ---");
 {
-  check("exactly ten steps", SETUP_STEPS.length === 10);
+  // Eleven since email confirmation was added: setup could be finished in full
+  // and the account still receive nothing, because every send needs a verified
+  // address and no step mentioned it.
+  check("exactly eleven steps", SETUP_STEPS.length === 11);
   check(
     "order matches S-3",
     JSON.stringify(SETUP_STEPS.map((s) => s.key)) ===
       JSON.stringify([
         "business",
+        "email_verified",
         "assistant",
         "prompt",
         "voice",
@@ -121,10 +125,10 @@ console.log("\n--- display steps: exactly one 'next' unless blocked ---");
   const display = buildDisplaySteps(statuses);
   const nextCount = display.filter((s) => s.status === "next").length;
   check("exactly one step is marked next", nextCount === 1);
-  check("the first incomplete step is the one marked next", display.find((s) => s.status === "next")!.key === "assistant");
+  check("the first incomplete step is the one marked next", display.find((s) => s.status === "next")!.key === "email_verified");
   check("done stays done in the display list", display.find((s) => s.key === "business")!.status === "done");
 
-  const withBlock = buildDisplaySteps(deriveStepStatuses({ business: { status: "done" }, assistant: { status: "blocked" } }, EMPTY_SETUP_SIGNALS));
+  const withBlock = buildDisplaySteps(deriveStepStatuses({ business: { status: "done" }, email_verified: { status: "done" }, assistant: { status: "blocked" } }, EMPTY_SETUP_SIGNALS));
   check("a blocked step is never relabelled next", withBlock.find((s) => s.key === "assistant")!.status === "blocked");
   check("no step is marked next when the first incomplete one is blocked", withBlock.filter((s) => s.status === "next").length === 0);
   check("a blocked step carries a reason", Boolean(withBlock.find((s) => s.key === "assistant")!.blockedReason));
@@ -132,11 +136,11 @@ console.log("\n--- display steps: exactly one 'next' unless blocked ---");
 
 console.log("\n--- progress label and completion ---");
 {
-  check("0 of 10 for a brand-new firm", progressLabel(deriveStepStatuses({}, EMPTY_SETUP_SIGNALS)) === "0 of 10");
+  check("nothing done for a brand-new firm", progressLabel(deriveStepStatuses({}, EMPTY_SETUP_SIGNALS)) === "0 of 11");
   const nineDone: SavedSteps = Object.fromEntries(
     SETUP_STEPS.filter((s) => s.key !== "review").map((s) => [s.key, { status: "done" }]),
   );
-  check("9 of 10 once every non-review step is done", progressLabel(deriveStepStatuses(nineDone, EMPTY_SETUP_SIGNALS)) === "9 of 10");
+  check("every non-review step done reads as all but review", progressLabel(deriveStepStatuses(nineDone, EMPTY_SETUP_SIGNALS)) === "10 of 11");
   check("setup is 'complete' once every step but review is done", isSetupComplete(deriveStepStatuses(nineDone, EMPTY_SETUP_SIGNALS)) === true);
   check("setup is not complete with one step outstanding", isSetupComplete(deriveStepStatuses({}, EMPTY_SETUP_SIGNALS)) === false);
 }
@@ -156,7 +160,7 @@ console.log("\n--- next action and review summary ---");
   check("once everything else is done, the next action points at review", doneAction.href === null || doneAction.href === "#review");
 
   const review = buildReviewSummary(doneDisplay);
-  check("review lists nine done steps", review.doneTitles.length === 9);
+  check("review lists every done step but itself", review.doneTitles.length === SETUP_STEPS.length - 1);
   check("review never lists itself as done or missing", !review.doneTitles.includes("Final review and activation") && !review.missingTitles.includes("Final review and activation"));
 }
 
@@ -170,6 +174,37 @@ console.log("\n--- the page never activates automatically ---");
   );
   check("there is exactly one primary next-action control", pageSrc.includes("<NextActionCard"));
   check("newly-inferred steps are written back, not just displayed", pageSrc.includes("useSyncInferredSteps"));
+}
+
+console.log("\n--- confirming the email address ---");
+{
+  // The gap this closes: every message SiteMint sends goes only to a VERIFIED
+  // address, so a business could tick off all ten original steps and still
+  // never hear about a single call — with nothing on the checklist to explain
+  // it.
+  const step = SETUP_STEPS.find((s) => s.key === "email_verified");
+  check("the step exists", step !== undefined);
+  check("it comes second, before any assistant work", SETUP_STEPS[1]!.key === "email_verified");
+  check("it links to the page that finishes it", step?.href === "/verify-email");
+  check("it says what is lost without it", /nothing is sent/i.test(step?.detail ?? ""));
+
+  const verified = deriveStepStatuses({}, { ...EMPTY_SETUP_SIGNALS, emailVerified: true });
+  check("a verified address ticks it without a saved record", verified.email_verified === "done");
+  const unverified = deriveStepStatuses({}, { ...EMPTY_SETUP_SIGNALS, emailVerified: false });
+  check("an unverified one leaves it outstanding", unverified.email_verified === "pending");
+  // "We could not ask" is not "not verified". Inference only ever upgrades, so
+  // a failed read must leave the step exactly as the server last recorded it.
+  const unknown = deriveStepStatuses({ email_verified: { status: "done" } }, { ...EMPTY_SETUP_SIGNALS, emailVerified: null });
+  check("a failed read never un-ticks a step the server recorded done", unknown.email_verified === "done");
+
+  check(
+    "a newly-verified address is written back to the server",
+    newlyInferredDone({}, { ...EMPTY_SETUP_SIGNALS, emailVerified: true }).includes("email_verified"),
+  );
+  check(
+    "and an already-saved one is not written again",
+    !newlyInferredDone({ email_verified: { status: "done" } }, { ...EMPTY_SETUP_SIGNALS, emailVerified: true }).includes("email_verified"),
+  );
 }
 
 console.log(

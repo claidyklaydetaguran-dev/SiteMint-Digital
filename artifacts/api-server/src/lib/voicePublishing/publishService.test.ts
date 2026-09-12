@@ -122,12 +122,31 @@ function validConfig(preset = "natural-balanced"): Record<string, unknown> {
 
 const fixedClock: Clock = { now: () => new Date(FIXED_NOW.getTime()) };
 
+/**
+ * Every dependency is injected, including the three attachment loaders.
+ *
+ * They were previously omitted, so the service fell back to reading
+ * `process.env` and the suite tested the machine rather than the code. With no
+ * voice flags set — a bare development machine — the payload carried no
+ * attachments and everything passed; in the deployment container, where
+ * VOICE_TOOLS_ATTACH_ENABLED and VOICE_WEBHOOK_ATTACH_ENABLED are genuinely on,
+ * the server-config load requires a webhook credential that no unit test
+ * supplies, so publishing failed and 30 cases went red.
+ *
+ * `() => null` is the deliberate default: these cases are about the publish
+ * LIFECYCLE, and the attachment behaviour has its own suites
+ * (capabilityFlags.test.ts, capabilityAgreement.test.ts) that inject real
+ * values on purpose.
+ */
 function deps(overrides: {
   repository: FakePublishRepository;
   provider?: VoiceProvider;
   isEnabled?: () => boolean;
   loadCatalog?: () => RuntimeCatalog;
   loadArtifactPolicy?: () => VoiceArtifactPolicy;
+  loadServerConfig?: PublishServiceDependencies["loadServerConfig"];
+  loadToolsConfig?: PublishServiceDependencies["loadToolsConfig"];
+  loadCallPolicy?: PublishServiceDependencies["loadCallPolicy"];
   createProvider?: () => VoiceProvider;
   clock?: Clock;
 }): PublishServiceDependencies {
@@ -137,6 +156,9 @@ function deps(overrides: {
     loadCatalog: overrides.loadCatalog ?? catalog,
     // AR-001G: the only policy approved for AR-001 staging.
     loadArtifactPolicy: overrides.loadArtifactPolicy ?? ((): VoiceArtifactPolicy => "none"),
+    loadServerConfig: overrides.loadServerConfig ?? (() => null),
+    loadToolsConfig: overrides.loadToolsConfig ?? (() => null),
+    loadCallPolicy: overrides.loadCallPolicy ?? (() => null),
     createProvider: overrides.createProvider ?? (() => provider),
     repository: overrides.repository,
     clock: overrides.clock ?? fixedClock,

@@ -14,6 +14,7 @@ import {
   requestPasswordReset,
 } from "../lib/accountSecurity/accountTokens.js";
 import { changeAccountEmail, productionEmailChangeDeps } from "../lib/accountSecurity/emailChange.js";
+import { resolveVerifiedBusinessRecipient } from "../lib/voiceNotifications/recipient.js";
 import { acceptInvitation, inviteMember, listFirmMembers, revokeMemberById } from "../lib/voiceAccounts/membership.js";
 import { resolveEntitlementsForFirm } from "../lib/voiceBilling/entitlements.js";
 import {
@@ -92,6 +93,35 @@ router.post("/receptionist/account/password-reset/complete", async (req: Request
     res.json({ ok: true, message: "Password updated. Sign in with your new password." });
   } catch (err) {
     req.log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[account] reset complete failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /api/receptionist/account/email-status ───────────────────────────────
+//
+// Can this business actually be emailed?
+//
+// Nothing in the dashboard could answer that. Every outbound message — the
+// post-call summary, the daily digest, a critical alert — goes only to a
+// VERIFIED address, so a business with an unconfirmed one hears nothing and had
+// no way to find out why. Setup could be ticked off completely and still be
+// silent.
+//
+// The answer comes from `resolveVerifiedBusinessRecipient`, which is the SAME
+// function the sender calls. A second "is it verified?" check here could drift
+// from the one that decides whether mail is sent, and then the dashboard would
+// promise delivery the sender refuses.
+
+router.get("/receptionist/account/email-status", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const resolution = await resolveVerifiedBusinessRecipient(req.firmId!);
+    res.json(
+      resolution.ok
+        ? { canReceiveEmail: true, email: resolution.email, reason: null }
+        : { canReceiveEmail: false, email: null, reason: resolution.reason },
+    );
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] email status failed");
     res.status(500).json({ error: "Internal error" });
   }
 });

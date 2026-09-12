@@ -16,7 +16,7 @@ import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { apiFetch } from "@/lib/api";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { useAvailabilityConfig, useCalendarStatus } from "@/hooks/useAvailability";
-import { fetchAgentConfig, readAccountProfile } from "@/lib/accountApi";
+import { fetchAgentConfig, fetchEmailStatus, readAccountProfile } from "@/lib/accountApi";
 import {
   fetchOnboardingState,
   updateOnboardingState,
@@ -52,6 +52,22 @@ function useVoiceNumbers() {
   return useQuery({
     queryKey: firmId !== undefined ? [ROOT, "numbers", firmId] : [ROOT, "numbers", "unresolved"],
     queryFn: fetchVoiceNumbers,
+    enabled: firmId !== undefined,
+    retry: 1,
+  });
+}
+
+/**
+ * Whether the account can actually receive email.
+ *
+ * Answered server-side by the same resolver the sender uses, so the Setup tick
+ * means delivery would happen — not that a column looks right.
+ */
+function useEmailStatus() {
+  const firmId = useAuthenticatedFirmId();
+  return useQuery({
+    queryKey: firmId !== undefined ? [ROOT, "email-status", firmId] : [ROOT, "email-status", "unresolved"],
+    queryFn: fetchEmailStatus,
     enabled: firmId !== undefined,
     retry: 1,
   });
@@ -102,17 +118,21 @@ export function useSetupData(): SetupData {
   const availability = useAvailabilityConfig();
   const calendarStatus = useCalendarStatus();
   const numbers = useVoiceNumbers();
+  const emailStatus = useEmailStatus();
 
   const loading =
-    onboarding.isLoading || agentConfig.isLoading || availability.isLoading || calendarStatus.isLoading || numbers.isLoading;
+    onboarding.isLoading || agentConfig.isLoading || availability.isLoading || calendarStatus.isLoading || numbers.isLoading || emailStatus.isLoading;
   const ready =
-    !onboarding.isLoading && !agentConfig.isLoading && !availability.isLoading && !calendarStatus.isLoading && !numbers.isLoading;
+    !onboarding.isLoading && !agentConfig.isLoading && !availability.isLoading && !calendarStatus.isLoading && !numbers.isLoading && !emailStatus.isLoading;
 
   const profile = agentConfig.isError ? null : readAccountProfile(agentConfig.data ?? null);
   const availabilityConfig = availability.isError ? null : (availability.data as { config?: unknown } | undefined)?.config;
 
   const signals: SetupSignals = {
     businessComplete: profile ? Boolean(profile.name.trim() && profile.industry.trim()) : null,
+    // null when the read failed: "we could not ask" is not "not verified",
+    // and ticking or un-ticking the step on a failed request would be a guess.
+    emailVerified: emailStatus.isError ? null : (emailStatus.data?.canReceiveEmail ?? null),
     availabilityConfigured: availability.isError
       ? null
       : Boolean(

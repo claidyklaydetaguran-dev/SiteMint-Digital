@@ -14,6 +14,7 @@ import { apiFetch } from "@/lib/api";
 
 export const ONBOARDING_STEP_KEYS = [
   "business",
+  "email_verified",
   "assistant",
   "prompt",
   "voice",

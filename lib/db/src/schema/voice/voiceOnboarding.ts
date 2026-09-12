@@ -16,6 +16,11 @@ import { intakeFirms } from "../intakeAgent";
 
 export const ONBOARDING_STEP_KEYS = [
   "business",
+  // Added without a migration: the column guards SHAPE only (see above), so a
+  // new key is a value, not a schema change. It exists because setup could be
+  // completed in full while the account still could not receive a single
+  // message — every send requires a VERIFIED address.
+  "email_verified",
   "assistant",
   "prompt",
   "voice",
