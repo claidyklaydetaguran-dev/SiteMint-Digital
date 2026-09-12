@@ -416,6 +416,7 @@ function syncDeps(overrides: Partial<CalendarSyncDeps> = {}): {
         return { ok: true, eventId: "evt-9" };
       },
       patchEventTimes: async () => ({ ok: true, eventId: "evt-9" }),
+      findEventByRequest: async () => ({ ok: true as const, eventId: null }),
       deleteEvent: async (_c, eventId) => {
         deletedEvents.push(eventId);
         return { ok: true };
@@ -473,6 +474,7 @@ describe("calendarEventSync", () => {
       writer: {
         insertEvent: async () => ({ ok: false, reason: "revoked" }),
         patchEventTimes: async () => ({ ok: false, reason: "provider_error" }),
+        findEventByRequest: async () => ({ ok: true as const, eventId: null }),
         deleteEvent: async () => ({ ok: true }),
       },
     });
@@ -501,6 +503,7 @@ describe("calendarEventSync", () => {
       writer: {
         insertEvent: async () => ({ ok: true, eventId: "x" }),
         patchEventTimes: async () => ({ ok: true, eventId: "x" }),
+        findEventByRequest: async () => ({ ok: true as const, eventId: null }),
         deleteEvent: async () => ({ ok: false, reason: "provider_error" }),
       },
     });

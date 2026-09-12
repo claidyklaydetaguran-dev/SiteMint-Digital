@@ -25,13 +25,28 @@ export interface CalendarEventInput {
   timezone: string;
 }
 
+/**
+ * `uncertain` is its own outcome, and the distinction matters more than any
+ * other here.
+ *
+ * A 400 means the write definitely did not happen. A timeout, a dropped
+ * connection or a 5xx means we do not know: the event may well exist in the
+ * business's calendar with our response lost on the way back. Collapsing that
+ * into "failed" invites a retry, and a blind retry is how one appointment
+ * becomes two events in a customer's calendar.
+ */
 export type EventWriteResult =
   | { ok: true; eventId: string }
-  | { ok: false; reason: "revoked" | "provider_error" };
+  | { ok: false; reason: "revoked" | "provider_error" | "uncertain" };
 
-export type EventDeleteResult = { ok: true } | { ok: false; reason: "revoked" | "provider_error" };
+export type EventDeleteResult = { ok: true } | { ok: false; reason: "revoked" | "provider_error" | "uncertain" };
 
-/** Create-only + delete-by-id + time-patch. No reads, no attendee management, no arbitrary fields. */
+/** What the provider says about an event we may or may not have created. */
+export type EventLookupResult =
+  | { ok: true; eventId: string | null }
+  | { ok: false; reason: "revoked" | "provider_error" | "uncertain" };
+
+/** Create + delete-by-id + time-patch, plus the one read that resolves an ambiguous write. */
 export interface CalendarEventWriter {
   insertEvent(connection: SchedulingCalendarConnection, input: CalendarEventInput): Promise<EventWriteResult>;
   patchEventTimes(
@@ -42,31 +57,55 @@ export interface CalendarEventWriter {
     timezone: string,
   ): Promise<EventWriteResult>;
   deleteEvent(connection: SchedulingCalendarConnection, eventId: string): Promise<EventDeleteResult>;
+  /**
+   * Does an event for this request already exist?
+   *
+   * The only read in this interface, and it exists for exactly one purpose:
+   * after an uncertain write, ASK rather than guess. Keyed on the iCalUID the
+   * writer stamps, which is derived from the request's public id — so the
+   * question "did my write land?" has an authoritative answer.
+   */
+  findEventByRequest(connection: SchedulingCalendarConnection, requestPublicId: string): Promise<EventLookupResult>;
 }
 
 export type EventsTransport = (
-  method: "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PATCH" | "DELETE",
   url: string,
   accessToken: string,
   body?: Record<string, unknown>,
 ) => Promise<{ status: number; body: unknown }>;
 
+/**
+ * A timeout, so an unanswered request cannot hold an approval open forever.
+ * Long enough that a slow-but-working provider is not cut off needlessly.
+ */
+export const EVENTS_TIMEOUT_MS = 15_000;
+
 export const defaultEventsTransport: EventsTransport = async (method, url, accessToken, body) => {
-  const response = await fetch(url, {
-    method,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      ...(body ? { "content-type": "application/json" } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  let parsed: unknown;
+  // A thrown fetch — DNS failure, connection reset, timeout — is reported as
+  // status 0 rather than propagating. The caller has to be able to tell
+  // "definitely refused" from "unknown", and an exception erases that
+  // distinction by unwinding past the code that knows how to ask.
   try {
-    parsed = await response.json();
+    const response = await fetch(url, {
+      method,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        ...(body ? { "content-type": "application/json" } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(EVENTS_TIMEOUT_MS),
+    });
+    let parsed: unknown;
+    try {
+      parsed = await response.json();
+    } catch {
+      parsed = undefined;
+    }
+    return { status: response.status, body: parsed };
   } catch {
-    parsed = undefined;
+    return { status: 0, body: undefined };
   }
-  return { status: response.status, body: parsed };
 };
 
 /**
@@ -78,13 +117,28 @@ export const defaultEventsTransport: EventsTransport = async (method, url, acces
  * attribution it was meant to carry is not worth putting a customer-facing URL
  * into a firm's calendar, and `summary` already identifies the booking.
  */
+export function iCalUidForRequest(requestPublicId: string): string {
+  return `${requestPublicId}@sitemint.digital`;
+}
+
 export function buildEventBody(input: CalendarEventInput): Record<string, unknown> {
   return {
     summary: input.summary,
     start: { dateTime: input.startUtc.toISOString(), timeZone: input.timezone },
     end: { dateTime: input.endUtc.toISOString(), timeZone: input.timezone },
-    iCalUID: `${input.requestPublicId}@sitemint.digital`,
+    iCalUID: iCalUidForRequest(input.requestPublicId),
   };
+}
+
+/**
+ * Which HTTP statuses mean "we do not know whether it happened".
+ *
+ * 408/429/5xx and a 0 (the transport threw) are all unresolved: the request may
+ * have been applied before the response was lost. Everything else the provider
+ * answered with is a definite refusal.
+ */
+export function isUncertainStatus(status: number): boolean {
+  return status === 0 || status === 408 || status === 429 || status >= 500;
 }
 
 export interface GoogleEventWriterDeps {
@@ -132,8 +186,14 @@ export class GoogleCalendarEventWriter implements CalendarEventWriter {
     if (status === 200 || status === 201) {
       const id = typeof body === "object" && body !== null ? (body as Record<string, unknown>).id : undefined;
       if (typeof id === "string" && id.length > 0) return { ok: true, eventId: id };
+      // Accepted, but we cannot name what was created — treat as unknown, not
+      // as failure: an event may well exist.
+      return { ok: false, reason: "uncertain" };
     }
-    return { ok: false, reason: "provider_error" };
+    // 409 means Google already holds an event with this iCalUID — our own
+    // earlier write landed. Unknown here, and the lookup resolves it.
+    if (status === 409) return { ok: false, reason: "uncertain" };
+    return { ok: false, reason: isUncertainStatus(status) ? "uncertain" : "provider_error" };
   }
 
   async patchEventTimes(
@@ -151,7 +211,42 @@ export class GoogleCalendarEventWriter implements CalendarEventWriter {
       start: { dateTime: startUtc.toISOString(), timeZone: timezone },
       end: { dateTime: endUtc.toISOString(), timeZone: timezone },
     });
-    return status === 200 ? { ok: true, eventId } : { ok: false, reason: "provider_error" };
+    if (status === 200) return { ok: true, eventId };
+    return { ok: false, reason: isUncertainStatus(status) ? "uncertain" : "provider_error" };
+  }
+
+  /**
+   * Asks Google whether an event for this request exists, by the iCalUID the
+   * writer stamps on every insert.
+   *
+   * `{ ok: true, eventId: null }` is a real answer — the provider replied and
+   * there is no such event — and is what makes it safe to conclude that an
+   * uncertain write did not land. Anything unresolved comes back `uncertain`,
+   * never as "no event", because the two lead to opposite decisions.
+   */
+  async findEventByRequest(
+    connection: SchedulingCalendarConnection,
+    requestPublicId: string,
+  ): Promise<EventLookupResult> {
+    const accessToken = await this.accessTokenFor(connection);
+    if (accessToken === undefined) return { ok: false, reason: "revoked" };
+    const transport = this.deps.transport ?? defaultEventsTransport;
+    const url =
+      `${GOOGLE_EVENTS_ENDPOINT_BASE}/${encodeURIComponent(connection.calendarId)}/events` +
+      `?iCalUID=${encodeURIComponent(iCalUidForRequest(requestPublicId))}&showDeleted=false&maxResults=1`;
+    const { status, body } = await transport("GET", url, accessToken);
+    if (status !== 200) {
+      return { ok: false, reason: isUncertainStatus(status) ? "uncertain" : "provider_error" };
+    }
+    const items = typeof body === "object" && body !== null ? (body as { items?: unknown }).items : undefined;
+    if (!Array.isArray(items)) return { ok: false, reason: "uncertain" };
+    const first = items[0];
+    const id = typeof first === "object" && first !== null ? (first as { id?: unknown }).id : undefined;
+    // Cancelled events still come back on some queries; only a live one counts
+    // as "the write landed".
+    const statusField = typeof first === "object" && first !== null ? (first as { status?: unknown }).status : undefined;
+    if (typeof id === "string" && id.length > 0 && statusField !== "cancelled") return { ok: true, eventId: id };
+    return { ok: true, eventId: null };
   }
 
   async deleteEvent(connection: SchedulingCalendarConnection, eventId: string): Promise<EventDeleteResult> {
@@ -162,6 +257,6 @@ export class GoogleCalendarEventWriter implements CalendarEventWriter {
     const { status } = await transport("DELETE", url, accessToken);
     // 404/410: the event is already gone — deletion is idempotent by intent.
     if (status === 200 || status === 204 || status === 404 || status === 410) return { ok: true };
-    return { ok: false, reason: "provider_error" };
+    return { ok: false, reason: isUncertainStatus(status) ? "uncertain" : "provider_error" };
   }
 }

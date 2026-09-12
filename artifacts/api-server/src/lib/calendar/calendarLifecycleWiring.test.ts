@@ -159,6 +159,7 @@ function harness(opts: {
         return opts.insertResult ?? { ok: true, eventId: "evt-" + state.row.publicId };
       },
       patchEventTimes: async () => ({ ok: true, eventId: "evt" }),
+      findEventByRequest: async () => ({ ok: true as const, eventId: null }),
       deleteEvent: async (_c, id) => {
         state.deletes.push(id);
         return opts.deleteResult ?? { ok: true };

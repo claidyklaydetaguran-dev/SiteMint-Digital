@@ -272,6 +272,39 @@ check("and records who added it",
   read("artifacts/helpdesk/src/components/booking/AddAppointmentPanel.tsx").includes('source: "manual"'));
 
 
+section("when the calendar never answered");
+
+// The distinction that matters: "it failed" makes a business press approve
+// again, and if the event did land that second press puts a duplicate in a
+// customer's calendar. So this outcome is worded as unknown, not as failure,
+// and points at the action that actually settles it.
+{
+  const copy = approveReasonCopy("event_write_uncertain");
+  check("it has its own copy, not the generic failure", copy.detail !== approveReasonCopy("something_new").detail);
+  check("the title says we do not know", /don't know|didn't answer/i.test(copy.title));
+  check("it is not worded as a failure", !/failed|couldn't write/i.test(copy.title));
+  check("it says nothing was approved", /nothing was approved/i.test(copy.detail));
+  check("it says nothing was retried", /nothing was retried/i.test(copy.detail));
+  check("it explains why stopping was the safe choice", /twice|duplicate/i.test(copy.detail));
+  check("it names reconcile as the way to settle it", /reconcile/i.test(copy.detail));
+  check("it differs from the ordinary write failure", copy.detail !== approveReasonCopy("event_write_failed").detail);
+  check("and it carries no raw token", !copy.detail.includes("event_write_uncertain"));
+}
+
+// The server must be able to send it, or the copy is unreachable.
+{
+  const calendarSrc = read("artifacts/api-server/src/routes/receptionistCalendar.ts");
+  check("the route maps the outcome to a status", calendarSrc.includes("event_write_uncertain"));
+  // 409, not 502: nothing is known to have failed, and the next step is
+  // reconciliation rather than a retry.
+  check("as a conflict rather than a bad gateway", /event_write_uncertain:\s*409/.test(calendarSrc));
+
+  const syncSrc = read("artifacts/api-server/src/lib/calendar/calendarEventSync.ts");
+  check("the approval asks the provider instead of retrying", syncSrc.includes("findEventByRequest"));
+  check("and there is exactly one insert call in the approval path", (syncSrc.match(/insertEvent\(/g) ?? []).length === 1);
+}
+
+
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {
   console.log("\nFailures:");

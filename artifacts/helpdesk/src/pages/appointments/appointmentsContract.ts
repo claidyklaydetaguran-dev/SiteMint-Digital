@@ -311,6 +311,14 @@ const APPROVE_REASON_COPY: Record<ApproveReason, ReasonCopy> = {
     title: DETAIL.approveFailedTitle,
     detail: "SiteMint couldn't write this appointment to the connected calendar. Nothing was approved.",
   },
+  event_write_uncertain: {
+    // Deliberately NOT worded as a failure. A business told "it failed" will
+    // press approve again, and if the event did land that second press puts a
+    // duplicate in a customer's calendar.
+    title: "We don't know if this reached your calendar",
+    detail:
+      "Your calendar didn't answer, so SiteMint stopped rather than risk creating the appointment twice. Nothing was approved and nothing was retried. Run Reconcile calendar from this page to settle it, then approve again if it is still pending.",
+  },
   conflict_after_write: {
     title: "Check the connected calendar",
     detail: "The calendar reported a conflict right after writing this event. Review the connected calendar before trying again.",

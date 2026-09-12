@@ -189,6 +189,9 @@ const APPROVE_STATUS: Record<string, number> = {
   not_found: 404,
   not_approvable: 409,
   event_write_failed: 502,
+  // 409, not 502: nothing failed as far as we know, and the right next step
+  // is reconciliation rather than another approval.
+  event_write_uncertain: 409,
   conflict_after_write: 409,
 };
 

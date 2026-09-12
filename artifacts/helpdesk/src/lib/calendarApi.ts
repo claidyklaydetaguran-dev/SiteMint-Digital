@@ -20,6 +20,8 @@ export type ApproveReason =
   | "not_found"
   | "not_approvable"
   | "event_write_failed"
+  /** The calendar never confirmed; nothing was retried. */
+  | "event_write_uncertain"
   | "conflict_after_write";
 
 export type CancelReason = "not_found" | "not_booked" | "conflict";

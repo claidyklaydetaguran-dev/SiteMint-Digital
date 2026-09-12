@@ -54,6 +54,13 @@ export type ApproveOutcome =
   | "not_found"
   | "not_approvable"
   | "event_write_failed"
+  /**
+   * The provider neither confirmed nor denied the write, and asking did not
+   * settle it either. Distinct from a failure because the opposite action is
+   * called for: a failure invites another approval, this one must not be
+   * retried until reconciliation has looked.
+   */
+  | "event_write_uncertain"
   | "conflict_after_write";
 
 /**
@@ -86,11 +93,54 @@ export async function approveRequestToBooked(
     endUtc: request.requestedEndAt,
     timezone: request.timezone,
   });
-  if (!written.ok) {
+
+  let eventId: string | null = written.ok ? written.eventId : null;
+
+  if (!written.ok && written.reason === "uncertain") {
+    // The write may have landed with the response lost on the way back. The
+    // one thing NOT to do here is try again: a blind retry is how a single
+    // appointment becomes two events in a customer's calendar.
+    //
+    // So ask. The iCalUID is derived from this request, which makes "did my
+    // write land?" a question the provider can answer authoritatively.
+    const lookup = await deps.writer.findEventByRequest(connection, request.publicId);
+    if (lookup.ok && lookup.eventId !== null) {
+      eventId = lookup.eventId;
+      deps.logger?.("calendar_event_recovered_after_uncertain_write", { firmId, requestId: request.id });
+    } else if (lookup.ok) {
+      // A real answer: nothing was created. Treated as an ordinary failure,
+      // and the request stays pending for the business to approve again.
+      await deps.openIssue({
+        firmId,
+        level: "warning",
+        code: "calendar_sync_failed",
+        message: "The calendar did not answer in time, and no event was created. The appointment is still pending.",
+        dedupeKey: `event-insert:${request.publicId}`,
+        context: { requestPublicId: request.publicId },
+      });
+      return "event_write_failed";
+    } else {
+      // We could not find out either. NOT reported as a failure and NOT
+      // retried — an unknown outcome is its own answer, and reconciliation is
+      // what settles it.
+      await deps.openIssue({
+        firmId,
+        level: "warning",
+        code: "calendar_sync_failed",
+        message:
+          "The calendar did not confirm whether this appointment's event was created. It has not been approved, and nothing was retried — reconcile the calendar to settle it.",
+        dedupeKey: `event-insert-unresolved:${request.publicId}`,
+        context: { requestPublicId: request.publicId },
+      });
+      return "event_write_uncertain";
+    }
+  }
+
+  if (eventId === null) {
     await deps.openIssue({
       firmId,
-      level: written.reason === "revoked" ? "error" : "warning",
-      code: written.reason === "revoked" ? "calendar_revoked" : "calendar_sync_failed",
+      level: written.ok || written.reason !== "revoked" ? "warning" : "error",
+      code: !written.ok && written.reason === "revoked" ? "calendar_revoked" : "calendar_sync_failed",
       message: "Writing an approved appointment to Google Calendar failed; the request stays pending.",
       dedupeKey: `event-insert:${request.publicId}`,
       context: { requestPublicId: request.publicId },
@@ -98,11 +148,11 @@ export async function approveRequestToBooked(
     return "event_write_failed";
   }
 
-  const stamped = await deps.markBooked(firmId, request.id, written.eventId, connection.calendarId);
+  const stamped = await deps.markBooked(firmId, request.id, eventId, connection.calendarId);
   if (!stamped) {
     // The row changed underneath us — undo the event so nothing orphaned
     // blocks the firm's calendar.
-    await deps.writer.deleteEvent(connection, written.eventId);
+    await deps.writer.deleteEvent(connection, eventId);
     return "conflict_after_write";
   }
   deps.logger?.("calendar_event_booked", { firmId, requestId: request.id });
