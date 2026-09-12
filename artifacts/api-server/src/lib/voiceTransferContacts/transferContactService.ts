@@ -26,7 +26,18 @@ export function isContactRole(value: unknown): value is ContactRole {
   return typeof value === "string" && (CONTACT_ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * Cap on transfer contacts per business.
+ *
+ * Carried over from the legacy `/transfer-destinations` surface, which enforced
+ * it while the newer `/transfer-contacts` surface did not — so a business could
+ * create an unbounded list through the dashboard and a bounded one through the
+ * older API. The limit now lives with the validation, so both surfaces get it.
+ */
+export const MAX_TRANSFER_CONTACTS = 10;
+
 export type ValidationCode =
+  | "too_many"
   | "label_required"
   | "label_too_long"
   | "phone_required"
@@ -271,6 +282,20 @@ export async function createTransferContact(
 ): Promise<{ ok: true; id: number } | { ok: false; errors: FieldError[] }> {
   const { db, table } = await wdb();
   const now = new Date();
+
+  const existing = await db.select({ id: table.id }).from(table).where(eq(table.firmId, firmId));
+  if (existing.length >= MAX_TRANSFER_CONTACTS) {
+    return {
+      ok: false,
+      errors: [
+        {
+          field: "form",
+          code: "too_many",
+          message: `You can have at most ${MAX_TRANSFER_CONTACTS} transfer contacts. Remove one first.`,
+        },
+      ],
+    };
+  }
 
   const [duplicate] = await db
     .select({ id: table.id })

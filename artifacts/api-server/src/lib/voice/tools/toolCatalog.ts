@@ -208,8 +208,13 @@ export const TOOL_PARAMETER_SCHEMAS: Record<VoiceToolName, JsonObject> = {
 
 export const TOOL_DESCRIPTIONS: Record<VoiceToolName, string> = {
   check_availability: "Look up open appointment slots for a date before offering times to the caller.",
-  book_appointment: "Book one offered slot for the caller after they confirm a specific time.",
-  reschedule_appointment: "Move an existing appointment the caller references to a new confirmed slot.",
+  // These create and move REQUESTS that a human still confirms. The wording is
+  // deliberate: a model told it "books" will tell the caller they are booked,
+  // and the caller will arrive for an appointment nobody accepted.
+  book_appointment:
+    "Request one offered slot for the caller after they choose a specific time. This creates a request the business still has to confirm — never tell the caller it is booked or confirmed.",
+  reschedule_appointment:
+    "Request a new time for an appointment the caller references. The business still has to confirm the change — never tell the caller it is already moved.",
   cancel_appointment: "Cancel an existing appointment the caller references.",
   save_message:
     "Save the caller's request as a message for the business to follow up. Call this after confirming their name and the details back to them, and only say it is saved once this tool has answered successfully.",

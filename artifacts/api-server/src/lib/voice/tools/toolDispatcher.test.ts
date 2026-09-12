@@ -296,7 +296,13 @@ describe("toolDispatcher", () => {
       },
     ]);
     expect(log.cancels).toEqual([OLD.publicId]);
-    expect(results[0]!.result).toContain("Rescheduled");
+    // V8: the property is that the caller is NOT told the change is done. These
+    // rows are `pending_review` until a human accepts them, and a caller told
+    // "rescheduled" turns up at a time nobody confirmed. The old assertion
+    // pinned the word "Rescheduled", which asserted the defect.
+    expect(results[0]!.result).toMatch(/requested/i);
+    expect(results[0]!.result).toMatch(/not yet confirmed/i);
+    expect(results[0]!.result).not.toMatch(/^Rescheduled/);
     expect(results[0]!.result).not.toContain("Original Name");
   });
 

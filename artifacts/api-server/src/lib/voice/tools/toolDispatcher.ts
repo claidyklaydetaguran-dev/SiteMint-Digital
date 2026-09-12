@@ -253,7 +253,11 @@ async function runBookAppointment(
   } catch {
     // outbox unavailability must not undo a successful booking
   }
-  return `Booked, pending the office's confirmation. Reference id ${result.request.publicId}. Tell the caller the office will confirm shortly.`;
+  // A request is not a booking. This path writes a `pending_review` row that a
+  // human still has to accept, so the caller must not be told a time is theirs
+  // — they would arrive expecting an appointment nobody confirmed. The spoken
+  // line says requested, and says who confirms it.
+  return `Requested, not yet confirmed. Reference id ${result.request.publicId}. Tell the caller you have asked the office to hold that time and they will confirm it — do not tell them it is booked.`;
 }
 
 async function runCancelAppointment(
@@ -303,7 +307,7 @@ async function runRescheduleAppointment(
     await deps.cancelAppointmentRequestByPublicId(firmId, created.request.publicId);
     return "I couldn't find the original appointment to move. The office can help with the existing booking.";
   }
-  return `Rescheduled, pending the office's confirmation. New reference id ${created.request.publicId}.`;
+  return `The new time is requested, not yet confirmed. New reference id ${created.request.publicId}. Tell the caller the office will confirm the change — do not tell them it is rescheduled.`;
 }
 
 /**
