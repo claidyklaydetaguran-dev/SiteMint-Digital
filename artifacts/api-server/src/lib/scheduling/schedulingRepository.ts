@@ -270,7 +270,19 @@ export async function getDayAvailability(
 }
 
 export type SlotMutationResult =
-  | { ok: true; request: SchedulingAppointmentRequest }
+  | {
+      ok: true;
+      request: SchedulingAppointmentRequest;
+      /**
+       * True when this call did not create the row — an identical earlier call
+       * did, and this is that same request returned again.
+       *
+       * The caller needs to know so it can repeat the original answer rather
+       * than announce a second booking, and so a duplicate is never counted as
+       * new activity.
+       */
+      duplicate?: boolean;
+    }
   | { ok: false; reason: "slot_no_longer_available" | "unknown_appointment_type" };
 
 function advisoryLockKeys(firmId: number, startUtc: Date): [number, number] {
@@ -306,6 +318,7 @@ async function createRequestRow(
   consent: ConsentInput,
   now: Date,
   freeBusyProvider: FreeBusyProvider | undefined,
+  toolCallId?: string,
 ): Promise<SlotMutationResult> {
   const typeIdNum = Number(appointmentTypeId);
   if (!Number.isInteger(typeIdNum)) return { ok: false, reason: "unknown_appointment_type" };
@@ -313,6 +326,27 @@ async function createRequestRow(
   return db.transaction(async (tx) => {
     const [firmKey, slotKey] = advisoryLockKeys(firmId, startUtc);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${firmKey}, ${slotKey})`);
+
+    // A repeat of the same tool call is the same request, not a second one.
+    //
+    // Checked INSIDE the lock and before the availability recheck, because the
+    // recheck is exactly what makes a duplicate look like a conflict: the
+    // caller's own first request occupies the slot, so the repeat would be
+    // refused with "that time is no longer available" for a booking that in
+    // fact succeeded.
+    if (toolCallId !== undefined && toolCallId !== "") {
+      const [existing] = await tx
+        .select()
+        .from(schedulingAppointmentRequests)
+        .where(
+          and(
+            eq(schedulingAppointmentRequests.firmId, firmId),
+            eq(schedulingAppointmentRequests.toolCallId, toolCallId),
+          ),
+        )
+        .limit(1);
+      if (existing) return { ok: true, request: existing, duplicate: true };
+    }
 
     const config = await buildAvailabilityConfig(firmId);
     const type = config.appointmentTypes.find((t) => t.id === appointmentTypeId);
@@ -344,6 +378,7 @@ async function createRequestRow(
         smsConsent: consent.smsConsent,
         emailConsent: consent.emailConsent,
         holdExpiresAt: status === "held" ? new Date(now.getTime() + HOLD_DURATION_MIN * 60_000) : null,
+        ...(toolCallId !== undefined && toolCallId !== "" ? { toolCallId } : {}),
       })
       .returning();
 
@@ -383,8 +418,12 @@ export async function submitAppointmentRequest(
   source: AppointmentRequestSource,
   now: Date,
   freeBusyProvider?: FreeBusyProvider,
+  /** The provider's tool-call id, when this came from a voice tool call. */
+  toolCallId?: string,
 ): Promise<SlotMutationResult> {
-  return createRequestRow(firmId, appointmentTypeId, startUtc, "pending_review", source, contact, consent, now, freeBusyProvider);
+  return createRequestRow(
+    firmId, appointmentTypeId, startUtc, "pending_review", source, contact, consent, now, freeBusyProvider, toolCallId,
+  );
 }
 
 export async function listAppointmentRequests(firmId: number): Promise<SchedulingAppointmentRequest[]> {

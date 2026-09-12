@@ -60,7 +60,7 @@ export interface ToolCallResult {
 }
 
 type SlotMutation =
-  | { ok: true; request: SchedulingAppointmentRequest }
+  | { ok: true; request: SchedulingAppointmentRequest; duplicate?: boolean }
   | { ok: false; reason: "slot_no_longer_available" | "unknown_appointment_type" };
 
 export interface ToolSchedulingDeps {
@@ -77,6 +77,8 @@ export interface ToolSchedulingDeps {
     contact: { name: string; phone: string | null; email: string | null },
     consent: { phoneConsent: boolean; smsConsent: boolean; emailConsent: boolean },
     now: Date,
+    /** The provider tool-call id, so a retry returns the original request. */
+    toolCallId?: string,
   ) => Promise<SlotMutation>;
   cancelAppointmentRequestByPublicId: (firmId: number, publicId: string) => Promise<boolean>;
   /**
@@ -145,8 +147,8 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
       const rows = await repo.listAppointmentRequests(firmId);
       return rows.find((r) => r.publicId === publicId);
     },
-    submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now) =>
-      repo.submitAppointmentRequest(firmId, typeId, startUtc, contact, consent, "ai_receptionist", now),
+    submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId) =>
+      repo.submitAppointmentRequest(firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, undefined, toolCallId),
     cancelAppointmentRequestByPublicId: (firmId, publicId) => repo.cancelAppointmentRequestByPublicId(firmId, publicId),
     enqueueBookingConfirmation: async (input) => {
       const outbox = await import("../../voiceSms/outboxService.js");
@@ -222,6 +224,7 @@ function typeMenu(types: Array<{ id: string; name: string; durationMin: number }
 
 async function runBookAppointment(
   firmId: number,
+  toolCallId: string,
   args: BookAppointmentArgs,
   deps: ToolSchedulingDeps,
   now: Date,
@@ -234,11 +237,22 @@ async function runBookAppointment(
     { name: args.customerName, phone: args.customerPhone ?? null, email: args.customerEmail ?? null },
     { phoneConsent: true, smsConsent: args.smsConsent === true, emailConsent: false },
     now,
+    // The provider's id for THIS tool call. A retry carries the same id, and
+    // the repository returns the original request instead of creating a second
+    // one — or, worse, refusing the repeat because the caller's own first
+    // request now occupies the slot.
+    toolCallId,
   );
   if (!result.ok) {
     return result.reason === "slot_no_longer_available"
       ? "That time was just taken. Check availability again and offer another slot."
       : "That appointment type isn't valid. Check availability first and use its appointment type id.";
+  }
+  // A repeat returns the same reference and sends nothing again: the caller
+  // already has the confirmation text, and a second one would read as a second
+  // appointment.
+  if (result.duplicate === true) {
+    return `Already requested — this is the same request, not a new one. Reference id ${result.request.publicId}. Repeat what you already told the caller; do not say it is booked.`;
   }
   // P5: consent-gated confirmation text (best-effort; the outbox enforces
   // consent and the send-time flag — a failure here never fails the booking).
@@ -271,8 +285,12 @@ async function runCancelAppointment(
     : "I couldn't find an appointment with that reference. The office can help if the caller doesn't have it.";
 }
 
+/** Statuses in which a request still holds its time. */
+const LIVE_STATUSES = new Set(["pending_review", "held", "booked", "requested"]);
+
 async function runRescheduleAppointment(
   firmId: number,
+  toolCallId: string,
   args: RescheduleAppointmentArgs,
   deps: ToolSchedulingDeps,
   now: Date,
@@ -282,6 +300,9 @@ async function runRescheduleAppointment(
   // request's type and contact details), then cancel the old reference.
   // Compensation: if the old reference fails to cancel after the new one was
   // created, release the new one so nothing is double-held.
+  //
+  // The original is never released before the replacement exists, so a failure
+  // anywhere above leaves the caller with the appointment they already had.
   const old = await deps.findRequestByPublicId(firmId, args.requestId);
   if (!old) {
     return "I couldn't find an appointment with that reference. The office can help if the caller doesn't have it.";
@@ -294,11 +315,23 @@ async function runRescheduleAppointment(
     { name: old.customerName, phone: old.customerPhone ?? null, email: old.customerEmail ?? null },
     { phoneConsent: old.phoneConsent, smsConsent: old.smsConsent, emailConsent: old.emailConsent },
     now,
+    toolCallId,
   );
   if (!created.ok) {
     return created.reason === "slot_no_longer_available"
       ? "That new time was just taken. Check availability again and offer another slot."
       : SAFE_FAILED;
+  }
+
+  // A retry of the same tool call. The move already ran once, so the old
+  // reference is already cancelled and re-running the cancel would report a
+  // failure that is not one.
+  if (created.duplicate === true) {
+    // Unless the first attempt compensated it away — then the replacement is
+    // gone and saying "requested" would promise a time nobody holds.
+    return LIVE_STATUSES.has(created.request.status)
+      ? `Already moved — this is the same change, not another one. New reference id ${created.request.publicId}. Repeat what you already told the caller; do not say it is confirmed.`
+      : "That change didn't go through, and the original appointment is unchanged. The office can help.";
   }
 
   const cancelledOld = await deps.cancelAppointmentRequestByPublicId(firmId, args.requestId);
@@ -438,11 +471,11 @@ async function executeOne(
       case "check_availability":
         return await runCheckAvailability(firmId, parsed.data as CheckAvailabilityArgs, deps, now);
       case "book_appointment":
-        return await runBookAppointment(firmId, parsed.data as BookAppointmentArgs, deps, now);
+        return await runBookAppointment(firmId, call.toolCallId, parsed.data as BookAppointmentArgs, deps, now);
       case "cancel_appointment":
         return await runCancelAppointment(firmId, parsed.data as CancelAppointmentArgs, deps);
       case "reschedule_appointment":
-        return await runRescheduleAppointment(firmId, parsed.data as RescheduleAppointmentArgs, deps, now);
+        return await runRescheduleAppointment(firmId, call.toolCallId, parsed.data as RescheduleAppointmentArgs, deps, now);
       case "save_message":
         return await runSaveMessage(firmId, call.toolCallId, parsed.data as SaveMessageArgs, context, deps);
     }

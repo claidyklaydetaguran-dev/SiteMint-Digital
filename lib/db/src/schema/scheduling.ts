@@ -253,12 +253,30 @@ export const schedulingAppointmentRequests = pgTable("scheduling_appointment_req
   // Remain NULL for the entirety of Checkpoint B — see invariant above.
   providerEventId:      text("provider_event_id"),
   providerCalendarId:   text("provider_calendar_id"),
+  /**
+   * The voice provider's own id for the tool call that created this row.
+   *
+   * It exists so a RETRIED tool call is recognised as the same request rather
+   * than treated as a second one. Without it the repeat reaches the
+   * availability recheck, finds the slot occupied by the caller's own first
+   * request, and the caller is told the time they just took is no longer
+   * available — a confusing refusal for something that actually succeeded.
+   *
+   * NULL for every request that did not come from a tool call (the public
+   * page, the dashboard), which is why the unique index below is partial.
+   */
+  toolCallId:           text("tool_call_id"),
   holdExpiresAt:        timestamp("hold_expires_at", { withTimezone: true }),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   cancelledAt:          timestamp("cancelled_at", { withTimezone: true }),
 }, (table) => [
   uniqueIndex("uq_scheduling_appointment_requests_public_id").on(table.publicId),
+  // Partial: one row per (firm, tool call), and no constraint at all on the
+  // many rows that never came from a tool call.
+  uniqueIndex("uq_scheduling_appointment_requests_firm_tool_call")
+    .on(table.firmId, table.toolCallId)
+    .where(sql`${table.toolCallId} IS NOT NULL`),
   index("ix_scheduling_appointment_requests_firm_id_status").on(table.firmId, table.status),
   index("ix_scheduling_appointment_requests_firm_id_start").on(table.firmId, table.requestedStartAt),
   check(

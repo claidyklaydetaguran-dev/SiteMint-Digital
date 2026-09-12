@@ -1,0 +1,2 @@
+ALTER TABLE "scheduling_appointment_requests" ADD COLUMN "tool_call_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_scheduling_appointment_requests_firm_tool_call" ON "scheduling_appointment_requests" USING btree ("firm_id","tool_call_id") WHERE "scheduling_appointment_requests"."tool_call_id" IS NOT NULL;

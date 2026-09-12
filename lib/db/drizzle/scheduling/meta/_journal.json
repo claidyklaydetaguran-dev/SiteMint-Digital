@@ -22,6 +22,13 @@
       "when": 1789196736922,
       "tag": "0002_superb_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789203213657,
+      "tag": "0003_tired_vivisector",
+      "breakpoints": true
     }
   ]
 }

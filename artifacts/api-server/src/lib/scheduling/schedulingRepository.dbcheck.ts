@@ -300,6 +300,71 @@ async function main() {
       afterReactivate.appointmentTypeDetail.filter((t) => t.name === "On-site estimate").length === 1,
     );
 
+    // ── A retried tool call is the same request ─────────────────────────────
+    //
+    // This needs a database because the guarantee is the partial unique index
+    // plus the in-transaction lookup working together. In memory it is trivial;
+    // what is being checked is that two calls carrying one tool-call id cannot
+    // produce two rows even when they race, and that the repeat is not refused
+    // by the availability recheck for a slot the caller themselves took.
+    const cfgForRetry = await getSerializedAvailabilitySettings(firmB);
+    const retryTypeId = cfgForRetry.appointmentTypeDetail.find((t) => t.name === "On-site estimate")!.id;
+    const retryStart = new Date("2027-07-09T17:00:00.000Z");
+    const retryToolCall = `tc-dbcheck-${Date.now()}`;
+
+    const firstBook = await submitAppointmentRequest(
+      firmB, retryTypeId, retryStart,
+      { name: "Retry Caller", phone: null, email: null },
+      { phoneConsent: false, smsConsent: false, emailConsent: false },
+      "ai_receptionist", new Date("2027-07-07T16:00:00.000Z"), undefined, retryToolCall,
+    );
+    ok("a tool-call booking succeeds", firstBook.ok);
+
+    const repeatBook = await submitAppointmentRequest(
+      firmB, retryTypeId, retryStart,
+      { name: "Retry Caller", phone: null, email: null },
+      { phoneConsent: false, smsConsent: false, emailConsent: false },
+      "ai_receptionist", new Date("2027-07-07T16:00:00.000Z"), undefined, retryToolCall,
+    );
+    ok("a repeat with the same tool-call id is not refused", repeatBook.ok);
+    if (firstBook.ok && repeatBook.ok) {
+      ok("the repeat returns the SAME request", repeatBook.request.publicId === firstBook.request.publicId);
+      ok("and says so", repeatBook.duplicate === true);
+      ok("the first one did not", firstBook.duplicate !== true);
+    }
+
+    // Two simultaneous repeats: the partial unique index and the advisory lock
+    // together must still yield exactly one row.
+    const racedToolCall = `tc-dbcheck-race-${Date.now()}`;
+    const racedStart = new Date("2027-07-09T18:00:00.000Z");
+    const [raceA, raceB] = await Promise.all([
+      submitAppointmentRequest(firmB, retryTypeId, racedStart, { name: "Race", phone: null, email: null },
+        { phoneConsent: false, smsConsent: false, emailConsent: false },
+        "ai_receptionist", new Date("2027-07-07T16:00:00.000Z"), undefined, racedToolCall),
+      submitAppointmentRequest(firmB, retryTypeId, racedStart, { name: "Race", phone: null, email: null },
+        { phoneConsent: false, smsConsent: false, emailConsent: false },
+        "ai_receptionist", new Date("2027-07-07T16:00:00.000Z"), undefined, racedToolCall),
+    ]);
+    ok("both simultaneous repeats succeed", raceA.ok && raceB.ok);
+    if (raceA.ok && raceB.ok) {
+      ok("and both name the same request", raceA.request.publicId === raceB.request.publicId);
+      const listed = await listAppointmentRequests(firmB);
+      ok(
+        "exactly one row carries that tool-call id",
+        listed.filter((r) => r.toolCallId === racedToolCall).length === 1,
+      );
+    }
+
+    // A DIFFERENT tool call for the same slot must still be refused — the key
+    // makes repeats safe, it does not make every booking succeed.
+    const otherCaller = await submitAppointmentRequest(
+      firmB, retryTypeId, retryStart,
+      { name: "Somebody Else", phone: null, email: null },
+      { phoneConsent: false, smsConsent: false, emailConsent: false },
+      "ai_receptionist", new Date("2027-07-07T16:00:00.000Z"), undefined, `tc-dbcheck-other-${Date.now()}`,
+    );
+    ok("a different tool call for a taken slot is still refused", !otherCaller.ok);
+
     // ── Clearing an override goes back to inheriting ────────────────────────
     await saveAvailabilitySettings(firmB, {
       timezone: "America/Los_Angeles",
