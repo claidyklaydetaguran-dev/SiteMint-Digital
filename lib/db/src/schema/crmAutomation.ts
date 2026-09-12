@@ -99,6 +99,24 @@ export const CRM_AUTOMATION_TRIGGER_RECORD: Record<CrmAutomationTrigger, CrmAuto
 };
 
 /**
+ * The two triggers that are NOT announced by a business write.
+ *
+ * Nothing "does" an overdue task or a silence: they become true as the clock
+ * passes a day boundary, with no request, no user and no route. They are
+ * therefore produced by a periodic sweep over record state
+ * (`artifacts/api-server/src/lib/automationSweep.ts`) rather than by a producer
+ * call, and they are the only two triggers whose pending event can still be
+ * CANCELLED before it fires — a task completed, or activity arriving, makes the
+ * thing that was about to be announced no longer true.
+ */
+export const CRM_AUTOMATION_SWEEP_TRIGGERS = ["task_overdue", "no_activity_for_days"] as const;
+export type CrmAutomationSweepTrigger = (typeof CRM_AUTOMATION_SWEEP_TRIGGERS)[number];
+
+export function isSweepTrigger(trigger: string): trigger is CrmAutomationSweepTrigger {
+  return (CRM_AUTOMATION_SWEEP_TRIGGERS as readonly string[]).includes(trigger);
+}
+
+/**
  * The typed payload each trigger carries.
  *
  * `recordId` is always present and always identifies the record named by
@@ -294,6 +312,18 @@ export const AUTOMATION_DEFAULT_WINDOW_MINUTES = 60;
 /** Attempts for an action that definitively failed, before it stops visibly. */
 export const AUTOMATION_DEFAULT_MAX_ACTION_ATTEMPTS = 3;
 
+/**
+ * Days of silence a `no_activity_for_days` rule waits for, when its author did
+ * not say. Two weeks: long enough that an ordinary gap between touches does not
+ * trip it, short enough that a contact going quiet is still worth a nudge.
+ *
+ * This lives on the RULE and not in a global setting because two rules can
+ * reasonably disagree — "chase a new enquiry after 3 days" and "review a dormant
+ * client after 60" are both sensible, and they are different windows over the
+ * same contacts.
+ */
+export const AUTOMATION_DEFAULT_INACTIVITY_DAYS = 14;
+
 // ── Rules ───────────────────────────────────────────────────────────────────
 
 export const crmAutomationRules = pgTable("crm_automation_rules", {
@@ -327,6 +357,15 @@ export const crmAutomationRules = pgTable("crm_automation_rules", {
   /** Retry budget for an action that definitively failed. */
   maxActionAttempts:   integer("max_action_attempts").notNull().default(AUTOMATION_DEFAULT_MAX_ACTION_ATTEMPTS),
 
+  /**
+   * ADDITIVE (M5). How many days of silence a `no_activity_for_days` rule waits
+   * for. Meaningless for every other trigger and deliberately left at its
+   * default there rather than made nullable: a NOT NULL column with a sensible
+   * default cannot produce a rule that sits enabled and never fires because
+   * nobody filled in the one number it needed.
+   */
+  inactivityDays:      integer("inactivity_days").notNull().default(AUTOMATION_DEFAULT_INACTIVITY_DAYS),
+
   createdByStaffId: integer("created_by_staff_id"),
   createdByLabel:   text("created_by_label"),
   updatedByStaffId: integer("updated_by_staff_id"),
@@ -354,9 +393,152 @@ export const crmAutomationRules = pgTable("crm_automation_rules", {
     sql`${table.windowMinutes} >= 1 AND ${table.windowMinutes} <= 10080`),
   check("ck_crm_automation_rules_attempts",
     sql`${table.maxActionAttempts} >= 1 AND ${table.maxActionAttempts} <= 10`),
+  // A zero-day silence window would fire on every contact on every sweep; a
+  // window longer than a year is a report, not an automation.
+  check("ck_crm_automation_rules_inactivity_days",
+    sql`${table.inactivityDays} >= 1 AND ${table.inactivityDays} <= 365`),
 ]);
 
 export type CrmAutomationRule = typeof crmAutomationRules.$inferSelect;
+
+// ── Events (M5) ─────────────────────────────────────────────────────────────
+//
+// ── The gap this closes ─────────────────────────────────────────────────────
+//
+// Business routes announce events through `fireAutomation()`, which is
+// deliberately fire-and-forget: a fault in somebody's rule must never fail the
+// request that merely caused the event. The original version handed the event
+// straight to the engine in memory. That kept the route safe and lost events:
+// if the process died between the business write and the emit, the rule never
+// ran for that occurrence, and — worse — NOTHING recorded that it had not.
+//
+// An event is now a ROW first. The engine reads rows, not memory, so a
+// restarted process finds the work still waiting instead of never knowing it
+// existed. The row is also the thing that makes a failure visible: an event
+// that cannot be turned into executions stays here with its error and its
+// attempt count, rather than becoming a log line nobody reads.
+//
+// ── What is and is not guaranteed ───────────────────────────────────────────
+//
+// AT-LEAST-ONCE, not exactly-once, and the difference is deliberate:
+//
+//   * The row is written AFTER the business write and not inside its
+//     transaction — the producers call `fireAutomation()` after they have
+//     already answered the request. A process killed in the microseconds
+//     between those two writes still loses that event. The window is one INSERT
+//     wide instead of a whole rule evaluation wide, which is a real
+//     improvement and is not the same thing as a guarantee.
+//   * Once the row exists, the event WILL reach rule evaluation: the worker
+//     retries it with backoff until it is processed, across restarts and across
+//     workers.
+//   * It may reach rule evaluation more than once — a worker lease that expires
+//     mid-flight is reclaimed — and that is harmless because the engine's
+//     `uq_crm_automation_executions_occurrence` index refuses the second
+//     execution for the same occurrence. Repeats are absorbed by the database,
+//     not by a caller remembering to check first.
+//
+// So: an event that is recorded runs at least once; a repeat does nothing; and
+// an event that never got recorded is still lost. Automation remains a
+// convenience layer over the record, never the system of record.
+
+export const CRM_AUTOMATION_EVENT_STATUSES = [
+  "pending", "processing", "processed", "cancelled", "failed",
+] as const;
+export type CrmAutomationEventStatus = (typeof CRM_AUTOMATION_EVENT_STATUSES)[number];
+
+/** Where an event came from. */
+export const CRM_AUTOMATION_EVENT_SOURCES = ["producer", "sweep", "manual"] as const;
+export type CrmAutomationEventSource = (typeof CRM_AUTOMATION_EVENT_SOURCES)[number];
+
+/**
+ * One recorded business occurrence, waiting to become rule executions.
+ *
+ * The UNIQUE index is on the OCCURRENCE, not on the row's own identity: two
+ * recordings of the same real event — a double submit, a retried request, two
+ * sweep workers racing on the same tick — collapse into one row before any rule
+ * is even looked at. That is the same principle as the executions table one
+ * layer down, applied one layer earlier so a duplicate costs nothing at all.
+ */
+export const crmAutomationEvents = pgTable("crm_automation_events", {
+  id:      serial("id").primaryKey(),
+  trigger: text("trigger").notNull(),
+
+  recordType: text("record_type").notNull(),
+  recordId:   integer("record_id").notNull(),
+
+  /**
+   * The identity of THIS occurrence, frozen when the event was recorded.
+   *
+   * Frozen rather than derived later on purpose. The engine derives a key from
+   * the record's own `updated_at` when none is supplied; if that derivation
+   * happened at PROCESSING time, a record that changed again in between would
+   * yield a different key and the retry would create a second execution. The
+   * key is decided once, here, so every retry of this row deduplicates against
+   * the same occurrence.
+   */
+  occurrenceKey: text("occurrence_key").notNull(),
+
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+
+  /** The loop-brake chain this event arrived on, carried through verbatim. */
+  chainDepth:          integer("chain_depth").notNull().default(0),
+  chainRuleIds:        jsonb("chain_rule_ids").$type<number[]>().notNull().default(sql`'[]'::jsonb`),
+  causedByExecutionId: integer("caused_by_execution_id"),
+
+  /**
+   * The rules this event is for, or NULL for "every rule listening to this
+   * trigger".
+   *
+   * Needed because one `no_activity_for_days` event is about a SPECIFIC silence
+   * window — a contact quiet for 7 days is not an occurrence of a rule that
+   * waits 30. Without this, every silence rule would fire on every other
+   * silence rule's event.
+   */
+  targetRuleIds: jsonb("target_rule_ids").$type<number[] | null>(),
+
+  source: text("source").notNull().default("producer"),
+  status: text("status").notNull().default("pending"),
+
+  attempts:      integer("attempts").notNull().default(0),
+  maxAttempts:   integer("max_attempts").notNull().default(10),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
+
+  /** The worker lease, so a killed process does not strand an event. */
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  lockedBy: text("locked_by"),
+
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  /** Why a sweep event was called off — see CRM_AUTOMATION_SWEEP_TRIGGERS. */
+  cancelledReason: text("cancelled_reason"),
+  lastError:   text("last_error"),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  // THE collapse. One row per real occurrence, whoever records it and however
+  // many times.
+  uniqueIndex("uq_crm_automation_events_occurrence")
+    .on(table.trigger, table.recordType, table.recordId, table.occurrenceKey),
+  // The worker's own query: what is due.
+  index("ix_crm_automation_events_due").on(table.status, table.nextAttemptAt),
+  index("ix_crm_automation_events_record").on(table.recordType, table.recordId, table.id),
+
+  check("ck_crm_automation_events_status", sql`${table.status} IN (
+    'pending', 'processing', 'processed', 'cancelled', 'failed')`),
+  check("ck_crm_automation_events_source",
+    sql`${table.source} IN ('producer', 'sweep', 'manual')`),
+  check("ck_crm_automation_events_record_type", sql`${table.recordType} IN (
+    'lead', 'deal', 'task', 'appointment', 'document_request', 'message')`),
+  check("ck_crm_automation_events_attempts",
+    sql`${table.attempts} >= 0 AND ${table.maxAttempts} >= 1`),
+  // A cancelled event must say what called it off, for the same reason a
+  // stopped execution must: otherwise "cancelled" and "we lost it" look
+  // identical in the history.
+  check("ck_crm_automation_events_cancel_needs_reason",
+    sql`${table.status} <> 'cancelled' OR ${table.cancelledReason} IS NOT NULL`),
+]);
+
+export type CrmAutomationEvent = typeof crmAutomationEvents.$inferSelect;
 
 // ── Executions ──────────────────────────────────────────────────────────────
 

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrmLayout } from "./CrmLayout";
 import {
-  AlertCircle, ArrowLeft, BookOpen, Check, ChevronDown, Eye, EyeOff, Inbox,
-  LifeBuoy, Loader2, Lock, Plus, RefreshCw, Search, Send, Tag, UserCircle, X,
+  AlertCircle, ArrowLeft, BookOpen, Check, ChevronDown, Clock, Eye, EyeOff,
+  Inbox, LifeBuoy, Loader2, Lock, Mail, Plus, RefreshCw, Search, Send, Tag,
+  UserCircle, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
 
@@ -23,6 +24,18 @@ import { adminFetch } from "@/lib/adminFetch";
 //   - "What the client sees" reads the server's own customer-facing projection
 //     rather than filtering the thread here, so this page cannot claim a
 //     guarantee the API does not actually make.
+//
+// The second line this page holds is between a reply being SENT and a reply
+// ARRIVING (M5). A customer reply is now genuinely emailed, and every one of
+// them carries the real outcome:
+//
+//   - the strongest thing shown is "Accepted by the mail provider", never
+//     "Sent" — the label comes from the server and is not composed here, so
+//     this screen cannot invent a stronger claim than the API makes;
+//   - a refused or unknown delivery is rendered as a problem with the reasons
+//     and the actions a person can take, not hidden behind a tick;
+//   - an internal note has NO delivery badge at all, because no delivery
+//     exists for it — a "not applicable" state would imply one could.
 //
 // Every vocabulary — statuses, the state machine, priorities, resolutions —
 // comes from `/api/crm/support/vocabulary`. Nothing here hard-codes a list, so
@@ -69,6 +82,41 @@ interface TicketRow {
   updatedAt: string;
 }
 
+/**
+ * What actually happened to a message that was meant to reach the client.
+ *
+ * The server decides the words. This screen never invents a label, and in
+ * particular never turns `accepted` into "Sent": the provider taking a message
+ * is not the client receiving it, and a screen that says otherwise leaves
+ * somebody believing a client has read something that bounced.
+ */
+interface DeliveryView {
+  state: string;
+  label: string;
+  tone: "waiting" | "working" | "accepted" | "attention";
+  explanation: string;
+  needsAttention: boolean;
+  attempt: number;
+  nextAttemptAt?: string | null;
+  deliveredTo?: string | null;
+  providerRef?: string | null;
+  failureReason?: string | null;
+  failureDetail?: string | null;
+  resolvedAt?: string | null;
+  resolution?: string | null;
+  resolutionNote?: string | null;
+  availableActions: Array<"retry" | "resend" | "acknowledge">;
+  retryCouldDuplicate: boolean;
+}
+
+interface DeliveryStatus {
+  canSend: boolean;
+  canReceiveReplies: boolean;
+  replyDomain?: string | null;
+  blockedReason?: string | null;
+  inboundNote: string;
+}
+
 interface ThreadMessage {
   id: number;
   visibility: "customer" | "internal";
@@ -77,6 +125,10 @@ interface ThreadMessage {
   sentByStaffId?: number | null;
   sentByLabel?: string | null;
   authorKnown: boolean;
+  /** True when the client's own words arrived here by email. */
+  arrivedByEmail?: boolean;
+  /** Null on an internal note and on the client's own words — no delivery exists. */
+  delivery?: DeliveryView | null;
   createdAt: string;
 }
 
@@ -88,7 +140,13 @@ interface TicketDetail {
   openedByName?: string | null;
   resolvedByName?: string | null;
   messages: ThreadMessage[];
-  counts: { messages: number; customerVisible: number; internalNotes: number };
+  counts: {
+    messages: number;
+    customerVisible: number;
+    internalNotes: number;
+    deliveriesNeedingAttention?: number;
+  };
+  delivery?: DeliveryStatus;
 }
 
 interface CustomerView {
@@ -103,6 +161,9 @@ interface Overview {
   awaitingFirstReply: number;
   assignedToMe: number | null;
   knowledgeBase: { total: number; published: number };
+  /** Replies written to a client that did not reach them. Each is a person waiting. */
+  deliveriesNeedingAttention?: number;
+  delivery?: DeliveryStatus;
   definitions: Record<string, string>;
 }
 
@@ -162,6 +223,40 @@ function Chip({ text, className }: { text: string; className: string }) {
   );
 }
 
+/**
+ * How each delivery tone is coloured.
+ *
+ * `accepted` is deliberately the same teal as an ordinary customer message
+ * rather than a success green: it is a normal outcome, not a guarantee, and
+ * dressing it as a tick invites the reading the server refuses to make.
+ */
+const DELIVERY_TONE: Record<DeliveryView["tone"], string> = {
+  waiting: "bg-sky-50 text-sky-800 border-sky-200",
+  working: "bg-sky-50 text-sky-800 border-sky-200",
+  accepted: "bg-teal-50 text-teal-800 border-teal-200",
+  attention: "bg-red-50 text-red-700 border-red-200",
+};
+
+const DELIVERY_ICON: Record<DeliveryView["tone"], typeof Check> = {
+  waiting: Clock,
+  working: Loader2,
+  accepted: Check,
+  attention: AlertCircle,
+};
+
+/** The one-line state of a message, in the server's own words. */
+function DeliveryBadge({ delivery }: { delivery: DeliveryView }) {
+  const Icon = DELIVERY_ICON[delivery.tone];
+  return (
+    <span
+      title={delivery.explanation}
+      className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[delivery.tone]}`}>
+      <Icon className={`w-3 h-3 shrink-0 ${delivery.tone === "working" ? "animate-spin" : ""}`} />
+      {delivery.label}
+    </span>
+  );
+}
+
 const FIELD =
   "w-full px-3 py-2 text-sm border border-input rounded-lg bg-background text-foreground " +
   "focus:outline-none focus:ring-1 focus:ring-teal-500";
@@ -200,6 +295,10 @@ export default function CrmSupport() {
 
   const [composeMode, setComposeMode] = useState<"internal" | "customer">("internal");
   const [draft, setDraft] = useState("");
+
+  /** The message whose delivery a person is currently deciding about. */
+  const [recovering, setRecovering] = useState<{ messageId: number; action: "retry" | "resend" | "acknowledge" } | null>(null);
+  const [recoveryReason, setRecoveryReason] = useState("");
 
   const [resolving, setResolving] = useState<string | null>(null);
   const [resolution, setResolution] = useState("");
@@ -415,9 +514,44 @@ export default function CrmSupport() {
     });
     if (!data) return;
     setDraft("");
-    setNotice(data.delivery?.note ?? "Recorded.");
+    // The server's own words for what happened, never a cheerful summary of
+    // our own. A reply that did not reach the client says so here.
+    const outcome = data.delivery as DeliveryView | null | undefined;
+    if (outcome?.needsAttention) {
+      setNotice(null);
+      setError(`${outcome.label}. ${outcome.explanation}`);
+    } else {
+      setNotice(outcome ? `${outcome.label}. ${outcome.explanation}` : "Recorded.");
+    }
     await refreshAll();
     if (customerView) await showCustomerView();
+  }
+
+  /**
+   * A person's decision about a reply that did not settle.
+   *
+   * The reason is required by the API and asked for here rather than sent
+   * blank, because the record of who decided what — and why — is the whole
+   * point of the action existing.
+   */
+  async function recoverDelivery(
+    messageId: number,
+    action: "retry" | "resend" | "acknowledge",
+    reason: string,
+  ) {
+    if (!reason.trim()) {
+      setError("Say why. A recovery with no reason is not a record.");
+      return;
+    }
+    const data = await write(`/api/crm/support/messages/${messageId}/delivery-recovery`, {
+      action, reason: reason.trim(),
+    });
+    if (!data) return;
+    setRecovering(null);
+    setRecoveryReason("");
+    const after = data.delivery as DeliveryView | null;
+    setNotice(after ? `${after.label}. ${data.note ?? ""}`.trim() : (data.note ?? "Recorded."));
+    await refreshAll();
   }
 
   async function changeStatus(next: string) {
@@ -650,6 +784,32 @@ export default function CrmSupport() {
                     {urgentActive}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {/* Replies that were written and did not reach the client. The
+                most consequential number on this screen: every one of them is
+                somebody still waiting for an answer they believe was sent. */}
+            {overview && (overview.deliveriesNeedingAttention ?? 0) > 0 && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-800 min-w-0">
+                  <span className="font-semibold">
+                    {overview.deliveriesNeedingAttention} {overview.deliveriesNeedingAttention === 1 ? "reply" : "replies"} did not reach the client.
+                  </span>{" "}
+                  {overview.definitions?.deliveriesNeedingAttention
+                    ?? "Open the ticket to see what happened and decide what to do."}
+                </p>
+              </div>
+            )}
+            {overview?.delivery && !overview.delivery.canSend && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-900 min-w-0">
+                  <span className="font-semibold">Support cannot email anybody from this server.</span>{" "}
+                  {overview.delivery.blockedReason ?? "Mail is not configured."} Replies are still
+                  recorded, and each one is marked as not sent rather than quietly dropped.
+                </p>
               </div>
             )}
 
@@ -951,9 +1111,18 @@ export default function CrmSupport() {
                                   </span>
                                 ) : (
                                   <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-700">
-                                    {m.origin === "customer" ? "From the client" : "Sent to the client"}
+                                    {m.origin === "customer" ? "From the client" : "To the client"}
                                   </span>
                                 )}
+                                {m.arrivedByEmail && (
+                                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <Mail className="w-3 h-3" /> By email
+                                  </span>
+                                )}
+                                {/* Null on an internal note and on the client's
+                                    own words: no delivery exists, so none is
+                                    described. */}
+                                {m.delivery && <DeliveryBadge delivery={m.delivery} />}
                                 <span className="text-[11px] text-muted-foreground ml-auto">
                                   {formatDateTime(m.createdAt)}
                                 </span>
@@ -966,6 +1135,61 @@ export default function CrmSupport() {
                                     : "Author not recorded (imported before this was tracked)"}
                               </p>
                               <p className="text-sm text-foreground whitespace-pre-wrap mt-1.5">{m.body}</p>
+
+                              {m.delivery?.needsAttention && (
+                                <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                                  <p className="text-[11px] text-red-800">{m.delivery.explanation}</p>
+                                  {m.delivery.deliveredTo && (
+                                    <p className="text-[11px] text-red-700/80 mt-0.5 break-all">
+                                      Aimed at {m.delivery.deliveredTo} · attempt {m.delivery.attempt}
+                                    </p>
+                                  )}
+
+                                  {recovering?.messageId === m.id ? (
+                                    <div className="mt-2 space-y-2">
+                                      <p className="text-[11px] text-red-800">
+                                        {recovering.action === "resend"
+                                          ? "A second copy will be sent with a new idempotency key, so the client may receive two."
+                                          : recovering.action === "retry"
+                                            ? m.delivery.retryCouldDuplicate
+                                              ? "The provider no longer collapses a repeat of this message, so a retry can genuinely duplicate it."
+                                              : "The original idempotency key is reused, so the provider collapses this into the first send if that send did reach it."
+                                            : "This closes the case without sending anything. What happened is left on the record exactly as it is."}
+                                      </p>
+                                      <input value={recoveryReason} onChange={e => setRecoveryReason(e.target.value)}
+                                        placeholder="Why are you doing this?" className={FIELD} />
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <button onClick={() => { setRecovering(null); setRecoveryReason(""); }}
+                                          className={GHOST_BUTTON}>Cancel</button>
+                                        <button
+                                          onClick={() => void recoverDelivery(m.id, recovering.action, recoveryReason)}
+                                          disabled={busy || !recoveryReason.trim()}
+                                          className={`${PRIMARY_BUTTON} ml-auto`}>
+                                          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                          Confirm {recovering.action}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                      {m.delivery.availableActions.map(a => (
+                                        <button key={a}
+                                          onClick={() => { setRecovering({ messageId: m.id, action: a }); setRecoveryReason(""); }}
+                                          className={GHOST_BUTTON}>
+                                          {a === "retry" ? "Try again" : a === "resend" ? "Send a new copy" : "Acknowledge"}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {m.delivery?.resolvedAt && (
+                                <p className="text-[11px] text-muted-foreground mt-1.5">
+                                  Closed {formatDateTime(m.delivery.resolvedAt)}
+                                  {m.delivery.resolutionNote ? ` — ${m.delivery.resolutionNote}` : ""}
+                                </p>
+                              )}
                             </div>
                           ))}
                           {detail.messages.length === 0 && (
@@ -1005,18 +1229,36 @@ export default function CrmSupport() {
                             composeMode === "customer" ? "border-teal-300" : "border-amber-300"
                           }`} />
 
+                        {/* Whether this server can reach anybody at all, said
+                            before the button is pressed rather than after.
+                            A reply written while mail is off is still recorded
+                            and still visibly marked as not sent. */}
+                        {composeMode === "customer" && detail.delivery && !detail.delivery.canSend && (
+                          <p className="text-[11px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                            This server cannot send mail right now, so this reply will be recorded and
+                            marked as not sent rather than reaching the client.
+                            {detail.delivery.blockedReason ? ` ${detail.delivery.blockedReason}` : ""}
+                          </p>
+                        )}
+                        {composeMode === "customer" && detail.delivery?.canSend && !detail.delivery.canReceiveReplies && (
+                          <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            This will be emailed, but no reply address is configured — if the client
+                            answers, their reply will not land on this ticket.
+                          </p>
+                        )}
+
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className={`text-[11px] flex-1 min-w-[200px] ${
+                          <p className={`text-[11px] flex-1 min-w-[180px] ${
                             composeMode === "customer" ? "text-teal-800" : "text-amber-800"
                           }`}>
                             {composeMode === "customer"
-                              ? "The client can see this. It is recorded on the ticket — Support does not email or text yet, so send it from Communications if they need it now."
-                              : "Private to the team. It never appears on any client-facing view."}
+                              ? "The client can see this, and it is emailed to them. What the mail provider says is recorded on the message — accepting it is not the same as the client receiving it."
+                              : "Private to the team. It is never delivered anywhere and never appears on any client-facing view."}
                           </p>
                           <button onClick={() => void send()} disabled={busy || !draft.trim()}
                             className={PRIMARY_BUTTON}>
                             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                            Record {composeMode === "customer" ? "reply" : "note"}
+                            {composeMode === "customer" ? "Send reply" : "Record note"}
                           </button>
                         </div>
                       </div>

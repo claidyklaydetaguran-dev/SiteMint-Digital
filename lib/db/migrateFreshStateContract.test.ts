@@ -156,17 +156,27 @@ const INITIALIZED_DATABASE = {
 //   portal   (5): crm_portal_accounts, crm_portal_invitations,
 //                 crm_portal_sessions, crm_portal_document_grants,
 //                 crm_portal_proposal_acceptances
+// M5 raises it to 74, adding exactly one:
+//   automation (1): crm_automation_events — the durable event log. A business
+//                   write used to hand an automation trigger straight to an
+//                   in-memory call, so a process that died in that moment lost
+//                   the event with nothing recording that it had. The row is
+//                   written first and drained by a worker, which makes the
+//                   guarantee at-least-once with dedup rather than best-effort.
+// Everything else M5 added is columns on existing tables: the marketing
+// campaign's inline audience, and support message delivery state.
+//
 // This number is a guard, not bookkeeping: it is what makes a table added
 // without review visible. Raise it only alongside the list above, so the
 // arithmetic can be checked rather than taken on trust.
-check("the shared barrel derives 73 base tables", BARREL.length === 73, `${BARREL.length}`);
+check("the shared barrel derives 74 base tables", BARREL.length === 74, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 check("the committed migrations derive 30 domain tables", DOMAIN.length === 30, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 103 public tables", // 30 domain + 73 barrel
-  APPLICATION.length === 103,
+  "the application owns exactly 104 public tables", // 30 domain + 74 barrel
+  APPLICATION.length === 104,
   `${APPLICATION.length}`,
 );
 check(

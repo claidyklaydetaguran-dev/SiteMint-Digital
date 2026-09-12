@@ -38,7 +38,12 @@ import {
   type MailOutcome,
 } from "./staffMail.js";
 import { AUTOMATION_JOB_KIND, runAutomationJob } from "./automationEngine.js";
+import {
+  AUTOMATION_SWEEP_JOB_KIND, AUTOMATION_EVENTS_JOB_KIND,
+  runAutomationSweepJob, runAutomationEventsJob, ensureAutomationWorkersScheduled,
+} from "./automationSweep.js";
 import { startDueCampaigns, marketingAutosendEnabled } from "../routes/crmMarketing.js";
+import { processDueSupportDeliveries, ingestSupportReplies } from "./supportDelivery.js";
 import { logger } from "./logger.js";
 
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1451,6 +1456,20 @@ const HANDLERS: Record<string, (job: CrmScheduledJob) => Promise<void>> = {
   // Automation executions ride this same runner — same lease, same settle,
   // same visibility — rather than a second timer nobody watches.
   [AUTOMATION_JOB_KIND]: runAutomationJob,
+  // The two M5 automation workers ride it for the same reasons. Both are
+  // singleton rows that re-arm themselves at the end of their own handler,
+  // exactly as the daily digest does, so the series cannot fan out on restart
+  // and two processes can never run one of them at once.
+  //
+  //   crm_automation_sweep   produces `task_overdue` and `no_activity_for_days`,
+  //                          which no business write can announce because
+  //                          nobody DOES them — they become true as the clock
+  //                          passes a day boundary.
+  //   crm_automation_events  turns recorded business events into executions,
+  //                          with retry, so an event survives the process that
+  //                          recorded it.
+  [AUTOMATION_SWEEP_JOB_KIND]: runAutomationSweepJob,
+  [AUTOMATION_EVENTS_JOB_KIND]: runAutomationEventsJob,
 };
 
 // ── The worker ──────────────────────────────────────────────────────────────
@@ -1595,6 +1614,12 @@ export function startCrmScheduler(intervalMs = TICK_MS): void {
   const tick = async () => {
     try {
       await migrateLegacyDeliveriesOnce();
+      // Self-healing, and deliberately not an unconditional re-schedule: it
+      // creates the two automation worker rows when they are missing and
+      // revives them when they have come to rest, but leaves a pending row's
+      // `run_at` alone. Re-arming a pending sweep every tick would quietly
+      // move its cadence out of the constant that claims to set it.
+      await ensureAutomationWorkersScheduled();
       const r = await processDueJobs();
       status.processed += r.processed;
       status.lastError = null;
@@ -1606,6 +1631,17 @@ export function startCrmScheduler(intervalMs = TICK_MS): void {
       // mails customers with nobody pressing a button does not arrive
       // switched on. Isolated from the reminder work above so a campaign
       // fault cannot stop reminders going out.
+      // Support replies: retry the ones whose next attempt is due, and file
+      // any customer replies the inbound pipeline has matched to a ticket.
+      // Wrapped separately so a support fault cannot stop reminders or
+      // campaigns, in the same shape as the marketing block below.
+      try {
+        await processDueSupportDeliveries();
+        await ingestSupportReplies();
+      } catch (err) {
+        logger.error({ err }, "support: delivery tick failed; reminders are unaffected");
+      }
+
       if (marketingAutosendEnabled()) {
         try {
           const started = await startDueCampaigns();

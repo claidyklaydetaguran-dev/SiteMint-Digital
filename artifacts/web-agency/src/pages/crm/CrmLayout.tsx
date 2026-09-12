@@ -105,11 +105,17 @@ const NAV_GROUPS: NavGroup[] = [
     id: "marketing",
     label: "Marketing",
     icon: Megaphone,
+    // Naming, not decoration. Two different things were both called "campaign"
+    // — one-off broadcasts and multi-step nurture sequences — and each had a
+    // "New campaign" button, so somebody wanting to send one email had to know
+    // that "Campaigns" was the wrong door. Marketing is now the front door and
+    // is listed first; the sequence system keeps its own name and its own
+    // queue, which is what it actually is.
     items: [
-      { label: "Campaigns",        href: "/admin/crm/campaigns",         icon: Zap },
-      { label: "Campaign Builder", href: "/admin/crm/campaign-builder", icon: Layers },
-      { label: "Campaign Queue",   href: "/admin/crm/campaign-queue",   icon: Activity },
-      { label: "Email Templates",  href: "/admin/crm/email-templates", icon: MailIcon },
+      { label: "Marketing",       href: "/admin/crm/campaign-builder", icon: MailIcon },
+      { label: "Sequences",       href: "/admin/crm/campaigns",        icon: Zap },
+      { label: "Sequence Queue",  href: "/admin/crm/campaign-queue",   icon: Activity },
+      { label: "Email Templates", href: "/admin/crm/email-templates",  icon: Layers },
     ],
   },
   {

@@ -2,133 +2,114 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
-  AlertCircle, AlertTriangle, ArrowLeft, Ban, BarChart2, Check, CheckCircle2,
-  Clock, Layers, Loader2, Mail, Pause, Play, Plus, RefreshCw, Save, Send,
-  Sparkles, Trash2, Users, X, XCircle,
+  AlertCircle, AlertTriangle, ArrowUpRight, BarChart2, Ban, Copy, Loader2, Mail,
+  Pause, Pencil, Play, Plus, RefreshCw, Search, Settings2, Trash2, Users, Workflow,
 } from "lucide-react";
-import { adminFetch } from "@/lib/adminFetch";
-import SegmentBuilder, {
-  emptyDefinition, type SegmentDefinition, type SegmentVocabulary,
-} from "@/components/crm/SegmentBuilder";
-import EmailDesigner, { type EmailBlock, type TokenProblem } from "@/components/crm/EmailDesigner";
+import type { SegmentVocabulary } from "@/components/crm/SegmentBuilder";
+import CampaignWorkspace from "@/components/crm/campaign/CampaignWorkspace";
+import CampaignResults from "@/components/crm/campaign/CampaignResults";
+import {
+  btnGhost, btnPrimary, btnQuiet, call, cardClass, failureText, formatWhen,
+  inputClass, postJson,
+  type AiAvailability, type Campaign, type Design, type MarketingSettings, type Segment,
+} from "@/components/crm/campaign/shared";
 
-// ── M4: the marketing workspace ──────────────────────────────────────────────
+// ── M5: Marketing ────────────────────────────────────────────────────────────
 //
-// Audience → design → review → send → results, in that order, because that is
-// the order in which the questions actually get answered.
+// The problem this screen was rebuilt to solve is a naming one that had become
+// a usability one. Two different systems were both called "campaign":
 //
-// The screen is built around the things that are normally hidden:
+//   /admin/crm/campaigns        the SEQUENCE engine — several messages over
+//                               days, contacts enrolled into it, follow-up
+//                               automated. Draft / Ready / Archived.
+//   /admin/crm/campaign-builder this — one email to a list of people, once.
 //
-//   Review is not a formality. Every reason somebody will NOT receive this is
-//   listed by name before anything goes out, and the same reasons are shown
-//   afterwards. A count with no names behind it is where silent drops live.
+// Both had a "New campaign" button, and only one of them was called Marketing.
+// So the first decision an operator faced was one nobody had explained to them,
+// between two words that were the same word.
 //
-//   Cancel says what it cannot do. "12 messages are already in people's
-//   inboxes and cancelling does not recall them" is the only honest wording,
-//   and it is on the button's confirmation, not buried in a note afterwards.
+// Neither system is wrong and neither is going away. What changed is that this
+// page is now unambiguously the front door for "send one email", says so in
+// those words, and names the other system — with a link — instead of competing
+// with it silently.
 //
-//   Results refuse to invent engagement. Opens and clicks are not tracked, so
-//   the panel says so instead of showing 0%.
+// Everything else follows from making one job easy:
 //
-// The legacy multi-step sequence builder still lives at
-// /admin/crm/campaigns?view=builder and is linked from here; this page does not
-// replace it and does not touch its tables.
+//   ONE primary button. Create campaign. Not two.
+//
+//   States an operator recognises. Draft, Scheduled, Sending, Completed,
+//   Needs attention — where "needs attention" includes the case this product
+//   used to hide: scheduled on a server where nothing starts a scheduled send.
+//
+//   Templates, saved audiences and settings are secondary. They are things you
+//   occasionally set up, not things you do; they live behind tabs, not beside
+//   the list as equals.
 
-// ── The live API contract ────────────────────────────────────────────────────
+type Tab = "campaigns" | "templates" | "audiences" | "settings";
+type StateFilter = "all" | "draft" | "scheduled" | "sending" | "completed" | "attention" | "cancelled";
 
-interface Segment {
-  id: number;
-  name: string;
-  description?: string | null;
-  definition: SegmentDefinition;
-  memberCount?: number;
-  createdByLabel?: string | null;
-}
-
-interface Design {
-  id: number;
-  name: string;
-  subject?: string | null;
-  preheader?: string | null;
-  blocks: EmailBlock[];
-}
-
-type CampaignStatus = "draft" | "scheduled" | "sending" | "paused" | "cancelled" | "sent";
-
-interface Campaign {
-  id: number;
-  name: string;
-  subject: string;
-  preheader?: string | null;
-  blocks: EmailBlock[];
-  segmentId?: number | null;
-  designId?: number | null;
-  status: CampaignStatus;
-  scheduledAt?: string | null;
-  aiContentState: "none" | "draft" | "approved";
-  aiApprovedByLabel?: string | null;
-  aiApprovedAt?: string | null;
-  updatedAt: string;
-  counts?: Record<string, number>;
-}
-
-interface ExclusionBucket {
-  reason: string;
+interface DisplayState {
+  key: Exclude<StateFilter, "all">;
   label: string;
-  count: number;
-  contacts: { id?: number; leadId?: number; name: string; email?: string | null; detail?: string | null }[];
+  className: string;
+  /** Shown under the name when something is not as it looks. */
+  note: string | null;
 }
 
-interface Preflight {
-  audienceSize: number;
-  sendable: number;
-  excluded: number;
-  excludedByReason: ExclusionBucket[];
-  fallbackWarnings: { field: string; count: number; share: number }[];
-  blockers: string[];
-  canSend: boolean;
-  delivery: { configured: boolean; note: string };
+/**
+ * What state a campaign is really in, from the operator's point of view.
+ *
+ * The stored status is not enough on its own. "Scheduled" is a promise, and on
+ * a server where nothing starts a scheduled send it is a promise nobody will
+ * keep — so it is reported as needing attention, with the reason, rather than
+ * as a quiet success.
+ */
+export function displayState(c: Campaign, autosend: boolean): DisplayState {
+  const failed = c.counts?.["failed"] ?? 0;
+  const attention = "bg-amber-50 text-amber-900 border border-amber-300";
+
+  if (c.status === "paused") {
+    return { key: "attention", label: "Needs attention", className: attention, note: "Paused part-way through a send." };
+  }
+  if (c.status === "scheduled" && !autosend) {
+    return {
+      key: "attention", label: "Needs attention", className: attention,
+      note: `Scheduled for ${formatWhen(c.scheduledAt, c.scheduledTimezone)}, but nothing on this server will start it — somebody has to press Send.`,
+    };
+  }
+  if (failed > 0 && (c.status === "sent" || c.status === "cancelled")) {
+    return {
+      key: "attention", label: "Needs attention", className: attention,
+      note: `${failed} ${failed === 1 ? "message was" : "messages were"} refused by the mail provider.`,
+    };
+  }
+  if (c.status === "scheduled") {
+    return {
+      key: "scheduled", label: "Scheduled", className: "bg-teal-50 text-teal-900 border border-teal-200",
+      note: `Starts on its own at ${formatWhen(c.scheduledAt, c.scheduledTimezone)}.`,
+    };
+  }
+  if (c.status === "sending") {
+    return { key: "sending", label: "Sending", className: "bg-teal-700 text-white", note: null };
+  }
+  if (c.status === "sent") {
+    return { key: "completed", label: "Completed", className: "bg-emerald-50 text-emerald-900 border border-emerald-200", note: null };
+  }
+  if (c.status === "cancelled") {
+    return { key: "cancelled", label: "Cancelled", className: "bg-muted text-muted-foreground border border-border", note: null };
+  }
+  return { key: "draft", label: "Draft", className: "bg-muted text-muted-foreground border border-border", note: null };
 }
 
-interface Results {
-  counts: { audience: number; sent: number; failed: number; excluded: number; neverAttempted: number; testSends: number };
-  excludedByReason: ExclusionBucket[];
-  recipients: { id: number; leadId: number; name: string; address: string | null; status: string; lastError?: string | null; sentAt?: string | null }[];
-  engagement: { tracked: boolean; why: string };
-  deliverySignal: { meaning: string; providerIdsRecorded: number };
-  definitions: Record<string, string>;
-}
-
-interface AiAvailability { available: boolean; reason: string | null; missing: string[] }
-
-const STATUS_STYLE: Record<CampaignStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  scheduled: "bg-teal-50 text-teal-800 border border-teal-200",
-  sending: "bg-teal-600 text-white",
-  paused: "bg-amber-50 text-amber-800 border border-amber-200",
-  cancelled: "bg-red-50 text-red-700 border border-red-200",
-  sent: "bg-emerald-50 text-emerald-800 border border-emerald-200",
-};
-
-const btnPrimary =
-  "flex items-center justify-center gap-2 px-4 py-2 bg-teal-700 text-white text-sm font-semibold rounded-lg " +
-  "hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
-const btnGhost =
-  "flex items-center justify-center gap-2 px-3 py-2 border border-border text-sm font-semibold rounded-lg " +
-  "text-foreground hover:bg-accent disabled:opacity-50 transition-colors";
-
-async function call<T>(path: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T & Record<string, any> }> {
-  const res = await adminFetch(path, init);
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, data: data as T & Record<string, any> };
-}
-
-const json = (body: unknown): RequestInit => ({
-  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-});
-const patch = (body: unknown): RequestInit => ({
-  method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-});
+const FILTERS: { id: StateFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "draft", label: "Draft" },
+  { id: "scheduled", label: "Scheduled" },
+  { id: "sending", label: "Sending" },
+  { id: "completed", label: "Completed" },
+  { id: "attention", label: "Needs attention" },
+  { id: "cancelled", label: "Cancelled" },
+];
 
 export default function CrmCampaignBuilderPage() {
   const [, navigate] = useLocation();
@@ -142,219 +123,152 @@ export default function CrmCampaignBuilderPage() {
   const [designs, setDesigns] = useState<Design[]>([]);
   const [vocabulary, setVocabulary] = useState<SegmentVocabulary | null>(null);
   const [mergeFields, setMergeFields] = useState<Record<string, string>>({});
+  const [settings, setSettings] = useState<MarketingSettings | null>(null);
   const [ai, setAi] = useState<AiAvailability | null>(null);
+  const [autosend, setAutosend] = useState(false);
+
+  const [tab, setTab] = useState<Tab>("campaigns");
+  const [filter, setFilter] = useState<StateFilter>("all");
+  const [search, setSearch] = useState("");
 
   const [openId, setOpenId] = useState<number | null>(null);
-  const [campaign, setCampaign] = useState<Campaign | null>(null);
-  const [tab, setTab] = useState<"audience" | "design" | "review" | "results">("audience");
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const [preflight, setPreflight] = useState<Preflight | null>(null);
-  const [results, setResults] = useState<Results | null>(null);
-
-  const [previewLeadId, setPreviewLeadId] = useState<number | null>(null);
-  const [preview, setPreview] = useState<{ html: string | null; subject: string | null; as: { id: number; name: string } | null; fallbacks: string[]; problems: TokenProblem[] }>({
-    html: null, subject: null, as: null, fallbacks: [], problems: [],
-  });
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
-  const [newSegment, setNewSegment] = useState<{ name: string; definition: SegmentDefinition } | null>(null);
-  const [testTo, setTestTo] = useState("");
-  const [scheduleAt, setScheduleAt] = useState("");
-  const [aiGoal, setAiGoal] = useState("");
-  const [confirmCancel, setConfirmCancel] = useState(false);
-
-  const readOnly = !!campaign && campaign.status !== "draft" && campaign.status !== "scheduled";
+  const [resultsId, setResultsId] = useState<number | null>(null);
+  const [busyRow, setBusyRow] = useState<number | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [showAdminDetail, setShowAdminDetail] = useState(false);
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
-  const loadIndex = useCallback(async () => {
+  const loadCampaigns = useCallback(async () => {
+    const r = await call<{ campaigns: Campaign[]; autosendEnabled?: boolean }>("/api/crm/marketing/campaigns");
+    if (!r.ok) return false;
+    setCampaigns(r.data.campaigns ?? []);
+    setAutosend(r.data.autosendEnabled === true);
+    return true;
+  }, []);
+
+  const loadSegments = useCallback(async () => {
+    const r = await call<{
+      segments: Segment[]; fields: string[];
+      fieldOperators: Record<string, string[]>; fieldValues: Record<string, string[]>;
+    }>("/api/crm/marketing/segments");
+    if (!r.ok) return false;
+    setSegments(r.data.segments ?? []);
+    setVocabulary({
+      fields: r.data.fields ?? [],
+      fieldOperators: r.data.fieldOperators ?? {},
+      fieldValues: r.data.fieldValues ?? {},
+    });
+    return true;
+  }, []);
+
+  const loadDesigns = useCallback(async () => {
+    const r = await call<{ designs: Design[]; mergeFields: Record<string, string> }>("/api/crm/marketing/designs");
+    if (!r.ok) return false;
+    setDesigns(r.data.designs ?? []);
+    setMergeFields(r.data.mergeFields ?? {});
+    return true;
+  }, []);
+
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [c, s, d, a] = await Promise.all([
-        call<{ campaigns: Campaign[] }>("/api/crm/marketing/campaigns"),
-        call<{ segments: Segment[]; fields: string[]; fieldOperators: Record<string, string[]>; fieldValues: Record<string, string[]> }>("/api/crm/marketing/segments"),
-        call<{ designs: Design[]; mergeFields: Record<string, string> }>("/api/crm/marketing/designs"),
+      const [c, s, d, settingsRes, aiRes] = await Promise.all([
+        loadCampaigns(), loadSegments(), loadDesigns(),
+        call<MarketingSettings>("/api/crm/marketing/settings"),
         call<AiAvailability>("/api/crm/marketing/ai/availability"),
       ]);
-      if (!c.ok || !s.ok || !d.ok) throw new Error("load failed");
-      setCampaigns(c.data.campaigns ?? []);
-      setSegments(s.data.segments ?? []);
-      setVocabulary({ fields: s.data.fields ?? [], fieldOperators: s.data.fieldOperators ?? {}, fieldValues: s.data.fieldValues ?? {} });
-      setDesigns(d.data.designs ?? []);
-      setMergeFields(d.data.mergeFields ?? {});
-      setAi(a.ok ? a.data : { available: false, reason: "The availability of AI drafting could not be checked.", missing: [] });
+      if (!c || !s || !d) { setLoadError("Marketing could not be loaded."); return; }
+      if (settingsRes.ok) {
+        setSettings(settingsRes.data);
+        setAutosend(settingsRes.data.autosend.enabled);
+      }
+      setAi(aiRes.ok ? aiRes.data : { available: false });
     } catch {
-      setLoadError("The marketing workspace could not be loaded.");
+      setLoadError("Marketing could not be loaded — the server did not answer.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCampaigns, loadSegments, loadDesigns]);
 
-  useEffect(() => { void loadIndex(); }, [loadIndex]);
+  useEffect(() => { void loadAll(); }, [loadAll]);
 
-  const loadCampaign = useCallback(async (id: number) => {
-    const r = await call<{ campaign: Campaign }>(`/api/crm/marketing/campaigns/${id}`);
-    if (!r.ok) { setBanner({ tone: "bad", text: r.data.error ?? "That campaign could not be opened." }); return; }
-    setCampaign(r.data.campaign);
-    setDirty(false);
-  }, []);
-
-  const loadPreflight = useCallback(async (id: number) => {
-    const r = await call<Preflight>(`/api/crm/marketing/campaigns/${id}/preflight`);
-    setPreflight(r.ok ? r.data : null);
-  }, []);
-
-  const loadResults = useCallback(async (id: number) => {
-    const r = await call<Results>(`/api/crm/marketing/campaigns/${id}/results`);
-    setResults(r.ok ? r.data : null);
-  }, []);
-
-  const loadPreview = useCallback(async (id: number, leadId: number | null) => {
-    setPreviewLoading(true);
-    setPreviewError(null);
-    const q = leadId ? `?leadId=${leadId}` : "";
-    const r = await call<{ html: string; subject: string; as: { id: number; name: string } | null; fallbacksUsed: string[]; tokenProblems: TokenProblem[] }>(
-      `/api/crm/marketing/campaigns/${id}/preview${q}`,
-    );
-    setPreviewLoading(false);
-    if (!r.ok) { setPreviewError(r.data.error ?? "The preview could not be rendered."); return; }
-    setPreview({
-      html: r.data.html, subject: r.data.subject, as: r.data.as,
-      fallbacks: r.data.fallbacksUsed ?? [], problems: r.data.tokenProblems ?? [],
-    });
-  }, []);
-
-  useEffect(() => {
-    if (openId === null) return;
-    void loadCampaign(openId);
-    void loadPreflight(openId);
-    void loadResults(openId);
-  }, [openId, loadCampaign, loadPreflight, loadResults]);
-
-  useEffect(() => {
-    if (openId === null || tab !== "design") return;
-    void loadPreview(openId, previewLeadId);
-  }, [openId, tab, previewLeadId, loadPreview]);
-
-  // ── Mutations ──────────────────────────────────────────────────────────────
-
-  const save = async () => {
-    if (!campaign) return;
-    setSaving(true);
-    const r = await call<{ campaign: Campaign }>(`/api/crm/marketing/campaigns/${campaign.id}`, patch({
-      name: campaign.name, subject: campaign.subject, preheader: campaign.preheader ?? "",
-      segmentId: campaign.segmentId ?? null, blocks: campaign.blocks,
-    }));
-    setSaving(false);
-    if (!r.ok) { setBanner({ tone: "bad", text: r.data.error ?? "Nothing was saved." }); return; }
-    setCampaign(r.data.campaign);
-    setDirty(false);
-    setBanner({ tone: "ok", text: "Saved." });
-    void loadPreflight(campaign.id);
-    if (tab === "design") void loadPreview(campaign.id, previewLeadId);
-  };
-
-  const act = async (path: string, body: unknown, label: string) => {
-    if (!campaign) return;
-    setBusy(label);
-    const r = await call<Record<string, any>>(`/api/crm/marketing/campaigns/${campaign.id}${path}`, json(body));
-    setBusy(null);
-    if (!r.ok) {
-      const blockers = Array.isArray(r.data.blockers) ? ` ${r.data.blockers.join(" ")}` : "";
-      setBanner({ tone: "bad", text: `${r.data.error ?? "That did not work."}${blockers}` });
-    } else {
-      setBanner({ tone: "ok", text: String(r.data.note ?? "Done.") });
-    }
-    await loadCampaign(campaign.id);
-    await loadPreflight(campaign.id);
-    await loadResults(campaign.id);
-    await loadIndex();
-    return r;
-  };
+  // ── Row actions ────────────────────────────────────────────────────────────
 
   const createCampaign = async () => {
-    const name = `New campaign — ${new Date().toLocaleDateString()}`;
-    const r = await call<{ campaign: Campaign }>("/api/crm/marketing/campaigns", json({ name, blocks: [] }));
-    if (!r.ok) { setBanner({ tone: "bad", text: r.data.error ?? "The campaign could not be created." }); return; }
-    await loadIndex();
-    setOpenId(r.data.campaign.id);
-    setTab("audience");
-  };
-
-  const saveSegment = async () => {
-    if (!newSegment?.name.trim()) { setBanner({ tone: "bad", text: "Give the audience a name." }); return; }
-    const r = await call<{ segment: Segment }>("/api/crm/marketing/segments", json(newSegment));
-    if (!r.ok) {
-      const problems = Array.isArray(r.data.problems) ? ` ${r.data.problems.map((p: any) => p.problem).join(" ")}` : "";
-      setBanner({ tone: "bad", text: `${r.data.error ?? "The audience could not be saved."}${problems}` });
-      return;
-    }
-    setNewSegment(null);
-    await loadIndex();
-    if (campaign) {
-      setCampaign({ ...campaign, segmentId: r.data.segment.id });
-      setDirty(true);
-    }
-    setBanner({ tone: "ok", text: `Audience "${r.data.segment.name}" saved.` });
-  };
-
-  const applyDesign = (design: Design) => {
-    if (!campaign) return;
-    setCampaign({
-      ...campaign,
-      subject: design.subject ?? campaign.subject,
-      preheader: design.preheader ?? campaign.preheader,
-      blocks: design.blocks ?? [],
-      designId: design.id,
-    });
-    setDirty(true);
-  };
-
-  const saveAsTemplate = async () => {
-    if (!campaign) return;
-    const name = window.prompt("Name this template", campaign.name);
-    if (!name) return;
-    const r = await call<{ design: Design }>("/api/crm/marketing/designs", json({
-      name, subject: campaign.subject, preheader: campaign.preheader, blocks: campaign.blocks,
+    setCreating(true);
+    setBanner(null);
+    const stamp = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const r = await call<{ campaign: Campaign }>("/api/crm/marketing/campaigns", postJson({
+      name: `Untitled campaign — ${stamp}`,
+      // A new campaign opens on "choose contacts" rather than on the list of
+      // saved audiences. The saved-audience list is what the old screen opened
+      // on, and it is the dead end: somebody who wants to email eleven people
+      // was shown a list that did not contain them and an instruction to go
+      // make one. Nothing is selected — the mode is just the least surprising
+      // place to start.
+      audienceMode: "list",
+      audienceLeadIds: [],
     }));
-    if (!r.ok) { setBanner({ tone: "bad", text: r.data.error ?? "The template could not be saved." }); return; }
-    await loadIndex();
-    setBanner({ tone: "ok", text: "Template saved. It reopens as editable blocks, not as finished HTML." });
+    setCreating(false);
+    if (!r.ok) { setBanner({ tone: "bad", text: failureText(r, "The campaign could not be created.") }); return; }
+    setCampaigns((list) => [r.data.campaign, ...list]);
+    setOpenId(r.data.campaign.id);
   };
 
-  const askAi = async () => {
-    if (!campaign || !aiGoal.trim()) return;
-    setBusy("ai");
-    const r = await call<Record<string, any>>(`/api/crm/marketing/campaigns/${campaign.id}/ai-draft`, json({ goal: aiGoal }));
-    setBusy(null);
-    if (!r.ok) {
-      const claims = Array.isArray(r.data.claims) ? ` ${r.data.claims.map((c: any) => c.why).join(" ")}` : "";
-      setBanner({ tone: "bad", text: `${r.data.error ?? "No draft was produced."}${claims}` });
+  const rowAction = async (id: number, action: "duplicate" | "pause" | "resume" | "cancel") => {
+    setBusyRow(id);
+    setBanner(null);
+    const r = await call<{ campaign: Campaign; note?: string }>(
+      `/api/crm/marketing/campaigns/${id}/${action}`, postJson({}),
+    );
+    setBusyRow(null);
+    if (!r.ok) { setBanner({ tone: "bad", text: failureText(r, `That campaign could not be ${action}d.`) }); return; }
+    await loadCampaigns();
+    if (action === "duplicate") {
+      setBanner({ tone: "ok", text: r.data.note ?? "Copied into a new draft." });
+      setOpenId(r.data.campaign.id);
       return;
     }
-    setBanner({ tone: "warn", text: String(r.data.note ?? "A draft was written. It needs approving before this can be sent.") });
-    await loadCampaign(campaign.id);
-    await loadPreflight(campaign.id);
-    setTab("design");
+    setBanner({ tone: action === "cancel" ? "warn" : "ok", text: r.data.note ?? "Done." });
   };
 
-  const selectedSegment = useMemo(
-    () => segments.find((s) => s.id === campaign?.segmentId) ?? null,
-    [segments, campaign?.segmentId],
+  const archive = async (kind: "segments" | "designs", id: number, name: string) => {
+    const r = await call<Record<string, unknown>>(`/api/crm/marketing/${kind}/${id}`, { method: "DELETE" });
+    if (!r.ok) { setBanner({ tone: "bad", text: failureText(r, "That could not be archived.") }); return; }
+    setBanner({ tone: "ok", text: `"${name}" is archived. Campaigns that already used it still name it.` });
+    if (kind === "segments") await loadSegments(); else await loadDesigns();
+  };
+
+  // ── The list ───────────────────────────────────────────────────────────────
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return campaigns.filter((c) => {
+      const state = displayState(c, autosend);
+      if (filter !== "all" && state.key !== filter) return false;
+      if (!term) return true;
+      return [c.name, c.subject, c.audienceLabel, c.createdByLabel, c.updatedByLabel]
+        .filter(Boolean).some((v) => String(v).toLowerCase().includes(term));
+    });
+  }, [campaigns, filter, search, autosend]);
+
+  const attentionCount = useMemo(
+    () => campaigns.filter((c) => displayState(c, autosend).key === "attention").length,
+    [campaigns, autosend],
   );
 
-  // ── Chrome ────────────────────────────────────────────────────────────────
+  const open = openId === null ? null : campaigns.find((c) => c.id === openId) ?? null;
+  const results = resultsId === null ? null : campaigns.find((c) => c.id === resultsId) ?? null;
+
+  // ── Shell states ───────────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <CrmLayout>
         <div className="flex items-center justify-center h-full text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading the marketing workspace…
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading Marketing…
         </div>
       </CrmLayout>
     );
@@ -366,7 +280,7 @@ export default function CrmCampaignBuilderPage() {
         <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
           <AlertCircle className="w-8 h-8 text-red-600" />
           <p className="text-sm text-foreground">{loadError}</p>
-          <button onClick={() => void loadIndex()} className={btnGhost}>
+          <button type="button" onClick={() => void loadAll()} className={btnGhost}>
             <RefreshCw className="w-4 h-4" /> Try again
           </button>
         </div>
@@ -374,764 +288,382 @@ export default function CrmCampaignBuilderPage() {
     );
   }
 
-  // ══════════════════ Campaign list ══════════════════
-
-  if (openId === null || !campaign) {
+  if (open) {
     return (
       <CrmLayout>
-        <div className="flex flex-col h-full">
-          <header className="px-4 sm:px-6 py-4 border-b border-border bg-card flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold font-serif text-foreground">Marketing</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Saved audiences, a visual email builder, and an honest account of who received what.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate("/admin/crm/campaigns?view=builder")} className={btnGhost}>
-                <Layers className="w-4 h-4" /> <span className="hidden sm:inline">Sequence builder</span>
-              </button>
-              <button onClick={() => void createCampaign()} className={btnPrimary}>
-                <Plus className="w-4 h-4" /> New campaign
-              </button>
-            </div>
-          </header>
-
-          <Banner banner={banner} onClose={() => setBanner(null)} />
-
-          <div className="flex-1 overflow-auto p-4 sm:p-6">
-            {campaigns.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                <Mail className="w-7 h-7 mx-auto text-teal-700 mb-2" />
-                <p className="text-sm font-semibold text-foreground">No broadcasts yet.</p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                  A broadcast is one email to a saved audience. Multi-step nurture sequences live in the
-                  sequence builder and are unaffected by anything here.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                {campaigns.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setOpenId(c.id); setTab(c.status === "draft" ? "audience" : "results"); }}
-                    className="text-left rounded-lg border border-border bg-card p-3.5 hover:border-teal-400 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold text-foreground line-clamp-2">{c.name}</span>
-                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_STYLE[c.status]}`}>
-                        {c.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{c.subject || "No subject yet"}</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-[11px] text-muted-foreground">
-                      <span>{c.counts?.sent ?? 0} sent</span>
-                      <span>{c.counts?.excluded ?? 0} excluded</span>
-                      {(c.counts?.failed ?? 0) > 0 && <span className="text-red-700">{c.counts?.failed} failed</span>}
-                      {c.aiContentState === "draft" && (
-                        <span className="text-amber-700 font-semibold">AI draft not approved</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+          <CampaignWorkspace
+            key={open.id}
+            campaign={open}
+            segments={segments}
+            designs={designs}
+            vocabulary={vocabulary}
+            mergeFields={mergeFields}
+            settings={settings}
+            ai={ai}
+            onClose={() => { setOpenId(null); void loadCampaigns(); }}
+            onCampaignChanged={(next) => setCampaigns((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)))}
+            onSegmentsChanged={() => void loadSegments()}
+            onDesignsChanged={() => void loadDesigns()}
+          />
         </div>
       </CrmLayout>
     );
   }
 
-  // ══════════════════ One campaign ══════════════════
+  if (results) {
+    return (
+      <CrmLayout>
+        <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+          <CampaignResults campaign={results} onClose={() => setResultsId(null)} />
+        </div>
+      </CrmLayout>
+    );
+  }
 
   return (
     <CrmLayout>
-      <div className="flex flex-col h-full">
-        <header className="px-4 sm:px-6 py-3 border-b border-border bg-card shrink-0">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <button onClick={() => { setOpenId(null); setCampaign(null); setBanner(null); }}
-                aria-label="Back to campaigns" className="p-1.5 rounded-md text-muted-foreground hover:bg-accent">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <input
-                className="min-w-0 flex-1 text-base font-bold font-serif text-foreground bg-transparent border-0 border-b border-transparent hover:border-border focus:border-teal-500 focus:outline-none px-0.5"
-                value={campaign.name}
-                disabled={readOnly}
-                onChange={(e) => { setCampaign({ ...campaign, name: e.target.value }); setDirty(true); }}
-              />
-              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_STYLE[campaign.status]}`}>
-                {campaign.status}
-              </span>
-            </div>
-            {!readOnly && (
-              <button onClick={() => void save()} disabled={!dirty || saving} className={btnPrimary}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {dirty ? "Save" : "Saved"}
-              </button>
-            )}
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4">
+        {/* ══ Header ══ */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Mail className="w-5 h-5 text-teal-700" /> Marketing
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              One email, sent once, to a list of people.
+            </p>
           </div>
-
-          <nav className="flex gap-0 mt-2 -mb-3 overflow-x-auto">
-            {(["audience", "design", "review", "results"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-3 sm:px-4 py-2.5 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
-                  tab === t ? "border-teal-700 text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t === "audience" ? "Audience" : t === "design" ? "Design" : t === "review" ? "Review & send" : "Results"}
-              </button>
-            ))}
-          </nav>
-        </header>
-
-        <Banner banner={banner} onClose={() => setBanner(null)} />
-
-        {readOnly && (
-          <p className="px-4 sm:px-6 py-2 text-xs text-muted-foreground bg-muted/50 border-b border-border">
-            This campaign is <strong className="text-foreground">{campaign.status}</strong>, so its content is locked.
-            Part of the audience may already hold the version that went out, and editing it here would make
-            the record disagree with what people actually received.
-          </p>
-        )}
-
-        <div className="flex-1 overflow-auto p-4 sm:p-6">
-
-          {/* ══════════ Audience ══════════ */}
-          {tab === "audience" && (
-            <div className="space-y-4 max-w-3xl">
-              <section className="rounded-lg border border-border bg-card p-3.5">
-                <h2 className="text-sm font-bold text-foreground mb-2">Who is this going to?</h2>
-                <select
-                  className="w-full px-2.5 py-2 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 disabled:opacity-60"
-                  value={campaign.segmentId ?? ""}
-                  disabled={readOnly}
-                  onChange={(e) => { setCampaign({ ...campaign, segmentId: e.target.value ? Number(e.target.value) : null }); setDirty(true); }}
-                >
-                  <option value="">— choose a saved audience —</option>
-                  {segments.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{typeof s.memberCount === "number" ? ` (${s.memberCount} now)` : ""}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedSegment && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {selectedSegment.description || "No description."}{" "}
-                    The list is worked out again when the send starts, so this count is today's, not the send's.
-                  </p>
-                )}
-
-                {!readOnly && (
-                  <button
-                    onClick={() => setNewSegment({ name: "", definition: emptyDefinition() })}
-                    className={`${btnGhost} mt-2.5`}
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Build a new audience
-                  </button>
-                )}
-              </section>
-
-              {newSegment && (
-                <section className="rounded-lg border border-teal-300 bg-card p-3.5 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-bold text-foreground">New audience</h2>
-                    <button onClick={() => setNewSegment(null)} aria-label="Discard"
-                      className="p-1 rounded text-muted-foreground hover:bg-accent"><X className="w-4 h-4" /></button>
-                  </div>
-                  <input
-                    className="w-full px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                    placeholder="Name it, e.g. Qualified leads not contacted in 30 days"
-                    value={newSegment.name}
-                    onChange={(e) => setNewSegment({ ...newSegment, name: e.target.value })}
-                  />
-                  <SegmentBuilder
-                    definition={newSegment.definition}
-                    vocabulary={vocabulary}
-                    onChange={(definition) => setNewSegment({ ...newSegment, definition })}
-                  />
-                  <button onClick={() => void saveSegment()} className={btnPrimary}>
-                    <Save className="w-4 h-4" /> Save audience
-                  </button>
-                </section>
-              )}
-
-              {/* ── Exclusions ── */}
-              <section className="rounded-lg border border-border bg-card p-3.5">
-                <h2 className="text-sm font-bold text-foreground mb-1">Leave somebody out of this one</h2>
-                <p className="text-xs text-muted-foreground mb-2">
-                  A one-off decision about this campaign. It is separate from the suppression list —
-                  a bounce, a spam complaint or an unsubscribe applies to every campaign, forever, and is
-                  applied automatically.
-                </p>
-                <p className="text-xs text-muted-foreground mb-2">
-                  There is no one-click unsubscribe link yet. The email footer asks people to reply with
-                  “unsubscribe”; those replies land in the CRM inbox and somebody has to record the
-                  unsubscribe, which then applies everywhere at once.
-                </p>
-                <ExclusionEditor
-                  campaignId={campaign.id}
-                  disabled={readOnly}
-                  onChanged={() => { void loadPreflight(campaign.id); }}
-                  onError={(text) => setBanner({ tone: "bad", text })}
-                />
-              </section>
-            </div>
-          )}
-
-          {/* ══════════ Design ══════════ */}
-          {tab === "design" && (
-            <div className="space-y-4">
-              {/* AI drafting */}
-              <section className="rounded-lg border border-border bg-card p-3.5">
-                <div className="flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-sm font-bold text-foreground">Draft it with AI</h2>
-                    {ai?.available === false ? (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <span className="font-semibold text-amber-800">Unavailable.</span> {ai.reason}
-                      </p>
-                    ) : (
-                      <>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          The model is given only verified information about SiteMint and a description of this
-                          audience — never a customer record, never a price, never a figure. Anything it writes is a
-                          draft until somebody approves it, and a draft that invents a claim is refused rather than
-                          quietly trimmed.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-2 mt-2">
-                          <input
-                            className="flex-1 min-w-0 px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                            placeholder="What is this campaign for?"
-                            value={aiGoal}
-                            disabled={readOnly}
-                            onChange={(e) => setAiGoal(e.target.value)}
-                          />
-                          <button onClick={() => void askAi()} disabled={readOnly || !aiGoal.trim() || busy === "ai"} className={btnPrimary}>
-                            {busy === "ai" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                            Draft
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {campaign.aiContentState === "draft" && (
-                  <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-2.5">
-                    <p className="text-xs text-amber-900 flex items-start gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                      <span>
-                        This campaign contains AI-written copy that nobody has approved. It cannot be sent
-                        until somebody reads it and says so.
-                      </span>
-                    </p>
-                    <button
-                      onClick={() => void act("/ai-draft/approve", {}, "approve")}
-                      disabled={busy === "approve"}
-                      className={`${btnPrimary} mt-2`}
-                    >
-                      {busy === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                      I have read it — approve
-                    </button>
-                  </div>
-                )}
-                {campaign.aiContentState === "approved" && (
-                  <p className="mt-2 text-xs text-emerald-800 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    AI copy approved by {campaign.aiApprovedByLabel ?? "a member of staff"}.
-                  </p>
-                )}
-              </section>
-
-              {/* Templates */}
-              <section className="rounded-lg border border-border bg-card p-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-bold text-foreground">Templates</h2>
-                  <button onClick={() => void saveAsTemplate()} disabled={readOnly} className={btnGhost}>
-                    <Save className="w-3.5 h-3.5" /> Save this as a template
-                  </button>
-                </div>
-                {designs.length === 0 ? (
-                  <p className="text-xs text-muted-foreground mt-1.5">No saved templates yet.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {designs.map((d) => (
-                      <button key={d.id} onClick={() => applyDesign(d)} disabled={readOnly}
-                        className="px-2.5 py-1 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50">
-                        {d.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Preview-as picker */}
-              <section className="rounded-lg border border-border bg-card p-3.5">
-                <label className="block text-xs font-semibold text-foreground mb-1">Preview as a real contact</label>
-                <ContactPicker
-                  value={previewLeadId}
-                  onChange={setPreviewLeadId}
-                  onError={(text) => setBanner({ tone: "bad", text })}
-                />
-              </section>
-
-              <EmailDesigner
-                subject={campaign.subject}
-                preheader={campaign.preheader ?? ""}
-                blocks={campaign.blocks ?? []}
-                mergeFields={mergeFields}
-                tokenProblems={preview.problems}
-                readOnly={readOnly}
-                onChange={(p) => { setCampaign({ ...campaign, ...p }); setDirty(true); }}
-                previewHtml={preview.html}
-                previewLoading={previewLoading}
-                previewError={previewError}
-                previewSubject={preview.subject}
-                previewAs={preview.as}
-                fallbacksUsed={preview.fallbacks}
-                onRefreshPreview={() => void loadPreview(campaign.id, previewLeadId)}
-              />
-            </div>
-          )}
-
-          {/* ══════════ Review & send ══════════ */}
-          {tab === "review" && (
-            <div className="space-y-4 max-w-3xl">
-              {!preflight ? (
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <p className="text-sm text-muted-foreground">The pre-send check could not be loaded.</p>
-                  <button onClick={() => void loadPreflight(campaign.id)} className={`${btnGhost} mt-2`}>
-                    <RefreshCw className="w-3.5 h-3.5" /> Try again
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Stat label="In the audience" value={preflight.audienceSize} />
-                    <Stat label="Will be sent to" value={preflight.sendable} tone="ok" />
-                    <Stat label="Excluded" value={preflight.excluded} tone={preflight.excluded > 0 ? "warn" : undefined} />
-                  </div>
-
-                  {preflight.blockers.length > 0 && (
-                    <section className="rounded-lg border border-red-300 bg-red-50 p-3.5">
-                      <h2 className="text-sm font-bold text-red-900 flex items-center gap-1.5">
-                        <XCircle className="w-4 h-4" /> Not ready to send
-                      </h2>
-                      <ul className="mt-1.5 space-y-1">
-                        {preflight.blockers.map((b, i) => (
-                          <li key={i} className="text-xs text-red-800">• {b}</li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-
-                  <ExcludedPanel buckets={preflight.excludedByReason} total={preflight.excluded} />
-
-                  {preflight.fallbackWarnings.length > 0 && (
-                    <section className="rounded-lg border border-amber-300 bg-amber-50 p-3.5">
-                      <h2 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
-                        <AlertTriangle className="w-4 h-4" /> Some people will see the fallback wording
-                      </h2>
-                      <ul className="mt-1.5 space-y-1">
-                        {preflight.fallbackWarnings.map((w) => (
-                          <li key={w.field} className="text-xs text-amber-900">
-                            <strong>{w.field}</strong> is missing for {w.count} of {preflight.sendable} recipients
-                            ({w.share}%). They will see whatever you wrote after the bar.
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-
-                  <section className="rounded-lg border border-border bg-card p-3.5">
-                    <h2 className="text-sm font-bold text-foreground">Send a test to yourself first</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      A test can only go to an active staff account. It is marked as a test in the subject and in
-                      the message, and it never counts as a delivery.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2 mt-2">
-                      <input
-                        className="flex-1 min-w-0 px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                        placeholder="your.name@… (staff address)"
-                        value={testTo}
-                        onChange={(e) => setTestTo(e.target.value)}
-                      />
-                      <button
-                        onClick={() => void act("/test-send", { to: testTo, asLeadId: previewLeadId ?? undefined }, "test")}
-                        disabled={!testTo.trim() || busy === "test"}
-                        className={btnGhost}
-                      >
-                        {busy === "test" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                        Send test
-                      </button>
-                    </div>
-                  </section>
-
-                  <section className={`rounded-lg border p-3.5 ${preflight.delivery.configured ? "border-border bg-card" : "border-amber-300 bg-amber-50"}`}>
-                    <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                      <Send className="w-4 h-4" /> Send
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-1">{preflight.delivery.note}</p>
-
-                    {campaign.status === "scheduled" && (
-                      <p className="mt-2 text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded-md px-2.5 py-2 flex items-start gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                        <span>
-                          Scheduled for{" "}
-                          <strong>{campaign.scheduledAt ? new Date(campaign.scheduledAt).toLocaleString() : "an unknown time"}</strong>.
-                          Nothing starts this send on its own — there is no background worker for broadcasts yet,
-                          so somebody has to come back and press Send. The time is a reminder and a record of
-                          intent, not an alarm clock.
-                        </span>
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {(campaign.status === "draft" || campaign.status === "scheduled") && (
-                        <button
-                          onClick={() => void act("/send", { batchSize: 50 }, "send")}
-                          disabled={!preflight.canSend || busy === "send"}
-                          className={btnPrimary}
-                        >
-                          {busy === "send" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                          Send now to {preflight.sendable}
-                        </button>
-                      )}
-                      {campaign.status === "sending" && (
-                        <>
-                          <button onClick={() => void act("/send", { batchSize: 50 }, "send")} disabled={busy === "send"} className={btnPrimary}>
-                            {busy === "send" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            Continue sending
-                          </button>
-                          <button onClick={() => void act("/pause", {}, "pause")} disabled={busy === "pause"} className={btnGhost}>
-                            <Pause className="w-4 h-4" /> Pause
-                          </button>
-                        </>
-                      )}
-                      {campaign.status === "paused" && (
-                        <button onClick={() => void act("/resume", {}, "resume")} disabled={busy === "resume"} className={btnPrimary}>
-                          <Play className="w-4 h-4" /> Resume
-                        </button>
-                      )}
-                      {campaign.status !== "cancelled" && campaign.status !== "sent" && (
-                        <button onClick={() => setConfirmCancel(true)} className={`${btnGhost} text-red-700 border-red-200 hover:bg-red-50`}>
-                          <Ban className="w-4 h-4" /> Cancel
-                        </button>
-                      )}
-                    </div>
-
-                    {campaign.status === "draft" && preflight.canSend && (
-                      <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-border">
-                        <input
-                          type="datetime-local"
-                          aria-label="When to send"
-                          className="flex-1 min-w-0 px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                          value={scheduleAt}
-                          onChange={(e) => setScheduleAt(e.target.value)}
-                        />
-                        <button
-                          onClick={() => {
-                            if (!scheduleAt) { setBanner({ tone: "bad", text: "Pick a time first." }); return; }
-                            void act("/schedule", { scheduledAt: new Date(scheduleAt).toISOString() }, "schedule");
-                          }}
-                          disabled={busy === "schedule"}
-                          className={btnGhost}
-                        >
-                          <Clock className="w-4 h-4" /> Schedule instead
-                        </button>
-                      </div>
-                    )}
-                  </section>
-
-                  {confirmCancel && (
-                    <section className="rounded-lg border border-red-300 bg-red-50 p-3.5">
-                      <h2 className="text-sm font-bold text-red-900">Cancel this campaign?</h2>
-                      <p className="text-xs text-red-800 mt-1">
-                        {(results?.counts.sent ?? 0) > 0
-                          ? `${results?.counts.sent} messages have already been handed to the mail provider and are in people's inboxes. Cancelling stops the rest — it does not and cannot recall those.`
-                          : "Nothing has been handed to the mail provider yet, so nobody will have received this."}
-                      </p>
-                      <div className="flex gap-2 mt-2.5">
-                        <button
-                          onClick={() => { setConfirmCancel(false); void act("/cancel", {}, "cancel"); }}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white text-sm font-semibold rounded-lg hover:bg-red-800"
-                        >
-                          <Ban className="w-4 h-4" /> Cancel the campaign
-                        </button>
-                        <button onClick={() => setConfirmCancel(false)} className={btnGhost}>Keep it</button>
-                      </div>
-                    </section>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ══════════ Results ══════════ */}
-          {tab === "results" && (
-            <div className="space-y-4 max-w-4xl">
-              {!results ? (
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <p className="text-sm text-muted-foreground">Results could not be loaded.</p>
-                  <button onClick={() => void loadResults(campaign.id)} className={`${btnGhost} mt-2`}>
-                    <RefreshCw className="w-3.5 h-3.5" /> Try again
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <Stat label="Audience" value={results.counts.audience} />
-                    <Stat label="Sent" value={results.counts.sent} tone="ok" />
-                    <Stat label="Failed" value={results.counts.failed} tone={results.counts.failed ? "bad" : undefined} />
-                    <Stat label="Excluded" value={results.counts.excluded} tone={results.counts.excluded ? "warn" : undefined} />
-                    <Stat label="Never attempted" value={results.counts.neverAttempted} />
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">{results.deliverySignal.meaning}</p>
-
-                  <ExcludedPanel buckets={results.excludedByReason} total={results.counts.excluded} />
-
-                  <section className="rounded-lg border border-border bg-muted/40 p-3.5">
-                    <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                      <BarChart2 className="w-4 h-4" /> Opens and clicks — not tracked
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-1">{results.engagement.why}</p>
-                  </section>
-
-                  <section className="rounded-lg border border-border bg-card overflow-hidden">
-                    <h2 className="text-sm font-bold text-foreground px-3.5 py-2.5 border-b border-border">
-                      Every recipient ({results.recipients.length})
-                    </h2>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-muted/60">
-                          <tr>
-                            <th className="text-left px-3 py-1.5 font-semibold text-foreground">Contact</th>
-                            <th className="text-left px-3 py-1.5 font-semibold text-foreground hidden sm:table-cell">Address</th>
-                            <th className="text-left px-3 py-1.5 font-semibold text-foreground">Outcome</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {results.recipients.map((r) => (
-                            <tr key={r.id} className="border-t border-border">
-                              <td className="px-3 py-1.5 text-foreground whitespace-nowrap">{r.name}</td>
-                              <td className="px-3 py-1.5 text-muted-foreground hidden sm:table-cell truncate max-w-[200px]">{r.address ?? "—"}</td>
-                              <td className="px-3 py-1.5 text-muted-foreground">
-                                {r.status}
-                                {r.lastError ? <span className="text-red-700"> — {r.lastError}</span> : null}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  <dl className="rounded-lg border border-border bg-muted/40 p-3.5 space-y-1.5">
-                    {Object.entries(results.definitions).map(([k, v]) => (
-                      <div key={k} className="text-xs">
-                        <dt className="inline font-semibold text-foreground">{k}: </dt>
-                        <dd className="inline text-muted-foreground">{v}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              )}
-            </div>
-          )}
+          <button type="button" className={btnPrimary} disabled={creating} onClick={() => void createCampaign()}>
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Create campaign
+          </button>
         </div>
-      </div>
-    </CrmLayout>
-  );
-}
 
-// ── Small pieces ─────────────────────────────────────────────────────────────
-
-function Banner({ banner, onClose }: { banner: { tone: "ok" | "warn" | "bad"; text: string } | null; onClose: () => void }) {
-  if (!banner) return null;
-  const tone =
-    banner.tone === "ok" ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-      : banner.tone === "warn" ? "border-amber-300 bg-amber-50 text-amber-900"
-        : "border-red-300 bg-red-50 text-red-900";
-  return (
-    <div className={`mx-4 sm:mx-6 mt-3 rounded-lg border px-3 py-2 flex items-start gap-2 ${tone}`}>
-      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-      <p className="text-xs flex-1">{banner.text}</p>
-      <button onClick={onClose} aria-label="Dismiss" className="shrink-0 p-0.5 rounded hover:bg-black/5">
-        <X className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "ok" | "warn" | "bad" }) {
-  const colour =
-    tone === "ok" ? "text-emerald-700" : tone === "warn" ? "text-amber-700" : tone === "bad" ? "text-red-700" : "text-foreground";
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2">
-      <p className={`text-xl font-bold ${colour}`}>{value}</p>
-      <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
-    </div>
-  );
-}
-
-/** Excluded contacts, always by reason, always with the names behind the count. */
-function ExcludedPanel({ buckets, total }: { buckets: ExclusionBucket[]; total: number }) {
-  if (total === 0) {
-    return (
-      <section className="rounded-lg border border-border bg-card p-3.5">
-        <p className="text-xs text-muted-foreground">
-          Nobody in this audience is excluded. If that changes — a bounce, a spam complaint, an
-          unsubscribe — they will appear here with the reason.
-        </p>
-      </section>
-    );
-  }
-  return (
-    <section className="rounded-lg border border-border bg-card overflow-hidden">
-      <h2 className="text-sm font-bold text-foreground px-3.5 py-2.5 border-b border-border flex items-center gap-1.5">
-        <Users className="w-4 h-4" /> {total} excluded, and why
-      </h2>
-      <div className="divide-y divide-border">
-        {buckets.map((b) => (
-          <details key={b.reason} className="px-3.5 py-2.5">
-            <summary className="text-xs font-semibold text-foreground cursor-pointer">
-              {b.count} — {b.label}
-            </summary>
-            <ul className="mt-1.5 space-y-0.5">
-              {b.contacts.map((c, i) => (
-                <li key={`${c.leadId ?? c.id}-${i}`} className="text-xs text-muted-foreground">
-                  {c.name}{c.email ? ` · ${c.email}` : ""}{c.detail ? ` — ${c.detail}` : ""}
-                </li>
-              ))}
-            </ul>
-          </details>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** Searches contacts by name or address, using the existing CRM leads route. */
-function ContactPicker({
-  value, onChange, onError,
-}: { value: number | null; onChange: (id: number | null) => void; onError: (text: string) => void }) {
-  const [query, setQuery] = useState("");
-  const [options, setOptions] = useState<{ id: number; name: string; email: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let live = true;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await adminFetch(`/api/crm/leads?search=${encodeURIComponent(query)}&limit=20`);
-        const data = await res.json().catch(() => ({}));
-        if (!live) return;
-        if (!res.ok) { onError("Contacts could not be searched."); setOptions([]); return; }
-        const rows = (Array.isArray(data.leads) ? data.leads : []) as { id: number; name: string; email: string }[];
-        setOptions(rows.slice(0, 20));
-      } catch {
-        if (live) { onError("Contacts could not be searched."); setOptions([]); }
-      } finally {
-        if (live) setLoading(false);
-      }
-    }, 300);
-    return () => { live = false; clearTimeout(t); };
-  }, [query, onError]);
-
-  return (
-    <div className="flex flex-col sm:flex-row gap-2">
-      <input
-        className="flex-1 min-w-0 px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-        placeholder="Search contacts by name or address"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      <select
-        className="flex-1 min-w-0 px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      >
-        <option value="">{loading ? "Searching…" : "— tokens shown as written —"}</option>
-        {options.map((o) => <option key={o.id} value={o.id}>{o.name} · {o.email}</option>)}
-      </select>
-    </div>
-  );
-}
-
-/** Adds and removes the one-off "not this person, not this time" exclusions. */
-function ExclusionEditor({
-  campaignId, disabled, onChanged, onError,
-}: { campaignId: number; disabled?: boolean; onChanged: () => void; onError: (text: string) => void }) {
-  const [rows, setRows] = useState<{ leadId: number; name: string; email: string; reason?: string | null }[]>([]);
-  const [leadId, setLeadId] = useState<number | null>(null);
-  const [reason, setReason] = useState("");
-
-  const load = useCallback(async () => {
-    const res = await adminFetch(`/api/crm/marketing/campaigns/${campaignId}`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { onError("The exclusions could not be loaded."); return; }
-    setRows(Array.isArray(data.exclusions) ? data.exclusions : []);
-  }, [campaignId, onError]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const add = async () => {
-    if (!leadId) return;
-    const res = await adminFetch(`/api/crm/marketing/campaigns/${campaignId}/exclusions`, json({ leadId, reason }));
-    if (!res.ok) { onError("That contact could not be excluded."); return; }
-    setLeadId(null); setReason("");
-    await load();
-    onChanged();
-  };
-
-  const remove = async (id: number) => {
-    const res = await adminFetch(`/api/crm/marketing/campaigns/${campaignId}/exclusions/${id}`, { method: "DELETE" });
-    if (!res.ok) { onError("That exclusion could not be removed."); return; }
-    await load();
-    onChanged();
-  };
-
-  return (
-    <div className="space-y-2">
-      {rows.length > 0 && (
-        <ul className="space-y-1">
-          {rows.map((r) => (
-            <li key={r.leadId} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-              <span className="text-xs text-foreground min-w-0 truncate">
-                {r.name} <span className="text-muted-foreground">· {r.email}</span>
-                {r.reason ? <span className="text-muted-foreground"> — {r.reason}</span> : null}
-              </span>
-              <button onClick={() => void remove(r.leadId)} disabled={disabled} aria-label="Put them back in"
-                className="shrink-0 p-1 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 disabled:opacity-40">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!disabled && (
-        <>
-          <ContactPicker value={leadId} onChange={setLeadId} onError={onError} />
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              className="flex-1 min-w-0 px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-              placeholder="Why are they being left out? (recorded)"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-            <button onClick={() => void add()} disabled={!leadId} className={btnGhost}>
-              <Plus className="w-3.5 h-3.5" /> Exclude
+        {/* ══ The other thing called "campaign" ══ */}
+        <div className="rounded-xl border border-border bg-muted/40 px-3.5 py-3">
+          <p className="text-sm text-foreground flex items-start gap-2">
+            <Workflow className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+            <span>
+              <strong className="font-semibold">Looking for multi-step follow-up?</strong>{" "}
+              A <em>sequence</em> is the other thing — several messages over days, with contacts
+              enrolled into it. It lives in its own screens and is not affected by anything here.
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2 pl-6">
+            <button type="button" className={btnQuiet} onClick={() => navigate("/admin/crm/campaigns")}>
+              Open sequences <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" className={btnQuiet} onClick={() => navigate("/admin/crm/campaign-queue")}>
+              Sequence message queue <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        </>
-      )}
-    </div>
+        </div>
+
+        {banner && (
+          <div className={`rounded-xl border px-3.5 py-3 text-sm ${
+            banner.tone === "bad" ? "border-red-200 bg-red-50 text-red-800"
+              : banner.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-900"
+                : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}>
+            {banner.text}
+          </div>
+        )}
+
+        {/* ══ Tabs — the list is the page; the rest is setup ══ */}
+        <div className="flex flex-wrap items-center gap-1 border-b border-border">
+          {([
+            ["campaigns", "Campaigns"],
+            ["templates", `Templates (${designs.length})`],
+            ["audiences", `Saved audiences (${segments.length})`],
+            ["settings", "Settings"],
+          ] as [Tab, string][]).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              aria-current={tab === id ? "page" : undefined}
+              className={`px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px min-h-[44px] ${
+                tab === id
+                  ? "border-teal-700 text-teal-900"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ══ Campaigns ══ */}
+        {tab === "campaigns" && (
+          <>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  className={`${inputClass} pl-9`}
+                  placeholder="Search campaigns by name, subject, audience or who edited them"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <button type="button" className={btnGhost} onClick={() => void loadCampaigns()}>
+                <RefreshCw className="w-4 h-4" /> Refresh
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFilter(f.id)}
+                  aria-pressed={filter === f.id}
+                  className={`px-3 py-2 rounded-full text-xs font-semibold border min-h-[36px] ${
+                    filter === f.id
+                      ? "border-teal-600 bg-teal-50 text-teal-900"
+                      : "border-border bg-card text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {f.label}
+                  {f.id === "attention" && attentionCount > 0 && (
+                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-900">{attentionCount}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {visible.length === 0 ? (
+              <div className={`${cardClass} p-8 text-center`}>
+                <Mail className="w-8 h-8 text-muted-foreground mx-auto" />
+                <p className="text-sm text-foreground mt-2">
+                  {campaigns.length === 0
+                    ? "No campaigns yet."
+                    : "No campaign matches what you are looking for."}
+                </p>
+                {campaigns.length === 0 && (
+                  <button type="button" className={`${btnPrimary} mx-auto mt-3`} onClick={() => void createCampaign()}>
+                    <Plus className="w-4 h-4" /> Create your first campaign
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {visible.map((c) => {
+                  const state = displayState(c, autosend);
+                  const sent = c.counts?.["sent"] ?? 0;
+                  const failedCount = c.counts?.["failed"] ?? 0;
+                  const excluded = c.counts?.["excluded"] ?? 0;
+                  const editable = c.status === "draft" || c.status === "scheduled";
+                  return (
+                    <li key={c.id} className={`${cardClass} p-3.5`}>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => (editable ? setOpenId(c.id) : setResultsId(c.id))}
+                              className="text-base font-semibold text-foreground hover:text-teal-800 text-left truncate"
+                            >
+                              {c.name}
+                            </button>
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${state.className}`}>
+                              {state.label}
+                            </span>
+                          </div>
+                          {c.subject && (
+                            <p className="text-sm text-muted-foreground truncate mt-0.5">“{c.subject}”</p>
+                          )}
+                          {state.note && (
+                            <p className="text-xs text-amber-900 mt-1 flex items-start gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> {state.note}
+                            </p>
+                          )}
+                          <dl className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" />
+                              <dt className="sr-only">Audience</dt>
+                              <dd>{c.audienceLabel ?? "No audience yet"}</dd>
+                            </div>
+                            <div>
+                              <dt className="sr-only">Results</dt>
+                              <dd>
+                                {c.status === "draft" || c.status === "scheduled"
+                                  ? "Not sent yet"
+                                  : `${sent} delivered${failedCount ? `, ${failedCount} failed` : ""}${excluded ? `, ${excluded} left out` : ""}`}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="sr-only">Last edited</dt>
+                              <dd>
+                                Edited {formatWhen(c.updatedAt)}
+                                {c.updatedByLabel ? ` by ${c.updatedByLabel}` : ""}
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1 shrink-0">
+                          {editable && (
+                            <button type="button" className={btnQuiet} onClick={() => setOpenId(c.id)}>
+                              <Pencil className="w-3.5 h-3.5" /> Edit
+                            </button>
+                          )}
+                          <button
+                            type="button" className={btnQuiet}
+                            disabled={busyRow === c.id}
+                            onClick={() => void rowAction(c.id, "duplicate")}
+                          >
+                            <Copy className="w-3.5 h-3.5" /> Duplicate
+                          </button>
+                          {c.status === "sending" && (
+                            <button type="button" className={btnQuiet} disabled={busyRow === c.id} onClick={() => void rowAction(c.id, "pause")}>
+                              <Pause className="w-3.5 h-3.5" /> Pause
+                            </button>
+                          )}
+                          {c.status === "paused" && (
+                            <button type="button" className={btnQuiet} disabled={busyRow === c.id} onClick={() => void rowAction(c.id, "resume")}>
+                              <Play className="w-3.5 h-3.5" /> Resume
+                            </button>
+                          )}
+                          {c.status !== "sent" && c.status !== "cancelled" && (
+                            <button type="button" className={btnQuiet} disabled={busyRow === c.id} onClick={() => void rowAction(c.id, "cancel")}>
+                              <Ban className="w-3.5 h-3.5" /> Cancel
+                            </button>
+                          )}
+                          {c.status !== "draft" && (
+                            <button type="button" className={btnQuiet} onClick={() => setResultsId(c.id)}>
+                              <BarChart2 className="w-3.5 h-3.5" /> Results
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+
+        {/* ══ Templates ══ */}
+        {tab === "templates" && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Saved emails you can start a campaign from. Create one from inside a campaign, on the
+              Email step.
+            </p>
+            {designs.length === 0 ? (
+              <div className={`${cardClass} p-6 text-center text-sm text-muted-foreground`}>
+                No templates yet.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {designs.map((d) => (
+                  <li key={d.id} className={`${cardClass} p-3.5 flex items-start justify-between gap-3`}>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{d.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {d.subject ? `“${d.subject}”` : `${(d.blocks ?? []).length} blocks`}
+                      </p>
+                    </div>
+                    <button type="button" className={btnQuiet} onClick={() => void archive("designs", d.id, d.name)}>
+                      <Trash2 className="w-3.5 h-3.5" /> Archive
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* ══ Saved audiences ══ */}
+        {tab === "audiences" && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Reusable audiences. You do not need one to send a campaign — pick contacts or build a
+              filter inside the campaign instead. Counts are worked out now, from the conditions;
+              nothing stores a member list.
+            </p>
+            {segments.length === 0 ? (
+              <div className={`${cardClass} p-6 text-center text-sm text-muted-foreground`}>
+                No saved audiences yet.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {segments.map((s) => (
+                  <li key={s.id} className={`${cardClass} p-3.5 flex items-start justify-between gap-3`}>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.memberCount ?? 0} contacts match right now
+                        {s.createdByLabel ? ` · made by ${s.createdByLabel}` : ""}
+                      </p>
+                    </div>
+                    <button type="button" className={btnQuiet} onClick={() => void archive("segments", s.id, s.name)}>
+                      <Trash2 className="w-3.5 h-3.5" /> Archive
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* ══ Settings ══ */}
+        {tab === "settings" && settings && (
+          <div className="space-y-2">
+            <div className={`${cardClass} p-3.5`}>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-teal-700" /> Automatic sending
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">{settings.autosend.operatorNote}</p>
+            </div>
+
+            <div className={`${cardClass} p-3.5`}>
+              <p className="text-sm font-semibold text-foreground">Mail delivery</p>
+              <p className="text-sm text-muted-foreground mt-1">{settings.delivery.operatorNote}</p>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Emails are sent from <span className="text-foreground">{settings.sender.address}</span>.
+              </p>
+            </div>
+
+            <div className={`${cardClass} p-3.5`}>
+              <p className="text-sm font-semibold text-foreground">Test addresses</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                A test send can only reach one of these — never a customer.
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {settings.testAddresses.map((s) => (
+                  <li key={s.id} className="text-sm text-muted-foreground">
+                    {s.displayName ?? s.email} <span className="text-xs">— {s.email}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className={`${cardClass} p-3.5`}>
+              <button
+                type="button"
+                onClick={() => setShowAdminDetail((v) => !v)}
+                aria-expanded={showAdminDetail}
+                className={`${btnQuiet} -ml-2.5`}
+              >
+                Setup detail for whoever administers this system
+              </button>
+              {showAdminDetail && (
+                <ul className="mt-1.5 space-y-1.5">
+                  {[settings.autosend.adminNote, settings.delivery.adminNote]
+                    .filter((v): v is string => !!v)
+                    .map((note) => (
+                      <li key={note} className="text-xs text-muted-foreground font-mono break-words">{note}</li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </CrmLayout>
   );
 }

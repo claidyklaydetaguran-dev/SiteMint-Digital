@@ -84,8 +84,16 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   // `support.assign` when the create body also names an assignee, so creation
   // cannot be used to hand somebody work you are not allowed to hand them.
   //
-  // Nothing here sends anything: a customer-visible message is RECORDED. The
-  // route says so in its response.
+  // Support DOES now email the client. It used to only record a reply, and
+  // this note used to say so; leaving that standing would have understated
+  // what these routes can do. A customer-visible message is handed to the mail
+  // provider, and the three delivery routes below move real mail — a retry, a
+  // deliberate duplicate, or an acknowledgement of an unknown outcome — so
+  // they sit at the same level as the reminder-delivery recovery they mirror.
+  // Each additionally asserts communications.send and requires a reason.
+  "POST /api/crm/support/messages/:id/delivery-recovery": "admin",
+  "POST /api/crm/support/deliveries/process": "admin",
+  "POST /api/crm/support/inbound/ingest": "admin",
 
   // ── M4 Workflow automation ────────────────────────────────────────────
   //
@@ -140,6 +148,17 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   // marketing-local record.
   "POST /api/crm/marketing/segments": "admin",
   "POST /api/crm/marketing/segments/preview": "admin",
+  // M5. `audience/preview` is the same idea for an audience built inline while
+  // composing a campaign — the flow no longer forces somebody to save a segment
+  // before they can see who they are writing to. It writes nothing and requires
+  // campaigns.read, exactly like the segment preview above.
+  //
+  // `duplicate` creates a new campaign from an existing one, so it is a write
+  // and takes campaigns.write. It deliberately does NOT copy the sent state:
+  // a duplicate starts as a draft, or duplicating a completed campaign would
+  // hand somebody something that looks ready to go out again.
+  "POST /api/crm/marketing/audience/preview": "admin",
+  "POST /api/crm/marketing/campaigns/:id/duplicate": "admin",
   "PATCH /api/crm/marketing/segments/:id": "admin",
   "DELETE /api/crm/marketing/segments/:id": "admin",
   "POST /api/crm/marketing/designs": "admin",

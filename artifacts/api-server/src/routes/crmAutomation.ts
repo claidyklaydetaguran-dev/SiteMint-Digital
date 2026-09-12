@@ -64,6 +64,7 @@ type Validated = {
   windowCap: number;
   windowMinutes: number;
   maxActionAttempts: number;
+  inactivityDays: number;
 };
 
 /** Per-action-type required settings, so a half-written action cannot be saved. */
@@ -176,6 +177,9 @@ function validateRule(body: Record<string, unknown>): { ok: true; value: Validat
       windowCap: bounded("windowCap", 5, 1, 500),
       windowMinutes: bounded("windowMinutes", 60, 1, 10080),
       maxActionAttempts: bounded("maxActionAttempts", 3, 1, 10),
+      // Only meaningful for no_activity_for_days; harmless on every other
+      // trigger, and cheaper than a conditional shape.
+      inactivityDays: bounded("inactivityDays", 14, 1, 365),
     },
   };
 }
@@ -288,6 +292,10 @@ router.patch("/crm/automation/rules/:id", requireCrmAuth("settings.write"), asyn
     windowCap: existing.windowCap,
     windowMinutes: existing.windowMinutes,
     maxActionAttempts: existing.maxActionAttempts,
+    // Load-bearing: the validator below defaults a missing inactivityDays to
+    // 14, so without carrying the stored value forward a plain enable/disable
+    // PATCH would quietly reset a 30-day rule.
+    inactivityDays: existing.inactivityDays,
     ...body,
   };
 

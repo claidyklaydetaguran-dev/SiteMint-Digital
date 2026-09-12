@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   AlertCircle, ChevronDown, ChevronUp, Image as ImageIcon, Loader2, Minus,
-  MousePointerClick, Monitor, Plus, RefreshCw, Smartphone, Trash2, Type,
+  MousePointerClick, Monitor, Plus, RefreshCw, Smartphone, Sparkles, Trash2, Type,
 } from "lucide-react";
 
 // ── M4: the visual email designer ────────────────────────────────────────────
@@ -43,6 +43,17 @@ interface Props {
   onChange: (patch: { subject?: string; preheader?: string; blocks?: EmailBlock[] }) => void;
   readOnly?: boolean;
 
+  /**
+   * Rendered at the top of the editor column.
+   *
+   * "Draft with AI" belongs INSIDE the editor, next to the words it rewrites —
+   * a separate screen for it would mean leaving a half-written campaign to use
+   * it, which is the moment work gets lost.
+   */
+  aiPanel?: ReactNode;
+  /** Anything the caller wants above the blocks — a template picker, usually. */
+  header?: ReactNode;
+
   /** Server-rendered HTML for the preview pane. */
   previewHtml: string | null;
   previewLoading: boolean;
@@ -62,8 +73,10 @@ const BLOCK_MENU: { type: EmailBlock["type"]; label: string; icon: typeof Type }
   { type: "spacer", label: "Spacer", icon: Minus },
 ];
 
+const blockId = () => `b-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
 function newBlock(type: EmailBlock["type"]): EmailBlock {
-  const id = `b-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = blockId();
   switch (type) {
     case "heading": return { id, type, text: "Hi {{first_name|there}}", level: 1, align: "left" };
     case "text": return { id, type, text: "Write something worth reading.", align: "left" };
@@ -74,6 +87,25 @@ function newBlock(type: EmailBlock["type"]): EmailBlock {
   }
 }
 
+/**
+ * The house layout: a greeting that can never render blank, a paragraph, a
+ * divider and one call to action.
+ *
+ * Offered rather than imposed — starting from an empty canvas is a real
+ * request. But an empty canvas is also where people write `{{first_name}}`
+ * without a fallback and put a button with no link in the middle, so the
+ * default shape is one that already has those decisions made correctly.
+ */
+function brandStarter(): EmailBlock[] {
+  return [
+    { id: blockId(), type: "heading", text: "Hi {{first_name|there}}", level: 1, align: "left" },
+    { id: blockId(), type: "text", text: "A short, specific reason you are writing to {{company|your team}} — one idea, in plain words.\n\nWhat it would mean for them, and what it would take.", align: "left" },
+    { id: blockId(), type: "button", text: "Book a fifteen-minute call", url: "https://sitemintdigital.com/contact", align: "left" },
+    { id: blockId(), type: "divider" },
+    { id: blockId(), type: "text", text: "— The SiteMint Digital team", align: "left" },
+  ];
+}
+
 const inputClass =
   "w-full px-2.5 py-1.5 border border-input rounded-md bg-background text-foreground text-sm " +
   "focus:outline-none focus:ring-2 focus:ring-teal-500/30 disabled:opacity-60";
@@ -82,7 +114,7 @@ export default function EmailDesigner(props: Props) {
   const {
     subject, preheader, blocks, mergeFields, tokenProblems, onChange, readOnly,
     previewHtml, previewLoading, previewError, previewSubject, previewAs,
-    fallbacksUsed, onRefreshPreview,
+    fallbacksUsed, onRefreshPreview, aiPanel, header,
   } = props;
 
   const [width, setWidth] = useState<"desktop" | "mobile">("desktop");
@@ -125,6 +157,9 @@ export default function EmailDesigner(props: Props) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* ══════════════ Editor ══════════════ */}
       <div className="space-y-3 min-w-0">
+        {header}
+        {aiPanel}
+
         <div className="rounded-lg border border-border bg-card p-3 space-y-2.5">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">Subject line</label>
@@ -155,9 +190,21 @@ export default function EmailDesigner(props: Props) {
         {/* ── Blocks ── */}
         <div className="space-y-2">
           {blocks.length === 0 && (
-            <p className="text-sm text-muted-foreground px-1">
-              Nothing in the email yet. Add a block below.
-            </p>
+            <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-center">
+              <p className="text-sm text-muted-foreground">Nothing in the email yet.</p>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => onChange({ blocks: brandStarter() })}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg bg-teal-700 text-white hover:bg-teal-800 disabled:opacity-60 min-h-[40px]"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Start from our layout
+              </button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                A greeting that can never come out blank, a paragraph, and one call to action —
+                or add blocks yourself below.
+              </p>
+            </div>
           )}
 
           {blocks.map((block, index) => (

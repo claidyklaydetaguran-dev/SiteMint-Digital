@@ -306,7 +306,13 @@ suite("marketing: audience, exclusions, sending, and honest numbers (real DB)", 
     const availability = await owner.call("GET", "/api/crm/marketing/ai/availability");
     expect(availability.status).toBe(200);
     expect(availability.json["available"]).toBe(false);
-    expect(String(availability.json["reason"])).toMatch(/not configured/i);
+    // Two audiences, two messages. The operator sentence must be readable by
+    // somebody selling websites, so it carries no variable names at all; the
+    // administrator detail is where those belong, and the UI keeps it behind a
+    // disclosure.
+    expect(String(availability.json["reason"])).toMatch(/not switched on|write the email yourself/i);
+    expect(String(availability.json["reason"])).not.toMatch(/AI_INTEGRATIONS_OPENAI|process\.env/);
+    expect(String(availability.json["adminDetail"])).toMatch(/AI_INTEGRATIONS_OPENAI/);
     // The names of absent variables, never their values.
     expect(String(JSON.stringify(availability.json["missing"]))).toMatch(/AI_INTEGRATIONS_OPENAI/);
 

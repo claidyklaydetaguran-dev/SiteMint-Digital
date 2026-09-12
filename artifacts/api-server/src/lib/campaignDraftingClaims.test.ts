@@ -99,3 +99,23 @@ describe("ungrounded claim guard", () => {
     expect(found.map((f) => f.rule)).toContain("testimonial");
   });
 });
+
+describe("approved facts reach the guard through the grounding", () => {
+  it("carries owner-approved facts into the stored grounding", async () => {
+    const { buildGrounding } = await import("./campaignDrafting.js");
+    const g = buildGrounding({
+      goal: "announce the maintenance plan",
+      approvedFacts: owner,
+    });
+    // The stored grounding is what makes a price in a sent email traceable to
+    // the person who approved it. If it did not carry them, the claim would be
+    // licensed by something no record could later point at.
+    expect(g.approvedFacts).toHaveLength(2);
+    expect(g.approvedFacts[0].approvedBy).toBe("Shasta Greene");
+  });
+
+  it("defaults to licensing nothing when no owner facts are supplied", async () => {
+    const { buildGrounding } = await import("./campaignDrafting.js");
+    expect(buildGrounding({ goal: "just say hello" }).approvedFacts).toEqual([]);
+  });
+});

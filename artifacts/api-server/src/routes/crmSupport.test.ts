@@ -19,10 +19,30 @@
  *
  * Gated on CRM_TEST_DATABASE_URL.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { eq, inArray } from "drizzle-orm";
+
+// Support can now actually email a client. Nothing in this suite should be able
+// to reach a provider, and `CRM_EMAIL_TEST_MODE` is an environment variable —
+// not a boundary worth trusting between a test run and somebody's inbox.
+// Mocking the seam makes a real send impossible rather than merely unlikely.
+vi.mock("../lib/staffMail.js", () => ({
+  RESEND_IDEMPOTENCY_WINDOW_MS: 24 * 60 * 60 * 1000,
+  staffMailConfigured: () => false,
+  staffMailBlockedReason: () => "RESEND_API_KEY is not set in this test run.",
+  trySendStaffMail: async () => ({
+    sent: false as const,
+    failure: "not_configured" as const,
+    configured: false,
+    reason: "RESEND_API_KEY is not set in this test run.",
+  }),
+  classifyProviderError: () => "rejected",
+  classifyThrownMailError: () => "uncertain",
+  inviteMessage: () => ({ subject: "", text: "" }),
+  resetMessage: () => ({ subject: "", text: "" }),
+}));
 
 const TEST_DB = process.env.CRM_TEST_DATABASE_URL;
 process.env.DATABASE_URL = TEST_DB ?? process.env.DATABASE_URL ?? "postgresql://127.0.0.1:1/never_connected";
@@ -275,12 +295,24 @@ suite("support: tickets, the thread, and the knowledge base (real DB)", () => {
     for (const r of [a, b, c]) expect(r.json["message"].origin).toBe("staff");
   }, 60_000);
 
-  it("says plainly that a recorded reply was not sent to anybody", async () => {
+  it("says plainly when a reply could not go out, rather than implying it did", async () => {
+    // This used to assert that Support could never send at all, which was the
+    // gap rather than the contract. Support sends now; what is pinned here is
+    // the behaviour when it cannot — mail is unconfigured in this run, so the
+    // reply must be visibly waiting and flagged for somebody, never quietly
+    // recorded as if the client had received it.
     const sent = await shasta.call("POST", `/api/crm/support/tickets/${ticketId}/messages`,
       { visibility: "customer", body: "[CRM-TEST] One more note for the client." });
-    expect(sent.status).toBe(201);
-    expect(sent.json["delivery"].sent).toBe(false);
-    expect(String(sent.json["delivery"].note)).toMatch(/nothing was emailed|not.*sent/i);
+    expect(sent.status, JSON.stringify(sent.json)).toBe(201);
+    expect(sent.json["delivery"].state).toBe("pending");
+    expect(sent.json["delivery"].needsAttention).toBe(true);
+    // The label must not CLAIM delivery. A blunt /\bsent\b/ is the wrong check
+    // here — "Waiting — not sent" contains the word and is exactly the honest
+    // wording we want, so assert the negation is present rather than that the
+    // word is absent.
+    expect(String(sent.json["delivery"].label)).toMatch(/not sent|waiting/i);
+    expect(String(sent.json["delivery"].label)).not.toMatch(/^sent\b|\bdelivered\b/i);
+    expect(String(sent.json["delivery"].explanation)).toMatch(/RESEND_API_KEY|test mode|not set/i);
   }, 60_000);
 
   it("starts the first-response clock on a reply to the customer, never on an internal note", async () => {

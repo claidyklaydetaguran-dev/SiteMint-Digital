@@ -237,6 +237,23 @@ export const CRM_MARKETING_CAMPAIGN_TRANSITIONS: Record<CrmMarketingCampaignStat
 export const CRM_AI_CONTENT_STATES = ["none", "draft", "approved"] as const;
 export type CrmAiContentState = (typeof CRM_AI_CONTENT_STATES)[number];
 
+/**
+ * Where a campaign's audience comes from. M5, additive.
+ *
+ *   segment  a saved audience, by id — re-evaluated at send time
+ *   filter   conditions held on the campaign itself, never saved as a segment
+ *   list     an explicit list of contact ids somebody picked by hand
+ *
+ * `filter` and `list` exist because requiring a saved segment first was a dead
+ * end: somebody who wants to mail eleven named people had to invent and name a
+ * reusable audience before they could write a word. A campaign-local filter is
+ * still a DEFINITION and is still re-evaluated at send time, so it keeps the
+ * re-evaluation guarantee; `list` is the one deliberately frozen shape, and it
+ * is frozen because "these eleven people" is what was meant.
+ */
+export const CRM_MARKETING_AUDIENCE_MODES = ["segment", "filter", "list"] as const;
+export type CrmMarketingAudienceMode = (typeof CRM_MARKETING_AUDIENCE_MODES)[number];
+
 export const crmMarketingCampaigns = pgTable("crm_marketing_campaigns", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -250,8 +267,24 @@ export const crmMarketingCampaigns = pgTable("crm_marketing_campaigns", {
   /** The template it was seeded from, for provenance only. */
   designId: integer("design_id"),
 
+  // ── M5: the audience, without a saved segment as a prerequisite ──
+  audienceMode: text("audience_mode").notNull().default("segment"),
+  /** `filter` mode: the same shape a segment stores, held on the campaign. */
+  audienceDefinition: jsonb("audience_definition").$type<CrmSegmentDefinition>(),
+  /** `list` mode: the contact ids somebody chose by hand. */
+  audienceLeadIds: jsonb("audience_lead_ids").$type<number[]>(),
+
   status: text("status").notNull().default("draft"),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  /**
+   * The IANA zone the person was thinking in when they scheduled it.
+   *
+   * `scheduled_at` is an instant and is unambiguous on its own; this is kept so
+   * the screen can say "9:00 AM, Los Angeles time" rather than re-projecting the
+   * instant into whatever zone the reader's laptop happens to be in and quietly
+   * showing a different hour to two colleagues.
+   */
+  scheduledTimezone: text("scheduled_timezone"),
   startedAt: timestamp("started_at", { withTimezone: true }),
   pausedAt: timestamp("paused_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
@@ -273,6 +306,16 @@ export const crmMarketingCampaigns = pgTable("crm_marketing_campaigns", {
   createdByStaffId: integer("created_by_staff_id"),
   createdByLabel: text("created_by_label"),
 
+  /**
+   * Who touched it last. M5, additive.
+   *
+   * Not decoration: two people editing one campaign is the normal case in a
+   * four-person office, and "somebody else changed this" is an unactionable
+   * message. The optimistic-concurrency refusal names this person.
+   */
+  updatedByStaffId: integer("updated_by_staff_id"),
+  updatedByLabel: text("updated_by_label"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
@@ -281,6 +324,10 @@ export const crmMarketingCampaigns = pgTable("crm_marketing_campaigns", {
   check(
     "ck_crm_marketing_campaigns_status",
     sql`${table.status} IN ('draft','scheduled','sending','paused','cancelled','sent')`,
+  ),
+  check(
+    "ck_crm_marketing_campaigns_audience_mode",
+    sql`${table.audienceMode} IN ('segment','filter','list')`,
   ),
   check(
     "ck_crm_marketing_campaigns_ai_state",

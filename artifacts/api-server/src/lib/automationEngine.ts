@@ -221,6 +221,21 @@ export interface AutomationEmitResult {
 }
 
 /**
+ * Narrowing applied to one emission.
+ *
+ * `onlyRuleIds` exists for events that are about a SPECIFIC rule's parameter
+ * rather than about the trigger in general. A contact that has been silent for
+ * seven days is an occurrence for the rules that wait seven days and is not an
+ * occurrence for a rule that waits thirty; fanning that event out to every
+ * `no_activity_for_days` rule would make every silence window fire on every
+ * other window's event. `null`/absent keeps the default behaviour — every
+ * enabled rule listening for this trigger.
+ */
+export interface AutomationEmitOptions {
+  onlyRuleIds?: number[] | null;
+}
+
+/**
  * Announce that something happened. Every rule listening for this trigger gets
  * an execution row — or is refused one by a brake, which is itself recorded.
  *
@@ -231,6 +246,7 @@ export interface AutomationEmitResult {
 export async function emitAutomationTrigger(
   event: CrmAutomationTriggerEvent,
   deps: AutomationDeps = defaultAutomationDeps(),
+  options: AutomationEmitOptions = {},
 ): Promise<AutomationEmitResult> {
   const result: AutomationEmitResult = { queued: [], deduplicated: [], stopped: [] };
 
@@ -238,10 +254,17 @@ export async function emitAutomationTrigger(
   const recordId = Number(event.payload.recordId);
   if (!Number.isFinite(recordId) || recordId <= 0) return result;
 
+  const only = options.onlyRuleIds ?? null;
+  // An explicit EMPTY list means "no rules want this", which is not the same as
+  // "no filter". Treating the two alike would fan an empty target out to
+  // everything, which is the exact bug this option exists to prevent.
+  if (only !== null && only.length === 0) return result;
+
   const rules = await db.select().from(crmAutomationRules).where(and(
     eq(crmAutomationRules.trigger, event.trigger),
     eq(crmAutomationRules.enabled, true),
     isNull(crmAutomationRules.archivedAt),
+    ...(only === null ? [] : [inArray(crmAutomationRules.id, only)]),
   ));
   if (rules.length === 0) return result;
 

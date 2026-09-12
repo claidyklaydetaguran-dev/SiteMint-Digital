@@ -85,9 +85,18 @@ interface Props {
   vocabulary: SegmentVocabulary | null;
   onChange: (next: SegmentDefinition) => void;
   disabled?: boolean;
+  /**
+   * Hide the live-count panel, for the caller that already shows a richer one.
+   *
+   * The count query still runs — it is what marks the individual condition that
+   * is wrong, and losing that would leave somebody with an invalid filter and no
+   * idea which line of it to fix. Only the summary block is suppressed, so the
+   * screen never shows two teal panels arguing about the same number.
+   */
+  hideSummary?: boolean;
 }
 
-export default function SegmentBuilder({ definition, vocabulary, onChange, disabled }: Props) {
+export default function SegmentBuilder({ definition, vocabulary, onChange, disabled, hideSummary }: Props) {
   const [count, setCount] = useState<number | null>(null);
   const [sample, setSample] = useState<PreviewContact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -272,7 +281,7 @@ export default function SegmentBuilder({ definition, vocabulary, onChange, disab
       </button>
 
       {/* ── The live count ── */}
-      <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-3">
+      <div className={`rounded-lg border border-teal-200 bg-teal-50/60 p-3 ${hideSummary ? "hidden" : ""}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Users className="w-4 h-4 text-teal-700 shrink-0" />

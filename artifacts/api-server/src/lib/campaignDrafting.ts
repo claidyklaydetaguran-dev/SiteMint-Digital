@@ -89,6 +89,14 @@ export interface CampaignGroundingInput {
   } | null;
   /** Merge fields this campaign may use. */
   mergeFields?: CrmMergeField[];
+  /**
+   * Prices, offers and terms an authorised owner has supplied and stands
+   * behind. These are the ONLY claims of their kind a draft may make: the
+   * guard licenses a matched fragment when it appears inside one of these,
+   * and refuses it otherwise. Without this a campaign could never mention a
+   * price, which is most of what marketing is for.
+   */
+  approvedFacts?: ApprovedFact[];
 }
 
 /**
@@ -109,6 +117,8 @@ export interface CampaignGrounding {
     shape: CampaignGroundingInput["audienceShape"];
   };
   mergeFields: { token: string; means: string }[];
+  /** What licensed any price or offer in the copy, and who approved it. */
+  approvedFacts: ApprovedFact[];
 }
 
 export function buildGrounding(input: CampaignGroundingInput): CampaignGrounding {
@@ -125,6 +135,7 @@ export function buildGrounding(input: CampaignGroundingInput): CampaignGrounding
       shape: input.audienceShape ?? null,
     },
     mergeFields: fields.map((token) => ({ token, means: CRM_MERGE_FIELDS[token] })),
+    approvedFacts: input.approvedFacts ?? [],
   };
 }
 
@@ -478,7 +489,10 @@ export async function draftCampaign(
   }
 
   const whole = `${draft.subject}\n${draft.preheader}\n${draft.body}\n${draft.ctaLabel}`;
-  const claims = findUngroundedClaims(whole);
+  // Owner-approved prices and terms license those exact claims; everything
+  // else of that kind is still refused. Passing the grounding's copy rather
+  // than the raw input keeps the check and the stored record in agreement.
+  const claims = findUngroundedClaims(whole, grounding.approvedFacts);
   const badTokens = findBadMergeTokens(whole);
   if (claims.length > 0 || badTokens.length > 0) {
     return {

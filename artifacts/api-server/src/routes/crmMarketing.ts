@@ -50,10 +50,12 @@ import {
   crmMarketingExclusions, crmMarketingRecipients,
   CRM_SEGMENT_FIELDS, CRM_SEGMENT_FIELD_OPERATORS, CRM_SEGMENT_MATCH_MODES,
   CRM_EMAIL_BLOCK_TYPES, CRM_MARKETING_CAMPAIGN_TRANSITIONS, CRM_MERGE_FIELDS,
+  CRM_MARKETING_AUDIENCE_MODES,
   CRM_STATUSES, CRM_SOURCES, CRM_PRIORITIES, PROJECT_TYPES,
   type CrmSegmentDefinition, type CrmSegmentCondition, type CrmSegmentField,
   type CrmSegmentOperator, type CrmEmailBlock, type CrmMarketingCampaign,
-  type CrmMarketingCampaignStatus, type CrmMergeField, type CrmLead,
+  type CrmMarketingCampaignStatus, type CrmMarketingAudienceMode,
+  type CrmMergeField, type CrmLead,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { trySendStaffMail, staffMailBlockedReason } from "../lib/staffMail.js";
@@ -252,6 +254,136 @@ export function segmentWhere(definition: CrmSegmentDefinition): SQL | undefined 
 export async function resolveSegment(definition: CrmSegmentDefinition): Promise<CrmLead[]> {
   const where = segmentWhere(definition);
   return db.select().from(crmLeads).where(where).orderBy(asc(crmLeads.id));
+}
+
+// ── The audience (M5) ───────────────────────────────────────────────────────
+//
+// A campaign's audience is one of three things, and until M5 it could only be
+// the first:
+//
+//   segment  a saved, reusable audience
+//   filter   conditions held on the campaign itself
+//   list     contacts somebody picked by hand
+//
+// The second and third exist because requiring a saved segment first was a dead
+// end. Somebody who wants to mail eleven named customers had to invent a
+// uniquely-named reusable audience before they could write a word of the email
+// they came to write — so the first thing the screen asked for was the one
+// thing they did not want.
+//
+// `filter` is still a DEFINITION, so it keeps the re-evaluation guarantee: it is
+// resolved again when the send starts, and anybody who stopped matching in the
+// meantime is left out. `list` is the one deliberately frozen audience, because
+// "these eleven people" is precisely what was meant — but it is resolved through
+// the same exclusion check as everything else, so a hand-picked contact who
+// unsubscribed yesterday is still not mailed.
+
+export interface AudienceSource {
+  mode: CrmMarketingAudienceMode;
+  segmentId?: number | null;
+  audienceDefinition?: CrmSegmentDefinition | null;
+  audienceLeadIds?: number[] | null;
+}
+
+export interface ResolvedAudience {
+  leads: CrmLead[];
+  /** One line describing this audience, for a list row. */
+  label: string;
+  /** Why it cannot be used — the exact wording preflight refuses with. */
+  problem: string | null;
+  /** True, but not a reason to refuse. */
+  note: string | null;
+}
+
+const asLeadIds = (raw: unknown): number[] => {
+  if (!Array.isArray(raw)) return [];
+  const out: number[] = [];
+  for (const v of raw) {
+    const n = num(v);
+    if (n && !out.includes(n)) out.push(n);
+  }
+  return out.slice(0, 5000);
+};
+
+/** Reads the audience off a campaign row, whatever shape it is in. */
+export function audienceOf(campaign: {
+  audienceMode?: string | null;
+  segmentId?: number | null;
+  audienceDefinition?: CrmSegmentDefinition | null;
+  audienceLeadIds?: number[] | null;
+}): AudienceSource {
+  const raw = campaign.audienceMode ?? "segment";
+  const mode = (CRM_MARKETING_AUDIENCE_MODES as readonly string[]).includes(raw)
+    ? (raw as CrmMarketingAudienceMode) : "segment";
+  return {
+    mode,
+    segmentId: campaign.segmentId ?? null,
+    audienceDefinition: campaign.audienceDefinition ?? null,
+    audienceLeadIds: campaign.audienceLeadIds ?? null,
+  };
+}
+
+export async function resolveAudience(source: AudienceSource): Promise<ResolvedAudience> {
+  if (source.mode === "list") {
+    const ids = asLeadIds(source.audienceLeadIds);
+    if (ids.length === 0) {
+      return {
+        leads: [], label: "Nobody chosen yet", note: null,
+        problem: "No contacts are chosen. Pick the people this should go to.",
+      };
+    }
+    const leads = await db.select().from(crmLeads)
+      .where(inArray(crmLeads.id, ids)).orderBy(asc(crmLeads.id));
+    const gone = ids.length - leads.length;
+    return {
+      leads,
+      label: `${leads.length} chosen contact${leads.length === 1 ? "" : "s"}`,
+      // A contact deleted after being chosen is reported rather than silently
+      // dropped from a count somebody is about to trust.
+      note: gone > 0 ? `${gone} of the chosen contacts no longer exist and were left out.` : null,
+      problem: leads.length === 0 ? "None of the chosen contacts still exist." : null,
+    };
+  }
+
+  if (source.mode === "filter") {
+    const parsed = validateSegmentDefinition(source.audienceDefinition ?? null);
+    if ("problems" in parsed) {
+      const first = parsed.problems[0]?.problem ?? "It is not a usable set of conditions.";
+      return {
+        leads: [], label: "Filter not finished", note: null,
+        problem: `The audience filter on this campaign cannot be used. ${first}`,
+      };
+    }
+    const leads = await resolveSegment(parsed.definition);
+    const n = parsed.definition.conditions.length;
+    return {
+      leads,
+      label: `Filter — ${n} condition${n === 1 ? "" : "s"}`,
+      problem: null,
+      note: null,
+    };
+  }
+
+  if (!source.segmentId) {
+    return {
+      leads: [], label: "No audience yet", note: null,
+      problem: "No audience is chosen. Pick contacts, choose a saved audience, or build a filter.",
+    };
+  }
+  const [segment] = await db.select().from(crmMarketingSegments)
+    .where(eq(crmMarketingSegments.id, source.segmentId)).limit(1);
+  if (!segment) {
+    return {
+      leads: [], label: "Missing saved audience", note: null,
+      problem: "The saved audience this campaign points at no longer exists.",
+    };
+  }
+  return {
+    leads: await resolveSegment(segment.definition),
+    label: segment.name,
+    problem: null,
+    note: segment.archivedAt ? `The saved audience "${segment.name}" has been archived, but this campaign still uses it.` : null,
+  };
 }
 
 // ── Merge fields ────────────────────────────────────────────────────────────
@@ -605,6 +737,7 @@ const EXCLUSION_LABELS: Record<string, string> = {
 interface PreflightResult {
   campaignId: number;
   status: string;
+  audience: { mode: string; label: string; note: string | null };
   audienceSize: number;
   sendable: number;
   excluded: number;
@@ -620,21 +753,15 @@ async function preflight(campaign: CrmMarketingCampaign): Promise<PreflightResul
 
   if (!campaign.subject.trim()) blockers.push("The campaign has no subject line.");
   if (!Array.isArray(campaign.blocks) || campaign.blocks.length === 0) blockers.push("The email has no content blocks.");
-  if (!campaign.segmentId) blockers.push("No audience is chosen. Pick a segment before sending.");
   if (campaign.aiContentState === "draft") {
     blockers.push("This campaign contains AI-drafted copy that nobody has approved. Read it and approve it, or replace it, before sending.");
   }
   for (const p of mergeTokenProblems(campaign)) blockers.push(`${p.token} — ${p.problem}`);
 
-  let leads: CrmLead[] = [];
-  let segmentMissing = false;
-  if (campaign.segmentId) {
-    const [segment] = await db.select().from(crmMarketingSegments)
-      .where(eq(crmMarketingSegments.id, campaign.segmentId)).limit(1);
-    if (!segment) { segmentMissing = true; blockers.push("The segment this campaign points at no longer exists."); }
-    // Resolved HERE, at preflight time, from the same function the send uses.
-    else leads = await resolveSegment(segment.definition);
-  }
+  // Resolved HERE, at preflight time, by the same function the send uses.
+  const audience = await resolveAudience(audienceOf(campaign));
+  const leads = audience.leads;
+  if (audience.problem) blockers.push(audience.problem);
 
   const [exclusionRows, suppressions] = await Promise.all([
     db.select().from(crmMarketingExclusions).where(eq(crmMarketingExclusions.campaignId, campaign.id)),
@@ -673,11 +800,11 @@ async function preflight(campaign: CrmMarketingCampaign): Promise<PreflightResul
     field, count, share: sendable > 0 ? Math.round((count / sendable) * 100) : 0,
   })).sort((a, b) => b.count - a.count);
 
-  if (!segmentMissing && campaign.segmentId && sendable === 0) {
+  if (!audience.problem && sendable === 0) {
     blockers.push(
       leads.length === 0
-        ? "The segment matches nobody right now, so there is nobody to send to."
-        : `Every one of the ${leads.length} contacts in this segment is excluded, so there is nobody left to send to.`,
+        ? "This audience matches nobody right now, so there is nobody to send to."
+        : `Every one of the ${leads.length} contacts in this audience is excluded, so there is nobody left to send to.`,
     );
   }
 
@@ -686,6 +813,7 @@ async function preflight(campaign: CrmMarketingCampaign): Promise<PreflightResul
   return {
     campaignId: campaign.id,
     status: campaign.status,
+    audience: { mode: audienceOf(campaign).mode, label: audience.label, note: audience.note },
     audienceSize: leads.length,
     sendable,
     excluded,
@@ -722,18 +850,13 @@ function refuseTransition(from: CrmMarketingCampaignStatus, to: CrmMarketingCamp
  * a resumed send must continue the list it started, not re-open it.
  */
 async function materialiseAudience(campaign: CrmMarketingCampaign): Promise<{ resolved: number; excluded: number }> {
-  if (!campaign.segmentId) return { resolved: 0, excluded: 0 };
-  const [segment] = await db.select().from(crmMarketingSegments)
-    .where(eq(crmMarketingSegments.id, campaign.segmentId)).limit(1);
-  if (!segment) return { resolved: 0, excluded: 0 };
-
   // A test send left rows behind; they are not part of the real audience.
   await db.delete(crmMarketingRecipients).where(and(
     eq(crmMarketingRecipients.campaignId, campaign.id),
     eq(crmMarketingRecipients.status, "test"),
   ));
 
-  const leads = await resolveSegment(segment.definition);
+  const { leads } = await resolveAudience(audienceOf(campaign));
   if (leads.length === 0) return { resolved: 0, excluded: 0 };
 
   const [exclusionRows, suppressions] = await Promise.all([
@@ -953,6 +1076,132 @@ router.delete("/crm/marketing/segments/:id", requireCrmAuth("campaigns.write"), 
   });
 });
 
+// ── Contacts, for picking an audience by hand ───────────────────────────────
+
+/**
+ * Contacts matching a search, with whether each one can actually be mailed.
+ *
+ * The eligibility verdict comes from `verdictFor` — the same function the send
+ * uses — so a contact shown as mailable in the picker is mailable at send time
+ * for the same reasons, and one shown as suppressed is suppressed with the same
+ * wording. A picker that offered people the send would later drop would be a
+ * list of promises the campaign cannot keep.
+ *
+ * Nothing is pre-selected and nothing is implied to be selected: this route
+ * returns candidates, and the campaign's own `audienceLeadIds` is the only
+ * record of who was chosen.
+ */
+router.get("/crm/marketing/contacts", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
+  const search = trimmed(req.query["search"]);
+  const limit = Math.min(Math.max(num(req.query["limit"]) ?? 25, 1), 100);
+  const ids = asLeadIds(String(req.query["ids"] ?? "").split(",").filter(Boolean));
+
+  const where = ids.length > 0
+    ? inArray(crmLeads.id, ids)
+    : search
+      ? or(
+        ilike(crmLeads.name, `%${search}%`),
+        ilike(crmLeads.email, `%${search}%`),
+        ilike(crmLeads.company, `%${search}%`),
+      )
+      : undefined;
+
+  const rows = await db.select().from(crmLeads).where(where)
+    .orderBy(asc(crmLeads.name)).limit(ids.length > 0 ? ids.length : limit);
+
+  const [total] = await db.select({ n: sql<number>`count(*)::int` }).from(crmLeads).where(where);
+  const suppressions = await liveSuppressions();
+
+  res.json({
+    contacts: rows.map((lead) => {
+      const verdict = verdictFor(lead, new Set<number>(), new Map(), suppressions);
+      return {
+        id: lead.id, name: lead.name, email: lead.email, company: lead.company,
+        status: lead.status, source: lead.source,
+        eligible: verdict.reason === null,
+        exclusionReason: verdict.reason,
+        exclusionLabel: verdict.reason ? (EXCLUSION_LABELS[verdict.reason] ?? verdict.reason) : null,
+        exclusionDetail: verdict.detail,
+      };
+    }),
+    total: Number(total?.n ?? 0),
+    showing: rows.length,
+  });
+});
+
+/**
+ * Evaluates any audience shape — saved segment, campaign-local filter, or a
+ * hand-picked list — and answers the only two questions that matter before a
+ * send: who gets this, and who does not and why.
+ *
+ * One endpoint for all three modes on purpose. Three endpoints would be three
+ * places for the exclusion rules to be applied slightly differently, and the
+ * one that drifted would be discovered by a customer receiving something they
+ * had unsubscribed from.
+ */
+router.post("/crm/marketing/audience/preview", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const rawMode = String(body["audienceMode"] ?? body["mode"] ?? "segment");
+  if (!(CRM_MARKETING_AUDIENCE_MODES as readonly string[]).includes(rawMode)) {
+    res.status(400).json({ error: `"${rawMode}" is not a way of choosing an audience.` });
+    return;
+  }
+
+  const resolved = await resolveAudience({
+    mode: rawMode as CrmMarketingAudienceMode,
+    segmentId: num(body["segmentId"]) ?? null,
+    audienceDefinition: (body["audienceDefinition"] ?? null) as CrmSegmentDefinition | null,
+    audienceLeadIds: asLeadIds(body["audienceLeadIds"]),
+  });
+
+  // Per-campaign exclusions count too, when the caller says which campaign —
+  // otherwise a person who deliberately left somebody out would see them back
+  // in the eligible list the next time they opened the step.
+  const campaignId = num(body["campaignId"]);
+  const exclusionRows = campaignId
+    ? await db.select().from(crmMarketingExclusions).where(eq(crmMarketingExclusions.campaignId, campaignId))
+    : [];
+  const excludedIds = new Set(exclusionRows.map((r) => r.leadId));
+  const excludedDetail = new Map(exclusionRows.map((r) => [r.leadId, r.reason]));
+  const suppressions = await liveSuppressions();
+
+  const eligible: { id: number; name: string; email: string | null; company: string | null }[] = [];
+  const buckets = new Map<string, { id: number; name: string; email: string | null; detail: string | null }[]>();
+
+  for (const lead of resolved.leads) {
+    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions);
+    if (verdict.reason) {
+      const list = buckets.get(verdict.reason) ?? [];
+      list.push({ id: lead.id, name: lead.name, email: lead.email, detail: verdict.detail });
+      buckets.set(verdict.reason, list);
+      continue;
+    }
+    eligible.push({ id: lead.id, name: lead.name, email: lead.email, company: lead.company });
+  }
+
+  const excludedByReason = [...buckets.entries()].map(([reason, contacts]) => ({
+    reason, label: EXCLUSION_LABELS[reason] ?? reason, count: contacts.length, contacts,
+  })).sort((a, b) => b.count - a.count);
+
+  res.json({
+    mode: rawMode,
+    label: resolved.label,
+    problem: resolved.problem,
+    note: resolved.note,
+    audienceSize: resolved.leads.length,
+    eligibleCount: eligible.length,
+    excludedCount: excludedByReason.reduce((s, b) => s + b.count, 0),
+    // Capped for the wire, with the count kept honest above it — a thousand
+    // names is not a list anybody reads, but the number must still be the real
+    // one.
+    eligible: eligible.slice(0, 200),
+    eligibleShown: Math.min(eligible.length, 200),
+    excludedByReason,
+    resolvedAt: new Date().toISOString(),
+    reevaluated: rawMode !== "list",
+  });
+});
+
 // ── Designs (saved templates) ───────────────────────────────────────────────
 
 router.get("/crm/marketing/designs", requireCrmAuth("campaigns.read"), async (_req: Request, res: Response) => {
@@ -1040,11 +1289,140 @@ router.get("/crm/marketing/campaigns", requireCrmAuth("campaigns.read"), async (
     byCampaign.set(c.campaignId, bucket);
   }
 
+  // Segment names in ONE query, so a list of forty campaigns is not forty
+  // lookups — and no audience is RESOLVED here at all. Resolving every
+  // campaign's audience to show a list would run a contact query per row, and
+  // the number it produced would be a live count sitting next to a historical
+  // one in the same table, which is exactly the confusion this screen exists to
+  // remove.
+  const segmentNames = new Map<number, string>(
+    (await db.select({ id: crmMarketingSegments.id, name: crmMarketingSegments.name })
+      .from(crmMarketingSegments)).map((s) => [s.id, s.name]),
+  );
+
+  const audienceLabel = (c: typeof campaigns[number]): string => {
+    const mode = audienceOf(c).mode;
+    if (mode === "list") {
+      const n = asLeadIds(c.audienceLeadIds).length;
+      return n === 0 ? "Nobody chosen yet" : `${n} chosen contact${n === 1 ? "" : "s"}`;
+    }
+    if (mode === "filter") {
+      const n = Array.isArray(c.audienceDefinition?.conditions) ? c.audienceDefinition.conditions.length : 0;
+      return n === 0 ? "Filter not finished" : `Filter — ${n} condition${n === 1 ? "" : "s"}`;
+    }
+    if (!c.segmentId) return "No audience yet";
+    return segmentNames.get(c.segmentId) ?? "Missing saved audience";
+  };
+
   res.json({
-    campaigns: campaigns.map((c) => ({ ...c, counts: byCampaign.get(c.id) ?? {} })),
+    campaigns: campaigns.map((c) => ({
+      ...c,
+      counts: byCampaign.get(c.id) ?? {},
+      audienceLabel: audienceLabel(c),
+    })),
     statuses: Object.keys(CRM_MARKETING_CAMPAIGN_TRANSITIONS),
+    autosendEnabled: marketingAutosendEnabled(),
   });
 });
+
+// ── Settings the screen must not guess at ───────────────────────────────────
+
+/**
+ * What this server will and will not actually do.
+ *
+ * Every field here exists because the alternative was a screen implying
+ * something untrue:
+ *
+ *   autosend  A campaign shown as "Scheduled" on a server where nothing starts
+ *             a scheduled send reads as "it will go out". It will not. The
+ *             screen has to be able to say so, which means it has to be able to
+ *             ask.
+ *
+ *   delivery  "Sent" on a server with no mail provider means "simulated".
+ *
+ *   testAddresses  A test send may only reach an active staff account. Making
+ *             somebody type an address they then get refused for is a worse way
+ *             to learn that than offering the addresses that work.
+ */
+router.get("/crm/marketing/settings", requireCrmAuth("campaigns.read"), async (_req: Request, res: Response) => {
+  const staff = await db.select({ id: crmStaff.id, email: crmStaff.email, displayName: crmStaff.displayName })
+    .from(crmStaff).where(eq(crmStaff.status, "active")).orderBy(asc(crmStaff.displayName));
+  const blocked = staffMailBlockedReason();
+
+  res.json({
+    autosend: {
+      enabled: marketingAutosendEnabled(),
+      envVar: MARKETING_AUTOSEND_ENV_VAR,
+      operatorNote: marketingAutosendEnabled()
+        ? "Scheduled campaigns start on their own at the time you set."
+        : "Nothing starts a scheduled campaign on its own on this server. At the scheduled time somebody has to open the campaign and press Send.",
+      adminNote: `Set ${MARKETING_AUTOSEND_ENV_VAR}="true" on the server to let scheduled campaigns start themselves. Any other value, including unset, leaves it off.`,
+    },
+    delivery: {
+      configured: blocked === null,
+      operatorNote: blocked === null
+        ? "Mail is configured. A send will reach real mailboxes."
+        : "This server does not send real mail. Everything works, including test sends, but nothing leaves the building.",
+      adminNote: blocked,
+    },
+    // The address these emails will come FROM. The last step has to show it,
+    // because "who is this from" is the first thing a recipient decides on and
+    // the last thing anybody checks.
+    //
+    // The fallback mirrors `FROM()` in lib/staffMail.ts, which does not export
+    // it. Two copies of a default is a drift risk and the fix is to export it
+    // from there; until then `configuredExplicitly` says which of the two a
+    // reader is looking at.
+    sender: {
+      address: process.env["RESEND_FROM_EMAIL"] ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
+      configuredExplicitly: Boolean(process.env["RESEND_FROM_EMAIL"]),
+    },
+    testAddresses: staff,
+    now: new Date().toISOString(),
+    serverTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+  });
+});
+
+/**
+ * Reads the audience fields out of a request body.
+ *
+ * Returns only the keys that were actually present, so a PATCH that changes the
+ * subject line does not quietly reset the audience to the default mode — the
+ * bug where saving one field wipes another is invisible until the send.
+ */
+function audiencePatch(body: Record<string, unknown>): { patch: Record<string, unknown>; error: string | null } {
+  const patch: Record<string, unknown> = {};
+
+  if (body["audienceMode"] !== undefined) {
+    const mode = String(body["audienceMode"]);
+    if (!(CRM_MARKETING_AUDIENCE_MODES as readonly string[]).includes(mode)) {
+      return { patch: {}, error: `"${mode}" is not a way of choosing an audience.` };
+    }
+    patch["audienceMode"] = mode;
+  }
+
+  if (body["audienceDefinition"] !== undefined) {
+    if (body["audienceDefinition"] === null) {
+      patch["audienceDefinition"] = null;
+    } else {
+      // Stored only once it is valid. A half-written filter is kept in the
+      // browser, not written to a column the send path reads.
+      const parsed = validateSegmentDefinition(body["audienceDefinition"]);
+      if ("problems" in parsed) {
+        return { patch: {}, error: parsed.problems[0]?.problem ?? "That filter cannot be used." };
+      }
+      patch["audienceDefinition"] = parsed.definition;
+    }
+  }
+
+  if (body["audienceLeadIds"] !== undefined) {
+    patch["audienceLeadIds"] = body["audienceLeadIds"] === null ? null : asLeadIds(body["audienceLeadIds"]);
+  }
+
+  if (body["segmentId"] !== undefined) patch["segmentId"] = num(body["segmentId"]) ?? null;
+
+  return { patch, error: null };
+}
 
 router.post("/crm/marketing/campaigns", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
@@ -1052,18 +1430,63 @@ router.post("/crm/marketing/campaigns", requireCrmAuth("campaigns.write"), async
   if (!name) { res.status(400).json({ error: "Give the campaign a name." }); return; }
   const me = actor(req);
 
+  const audience = audiencePatch(body);
+  if (audience.error) { res.status(400).json({ error: audience.error }); return; }
+
   const [row] = await db.insert(crmMarketingCampaigns).values({
     name,
     subject: trimmed(body["subject"]) ?? "",
     preheader: trimmed(body["preheader"]),
     blocks: parseBlocks(body["blocks"]),
-    segmentId: num(body["segmentId"]) ?? null,
     designId: num(body["designId"]) ?? null,
+    ...audience.patch,
     createdByStaffId: me.id, createdByLabel: me.label,
+    updatedByStaffId: me.id, updatedByLabel: me.label,
   }).returning();
 
   await auditAction(req, "marketing.campaign_created", `campaign:${row.id}`);
   res.status(201).json({ campaign: row });
+});
+
+/**
+ * Copies a campaign into a new draft.
+ *
+ * Copies the copy and the audience; copies NOTHING about what happened. The new
+ * campaign has no recipients, no schedule, no send history and no AI approval —
+ * a duplicate that inherited an approval would let unapproved copy reach a send
+ * path by being copied out of an approved one.
+ */
+router.post("/crm/marketing/campaigns/:id/duplicate", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
+  const id = num(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "Invalid campaign." }); return; }
+  const [source] = await db.select().from(crmMarketingCampaigns)
+    .where(eq(crmMarketingCampaigns.id, id)).limit(1);
+  if (!source) { res.status(404).json({ error: "Not found." }); return; }
+
+  const me = actor(req);
+  const requested = trimmed((req.body as { name?: unknown })?.name);
+  const [row] = await db.insert(crmMarketingCampaigns).values({
+    name: requested ?? `Copy of ${source.name}`.slice(0, 200),
+    subject: source.subject,
+    preheader: source.preheader,
+    blocks: source.blocks,
+    segmentId: source.segmentId,
+    designId: source.designId,
+    audienceMode: source.audienceMode,
+    audienceDefinition: source.audienceDefinition,
+    audienceLeadIds: source.audienceLeadIds,
+    // Deliberately not carried over: status, every timestamp, and the whole AI
+    // approval record.
+    createdByStaffId: me.id, createdByLabel: me.label,
+    updatedByStaffId: me.id, updatedByLabel: me.label,
+  }).returning();
+
+  await auditAction(req, "marketing.campaign_duplicated", `campaign:${id} copy:${row.id}`);
+  res.status(201).json({
+    campaign: row,
+    copiedFrom: { id: source.id, name: source.name },
+    note: "A new draft with the same copy and audience. Nothing about the original's send was copied, and any AI copy needs approving again.",
+  });
 });
 
 router.get("/crm/marketing/campaigns/:id", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
@@ -1100,7 +1523,41 @@ router.patch("/crm/marketing/campaigns/:id", requireCrmAuth("campaigns.write"), 
   }
 
   const body = req.body as Record<string, unknown>;
-  const patch: Record<string, unknown> = { updatedAt: new Date() };
+
+  // ── Optimistic concurrency ──
+  //
+  // Two people editing one campaign is the normal case in a four-person office,
+  // and the default behaviour — last write wins, silently — means the person
+  // who saved first watches their work disappear with no event to notice. The
+  // caller sends the `updatedAt` it last read; if the row has moved on, nothing
+  // is written and the refusal names who moved it and returns their version, so
+  // the browser can show both rather than picking one.
+  const expected = trimmed(body["expectedUpdatedAt"]);
+  if (expected) {
+    const seen = new Date(expected).getTime();
+    const actual = new Date(campaign.updatedAt).getTime();
+    if (Number.isNaN(seen)) { res.status(400).json({ error: "That is not a version stamp." }); return; }
+    if (seen !== actual) {
+      res.status(409).json({
+        error: `${campaign.updatedByLabel ?? "Somebody else"} changed this campaign after you opened it. Nothing you typed has been saved yet.`,
+        conflict: {
+          by: campaign.updatedByLabel ?? null,
+          at: campaign.updatedAt,
+          yourVersion: expected,
+        },
+        campaign,
+        note: "Their version is above. Reload it and re-apply your change, or save over it deliberately.",
+      });
+      return;
+    }
+  }
+
+  const me = actor(req);
+  const patch: Record<string, unknown> = {
+    updatedAt: new Date(),
+    updatedByStaffId: me.id,
+    updatedByLabel: me.label,
+  };
   if (body["name"] !== undefined) {
     const name = trimmed(body["name"]);
     if (!name) { res.status(400).json({ error: "Give the campaign a name." }); return; }
@@ -1108,8 +1565,12 @@ router.patch("/crm/marketing/campaigns/:id", requireCrmAuth("campaigns.write"), 
   }
   if (body["subject"] !== undefined) patch["subject"] = trimmed(body["subject"]) ?? "";
   if (body["preheader"] !== undefined) patch["preheader"] = trimmed(body["preheader"]);
-  if (body["segmentId"] !== undefined) patch["segmentId"] = num(body["segmentId"]) ?? null;
   if (body["designId"] !== undefined) patch["designId"] = num(body["designId"]) ?? null;
+  if (body["scheduledTimezone"] !== undefined) patch["scheduledTimezone"] = trimmed(body["scheduledTimezone"]);
+
+  const audience = audiencePatch(body);
+  if (audience.error) { res.status(400).json({ error: audience.error }); return; }
+  Object.assign(patch, audience.patch);
 
   // Editing AI-written copy by hand does not make it approved — but it does not
   // stay "AI-drafted" either once a person has rewritten it. Only the explicit
@@ -1280,6 +1741,16 @@ router.post("/crm/marketing/campaigns/:id/test-send", requireCrmAuth("campaigns.
     sent: outcome.sent,
     to: staff.email,
     reason: outcome.sent ? null : outcome.reason,
+    // Two audiences, two sentences — the same split the AI availability check
+    // makes. `reason` comes from the mail layer and names environment
+    // variables; an operator reading "RESEND_API_KEY is not set" learns
+    // nothing they can act on, and the variable name belongs in the
+    // administrator's half of the screen.
+    operatorReason: outcome.sent ? null
+      : outcome.failure === "not_configured"
+        ? "This server does not send real mail, so nothing arrived. Everything else about the test worked — the email rendered, and the address was accepted."
+        : "The mail provider refused this test. Nothing was delivered.",
+    adminDetail: outcome.sent ? null : outcome.reason,
     renderedAs: lead ? { id: lead.id, name: lead.name } : null,
     fallbacksUsed: rendered.fallbacks,
     note: "A test send goes to a staff address only and is never counted as a delivery.",
@@ -1298,6 +1769,12 @@ router.post("/crm/marketing/campaigns/:id/schedule", requireCrmAuth("campaigns.s
   const raw = (req.body as { scheduledAt?: unknown })?.scheduledAt;
   const when = raw === null ? null : new Date(String(raw));
   if (when !== null && Number.isNaN(when.getTime())) { res.status(400).json({ error: "That is not a time." }); return; }
+
+  // The zone the person was thinking in. `scheduledAt` is the instant and is
+  // authoritative; this is kept so the screen can name an hour in the zone it
+  // was chosen in, instead of re-projecting it into the reader's own zone and
+  // showing two colleagues two different times for one send.
+  const timezone = trimmed((req.body as { timezone?: unknown })?.timezone);
 
   if (when === null) {
     const refusal = refuseTransition(campaign.status as CrmMarketingCampaignStatus, "draft");
@@ -1319,14 +1796,20 @@ router.post("/crm/marketing/campaigns/:id/schedule", requireCrmAuth("campaigns.s
     return;
   }
 
+  const me = actor(req);
   const [row] = await db.update(crmMarketingCampaigns)
-    .set({ status: "scheduled", scheduledAt: when, updatedAt: new Date() })
+    .set({
+      status: "scheduled", scheduledAt: when,
+      scheduledTimezone: timezone ?? campaign.scheduledTimezone,
+      updatedAt: new Date(), updatedByStaffId: me.id, updatedByLabel: me.label,
+    })
     .where(eq(crmMarketingCampaigns.id, id)).returning();
   await auditAction(req, "marketing.campaign_scheduled", `campaign:${id}`);
   res.json({
     campaign: row,
     preflight: check,
     autoStarts: marketingAutosendEnabled(),
+    autosendEnvVar: MARKETING_AUTOSEND_ENV_VAR,
     note: marketingAutosendEnabled()
       ? "Scheduled, and it will start on its own at that time. The audience is NOT fixed now — it is "
         + "resolved again when the send actually starts, so anybody who unsubscribes or stops matching "
@@ -1664,32 +2147,49 @@ router.post("/crm/marketing/campaigns/:id/ai-draft", requireCrmAuth("campaigns.w
     return;
   }
 
-  const goal = trimmed((req.body as { goal?: unknown })?.goal);
-  if (!goal) { res.status(400).json({ error: "Say what this campaign is for." }); return; }
+  // The brief, in the four parts a person can actually answer: what this is
+  // for, who it is going to, the one thing it must say, and what the reader
+  // should do. They are composed into the single `goal` the drafting library
+  // takes, rather than each becoming a new parameter — the library owns its own
+  // contract, and this route owns how a brief is phrased.
+  const body = req.body as Record<string, unknown>;
+  const purpose = trimmed(body["purpose"]) ?? trimmed(body["goal"]);
+  if (!purpose) { res.status(400).json({ error: "Say what this campaign is for." }); return; }
+  const keyMessage = trimmed(body["keyMessage"]);
+  const action = trimmed(body["action"]);
+  const audienceNote = trimmed(body["audienceNote"]);
+  const length = trimmed(body["length"]);
 
-  let segmentName: string | null = null;
-  let segmentDescription: string | null = null;
-  let audienceShape: { size: number; statuses: string[]; sources: string[]; services: string[] } | null = null;
+  const goal = [
+    purpose,
+    keyMessage ? `The one thing it must say: ${keyMessage}` : null,
+    action ? `What the reader should do: ${action}` : null,
+    audienceNote ? `About the audience: ${audienceNote}` : null,
+    length ? `Length: ${length}.` : null,
+  ].filter(Boolean).join(" ");
 
-  if (campaign.segmentId) {
+  const audience = await resolveAudience(audienceOf(campaign));
+  const leads = audience.leads;
+  const segmentName = audience.problem ? null : audience.label;
+  let segmentDescription: string | null = audienceNote;
+  if (campaign.audienceMode === "segment" && campaign.segmentId) {
     const [segment] = await db.select().from(crmMarketingSegments)
       .where(eq(crmMarketingSegments.id, campaign.segmentId)).limit(1);
-    if (segment) {
-      segmentName = segment.name;
-      segmentDescription = segment.description;
-      const leads = await resolveSegment(segment.definition);
-      audienceShape = {
-        size: leads.length,
-        statuses: [...new Set(leads.map((l) => l.status).filter(Boolean))].slice(0, 12),
-        sources: [...new Set(leads.map((l) => l.source).filter(Boolean))].slice(0, 12),
-        services: [...new Set(leads.map((l) => l.serviceInterest).filter((v): v is string => !!v))].slice(0, 12),
-      };
-    }
+    if (segment?.description) segmentDescription = segment.description;
   }
+
+  // A DESCRIPTION of the audience — counts and distinct classification values.
+  // Never a list of people and never a customer's record.
+  const audienceShape = leads.length > 0 ? {
+    size: leads.length,
+    statuses: [...new Set(leads.map((l) => l.status).filter(Boolean))].slice(0, 12),
+    sources: [...new Set(leads.map((l) => l.source).filter(Boolean))].slice(0, 12),
+    services: [...new Set(leads.map((l) => l.serviceInterest).filter((v): v is string => !!v))].slice(0, 12),
+  } : null;
 
   const result = await draftCampaign({
     goal,
-    tone: trimmed((req.body as { tone?: unknown })?.tone),
+    tone: trimmed(body["tone"]),
     segmentName, segmentDescription, audienceShape,
     mergeFields: ["first_name", "company"] as CrmMergeField[],
   });

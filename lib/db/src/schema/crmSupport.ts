@@ -158,6 +158,44 @@ export type CrmSupportMessageOrigin = (typeof CRM_SUPPORT_MESSAGE_ORIGINS)[numbe
 export const CRM_KB_STATUSES = ["draft", "published"] as const;
 export type CrmKbStatus = (typeof CRM_KB_STATUSES)[number];
 
+// ── M5: delivery of a customer reply ────────────────────────────────────────
+//
+// Reviewed DDL lives in docs/crm-ops/schema/M5-support-delivery.sql. Additive
+// and nullable throughout, so a row written before M5 reads exactly as it did:
+// a null `deliveryState` means "no delivery exists for this row", which is the
+// truth for an internal note, for the customer's own words, and for every
+// reply recorded while Support could not send anything.
+//
+// The states are `CRM_DELIVERY_STATES` from crmDeliveries.ts, not a second
+// vocabulary — a support reply and a reminder are the same problem (did the
+// provider take it, and may we try again?) and answering it two different ways
+// is how two halves of one CRM come to disagree about what "sent" means.
+//
+// Delivery lives on the message row rather than in a side table because a
+// support reply has exactly one recipient and one occurrence: the message
+// itself. The (occurrence, recipient) pair that justifies
+// `crm_reminder_deliveries` being its own table collapses to this row's own
+// identity here.
+
+/**
+ * What an operator can do about a support delivery that did not settle.
+ *
+ * The same three as M4, and they are genuinely different acts:
+ *  - `retry`       — try again with the SAME idempotency key. Safe only while
+ *                    the provider still honours that key; past the window it
+ *                    can duplicate, and the API says so before doing it.
+ *  - `resend`      — deliberately ask for a second copy. NEW key, because a
+ *                    re-send that reused the key would be collapsed into the
+ *                    first send and silently do nothing.
+ *  - `acknowledge` — close the case without sending anything.
+ */
+export const CRM_SUPPORT_DELIVERY_ACTIONS = ["retry", "resend", "acknowledge"] as const;
+export type CrmSupportDeliveryAction = (typeof CRM_SUPPORT_DELIVERY_ACTIONS)[number];
+
+/** How a person closed a support delivery. Mirrors CRM_DELIVERY_RESOLUTIONS. */
+export const CRM_SUPPORT_DELIVERY_RESOLUTIONS = ["acknowledged", "resent", "accepted"] as const;
+export type CrmSupportDeliveryResolution = (typeof CRM_SUPPORT_DELIVERY_RESOLUTIONS)[number];
+
 // ── Tickets ─────────────────────────────────────────────────────────────────
 
 /**
@@ -228,11 +266,28 @@ export const crmSupportTickets = pgTable("crm_support_tickets", {
   /** The knowledge-base article that answers this, when one does. */
   kbArticleId: integer("kb_article_id"),
 
+  /**
+   * M5. The ticket's own `crm_conversations` row, which exists for exactly one
+   * reason: it holds the unguessable reply token that outbound support mail
+   * puts in its `Reply-To`, so the EXISTING inbound webhook correlates a
+   * customer's reply to this ticket without a second correlation scheme.
+   *
+   * Per ticket, in its own identity namespace (`email:support-ticket:<id>`),
+   * because `identityKeyFor()` keys a contact's mail on `email:lead:<id>` —
+   * every ticket for one client would otherwise share one token and a reply
+   * could not say which ticket it answered.
+   *
+   * Null until the first customer reply is actually sent. No foreign key,
+   * matching every other `crm_*` table here.
+   */
+  conversationId: integer("conversation_id"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   // The queue's own order: newest first, keyset-paged on the immutable id.
   index("ix_crm_support_tickets_status_id").on(table.status, table.id),
+  index("ix_crm_support_tickets_conversation").on(table.conversationId),
   index("ix_crm_support_tickets_assignee_id").on(table.assignedToStaffId, table.id),
   index("ix_crm_support_tickets_priority_id").on(table.priority, table.id),
   index("ix_crm_support_tickets_lead").on(table.leadId),
@@ -292,6 +347,69 @@ export const crmSupportMessages = pgTable("crm_support_messages", {
   sentByLabel:   text("sent_by_label"),
   origin:        text("origin").notNull(),
 
+  // ── M5: did this actually reach the customer? ─────────────────────────────
+  //
+  // Every column below is nullable, and null is meaningful rather than missing:
+  // it says NO DELIVERY EXISTS for this row. That is the truth for an internal
+  // note (which is never sent), for the customer's own words (which we do not
+  // mail back to them), and for every reply recorded before Support could send.
+
+  /**
+   * One of `CRM_DELIVERY_STATES`, or null for a row with no delivery.
+   *
+   * `accepted` is the strongest thing the provider can tell us and it is NOT
+   * "delivered" — a bounce arrives afterwards. Nothing in the API or the UI
+   * may render it as "Sent".
+   */
+  deliveryState:   text("delivery_state"),
+  deliveryAttempt: integer("delivery_attempt"),
+
+  /**
+   * When the worker may next attempt this — the ONLY thing a retry moves, and
+   * separate from everything else on the row for the same reason M4 keeps it
+   * separate from `occurrence_at`.
+   *
+   * A `pending` row with a null `nextAttemptAt` is the "waiting for a person"
+   * case: mail is not configured, or an operator has to decide. The check
+   * constraint allows a time only while the state is `pending`.
+   */
+  nextAttemptAt:    timestamp("next_attempt_at", { withTimezone: true }),
+  attemptStartedAt: timestamp("attempt_started_at", { withTimezone: true }),
+  attemptWorker:    text("attempt_worker"),
+
+  /**
+   * Stable across every retry of THIS message, so the provider collapses a
+   * repeat into the original send. A deliberate re-send gets a new one,
+   * because a re-send is a request for a second copy.
+   */
+  deliveryIdempotencyKey: text("delivery_idempotency_key"),
+  /** The address it was handed to, captured at send time. */
+  deliveredTo:            text("delivered_to"),
+  deliveryProviderRef:    text("delivery_provider_ref"),
+  /** A short machine reason, from `DELIVERY_FAILURE_REASONS`. */
+  deliveryFailureReason:  text("delivery_failure_reason"),
+  /** What the provider or the transport actually said. */
+  deliveryFailureDetail:  text("delivery_failure_detail"),
+  deliveryResendCount:    integer("delivery_resend_count"),
+
+  lastRecoveryAction:    text("last_recovery_action"),
+  lastRecoveryByStaffId: integer("last_recovery_by_staff_id"),
+  lastRecoveryAt:        timestamp("last_recovery_at", { withTimezone: true }),
+
+  deliveryResolvedAt:      timestamp("delivery_resolved_at", { withTimezone: true }),
+  deliveryResolvedByStaffId: integer("delivery_resolved_by_staff_id"),
+  deliveryResolution:      text("delivery_resolution"),
+  deliveryResolutionNote:  text("delivery_resolution_note"),
+
+  /**
+   * The `crm_messages` row this thread entry was mirrored from, when the
+   * customer's words arrived by email rather than being typed in here.
+   *
+   * UNIQUE where not null, so re-running the ingest — or two workers running
+   * it at once — cannot double-post a client's reply into their own ticket.
+   */
+  inboundMessageId: integer("inbound_message_id"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("ix_crm_support_messages_ticket").on(table.ticketId, table.id),
@@ -308,6 +426,65 @@ export const crmSupportMessages = pgTable("crm_support_messages", {
   // cannot see.
   check("ck_crm_support_messages_internal_is_ours",
     sql`${table.visibility} <> 'internal' OR ${table.origin} <> 'customer'`),
+
+  // ── M5 ────────────────────────────────────────────────────────────────────
+
+  // Partial, and the uniqueness is the duplicate-send guard: two rows can
+  // never hold the same provider idempotency key, which is exactly the "same
+  // key, different payload" Resend answers with `invalid_idempotent_request`.
+  uniqueIndex("uq_crm_support_messages_idempotency").on(table.deliveryIdempotencyKey)
+    .where(sql`${table.deliveryIdempotencyKey} IS NOT NULL`),
+  // One received email becomes at most one thread entry.
+  uniqueIndex("uq_crm_support_messages_inbound").on(table.inboundMessageId)
+    .where(sql`${table.inboundMessageId} IS NOT NULL`),
+  index("ix_crm_support_messages_delivery_due").on(table.deliveryState, table.nextAttemptAt)
+    .where(sql`${table.deliveryState} IS NOT NULL`),
+  index("ix_crm_support_messages_delivery_open").on(table.deliveryState, table.id)
+    .where(sql`${table.deliveryState} IS NOT NULL AND ${table.deliveryResolvedAt} IS NULL`),
+
+  check("ck_crm_support_messages_delivery_state",
+    sql`${table.deliveryState} IS NULL OR ${table.deliveryState} IN (
+      'pending', 'attempting', 'accepted', 'refused', 'uncertain')`),
+  check("ck_crm_support_messages_recovery_action",
+    sql`${table.lastRecoveryAction} IS NULL OR ${table.lastRecoveryAction} IN (
+      'retry', 'resend', 'acknowledge')`),
+  check("ck_crm_support_messages_delivery_resolution",
+    sql`${table.deliveryResolution} IS NULL OR ${table.deliveryResolution} IN (
+      'acknowledged', 'resent', 'accepted')`),
+
+  // The one this whole feature turns on. An internal note cannot carry a
+  // delivery state, an idempotency key, a recipient or a scheduled attempt —
+  // so no route, present or future, can make a private note deliverable by
+  // forgetting a branch. The database refuses it.
+  check("ck_crm_support_messages_internal_never_sent",
+    sql`${table.visibility} = 'customer'
+      OR (${table.deliveryState} IS NULL
+          AND ${table.deliveryIdempotencyKey} IS NULL
+          AND ${table.deliveredTo} IS NULL
+          AND ${table.nextAttemptAt} IS NULL
+          AND ${table.deliveryProviderRef} IS NULL)`),
+
+  // We never mail the client the words the client sent us. Without this, a
+  // sweep over "customer-visible messages with no delivery state" would
+  // cheerfully send a customer their own message back.
+  check("ck_crm_support_messages_customer_words_never_sent",
+    sql`${table.origin} <> 'customer' OR ${table.deliveryState} IS NULL`),
+
+  // "An automatic attempt is scheduled" is only ever true of a pending row.
+  check("ck_crm_support_messages_next_attempt",
+    sql`${table.nextAttemptAt} IS NULL OR ${table.deliveryState} = 'pending'`),
+
+  check("ck_crm_support_messages_delivery_attempt",
+    sql`${table.deliveryAttempt} IS NULL OR ${table.deliveryAttempt} >= 0`),
+  check("ck_crm_support_messages_resend_count",
+    sql`${table.deliveryResendCount} IS NULL OR ${table.deliveryResendCount} >= 0`),
+
+  // A closed case and its reason are one fact, so "resolved" is never half
+  // written — and nothing can be resolved that was never a delivery at all.
+  check("ck_crm_support_messages_resolved_pair",
+    sql`(${table.deliveryResolvedAt} IS NULL) = (${table.deliveryResolution} IS NULL)`),
+  check("ck_crm_support_messages_resolved_needs_delivery",
+    sql`${table.deliveryResolvedAt} IS NULL OR ${table.deliveryState} IS NOT NULL`),
 ]);
 
 export type CrmSupportMessage = typeof crmSupportMessages.$inferSelect;
