@@ -95,6 +95,58 @@ export const TYPES = {
   durationLabel: "Minutes",
   add: "Add appointment type",
   remove: "Remove",
+
+  descriptionLabel: "What this is (optional)",
+  descriptionHelp: "Shown on your public scheduling page.",
+
+  publicLabel: "Offer on the public scheduling page",
+  publicHelp: "Off means only you and the receptionist can use it.",
+  activeLabel: "Accepting bookings",
+  inactiveBadge: "Not accepting bookings",
+  inactiveHelp: "Turn this back on to make it bookable again. Past appointments keep their type either way.",
+
+  rulesToggleShow: "Set different rules for this service",
+  rulesToggleHide: "Hide this service's rules",
+  rulesHelp: "Anything left on “Follow business setting” uses the value from the Settings tab.",
+  inheritLabel: "Follow business setting",
+  overrideLabel: "Set for this service",
+  // The effective value is always stated, so a business never has to work out
+  // what an inherited rule currently resolves to.
+  effectivePrefix: "In use now:",
+
+  ruleBufferBefore: "Buffer before (minutes)",
+  ruleBufferAfter: "Buffer after (minutes)",
+  ruleMinNotice: "Minimum notice (hours)",
+  ruleMaxAdvance: "Booking window (days ahead)",
+  ruleSlotInterval: "Start times every (minutes)",
+  ruleDailyLimit: "Most per day, this service",
+  ruleDailyLimitHelp: "Counts only this service. The business-wide daily limit still applies on top.",
+} as const;
+
+/**
+ * Per-date closures and short days.
+ *
+ * Separate from "Blocked dates" on purpose, and the wording says which is
+ * which: a blocked date shuts a day, an exception can also OPEN one or shorten
+ * it. Collapsing the two would make "closed" and "open 9–11" the same control.
+ */
+export const EXCEPTIONS = {
+  heading: "Specific dates",
+  help: "Holidays, and days with different hours. These override your weekly hours for that one date.",
+  none: "No date changes yet.",
+  addClosed: "Add a closed day",
+  addHours: "Add a day with different hours",
+  remove: "Remove",
+  dateLabel: "Date",
+  labelLabel: "Why (optional)",
+  labelPlaceholder: "e.g. Public holiday",
+  startLabel: "Opens",
+  endLabel: "Closes",
+  closedTag: "Closed all day",
+  openTag: "Different hours",
+  switchToClosed: "Close all day instead",
+  switchToHours: "Use different hours instead",
+  duplicate: "That date is already listed. Edit the existing entry instead.",
 } as const;
 
 /** One-line pointer to the Calendar screen; this module owns no connection wording. */
@@ -151,12 +203,18 @@ export type ConfigField =
   | "minNoticeHours"
   | "maxAdvanceDays"
   | "blockedDates"
+  | "dateExceptions"
   | "dailyLimit";
 
+// Order matters: the server's per-type messages are prefixed
+// `appointmentTypes[n].bufferBeforeMin`, so the appointmentTypes pattern has to
+// be tested BEFORE the bare rule names or every per-type rejection would be
+// attributed to the business-wide field on the other tab.
 const FIELD_PATTERNS: [ConfigField, RegExp][] = [
   ["timezone", /timezone|IANA/i],
   ["weeklyHours", /weeklyHours/i],
   ["appointmentTypes", /appointmentTypes|appointment type/i],
+  ["dateExceptions", /dateExceptions/i],
   ["bufferBeforeMin", /bufferBeforeMin/i],
   ["bufferAfterMin", /bufferAfterMin/i],
   ["minNoticeHours", /minNoticeHours/i],
@@ -180,7 +238,7 @@ export function saveErrorDetail(message: string | null | undefined): string {
 
 /** Which tab a rejected field lives on, so the error can move the operator there. */
 const ADVANCED_FIELDS: ReadonlySet<ConfigField> = new Set([
-  "bufferBeforeMin", "bufferAfterMin", "minNoticeHours", "maxAdvanceDays", "blockedDates", "dailyLimit",
+  "bufferBeforeMin", "bufferAfterMin", "minNoticeHours", "maxAdvanceDays", "blockedDates", "dateExceptions", "dailyLimit",
 ]);
 
 export function tabForField(field: ConfigField): AvailabilityTab {
@@ -193,6 +251,103 @@ export function isAdvancedField(field: ConfigField): boolean {
 
 export { WEEKDAY_NAMES } from "../../lib/schedulingDates";
 
+/* ── Read shape → write shape ──────────────────────────────────────────── */
+
+import type {
+  AppointmentTypeDetail,
+  AppointmentTypeInput,
+  AvailabilityConfig,
+  AvailabilityConfigInput,
+  DateException,
+} from "../../lib/availabilityApi";
+
+/**
+ * The editable draft, derived from what the server returned.
+ *
+ * `appointmentTypeDetail` is the source for types when the server provides it;
+ * `appointmentTypes` is the fallback for a server that predates per-type rules.
+ * Without that fallback, a dashboard deployed ahead of its backend would show a
+ * business zero appointment types and then save that emptiness.
+ *
+ * The read-only `effective` block is deliberately dropped: echoing a computed
+ * value back as if it were a setting is how every inherited rule would silently
+ * become a hard-coded override on the first save.
+ */
+export function toConfigInput(config: AvailabilityConfig): AvailabilityConfigInput {
+  const detail = config.appointmentTypeDetail;
+  const types: AppointmentTypeInput[] =
+    detail !== undefined
+      ? detail.map((t) => ({
+          id: t.id,
+          name: t.name,
+          durationMin: t.durationMin,
+          description: t.description,
+          active: t.active,
+          public: t.public,
+          calendarId: t.calendarId,
+          ...t.overrides,
+        }))
+      : config.appointmentTypes.map((t) => ({ id: t.id, name: t.name, durationMin: t.durationMin }));
+
+  return {
+    timezone: config.timezone,
+    weeklyHours: { ...config.weeklyHours },
+    appointmentTypes: types,
+    bufferBeforeMin: config.bufferBeforeMin,
+    bufferAfterMin: config.bufferAfterMin,
+    minNoticeHours: config.minNoticeHours,
+    maxAdvanceDays: config.maxAdvanceDays,
+    blockedDates: [...config.blockedDates],
+    dateExceptions: (config.dateExceptions ?? []).map((e) => ({ ...e })),
+    dailyLimit: config.dailyLimit,
+  };
+}
+
+/** The `effective` block for one draft type, or null for a type the server has not seen yet. */
+export function effectiveForType(
+  config: AvailabilityConfig | undefined,
+  typeId: string | undefined,
+): AppointmentTypeDetail["effective"] | null {
+  if (config?.appointmentTypeDetail === undefined || typeId === undefined) return null;
+  return config.appointmentTypeDetail.find((t) => t.id === typeId)?.effective ?? null;
+}
+
+/* ── Date exceptions ───────────────────────────────────────────────────── */
+
+/** ISO date key for today in the viewer's own zone — the sensible default for a new row. */
+export function todayDateKey(now: Date): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * A date not already claimed by another exception.
+ *
+ * The server refuses two entries for one date (the table's unique index), so
+ * offering a duplicate would produce a rejected save instead of a new row.
+ */
+export function nextFreeDateKey(existing: readonly DateException[], now: Date): string {
+  const taken = new Set(existing.map((e) => e.dateKey));
+  const cursor = new Date(now.getTime());
+  for (let i = 0; i < 400; i += 1) {
+    const key = todayDateKey(cursor);
+    if (!taken.has(key)) return key;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return todayDateKey(now);
+}
+
+export function exceptionsSorted(list: readonly DateException[]): DateException[] {
+  return [...list].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+/** True when changing row `index`'s date to `dateKey` would collide with another row. */
+export function wouldDuplicateDate(list: readonly DateException[], index: number, dateKey: string): boolean {
+  return list.some((e, i) => i !== index && e.dateKey === dateKey);
+}
+
 /* ── Exhaustive string surface ─────────────────────────────────────────── */
 
 export function everyRenderableString(): string[] {
@@ -201,6 +356,7 @@ export function everyRenderableString(): string[] {
     ...tabs().map((t) => t.label),
     ...Object.values(SETTINGS),
     ...Object.values(TYPES),
+    ...Object.values(EXCEPTIONS),
     ...Object.values(CALENDAR_POINTER),
     ...Object.values(PUBLIC_LINK),
     saveErrorDetail(null),

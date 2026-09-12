@@ -24,20 +24,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useUpdateAvailabilityConfig, useSetPublicSchedulingLink } from "@/hooks/useAvailability";
-import type { AvailabilityConfig, DayHours } from "@/lib/availabilityApi";
+import type {
+  AppointmentTypeInput,
+  AvailabilityConfig,
+  AvailabilityConfigInput,
+  DateException,
+  DayHours,
+} from "@/lib/availabilityApi";
 import { WEEKDAY_NAMES } from "@/lib/schedulingDates";
 import {
   CALENDAR_POINTER,
+  EXCEPTIONS,
   PAGE,
   PUBLIC_LINK,
   SETTINGS,
   TYPES,
+  effectiveForType,
+  exceptionsSorted,
   fieldForError,
+  isAdvancedField,
+  nextFreeDateKey,
   publicLinkActions,
   publicLinkUrlVisible,
   publicScheduleUrl,
   saveErrorDetail,
   tabForField,
+  toConfigInput,
+  wouldDuplicateDate,
   type AvailabilityTab,
   type ConfigField,
   type PublicLinkKnownState,
@@ -45,15 +58,6 @@ import {
 } from "@/pages/availability/availabilityContract";
 
 type SaveState = "idle" | "pending" | "saved" | "invalid" | "failed";
-
-function clone(config: AvailabilityConfig): AvailabilityConfig {
-  return {
-    ...config,
-    weeklyHours: { ...config.weeklyHours },
-    appointmentTypes: config.appointmentTypes.map((t) => ({ ...t })),
-    blockedDates: [...config.blockedDates],
-  };
-}
 
 export function AvailabilitySettingsForm({
   config,
@@ -70,33 +74,41 @@ export function AvailabilitySettingsForm({
   onFieldMoved?: (tab: AvailabilityTab) => void;
 }) {
   const updateMutation = useUpdateAvailabilityConfig();
-  const [draft, setDraft] = useState<AvailabilityConfig | null>(null);
+  const [draft, setDraft] = useState<AvailabilityConfigInput | null>(null);
+  // What the server last returned, which is where the `effective` values come
+  // from. Kept apart from the draft because an unsaved edit has no effective
+  // value yet, and inventing one would state a rule that is not in force.
+  const [saved, setSaved] = useState<AvailabilityConfig | undefined>(undefined);
   const [save, setSave] = useState<SaveState>("idle");
   const [errorText, setErrorText] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [openTypeRules, setOpenTypeRules] = useState<Set<number>>(() => new Set());
+  const [duplicateDate, setDuplicateDate] = useState(false);
   const seeded = useRef(false);
   const resultRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!seeded.current && config) {
       seeded.current = true;
-      setDraft(clone(config));
+      setDraft(toConfigInput(config));
+      setSaved(config);
     }
   }, [config]);
 
-  const patch = (next: Partial<AvailabilityConfig>) => setDraft((d) => (d ? { ...d, ...next } : d));
+  const patch = (next: Partial<AvailabilityConfigInput>) => setDraft((d) => (d ? { ...d, ...next } : d));
 
   const setDay = (day: number, hours: DayHours | null) =>
     setDraft((d) => (d ? { ...d, weeklyHours: { ...d.weeklyHours, [day]: hours } } : d));
 
-  const setType = (index: number, key: "name" | "durationMin", value: string) =>
+  const setTypeField = (index: number, next: Partial<AppointmentTypeInput>) =>
     setDraft((d) => {
       if (!d) return d;
       const types = [...d.appointmentTypes];
-      const current = types[index]!;
-      types[index] = key === "name" ? { ...current, name: value } : { ...current, durationMin: value === "" ? 0 : Number(value) };
+      types[index] = { ...types[index]!, ...next };
       return { ...d, appointmentTypes: types };
     });
+
+  const setExceptions = (list: DateException[]) => patch({ dateExceptions: exceptionsSorted(list) });
 
   const num = (value: string, fallback: number) => (value === "" ? fallback : Number(value));
 
@@ -106,7 +118,8 @@ export function AvailabilitySettingsForm({
     setErrorText(null);
     try {
       const res = await updateMutation.mutateAsync(draft);
-      setDraft(clone(res.config));
+      setDraft(toConfigInput(res.config));
+      setSaved(res.config);
       setSave("saved");
     } catch (err) {
       const status = (err as { status?: number }).status;
@@ -115,9 +128,7 @@ export function AvailabilitySettingsForm({
       setSave(status === 400 ? "invalid" : "failed");
       const field = status === 400 ? fieldForError(message) : null;
       if (field) {
-        if (field === "bufferBeforeMin" || field === "bufferAfterMin" || field === "minNoticeHours" || field === "maxAdvanceDays" || field === "blockedDates" || field === "dailyLimit") {
-          setAdvancedOpen(true);
-        }
+        if (isAdvancedField(field)) setAdvancedOpen(true);
         const tab = tabForField(field);
         if (tab !== activeTab) onFieldMoved?.(tab);
       }
@@ -278,6 +289,134 @@ export function AvailabilitySettingsForm({
                 }}
               />
             </div>
+
+            <h3 className="sa-section__title">{EXCEPTIONS.heading}</h3>
+            <p className="sa-section__help">{EXCEPTIONS.help}</p>
+            {fieldError("dateExceptions") !== null && <p className="sa-field__error">{fieldError("dateExceptions")}</p>}
+            {draft.dateExceptions.length === 0 ? (
+              <p className="sa-muted">{EXCEPTIONS.none}</p>
+            ) : (
+              <ul className="sa-exceptions">
+                {draft.dateExceptions.map((exception, i) => (
+                  <li key={`${exception.dateKey}-${i}`} className="sa-exceptions__row">
+                    <div className="sa-field sa-field--tight">
+                      <label className="sa-field__label" htmlFor={`sa-exc-date-${i}`}>{EXCEPTIONS.dateLabel}</label>
+                      <input
+                        id={`sa-exc-date-${i}`} className="sa-input sa-input--date" type="date" value={exception.dateKey}
+                        onChange={(e) => {
+                          const key = e.target.value;
+                          if (key === "") return;
+                          // Refused here rather than at the server: the table
+                          // allows one entry per date, and a second row would
+                          // come back as a rejected save with the edit lost.
+                          if (wouldDuplicateDate(draft.dateExceptions, i, key)) {
+                            setDuplicateDate(true);
+                            return;
+                          }
+                          setDuplicateDate(false);
+                          const next = [...draft.dateExceptions];
+                          next[i] = { ...exception, dateKey: key };
+                          setExceptions(next);
+                        }}
+                      />
+                    </div>
+
+                    <span className="sa-exceptions__tag" data-closed={exception.closed}>
+                      {exception.closed ? EXCEPTIONS.closedTag : EXCEPTIONS.openTag}
+                    </span>
+
+                    {!exception.closed && (
+                      <div className="sa-days__hours">
+                        <label className="sa-vh" htmlFor={`sa-exc-start-${i}`}>{`${exception.dateKey} ${EXCEPTIONS.startLabel}`}</label>
+                        <input
+                          id={`sa-exc-start-${i}`} className="sa-input sa-input--time" type="time"
+                          value={exception.hours?.start ?? "09:00"}
+                          onChange={(e) => {
+                            const next = [...draft.dateExceptions];
+                            next[i] = { ...exception, hours: { start: e.target.value, end: exception.hours?.end ?? "17:00" } };
+                            setExceptions(next);
+                          }}
+                        />
+                        <label className="sa-vh" htmlFor={`sa-exc-end-${i}`}>{`${exception.dateKey} ${EXCEPTIONS.endLabel}`}</label>
+                        <input
+                          id={`sa-exc-end-${i}`} className="sa-input sa-input--time" type="time"
+                          value={exception.hours?.end ?? "17:00"}
+                          onChange={(e) => {
+                            const next = [...draft.dateExceptions];
+                            next[i] = { ...exception, hours: { start: exception.hours?.start ?? "09:00", end: e.target.value } };
+                            setExceptions(next);
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="sa-field sa-field--grow">
+                      <label className="sa-field__label" htmlFor={`sa-exc-label-${i}`}>{EXCEPTIONS.labelLabel}</label>
+                      <input
+                        id={`sa-exc-label-${i}`} className="sa-input" maxLength={100}
+                        placeholder={EXCEPTIONS.labelPlaceholder}
+                        value={exception.label ?? ""}
+                        onChange={(e) => {
+                          const next = [...draft.dateExceptions];
+                          next[i] = { ...exception, label: e.target.value };
+                          setExceptions(next);
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="button" className="sa-button sa-button--quiet"
+                      onClick={() => {
+                        const next = [...draft.dateExceptions];
+                        // Switching to closed drops the hours, because the
+                        // server stores a closed day with no hours at all.
+                        next[i] = exception.closed
+                          ? { dateKey: exception.dateKey, closed: false, hours: { start: "09:00", end: "17:00" }, ...(exception.label === undefined ? {} : { label: exception.label }) }
+                          : { dateKey: exception.dateKey, closed: true, ...(exception.label === undefined ? {} : { label: exception.label }) };
+                        setExceptions(next);
+                      }}
+                    >
+                      {exception.closed ? EXCEPTIONS.switchToHours : EXCEPTIONS.switchToClosed}
+                    </button>
+
+                    <button
+                      type="button" className="sa-button sa-button--quiet"
+                      aria-label={`${EXCEPTIONS.remove} ${exception.dateKey}`}
+                      onClick={() => {
+                        setDuplicateDate(false);
+                        setExceptions(draft.dateExceptions.filter((_, n) => n !== i));
+                      }}
+                    >
+                      {EXCEPTIONS.remove}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {duplicateDate && <p className="sa-field__error" role="alert">{EXCEPTIONS.duplicate}</p>}
+            <div className="sa-exceptions__add">
+              <button
+                type="button" className="sa-button"
+                onClick={() => {
+                  setDuplicateDate(false);
+                  setExceptions([...draft.dateExceptions, { dateKey: nextFreeDateKey(draft.dateExceptions, new Date()), closed: true }]);
+                }}
+              >
+                {EXCEPTIONS.addClosed}
+              </button>
+              <button
+                type="button" className="sa-button"
+                onClick={() => {
+                  setDuplicateDate(false);
+                  setExceptions([
+                    ...draft.dateExceptions,
+                    { dateKey: nextFreeDateKey(draft.dateExceptions, new Date()), closed: false, hours: { start: "09:00", end: "13:00" } },
+                  ]);
+                }}
+              >
+                {EXCEPTIONS.addHours}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -291,23 +430,132 @@ export function AvailabilitySettingsForm({
           <p className="sa-section__help">{TYPES.help}</p>
           {fieldError("appointmentTypes") !== null && <p className="sa-field__error">{fieldError("appointmentTypes")}</p>}
           <ul className="sa-types">
-            {draft.appointmentTypes.map((type, i) => (
-              <li key={type.id} className="sa-types__row">
-                <div className="sa-field sa-field--grow">
-                  <label className="sa-field__label" htmlFor={`sa-type-name-${i}`}>{TYPES.nameLabel}</label>
-                  <input id={`sa-type-name-${i}`} className="sa-input" value={type.name} maxLength={100} onChange={(e) => setType(i, "name", e.target.value)} />
-                </div>
-                <div className="sa-field sa-field--tight">
-                  <label className="sa-field__label" htmlFor={`sa-type-min-${i}`}>{TYPES.durationLabel}</label>
-                  <input id={`sa-type-min-${i}`} className="sa-input sa-input--num" type="number" inputMode="numeric" min={5} max={480} value={type.durationMin} onChange={(e) => setType(i, "durationMin", e.target.value)} />
-                </div>
-                <button type="button" className="sa-button sa-button--quiet" onClick={() => patch({ appointmentTypes: draft.appointmentTypes.filter((_, n) => n !== i) })} disabled={draft.appointmentTypes.length <= 1}>{TYPES.remove}</button>
-              </li>
-            ))}
+            {draft.appointmentTypes.map((type, i) => {
+              const effective = effectiveForType(saved, type.id);
+              const rulesOpen = openTypeRules.has(i);
+              const toggleRules = () =>
+                setOpenTypeRules((open) => {
+                  const next = new Set(open);
+                  if (next.has(i)) next.delete(i);
+                  else next.add(i);
+                  return next;
+                });
+              const isActive = type.active ?? true;
+              return (
+                <li key={type.id ?? `new-${i}`} className="sa-types__item" data-inactive={!isActive}>
+                  <div className="sa-types__row">
+                    <div className="sa-field sa-field--grow">
+                      <label className="sa-field__label" htmlFor={`sa-type-name-${i}`}>{TYPES.nameLabel}</label>
+                      <input id={`sa-type-name-${i}`} className="sa-input" value={type.name} maxLength={100} onChange={(e) => setTypeField(i, { name: e.target.value })} />
+                    </div>
+                    <div className="sa-field sa-field--tight">
+                      <label className="sa-field__label" htmlFor={`sa-type-min-${i}`}>{TYPES.durationLabel}</label>
+                      <input
+                        id={`sa-type-min-${i}`} className="sa-input sa-input--num" type="number" inputMode="numeric" min={5} max={480}
+                        value={type.durationMin}
+                        onChange={(e) => setTypeField(i, { durationMin: e.target.value === "" ? 0 : Number(e.target.value) })}
+                      />
+                    </div>
+                    <button
+                      type="button" className="sa-button sa-button--quiet"
+                      onClick={() => {
+                        patch({ appointmentTypes: draft.appointmentTypes.filter((_, n) => n !== i) });
+                        setOpenTypeRules(new Set());
+                      }}
+                      disabled={draft.appointmentTypes.length <= 1}
+                    >
+                      {TYPES.remove}
+                    </button>
+                  </div>
+
+                  <div className="sa-field">
+                    <label className="sa-field__label" htmlFor={`sa-type-desc-${i}`}>{TYPES.descriptionLabel}</label>
+                    <input
+                      id={`sa-type-desc-${i}`} className="sa-input sa-input--wide" maxLength={500}
+                      value={type.description ?? ""}
+                      aria-describedby={`sa-type-desc-help-${i}`}
+                      onChange={(e) => setTypeField(i, { description: e.target.value })}
+                    />
+                    <p className="sa-field__help" id={`sa-type-desc-help-${i}`}>{TYPES.descriptionHelp}</p>
+                  </div>
+
+                  <div className="sa-types__flags">
+                    <label className="sa-check" htmlFor={`sa-type-active-${i}`}>
+                      <input
+                        id={`sa-type-active-${i}`} type="checkbox" checked={isActive}
+                        onChange={(e) => setTypeField(i, { active: e.target.checked })}
+                      />
+                      <span>{TYPES.activeLabel}</span>
+                    </label>
+                    <label className="sa-check" htmlFor={`sa-type-public-${i}`}>
+                      <input
+                        id={`sa-type-public-${i}`} type="checkbox" checked={type.public ?? true}
+                        onChange={(e) => setTypeField(i, { public: e.target.checked })}
+                        aria-describedby={`sa-type-public-help-${i}`}
+                      />
+                      <span>{TYPES.publicLabel}</span>
+                    </label>
+                    <p className="sa-field__help" id={`sa-type-public-help-${i}`}>{TYPES.publicHelp}</p>
+                  </div>
+                  {!isActive && (
+                    <p className="sa-types__inactive" role="note">
+                      <strong>{TYPES.inactiveBadge}.</strong> {TYPES.inactiveHelp}
+                    </p>
+                  )}
+
+                  <button
+                    type="button" className="sa-button sa-button--quiet"
+                    aria-expanded={rulesOpen} aria-controls={`sa-type-rules-${i}`}
+                    onClick={toggleRules}
+                  >
+                    {rulesOpen ? TYPES.rulesToggleHide : TYPES.rulesToggleShow}
+                  </button>
+
+                  <div id={`sa-type-rules-${i}`} hidden={!rulesOpen} className="sa-types__rules">
+                    <p className="sa-field__help">{TYPES.rulesHelp}</p>
+                    <RuleField
+                      id={`sa-type-bb-${i}`} label={TYPES.ruleBufferBefore} min={0} max={240}
+                      value={type.bufferBeforeMin ?? null} effective={effective?.bufferBeforeMin ?? null}
+                      onChange={(v) => setTypeField(i, { bufferBeforeMin: v })}
+                    />
+                    <RuleField
+                      id={`sa-type-ba-${i}`} label={TYPES.ruleBufferAfter} min={0} max={240}
+                      value={type.bufferAfterMin ?? null} effective={effective?.bufferAfterMin ?? null}
+                      onChange={(v) => setTypeField(i, { bufferAfterMin: v })}
+                    />
+                    <RuleField
+                      id={`sa-type-mn-${i}`} label={TYPES.ruleMinNotice} min={0} max={720}
+                      value={type.minNoticeHours ?? null} effective={effective?.minNoticeHours ?? null}
+                      onChange={(v) => setTypeField(i, { minNoticeHours: v })}
+                    />
+                    <RuleField
+                      id={`sa-type-ma-${i}`} label={TYPES.ruleMaxAdvance} min={1} max={365}
+                      value={type.maxAdvanceDays ?? null} effective={effective?.maxAdvanceDays ?? null}
+                      onChange={(v) => setTypeField(i, { maxAdvanceDays: v })}
+                    />
+                    <RuleField
+                      id={`sa-type-si-${i}`} label={TYPES.ruleSlotInterval} min={5} max={240}
+                      value={type.slotIntervalMin ?? null} effective={effective?.slotIntervalMin ?? null}
+                      onChange={(v) => setTypeField(i, { slotIntervalMin: v })}
+                    />
+                    <RuleField
+                      id={`sa-type-dl-${i}`} label={TYPES.ruleDailyLimit} min={1} max={200}
+                      value={type.dailyLimit ?? null} effective={effective?.typeDailyLimit ?? null}
+                      help={TYPES.ruleDailyLimitHelp}
+                      onChange={(v) => setTypeField(i, { dailyLimit: v })}
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
           <button
             type="button" className="sa-button"
-            onClick={() => patch({ appointmentTypes: [...draft.appointmentTypes, { id: `new-${draft.appointmentTypes.length + 1}`, name: "", durationMin: 30 }] })}
+            onClick={() =>
+              // No `id`: the server assigns one. A client-invented id would be
+              // treated as "update the row with that id" and match nothing.
+              patch({ appointmentTypes: [...draft.appointmentTypes, { name: "", durationMin: 30, active: true, public: true }] })
+            }
           >
             {TYPES.add}
           </button>
@@ -316,6 +564,62 @@ export function AvailabilitySettingsForm({
         {saveBar}
       </div>
     </div>
+  );
+}
+
+/**
+ * One per-service rule: inherit, or set a number.
+ *
+ * The two states are a radio pair rather than an empty-means-inherit text box,
+ * because an empty box cannot distinguish "follow the business" from "no buffer
+ * at all", and those produce different bookable times. The in-force value is
+ * always shown next to it, so a business reading an inherited rule can see what
+ * it currently resolves to without opening the other tab.
+ */
+function RuleField({ id, label, value, effective, min, max, help, onChange }: {
+  id: string;
+  label: string;
+  value: number | null;
+  /** What the server says is in force; null when it is uncapped or not yet saved. */
+  effective: number | null;
+  min: number;
+  max: number;
+  help?: string;
+  onChange: (value: number | null) => void;
+}) {
+  const overriding = value !== null;
+  return (
+    <fieldset className="sa-rule">
+      <legend className="sa-field__label">{label}</legend>
+      <label className="sa-check" htmlFor={`${id}-inherit`}>
+        <input
+          id={`${id}-inherit`} type="radio" name={id} checked={!overriding}
+          onChange={() => onChange(null)}
+        />
+        <span>{TYPES.inheritLabel}</span>
+      </label>
+      <label className="sa-check" htmlFor={`${id}-override`}>
+        <input
+          id={`${id}-override`} type="radio" name={id} checked={overriding}
+          // Seeds from the value in force, so switching to "set" starts from
+          // what is already happening rather than from an arbitrary number.
+          onChange={() => onChange(effective ?? min)}
+        />
+        <span>{TYPES.overrideLabel}</span>
+      </label>
+      {overriding && (
+        <>
+          <label className="sa-vh" htmlFor={`${id}-value`}>{label}</label>
+          <input
+            id={`${id}-value`} className="sa-input sa-input--num" type="number" inputMode="numeric"
+            min={min} max={max} value={value}
+            onChange={(e) => onChange(e.target.value === "" ? min : Number(e.target.value))}
+          />
+        </>
+      )}
+      {effective !== null && <p className="sa-rule__effective">{`${TYPES.effectivePrefix} ${effective}`}</p>}
+      {help !== undefined && <p className="sa-field__help">{help}</p>}
+    </fieldset>
   );
 }
 

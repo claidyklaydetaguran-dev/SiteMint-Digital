@@ -10,7 +10,7 @@ import {
   cancelAppointmentRequest,
   setPublicSchedulingLink,
   fetchCalendarStatus,
-  type AvailabilityConfig,
+  type AvailabilityConfigInput,
   type AppointmentContact,
 } from "@/lib/availabilityApi";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
@@ -31,7 +31,7 @@ export function useUpdateAvailabilityConfig() {
   const qc = useQueryClient();
   const firmId = useAuthenticatedFirmId();
   return useMutation({
-    mutationFn: (config: AvailabilityConfig) => updateAvailabilityConfig(config),
+    mutationFn: (config: AvailabilityConfigInput) => updateAvailabilityConfig(config),
     onSuccess: () => {
       if (firmId !== undefined) qc.invalidateQueries({ queryKey: [ROOT, "config", firmId] });
     },

@@ -19,16 +19,107 @@ export interface AppointmentType {
   durationMin: number;
 }
 
+/**
+ * A per-appointment-type rule override.
+ *
+ * `null` means "inherit the business default" and is NOT the same as 0 — a
+ * service with no buffer sends 0, a service that follows the business sends
+ * null. The server keeps both meanings, so the editor must too.
+ */
+export interface AppointmentTypeOverrides {
+  bufferBeforeMin: number | null;
+  bufferAfterMin: number | null;
+  minNoticeHours: number | null;
+  maxAdvanceDays: number | null;
+  slotIntervalMin: number | null;
+  dailyLimit: number | null;
+}
+
+/** What the server will actually use for this type, after inheritance. */
+export interface EffectiveTypeRules {
+  durationMin: number;
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
+  minNoticeHours: number;
+  maxAdvanceDays: number;
+  slotIntervalMin: number;
+  dailyLimit: number | null;
+  typeDailyLimit: number | null;
+}
+
+export interface AppointmentTypeDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMin: number;
+  active: boolean;
+  public: boolean;
+  calendarId: string | null;
+  overrides: AppointmentTypeOverrides;
+  /**
+   * Computed server-side by the same function the slot search uses. The editor
+   * DISPLAYS this and never recomputes it — a second inheritance calculation
+   * here is how a shown rule starts differing from the enforced one.
+   */
+  effective: EffectiveTypeRules;
+}
+
+/** A named departure from the weekly pattern on one date, in the business's zone. */
+export interface DateException {
+  dateKey: string;
+  closed: boolean;
+  hours?: DayHours;
+  label?: string;
+}
+
 export interface AvailabilityConfig {
   timezone: string;
   weeklyHours: Record<number, DayHours | null>;
   appointmentTypes: AppointmentType[];
+  /** Present from the scheduling 0002 server; absent from an older one. */
+  appointmentTypeDetail?: AppointmentTypeDetail[];
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
+  minNoticeHours: number;
+  maxAdvanceDays: number;
+  slotIntervalMin?: number;
+  blockedDates: string[];
+  dateExceptions?: DateException[];
+  dailyLimit: number | null;
+}
+
+/**
+ * What the editor sends back. Distinct from `AvailabilityConfig` because the
+ * write shape is not the read shape: types carry their overrides inline, and
+ * the read-only `effective` block is never echoed back.
+ */
+export interface AvailabilityConfigInput {
+  timezone: string;
+  weeklyHours: Record<number, DayHours | null>;
+  appointmentTypes: AppointmentTypeInput[];
   bufferBeforeMin: number;
   bufferAfterMin: number;
   minNoticeHours: number;
   maxAdvanceDays: number;
   blockedDates: string[];
+  dateExceptions: DateException[];
   dailyLimit: number | null;
+}
+
+export interface AppointmentTypeInput {
+  id?: string;
+  name: string;
+  durationMin: number;
+  description?: string | null;
+  active?: boolean;
+  public?: boolean;
+  calendarId?: string | null;
+  bufferBeforeMin?: number | null;
+  bufferAfterMin?: number | null;
+  minNoticeHours?: number | null;
+  maxAdvanceDays?: number | null;
+  slotIntervalMin?: number | null;
+  dailyLimit?: number | null;
 }
 
 export const DAY_REASONS = [
@@ -121,7 +212,7 @@ export function fetchAvailabilityConfig(): Promise<{ config: AvailabilityConfig 
   return apiFetch("/receptionist/availability/config");
 }
 
-export function updateAvailabilityConfig(config: AvailabilityConfig): Promise<{ config: AvailabilityConfig }> {
+export function updateAvailabilityConfig(config: AvailabilityConfigInput): Promise<{ config: AvailabilityConfig }> {
   return apiFetch("/receptionist/availability/config", { method: "PUT", body: JSON.stringify(config) });
 }
 

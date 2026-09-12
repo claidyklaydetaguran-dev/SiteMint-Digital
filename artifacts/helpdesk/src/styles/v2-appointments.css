@@ -841,6 +841,103 @@
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 }
 
+/* ── Appointment types: one card per service ───────────────────────────── */
+
+.sa-types__item {
+  padding: var(--sd-space-4) 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+.sa-types__item > .sa-types__row {
+  padding-top: 0;
+  border-bottom: 0;
+}
+/* A service that is not accepting bookings still reads clearly — dimmed text
+   would make the row that most needs attention the hardest one to read. */
+.sa-types__item[data-inactive="true"] {
+  padding-left: var(--sd-space-3);
+  border-left: 3px solid var(--sd-border-strong);
+}
+
+.sa-types__flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-2) var(--sd-space-4);
+  margin-top: var(--sd-space-2);
+}
+.sa-types__inactive {
+  margin: var(--sd-space-2) 0 0;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text);
+}
+
+.sa-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  /* 44px keeps the whole label a comfortable target, not just the box. */
+  min-height: 44px;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text);
+  cursor: pointer;
+}
+.sa-check input { width: 18px; height: 18px; cursor: pointer; }
+
+.sa-types__rules {
+  display: grid;
+  gap: var(--sd-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin-top: var(--sd-space-3);
+}
+.sa-types__rules > .sa-field__help { grid-column: 1 / -1; margin: 0; }
+
+.sa-rule {
+  margin: 0;
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-control);
+}
+.sa-rule legend {
+  padding: 0 var(--sd-space-1);
+}
+.sa-rule .sa-check { min-height: 32px; }
+.sa-rule .sa-input--num { margin-top: var(--sd-space-1); }
+.sa-rule__effective {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text-muted);
+}
+
+/* ── Specific dates ───────────────────────────────────────────────────── */
+
+.sa-exceptions { margin: 0; padding: 0; list-style: none; }
+.sa-exceptions__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sd-space-2);
+  padding: var(--sd-space-3) 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+.sa-exceptions__tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--sd-space-3);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  font-size: var(--sd-text-small);
+  color: var(--sd-text);
+  white-space: nowrap;
+}
+.sa-exceptions__add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-2);
+  margin-top: var(--sd-space-3);
+}
+
 .sa-blocked { display: flex; flex-wrap: wrap; gap: var(--sd-space-2); }
 .sa-blocked__item {
   display: inline-flex;
