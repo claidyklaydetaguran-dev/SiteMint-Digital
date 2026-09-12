@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
+import { ConnectionBanner } from "@/components/crm/ConnectionBanner";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
@@ -15,7 +16,7 @@ import {
   ExternalLink, Building2, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { adminFetch, adminProbe, adminLogout, getAdminToken } from "@/lib/adminFetch";
+import { adminFetch, adminProbe, adminLogout, getAdminToken, bindDraftOwner } from "@/lib/adminFetch";
 import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
@@ -976,8 +977,14 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
       try {
         const r = await adminProbe("/api/crm/staff/me");
         if (!r.ok || cancelled) return;
-        const d = await r.json() as { staff?: { displayName: string; email: string; role: string } };
-        if (d.staff) setSignedIn(d.staff);
+        const d = await r.json() as { staff?: { id?: number; displayName: string; email: string; role: string } };
+        if (d.staff) {
+          setSignedIn(d.staff);
+          // Scope preserved editor content to this person. Switching accounts
+          // on a shared machine discards the previous one's unsent text before
+          // they can reach an editor.
+          bindDraftOwner(d.staff.id ?? d.staff.email);
+        }
       } catch { /* leave the generic chip */ }
     })();
     return () => { cancelled = true; };
@@ -1316,6 +1323,9 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main content ── */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
+          {/* Above the breadcrumbs so a connection problem is visible on every
+              CRM screen rather than only where somebody remembered to add it. */}
+          <ConnectionBanner />
           <CrmBreadcrumbs location={location} />
           <CrmErrorBoundary>
             {children}

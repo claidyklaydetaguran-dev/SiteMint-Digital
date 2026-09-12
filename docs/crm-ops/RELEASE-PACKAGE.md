@@ -61,9 +61,16 @@ step 4. Do not print it.
 
 ## 3. Reviewed schema diff
 
-The CRM owns **41 `crm_*` tables** after this release. Of those, M1–M3 on this
-branch add the following; everything else already exists in environments that
-have ever had the CRM.
+The CRM owns **60 `crm_*` tables** after this release — the number the schema
+barrel declares, and the number a first installation produces. Of those, M1–M4
+on this branch add the following; everything else already exists in
+environments that have ever had the CRM.
+
+To check an environment against this figure rather than trusting it:
+
+```bash
+psql "$DATABASE_URL" -tAc "select count(*) from information_schema.tables where table_schema='public' and table_name like 'crm\_%'"
+```
 
 ### 3a. Tables added by M1 (staff identity)
 

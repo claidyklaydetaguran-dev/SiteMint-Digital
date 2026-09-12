@@ -134,25 +134,45 @@ export interface DraftingAvailability {
   available: boolean;
   /** Names of absent configuration variables — never their values. */
   missing: readonly string[];
+  /**
+   * For the person trying to write a campaign. No variable names, no server
+   * vocabulary: somebody selling websites should not have to read an
+   * environment variable to understand why a button is greyed out.
+   */
   reason: string | null;
+  /**
+   * For whoever administers the deployment. This is where the variable names
+   * live, and the UI shows it behind a disclosure rather than in the flow.
+   */
+  adminDetail: string | null;
 }
 
 /**
- * Whether drafting can run at all, and if not, why — in words an operator can
- * act on. The builder renders this as a status panel rather than hiding the
- * feature, because "the button is missing" and "the button is broken" are
- * indistinguishable to the person using it.
+ * Whether drafting can run at all, and if not, why.
+ *
+ * Two audiences, two messages. The builder renders the operator one as a status
+ * panel rather than hiding the feature, because "the button is missing" and
+ * "the button is broken" are indistinguishable to the person using it — and it
+ * keeps the administrator detail collapsed, because a raw variable name in the
+ * main flow is noise to the operator and an invitation to paste a secret
+ * somewhere it does not belong.
  */
 export function draftingAvailability(env: NodeJS.ProcessEnv = process.env): DraftingAvailability {
-  if (isOpenAiConfigured(env)) return { available: true, missing: [], reason: null };
+  if (isOpenAiConfigured(env)) {
+    return { available: true, missing: [], reason: null, adminDetail: null };
+  }
   const missing = missingOpenAiConfig(env);
   return {
     available: false,
     missing,
     reason:
-      `AI drafting is not configured on this server (${missing.join(" and ")} not set). `
-      + "Everything else in the campaign builder works; write the copy yourself, "
-      + "or ask whoever administers this deployment to add the configuration.",
+      "Drafting with AI is not switched on for this workspace yet. "
+      + "Everything else here works — write the email yourself, or ask whoever "
+      + "looks after this system to turn it on.",
+    adminDetail:
+      `Set ${missing.join(" and ")} in the deployment's secret store, then restart. `
+      + "These are the same variables the AI intake scoring already uses, so an "
+      + "environment where that works needs no new credential.",
   };
 }
 
@@ -170,7 +190,13 @@ export function draftingAvailability(env: NodeJS.ProcessEnv = process.env): Draf
 const UNGROUNDED_CLAIM_RULES: { name: string; pattern: RegExp; why: string }[] = [
   {
     name: "price",
-    pattern: /(?:[$£€]\s?\d|(?:\b\d[\d,]*(?:\.\d+)?)\s?(?:usd|dollars|per month|\/month|a month))/i,
+    // The amount must be captured WHOLE. An earlier version matched only the
+    // symbol and one digit, so "£499" reported as "£4" — harmless while the
+    // guard only ever refused, but once an approved fact can license a match,
+    // a truncated "£1" out of "£1,999" is a substring of an approved "£1,200"
+    // and would license an invented price. The match is the unit of trust, so
+    // it has to be the whole claim.
+    pattern: /(?:[$£€]\s?\d[\d,]*(?:\.\d+)?|(?:\b\d[\d,]*(?:\.\d+)?)\s?(?:usd|dollars|per month|\/month|a month))/i,
     why: "It names a price. Nothing in the grounding set contains pricing, so any figure here was invented.",
   },
   {
@@ -217,17 +243,60 @@ export interface UngroundedClaim {
 }
 
 /**
+ * A fact an authorised owner has supplied and stands behind.
+ *
+ * This is what makes a price sayable. The guard below does not ask "does this
+ * text contain a number" — it asks "is this claim one the owner approved". A
+ * campaign that genuinely has a price is normal business, and refusing it would
+ * make the feature useless for the thing marketing exists to do. What must
+ * never happen is the *model* inventing one.
+ */
+export interface ApprovedFact {
+  /** The exact claim as the owner wrote it, e.g. "£1,200 setup". */
+  text: string;
+  /** Who approved it. Recorded so a claim in a sent email has a name against it. */
+  approvedBy: string;
+}
+
+/** Normalised for comparison: case, whitespace and thousands separators. */
+function claimKey(s: string): string {
+  return s.toLowerCase().replace(/,/g, "").replace(/\s+/g, " ").trim();
+}
+
+/**
  * Finds claims in drafted copy that nothing in the grounding set supports.
  *
  * Pure, so the judgement can be tested without a model or a network — which
  * matters, because this function is the actual guarantee. The prompt is only
  * the polite version of it.
+ *
+ * `approved` licenses specific claims. A matched fragment is allowed when it
+ * appears inside a fact an owner approved — so "£1,200 setup" passes if the
+ * owner supplied it, and "£999 this week only" still fails, because nobody
+ * authorised that figure. Matching is on the normalised fragment rather than
+ * the whole sentence, so the model may write around the fact without having to
+ * reproduce the owner's sentence word for word.
  */
-export function findUngroundedClaims(text: string): UngroundedClaim[] {
+export function findUngroundedClaims(
+  text: string,
+  approved: readonly ApprovedFact[] = [],
+): UngroundedClaim[] {
+  const licensed = approved.map((f) => claimKey(f.text));
+  const isLicensed = (fragment: string) => {
+    const key = claimKey(fragment);
+    return licensed.some((fact) => fact.includes(key));
+  };
+
   const found: UngroundedClaim[] = [];
   for (const rule of UNGROUNDED_CLAIM_RULES) {
-    const m = rule.pattern.exec(text);
-    if (m) found.push({ rule: rule.name, matched: m[0].slice(0, 120), why: rule.why });
+    // `matchAll` rather than `exec`: a draft can carry one approved price and
+    // one invented one, and stopping at the first match would let the second
+    // through whenever the approved one happened to come first.
+    for (const m of text.matchAll(new RegExp(rule.pattern.source, rule.pattern.flags.replace("g", "") + "g"))) {
+      if (isLicensed(m[0])) continue;
+      found.push({ rule: rule.name, matched: m[0].slice(0, 120), why: rule.why });
+      break;
+    }
   }
   return found;
 }

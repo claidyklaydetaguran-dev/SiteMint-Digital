@@ -23,6 +23,9 @@
  * throw `AdminApiError` for non-2xx responses.
  */
 
+import { reportRequestFailed, reportRequestSucceeded } from "./connectionState";
+import { clearAllDrafts, setDraftOwner } from "./draftVault";
+
 export const ADMIN_TOKEN_KEY = "adminToken";
 export const ADMIN_UNAUTHORIZED_EVENT = "admin:unauthorized";
 export const ADMIN_LOGIN_PATH = "/admin";
@@ -175,7 +178,19 @@ export async function adminFetch(path: string, init: RequestInit = {}): Promise<
   if (csrf && MUTATING_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
     headers.set(CSRF_HEADER, csrf);
   }
-  const res = await fetch(path, { ...init, headers, credentials: "include" });
+  // A completed request proves the transport works, whatever the server said;
+  // a rejected fetch is the only thing that means "we could not reach it". An
+  // HTTP 500 is a server problem, not a connection problem, and telling
+  // somebody they are offline when they are not sends them to fix the wrong
+  // thing.
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, credentials: "include" });
+  } catch (err) {
+    reportRequestFailed();
+    throw err;
+  }
+  reportRequestSucceeded();
   if (res.status === 401 && ownsSessionSignal(path)) notifyUnauthorized();
   return res;
 }
@@ -258,8 +273,22 @@ export async function adminLogout(): Promise<void> {
   } finally {
     clearAdminToken();
     clearCsrfToken();
+    // Unsent scratch content belongs to the person who typed it, and a shared
+    // machine is normal in a three-person agency. It goes at sign-out, before
+    // the next person can reach an editor — not "eventually".
+    clearAllDrafts();
     unauthorizedNotified = false;
   }
+}
+
+/**
+ * Bind preserved drafts to the signed-in person.
+ *
+ * Call this once the staff identity is known. Switching accounts on a shared
+ * machine discards the previous person's unsent content; see `draftVault`.
+ */
+export function bindDraftOwner(staffId: number | string | null): void {
+  setDraftOwner(staffId);
 }
 
 function authHeaderOnly(): HeadersInit {

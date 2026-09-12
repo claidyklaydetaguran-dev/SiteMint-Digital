@@ -335,7 +335,7 @@ suite("marketing: audience, exclusions, sending, and honest numbers (real DB)", 
     expect(findBadMergeTokens("Hi {{first_name}}")).not.toHaveLength(0);
     expect(findBadMergeTokens("Hi {{first_name|there}}")).toHaveLength(0);
 
-    const available = () => ({ available: true, missing: [] as string[], reason: null });
+    const available = () => ({ available: true, missing: [] as string[], reason: null, adminDetail: null });
 
     const priced = await draftCampaign({ goal: "sell an audit" }, {
       availability: available,
