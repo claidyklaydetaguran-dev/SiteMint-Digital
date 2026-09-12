@@ -642,13 +642,13 @@ check(
   // voice 0008 added voice_signup_jobs (durable registration -> CRM -> email).
   // voice 0010 added voice_messages (saved caller requests) and
   // voice_notifications (the durable post-call email outbox).
-  "the committed migrations create exactly thirty-two domain tables",
-  domainTables.length === 32,
+  "the committed migrations create exactly thirty-three domain tables",
+  domainTables.length === 33, // scheduling 0002: +scheduling_date_exceptions
   domainTables.join(","),
 );
 check(
-  "the scheduling migrations create exactly seven scheduling_* tables",
-  schedulingTables.length === 7 && schedulingTables.every((t) => t.startsWith("scheduling_")),
+  "the scheduling migrations create exactly eight scheduling_* tables",
+  schedulingTables.length === 8 && schedulingTables.every((t) => t.startsWith("scheduling_")),
   schedulingTables.join(","),
 );
 check(

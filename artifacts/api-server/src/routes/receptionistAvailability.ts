@@ -17,7 +17,9 @@ import {
   getSerializedAvailabilitySettings,
   setPublicSlug,
   newPublicSlug,
+  type AppointmentTypeInput,
   type AvailabilitySettingsInput,
+  type DateExceptionInput,
 } from "../lib/scheduling/schedulingRepository.js";
 import type { DayHours } from "../lib/scheduling/availabilityEngine.js";
 import { parseDateKey } from "../lib/scheduling/zonedTime.js";
@@ -52,6 +54,7 @@ const router = Router();
 
 const MAX_APPOINTMENT_TYPES = 20;
 const MAX_BLOCKED_DATES = 366;
+const MAX_DATE_EXCEPTIONS = 366;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -73,9 +76,32 @@ function validateDayHours(value: unknown, label: string): DayHours | null {
   return { start, end };
 }
 
-function validateAppointmentType(value: unknown, index: number): { id?: string; name: string; durationMin: number } {
+/**
+ * An optional per-type rule override.
+ *
+ * Three states have to survive the wire, because collapsing any two of them
+ * loses a meaning the business actually needs:
+ *   - absent    → leave whatever is stored alone,
+ *   - null      → clear the override, go back to inheriting,
+ *   - a number  → set it (0 included: "no buffer" is a real choice).
+ */
+function validateOverride(
+  value: unknown,
+  label: string,
+  min: number,
+  max: number,
+): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new ValidationError(`${label} must be null (inherit) or an integer between ${min} and ${max}.`);
+  }
+  return value;
+}
+
+function validateAppointmentType(value: unknown, index: number): AppointmentTypeInput {
   if (!isPlainObject(value)) throw new ValidationError(`appointmentTypes[${index}] must be an object.`);
-  const { id, name, durationMin } = value;
+  const { id, name, durationMin, description, calendarId, active, public: isPublic } = value;
   if (id !== undefined && (typeof id !== "string" || id.length > 50)) {
     throw new ValidationError(`appointmentTypes[${index}].id must be a string (max 50 chars) if provided.`);
   }
@@ -85,7 +111,65 @@ function validateAppointmentType(value: unknown, index: number): { id?: string; 
   if (typeof durationMin !== "number" || !Number.isInteger(durationMin) || durationMin < 5 || durationMin > 480) {
     throw new ValidationError(`appointmentTypes[${index}].durationMin must be an integer between 5 and 480.`);
   }
-  return { ...(typeof id === "string" ? { id } : {}), name: name.trim(), durationMin };
+  if (description !== undefined && description !== null && (typeof description !== "string" || description.length > 500)) {
+    throw new ValidationError(`appointmentTypes[${index}].description must be a string of 500 characters or fewer, or null.`);
+  }
+  // The calendar identifier is an opaque provider string the business chose from
+  // its own connected-calendar list. It is never used to construct a request URL.
+  if (calendarId !== undefined && calendarId !== null && (typeof calendarId !== "string" || calendarId.length > 200)) {
+    throw new ValidationError(`appointmentTypes[${index}].calendarId must be a string of 200 characters or fewer, or null.`);
+  }
+  function validateFlag(flag: unknown, field: string): boolean | undefined {
+    if (flag === undefined) return undefined;
+    if (typeof flag !== "boolean") throw new ValidationError(`appointmentTypes[${index}].${field} must be true or false.`);
+    return flag;
+  }
+  const parsedActive = validateFlag(active, "active");
+  const parsedPublic = validateFlag(isPublic, "public");
+
+  const prefix = `appointmentTypes[${index}]`;
+  return {
+    ...(typeof id === "string" ? { id } : {}),
+    name: name.trim(),
+    durationMin,
+    // Both stay ABSENT when the client omitted them. Mapping an omission to
+    // null would clear a stored value that nobody asked to clear.
+    ...(description === undefined ? {} : { description: typeof description === "string" ? description.trim() : null }),
+    ...(calendarId === undefined ? {} : { calendarId: typeof calendarId === "string" ? calendarId : null }),
+    ...(parsedActive === undefined ? {} : { active: parsedActive }),
+    ...(parsedPublic === undefined ? {} : { public: parsedPublic }),
+    bufferBeforeMin: validateOverride(value.bufferBeforeMin, `${prefix}.bufferBeforeMin`, 0, 240),
+    bufferAfterMin: validateOverride(value.bufferAfterMin, `${prefix}.bufferAfterMin`, 0, 240),
+    minNoticeHours: validateOverride(value.minNoticeHours, `${prefix}.minNoticeHours`, 0, 24 * 30),
+    maxAdvanceDays: validateOverride(value.maxAdvanceDays, `${prefix}.maxAdvanceDays`, 1, 365),
+    slotIntervalMin: validateOverride(value.slotIntervalMin, `${prefix}.slotIntervalMin`, 5, 240),
+    dailyLimit: validateOverride(value.dailyLimit, `${prefix}.dailyLimit`, 1, 200),
+  };
+}
+
+function validateDateException(value: unknown, index: number): DateExceptionInput {
+  if (!isPlainObject(value)) throw new ValidationError(`dateExceptions[${index}] must be an object.`);
+  const { dateKey, closed, hours, label } = value;
+  if (typeof dateKey !== "string" || !DATE_KEY_PATTERN.test(dateKey)) {
+    throw new ValidationError(`dateExceptions[${index}].dateKey must be "YYYY-MM-DD".`);
+  }
+  parseDateKey(dateKey);
+  if (typeof closed !== "boolean") {
+    // Not defaulted. "Closed" and "open with different hours" are opposite
+    // instructions, and guessing which one a business meant is not acceptable.
+    throw new ValidationError(`dateExceptions[${index}].closed must be true (closed all day) or false (special hours).`);
+  }
+  if (label !== undefined && label !== null && (typeof label !== "string" || label.length > 100)) {
+    throw new ValidationError(`dateExceptions[${index}].label must be a string of 100 characters or fewer, or null.`);
+  }
+  if (!closed) {
+    const parsed = validateDayHours(hours ?? null, `dateExceptions[${index}].hours`);
+    if (parsed === null) {
+      throw new ValidationError(`dateExceptions[${index}] is open, so it needs hours: { start, end }.`);
+    }
+    return { dateKey, closed, hours: parsed, ...(label === undefined ? {} : { label }) };
+  }
+  return { dateKey, closed, ...(label === undefined ? {} : { label }) };
 }
 
 function validateNonNegativeInt(value: unknown, label: string, max: number): number {
@@ -99,7 +183,7 @@ function validateNonNegativeInt(value: unknown, label: string, max: number): num
 function validateAvailabilitySettingsInput(body: unknown): AvailabilitySettingsInput {
   if (!isPlainObject(body)) throw new ValidationError("Request body must be an object.");
 
-  const { timezone, weeklyHours, appointmentTypes, bufferBeforeMin, bufferAfterMin, minNoticeHours, maxAdvanceDays, blockedDates, dailyLimit } = body;
+  const { timezone, weeklyHours, appointmentTypes, bufferBeforeMin, bufferAfterMin, minNoticeHours, maxAdvanceDays, blockedDates, dateExceptions, dailyLimit } = body;
 
   if (typeof timezone !== "string" || timezone.trim().length === 0 || timezone.length > 100) {
     throw new ValidationError("timezone is required.");
@@ -132,6 +216,23 @@ function validateAvailabilitySettingsInput(body: unknown): AvailabilitySettingsI
     return d;
   });
 
+  let parsedDateExceptions: DateExceptionInput[] = [];
+  if (dateExceptions !== undefined) {
+    if (!Array.isArray(dateExceptions)) throw new ValidationError("dateExceptions must be an array.");
+    if (dateExceptions.length > MAX_DATE_EXCEPTIONS) {
+      throw new ValidationError(`No more than ${MAX_DATE_EXCEPTIONS} date exceptions are supported.`);
+    }
+    parsedDateExceptions = dateExceptions.map((e, i) => validateDateException(e, i));
+    // One instruction per date. Two rows for the same day would make the day's
+    // behaviour depend on insert order, and the table's unique index would
+    // reject the write anyway — as a 500 rather than as an explanation.
+    const seen = new Set<string>();
+    for (const e of parsedDateExceptions) {
+      if (seen.has(e.dateKey)) throw new ValidationError(`dateExceptions has more than one entry for ${e.dateKey}.`);
+      seen.add(e.dateKey);
+    }
+  }
+
   return {
     timezone: timezone.trim(),
     weeklyHours: parsedWeeklyHours,
@@ -145,6 +246,7 @@ function validateAvailabilitySettingsInput(body: unknown): AvailabilitySettingsI
       return v;
     })(),
     blockedDates: parsedBlockedDates,
+    ...(dateExceptions === undefined ? {} : { dateExceptions: parsedDateExceptions }),
     ...(dailyLimit !== undefined && dailyLimit !== null
       ? { dailyLimit: validateNonNegativeInt(dailyLimit, "dailyLimit", 200) }
       : {}),

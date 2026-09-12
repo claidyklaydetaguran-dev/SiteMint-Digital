@@ -17,10 +17,47 @@ export interface DayHours {
   end: string;
 }
 
+/**
+ * One bookable service.
+ *
+ * Every rule beyond `durationMin` is an OPTIONAL override of the firm-wide
+ * default. `undefined` means "inherit", which is not the same as 0 — a type
+ * that genuinely wants no buffer says `0`, and a type that has never been
+ * configured says nothing and follows the business. Resolve the pair through
+ * `resolveTypeRules` rather than reading either side directly, so the number
+ * the caller is told, the number the slot search used, and the number the
+ * dashboard displays cannot drift apart.
+ */
 export interface AppointmentType {
   id: string;
   name: string;
   durationMin: number;
+  bufferBeforeMin?: number;
+  bufferAfterMin?: number;
+  minNoticeHours?: number;
+  maxAdvanceDays?: number;
+  slotIntervalMin?: number;
+  /** Cap on appointments OF THIS TYPE per calendar day. */
+  dailyLimit?: number;
+}
+
+/**
+ * A named departure from the weekly pattern on one specific date, in the
+ * business's own timezone.
+ *
+ * Two distinct cases, deliberately not collapsed into one:
+ *   - `closed: true` — a holiday. The day is shut regardless of weeklyHours.
+ *   - `closed: false` with `hours` — special hours, e.g. a short Christmas Eve.
+ *     These REPLACE the weekday's hours rather than narrowing them, so a date
+ *     can also open a day the business is normally closed.
+ */
+export interface DateException {
+  /** "YYYY-MM-DD" in the business's timezone. */
+  dateKey: string;
+  closed: boolean;
+  hours?: DayHours;
+  /** Shown to the business, never to a caller. */
+  label?: string;
 }
 
 export interface AvailabilityConfig {
@@ -35,6 +72,8 @@ export interface AvailabilityConfig {
   maxAdvanceDays: number;
   /** "YYYY-MM-DD", fully closed regardless of weeklyHours (holidays, manual time off). */
   blockedDates: string[];
+  /** Per-date closures and special hours. Takes precedence over weeklyHours. */
+  dateExceptions?: DateException[];
   /** Slot start granularity, e.g. 30 for on-the-half-hour starts. */
   slotIntervalMin: number;
   /** Optional cap on total appointments per calendar day, across all types. */
@@ -44,6 +83,46 @@ export interface AvailabilityConfig {
 export interface ExistingBooking {
   startUtc: Date;
   endUtc: Date;
+  /**
+   * Which appointment type occupies the time, when that is known. Absent for
+   * calendar busy ranges and manual blocks, which belong to no type — so a
+   * per-type daily cap counts only what it can attribute, and an external busy
+   * range can never consume a type's quota.
+   */
+  appointmentTypeId?: string;
+}
+
+/** Every rule that actually governs one type's slot search, after inheritance. */
+export interface EffectiveTypeRules {
+  durationMin: number;
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
+  minNoticeHours: number;
+  maxAdvanceDays: number;
+  slotIntervalMin: number;
+  /** Firm-wide cap across all types; `null` when uncapped. */
+  dailyLimit: number | null;
+  /** Cap on this type alone; `null` when uncapped. */
+  typeDailyLimit: number | null;
+}
+
+/**
+ * Collapses firm defaults and per-type overrides into the one set of numbers
+ * the engine uses. Exported because the dashboard has to be able to state what
+ * a type will actually do, and a second, separate calculation there is exactly
+ * how a displayed rule stops matching the rule being enforced.
+ */
+export function resolveTypeRules(config: AvailabilityConfig, type: AppointmentType): EffectiveTypeRules {
+  return {
+    durationMin: type.durationMin,
+    bufferBeforeMin: type.bufferBeforeMin ?? config.bufferBeforeMin,
+    bufferAfterMin: type.bufferAfterMin ?? config.bufferAfterMin,
+    minNoticeHours: type.minNoticeHours ?? config.minNoticeHours,
+    maxAdvanceDays: type.maxAdvanceDays ?? config.maxAdvanceDays,
+    slotIntervalMin: type.slotIntervalMin ?? config.slotIntervalMin,
+    dailyLimit: config.dailyLimit ?? null,
+    typeDailyLimit: type.dailyLimit ?? null,
+  };
 }
 
 export type SlotAvailability = "available" | "unavailable";
@@ -114,24 +193,41 @@ export function computeDayAvailability(
     return { dateKey, reason: "blocked", slots: [] };
   }
 
+  // A date exception outranks the weekly pattern in both directions: it can
+  // close a normally-open day, and it can open a normally-closed one.
+  const exception = config.dateExceptions?.find((e) => e.dateKey === dateKey);
+  if (exception?.closed) {
+    return { dateKey, reason: "blocked", slots: [] };
+  }
+
+  const rules = resolveTypeRules(config, type);
   const { year, month, day } = parseDateKey(dateKey);
   // Determine weekday by asking what a midday instant on that date resolves
   // to in the business timezone — robust to any DST edge case on the date itself.
   const middayUtc = zonedTimeToUtc(config.timezone, year, month, day, 12, 0);
   const weekday = utcToZonedParts(config.timezone, middayUtc).weekday;
-  const hours = config.weeklyHours[weekday];
+  const hours = exception?.hours ?? config.weeklyHours[weekday];
   if (!hours) {
     return { dateKey, reason: "outside_hours", slots: [] };
   }
 
-  const maxAdvanceUtc = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60_000);
-  const minNoticeUtc = new Date(now.getTime() + config.minNoticeHours * 60 * 60_000);
+  const maxAdvanceUtc = new Date(now.getTime() + rules.maxAdvanceDays * 24 * 60 * 60_000);
+  const minNoticeUtc = new Date(now.getTime() + rules.minNoticeHours * 60 * 60_000);
 
   const openMin = timeStringToMinutes(hours.start);
   const closeMin = timeStringToMinutes(hours.end);
 
   const dayBookings = existingBookings.filter((b) => zonedDateKey(config.timezone, b.startUtc) === dateKey);
-  if (config.dailyLimit !== undefined && dayBookings.length >= config.dailyLimit) {
+  if (rules.dailyLimit !== null && dayBookings.length >= rules.dailyLimit) {
+    return { dateKey, reason: "fully_booked", slots: [] };
+  }
+  // A per-type cap counts only appointments of that type. Unattributed busy
+  // time (a calendar block, a manual closure) still blocks individual slots
+  // through the overlap check below, but it must not exhaust a type's quota.
+  if (
+    rules.typeDailyLimit !== null &&
+    dayBookings.filter((b) => b.appointmentTypeId === type.id).length >= rules.typeDailyLimit
+  ) {
     return { dateKey, reason: "fully_booked", slots: [] };
   }
 
@@ -139,10 +235,10 @@ export function computeDayAvailability(
   let beyondAdvance = false;
   let pastNotice = false;
 
-  for (let startMin = openMin; startMin + type.durationMin <= closeMin; startMin += config.slotIntervalMin) {
+  for (let startMin = openMin; startMin + rules.durationMin <= closeMin; startMin += rules.slotIntervalMin) {
     const { hour, minute } = minutesToTimeParts(startMin);
     const startUtc = zonedTimeToUtc(config.timezone, year, month, day, hour, minute);
-    const endUtc = new Date(startUtc.getTime() + type.durationMin * 60_000);
+    const endUtc = new Date(startUtc.getTime() + rules.durationMin * 60_000);
 
     if (startUtc.getTime() > maxAdvanceUtc.getTime()) {
       beyondAdvance = true;
@@ -153,9 +249,9 @@ export function computeDayAvailability(
       continue;
     }
 
-    const candidate = occupiedRange({ startUtc, endUtc }, config.bufferBeforeMin, config.bufferAfterMin);
+    const candidate = occupiedRange({ startUtc, endUtc }, rules.bufferBeforeMin, rules.bufferAfterMin);
     const conflict = dayBookings.some((booking) => {
-      const existing = occupiedRange(booking, config.bufferBeforeMin, config.bufferAfterMin);
+      const existing = occupiedRange(booking, rules.bufferBeforeMin, rules.bufferAfterMin);
       return overlaps(candidate.start, candidate.end, existing.start, existing.end);
     });
     if (conflict) continue;

@@ -193,6 +193,124 @@ async function main() {
     ok("public slug resolves to the correct firm", resolved?.firmId === firmA);
     const unresolved = await getFirmByPublicSlug("0".repeat(32));
     ok("unknown public slug resolves to null (no enumeration signal)", unresolved === null);
+
+    // ── Holidays and date exceptions, against the real timezone conversion ──
+    //
+    // These need a database because the defect they cover was in the STORED
+    // representation: a holiday was written as a UTC-midnight span, which for a
+    // Pacific business closed 17:00 the previous day through 16:59 of the
+    // intended day. Every pure unit test passed while that was happening,
+    // because the conversion is what was wrong.
+    await _resetSchedulingForTests(firmB);
+    const allOpen = {
+      0: { start: "09:00", end: "17:00" }, 1: { start: "09:00", end: "17:00" },
+      2: { start: "09:00", end: "17:00" }, 3: { start: "09:00", end: "17:00" },
+      4: { start: "09:00", end: "17:00" }, 5: { start: "09:00", end: "17:00" },
+      6: { start: "09:00", end: "17:00" },
+    };
+    const holiday = "2027-07-05";
+    const dayBefore = "2027-07-04";
+    const shortDay = "2027-07-06";
+
+    await saveAvailabilitySettings(firmB, {
+      timezone: "America/Los_Angeles",
+      weeklyHours: allOpen,
+      appointmentTypes: [
+        { name: "Consultation", durationMin: 30 },
+        { name: "On-site estimate", durationMin: 60, bufferAfterMin: 30, minNoticeHours: 48, dailyLimit: 2 },
+      ],
+      bufferBeforeMin: 0,
+      bufferAfterMin: 0,
+      minNoticeHours: 0,
+      maxAdvanceDays: 365,
+      blockedDates: [holiday],
+      dateExceptions: [{ dateKey: shortDay, closed: false, hours: { start: "09:00", end: "11:00" }, label: "Half day" }],
+    });
+
+    const cfgB = await getSerializedAvailabilitySettings(firmB);
+    const consultId = cfgB.appointmentTypeDetail.find((t) => t.name === "Consultation")!.id;
+    const estimate = cfgB.appointmentTypeDetail.find((t) => t.name === "On-site estimate")!;
+
+    ok("a holiday round-trips as the date the business entered", cfgB.blockedDates.includes(holiday));
+    ok("a date exception round-trips with its hours", cfgB.dateExceptions.some((e) => e.dateKey === shortDay && e.hours?.end === "11:00"));
+    ok("a date exception keeps its label", cfgB.dateExceptions.some((e) => e.dateKey === shortDay && e.label === "Half day"));
+
+    const onHoliday = await getDayAvailability(firmB, holiday, consultId, new Date("2027-01-01T00:00:00Z"));
+    ok("the holiday itself is closed", onHoliday.reason === "blocked" && onHoliday.slots.length === 0);
+    // The specific wrong-day symptom: the day BEFORE a Pacific holiday must be
+    // untouched. Under the old UTC-midnight storage its afternoon was consumed.
+    const beforeHoliday = await getDayAvailability(firmB, dayBefore, consultId, new Date("2027-01-01T00:00:00Z"));
+    ok("the day before the holiday is still fully open", beforeHoliday.reason === "open" && beforeHoliday.slots.length === 16);
+    ok(
+      "the afternoon before the holiday is not consumed",
+      beforeHoliday.slots.some((s) => s.startUtc.getTime() === new Date("2027-07-04T23:30:00.000Z").getTime()),
+    );
+
+    const onShortDay = await getDayAvailability(firmB, shortDay, consultId, new Date("2027-01-01T00:00:00Z"));
+    ok("special hours replace the weekday's hours", onShortDay.reason === "open" && onShortDay.slots.length === 4);
+    ok(
+      "nothing is offered after the special closing time",
+      onShortDay.slots.every((s) => s.endUtc.getTime() <= new Date("2027-07-06T18:00:00.000Z").getTime()),
+    );
+
+    // ── Per-type overrides survive the round trip and govern the search ─────
+    ok("an override is stored as an override", estimate.overrides.bufferAfterMin === 30 && estimate.overrides.minNoticeHours === 48);
+    ok("an unset rule reads back as inheriting, not as zero", estimate.overrides.bufferBeforeMin === null);
+    ok("the effective value resolves from the business default", estimate.effective.bufferBeforeMin === cfgB.bufferBeforeMin);
+    ok("the effective value resolves from the override where set", estimate.effective.minNoticeHours === 48);
+    ok("a per-type cap is reported as a per-type cap", estimate.effective.typeDailyLimit === 2 && estimate.effective.dailyLimit === null);
+
+    // A 48-hour notice on this type means a day two days out is refused for it
+    // while the same day is open for the type that inherits no notice.
+    const soon = new Date("2027-07-07T16:00:00.000Z");
+    const estimateSoon = await getDayAvailability(firmB, "2027-07-08", estimate.id, soon);
+    const consultSoon = await getDayAvailability(firmB, "2027-07-08", consultId, soon);
+    ok("the type's own notice window is enforced", estimateSoon.reason === "past_booking_window");
+    ok("and it does not leak onto a type that inherits", consultSoon.reason === "open");
+
+    // ── Deactivating and reactivating a type keeps the same row ─────────────
+    await saveAvailabilitySettings(firmB, {
+      timezone: "America/Los_Angeles",
+      weeklyHours: allOpen,
+      appointmentTypes: [
+        { id: consultId, name: "Consultation", durationMin: 30 },
+        { id: estimate.id, name: "On-site estimate", durationMin: 60, active: false },
+      ],
+      bufferBeforeMin: 0, bufferAfterMin: 0, minNoticeHours: 0, maxAdvanceDays: 365, blockedDates: [],
+    });
+    const afterDeactivate = await getSerializedAvailabilitySettings(firmB);
+    ok("a deactivated type is no longer bookable", !afterDeactivate.appointmentTypes.some((t) => t.id === estimate.id));
+    ok("but it is still visible to the business", afterDeactivate.appointmentTypeDetail.some((t) => t.id === estimate.id && !t.active));
+
+    await saveAvailabilitySettings(firmB, {
+      timezone: "America/Los_Angeles",
+      weeklyHours: allOpen,
+      appointmentTypes: [
+        { id: consultId, name: "Consultation", durationMin: 30 },
+        { id: estimate.id, name: "On-site estimate", durationMin: 60, active: true },
+      ],
+      bufferBeforeMin: 0, bufferAfterMin: 0, minNoticeHours: 0, maxAdvanceDays: 365, blockedDates: [],
+    });
+    const afterReactivate = await getSerializedAvailabilitySettings(firmB);
+    ok("reactivating restores the same type", afterReactivate.appointmentTypes.some((t) => t.id === estimate.id));
+    // The defect this covers: matching only active rows meant reactivation
+    // inserted a SECOND row, and the business ended up with two of the service.
+    ok(
+      "reactivating does not create a duplicate",
+      afterReactivate.appointmentTypeDetail.filter((t) => t.name === "On-site estimate").length === 1,
+    );
+
+    // ── Clearing an override goes back to inheriting ────────────────────────
+    await saveAvailabilitySettings(firmB, {
+      timezone: "America/Los_Angeles",
+      weeklyHours: allOpen,
+      appointmentTypes: [{ id: estimate.id, name: "On-site estimate", durationMin: 60, bufferAfterMin: null, minNoticeHours: null }],
+      bufferBeforeMin: 5, bufferAfterMin: 5, minNoticeHours: 1, maxAdvanceDays: 365, blockedDates: [],
+    });
+    const cleared = await getSerializedAvailabilitySettings(firmB);
+    const clearedEstimate = cleared.appointmentTypeDetail.find((t) => t.id === estimate.id)!;
+    ok("an explicit null clears the override", clearedEstimate.overrides.bufferAfterMin === null);
+    ok("and the effective value falls back to the business default", clearedEstimate.effective.bufferAfterMin === 5);
   } finally {
     await deleteTestFirm(firmA);
     await deleteTestFirm(firmB);

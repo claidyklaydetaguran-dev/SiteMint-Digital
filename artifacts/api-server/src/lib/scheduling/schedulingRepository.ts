@@ -21,6 +21,7 @@ import {
   schedulingWeeklyHours,
   schedulingAppointmentTypes,
   schedulingBlockedPeriods,
+  schedulingDateExceptions,
   schedulingAppointmentRequests,
   type SchedulingAppointmentType,
   type SchedulingAppointmentRequest,
@@ -29,12 +30,16 @@ import {
 import {
   computeDayAvailability,
   isSlotStillAvailable,
+  resolveTypeRules,
   type AvailabilityConfig,
   type AppointmentType,
+  type DateException,
   type DayHours,
+  type EffectiveTypeRules,
   type ExistingBooking,
   type DayAvailabilityResult,
 } from "./availabilityEngine.js";
+import { parseDateKey, zonedDateKey, zonedTimeToUtc } from "./zonedTime.js";
 import type { FreeBusyProvider } from "../calendar/FreeBusyProvider.js";
 
 // ── Safe defaults for a firm with no configured schedule ────────────────────
@@ -109,17 +114,64 @@ async function getActiveAppointmentTypeRows(firmId: number): Promise<SchedulingA
     .orderBy(asc(schedulingAppointmentTypes.id));
 }
 
+/**
+ * A NULL override column means "inherit the business default" and must stay
+ * absent from the engine's type, not become 0 — `resolveTypeRules` distinguishes
+ * the two, and collapsing them here would silently rewrite every inheriting
+ * type's buffer to zero.
+ */
 function toEngineAppointmentType(row: SchedulingAppointmentType): AppointmentType {
-  return { id: String(row.id), name: row.name, durationMin: row.durationMinutes };
+  return {
+    id: String(row.id),
+    name: row.name,
+    durationMin: row.durationMinutes,
+    ...(row.bufferBeforeMinutes !== null ? { bufferBeforeMin: row.bufferBeforeMinutes } : {}),
+    ...(row.bufferAfterMinutes !== null ? { bufferAfterMin: row.bufferAfterMinutes } : {}),
+    ...(row.minNoticeMinutes !== null ? { minNoticeHours: row.minNoticeMinutes / 60 } : {}),
+    ...(row.maxAdvanceDays !== null ? { maxAdvanceDays: row.maxAdvanceDays } : {}),
+    ...(row.slotIntervalMinutes !== null ? { slotIntervalMin: row.slotIntervalMinutes } : {}),
+    ...(row.dailyLimit !== null ? { dailyLimit: row.dailyLimit } : {}),
+  };
 }
 
-/** Builds the pure engine's AvailabilityConfig from durable settings + weekly hours + active appointment types. blockedDates stays empty here — blocked_periods rows are merged as busy ranges instead (see getBookingsForAvailability), which also supports partial-day blocks that a flat date list cannot express. */
+async function getDateExceptions(firmId: number): Promise<DateException[]> {
+  const rows = await db
+    .select()
+    .from(schedulingDateExceptions)
+    .where(eq(schedulingDateExceptions.firmId, firmId))
+    .orderBy(asc(schedulingDateExceptions.dateKey));
+  return rows.map((row) => ({
+    dateKey: row.dateKey,
+    closed: row.closed,
+    ...(row.startTime !== null && row.endTime !== null
+      ? { hours: { start: row.startTime, end: row.endTime } }
+      : {}),
+    ...(row.label !== null ? { label: row.label } : {}),
+  }));
+}
+
+/**
+ * Builds the pure engine's AvailabilityConfig from durable settings, weekly
+ * hours, active appointment types and per-date exceptions.
+ *
+ * `blockedDates` is derived from all-day blocked_periods rows so the engine can
+ * answer "closed" rather than "fully booked" for a whole-day closure — an
+ * honest reason matters, because "fully booked" invites the caller to ask about
+ * a later time on a day nobody is there. Partial-day blocks stay as busy ranges
+ * (see getBookingsForAvailability), which a flat date list cannot express.
+ */
 export async function buildAvailabilityConfig(firmId: number): Promise<AvailabilityConfig> {
-  const [settings, weeklyHours, typeRows] = await Promise.all([
+  const [settings, weeklyHours, typeRows, dateExceptions] = await Promise.all([
     getOrCreateSettingsRow(firmId),
     getWeeklyHoursConfig(firmId),
     getActiveAppointmentTypeRows(firmId),
+    getDateExceptions(firmId),
   ]);
+
+  const allDayBlocks = await db
+    .select({ startsAt: schedulingBlockedPeriods.startsAt })
+    .from(schedulingBlockedPeriods)
+    .where(and(eq(schedulingBlockedPeriods.firmId, firmId), eq(schedulingBlockedPeriods.allDay, true)));
 
   return {
     timezone: settings.timezone,
@@ -129,7 +181,11 @@ export async function buildAvailabilityConfig(firmId: number): Promise<Availabil
     bufferAfterMin: settings.defaultBufferAfterMinutes,
     minNoticeHours: settings.minimumSchedulingNoticeMinutes / 60,
     maxAdvanceDays: settings.maximumAdvanceBookingDays,
-    blockedDates: [],
+    // The local date the block falls on — NOT the UTC date. A block stored as a
+    // local-midnight instant is 08:00Z, so reading its UTC date would be right
+    // by luck for a business east of Greenwich and wrong for one west of it.
+    blockedDates: allDayBlocks.map((b) => zonedDateKey(settings.timezone, b.startsAt)),
+    dateExceptions,
     slotIntervalMin: DEFAULT_SLOT_INTERVAL_MIN,
     ...(settings.defaultDailyAppointmentLimit !== null ? { dailyLimit: settings.defaultDailyAppointmentLimit } : {}),
   };
@@ -156,7 +212,14 @@ export async function getBookingsForAvailability(
 ): Promise<ExistingBooking[]> {
   const [requestRows, blockedRows, googleBusy] = await Promise.all([
     db
-      .select({ startAt: schedulingAppointmentRequests.requestedStartAt, endAt: schedulingAppointmentRequests.requestedEndAt })
+      .select({
+        startAt: schedulingAppointmentRequests.requestedStartAt,
+        endAt: schedulingAppointmentRequests.requestedEndAt,
+        // Carried through so a per-type daily cap counts appointments of that
+        // type. Blocked periods and calendar busy ranges belong to no type and
+        // are deliberately left unattributed below.
+        appointmentTypeId: schedulingAppointmentRequests.appointmentTypeId,
+      })
       .from(schedulingAppointmentRequests)
       .where(
         and(
@@ -180,7 +243,11 @@ export async function getBookingsForAvailability(
     freeBusyProvider ? freeBusyProvider.getBusyRanges(firmId, rangeStartUtc, rangeEndUtc) : Promise.resolve([]),
   ]);
 
-  const bookings: ExistingBooking[] = requestRows.map((r) => ({ startUtc: r.startAt, endUtc: r.endAt }));
+  const bookings: ExistingBooking[] = requestRows.map((r) => ({
+    startUtc: r.startAt,
+    endUtc: r.endAt,
+    appointmentTypeId: String(r.appointmentTypeId),
+  }));
   for (const b of blockedRows) bookings.push({ startUtc: b.startsAt, endUtc: b.endsAt });
   for (const g of googleBusy) bookings.push({ startUtc: g.startUtc, endUtc: g.endUtc });
   return bookings;
@@ -361,16 +428,79 @@ export async function expireStaleHolds(firmId: number, now: Date): Promise<void>
 
 // ── Availability settings + appointment types (admin CRUD) ──────────────────
 
+/**
+ * One appointment type as the business submits it.
+ *
+ * Every rule field is `number | null | undefined` on purpose:
+ *   - a number sets an override,
+ *   - `null` clears it back to inheriting the business default,
+ *   - `undefined` (absent from the body) leaves whatever is stored alone.
+ *
+ * A single nullable field could not express all three, and the missing one is
+ * the dangerous one: without `undefined`, a client that omits a field would
+ * silently clear it.
+ */
+export interface AppointmentTypeInput {
+  id?: string;
+  name: string;
+  durationMin: number;
+  description?: string | null;
+  bufferBeforeMin?: number | null;
+  bufferAfterMin?: number | null;
+  minNoticeHours?: number | null;
+  maxAdvanceDays?: number | null;
+  slotIntervalMin?: number | null;
+  dailyLimit?: number | null;
+  calendarId?: string | null;
+  active?: boolean;
+  public?: boolean;
+}
+
+export interface DateExceptionInput {
+  dateKey: string;
+  closed: boolean;
+  hours?: DayHours | null;
+  label?: string | null;
+}
+
 export interface AvailabilitySettingsInput {
   timezone: string;
   weeklyHours: Record<number, DayHours | null>;
-  appointmentTypes: { id?: string; name: string; durationMin: number }[];
+  appointmentTypes: AppointmentTypeInput[];
   bufferBeforeMin: number;
   bufferAfterMin: number;
   minNoticeHours: number;
   maxAdvanceDays: number;
   blockedDates: string[];
+  /** Absent leaves stored exceptions untouched; an array replaces them wholly. */
+  dateExceptions?: DateExceptionInput[];
   dailyLimit?: number;
+}
+
+/** `undefined` leaves the column as it is; `null` clears it; a number sets it. */
+function overrideColumn(value: number | null | undefined): { set: boolean; value: number | null } {
+  if (value === undefined) return { set: false, value: null };
+  return { set: true, value };
+}
+
+function typeRuleColumns(input: AppointmentTypeInput): Record<string, unknown> {
+  const columns: Record<string, unknown> = {};
+  const pairs: Array<[string, number | null | undefined]> = [
+    ["bufferBeforeMinutes", input.bufferBeforeMin],
+    ["bufferAfterMinutes", input.bufferAfterMin],
+    ["minNoticeMinutes", input.minNoticeHours === undefined || input.minNoticeHours === null ? input.minNoticeHours : Math.round(input.minNoticeHours * 60)],
+    ["maxAdvanceDays", input.maxAdvanceDays],
+    ["slotIntervalMinutes", input.slotIntervalMin],
+    ["dailyLimit", input.dailyLimit],
+  ];
+  for (const [column, value] of pairs) {
+    const resolved = overrideColumn(value);
+    if (resolved.set) columns[column] = resolved.value;
+  }
+  if (input.description !== undefined) columns.description = input.description;
+  if (input.calendarId !== undefined) columns.calendarId = input.calendarId;
+  if (input.public !== undefined) columns.public = input.public;
+  return columns;
 }
 
 export async function saveAvailabilitySettings(firmId: number, input: AvailabilitySettingsInput): Promise<void> {
@@ -402,38 +532,45 @@ export async function saveAvailabilitySettings(firmId: number, input: Availabili
       }));
     if (weeklyRows.length > 0) await tx.insert(schedulingWeeklyHours).values(weeklyRows);
 
-    // Appointment types: upsert by numeric id when it matches an existing
-    // active row for this firm; otherwise insert. Any existing active row
-    // not present in the submitted list is soft-deleted (active=false) —
-    // never hard-deleted, since appointment_requests reference it by FK.
+    // Appointment types: upsert by numeric id when it matches a row of THIS
+    // firm — active or not. Matching only active rows made a deactivated type
+    // unreachable: submitting it again could not find it, so a duplicate row was
+    // inserted instead of the original being brought back.
+    //
+    // Any active row absent from the submitted list is soft-deleted
+    // (active=false) — never hard-deleted, since appointment_requests reference
+    // it by FK and a past appointment must keep naming the service it was for.
     const existing = await tx
-      .select({ id: schedulingAppointmentTypes.id })
+      .select({ id: schedulingAppointmentTypes.id, active: schedulingAppointmentTypes.active })
       .from(schedulingAppointmentTypes)
-      .where(and(eq(schedulingAppointmentTypes.firmId, firmId), eq(schedulingAppointmentTypes.active, true)));
-    const existingIds = new Set(existing.map((r) => r.id));
-    const keptIds = new Set<number>();
+      .where(eq(schedulingAppointmentTypes.firmId, firmId));
+    const ownedIds = new Set(existing.map((r) => r.id));
+    const activeIds = new Set(existing.filter((r) => r.active).map((r) => r.id));
+    const keptActiveIds = new Set<number>();
 
     for (const t of input.appointmentTypes) {
+      // `active` defaults to true: a type the business submits is one it wants
+      // bookable unless it explicitly said otherwise.
+      const active = t.active ?? true;
       const asNum = t.id !== undefined ? Number(t.id) : NaN;
-      if (Number.isInteger(asNum) && existingIds.has(asNum)) {
+      if (Number.isInteger(asNum) && ownedIds.has(asNum)) {
         await tx
           .update(schedulingAppointmentTypes)
-          .set({ name: t.name, durationMinutes: t.durationMin, updatedAt: new Date() })
+          .set({ name: t.name, durationMinutes: t.durationMin, active, ...typeRuleColumns(t), updatedAt: new Date() })
           .where(and(eq(schedulingAppointmentTypes.id, asNum), eq(schedulingAppointmentTypes.firmId, firmId)));
-        keptIds.add(asNum);
+        if (active) keptActiveIds.add(asNum);
       } else {
         const [created] = await tx
           .insert(schedulingAppointmentTypes)
-          // Public by default: the admin Availability Settings UI has no
-          // per-type visibility toggle yet (documented limitation), so a
-          // type created there is immediately selectable on the public
-          // scheduling page too.
-          .values({ firmId, name: t.name, durationMinutes: t.durationMin, public: true })
+          // Public by default unless the business says otherwise, matching the
+          // long-standing behaviour of this endpoint. A type submitted with
+          // `public: false` stays internal to the dashboard and the receptionist.
+          .values({ firmId, name: t.name, durationMinutes: t.durationMin, public: true, active, ...typeRuleColumns(t) })
           .returning({ id: schedulingAppointmentTypes.id });
-        if (created) keptIds.add(created.id);
+        if (created && active) keptActiveIds.add(created.id);
       }
     }
-    const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+    const removedIds = [...activeIds].filter((id) => !keptActiveIds.has(id));
     if (removedIds.length > 0) {
       await tx
         .update(schedulingAppointmentTypes)
@@ -442,48 +579,147 @@ export async function saveAvailabilitySettings(firmId: number, input: Availabili
     }
 
     // Blocked dates: full replace of all-day blocked_periods rows.
+    //
+    // The instants are derived from the BUSINESS's midnight, not from UTC
+    // midnight. The previous `${dateKey}T00:00:00.000Z` closed 17:00 the
+    // previous day through 16:59 of the intended day for a business in
+    // America/Los_Angeles — a holiday on the wrong day, with no error anywhere.
     await tx.delete(schedulingBlockedPeriods).where(and(eq(schedulingBlockedPeriods.firmId, firmId), eq(schedulingBlockedPeriods.allDay, true)));
     if (input.blockedDates.length > 0) {
       await tx.insert(schedulingBlockedPeriods).values(
-        input.blockedDates.map((dateKey) => ({
-          firmId,
-          startsAt: new Date(`${dateKey}T00:00:00.000Z`),
-          endsAt: new Date(`${dateKey}T23:59:59.999Z`),
-          allDay: true,
-        })),
+        input.blockedDates.map((dateKey) => {
+          const { year, month, day } = parseDateKey(dateKey);
+          const startsAt = zonedTimeToUtc(input.timezone, year, month, day, 0, 0);
+          // The next local midnight, so a 23-hour or 25-hour DST day is still
+          // covered exactly — a fixed 24-hour span would leak or overreach by
+          // an hour twice a year.
+          const endsAt = zonedTimeToUtc(input.timezone, year, month, day + 1, 0, 0);
+          return { firmId, startsAt, endsAt, allDay: true };
+        }),
       );
     }
+
+    // Date exceptions: absent means "leave what is stored"; an array replaces
+    // the set wholly, which is what an editor that shows every row submits.
+    if (input.dateExceptions !== undefined) {
+      await tx.delete(schedulingDateExceptions).where(eq(schedulingDateExceptions.firmId, firmId));
+      if (input.dateExceptions.length > 0) {
+        await tx.insert(schedulingDateExceptions).values(
+          input.dateExceptions.map((e) => ({
+            firmId,
+            dateKey: e.dateKey,
+            closed: e.closed,
+            // The table's CHECK requires hours exactly when the day is open, so
+            // a closed day's hours are dropped rather than stored and ignored.
+            startTime: e.closed ? null : (e.hours?.start ?? null),
+            endTime: e.closed ? null : (e.hours?.end ?? null),
+            label: e.label ?? null,
+          })),
+        );
+      }
+    }
   });
+}
+
+/**
+ * One appointment type as the dashboard shows it: the overrides the business
+ * set, alongside the numbers that will ACTUALLY be used once inheritance is
+ * applied.
+ *
+ * Both are sent because either alone misleads. The overrides alone cannot tell
+ * a business what a type will do; the effective values alone cannot tell it
+ * which of those it chose and which it is inheriting — so a change to the
+ * business default would appear to change nothing.
+ */
+export interface SerializedAppointmentType {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMin: number;
+  active: boolean;
+  public: boolean;
+  calendarId: string | null;
+  /** null = inheriting the business default. */
+  overrides: {
+    bufferBeforeMin: number | null;
+    bufferAfterMin: number | null;
+    minNoticeHours: number | null;
+    maxAdvanceDays: number | null;
+    slotIntervalMin: number | null;
+    dailyLimit: number | null;
+  };
+  /** What the slot search will use — computed by the engine, not by the caller. */
+  effective: EffectiveTypeRules;
 }
 
 export interface SerializedAvailabilityConfig {
   timezone: string;
   weeklyHours: Record<number, DayHours | null>;
+  /** Engine-shaped types, kept for the existing consumers of this endpoint. */
   appointmentTypes: AppointmentType[];
+  /** The full per-type detail the Appointment Types editor needs. */
+  appointmentTypeDetail: SerializedAppointmentType[];
   bufferBeforeMin: number;
   bufferAfterMin: number;
   minNoticeHours: number;
   maxAdvanceDays: number;
+  slotIntervalMin: number;
   blockedDates: string[];
+  dateExceptions: DateException[];
   dailyLimit: number | null;
 }
 
 export async function getSerializedAvailabilitySettings(firmId: number): Promise<SerializedAvailabilityConfig> {
   const config = await buildAvailabilityConfig(firmId);
-  const blockedRows = await db
-    .select({ startsAt: schedulingBlockedPeriods.startsAt })
-    .from(schedulingBlockedPeriods)
-    .where(and(eq(schedulingBlockedPeriods.firmId, firmId), eq(schedulingBlockedPeriods.allDay, true)));
+  // ALL of the firm's types, not only the active ones, plus the columns the
+  // engine's type deliberately does not carry (description, active, public,
+  // calendar). Inactive types are included so the editor can show and reactivate
+  // them — a type that vanishes from the interface when it is switched off looks
+  // deleted, and the business has no way back to it.
+  const rows = await db
+    .select()
+    .from(schedulingAppointmentTypes)
+    .where(eq(schedulingAppointmentTypes.firmId, firmId))
+    .orderBy(asc(schedulingAppointmentTypes.id));
+
+  const detail: SerializedAppointmentType[] = rows.map((row) => {
+    const engineType = toEngineAppointmentType(row);
+    return {
+      id: String(row.id),
+      name: row.name,
+      description: row.description,
+      durationMin: row.durationMinutes,
+      active: row.active,
+      public: row.public,
+      calendarId: row.calendarId,
+      overrides: {
+        bufferBeforeMin: row.bufferBeforeMinutes,
+        bufferAfterMin: row.bufferAfterMinutes,
+        minNoticeHours: row.minNoticeMinutes === null ? null : row.minNoticeMinutes / 60,
+        maxAdvanceDays: row.maxAdvanceDays,
+        slotIntervalMin: row.slotIntervalMinutes,
+        dailyLimit: row.dailyLimit,
+      },
+      // The one calculation. The dashboard never recomputes inheritance.
+      effective: resolveTypeRules(config, engineType),
+    };
+  });
 
   return {
     timezone: config.timezone,
     weeklyHours: config.weeklyHours,
     appointmentTypes: config.appointmentTypes,
+    appointmentTypeDetail: detail,
     bufferBeforeMin: config.bufferBeforeMin,
     bufferAfterMin: config.bufferAfterMin,
     minNoticeHours: config.minNoticeHours,
     maxAdvanceDays: config.maxAdvanceDays,
-    blockedDates: blockedRows.map((r) => r.startsAt.toISOString().slice(0, 10)),
+    slotIntervalMin: config.slotIntervalMin,
+    // Already the business's own local dates (see buildAvailabilityConfig);
+    // re-deriving them from the stored instant's UTC date is what put holidays
+    // on the wrong day before.
+    blockedDates: config.blockedDates,
+    dateExceptions: config.dateExceptions ?? [],
     dailyLimit: config.dailyLimit ?? null,
   };
 }

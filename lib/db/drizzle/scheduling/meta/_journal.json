@@ -15,6 +15,13 @@
       "when": 1788090283819,
       "tag": "0001_black_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789196736922,
+      "tag": "0002_superb_wither",
+      "breakpoints": true
     }
   ]
 }

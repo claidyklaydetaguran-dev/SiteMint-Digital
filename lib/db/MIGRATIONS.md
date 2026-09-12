@@ -139,7 +139,64 @@ A `DROP TABLE` was never acceptable and still is not.
 
 ## 2. Exact commands
 
-Run from the repository root. Every one of these reads `DATABASE_URL`.
+Run from the repository root.
+
+### 2.0 Naming the database is mandatory
+
+Two databases live in the same workspace: the development one and the
+deployment one. Until 2026-09-12, every command here read `DATABASE_URL`, so
+which database a command touched depended on which variable happened to be
+exported in that shell — and a correct command in a stale environment looked
+exactly like a correct command.
+
+`migrate:*` and `preflight` now refuse to run without a named target, and the
+name is what selects the connection:
+
+| Target | Connection variable | Extra requirement |
+|---|---|---|
+| `dev` | `DATABASE_URL` | — |
+| `prod` | `PROD_DATABASE_URL` | `--confirm prod` |
+
+There is no default and **no fallback between them**: `--target prod` never
+reads `DATABASE_URL`, so an unset `PROD_DATABASE_URL` fails loudly instead of
+quietly migrating development.
+
+Naming a target is a claim, not proof, so the caller must also state the
+identity it expects to reach. Read it first — this connects, writes nothing,
+and prints no credential:
+
+```bash
+cd lib/db && node ./src/db-identity.mjs --target dev
+```
+
+It prints `current_database()`, the role, the server version, and a
+**fingerprint**: a one-way digest of host, port, database and user. The
+fingerprint is stable for a given database, changes if any of those change,
+survives a password rotation, and reveals nothing secret — which is what makes
+it safe to paste into a runbook. The connection URL itself is never printed by
+any of these commands.
+
+Pass both back to every migrating command. It verifies them against the live
+connection **before** taking the advisory lock, and hands drizzle-kit that same
+connection rather than letting it resolve an ambient `DATABASE_URL`:
+
+```bash
+pnpm --filter @workspace/db run preflight -- --target dev
+pnpm --filter @workspace/db run migrate:scheduling -- \
+  --target dev --expect-db <name> --expect-fingerprint <hex12>
+```
+
+For the deployment database, add `--confirm prod`. A typo in a target name is
+recoverable; a typo that writes to the deployment database is not.
+
+Held by `dbTargetContract.test.ts`, which also asserts at source level that no
+command re-reads `process.env.DATABASE_URL`.
+
+`push` / `push-force` / `migrate:fresh` still read `DATABASE_URL` directly —
+they are bootstrap-only commands for an empty database and must never be aimed
+at an initialised one (§2, §3).
+
+### 2.1 The commands
 
 | Command | Manages | Mode |
 |---|---|---|
