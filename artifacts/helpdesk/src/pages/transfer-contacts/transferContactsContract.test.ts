@@ -16,6 +16,14 @@ import {
   timeValueToMinutes,
 } from "./transferContactsContract.js";
 import { CONTACT_ROLES } from "../../lib/inquiriesApi.js";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+// src/pages/transfer-contacts → src/pages → src → helpdesk → artifacts → root
+const repoRoot = path.resolve(here, "../../../../..");
+const read = (rel: string) => readFileSync(path.join(repoRoot, rel), "utf8");
 
 let passed = 0;
 const failures: string[] = [];
@@ -115,6 +123,34 @@ check(
   "no string leaks an internal identifier or provider name",
   strings.every((s) => !/vapi|twilio|firm_id|firmId|e164/i.test(s)),
 );
+
+section("what the check tells a business before it authorises a transfer");
+
+{
+  const apiSrc = read("artifacts/api-server/src/routes/receptionistTransferContacts.ts");
+  const pageSrc = read("artifacts/helpdesk/src/pages/TransferContacts.tsx");
+
+  // A label is not enough to agree to. The business is authorising these
+  // digits, and the resolver may pick a different contact than the one being
+  // checked — so the check resolves and reports the number that would ring.
+  check("the check resolves the number that would actually ring", apiSrc.includes("wouldDial"));
+  check("and the page shows it", pageSrc.includes("report.report.wouldDial") && pageSrc.includes("phoneDisplay"));
+  check("with a label that says what it is", COPY.wouldDialLabel.length > 0 && /ring/i.test(COPY.wouldDialLabel));
+
+  // Connecting a call costs money. Saying so is not optional; quoting a rate
+  // nobody agreed would be worse than saying nothing.
+  check("the check says a transfer is billable", /billable/i.test(apiSrc));
+  check("and quotes no rate", !/\$\d|\d+\s*(cents|p\/min|per minute)/i.test(apiSrc));
+
+  // A cold handoff. Promising the assistant can recover the caller would be a
+  // promise this mechanism cannot keep.
+  check("the check says the assistant leaves the call", /assistant leaves the call/i.test(apiSrc));
+  check("and says it cannot take the caller back", /cannot take them back/i.test(apiSrc));
+  check(
+    "no page string promises a callback after a handoff",
+    strings.every((s) => !/we('| wi)ll call (you|them) back|the assistant will (come|take) back/i.test(s)),
+  );
+}
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

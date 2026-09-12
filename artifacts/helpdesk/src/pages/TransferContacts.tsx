@@ -566,9 +566,28 @@ export default function TransferContacts() {
                         </li>
                       ))}
                     </ul>
+                    {/*
+                      The number, not just the name. A business authorising a
+                      transfer is agreeing that callers may be put through to
+                      these digits, and the resolver may pick a different
+                      contact than the one being checked.
+                    */}
+                    {report.report.wouldDial != null && (
+                      <p className="mt-2 text-sm">
+                        <span className="font-medium">{COPY.wouldDialLabel}</span>{" "}
+                        {report.report.wouldDial.label} —{" "}
+                        <span className="tabular-nums">{report.report.wouldDial.phoneDisplay}</span>
+                      </p>
+                    )}
                     <p className="mt-2 text-xs text-muted-foreground">
                       {COPY.checkNobodyCalledNote} {report.report.limitation}
                     </p>
+                    {report.report.handoffNote != null && (
+                      <p className="mt-1 text-xs text-muted-foreground">{report.report.handoffNote}</p>
+                    )}
+                    {report.report.costNote != null && (
+                      <p className="mt-1 text-xs text-muted-foreground">{report.report.costNote}</p>
+                    )}
                   </div>
                 )}
 

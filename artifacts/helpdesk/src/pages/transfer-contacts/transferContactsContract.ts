@@ -109,6 +109,9 @@ export const COPY = {
   checkFailedTitle: "The check couldn't run",
   checkFailedDetail: "Nothing changed. Try again.",
 
+  // The digits a business is authorising, not just the name on them.
+  wouldDialLabel: "A transfer now would ring:",
+
   // Capability
   capabilityTitle: "What transfers can do today",
   browserVsPhoneNote:

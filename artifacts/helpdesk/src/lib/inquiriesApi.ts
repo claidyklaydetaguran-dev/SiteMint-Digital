@@ -193,6 +193,19 @@ export interface TransferTestReport {
   dialed: boolean;
   mode: "preflight_only" | "preflight_then_live_available";
   checks: TransferTestCheck[];
+  /**
+   * The number that would actually ring, resolved now — which may belong to a
+   * different contact than the one being checked. A label alone is not enough
+   * to authorize putting a caller through to someone.
+   *
+   * Optional so a dashboard deployed ahead of its backend degrades to the
+   * previous report rather than rendering "undefined".
+   */
+  wouldDial?: { label: string; phoneE164: string; phoneDisplay: string } | null;
+  /** What a transfer costs. No rate is quoted — none has been agreed. */
+  costNote?: string;
+  /** What happens after the handover, including what SiteMint can no longer do. */
+  handoffNote?: string;
   readyToAttempt: boolean;
   limitation: string;
 }

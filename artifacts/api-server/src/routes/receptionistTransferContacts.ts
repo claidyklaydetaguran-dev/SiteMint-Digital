@@ -247,12 +247,41 @@ router.post(
 
       const numberAssigned = await hasAssignedNumber(req.firmId!);
 
+      // The number that would ACTUALLY ring, resolved now. The label alone is
+      // not enough to authorize a transfer with: a business needs to see the
+      // digits before it agrees that a caller may be put through to them, and
+      // the resolver may well pick a different contact than the one being
+      // checked.
+      const wouldDial =
+        resolution.ok && resolution.destinationId !== undefined
+          ? await (async () => {
+              const target = await getTransferContact(req.firmId!, resolution.destinationId!);
+              return target
+                ? { label: target.label, phoneE164: target.phoneE164, phoneDisplay: formatE164ForDisplay(target.phoneE164) }
+                : null;
+            })()
+          : null;
+
       res.json({
         contact: serializeContact(contact),
         // Unambiguous: nothing was called.
         dialed: false,
         mode: numberAssigned ? "preflight_then_live_available" : "preflight_only",
         checks,
+        wouldDial,
+        // What a transfer costs, and what it does NOT do afterwards. Both are
+        // stated because both change whether a business wants to switch it on.
+        //
+        // No rate is quoted: this deployment has no agreed pricing, and a
+        // number invented here would be worse than none at all.
+        costNote:
+          "Putting a caller through places an outbound call to that number and keeps both legs open for as long as they talk. That time is billable on the telephone account this number belongs to.",
+        // A cold handoff. Once the caller is passed to the destination, the
+        // assistant is no longer on the call — so whatever happens next (no
+        // answer, voicemail, a busy tone) is the destination's own behaviour,
+        // and SiteMint cannot take the caller back.
+        handoffNote:
+          "A transfer is a handover, not a conference. Once the caller is passed across, the assistant leaves the call — if nobody picks up, the caller reaches whatever that number does next (voicemail, ringing out), and the assistant cannot take them back or offer to take a message.",
         readyToAttempt: checks.every((c) => c.pass),
         // Said plainly, because "the provider accepted the transfer request" is
         // not the same thing as "a person answered", and only the second one
