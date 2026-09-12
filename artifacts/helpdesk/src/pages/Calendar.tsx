@@ -11,7 +11,7 @@
 
 import { useCallback, useState } from "react";
 import { useCalendarStatus } from "@/hooks/useAvailability";
-import { useDisconnectCalendar, useStartGoogleCalendarConnect } from "@/hooks/useCalendar";
+import { useCalendarHealth, useDisconnectCalendar, useStartGoogleCalendarConnect } from "@/hooks/useCalendar";
 import { isCalendarActionError } from "@/lib/calendarApi";
 import {
   AlertDialog,
@@ -30,9 +30,13 @@ import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { CalendarReturnBanner } from "@/pages/calendar/CalendarReturnBanner";
 import {
   CONNECT,
+  HEALTH_FIELDS,
   PAGE,
+  calendarDisplayName,
   calendarViewState,
   classifyConnectError,
+  healthSummary,
+  healthTimestamp,
   lastCheckedLabel,
   type ConnectFailure,
 } from "@/pages/calendar/calendarContract";
@@ -41,6 +45,7 @@ import "@/styles/v2-dashboard.css";
 export default function CalendarPage() {
   const { data: me, isLoading: sessionLoading } = useSession();
   const statusQuery = useCalendarStatus();
+  const healthQuery = useCalendarHealth();
   const startMutation = useStartGoogleCalendarConnect();
   const disconnectMutation = useDisconnectCalendar();
 
@@ -81,10 +86,16 @@ export default function CalendarPage() {
   }
   if (!me) return null;
 
+  const health = healthQuery.data?.health;
+  const summary = healthSummary(health);
+
   const view = calendarViewState({
     statusLoading: statusQuery.isLoading,
     statusError: statusQuery.isError,
-    connected: statusQuery.data?.connected === true && !disconnected,
+    // A revoked connection still has a row, so `connected` alone would keep the
+    // business on the connected panel with no way to reconnect. The health read
+    // is what decides whether there is a working connection to show.
+    connected: statusQuery.data?.connected === true && !disconnected && health?.state !== "not_connected",
     connecting,
     connectDisabled: connectFailure === "disabled",
   });
@@ -136,12 +147,22 @@ export default function CalendarPage() {
 
       {(view === "not-connected" || view === "connecting") && (
         <section className="sd-section" aria-labelledby="cal-connect-title">
-          <div className="sd-status" data-state="unknown">
+          {/*
+            A withdrawn connection reaches this panel too, because the row is no
+            longer active. Without this the business would be shown a plain
+            "not connected" and never learn that something it HAD set up stopped
+            working, or why.
+          */}
+          <div className="sd-status" data-state={health?.state === "revoked" ? "attention" : "unknown"}>
             <div className="sd-status__head">
               <span className="sd-status__dot" aria-hidden="true" />
               <div className="sd-status__body">
-                <h2 className="sd-status__title" id="cal-connect-title">{CONNECT.notConnectedTitle}</h2>
-                <p className="sd-status__detail">{CONNECT.notConnectedDetail}</p>
+                <h2 className="sd-status__title" id="cal-connect-title">
+                  {health?.state === "revoked" ? summary.title : CONNECT.notConnectedTitle}
+                </h2>
+                <p className="sd-status__detail">
+                  {health?.state === "revoked" ? summary.detail : CONNECT.notConnectedDetail}
+                </p>
               </div>
             </div>
           </div>
@@ -170,25 +191,65 @@ export default function CalendarPage() {
 
       {view === "connected" && (
         <section className="sd-section" aria-labelledby="cal-connected-title">
-          <div className="sd-status" data-state="answering">
+          {/*
+            The heading states the connection's ACTUAL condition, not the fact
+            that a row exists. "Connected" while Google has withdrawn access is
+            the one reading that would cost a business real appointments.
+          */}
+          <div className="sd-status" data-state={health?.usable === false ? "attention" : "answering"}>
             <div className="sd-status__head">
               <span className="sd-status__dot" aria-hidden="true" />
               <div className="sd-status__body">
-                <h2 className="sd-status__title" id="cal-connected-title">{CONNECT.connectedTitle}</h2>
-                <p className="sd-status__detail">{CONNECT.connectedExplain}</p>
+                <h2 className="sd-status__title" id="cal-connected-title">{summary.title}</h2>
+                <p className="sd-status__detail">{summary.detail}</p>
               </div>
             </div>
           </div>
+
+          {healthQuery.data?.writeEnabled === false && (
+            <div className="sd-error" role="status">
+              <div className="sd-error__body">
+                <span className="sd-error__title">{HEALTH_FIELDS.writeDisabledTitle}</span>
+                <p className="sd-error__detail">{HEALTH_FIELDS.writeDisabledDetail}</p>
+              </div>
+            </div>
+          )}
 
           <dl className="sd-figures">
             <div className="sd-figure">
               <span className="sd-figure__value">{CONNECT.providerGoogle}</span>
               <span className="sd-figure__label">{CONNECT.providerLabel}</span>
             </div>
+            {/* Which account and which calendar — so a business can tell whether
+                this is the one it meant to connect. */}
+            {health?.accountLabel !== null && health?.accountLabel !== undefined && (
+              <div className="sd-figure">
+                <span className="sd-figure__value">{health.accountLabel}</span>
+                <span className="sd-figure__label">{HEALTH_FIELDS.accountLabel}</span>
+              </div>
+            )}
             <div className="sd-figure">
-              <span className="sd-figure__value">{lastCheckedLabel(statusQuery.dataUpdatedAt)}</span>
-              <span className="sd-figure__label">{CONNECT.lastCheckedLabel}</span>
+              <span className="sd-figure__value">{calendarDisplayName(health?.calendarId ?? null)}</span>
+              <span className="sd-figure__label">{HEALTH_FIELDS.calendarLabel}</span>
             </div>
+            <div className="sd-figure">
+              {/*
+                When the SERVER recorded a successful check, that is the fact
+                worth showing. `lastCheckedLabel` only says when this browser
+                last re-read the status, which is not the same thing and reads
+                as reassurance it cannot give.
+              */}
+              <span className="sd-figure__value">
+                {health?.lastSuccessAt != null ? healthTimestamp(health.lastSuccessAt) : lastCheckedLabel(statusQuery.dataUpdatedAt)}
+              </span>
+              <span className="sd-figure__label">{HEALTH_FIELDS.lastSuccessLabel}</span>
+            </div>
+            {health?.lastErrorAt != null && (
+              <div className="sd-figure">
+                <span className="sd-figure__value">{healthTimestamp(health.lastErrorAt)}</span>
+                <span className="sd-figure__label">{HEALTH_FIELDS.lastErrorLabel}</span>
+              </div>
+            )}
           </dl>
 
           {disconnectFailed && (

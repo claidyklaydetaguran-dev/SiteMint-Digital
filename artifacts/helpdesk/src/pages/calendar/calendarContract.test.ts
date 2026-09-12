@@ -6,12 +6,17 @@
 
 import {
   CONNECT,
+  HEALTH,
+  HEALTH_FIELDS,
   PAGE,
   RETURN_BANNER,
+  calendarDisplayName,
   calendarReturnCopy,
   calendarViewState,
   classifyConnectError,
   everyRenderableString,
+  healthSummary,
+  healthTimestamp,
   lastCheckedLabel,
   parseCalendarReturn,
 } from "./calendarContract.js";
@@ -101,6 +106,48 @@ check("every renderable string is non-empty", strings.every((s) => typeof s === 
 check("the page title is present", strings.includes(PAGE.title));
 check("no string claims a calendar id, account email or token is shown", strings.every((s) =>
   !/calendar id|account email|access token|refresh token/i.test(s)));
+
+section("connection health — set up is not the same as working");
+
+// The case this exists for: an owner removes SiteMint's access at Google.
+// Nothing works from that moment, but the connection row stays active until
+// something tries to use it — so the screen reported a healthy connection while
+// every approval silently failed.
+eq("a withdrawn connection is not called disconnected", HEALTH.revoked.title, "Access to this calendar was withdrawn");
+check("it says busy times are not being checked", /busy times are not being checked/i.test(HEALTH.revoked.detail));
+check("it says approvals cannot write events", /cannot write events/i.test(HEALTH.revoked.detail));
+check("it says what to do", /reconnect/i.test(HEALTH.revoked.detail));
+// Reconnecting must not imply the past is undone.
+check("it says events already written stay", /already written stay/i.test(HEALTH.revoked.detail));
+eq("and it is the strongest tone", HEALTH.revoked.tone, "error");
+
+check("connected-but-unused is not reported as working", HEALTH.untested.title !== HEALTH.healthy.title);
+check("a failed last check is not reported as working", HEALTH.failing.title !== HEALTH.healthy.title);
+check("a failed check says it may be temporary", /may be temporary/i.test(HEALTH.failing.detail));
+check("not-connected still says requests can be taken", /take and hold requests/i.test(HEALTH.not_connected.detail));
+check("every state has its own wording", new Set(Object.values(HEALTH).map((h) => h.detail)).size === 5);
+
+eq("an absent health read is treated as not connected, never as healthy", healthSummary(undefined).title, HEALTH.not_connected.title);
+eq("each state maps to its own summary", healthSummary({
+  state: "revoked", usable: false, provider: "google", accountLabel: null,
+  calendarId: null, lastSuccessAt: null, lastErrorAt: null, connectedAt: null,
+}).title, HEALTH.revoked.title);
+
+section("what the health panel is allowed to say");
+
+// "primary" is a provider default, not a name the business chose — showing it
+// raw would read as a calendar called "primary".
+eq("the provider's default calendar is named plainly", calendarDisplayName("primary"), HEALTH_FIELDS.defaultCalendar);
+eq("a named calendar is shown as it is", calendarDisplayName("team@group.calendar.google.com"), "team@group.calendar.google.com");
+eq("an absent calendar is not invented", calendarDisplayName(null), HEALTH_FIELDS.none);
+eq("nor is an empty one", calendarDisplayName("   "), HEALTH_FIELDS.none);
+
+eq("a missing timestamp is not invented", healthTimestamp(null), HEALTH_FIELDS.none);
+eq("an unparseable timestamp is not invented either", healthTimestamp("not-a-date"), HEALTH_FIELDS.none);
+check("a real timestamp is formatted", healthTimestamp("2026-09-11T15:04:00.000Z") !== HEALTH_FIELDS.none);
+
+check("the write-disabled note says busy times are still read", /busy times are still read/i.test(HEALTH_FIELDS.writeDisabledDetail));
+
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

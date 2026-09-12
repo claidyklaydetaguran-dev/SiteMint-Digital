@@ -21,6 +21,23 @@ export async function getActiveConnection(firmId: number): Promise<SchedulingCal
   return row;
 }
 
+/**
+ * The firm's connection row whatever its status, including a revoked one.
+ *
+ * `getActiveConnection` filters revoked rows out, which is right for anything
+ * that wants to USE the connection and wrong for anything that wants to REPORT
+ * on it — a revoked connection is the single most important thing to be able
+ * to tell a business about.
+ */
+export async function findAnyConnection(firmId: number): Promise<SchedulingCalendarConnection | undefined> {
+  const [row] = await db
+    .select()
+    .from(schedulingCalendarConnections)
+    .where(eq(schedulingCalendarConnections.firmId, firmId))
+    .limit(1);
+  return row;
+}
+
 export interface UpsertConnectionInput {
   firmId: number;
   refreshTokenEnc: string;

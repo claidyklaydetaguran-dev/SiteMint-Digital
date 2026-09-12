@@ -74,6 +74,64 @@ export const PREVIEW = {
   heldUntilPrefix: "Holds the time until",
 } as const;
 
+/* ── What a test does, and what it does not ────────────────────────────── */
+//
+// The page already said a test request is stored as a real row. What it never
+// said is where that row STOPS: a test request writes nothing to a calendar,
+// and cannot, because nothing reaches a calendar until somebody approves it.
+// Leaving that unsaid invites the opposite reading — that a successful test
+// proved the whole chain, calendar included — and that is the claim a business
+// would act on when deciding it is ready to take real bookings.
+
+export const BOUNDARY = {
+  heading: "What a test does",
+  doesHeading: "It does",
+  doesNotHeading: "It does not",
+  does: [
+    "Store a real request on this account, exactly as a client's would be stored.",
+    "Hold the time, so the slot stops being offered to anyone else.",
+    "Appear under Appointments, marked as a test.",
+  ],
+  doesNot: [
+    "Write anything to your calendar. Nothing reaches a calendar until you approve it.",
+    "Contact anyone. No email or text is sent to the name you type here.",
+    "Prove your calendar works. Approving a request is what tests that.",
+  ],
+} as const;
+
+export type CalendarReadiness = "connected" | "not_connected" | "unknown";
+
+export function calendarReadiness(status: { connected: boolean } | undefined, isError: boolean): CalendarReadiness {
+  if (isError) return "unknown";
+  if (status === undefined) return "unknown";
+  return status.connected ? "connected" : "not_connected";
+}
+
+/**
+ * What approving a test request would actually do, given the connection as it
+ * stands. Stated on this page because "the test worked" and "a real booking
+ * would reach my calendar" are different claims, and only one of them is
+ * answered by creating a test request.
+ */
+export const CALENDAR_NOTE: Record<CalendarReadiness, { title: string; detail: string; tone: "ok" | "warn" | "neutral" }> = {
+  connected: {
+    title: "A calendar is connected",
+    detail: "Approving a request — a test one or a client's — writes a real event to it.",
+    tone: "ok",
+  },
+  not_connected: {
+    title: "No calendar is connected",
+    detail:
+      "Requests can still be taken and held, but none of them can be approved into a calendar event yet. Connect one under Calendar.",
+    tone: "warn",
+  },
+  unknown: {
+    title: "Calendar connection unknown",
+    detail: "This workspace couldn't read whether a calendar is connected. Check the Calendar screen.",
+    tone: "neutral",
+  },
+};
+
 export function withTestPrefix(name: string): string {
   const trimmed = name.trim();
   return trimmed.startsWith(TEST_REQUEST_PREFIX) ? trimmed : `${TEST_REQUEST_PREFIX}${trimmed}`;
@@ -89,5 +147,15 @@ export function activeAppointmentTypeId(
 /* ── Exhaustive string surface ─────────────────────────────────────────── */
 
 export function everyRenderableString(): string[] {
-  return [...Object.values(PAGE), ...Object.values(PREVIEW), withTestPrefix("Jane Doe")];
+  return [
+    ...Object.values(PAGE),
+    ...Object.values(PREVIEW),
+    BOUNDARY.heading,
+    BOUNDARY.doesHeading,
+    BOUNDARY.doesNotHeading,
+    ...BOUNDARY.does,
+    ...BOUNDARY.doesNot,
+    ...Object.values(CALENDAR_NOTE).flatMap((c) => [c.title, c.detail]),
+    withTestPrefix("Jane Doe"),
+  ];
 }

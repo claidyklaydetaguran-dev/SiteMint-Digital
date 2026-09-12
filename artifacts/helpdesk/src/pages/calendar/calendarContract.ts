@@ -1,14 +1,20 @@
 /**
  * V5 PR-7 — every string and every rule the Calendar screen displays.
  *
- * `GET /api/receptionist/availability/calendar-status` reports only
- * `{ connected, provider }`; the calendar router
- * (`artifacts/api-server/src/routes/receptionistCalendar.ts`) offers exactly
- * `POST .../google/start`, `GET .../google/callback` (a server redirect, never
- * called from the browser directly), and `DELETE .../connection`. So this
- * screen has five reachable states — not-connected, connecting, connected,
- * error and disabled — and nothing this module produces claims more than that
- * boundary supports: no calendar id, no account email, no event count.
+ * The screen has five interaction states — not-connected, connecting,
+ * connected, error and disabled — driven by `POST .../google/start`,
+ * `GET .../google/callback` (a server redirect, never called from the browser
+ * directly) and `DELETE .../connection`.
+ *
+ * It additionally reports CONNECTION HEALTH from
+ * `GET /api/receptionist/calendar/health`. That endpoint exists because
+ * `.../availability/calendar-status` answers a single boolean derived from a
+ * row existing, and that boolean is wrong in the case that matters most: when
+ * an owner withdraws SiteMint's access at Google, the row stays active until
+ * something tries to use it, so the screen showed a healthy connection while
+ * every approval silently failed. Everything displayed here comes from what the
+ * connection row actually records — no event count, and no claim about a
+ * calendar this workspace has not read.
  */
 
 import type { CalendarActionError } from "@/lib/calendarApi";
@@ -60,6 +66,92 @@ export const CONNECT = {
   retryLabel: "Try again",
   retryingLabel: "Trying…",
 } as const;
+
+/* ── Connection health ─────────────────────────────────────────────────── */
+//
+// "Connected" was derived from a row existing, which is exactly wrong in the
+// case that matters: the owner removes SiteMint's access at Google, every call
+// starts failing, and the row stays active until something tries to use it. The
+// screen showed a healthy connection while every approval silently failed.
+//
+// `GET /receptionist/calendar/health` answers what the row actually records,
+// and these five states are the honest readings of it.
+
+export type CalendarHealthState = "not_connected" | "revoked" | "failing" | "untested" | "healthy";
+
+export interface CalendarHealth {
+  state: CalendarHealthState;
+  usable: boolean;
+  provider: string | null;
+  accountLabel: string | null;
+  calendarId: string | null;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  connectedAt: string | null;
+}
+
+export const HEALTH: Record<CalendarHealthState, { title: string; detail: string; tone: "ok" | "warn" | "error" | "neutral" }> = {
+  not_connected: {
+    title: "No calendar connected",
+    detail: "SiteMint can still take and hold requests, but nothing can be written to a calendar until one is connected.",
+    tone: "neutral",
+  },
+  revoked: {
+    // The whole reason this exists. Say what happened, and that nothing is
+    // working — not "disconnected", which sounds like something the business
+    // chose.
+    title: "Access to this calendar was withdrawn",
+    detail:
+      "Google is no longer letting SiteMint use this calendar, so busy times are not being checked and approvals cannot write events. Reconnect to restore it. Events already written stay where they are.",
+    tone: "error",
+  },
+  failing: {
+    title: "The last check on this calendar failed",
+    detail:
+      "The connection is still in place, so this may be temporary. If it keeps failing, disconnect and reconnect the calendar.",
+    tone: "warn",
+  },
+  untested: {
+    title: "Connected, not yet used",
+    detail: "Nothing has needed to read this calendar yet. The first availability check will confirm it works.",
+    tone: "neutral",
+  },
+  healthy: {
+    title: "Connected and working",
+    detail: "Busy times are being read from this calendar, and approved appointments are written to it.",
+    tone: "ok",
+  },
+};
+
+export const HEALTH_FIELDS = {
+  accountLabel: "Account",
+  calendarLabel: "Calendar",
+  connectedAtLabel: "Connected",
+  lastSuccessLabel: "Last successful check",
+  lastErrorLabel: "Last failure",
+  none: "Not recorded",
+  defaultCalendar: "Primary calendar",
+  writeDisabledTitle: "Writing to calendars is switched off for this workspace",
+  writeDisabledDetail: "Busy times are still read. Approving an appointment will not create an event until it is switched on.",
+} as const;
+
+/** A connection can be present and still be unable to do the thing it exists for. */
+export function healthSummary(health: CalendarHealth | undefined): { title: string; detail: string; tone: "ok" | "warn" | "error" | "neutral" } {
+  return HEALTH[health?.state ?? "not_connected"];
+}
+
+/** Never invent a calendar name: "primary" is a provider default, not a label the business chose. */
+export function calendarDisplayName(calendarId: string | null): string {
+  if (calendarId === null || calendarId.trim() === "") return HEALTH_FIELDS.none;
+  return calendarId === "primary" ? HEALTH_FIELDS.defaultCalendar : calendarId;
+}
+
+export function healthTimestamp(iso: string | null): string {
+  if (iso === null) return HEALTH_FIELDS.none;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return HEALTH_FIELDS.none;
+  return date.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
 
 export const RETURN_BANNER = {
   connectedTitle: "Google Calendar connected",
@@ -152,6 +244,11 @@ export function everyRenderableString(): string[] {
     ...Object.values(PAGE),
     ...Object.values(CONNECT),
     ...Object.values(RETURN_BANNER),
+    ...Object.values(HEALTH).flatMap((h) => [h.title, h.detail]),
+    ...Object.values(HEALTH_FIELDS),
+    calendarDisplayName(null),
+    calendarDisplayName("primary"),
+    healthTimestamp(null),
     lastCheckedLabel(undefined),
     lastCheckedLabel(Date.now()),
   ];

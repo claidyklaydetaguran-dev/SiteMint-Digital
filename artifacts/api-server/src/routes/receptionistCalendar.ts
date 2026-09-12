@@ -27,7 +27,9 @@ import {
   upsertConnection,
   markConnectionRevoked,
   getActiveConnection,
+  findAnyConnection,
 } from "../lib/calendar/calendarConnectionsRepository.js";
+import { assessConnectionHealth } from "../lib/calendar/connectionHealth.js";
 import {
   approveRequestToBooked,
   cancelBookedRequest,
@@ -115,6 +117,31 @@ router.get("/receptionist/calendar/google/callback", requireReceptionistAuth, as
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] callback failed");
     res.redirect(`${DASHBOARD_SETTINGS_PATH}?calendar=error`);
+  }
+});
+
+// ── GET /api/receptionist/calendar/health ────────────────────────────────────
+//
+// The honest connection report. `GET /availability/calendar-status` answers one
+// boolean derived from an active row existing, which says "connected" in the
+// case that matters most: the owner has removed SiteMint's access at the
+// provider, nothing works any more, and the row stays `active` until something
+// tries to use it. This returns what the row actually records — which account,
+// which calendar, when it last worked, when it last failed — so the dashboard
+// can tell "set up" apart from "working".
+//
+// Read-only, firm-scoped, and available even when connect is disabled: a
+// business must always be able to see the state of a connection it already has.
+
+router.get("/receptionist/calendar/health", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    // Deliberately NOT getActiveConnection: a revoked row is exactly what this
+    // endpoint exists to report, and that helper filters it out.
+    const connection = await findAnyConnection(req.firmId!);
+    res.json({ health: assessConnectionHealth(connection), writeEnabled: isCalendarWriteEnabled() });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] health read failed");
+    res.status(500).json({ error: "Internal error" });
   }
 });
 

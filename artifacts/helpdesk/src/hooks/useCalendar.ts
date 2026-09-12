@@ -20,11 +20,12 @@
  * same reason as a plain success case (no conflict is documented for those).
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   approveAppointmentRequest,
   cancelBookedAppointment,
   disconnectCalendar,
+  fetchCalendarHealth,
   reconcileCalendar,
   rescheduleBookedAppointment,
   startGoogleCalendarConnect,
@@ -39,6 +40,27 @@ function requestsKey(firmId: number | undefined) {
 
 function calendarStatusKey(firmId: number | undefined) {
   return firmId !== undefined ? [AVAILABILITY_ROOT, "calendar-status", firmId] : undefined;
+}
+
+function healthKey(firmId: number | undefined) {
+  return firmId !== undefined ? [AVAILABILITY_ROOT, "calendar-health", firmId] : undefined;
+}
+
+/**
+ * The honest connection report.
+ *
+ * Separate from `useCalendarStatus` because that one answers a boolean derived
+ * from a connection row existing — which reports a withdrawn connection as
+ * connected, right up until something tries to use it.
+ */
+export function useCalendarHealth() {
+  const firmId = useAuthenticatedFirmId();
+  const key = healthKey(firmId);
+  return useQuery({
+    queryKey: key ?? [AVAILABILITY_ROOT, "calendar-health", "unresolved-session"],
+    queryFn: fetchCalendarHealth,
+    enabled: key !== undefined,
+  });
 }
 
 export function useStartGoogleCalendarConnect() {

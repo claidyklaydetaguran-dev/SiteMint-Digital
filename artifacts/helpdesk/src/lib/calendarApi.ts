@@ -106,6 +106,31 @@ export function startGoogleCalendarConnect(): Promise<{ authorizeUrl: string }> 
   return calendarFetch("/receptionist/calendar/google/start", { method: "POST" });
 }
 
+export interface CalendarHealthResponse {
+  health: {
+    state: "not_connected" | "revoked" | "failing" | "untested" | "healthy";
+    usable: boolean;
+    provider: string | null;
+    accountLabel: string | null;
+    calendarId: string | null;
+    lastSuccessAt: string | null;
+    lastErrorAt: string | null;
+    connectedAt: string | null;
+  };
+  writeEnabled: boolean;
+}
+
+/**
+ * `GET /calendar/health` — what the connection row actually records.
+ *
+ * Distinct from `.../availability/calendar-status`, which answers one boolean
+ * derived from a row existing and therefore reports a withdrawn connection as
+ * connected.
+ */
+export function fetchCalendarHealth(): Promise<CalendarHealthResponse> {
+  return calendarFetch("/receptionist/calendar/health");
+}
+
 /** `DELETE /calendar/connection` → `{ disconnected: true }`; 404 when nothing is connected. */
 export function disconnectCalendar(): Promise<{ disconnected: true }> {
   return calendarFetch("/receptionist/calendar/connection", { method: "DELETE" });
