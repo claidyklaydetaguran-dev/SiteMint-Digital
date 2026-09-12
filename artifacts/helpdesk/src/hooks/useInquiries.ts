@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createTransferContact,
   deleteTransferContact,
+  fetchAssistantCapabilities,
   fetchInquiries,
   fetchNotifications,
   fetchTransferContacts,
   runTransferContactCheck,
   updateInquiryStatus,
   updateTransferContact,
+  type AssistantCapabilityList,
   type InquiryList,
   type InquiryStatus,
   type NotificationRecord,
@@ -59,6 +61,21 @@ export function useNotificationStatus() {
   return useQuery<{ items: NotificationRecord[]; count: number }>({
     queryKey: notificationsKey(firmId) ?? UNRESOLVED_SESSION_KEY,
     queryFn: fetchNotifications,
+    enabled: firmId !== undefined,
+  });
+}
+
+/**
+ * What the assistant can actually do. Kept in this hook module rather than in
+ * the assistant hooks because it is server-derived truth about the workspace,
+ * not part of the editable assistant draft — conflating the two is what lets a
+ * ticked checkbox masquerade as a working capability.
+ */
+export function useAssistantCapabilities() {
+  const firmId = useAuthenticatedFirmId();
+  return useQuery<AssistantCapabilityList>({
+    queryKey: firmId !== undefined ? [ROOT, "capabilities", firmId] : UNRESOLVED_SESSION_KEY,
+    queryFn: fetchAssistantCapabilities,
     enabled: firmId !== undefined,
   });
 }

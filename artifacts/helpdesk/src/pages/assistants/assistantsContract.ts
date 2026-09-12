@@ -346,6 +346,54 @@ export const GUIDANCE_NOTE =
    app's base itself, so these are correct under both the configured prefix
    and a root-base build. */
 
+/**
+ * V8 — "What it can do" copy.
+ *
+ * The wording keeps two claims apart on purpose. A capability card states what
+ * the assistant CAN do, which the server derives from the published payload's
+ * own rules. A permitted-action checkbox states what the owner WANTS it to do.
+ * When those disagree the screen says so rather than letting the tick imply the
+ * capability, because a ticked box that does nothing is the most expensive kind
+ * of wrong on this journey.
+ */
+export const ACTIONS = {
+  availableTitle: "What this assistant can do on a call",
+  availableDetail:
+    "Set by SiteMint and by what you have finished setting up. This is what a caller can actually get.",
+  loading: "Checking what's available…",
+  loadFailed: "SiteMint couldn't check what this assistant can do. Try again.",
+  noneAttachable:
+    "Your assistant can answer questions and speak with callers, but it cannot take actions like saving a message yet. Contact SiteMint to switch that on.",
+  stateActive: "Available",
+  stateUnavailable: "Not available yet",
+
+  permittedTitle: "What you want it to do",
+  permittedDetail:
+    "Tick the actions this assistant should take. Ticking one does not switch on a capability that isn't available yet.",
+  wantedButUnavailable: "You've asked for this, but it isn't available yet:",
+
+  escalationLabel: "When to hand over to a person",
+  escalationPlaceholder: "When should this assistant stop and pass the caller to someone?",
+  escalationHelp: "Also editable in Advanced, under the full prompt.",
+} as const;
+
+/**
+ * Which server capability a permitted action depends on, or null when it needs
+ * none. Answering questions and ending a call politely are prompt behaviour —
+ * they require no tool, so they are never blocked by one.
+ */
+const CAPABILITY_BY_ACTION: Record<string, string | null> = {
+  answer_questions: null,
+  check_availability: "scheduling",
+  create_appointment_requests: "scheduling",
+  take_messages: "messages",
+  end_call_politely: null,
+};
+
+export function capabilityForAction(actionId: string): string | null {
+  return CAPABILITY_BY_ACTION[actionId] ?? null;
+}
+
 export const LIST_PATH = "/assistants";
 export const NEW_PATH = "/assistants/new";
 
@@ -398,5 +446,6 @@ export function everyRenderableString(): string[] {
     lastSyncedNote("Aug 25, 2026, 4:20 PM"),
     providerLinkLabel({ provider: null, providerLinked: false }),
     providerLinkLabel({ provider: "vapi", providerLinked: true }),
+    ...Object.values(ACTIONS),
   ];
 }

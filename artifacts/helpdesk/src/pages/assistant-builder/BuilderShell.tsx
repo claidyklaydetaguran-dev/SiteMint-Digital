@@ -13,6 +13,7 @@ import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { useWorkspaceBusinessInfo, type WorkspaceBusinessInfo } from "@/hooks/useWorkspaceBusinessInfo";
 
+import ActionsTab from "@/pages/assistant-builder/ActionsTab";
 import ConfigurationTab from "@/pages/assistant-builder/ConfigurationTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
 import VoiceTab from "@/pages/assistant-builder/VoiceTab";
@@ -53,9 +54,11 @@ const NOT_ENABLED_REASON = "Not enabled on this workspace yet.";
  * bookmarked URL still resolves — see `resolveBuilderTab`.
  */
 export const BUILDER_TABS = [
-  { key: "configuration", label: "Configuration" },
-  { key: "prompt", label: "Prompt" },
-  { key: "voice", label: "Voice" },
+  { key: "configuration", label: "Business information" },
+  { key: "voice", label: "Greeting & voice" },
+  { key: "actions", label: "What it can do" },
+  { key: "testing", label: "Test & publish" },
+  { key: "prompt", label: "Advanced" },
 ] as const;
 
 export type BuilderTabKey = (typeof BUILDER_TABS)[number]["key"];
@@ -70,6 +73,12 @@ export function isBuilderTabKey(
 export const BUILDER_TAB_ALIASES: Record<string, BuilderTabKey> = {
   setup: "configuration",
   "voice-model": "voice",
+  // V8 renamed the sections but kept their keys, so every previously shared
+  // link still resolves. These two additions cover the business-language names
+  // a customer might type or a future link might use.
+  business: "configuration",
+  greeting: "voice",
+  advanced: "prompt",
 };
 
 /**
@@ -104,6 +113,11 @@ function TabPanel({
       return <PromptTab draft={draft} update={update} businessInfo={businessInfo} />;
     case "voice":
       return <VoiceTab draft={draft} update={update} businessInfo={businessInfo} />;
+    case "actions":
+      return <ActionsTab draft={draft} update={update} businessInfo={businessInfo} />;
+    case "testing":
+      // Rendered by the shell, which owns the publish/test/sync controls.
+      return null;
     default:
       return null;
   }
@@ -209,35 +223,31 @@ export function BuilderShell({
   const activeTabLabel = BUILDER_TABS.find((t) => t.key === tab)?.label ?? "";
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
+    <div className="sd-page sd-enter">
       <div aria-live="polite" className="sr-only">
         {announcement}
       </div>
 
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-border px-6 py-4">
-        <Link
-          href="/assistants"
-          className="inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-0 md:py-0"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Assistants
-        </Link>
-        <h1 className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Assistant Builder
-        </h1>
-        {/* V5 PR-6 (C-6): local breadcrumb — the lead swaps this for the shared
-            component once one exists. `Assistant / {name} / {Tab}`. */}
-        <nav aria-label="Breadcrumb" className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-          <span>Assistant</span>
-          <span aria-hidden="true">/</span>
-          <span className="max-w-[10rem] truncate font-medium text-foreground">
+      {/* Header — the same shell every other dashboard page uses. */}
+      <div className="sd-page__head">
+        <div className="min-w-0">
+          <Link
+            href="/assistants"
+            className="mb-1 inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-0 md:py-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Assistants
+          </Link>
+          <span className="sd-eyebrow">ASSISTANT</span>
+          <h1 className="sd-page__title">
             {draft.setup.assistantName || "Untitled assistant"}
-          </span>
-          <span aria-hidden="true">/</span>
-          <span>{activeTabLabel}</span>
-        </nav>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+          </h1>
+          <p className="sd-page__meta">{activeTabLabel}</p>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-card-border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Input
               aria-label="Assistant name"
@@ -296,12 +306,12 @@ export function BuilderShell({
       <Tabs
         value={tab}
         onValueChange={(v) => isBuilderTabKey(v) && onTabChange(v)}
-        className="flex min-h-0 flex-1 flex-col md:flex-row"
+        className="flex flex-col gap-4 md:flex-row"
       >
-        <div className="relative flex-shrink-0 md:w-48">
+        <div className="relative flex-shrink-0 md:w-56">
           <TabsList
             aria-label="Assistant builder sections"
-            className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-2 md:w-48 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-3"
+            className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg border border-card-border bg-card p-2 md:w-56 md:flex-col md:overflow-visible"
           >
             {BUILDER_TABS.map((t) => (
               <TabsTrigger
@@ -319,31 +329,116 @@ export function BuilderShell({
           />
         </div>
 
-        <div className="min-w-0 flex-1 overflow-y-auto p-6">
-          <fieldset disabled={contentDisabled} className="min-w-0">
-            <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
-          </fieldset>
+        <div className="min-w-0 flex-1 rounded-lg border border-card-border bg-card p-4 sm:p-5">
+          {tab === "testing" ? (
+            <TestAndPublishPanel
+              statusBadge={statusBadge}
+              testControl={testControl}
+              publishControl={publishControl}
+              syncControl={syncControl}
+            />
+          ) : (
+            <fieldset disabled={contentDisabled} className="min-w-0">
+              <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
+            </fieldset>
+          )}
+
+          {/* Technical guidance is secondary, so it sits at the foot of the
+              Advanced section rather than in a bar over every screen. */}
+          {tab === "prompt" && (
+            <div className="mt-6 border-t border-card-border pt-4">
+              {preset === undefined ? (
+                <p className="text-[11px] text-muted-foreground">{PRESET_RECOVERY.estimatesUnavailable}</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 sm:flex sm:gap-8">
+                  <CostBreakdown preset={preset} compact />
+                  <LatencyMeter latencyMs={preset.latencyMs} compact />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Tabs>
 
-      {/* Sticky estimate summary + save */}
-      <div className="flex-shrink-0 border-t border-border bg-card px-6 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid flex-1 grid-cols-2 gap-4 sm:flex sm:gap-8">
-            {preset === undefined ? (
-              <p className="col-span-2 self-center text-[11px] text-muted-foreground">
-                {PRESET_RECOVERY.estimatesUnavailable}
-              </p>
-            ) : (
-              <>
-                <CostBreakdown preset={preset} compact />
-                <LatencyMeter latencyMs={preset.latencyMs} compact />
-              </>
-            )}
-          </div>
-          {footerRight}
-        </div>
+      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-card-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-end">
+        {footerRight}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The "Test & publish" section.
+ *
+ * The controls themselves are the shell's existing publish/test/sync nodes,
+ * unchanged — including every guard and disabled reason they already carry.
+ * They are simply given a place of their own instead of competing for room in
+ * a header, which is what made publishing feel like a developer action rather
+ * than the last step of setting up.
+ */
+function TestAndPublishPanel({
+  statusBadge,
+  testControl,
+  publishControl,
+  syncControl,
+}: {
+  statusBadge: ReactNode;
+  testControl?: ReactNode;
+  publishControl?: ReactNode;
+  syncControl?: ReactNode;
+}) {
+  return (
+    <div className="space-y-5">
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Current state</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          What callers reach right now, and whether it matches what you last saved.
+        </p>
+        <div className="mt-2">{statusBadge}</div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Hear it yourself</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          A test call runs in this browser. It does not use your phone number and no
+          caller is involved.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {browserTestInBuild ? (
+            testControl ?? (
+              <UnavailableActionButton
+                icon={PlayCircle}
+                label="Test call"
+                availability="Save and publish this assistant before testing."
+              />
+            )
+          ) : (
+            <UnavailableActionButton icon={PlayCircle} label="Test call" availability={NOT_ENABLED_REASON} />
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Put it live</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Publishing sends your setup to the voice provider. Callers hear the published
+          version, not your unsaved edits.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {publishInBuild ? (
+            publishControl ?? (
+              <UnavailableActionButton
+                icon={Rocket}
+                label="Publish"
+                availability="Save this assistant as a draft before publishing."
+              />
+            )
+          ) : (
+            <UnavailableActionButton icon={Rocket} label="Publish" availability={NOT_ENABLED_REASON} />
+          )}
+          {syncInBuild && syncControl}
+        </div>
+      </section>
     </div>
   );
 }

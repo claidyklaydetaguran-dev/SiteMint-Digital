@@ -1,5 +1,6 @@
 import { BrainCircuit, AudioLines, Ear, Cpu, AlertTriangle, Check, ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CharCountField } from "@/components/common/CharCountField";
 import { CostBreakdown } from "@/components/common/CostBreakdown";
 import { LatencyMeter } from "@/components/common/LatencyMeter";
 import { VoiceSamplePlayer } from "@/components/common/VoiceSamplePlayer";
@@ -33,6 +34,11 @@ const MORE_PRESETS = VOICE_MODEL_PRESETS.filter((p) => !isCuratedVoicePreset(p.i
  * unchanged.
  */
 export default function VoiceTab({ draft, update }: BuilderTabProps) {
+  // The greeting lives here, with the voice that speaks it — the two are one
+  // decision for a business owner ("what do callers hear first?"), and splitting
+  // them across two screens is what made this journey feel like a config editor.
+  const setPrompt = (patch: Partial<typeof draft.prompt>) =>
+    update((d) => ({ ...d, prompt: { ...d.prompt, ...patch } }));
   const preset = findVoicePreset(draft.voiceModel.preset);
   const selectedIsCurated = isCuratedVoicePreset(draft.voiceModel.preset);
 
@@ -45,6 +51,18 @@ export default function VoiceTab({ draft, update }: BuilderTabProps) {
         <h2 className="font-display text-lg font-semibold text-foreground">{VOICE_MODEL.title}</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">{VOICE_MODEL.detail}</p>
       </div>
+
+      {/* The first thing a caller hears, above the voice that says it. */}
+      <CharCountField
+        id="greeting"
+        label="Greeting"
+        value={draft.prompt.firstMessage}
+        onChange={(v) => setPrompt({ firstMessage: v })}
+        maxLength={300}
+        rows={2}
+        placeholder="What the assistant says first"
+        helpText="The opening line on every call. Also editable in Advanced."
+      />
 
       {preset === undefined && (
         <div

@@ -88,6 +88,36 @@ export function fetchNotifications(): Promise<{ items: NotificationRecord[]; cou
   return apiFetch<{ items: NotificationRecord[]; count: number }>("/receptionist/voice/notifications");
 }
 
+// ── assistant capabilities ───────────────────────────────────────────────────
+
+/**
+ * What the assistant can ACTUALLY do, as the server derives it — not what the
+ * draft asks for. The two are different questions, and showing only the draft's
+ * answer is how a business ends up believing its assistant books appointments
+ * when the published payload carries no booking tool.
+ */
+export type CapabilityState = "active" | "blocked";
+
+export interface AssistantCapability {
+  key: string;
+  label: string;
+  state: CapabilityState;
+  detail: string;
+  /** Names what stands in the way, so the screen can link to the fix. */
+  blockedBy: "platform_disabled" | "not_authorized" | "needs_appointment_type" | null;
+}
+
+export interface AssistantCapabilityList {
+  items: AssistantCapability[];
+  /** False when a published assistant would carry no tools at all. */
+  toolsAttachable: boolean;
+  activeCount: number;
+}
+
+export function fetchAssistantCapabilities(): Promise<AssistantCapabilityList> {
+  return apiFetch<AssistantCapabilityList>("/receptionist/voice/capabilities");
+}
+
 // ── transfer contacts ────────────────────────────────────────────────────────
 
 export const CONTACT_ROLES = ["owner", "manager", "receptionist", "support", "sales", "other", "custom"] as const;

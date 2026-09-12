@@ -869,16 +869,29 @@ check(
   "no Advanced tab is offered, and nothing points at one",
   !/Advanced tab|under Advanced|AdvancedTab/.test(journeyCode),
 );
-check(
-  "the builder still exposes exactly the three tabs that are actually imported",
-  /BUILDER_TABS = \[\s*\{ key: "configuration"[\s\S]*?\{ key: "prompt"[\s\S]*?\{ key: "voice"[\s\S]*?\] as const;/.test(
-    shellCode,
-  ) &&
-    // BUILDER_TAB_ALIASES also contributes `key: "..."`-shaped object keys, so
-    // this count is over the tab catalogue's own three entries plus the two
-    // legacy aliases the catalogue array itself does not declare.
-    (shellCode.match(/key: "(configuration|prompt|voice)"/g) ?? []).length === 3,
-);
+// V8 regrouped the builder into business-language sections, so the count is no
+// longer three. The property this guarded was never the number — it was that
+// every section the catalogue offers is actually reachable, and that no
+// orphaned component sneaks in behind one. Both are now asserted directly,
+// which is stricter than a count: a section added without a handler fails here.
+{
+  const declared = [...(shellCode.match(/\{ key: "([a-z-]+)", label:/g) ?? [])].map(
+    (m) => /key: "([a-z-]+)"/.exec(m)![1],
+  );
+  eq(
+    "the builder offers the business-language sections, in order",
+    declared,
+    ["configuration", "voice", "actions", "testing", "prompt"],
+  );
+  check(
+    "every offered section is handled — by TabPanel, or by the shell itself",
+    declared.every(
+      (key) =>
+        new RegExp(`case "${key}":`).test(shellCode) ||
+        new RegExp(`tab === "${key}"`).test(shellCode),
+    ),
+  );
+}
 for (const orphan of ["AdvancedTab", "AnalysisTab", "KnowledgeTab", "TestingTab", "ToolsTab"]) {
   check(
     `${orphan} is imported by nothing, so it cannot surface`,
@@ -919,8 +932,13 @@ check(
   // this file (inside `choosePreset`'s own definition), and every place a
   // preset can be chosen calls that one function from an explicit
   // onClick/onKeyDown handler, never from an effect.
-  "the recovery state changes nothing by itself — the draft is written only by an explicit choice",
-  (voiceTabCode.match(/\bupdate\(/g) ?? []).length === 1 &&
+  // V8 moved the greeting onto this tab, so `update(` is no longer called
+  // exactly once. The property was never the call count — it was that the
+  // PRESET is written only by an explicit choice and never by an effect. That
+  // is now asserted directly: exactly one writer of `voiceModel`, it is
+  // `choosePreset`, every card calls it, and there is no effect on this tab.
+  "the recovery state changes nothing by itself — the preset is written only by an explicit choice",
+  (voiceTabCode.match(/voiceModel: \{/g) ?? []).length === 1 &&
     /const choosePreset = \(id: SupportedVoicePresetId\) =>\s*update\(/.test(voiceTabCode) &&
     (voiceTabCode.match(/choosePreset\(p\.id\)/g) ?? []).length >= 2 &&
     !/useEffect/.test(voiceTabCode),

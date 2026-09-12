@@ -1,9 +1,7 @@
 import { Link } from "wouter";
 import { ArrowUpRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { CharCountField } from "@/components/common/CharCountField";
-import { PERMITTED_ACTIONS } from "@/lib/promptComposer";
 import { CONFIGURATION } from "@/pages/assistants/assistantsContract";
 import { ROUTES } from "@/lib/routes";
 import type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
@@ -55,7 +53,7 @@ function Field({
 }
 
 export default function ConfigurationTab({ draft, update, businessInfo }: BuilderTabProps) {
-  const { setup, prompt, tools } = draft;
+  const { setup, prompt } = draft;
   const setSetup = (patch: Partial<typeof setup>) =>
     update((d) => ({ ...d, setup: { ...d.setup, ...patch } }));
   const setPrompt = (patch: Partial<typeof prompt>) =>
@@ -63,16 +61,6 @@ export default function ConfigurationTab({ draft, update, businessInfo }: Builde
 
   const businessName = businessInfo?.name || setup.businessName;
   const industry = businessInfo?.industry || setup.industry;
-
-  const togglePermittedAction = (id: string, checked: boolean) => {
-    const current = new Set(tools.permittedActions);
-    if (checked) current.add(id as (typeof tools.permittedActions)[number]);
-    else current.delete(id as (typeof tools.permittedActions)[number]);
-    update((d) => ({
-      ...d,
-      tools: { ...d.tools, permittedActions: PERMITTED_ACTIONS.map((a) => a.id).filter((a) => current.has(a)) },
-    }));
-  };
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -110,17 +98,10 @@ export default function ConfigurationTab({ draft, update, businessInfo }: Builde
         <Field id="language" label="Supported language" value={setup.language} onChange={(v) => setSetup({ language: v })} placeholder="e.g. English (US)" />
       </div>
 
-      <CharCountField
-        id="greeting"
-        label="Greeting"
-        value={prompt.firstMessage}
-        onChange={(v) => setPrompt({ firstMessage: v })}
-        maxLength={300}
-        rows={2}
-        placeholder="What the assistant says first"
-        helpText="Also shown, and editable, in the Prompt tab's guided sections."
-      />
-
+      {/* The greeting moved to "Greeting & voice", where it sits beside the
+          voice that speaks it. It is one decision for a business owner, and
+          splitting it across two screens is part of what made this journey
+          read as a configuration editor. */}
       <CharCountField
         id="business-context"
         label="Business context"
@@ -131,47 +112,9 @@ export default function ConfigurationTab({ draft, update, businessInfo }: Builde
         placeholder="Hours, location, services, policies — anything the assistant needs to answer questions accurately."
       />
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
-          {CONFIGURATION.permittedActionsLabel}
-        </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{CONFIGURATION.permittedActionsDetail}</p>
-        <div className="mt-2 space-y-2.5">
-          {PERMITTED_ACTIONS.map((action) => {
-            const checked = tools.permittedActions.includes(action.id);
-            const inputId = `permitted-action-${action.id}`;
-            return (
-              <label
-                key={action.id}
-                htmlFor={inputId}
-                className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card p-3 hover-elevate"
-              >
-                <Checkbox
-                  id={inputId}
-                  checked={checked}
-                  onCheckedChange={(v) => togglePermittedAction(action.id, v === true)}
-                  className="mt-0.5"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{action.label}</p>
-                  <p className="text-xs text-muted-foreground">{action.description}</p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
-      <CharCountField
-        id="escalation-behavior"
-        label="Escalation behaviour"
-        value={prompt.escalationRules}
-        onChange={(v) => setPrompt({ escalationRules: v })}
-        maxLength={800}
-        rows={3}
-        placeholder="When should this assistant hand off to a human?"
-        helpText="Also shown, and editable, in the Prompt tab's guided sections."
-      />
+      {/* "What you want it to do" and the hand-over rule moved to the
+          "What it can do" section, where they sit next to what the assistant
+          can ACTUALLY do — so a ticked box that is not yet available says so. */}
     </div>
   );
 }
