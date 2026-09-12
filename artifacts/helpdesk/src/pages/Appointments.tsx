@@ -15,6 +15,7 @@ import { useReconcileCalendar } from "@/hooks/useCalendar";
 import { isCalendarActionError } from "@/lib/calendarApi";
 import { AppointmentRequestsList } from "@/components/booking/AppointmentRequestsList";
 import { AppointmentDetailDrawer } from "@/components/booking/AppointmentDetailDrawer";
+import { AddAppointmentPanel } from "@/components/booking/AddAppointmentPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +26,12 @@ import { Button } from "@/components/ui/button";
 import { MoreHorizontal } from "lucide-react";
 import type { AppointmentRequest } from "@/lib/availabilityApi";
 import {
+  ADD,
+  GROUPS,
+  GROUP_ORDER,
   PAGE,
   REQUESTS,
+  groupRequests,
   reconcileReasonCopy,
   reconcileSummary,
 } from "@/pages/appointments/appointmentsContract";
@@ -41,6 +46,8 @@ export default function Appointments() {
 
   const [selected, setSelected] = useState<AppointmentRequest | null>(null);
   const [reconcileNotice, setReconcileNotice] = useState<{ title: string; detail: string; tone: "ok" | "error" } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addNotice, setAddNotice] = useState<{ title: string; detail: string; tone: "ok" | "warn" } | null>(null);
 
   const handleReconcile = useCallback(async () => {
     if (reconcileMutation.isPending) return;
@@ -74,6 +81,7 @@ export default function Appointments() {
   // reschedule or cancel that changes the selected row's state is reflected
   // in the drawer immediately, without a second read.
   const selectedLive = selected ? items.find((r) => r.id === selected.id) ?? null : null;
+  const grouped = groupRequests(items);
 
   return (
     <div className="sa-page sd-enter">
@@ -83,18 +91,32 @@ export default function Appointments() {
           <h1 className="sd-page__title">{PAGE.title}</h1>
           <p className="sa-lede">{PAGE.detail}</p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="icon" aria-label="More actions">
-              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReconcile(); }} disabled={reconcileMutation.isPending}>
-              {reconcileMutation.isPending ? REQUESTS.reconcilePendingLabel : REQUESTS.reconcileLabel}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="sa-page__actions">
+          <button
+            type="button"
+            className="sa-button sa-button--primary"
+            aria-expanded={addOpen}
+            aria-controls="sa-add-h"
+            onClick={() => {
+              setAddNotice(null);
+              setAddOpen((open) => !open);
+            }}
+          >
+            {ADD.openLabel}
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="icon" aria-label="More actions">
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReconcile(); }} disabled={reconcileMutation.isPending}>
+                {reconcileMutation.isPending ? REQUESTS.reconcilePendingLabel : REQUESTS.reconcileLabel}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {reconcileNotice && (
@@ -104,9 +126,22 @@ export default function Appointments() {
         </div>
       )}
 
-      <div className="sa-requests">
-        <p className="sa-requests__detail">{REQUESTS.detail}</p>
+      {addNotice && (
+        <div className="sa-notice" data-tone={addNotice.tone === "ok" ? "ok" : "neutral"} role="status">
+          <p className="sa-notice__title">{addNotice.title}</p>
+          <p className="sa-notice__detail">{addNotice.detail}</p>
+        </div>
+      )}
 
+      {addOpen && (
+        <AddAppointmentPanel
+          config={configQuery.data?.config}
+          onClose={() => setAddOpen(false)}
+          onDone={(notice) => setAddNotice(notice)}
+        />
+      )}
+
+      <div className="sa-requests">
         {requestsQuery.isLoading && (
           <p className="sa-status" role="status" aria-live="polite">{REQUESTS.loading}</p>
         )}
@@ -117,14 +152,35 @@ export default function Appointments() {
           </div>
         )}
 
-        {!requestsQuery.isLoading && !requestsQuery.isError && (
-          <AppointmentRequestsList
-            items={items}
-            config={configQuery.data?.config}
-            selectedId={selectedLive?.id ?? null}
-            onSelect={setSelected}
-          />
-        )}
+        {/*
+          Three groups, not one list. A confirmed appointment is not a request,
+          and a request nobody has accepted is not an appointment — reading a
+          status column on every row to tell them apart is work the page should
+          be doing.
+        */}
+        {!requestsQuery.isLoading && !requestsQuery.isError && GROUP_ORDER.map((groupId) => {
+          const group = GROUPS[groupId];
+          const rows = grouped[groupId];
+          // Closed rows are history; an empty history is not worth a panel.
+          if (groupId === "closed" && rows.length === 0) return null;
+          return (
+            <section className="sa-group" key={groupId} aria-labelledby={`sa-group-${groupId}`}>
+              <h2 className="sa-section__title" id={`sa-group-${groupId}`}>
+                {group.heading}
+                {rows.length > 0 && <span className="sa-group__count">{rows.length}</span>}
+              </h2>
+              <p className="sa-requests__detail">{group.detail}</p>
+              <AppointmentRequestsList
+                items={rows}
+                config={configQuery.data?.config}
+                selectedId={selectedLive?.id ?? null}
+                onSelect={setSelected}
+                emptyTitle={group.heading}
+                emptyDetail={group.emptyDetail}
+              />
+            </section>
+          );
+        })}
       </div>
 
       <AppointmentDetailDrawer

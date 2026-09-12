@@ -143,6 +143,48 @@ export const REQUESTS = {
   reconcileDisabledDetail: "Calendar connection is not enabled on this workspace yet.",
 } as const;
 
+/* ── Requests and confirmed appointments are not the same thing ─────────── */
+//
+// They were listed together under one heading, "Requests". A confirmed
+// appointment is not a request — somebody is expected to turn up for it — and a
+// request nobody has accepted is not an appointment. Mixing them makes the only
+// question that matters ("what still needs me?") something a business has to
+// work out by reading a status column on every row.
+
+export type AppointmentGroupId = "decide" | "confirmed" | "closed";
+
+export const GROUPS: Record<AppointmentGroupId, { heading: string; detail: string; emptyDetail: string }> = {
+  decide: {
+    heading: "Needs your decision",
+    detail: "Nobody has accepted these yet. The caller was told the time was requested, not booked.",
+    emptyDetail: "Nothing is waiting on you.",
+  },
+  confirmed: {
+    heading: "Confirmed appointments",
+    detail: "Accepted and written to your connected calendar.",
+    emptyDetail: "No confirmed appointments yet.",
+  },
+  closed: {
+    heading: "Cancelled and expired",
+    detail: "Kept for your records. These hold no time in the calendar.",
+    emptyDetail: "Nothing here.",
+  },
+};
+
+export const GROUP_ORDER: AppointmentGroupId[] = ["decide", "confirmed", "closed"];
+
+export function groupForState(state: string): AppointmentGroupId {
+  if (state === "pending_review" || state === "held" || state === "requested") return "decide";
+  if (state === "booked" || state === "rescheduled") return "confirmed";
+  return "closed";
+}
+
+export function groupRequests<T extends { state: string }>(items: readonly T[]): Record<AppointmentGroupId, T[]> {
+  const grouped: Record<AppointmentGroupId, T[]> = { decide: [], confirmed: [], closed: [] };
+  for (const item of items) grouped[groupForState(item.state)].push(item);
+  return grouped;
+}
+
 export function reconcileSummary(eventsRemoved: number, failures: number): string {
   const removedText = eventsRemoved === 1 ? "1 stray event removed" : `${eventsRemoved} stray events removed`;
   return failures > 0 ? `${removedText}, ${failures} couldn't be removed.` : `${removedText}.`;
@@ -315,12 +357,141 @@ export function reconcileReasonCopy(reason: string | null): ReasonCopy {
 
 /* ── Exhaustive string surface ─────────────────────────────────────────── */
 
+/* ── Adding an appointment the business took itself ─────────────────────── */
+//
+// A business that takes a booking on the phone, or at the counter, had no way
+// to put it in the book — so that time stayed "available" and the receptionist
+// could offer it to somebody else. The times offered here come from the same
+// availability endpoints the caller sees, so a manual entry obeys the same
+// hours, buffers, notice and caps as every other route in.
+
+export const ADD = {
+  openLabel: "Add an appointment",
+  heading: "Add an appointment",
+  detail: "For a booking you took yourself — on the phone, or in person. It holds the time like any other.",
+
+  typeLabel: "Service",
+  dateLabel: "Date",
+  slotHeading: "Available times",
+  slotsLoading: "Checking that day…",
+  slotsEmpty: "No times available on that day.",
+  slotsFailed: "Those times couldn't be loaded. Try again shortly.",
+  pickSlotFirst: "Choose a time.",
+
+  nameLabel: "Client name",
+  phoneLabel: "Phone (optional)",
+  emailLabel: "Email (optional)",
+  notesLabel: "Notes (optional)",
+
+  consentHeading: "Permission to contact",
+  consentHelp: "Tick only what the client actually agreed to. Nothing is sent automatically either way.",
+  phoneConsentLabel: "They agreed to be called",
+  smsConsentLabel: "They agreed to receive texts",
+  emailConsentLabel: "They agreed to be emailed",
+
+  submitLabel: "Add appointment",
+  submitPendingLabel: "Adding…",
+  cancelLabel: "Cancel",
+
+  nameRequired: "Enter the client's name.",
+  slotRequired: "Choose a time.",
+  typeRequired: "Choose a service.",
+
+  // The two outcomes are deliberately worded apart. Only one of them means a
+  // calendar anywhere knows about this appointment.
+  confirmedTitle: "Appointment confirmed",
+  confirmedDetail: "It holds the time and has been written to your connected calendar.",
+  savedTitle: "Appointment saved, not yet on a calendar",
+  savedNoCalendarDetail:
+    "It holds the time so nobody else can book it, but no calendar event exists. Connect a calendar, then approve it from the list.",
+  savedNotApprovedDetail:
+    "It holds the time so nobody else can book it. Approve it from the list to write the calendar event.",
+  failedTitle: "The appointment wasn't added",
+  slotTakenDetail: "That time was taken while you were filling this in. Pick another.",
+} as const;
+
+export interface AddAppointmentForm {
+  appointmentTypeId: string;
+  dateKey: string;
+  startUtc: string;
+  name: string;
+  phone: string;
+  email: string;
+  phoneConsent: boolean;
+  smsConsent: boolean;
+  emailConsent: boolean;
+}
+
+export function emptyAddForm(appointmentTypeId: string, dateKey: string): AddAppointmentForm {
+  return {
+    appointmentTypeId,
+    dateKey,
+    startUtc: "",
+    name: "",
+    phone: "",
+    email: "",
+    phoneConsent: false,
+    smsConsent: false,
+    emailConsent: false,
+  };
+}
+
+export type AddFieldErrors = Partial<Record<"appointmentTypeId" | "startUtc" | "name", string>>;
+
+export function validateAddAppointment(
+  form: AddAppointmentForm,
+): { ok: true; payload: { appointmentTypeId: string; startUtc: string; name: string; phone: string | null; email: string | null; phoneConsent: boolean; smsConsent: boolean; emailConsent: boolean } } | { ok: false; errors: AddFieldErrors } {
+  const errors: AddFieldErrors = {};
+  if (form.appointmentTypeId.trim() === "") errors.appointmentTypeId = ADD.typeRequired;
+  if (form.startUtc.trim() === "") errors.startUtc = ADD.slotRequired;
+  const name = form.name.trim();
+  if (name === "") errors.name = ADD.nameRequired;
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    payload: {
+      appointmentTypeId: form.appointmentTypeId,
+      startUtc: form.startUtc,
+      name,
+      phone: form.phone.trim() === "" ? null : form.phone.trim(),
+      email: form.email.trim() === "" ? null : form.email.trim(),
+      // Consent is only ever what was explicitly ticked — never inferred from
+      // a number or an address having been filled in.
+      phoneConsent: form.phoneConsent,
+      smsConsent: form.smsConsent,
+      emailConsent: form.emailConsent,
+    },
+  };
+}
+
+/**
+ * What to say after the row exists and confirmation was attempted.
+ *
+ * `approveOutcome` is the server's own word. "booked" is the only one that
+ * means a calendar event exists; everything else leaves the appointment
+ * holding its time but unconfirmed, and must say so rather than claiming a
+ * booking that did not happen.
+ */
+export function addOutcomeCopy(approveOutcome: string | null): { title: string; detail: string; tone: "ok" | "warn" } {
+  if (approveOutcome === "booked") return { title: ADD.confirmedTitle, detail: ADD.confirmedDetail, tone: "ok" };
+  if (approveOutcome === "no_connection" || approveOutcome === "disabled") {
+    return { title: ADD.savedTitle, detail: ADD.savedNoCalendarDetail, tone: "warn" };
+  }
+  return { title: ADD.savedTitle, detail: ADD.savedNotApprovedDetail, tone: "warn" };
+}
+
 export function everyRenderableString(): string[] {
   const states = ["pending_review", "held", "booked", "rescheduled", "cancelled", "expired", "requested", "failed", ""];
   return [
     ...Object.values(PAGE),
     ...Object.values(REQUESTS),
     ...Object.values(DETAIL),
+    ...Object.values(ADD),
+    ...GROUP_ORDER.flatMap((g) => [GROUPS[g].heading, GROUPS[g].detail, GROUPS[g].emptyDetail]),
+    ...[null, "booked", "no_connection", "event_write_failed"].flatMap((o) => {
+      const copy = addOutcomeCopy(o);
+      return [copy.title, copy.detail];
+    }),
     ...states.map((s) => requestStateLabel(s)),
     ...["website", "ai_receptionist", "manual", "unknown"].map((s) => sourceLabel(s)),
     contactName(null),

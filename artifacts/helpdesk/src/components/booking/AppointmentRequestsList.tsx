@@ -25,19 +25,24 @@ export function AppointmentRequestsList({
   config,
   selectedId,
   onSelect,
+  emptyTitle,
+  emptyDetail,
 }: {
   items: AppointmentRequest[];
   config: AvailabilityConfig | undefined;
   selectedId: string | null;
   onSelect: (request: AppointmentRequest) => void;
+  /** Overridden per group, so "nothing is waiting on you" never reads as "you have no appointments". */
+  emptyTitle?: string;
+  emptyDetail?: string;
 }) {
   const timezone = config?.timezone ?? "UTC";
 
   if (items.length === 0) {
     return (
       <section className="sa-empty" aria-labelledby="sa-req-empty">
-        <h2 className="sa-empty__title" id="sa-req-empty">{REQUESTS.emptyTitle}</h2>
-        <p className="sa-empty__detail">{REQUESTS.emptyDetail}</p>
+        <h2 className="sa-empty__title" id="sa-req-empty">{emptyTitle ?? REQUESTS.emptyTitle}</h2>
+        <p className="sa-empty__detail">{emptyDetail ?? REQUESTS.emptyDetail}</p>
       </section>
     );
   }

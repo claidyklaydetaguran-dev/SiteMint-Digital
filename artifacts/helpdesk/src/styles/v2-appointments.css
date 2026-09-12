@@ -909,6 +909,55 @@
   color: var(--sd-text-muted);
 }
 
+/* ── Appointment groups ────────────────────────────────────────────────── */
+
+.sa-page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+}
+
+.sa-group { margin-bottom: var(--sd-space-6); }
+.sa-group__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  margin-left: var(--sd-space-2);
+  padding: 0 var(--sd-space-1);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: 999px;
+  font-size: var(--sd-text-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text-muted);
+}
+
+/* ── Adding an appointment ─────────────────────────────────────────────── */
+
+.sa-add { margin-bottom: var(--sd-space-6); }
+.sa-add__form { display: grid; gap: var(--sd-space-4); }
+.sa-add__slots,
+.sa-add__consent {
+  margin: 0;
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-control);
+}
+.sa-add__slotgrid {
+  display: grid;
+  gap: var(--sd-space-2);
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  margin-top: var(--sd-space-2);
+}
+.sa-add__slot { font-variant-numeric: tabular-nums; }
+/* The chosen time has to be obvious without relying on colour alone. */
+.sa-add__slot[data-selected="true"] {
+  border-color: var(--sd-text);
+  box-shadow: inset 0 0 0 1px var(--sd-text);
+  font-weight: 600;
+}
+.sa-add__actions { display: flex; flex-wrap: wrap; gap: var(--sd-space-2); }
+
 /* ── Specific dates ───────────────────────────────────────────────────── */
 
 .sa-exceptions { margin: 0; padding: 0; list-style: none; }

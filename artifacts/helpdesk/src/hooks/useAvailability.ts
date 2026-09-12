@@ -84,10 +84,25 @@ export function useSubmitAppointmentRequest() {
   const qc = useQueryClient();
   const firmId = useAuthenticatedFirmId();
   return useMutation({
-    mutationFn: ({ appointmentTypeId, startUtc, contact }: { appointmentTypeId: string; startUtc: string; contact: AppointmentContact }) =>
-      submitAppointmentRequest(appointmentTypeId, startUtc, contact),
+    mutationFn: ({
+      appointmentTypeId,
+      startUtc,
+      contact,
+      options,
+    }: {
+      appointmentTypeId: string;
+      startUtc: string;
+      contact: AppointmentContact;
+      options?: Parameters<typeof submitAppointmentRequest>[3];
+    }) => submitAppointmentRequest(appointmentTypeId, startUtc, contact, options),
     onSuccess: () => {
-      if (firmId !== undefined) qc.invalidateQueries({ queryKey: [ROOT, "requests", firmId] });
+      if (firmId !== undefined) {
+        qc.invalidateQueries({ queryKey: [ROOT, "requests", firmId] });
+        // The new appointment occupies its slot, so any day or slot list still
+        // on screen is now stale and would offer a time that is already taken.
+        qc.invalidateQueries({ queryKey: [ROOT, "days"] });
+        qc.invalidateQueries({ queryKey: [ROOT, "slots"] });
+      }
     },
   });
 }

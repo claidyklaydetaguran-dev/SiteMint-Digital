@@ -19,7 +19,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ADD,
   DETAIL,
+  GROUPS,
+  GROUP_ORDER,
   PAGE,
   REQUESTS,
   TEST_REQUEST_PREFIX,
@@ -29,13 +32,18 @@ import {
   canApprove,
   canCancel,
   canReschedule,
+  addOutcomeCopy,
   contactDetail,
   contactName,
+  emptyAddForm,
+  groupForState,
+  groupRequests,
   everyRenderableString,
   isTestRequest,
   reconcileReasonCopy,
   reconcileSummary,
   requestStateLabel,
+  validateAddAppointment,
   requestStateTone,
   rescheduleReasonCopy,
   sourceLabel,
@@ -191,6 +199,78 @@ check("the drawer's reschedule label is present", strings.includes(DETAIL.resche
 check("the drawer's cancel label is present", strings.includes(DETAIL.cancelLabel));
 check("no string echoes a raw server reason token verbatim", strings.every((s) =>
   !/\bevent_write_failed\b|\bconflict_after_write\b|\bnot_approvable\b|\bslot_unavailable\b/.test(s)));
+
+section("requests and confirmed appointments are kept apart");
+
+// They shared one list called "Requests", which meant a confirmed appointment
+// was filed under a word that denies somebody is expected to turn up for it,
+// and the only question that matters — what still needs me? — had to be
+// answered by reading a status column on every row.
+eq("a request nobody has accepted needs a decision", groupForState("pending_review"), "decide");
+eq("a held slot needs a decision too", groupForState("held"), "decide");
+eq("a booked appointment is confirmed", groupForState("booked"), "confirmed");
+eq("a rescheduled appointment is still confirmed", groupForState("rescheduled"), "confirmed");
+eq("a cancelled appointment is closed", groupForState("cancelled"), "closed");
+eq("an expired one is closed", groupForState("expired"), "closed");
+eq("an unknown state is closed rather than silently confirmed", groupForState("something_new"), "closed");
+
+const sample = [
+  { id: "a", state: "pending_review" },
+  { id: "b", state: "booked" },
+  { id: "c", state: "cancelled" },
+  { id: "d", state: "held" },
+];
+eq("grouping keeps every row exactly once", groupRequests(sample).decide.map((r) => r.id).concat(
+  groupRequests(sample).confirmed.map((r) => r.id),
+  groupRequests(sample).closed.map((r) => r.id),
+).sort(), ["a", "b", "c", "d"]);
+eq("the decision group comes first", GROUP_ORDER[0], "decide");
+check("the decision group says the caller was not told it was booked", /requested, not booked/i.test(GROUPS.decide.detail));
+// "Nothing is waiting on you" must not be reachable as "you have no
+// appointments" — they are different facts and the empty copy differs.
+check("each group has its own empty sentence", new Set(GROUP_ORDER.map((g) => GROUPS[g].emptyDetail)).size === GROUP_ORDER.length);
+
+section("adding an appointment the business took itself");
+
+const form = emptyAddForm("3", "2027-05-04");
+eq("a new form holds no time and no consent", [form.startUtc, form.phoneConsent, form.smsConsent, form.emailConsent], ["", false, false, false]);
+
+check("a name is required", validateAddAppointment({ ...form, startUtc: "2027-05-04T16:00:00.000Z" }).ok === false);
+check("a time is required", validateAddAppointment({ ...form, name: "Dana" }).ok === false);
+const valid = validateAddAppointment({ ...form, name: "  Dana Rivera  ", startUtc: "2027-05-04T16:00:00.000Z", phone: " 07700 900123 ", email: "" });
+check("a complete form is accepted", valid.ok === true);
+if (valid.ok) {
+  eq("the name is trimmed", valid.payload.name, "Dana Rivera");
+  eq("an empty optional field becomes null, not an empty string", valid.payload.email, null);
+  eq("a filled optional field is kept", valid.payload.phone, "07700 900123");
+  // The defect this prevents: treating a phone number's presence as permission
+  // to ring it. Consent is only ever what was explicitly ticked.
+  eq("a phone number alone is not consent to call", valid.payload.phoneConsent, false);
+  eq("nor to text", valid.payload.smsConsent, false);
+}
+const consented = validateAddAppointment({ ...form, name: "Dana", startUtc: "x", phoneConsent: true });
+if (consented.ok) eq("an explicit tick is carried through", consented.payload.phoneConsent, true);
+
+section("what a business is told after adding one");
+
+// Creating the row and writing the calendar event are two steps, and only one
+// word means a calendar anywhere knows about the appointment.
+eq("only 'booked' is reported as confirmed", addOutcomeCopy("booked").title, ADD.confirmedTitle);
+check("everything else says it is not on a calendar yet", ["no_connection", "disabled", "event_write_failed", null].every(
+  (o) => addOutcomeCopy(o).title === ADD.savedTitle));
+check("no calendar connected is explained differently from a failed write",
+  addOutcomeCopy("no_connection").detail !== addOutcomeCopy("event_write_failed").detail);
+check("the saved-but-unconfirmed copy still says the time is held", /holds the time/i.test(addOutcomeCopy(null).detail));
+check("and says what to do next", /approve|connect a calendar/i.test(addOutcomeCopy(null).detail));
+// A saved-not-confirmed outcome must never be toned as a success.
+eq("a confirmed outcome is toned ok", addOutcomeCopy("booked").tone, "ok");
+eq("an unconfirmed one is not", addOutcomeCopy("no_connection").tone, "warn");
+
+check("the panel offers times from the real availability endpoint, not a free-text time box",
+  read("artifacts/helpdesk/src/components/booking/AddAppointmentPanel.tsx").includes("useAvailabilitySlots"));
+check("and records who added it",
+  read("artifacts/helpdesk/src/components/booking/AddAppointmentPanel.tsx").includes('source: "manual"'));
+
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

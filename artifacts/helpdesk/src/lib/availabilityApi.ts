@@ -238,14 +238,35 @@ export function holdSlot(appointmentTypeId: string, startUtc: string): Promise<{
   return apiFetch("/receptionist/availability/hold", { method: "POST", body: JSON.stringify({ appointmentTypeId, startUtc }) });
 }
 
+/**
+ * `source` records WHO put the appointment in the book, and it is not
+ * cosmetic: "Website" and "Added manually" mean different things to a business
+ * looking at the list later, and the receptionist's own bookings are a third
+ * thing again. A default of "website" for an appointment the business typed in
+ * itself would be a quiet lie in its own records.
+ *
+ * Consent is never inferred from a phone number or an address being present —
+ * only an explicit `true` reaches the server, which defaults it to false.
+ */
 export function submitAppointmentRequest(
   appointmentTypeId: string,
   startUtc: string,
   contact: AppointmentContact,
+  options?: { source?: "website" | "manual"; phoneConsent?: boolean; smsConsent?: boolean; emailConsent?: boolean },
 ): Promise<{ request: AppointmentRequest }> {
   return apiFetch("/receptionist/availability/requests", {
     method: "POST",
-    body: JSON.stringify({ appointmentTypeId, startUtc, contact, source: "website" }),
+    body: JSON.stringify({
+      appointmentTypeId,
+      startUtc,
+      contact: {
+        ...contact,
+        phoneConsent: options?.phoneConsent === true,
+        smsConsent: options?.smsConsent === true,
+        emailConsent: options?.emailConsent === true,
+      },
+      source: options?.source ?? "website",
+    }),
   });
 }
 
