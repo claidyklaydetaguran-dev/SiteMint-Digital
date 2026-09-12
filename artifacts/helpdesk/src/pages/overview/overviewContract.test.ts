@@ -405,6 +405,10 @@ eq(
     "/channels/sms",
     "/account/billing",
     "/account/settings",
+    // Team: the invite/list/revoke endpoints have existed since P8 with nothing
+    // calling them, so the only way to give a colleague access was to share the
+    // owner's password.
+    "/account/team",
     "/account/support",
   ],
 );

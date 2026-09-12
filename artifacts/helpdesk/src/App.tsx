@@ -55,6 +55,7 @@ const AgentConfig = lazy(() => import("@/pages/AgentConfig"));
 
 const Billing = lazy(() => import("@/pages/Billing"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Team = lazy(() => import("@/pages/Team"));
 const Support = lazy(() => import("@/pages/Support"));
 
 // The nine voice-platform pages are the one exception, and AR-001J is why:
@@ -178,6 +179,7 @@ function Router() {
 
             <Route path={ROUTES.billing} component={Billing} />
             <Route path={ROUTES.settings} component={Settings} />
+            <Route path={ROUTES.team} component={Team} />
             <Route path={ROUTES.support} component={Support} />
 
             {voicePlatformEnabled && (

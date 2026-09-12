@@ -296,7 +296,9 @@ eq(
     "/scheduling/appointments", "/scheduling/test-booking",
     "/activity/conversations", "/activity/contacts",
     "/channels/sms",
-    "/account/billing", "/account/settings", "/account/support",
+    // Team added: the P8 invite/revoke endpoints had no interface, so the
+    // only way to give a colleague access was to share the owner password.
+    "/account/billing", "/account/settings", "/account/team", "/account/support",
   ],
 );
 
@@ -1274,7 +1276,7 @@ eq(
     // V7 added Inquiries to Activity and Transfer Contacts to Channels.
     ["activity", ["calls", "inquiries", "conversations", "contacts"]],
     ["channels", ["phone-number", "transfer-contacts", "sms"]],
-    ["account", ["usage", "billing", "settings", "support", "issues"]],
+    ["account", ["usage", "billing", "settings", "team", "support", "issues"]],
     ["placeholders", ["tools", "phone-numbers", "voice-library", "knowledge", "analytics", "testing", "structured-outputs", "integrations", "api-keys", "squads", "outbound"]],
   ],
 );
@@ -1297,6 +1299,7 @@ eq(
     ["transfer-contacts", "The people a caller can be put through to when they ask for someone."],
     ["sms", "The SMS channel that texts with your clients."],
     ["usage", "Minutes used, minutes remaining, and your billing period."],
+    ["team", "Who else can sign in."],
     ["support", "Get help from SiteMint."],
     ["issues", "Problems SiteMint has flagged that may need your attention."],
     ["tools", "Assign actions your assistant can take during a call, like booking or transferring."],

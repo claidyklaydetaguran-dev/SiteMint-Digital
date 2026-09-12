@@ -99,6 +99,52 @@ export function updateAccountProfile(patch: AccountProfilePatch): Promise<AgentC
   });
 }
 
+// ─── Team ────────────────────────────────────────────────────────────────
+
+export const MEMBERS_ENDPOINT = "/api/receptionist/account/members";
+
+export interface TeamMemberResponse {
+  id: number;
+  email: string;
+  role: string;
+  status: string;
+  invitedAt: string | null;
+  acceptedAt: string | null;
+}
+
+export type TeamResult<T> = { ok: true; value: T } | { ok: false; message: string };
+
+async function teamFetch<T>(path: string, init?: RequestInit): Promise<TeamResult<T>> {
+  try {
+    const res = await fetch(path, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string } & Record<string, unknown>;
+    if (!res.ok) {
+      // The server's own sentence is passed through: it knows the member limit
+      // and the roster, which the browser does not.
+      return { ok: false, message: data.error?.trim() ? data.error : "Something went wrong. Try again." };
+    }
+    return { ok: true, value: data as T };
+  } catch {
+    return { ok: false, message: "We couldn't reach the server. Try again." };
+  }
+}
+
+export function fetchTeamMembers(): Promise<TeamResult<{ items: TeamMemberResponse[]; count: number }>> {
+  return teamFetch(MEMBERS_ENDPOINT);
+}
+
+export function inviteTeamMember(email: string, role: string): Promise<TeamResult<{ member: TeamMemberResponse }>> {
+  return teamFetch(MEMBERS_ENDPOINT, { method: "POST", body: JSON.stringify({ email, role }) });
+}
+
+export function removeTeamMember(id: number): Promise<TeamResult<Record<string, unknown>>> {
+  return teamFetch(`${MEMBERS_ENDPOINT}/${encodeURIComponent(String(id))}`, { method: "DELETE" });
+}
+
 // ─── Email address ───────────────────────────────────────────────────────
 
 export const EMAIL_CHANGE_ENDPOINT = "/api/receptionist/account/email";

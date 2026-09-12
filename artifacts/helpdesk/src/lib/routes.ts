@@ -73,6 +73,8 @@ export const ROUTES = {
   // Issues are, below.
   billing: "/account/billing",
   settings: "/account/settings",
+  /** Who else can sign in — the invite/revoke endpoints have existed since P8. */
+  team: "/account/team",
   support: "/account/support",
 
   // Voice-platform surfaces — routed only when `voicePlatformEnabled`.

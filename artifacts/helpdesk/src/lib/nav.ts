@@ -337,6 +337,11 @@ export function navGroupsWith(voice: VoiceNavSlots): NavGroup[] {
         { key: "billing", label: "Billing", href: "/account/billing", icon: CreditCard, state: "live", voiceGated: false },
         { key: "settings", label: "Settings", href: "/account/settings", icon: SettingsIcon, state: "live", voiceGated: false },
         {
+          key: "team", label: "Team", href: "/account/team", icon: Users,
+          state: "live", voiceGated: false,
+          description: "Who else can sign in.",
+        },
+        {
           key: "support", label: "Support", href: "/account/support", icon: LifeBuoy,
           state: "live", voiceGated: false,
           description: "Get help from SiteMint.",

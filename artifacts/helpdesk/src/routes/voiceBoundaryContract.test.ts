@@ -721,6 +721,7 @@ eq(
     "/channels/sms",
     "/account/billing",
     "/account/settings",
+    "/account/team",
     "/account/support",
   ],
 );
@@ -747,6 +748,7 @@ eq(
     "/account/usage",
     "/account/billing",
     "/account/settings",
+    "/account/team",
     "/account/support",
     "/account/issues",
   ],
@@ -804,7 +806,7 @@ eq(
     ["scheduling", ["availability", "appointment-types", "calendar", "appointments", "test-booking"]],
     ["activity", ["conversations", "contacts"]],
     ["channels", ["sms"]],
-    ["account", ["billing", "settings", "support"]],
+    ["account", ["billing", "settings", "team", "support"]],
     ["placeholders", []],
   ],
 );
@@ -904,6 +906,7 @@ eq(
     "sms",
     "billing",
     "settings",
+    "team",
     "support",
   ],
 );
@@ -1547,7 +1550,8 @@ const GATED_ONLY_ICONS: [string, string][] = [
   ["Phone", "phone"],
   ["AudioLines", "audio-lines"],
   ["BookOpen", "book-open"],
-  ["Users", "users"],
+  // "Users" removed: the ungated Team nav record uses it, so its presence in
+  // a default build no longer proves a gated module leaked.
   ["PhoneOutgoing", "phone-outgoing"],
   ["ScrollText", "scroll-text"],
   ["BarChart3", "chart-column"],
