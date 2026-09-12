@@ -335,8 +335,13 @@ async function main() {
 
     // Two simultaneous repeats: the partial unique index and the advisory lock
     // together must still yield exactly one row.
+    //
+    // A DIFFERENT DAY from the booking above, deliberately. 18:00 on the same
+    // day sat inside that booking's 30-minute after-buffer, so both sides were
+    // refused as unavailable and the case proved nothing about concurrency —
+    // it read as an idempotency failure when the engine was behaving correctly.
     const racedToolCall = `tc-dbcheck-race-${Date.now()}`;
-    const racedStart = new Date("2027-07-09T18:00:00.000Z");
+    const racedStart = new Date("2027-07-13T17:00:00.000Z");
     const [raceA, raceB] = await Promise.all([
       submitAppointmentRequest(firmB, retryTypeId, racedStart, { name: "Race", phone: null, email: null },
         { phoneConsent: false, smsConsent: false, emailConsent: false },
@@ -345,6 +350,13 @@ async function main() {
         { phoneConsent: false, smsConsent: false, emailConsent: false },
         "ai_receptionist", new Date("2027-07-07T16:00:00.000Z"), undefined, racedToolCall),
     ]);
+    if (!raceA.ok || !raceB.ok) {
+      // Say which side refused and why, rather than leaving a bare false. A
+      // refusal here could mean the idempotency key failed OR that the fixture
+      // picked a slot the earlier bookings already occupy, and those need
+      // different fixes.
+      console.log(`        raceA=${raceA.ok ? "ok" : raceA.reason} raceB=${raceB.ok ? "ok" : raceB.reason}`);
+    }
     ok("both simultaneous repeats succeed", raceA.ok && raceB.ok);
     if (raceA.ok && raceB.ok) {
       ok("and both name the same request", raceA.request.publicId === raceB.request.publicId);
