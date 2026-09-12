@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Contact,
   PhoneOutgoing,
+  PhoneForwarded,
+  Inbox,
   ScrollText,
   Smartphone,
   BarChart3,
@@ -136,12 +138,22 @@ export const VOICE_NAV: VoiceNavSlots = {
       state: "live", voiceGated: true,
       description: "Review stored call records and analysis.",
     },
+    {
+      key: "inquiries", label: "Inquiries", href: "/activity/inquiries", icon: Inbox,
+      state: "live", voiceGated: true,
+      description: "Messages your assistant took, and what still needs following up.",
+    },
   ],
   channels: [
     {
       key: "phone-number", label: "Phone Number", href: "/channels/phone-number", icon: Phone,
       state: "live", voiceGated: true,
       description: "The number your assistant answers and makes calls from.",
+    },
+    {
+      key: "transfer-contacts", label: "Transfer Contacts", href: "/channels/transfer-contacts", icon: PhoneForwarded,
+      state: "live", voiceGated: true,
+      description: "The people a caller can be put through to when they ask for someone.",
     },
   ],
   accountLead: [

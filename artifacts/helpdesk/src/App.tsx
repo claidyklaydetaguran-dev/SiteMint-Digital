@@ -68,7 +68,9 @@ const {
   AssistantBuilder,
   Calls,
   CallDetail,
+  Inquiries,
   PhoneNumber,
+  TransferContacts,
   Usage,
   Issues,
 } = voiceRoutePages;
@@ -186,7 +188,9 @@ function Router() {
                 <Route path={ROUTES.assistantDetail} component={AssistantBuilder} />
                 <Route path={ROUTES.calls} component={Calls} />
                 <Route path={ROUTES.callDetail} component={CallDetail} />
+                <Route path={ROUTES.inquiries} component={Inquiries} />
                 <Route path={ROUTES.phoneNumber} component={PhoneNumber} />
+                <Route path={ROUTES.transferContacts} component={TransferContacts} />
                 <Route path={ROUTES.usage} component={Usage} />
                 <Route path={ROUTES.issues} component={Issues} />
               </>

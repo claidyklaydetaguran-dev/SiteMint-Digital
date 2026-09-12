@@ -82,7 +82,11 @@ export const ROUTES = {
   assistantDetail: "/assistants/:id/:tab?",
   calls: "/activity/calls",
   callDetail: "/activity/calls/:id",
+  /** V7: messages the assistant took, with their follow-up workflow. */
+  inquiries: "/activity/inquiries",
   phoneNumber: "/channels/phone-number",
+  /** V7: the people a caller may be put through to. */
+  transferContacts: "/channels/transfer-contacts",
   usage: "/account/usage",
   issues: "/account/issues",
 } as const;
@@ -114,7 +118,9 @@ export type RouteKey = keyof typeof ROUTES;
 export const VOICE_CAPABILITY_PATHS: readonly string[] = [
   ROUTES.assistants,
   ROUTES.calls,
+  ROUTES.inquiries,
   ROUTES.phoneNumber,
+  ROUTES.transferContacts,
   ROUTES.usage,
   ROUTES.issues,
   ROUTES.assistantNew,

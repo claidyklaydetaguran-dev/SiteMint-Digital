@@ -20,6 +20,14 @@ interface BrowserTestPanelProps {
   supportReference?: string | null;
   onEnd: () => void;
   onDismiss: () => void;
+  /**
+   * AR-001V.3 controlled recovery. Provided only when the last failure was the
+   * provider REFUSING this assistant's stored credential — the one failure a
+   * fresh, identically scoped token can actually fix. Absent for a microphone
+   * or network failure, where offering a new credential would be misleading.
+   */
+  onRetryWithNewCredential?: (() => void) | undefined;
+  retryingCredential?: boolean;
 }
 
 /**
@@ -29,7 +37,17 @@ interface BrowserTestPanelProps {
  * safe, static information — never a provider assistant id, provider call
  * id, request metadata, or a raw provider event/error.
  */
-export function BrowserTestPanel({ state, assistantName, elapsedSeconds, errorMessage, supportReference, onEnd, onDismiss }: BrowserTestPanelProps) {
+export function BrowserTestPanel({
+  state,
+  assistantName,
+  elapsedSeconds,
+  errorMessage,
+  supportReference,
+  onEnd,
+  onDismiss,
+  onRetryWithNewCredential,
+  retryingCredential = false,
+}: BrowserTestPanelProps) {
   if (state === "idle") return null;
 
   const announcement: Record<Exclude<BrowserVoiceTestState, "idle">, string> = {
@@ -130,10 +148,23 @@ export function BrowserTestPanel({ state, assistantName, elapsedSeconds, errorMe
             <CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
             {errorMessage ?? "Something went wrong with the browser voice test. Please try again."}
           </p>
-          <Button onClick={onDismiss} variant="outline" size="sm" className="min-h-11 gap-1.5 md:min-h-8">
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-            Close
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {onRetryWithNewCredential && (
+              <Button
+                onClick={onRetryWithNewCredential}
+                variant="default"
+                size="sm"
+                disabled={retryingCredential}
+                className="min-h-11 gap-1.5 md:min-h-8"
+              >
+                {retryingCredential ? "Getting a new key…" : "Get a new key and retry"}
+              </Button>
+            )}
+            <Button onClick={onDismiss} variant="outline" size="sm" className="min-h-11 gap-1.5 md:min-h-8">
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              Close
+            </Button>
+          </div>
         </div>
       )}
 

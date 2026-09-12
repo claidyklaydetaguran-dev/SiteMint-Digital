@@ -1,0 +1,123 @@
+/**
+ * V7 — committed contract tests for the Transfer Contacts screen.
+ * Run via: tsx artifacts/helpdesk/src/pages/transfer-contacts/transferContactsContract.test.ts
+ *
+ * The claims these guard are the ones that would cause real-world harm if the
+ * copy drifted: that saving dials someone, that a settings check placed a call,
+ * or that a browser test can hand a caller over.
+ */
+import {
+  COPY,
+  PAGE,
+  everyRenderableString,
+  minutesToTimeValue,
+  roleLabel,
+  testOutcomeLabel,
+  timeValueToMinutes,
+} from "./transferContactsContract.js";
+import { CONTACT_ROLES } from "../../lib/inquiriesApi.js";
+
+let passed = 0;
+const failures: string[] = [];
+function check(label: string, condition: boolean): void {
+  if (condition) { passed++; console.log(`  PASS  ${label}`); }
+  else { failures.push(label); console.log(`  FAIL  ${label}`); }
+}
+function eq<T>(label: string, actual: T, expected: T): void {
+  check(`${label} (got ${JSON.stringify(actual)})`, JSON.stringify(actual) === JSON.stringify(expected));
+}
+function section(name: string): void { console.log(`\n── ${name} ${"─".repeat(Math.max(0, 66 - name.length))}`); }
+
+section("Saving never dials");
+
+check("the form states that saving calls nobody", /does not call anyone/i.test(COPY.saveNeverDialsNote));
+check(
+  "the save button is not worded as a call or a test",
+  !/call|dial|ring|test/i.test(COPY.saveLabel),
+);
+
+section("A check is a check, not a call");
+
+check("the action is named as a setup check", /check/i.test(COPY.checkLabel) && !/call/i.test(COPY.checkLabel));
+check(
+  "its confirmation promises no call and no charge",
+  /will not call anyone/i.test(COPY.checkConfirmDetail) && /nothing will be charged/i.test(COPY.checkConfirmDetail),
+);
+check("the result states plainly that nobody was called", /nobody was called/i.test(COPY.checkNobodyCalledNote));
+check(
+  "a passing check is labelled ready, never connected or successful",
+  !/connected|success|working/i.test(COPY.checkPassedLabel),
+);
+
+section("Browser versus telephone");
+
+check(
+  "the browser-vs-phone note says a browser test has no line to hand over",
+  /browser/i.test(COPY.browserVsPhoneNote) && /phone call/i.test(COPY.browserVsPhoneNote),
+);
+check(
+  "an untested contact says so rather than implying it works",
+  /not yet tested/i.test(COPY.lastTestNever),
+);
+
+section("Consent and roles");
+
+check(
+  "the consent checkbox asserts BOTH authorisation and the person's agreement",
+  /authorised/i.test(COPY.consentLabel) && /agreed/i.test(COPY.consentLabel),
+);
+check("its hint says nothing is dialled without it", /will not put a caller through/i.test(COPY.consentHint));
+check(
+  "the role hint says a role grants no access",
+  /no access/i.test(COPY.roleHint) && /routing/i.test(COPY.roleHint),
+);
+
+eq("a listed role uses its own label", roleLabel("manager", null), "Manager");
+eq("a custom role uses the business's own title", roleLabel("custom", "Operations Lead"), "Operations Lead");
+eq("a custom role with no title falls back, never to a different role", roleLabel("custom", null), "Custom title");
+eq("an unrecognised role is stated, never invented", roleLabel("supreme-leader", null), "Contact");
+check("every backend role has a label", CONTACT_ROLES.every((r) => roleLabel(r, "X").length > 0));
+
+section("Empty state");
+
+check("it tells the business what to do", /add a transfer contact/i.test(COPY.emptyTitle));
+check(
+  "it says what happens meanwhile, truthfully",
+  /takes a message/i.test(COPY.emptyDetail),
+);
+
+section("Hours conversion");
+
+eq("midnight", minutesToTimeValue(0), "00:00");
+eq("nine in the morning", minutesToTimeValue(540), "09:00");
+eq("half past five", minutesToTimeValue(17 * 60 + 30), "17:30");
+eq("end of day", minutesToTimeValue(1440), "00:00");
+eq("absent hours render as empty, not as midnight", minutesToTimeValue(null), "");
+
+eq("round trip 09:00", timeValueToMinutes("09:00"), 540);
+eq("round trip 17:30", timeValueToMinutes("17:30"), 1050);
+eq("a malformed time is rejected, never coerced to 0", timeValueToMinutes("nine"), null);
+eq("an out-of-range hour is rejected", timeValueToMinutes("25:00"), null);
+eq("an out-of-range minute is rejected", timeValueToMinutes("09:99"), null);
+
+section("Test outcomes");
+
+eq("connected", testOutcomeLabel("connected"), "Connected");
+eq("no answer", testOutcomeLabel("no_answer"), "No answer");
+eq("an unrecognised outcome is stated, never invented", testOutcomeLabel("teleported"), "Unknown");
+
+section("String surface");
+
+const strings = everyRenderableString();
+check("every renderable string is non-empty", strings.every((s) => typeof s === "string" && s.trim() !== ""));
+check("the page title is present", strings.includes(PAGE.title));
+check(
+  "no string leaks an internal identifier or provider name",
+  strings.every((s) => !/vapi|twilio|firm_id|firmId|e164/i.test(s)),
+);
+
+console.log(`\n${passed} passed, ${failures.length} failed.`);
+if (failures.length > 0) {
+  for (const f of failures) console.log(`  - ${f}`);
+  process.exit(1);
+}

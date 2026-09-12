@@ -71,7 +71,9 @@ export interface VoiceRoutePages {
   AssistantBuilder: VoiceRoutePage;
   Calls: VoiceRoutePage;
   CallDetail: VoiceRoutePage;
+  Inquiries: VoiceRoutePage;
   PhoneNumber: VoiceRoutePage;
+  TransferContacts: VoiceRoutePage;
   Usage: VoiceRoutePage;
   Issues: VoiceRoutePage;
 }
@@ -87,7 +89,9 @@ export const voiceRoutePages: VoiceRoutePages = voicePlatformEnabled
       AssistantBuilder: lazy(() => import("@/pages/AssistantBuilder")),
       Calls: lazy(() => import("@/pages/Calls")),
       CallDetail: lazy(() => import("@/pages/CallLogDetail")),
+      Inquiries: lazy(() => import("@/pages/Inquiries")),
       PhoneNumber: lazy(() => import("@/pages/PhoneNumber")),
+      TransferContacts: lazy(() => import("@/pages/TransferContacts")),
       Usage: lazy(() => import("@/pages/Usage")),
       Issues: lazy(() => import("@/pages/Issues")),
     }
@@ -98,7 +102,9 @@ export const voiceRoutePages: VoiceRoutePages = voicePlatformEnabled
       AssistantBuilder: lazy(unavailable),
       Calls: lazy(unavailable),
       CallDetail: lazy(unavailable),
+      Inquiries: lazy(unavailable),
       PhoneNumber: lazy(unavailable),
+      TransferContacts: lazy(unavailable),
       Usage: lazy(unavailable),
       Issues: lazy(unavailable),
     };

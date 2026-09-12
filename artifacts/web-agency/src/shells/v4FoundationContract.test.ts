@@ -155,9 +155,25 @@ check(
     // V5 (owner decision B-1 + D-8): appointments left the voice gate; the
     // gated live set is now assistants/calls/phoneNumber/usage/issues, and
     // the D-8 placeholder paths ride the same list so no build 404s them.
-    /export const VOICE_CAPABILITY_PATHS[\s\S]*ROUTES\.assistants,\s*ROUTES\.calls,\s*ROUTES\.phoneNumber,\s*ROUTES\.usage,\s*ROUTES\.issues,/.test(
-      read("artifacts/helpdesk/src/lib/routes.ts"),
-    ),
+    // V7 adds inquiries and transferContacts to the same list. The property
+    // under test is that every gated live route is IN the list — not the order
+    // it happens to be written in, which is why each is now asserted
+    // individually rather than as one positional run.
+    (() => {
+      const routesSrc = read("artifacts/helpdesk/src/lib/routes.ts");
+      const listMatch = /export const VOICE_CAPABILITY_PATHS[\s\S]*?\] as const;/.exec(routesSrc);
+      if (listMatch === null) return false;
+      const list = listMatch[0];
+      return [
+        "ROUTES.assistants",
+        "ROUTES.calls",
+        "ROUTES.inquiries",
+        "ROUTES.phoneNumber",
+        "ROUTES.transferContacts",
+        "ROUTES.usage",
+        "ROUTES.issues",
+      ].every((token) => list.includes(token));
+    })(),
 );
 check(
   "they render the neutral VoiceUnavailable state, not a fabricated surface",

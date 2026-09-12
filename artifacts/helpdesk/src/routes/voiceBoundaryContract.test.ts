@@ -234,9 +234,13 @@ eq(
   "every voice-gated navigation item, in approved order",
   gatedNavItems.map((i) => i.key),
   [
+    // V7: Inquiries sits after Calls in Activity; Transfer Contacts after
+    // Phone Number in Channels.
     "assistants",
     "calls",
+    "inquiries",
     "phone-number",
+    "transfer-contacts",
     "usage",
     "issues",
     "tools",
@@ -256,7 +260,15 @@ eq(
 eq(
   "the live voice-gated destinations are exactly Assistant, Calls, Phone Number, Usage and Issues (2026-09 owner replan — Appointments moved out of the voice gate, B-1)",
   gatedNavItems.filter((i) => i.state === "live").map((i) => i.href),
-  ["/assistants", "/activity/calls", "/channels/phone-number", "/account/usage", "/account/issues"],
+  [
+    "/assistants",
+    "/activity/calls",
+    "/activity/inquiries",
+    "/channels/phone-number",
+    "/channels/transfer-contacts",
+    "/account/usage",
+    "/account/issues",
+  ],
 );
 
 eq(
@@ -292,7 +304,9 @@ const GATED_ROUTE_KEYS = [
   "assistantDetail",
   "calls",
   "callDetail",
+  "inquiries",
   "phoneNumber",
+  "transferContacts",
   "usage",
   "issues",
 ] as const;
@@ -345,7 +359,10 @@ eq(
     "/assistants/:id/:tab?",
     "/activity/calls",
     "/activity/calls/:id",
+    // V7 surfaces, sitting inside the same two sections as their siblings.
+    "/activity/inquiries",
     "/channels/phone-number",
+    "/channels/transfer-contacts",
     "/account/usage",
     "/account/issues",
   ],
@@ -721,9 +738,11 @@ eq(
     "/scheduling/appointments",
     "/scheduling/test-booking",
     "/activity/calls",
+    "/activity/inquiries",
     "/activity/conversations",
     "/activity/contacts",
     "/channels/phone-number",
+    "/channels/transfer-contacts",
     "/channels/sms",
     "/account/usage",
     "/account/billing",
@@ -808,7 +827,9 @@ const GATED_RECORDS: [string, string, string | null, string, boolean, string | n
   [
     ["assistant", "assistants", "/assistants", "live", true, "Assistant", "Build and manage AI voice assistants for your business."],
     ["activity", "calls", "/activity/calls", "live", true, "Calls", "Review stored call records and analysis."],
+    ["activity", "inquiries", "/activity/inquiries", "live", true, "Inquiries", "Messages your assistant took, and what still needs following up."],
     ["channels", "phone-number", "/channels/phone-number", "live", true, "Phone Number", "The number your assistant answers and makes calls from."],
+    ["channels", "transfer-contacts", "/channels/transfer-contacts", "live", true, "Transfer Contacts", "The people a caller can be put through to when they ask for someone."],
     ["account", "usage", "/account/usage", "live", true, "Usage", "Minutes used, minutes remaining, and your billing period."],
     ["account", "issues", "/account/issues", "live", true, "Issues", "Problems SiteMint has flagged that may need your attention."],
     ["placeholders", "tools", "/tools", "comingSoon", true, "Tools", "Assign actions your assistant can take during a call, like booking or transferring."],
@@ -1170,12 +1191,32 @@ check(
     !/providerAssistantId/.test(assistantDtoBlock),
 );
 
+// AR-001V.3 added controlled recovery, so the fetch now lives in one named
+// function (`runBrowserTestSession`) that the confirm handler calls and that the
+// credential-replacement action calls with replaceToken: true. The property this
+// assertion protects is unchanged — the id is fetched in response to a
+// deliberate action, never on page load — and is still checked directly: the
+// confirm handler reaches the fetch, and no effect or query does.
 check(
-  "the browser-test session is fetched from the confirm handler, not on page load",
+  "the browser-test session is fetched from a deliberate action, not on page load",
   /export async function fetchBrowserTestSession/.test(assistantsApiCode) &&
-    /const confirmTest[\s\S]{0,2000}fetchBrowserTestSession\(numericId\)/.test(builderCode) &&
+    /const confirmTest[\s\S]{0,2000}runBrowserTestSession\(false\)/.test(builderCode) &&
+    /function runBrowserTestSession[\s\S]{0,1200}fetchBrowserTestSession\(numericId/.test(builderCode) &&
     !/useEffect\([^)]*fetchBrowserTestSession/.test(builderCode) &&
-    !/useQuery\([^)]*fetchBrowserTestSession/.test(builderCode),
+    !/useEffect\([^)]*runBrowserTestSession/.test(builderCode) &&
+    !/useQuery\([^)]*fetchBrowserTestSession/.test(builderCode) &&
+    !/useQuery\([^)]*runBrowserTestSession/.test(builderCode),
+);
+
+// And the recovery path is opt-in: a replacement credential is requested only
+// from the explicit action, never by the ordinary start path, so an ordinary
+// test can never discard a working token.
+check(
+  "a replacement credential is requested only by the explicit recovery action",
+    /runBrowserTestSession\(true\)/.test(builderCode) &&
+    /errorCategory === "provider_not_authorized"/.test(builderCode) &&
+    /replaceToken\?: boolean/.test(assistantsApiCode) &&
+    /replace=1/.test(assistantsApiCode),
 );
 
 check(
@@ -1515,6 +1556,9 @@ const GATED_ONLY_ICONS: [string, string][] = [
   ["Plug", "plug"],
   ["KeyRound", "key-round"],
   ["Gauge", "gauge"],
+  // V7 nav records.
+  ["Inbox", "inbox"],
+  ["PhoneForwarded", "phone-forwarded"],
 ];
 
 {

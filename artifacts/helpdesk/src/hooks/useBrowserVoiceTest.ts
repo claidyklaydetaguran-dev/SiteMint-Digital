@@ -46,6 +46,13 @@ function safelyDestroyClient(client: BrowserVoiceClient): void {
 export interface UseBrowserVoiceTestResult {
   state: BrowserVoiceTestState;
   errorMessage: string | null;
+  /**
+   * AR-001V.3 recovery: the classified category of the last failure, so a
+   * caller can distinguish a credential the provider REFUSED — which a fresh
+   * scoped token can fix — from a microphone or network problem, which it
+   * cannot. Our own enum, never provider text.
+   */
+  errorCategory: BrowserVoiceErrorCategory | null;
   /** Present only for a failure our copy could not already explain. Safe to display. */
   supportReference: string | null;
   elapsedSeconds: number;
@@ -76,6 +83,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
   const [state, setState] = useState<BrowserVoiceTestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [supportReference, setSupportReference] = useState<string | null>(null);
+  const [errorCategory, setErrorCategory] = useState<BrowserVoiceErrorCategory | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   /**
@@ -85,6 +93,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
    */
   const recordFailure = useCallback((category: BrowserVoiceErrorCategory, providerStatus?: number) => {
     setErrorMessage(safeBrowserVoiceErrorMessage(category));
+    setErrorCategory(category);
     const reference = browserVoiceErrorNeedsSupportReference(category) ? newBrowserVoiceSupportReference() : null;
     setSupportReference(reference);
     // One sanitized console line so a failure is diagnosable from a customer's
@@ -198,6 +207,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
       startGuardRef.current = true;
       setErrorMessage(null);
       setSupportReference(null);
+      setErrorCategory(null);
       setState("preparing");
 
       const client = source.create();
@@ -248,6 +258,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
         return prev;
       setErrorMessage(null);
       setSupportReference(null);
+      setErrorCategory(null);
       setElapsedSeconds(0);
       return "idle";
     });
@@ -257,6 +268,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
     teardownClient();
     setErrorMessage(null);
     setSupportReference(null);
+    setErrorCategory(null);
     setElapsedSeconds(0);
     setState("idle");
   }, [teardownClient]);
@@ -277,6 +289,7 @@ export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
   return {
     state,
     errorMessage,
+    errorCategory,
     supportReference,
     elapsedSeconds,
     clientAvailable,

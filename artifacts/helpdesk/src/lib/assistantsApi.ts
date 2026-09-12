@@ -423,12 +423,21 @@ export interface BrowserTestSessionDto {
  * server's own browser-test flag is on. It issues no provider request and
  * touches no microphone.
  */
-export async function fetchBrowserTestSession(id: number): Promise<BrowserTestSessionDto> {
+/**
+ * AR-001V.3 controlled recovery. `replaceToken` is set ONLY after the provider
+ * actually refused the stored credential, so an ordinary Start Browser Test
+ * never discards a working token. The replacement the server mints is scoped
+ * identically — this is not, and must never become, a fallback to a broader key.
+ */
+export async function fetchBrowserTestSession(
+  id: number,
+  options: { replaceToken?: boolean } = {},
+): Promise<BrowserTestSessionDto> {
   if (!ASSISTANT_ID_PATTERN.test(String(id)) || !Number.isSafeInteger(id) || id <= 0) {
     throw new AssistantApiRequestError(0, GENERIC_ERROR_MESSAGE);
   }
   const result = await request<{ session: BrowserTestSessionDto }>(
-    `/receptionist/voice/assistants/${id}/browser-test-session`,
+    `/receptionist/voice/assistants/${id}/browser-test-session${options.replaceToken === true ? "?replace=1" : ""}`,
     { method: "GET", headers: { Accept: "application/json" } },
   );
   return result.session;

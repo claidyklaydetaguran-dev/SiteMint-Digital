@@ -161,6 +161,7 @@ const unsavedChangesPrompt: string | null = publishInBuild
 const NO_BROWSER_TEST: UseBrowserVoiceTestResult = {
   state: "idle",
   errorMessage: null,
+  errorCategory: null,
   supportReference: null,
   elapsedSeconds: 0,
   clientAvailable: false,
@@ -230,6 +231,7 @@ export default function AssistantBuilder() {
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [testSessionError, setTestSessionError] = useState<string | null>(null);
+  const [renewingCredential, setRenewingCredential] = useState(false);
   const syncButtonRef = useRef<HTMLButtonElement | null>(null);
   const syncInFlightRef = useRef(false);
   const hydratedIdRef = useRef<number | null>(null);
@@ -626,27 +628,41 @@ export default function AssistantBuilder() {
         // is authoritative; this call is the only place in the client that
         // ever holds the id, and it is passed straight to the client seam
         // without being stored in state, a query cache, or the URL.
-        void fetchBrowserTestSession(numericId)
-          .then((session) => {
-            if (session.provider !== "vapi" || !session.providerAssistantId) {
-              setTestSessionError(BROWSER_TEST_SESSION_ERROR);
-              return;
-            }
-            browserTest.start({
-              provider: "vapi",
-              providerAssistantId: session.providerAssistantId,
-              publicKey: session.publicKey,
-            });
-          })
-          .catch(() => {
-            // Never surfaces the response body: it could carry provider text.
-            setTestSessionError(BROWSER_TEST_SESSION_ERROR);
-          })
-          .finally(() => {
-            testInFlightRef.current = false;
-          });
+        void runBrowserTestSession(false);
       }
     : () => {};
+
+  /**
+   * AR-001V.3 controlled recovery. `replaceToken` is passed ONLY from the
+   * recovery action below, which appears only after the provider actually
+   * refused this assistant's credential. An ordinary Start Browser Test never
+   * discards a working token, and the replacement is scoped identically — there
+   * is no fallback to a broader key anywhere on this path.
+   */
+  function runBrowserTestSession(replaceToken: boolean): Promise<void> {
+    if (numericId === undefined) return Promise.resolve();
+    if (replaceToken) setRenewingCredential(true);
+    return fetchBrowserTestSession(numericId, { replaceToken })
+      .then((session) => {
+        if (session.provider !== "vapi" || !session.providerAssistantId) {
+          setTestSessionError(BROWSER_TEST_SESSION_ERROR);
+          return;
+        }
+        browserTest.start({
+          provider: "vapi",
+          providerAssistantId: session.providerAssistantId,
+          publicKey: session.publicKey,
+        });
+      })
+      .catch(() => {
+        // Never surfaces the response body: it could carry provider text.
+        setTestSessionError(BROWSER_TEST_SESSION_ERROR);
+      })
+      .finally(() => {
+        testInFlightRef.current = false;
+        if (replaceToken) setRenewingCredential(false);
+      });
+  }
 
   if (!isValidId) {
     return (
@@ -807,6 +823,15 @@ export default function AssistantBuilder() {
               supportReference={browserTest.supportReference}
               onEnd={browserTest.end}
               onDismiss={browserTest.dismiss}
+              // Offered for exactly one category: the provider refused this
+              // assistant's credential. A microphone or network failure gets no
+              // such button, because a new key would not fix it.
+              onRetryWithNewCredential={
+                browserTest.errorCategory === "provider_not_authorized"
+                  ? () => void runBrowserTestSession(true)
+                  : undefined
+              }
+              retryingCredential={renewingCredential}
             />
           ) : undefined
         }
