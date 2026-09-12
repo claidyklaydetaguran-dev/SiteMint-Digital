@@ -19,6 +19,7 @@ import {
   TOOL_PARAMETER_SCHEMAS,
   type VoiceToolName,
 } from "../voice/tools/toolCatalog.js";
+export type { VoiceToolName };
 import {
   VOICE_TOOLS_CAPABILITIES_ENV_VAR,
   parseToolCapabilities,
@@ -66,6 +67,18 @@ export function buildVoiceToolDefinitions(
 export function loadVoiceToolsConfigFromEnv(
   serverConfig: VoiceServerConfig | null,
   env: Record<string, string | undefined> = process.env,
+  /**
+   * V8: the business's effective tool names, from the one shared capability
+   * resolution. When provided it NARROWS the operator allowlist to what this
+   * business has actually finished configuring — it can never widen it, because
+   * the allowlist check below still runs first.
+   *
+   * Optional so the env-contract boot probe can validate configuration without
+   * a firm, but every caller that has a firmId passes it: publish, sync, and
+   * the synchronization comparison must all see the same list or they disagree
+   * about what "up to date" means.
+   */
+  firmToolNames?: readonly VoiceToolName[],
 ): JsonObject[] | null {
   if (!isVoiceToolsAttachEnabled(env)) return null;
   if (serverConfig === null) {
@@ -85,5 +98,11 @@ export function loadVoiceToolsConfigFromEnv(
     );
   }
 
-  return buildVoiceToolDefinitions(serverConfig, toolNamesForCapabilities(parsed.capabilities));
+  const authorized = toolNamesForCapabilities(parsed.capabilities);
+  const effective =
+    firmToolNames === undefined
+      ? authorized
+      : authorized.filter((name) => firmToolNames.includes(name));
+
+  return buildVoiceToolDefinitions(serverConfig, effective);
 }

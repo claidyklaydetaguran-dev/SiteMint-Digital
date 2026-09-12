@@ -370,6 +370,15 @@ export const ACTIONS = {
     "Your assistant can answer questions and speak with callers, but it cannot take actions like saving a message yet. Contact SiteMint to switch that on.",
   stateActive: "Available",
   stateUnavailable: "Not available yet",
+  /**
+   * Said plainly because the two can legitimately differ for a while. This list
+   * is what your setup supports RIGHT NOW; the assistant callers reach is the
+   * version you last published. If you change your scheduling setup, the
+   * assistant stops offering what it can no longer do straight away — but the
+   * published version only catches up when you publish again.
+   */
+  publishToApply:
+    "This is what your setup supports now. Publish again to update the assistant callers reach.",
 
   permittedTitle: "What you want it to do",
   permittedDetail:

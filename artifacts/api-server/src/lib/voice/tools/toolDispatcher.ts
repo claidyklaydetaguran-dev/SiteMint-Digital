@@ -384,15 +384,32 @@ async function executeOne(
   // Capability gate, fail-closed. An unparseable or absent allowlist authorizes
   // NOTHING — the same rule the publish payload follows, so the two cannot
   // disagree about what this deployment is allowed to do.
-  let authorized: readonly VoiceToolCapability[];
+  // V8: EXECUTABLE, not merely published.
+  //
+  // Readiness can lapse after publication — a business deletes its last
+  // appointment type, or closes every day in its schedule — and the provider
+  // goes on advertising whatever was attached at publish time. Re-resolving
+  // here is what stops the assistant taking an action it can no longer honour,
+  // immediately, instead of at the business's next publish.
+  //
+  // The pure `authorizedCapabilities` seam stays for unit tests, which have no
+  // database; production resolves the same shared calculation everything else
+  // uses.
+  let executable: readonly VoiceToolCapability[];
   if (deps.authorizedCapabilities) {
-    authorized = deps.authorizedCapabilities();
+    executable = deps.authorizedCapabilities();
   } else {
-    const allowlist = parseToolCapabilities(process.env["VOICE_TOOLS_CAPABILITIES"]);
-    authorized = allowlist.ok ? allowlist.capabilities : [];
+    try {
+      const { resolveEffectiveCapabilities } = await import("./firmCapabilities.js");
+      const effective = await resolveEffectiveCapabilities(firmId);
+      executable = effective.reports.filter((r) => r.state === "active").map((r) => r.key);
+    } catch {
+      // Unresolvable capability state authorizes nothing.
+      executable = [];
+    }
   }
-  if (!authorized.includes(CAPABILITY_BY_TOOL[call.name])) {
-    deps.logger?.("voice_tool_capability_not_authorized", { firmId, tool: call.name });
+  if (!executable.includes(CAPABILITY_BY_TOOL[call.name])) {
+    deps.logger?.("voice_tool_capability_not_executable", { firmId, tool: call.name });
     return SAFE_INVALID;
   }
 

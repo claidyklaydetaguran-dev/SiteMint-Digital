@@ -20,6 +20,7 @@ import { loadRuntimeCatalogFromEnv } from "../voicePublishing/runtimeCatalog.js"
 import { loadVoiceServerConfigFromEnv } from "../voicePublishing/serverConfig.js";
 import { loadVoiceToolsConfigFromEnv } from "../voicePublishing/toolsConfig.js";
 import { loadVoiceCallPolicyFromEnv } from "../voicePublishing/callPolicyConfig.js";
+import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
 import { computeProviderPayloadHash } from "../voicePublishing/providerPayloadHash.js";
 import { buildSyncProviderInput } from "../voicePublishing/syncService.js";
 import { STALE_PROVIDER_SYNC_THRESHOLD_MS } from "./repository.js";
@@ -59,6 +60,20 @@ export interface ProviderSyncStateDependencies {
   loadServerConfig: typeof loadVoiceServerConfigFromEnv;
   loadToolsConfig: typeof loadVoiceToolsConfigFromEnv;
   loadCallPolicy: typeof loadVoiceCallPolicyFromEnv;
+  /**
+   * V8: the business's effective tool names, resolved ONCE per request by the
+   * caller and passed in.
+   *
+   * It is an argument rather than a lookup because this function runs per row
+   * on list reads — a database round trip per assistant would be wasteful — and
+   * because the publish path builds its payload from exactly this list. Passing
+   * it keeps the two in step by construction; deriving it independently here is
+   * how they drifted apart before.
+   *
+   * `undefined` means "not narrowed", which is what the env-contract probe and
+   * pure unit tests want.
+   */
+  firmToolNames?: readonly VoiceToolName[] | undefined;
   /** Injected so stale-versus-fresh is deterministic under test, never wall-clock-dependent. */
   clock: Clock;
 }
@@ -93,7 +108,7 @@ function buildComparisonInput(row: VoiceAssistant, deps: ProviderSyncStateDepend
     row,
     deps.loadCatalog(),
     serverConfig,
-    deps.loadToolsConfig(serverConfig),
+    deps.loadToolsConfig(serverConfig, process.env, deps.firmToolNames),
     deps.loadCallPolicy(),
   );
 }

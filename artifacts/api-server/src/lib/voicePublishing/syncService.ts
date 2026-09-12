@@ -30,6 +30,8 @@ import {
 import { isVoiceSyncEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
 import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
+import { resolveEffectiveCapabilities } from "../voice/tools/firmCapabilities.js";
+import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
 import { loadVoiceCallPolicyFromEnv, type VoiceCallPolicy } from "./callPolicyConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
@@ -92,7 +94,18 @@ export interface SyncServiceDependencies {
   /** P2: optional server-URL attachment loader; null (feature off) sends no `server` object. Defaults to the env loader when omitted. */
   loadServerConfig?: () => VoiceServerConfig | null;
   /** P3: optional tools attachment loader; null (feature off) sends no `tools`. Defaults to the env loader when omitted. */
-  loadToolsConfig?: (serverConfig: VoiceServerConfig | null) => JsonObject[] | null;
+  /**
+   * V8: takes the business's effective tool names so the payload carries only
+   * capabilities this business has finished configuring. The synchronization
+   * comparison passes the SAME list, which is what keeps 'up to date' honest.
+   */
+  loadToolsConfig?: (
+    serverConfig: VoiceServerConfig | null,
+    env?: Record<string, string | undefined>,
+    firmToolNames?: readonly VoiceToolName[],
+  ) => JsonObject[] | null;
+  /** Resolves what this business may carry. Defaults to the shared resolution. */
+  resolveCapabilities?: (firmId: number) => Promise<{ toolNames: VoiceToolName[] }>;
   /** P6: optional call-behavior policy; null (default) sends nothing. */
   loadCallPolicy?: () => VoiceCallPolicy | null;
   createProvider: () => VoiceProvider;
@@ -346,7 +359,14 @@ export async function synchronizePublishedAssistant(
   // P3: tools attachment, validated pre-claim; requires the server config.
   let toolsConfig: JsonObject[] | null;
   try {
-    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig);
+    // One shared capability resolution: the same list the dashboard reports
+    // and the synchronization comparison comes back to.
+    const effective = await (deps.resolveCapabilities ?? resolveEffectiveCapabilities)(firmId);
+    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(
+      serverConfig,
+      process.env,
+      effective.toolNames,
+    );
   } catch {
     return failure("sync_disabled");
   }

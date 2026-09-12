@@ -7,7 +7,13 @@ import type { VoiceAssistant } from "@workspace/db/schema/voice";
 import { voiceAssistantRepository } from "./repository.js";
 import { validateCreateBody, validateRouteId, validateUpdateBody } from "./validation.js";
 import { AssistantApiError } from "./errors.js";
-import { deriveProviderSyncState, type ProviderSyncState } from "./providerSyncState.js";
+import {
+  deriveProviderSyncState,
+  defaultProviderSyncStateDependencies,
+  type ProviderSyncState,
+} from "./providerSyncState.js";
+import { resolveEffectiveCapabilities } from "../voice/tools/firmCapabilities.js";
+import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
 
 const MAX_NAME_LENGTH = 100;
 const COPY_SUFFIX = " Copy";
@@ -43,7 +49,16 @@ export interface AssistantDto {
   updatedAt: string;
 }
 
-function toDto(row: VoiceAssistant): AssistantDto {
+/**
+ * V8: `firmToolNames` is the business's effective tool list, resolved ONCE
+ * per request by the caller.
+ *
+ * It has to be threaded rather than looked up here because this runs per row
+ * on a list read, and because the publish path builds its payload from exactly
+ * this list — deriving it independently is what made the two disagree and
+ * produced a permanent "changes not published" state.
+ */
+function toDto(row: VoiceAssistant, firmToolNames?: readonly VoiceToolName[]): AssistantDto {
   return {
     id: row.id,
     name: row.name,
@@ -58,7 +73,10 @@ function toDto(row: VoiceAssistant): AssistantDto {
     config: row.config,
     lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null,
     syncError: row.syncError,
-    providerSyncState: deriveProviderSyncState(row),
+    providerSyncState: deriveProviderSyncState(row, {
+      ...defaultProviderSyncStateDependencies,
+      firmToolNames,
+    }),
     providerSyncError: row.providerSyncError,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -75,21 +93,28 @@ function buildCopyName(originalName: string): string {
 
 export const voiceAssistantService = {
   async list(firmId: number): Promise<{ items: AssistantDto[]; count: number }> {
-    const rows = await voiceAssistantRepository.listByFirm(firmId);
-    return { items: rows.map(toDto), count: rows.length };
+    // Resolved once for the whole list: it is per-firm, not per-assistant.
+    const [rows, effective] = await Promise.all([
+      voiceAssistantRepository.listByFirm(firmId),
+      resolveEffectiveCapabilities(firmId),
+    ]);
+    return {
+      items: rows.map((row) => toDto(row, effective.toolNames)),
+      count: rows.length,
+    };
   },
 
   async create(firmId: number, body: unknown): Promise<AssistantDto> {
     const input = validateCreateBody(body);
     const row = await voiceAssistantRepository.createForFirm(firmId, input);
-    return toDto(row);
+    return toDto(row, (await resolveEffectiveCapabilities(firmId)).toolNames);
   },
 
   async get(firmId: number, rawId: string): Promise<AssistantDto> {
     const id = validateRouteId(rawId);
     const row = await voiceAssistantRepository.findByIdForFirm(firmId, id);
     if (!row) throw new AssistantApiError("NOT_FOUND", "Assistant not found");
-    return toDto(row);
+    return toDto(row, (await resolveEffectiveCapabilities(firmId)).toolNames);
   },
 
   async update(firmId: number, rawId: string, body: unknown): Promise<AssistantDto> {
@@ -97,14 +122,14 @@ export const voiceAssistantService = {
     const patch = validateUpdateBody(body);
     const row = await voiceAssistantRepository.updateByIdForFirm(firmId, id, patch);
     if (!row) throw new AssistantApiError("NOT_FOUND", "Assistant not found");
-    return toDto(row);
+    return toDto(row, (await resolveEffectiveCapabilities(firmId)).toolNames);
   },
 
   async duplicate(firmId: number, rawId: string): Promise<AssistantDto> {
     const id = validateRouteId(rawId);
     const copy = await voiceAssistantRepository.duplicateByIdForFirm(firmId, id, buildCopyName);
     if (!copy) throw new AssistantApiError("NOT_FOUND", "Assistant not found");
-    return toDto(copy);
+    return toDto(copy, (await resolveEffectiveCapabilities(firmId)).toolNames);
   },
 
   async remove(firmId: number, rawId: string): Promise<void> {

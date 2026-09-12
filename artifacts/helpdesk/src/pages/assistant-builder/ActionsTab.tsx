@@ -126,6 +126,7 @@ export function ActionsTab({ draft, update }: BuilderTabProps) {
                 <CapabilityCard key={c.key} capability={c} />
               ))}
             </ul>
+            <p className="mt-2 text-xs text-muted-foreground">{ACTIONS.publishToApply}</p>
           </>
         )}
       </section>

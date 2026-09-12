@@ -1,18 +1,16 @@
 // V8: what this business's assistant can actually do, and why anything it
 // cannot do is unavailable.
 //
-// The Assistant screen needs to answer "what can it do?" truthfully, which
-// means reading the same three gates the publish path reads rather than a
-// hard-coded list. A capability shown as active here is one the payload would
-// genuinely carry; a blocked one names the specific thing standing in the way.
+// Reads the ONE shared capability resolution (lib/voice/tools/firmCapabilities)
+// — the same one the publish payload, the synchronization comparison and the
+// runtime dispatcher use. This route adds only the wording; it decides nothing,
+// which is what makes "Available" here mean the same thing as "attached" there.
 
 import { Router, type Request, type Response } from "express";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import {
-  describeFirmCapabilities,
-  readCapabilityEnvironment,
+  resolveEffectiveCapabilities,
   type CapabilityBlockReason,
-  type FirmReadiness,
 } from "../lib/voice/tools/firmCapabilities.js";
 
 const router = Router();
@@ -30,7 +28,7 @@ const CAPABILITY_COPY: Record<string, { label: string; active: string }> = {
   },
   scheduling: {
     label: "Book appointments",
-    active: "Callers can check open times and book, reschedule, or cancel an appointment.",
+    active: "Callers can check open times and ask for an appointment. You confirm each request.",
   },
 };
 
@@ -39,57 +37,42 @@ const REASON_COPY: Record<CapabilityBlockReason, string> = {
   not_authorized: "Not switched on for your workspace yet. Contact SiteMint if you need it.",
   needs_appointment_type:
     "Add at least one appointment type first, so there is something for callers to book.",
+  needs_opening_hours:
+    "Set your opening hours first. With no open days the assistant would tell every caller you are closed.",
+  needs_timezone: "Set your business timezone first, so offered times are correct.",
 };
 
-/** What has to be true for the assistant to be trusted with a capability. */
-async function loadFirmReadiness(firmId: number): Promise<FirmReadiness> {
-  const { db } = await import("@workspace/db");
-  const { schedulingAppointmentTypes } = await import("@workspace/db/schema/scheduling");
-  const { and, eq, count } = await import("drizzle-orm");
-  const [row] = await db
-    .select({ n: count() })
-    .from(schedulingAppointmentTypes)
-    .where(and(eq(schedulingAppointmentTypes.firmId, firmId), eq(schedulingAppointmentTypes.active, true)));
-  return { bookableAppointmentTypes: Number(row?.n ?? 0) };
-}
-
-/**
- * Whether the platform could attach tools at all. Deliberately reuses the
- * publish path's own loaders, so this can never report "attachable" for a
- * configuration the publish path would reject.
- */
-async function isToolsAttachable(): Promise<boolean> {
-  try {
-    const { loadVoiceServerConfigFromEnv } = await import("../lib/voicePublishing/serverConfig.js");
-    const { loadVoiceToolsConfigFromEnv } = await import("../lib/voicePublishing/toolsConfig.js");
-    const serverConfig = loadVoiceServerConfigFromEnv();
-    return loadVoiceToolsConfigFromEnv(serverConfig) !== null;
-  } catch {
-    // Enabled-but-misconfigured is not attachable, and saying so is the point.
-    return false;
-  }
-}
+/** Where the owner goes to clear each blocker, when they can clear it themselves. */
+const REASON_FIX_PATH: Partial<Record<CapabilityBlockReason, string>> = {
+  needs_appointment_type: "/scheduling/appointment-types",
+  needs_opening_hours: "/scheduling/availability",
+  needs_timezone: "/scheduling/availability",
+};
 
 // ── GET /api/receptionist/voice/capabilities ──────────────────────────────────
 
 router.get("/receptionist/voice/capabilities", requireReceptionistAuth, async (req: Request, res: Response) => {
   try {
-    const [attachable, readiness] = await Promise.all([isToolsAttachable(), loadFirmReadiness(req.firmId!)]);
-    const env = readCapabilityEnvironment(attachable);
-    const reports = describeFirmCapabilities(env, readiness);
+    const effective = await resolveEffectiveCapabilities(req.firmId!);
 
     res.json({
-      items: reports.map((r) => ({
+      items: effective.reports.map((r) => ({
         key: r.key,
         label: CAPABILITY_COPY[r.key]?.label ?? r.key,
         state: r.state,
         detail: r.state === "active" ? CAPABILITY_COPY[r.key]?.active ?? "" : REASON_COPY[r.reason!] ?? "",
-        // Named so the screen can link to the page that unblocks it.
         blockedBy: r.reason,
+        fixPath: r.reason ? REASON_FIX_PATH[r.reason] ?? null : null,
       })),
       // True only when a published assistant would actually carry tools.
-      toolsAttachable: attachable,
-      activeCount: reports.filter((r) => r.state === "active").length,
+      toolsAttachable: effective.env.toolsAttachable,
+      activeCount: effective.reports.filter((r) => r.state === "active").length,
+      /**
+       * What a payload built right now would carry. Exposed so the dashboard can
+       * say "your setup changed — republish to apply" by comparing against the
+       * assistant's synchronization state, rather than guessing.
+       */
+      toolNames: effective.toolNames,
     });
   } catch (err) {
     req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to describe voice capabilities");
