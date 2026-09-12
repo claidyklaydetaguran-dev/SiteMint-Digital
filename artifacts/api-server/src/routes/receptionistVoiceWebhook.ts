@@ -29,7 +29,7 @@ import { Router, type Request, type Response } from "express";
 import { authenticateVapiWebhook } from "../lib/voice/webhooks/webhookAuthPolicy.js";
 import { parseVapiServerMessage } from "../lib/voice/webhooks/vapiServerMessage.js";
 import {
-  findFirmIdForVapiAssistant,
+  findVapiAssistantOwner,
   storeVapiWebhookEvent,
   readStoredToolCallResults,
   storeToolCallResults,
@@ -134,8 +134,11 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
 
   // The firm is derived ONLY from our own voice_assistants row for this
   // provider assistant id — never trusted from anything in the request body.
-  const firmId = await findFirmIdForVapiAssistant(message.call.assistantId);
-  if (!firmId) {
+  // The same lookup yields our assistant row id, so call-scoped records written
+  // below are attributed from verified provider context rather than from
+  // anything a model produced.
+  const owner = await findVapiAssistantOwner(message.call.assistantId);
+  if (!owner) {
     req.log.warn(
       { assistantId: message.call.assistantId, type: message.type },
       "[voice webhook] event for an assistant not known to this application",
@@ -143,6 +146,7 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
     res.status(200).json({ received: true });
     return;
   }
+  const { firmId } = owner;
 
   // P6: transfer-destination-request — in-call escalation routing against
   // the firm's approved destination list with the business-hours guard.
@@ -198,7 +202,11 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
         // store and respond — executing now is the correct completion.
       }
       const calls = (message.toolCallList ?? []).map((t) => ({ toolCallId: t.id, name: t.name, args: t.arguments }));
-      const results = await dispatchToolCalls(firmId, calls);
+      const results = await dispatchToolCalls(firmId, calls, {
+        provider: "vapi",
+        providerCallId: message.call.id,
+        assistantRowId: owner.assistantRowId,
+      });
       await storeToolCallResults(firmId, eventKey, results);
       req.log.info(
         { firmId, callId: message.call.id, count: results.length, authMode: auth.mode },

@@ -88,22 +88,40 @@ export function buildBrowserTestSessionError(code: BrowserTestSessionErrorCode):
   return { status: STATUS_BY_CODE[code], code, message: MESSAGE_BY_CODE[code] };
 }
 
+/**
+ * How long one mint attempt may hold the claim. Long enough to cover a slow
+ * provider round trip, short enough that a crashed request does not block
+ * browser testing for a noticeable time.
+ */
+export const BROWSER_TOKEN_MINT_LEASE_SECONDS = 30;
+
 export interface BrowserTestSessionDependencies {
   /** Explicit server switch, never read at module import time. Authoritative over any client build flag. */
   isEnabled: () => boolean;
   findByIdForFirm: typeof voiceAssistantRepository.findByIdForFirm;
+  claimBrowserTokenMint: typeof voiceAssistantRepository.claimBrowserTokenMint;
   setBrowserToken: typeof voiceAssistantRepository.setBrowserToken;
+  clearBrowserToken: typeof voiceAssistantRepository.clearBrowserToken;
   /** Mints a scoped browser credential. Null when the provider offers none. */
   mintBrowserToken: (
     providerAssistantId: string,
     name: string,
   ) => Promise<{ tokenId: string; tokenValue: string } | null>;
+  /**
+   * Revokes a provider-side token. Resolves false when the provider offers no
+   * revocation, so callers can report an untidied token instead of pretending
+   * it is gone.
+   */
+  revokeBrowserToken: (tokenId: string) => Promise<boolean>;
+  logger?: (event: string, meta: Record<string, unknown>) => void;
 }
 
 export const defaultBrowserTestSessionDependencies: BrowserTestSessionDependencies = {
   isEnabled: isVoiceBrowserTestEnabled,
   findByIdForFirm: voiceAssistantRepository.findByIdForFirm,
+  claimBrowserTokenMint: voiceAssistantRepository.claimBrowserTokenMint,
   setBrowserToken: voiceAssistantRepository.setBrowserToken,
+  clearBrowserToken: voiceAssistantRepository.clearBrowserToken,
   mintBrowserToken: async (providerAssistantId, name) => {
     // Lazy imports keep this module free of a provider construction at import
     // time, exactly as the publish path does.
@@ -114,6 +132,13 @@ export const defaultBrowserTestSessionDependencies: BrowserTestSessionDependenci
     const origins = loadBrowserTokenOrigins();
     if (origins.length === 0) return null;
     return provider.createBrowserToken({ providerAssistantId, allowedOrigins: origins, name });
+  },
+  revokeBrowserToken: async (tokenId) => {
+    const { createProductionVoiceProvider } = await import("../voicePublishing/providerFactory.js");
+    const provider = createProductionVoiceProvider();
+    if (typeof provider.deleteBrowserToken !== "function") return false;
+    await provider.deleteBrowserToken(tokenId);
+    return true;
   },
 };
 
@@ -134,6 +159,7 @@ export async function getBrowserTestSession(
   firmId: number,
   assistantId: number,
   deps: BrowserTestSessionDependencies = defaultBrowserTestSessionDependencies,
+  options: { replaceExistingToken?: boolean } = {},
 ): Promise<BrowserTestSessionResult> {
   if (!deps.isEnabled()) {
     return failure("browser_test_disabled");
@@ -164,23 +190,88 @@ export async function getBrowserTestSession(
   // repeated browser test creates nothing new.
   let publicKey = typeof row.browserTokenValue === "string" ? row.browserTokenValue.trim() : "";
 
+  // Controlled recovery: the owner asked for a replacement because the stored
+  // credential is no longer accepted by the provider. Discard it — revoking it
+  // provider-side first so a rejected-but-live token is not left behind — and
+  // fall through to the ordinary mint path. There is no shared-key fallback
+  // here and no widening of restrictions; a replacement is scoped exactly like
+  // the token it replaces, and if minting fails the honest answer is that
+  // browser testing is unavailable.
+  if (publicKey.length > 0 && options.replaceExistingToken === true) {
+    const staleTokenId = typeof row.browserTokenId === "string" ? row.browserTokenId.trim() : "";
+    if (staleTokenId.length > 0) {
+      const cleared = await deps.clearBrowserToken(firmId, row.id, staleTokenId);
+      if (cleared !== null) {
+        publicKey = "";
+        // Best-effort revocation AFTER the row no longer references it: if this
+        // fails, the token is unreferenced rather than unrevoked-and-in-use.
+        try {
+          const revoked = await deps.revokeBrowserToken(staleTokenId);
+          if (!revoked) {
+            deps.logger?.("voice_browser_token_revocation_unsupported", { firmId, assistantId: row.id });
+          }
+        } catch {
+          deps.logger?.("voice_browser_token_revocation_failed", { firmId, assistantId: row.id });
+        }
+      } else {
+        // Someone else already replaced it; re-read and use their token rather
+        // than minting a third one.
+        const reread = await deps.findByIdForFirm(firmId, row.id);
+        publicKey = typeof reread?.browserTokenValue === "string" ? reread.browserTokenValue.trim() : "";
+      }
+    }
+  }
+
   if (publicKey.length === 0) {
+    // CLAIM BEFORE MINTING. The conditional write below cannot prevent a
+    // duplicate provider token on its own — two requests could both mint and
+    // only one could store, orphaning the loser's live credential. So the right
+    // to mint is claimed first, and only the winner contacts the provider.
+    const claimed = await deps.claimBrowserTokenMint(
+      firmId,
+      row.id,
+      BROWSER_TOKEN_MINT_LEASE_SECONDS,
+      new Date(),
+    );
+    if (claimed === null) {
+      // Either a token appeared between our read and the claim, or another
+      // request is minting right now. Re-read: a present token is the answer,
+      // and an absent one means "ask again in a moment", which is what the
+      // retryable 503 says.
+      const reread = await deps.findByIdForFirm(firmId, row.id);
+      publicKey = typeof reread?.browserTokenValue === "string" ? reread.browserTokenValue.trim() : "";
+      if (publicKey.length === 0) return failure("browser_token_unavailable");
+      return { ok: true, session: { provider: VAPI_PROVIDER_NAME, providerAssistantId: providerId, publicKey } };
+    }
+
     let minted: { tokenId: string; tokenValue: string } | null = null;
     try {
       minted = await deps.mintBrowserToken(providerId, `sitemint-firm${firmId}-assistant${row.id}`);
     } catch {
       // A provider failure must not leak its text to the caller; the honest
-      // outcome is "could not prepare", not a generic internal error.
+      // outcome is "could not prepare", not a generic internal error. The lease
+      // is deliberately left to expire rather than cleared, so a provider that
+      // is failing is not hammered once per click.
       return failure("browser_token_unavailable");
     }
     if (minted === null) return failure("browser_token_unavailable");
 
-    // Conditional write: if a concurrent request already stored one, keep
-    // theirs and use it, so the two requests cannot diverge.
     const stored = await deps.setBrowserToken(firmId, row.id, minted.tokenId, minted.tokenValue);
     if (stored !== null) {
       publicKey = minted.tokenValue;
     } else {
+      // Holding the claim should make this unreachable; it remains handled
+      // because "unreachable" plus a live provider credential is a leak. We
+      // minted a token nobody will reference, so revoke it and use the stored
+      // one.
+      try {
+        const revoked = await deps.revokeBrowserToken(minted.tokenId);
+        if (!revoked) {
+          deps.logger?.("voice_browser_token_orphan_not_revocable", { firmId, assistantId: row.id });
+        }
+      } catch {
+        deps.logger?.("voice_browser_token_orphan_revocation_failed", { firmId, assistantId: row.id });
+      }
       const reread = await deps.findByIdForFirm(firmId, row.id);
       publicKey = typeof reread?.browserTokenValue === "string" ? reread.browserTokenValue.trim() : "";
       if (publicKey.length === 0) return failure("browser_token_unavailable");

@@ -532,6 +532,48 @@ export const voiceAssistantRepository = {
    * never erase the record of a previously proven agreement.
    */
   /**
+   * Claims the exclusive right to mint a browser token for one assistant.
+   *
+   * This exists because a conditional write on its own does NOT prevent
+   * duplicate minting. Two concurrent requests can both read an empty token,
+   * both call the provider, and only one can win the write — leaving the
+   * loser's token live at the provider and referenced by nothing. Reversing the
+   * order fixes it: claim first, then mint, so only the winner ever contacts
+   * the provider.
+   *
+   * The claim is a lease rather than a flag so a request that dies between
+   * claiming and storing does not wedge the assistant forever; after
+   * `leaseSeconds` another request may claim it again.
+   *
+   * Returns the claimed row, or null when the token already exists or another
+   * request holds an unexpired lease.
+   */
+  async claimBrowserTokenMint(
+    firmId: number,
+    id: number,
+    leaseSeconds: number,
+    now: Date = new Date(),
+  ): Promise<VoiceAssistant | null> {
+    const staleBefore = new Date(now.getTime() - leaseSeconds * 1000);
+    const [row] = await db
+      .update(voiceAssistants)
+      .set({ browserTokenMintLeaseAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(voiceAssistants.id, id),
+          eq(voiceAssistants.firmId, firmId),
+          isNull(voiceAssistants.browserTokenValue),
+          or(
+            isNull(voiceAssistants.browserTokenMintLeaseAt),
+            lt(voiceAssistants.browserTokenMintLeaseAt, staleBefore),
+          ),
+        ),
+      )
+      .returning();
+    return row ?? null;
+  },
+
+  /**
    * Stores a freshly minted browser token for one firm-scoped assistant.
    * Firm-scoped and conditional on the column still being empty, so two
    * concurrent browser-test requests cannot overwrite each other's token —
@@ -552,6 +594,43 @@ export const voiceAssistantRepository = {
           eq(voiceAssistants.id, id),
           eq(voiceAssistants.firmId, firmId),
           isNull(voiceAssistants.browserTokenValue),
+        ),
+      )
+      .returning();
+    return row ?? null;
+  },
+
+  /**
+   * Forgets a stored browser token so the next request mints a replacement.
+   *
+   * Conditional on `browserTokenId` still being the one the caller saw. That
+   * makes the operation safe to run concurrently with a mint: a caller trying
+   * to discard a token the provider has stopped accepting can never delete a
+   * newer, working replacement that someone else just stored.
+   *
+   * Clearing the lease as well is what allows the immediate re-mint; without
+   * it, recovery would have to wait out the lease it never took.
+   */
+  async clearBrowserToken(
+    firmId: number,
+    id: number,
+    expectedTokenId: string,
+  ): Promise<VoiceAssistant | null> {
+    const now = new Date();
+    const [row] = await db
+      .update(voiceAssistants)
+      .set({
+        browserTokenId: null,
+        browserTokenValue: null,
+        browserTokenIssuedAt: null,
+        browserTokenMintLeaseAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(voiceAssistants.id, id),
+          eq(voiceAssistants.firmId, firmId),
+          eq(voiceAssistants.browserTokenId, expectedTokenId),
         ),
       )
       .returning();

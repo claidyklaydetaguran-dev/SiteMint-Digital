@@ -24,8 +24,29 @@ export const VAPI_PROVIDER_NAME = "vapi";
  * a caller-supplied firm/account id in that case.
  */
 export async function findFirmIdForVapiAssistant(providerAssistantId: string): Promise<number | undefined> {
+  return (await findVapiAssistantOwner(providerAssistantId))?.firmId;
+}
+
+export interface VapiAssistantOwner {
+  firmId: number;
+  /** Our own voice_assistants row id, for foreign keys on call-scoped records. */
+  assistantRowId: number;
+}
+
+/**
+ * Resolves BOTH identifiers the webhook needs from one verified provider
+ * assistant id: the owning firm, and our own row id for that assistant.
+ *
+ * This is the single point where a provider-supplied assistant id becomes a
+ * tenant. Nothing else in a webhook payload — and nothing a model or caller
+ * says — may name a firm, which is why the lookup is by provider id alone and
+ * returns undefined for an assistant this application does not know.
+ */
+export async function findVapiAssistantOwner(
+  providerAssistantId: string,
+): Promise<VapiAssistantOwner | undefined> {
   const [row] = await db
-    .select({ firmId: voiceAssistants.firmId })
+    .select({ firmId: voiceAssistants.firmId, assistantRowId: voiceAssistants.id })
     .from(voiceAssistants)
     .where(
       and(
@@ -34,7 +55,7 @@ export async function findFirmIdForVapiAssistant(providerAssistantId: string): P
       ),
     )
     .limit(1);
-  return row?.firmId;
+  return row;
 }
 
 export interface StoreResult {

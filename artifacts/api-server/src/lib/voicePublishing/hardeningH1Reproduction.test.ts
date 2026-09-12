@@ -15,6 +15,7 @@ import { dirname, resolve } from "node:path";
 
 import { buildVapiAssistantRequestBody } from "../voice/providers/vapi/mapper.js";
 import { buildVoiceToolDefinitions } from "./toolsConfig.js";
+import { TOOL_NAMES } from "../voice/tools/toolCatalog.js";
 import { loadVoiceServerConfigFromEnv } from "./serverConfig.js";
 import { resolveCorsPolicy, isOriginAllowed } from "../corsPolicy.js";
 
@@ -69,7 +70,10 @@ describe("H1 defect 1 — assistant publish payload uses an HMAC credential, not
   });
 
   it("emits tool server blocks with the credential reference too", () => {
-    const tools = buildVoiceToolDefinitions({ url: FIXTURE_URL, credentialId: FIXTURE_CREDENTIAL_ID });
+    const tools = buildVoiceToolDefinitions(
+      { url: FIXTURE_URL, credentialId: FIXTURE_CREDENTIAL_ID },
+      TOOL_NAMES,
+    );
 
     expect(tools.length).toBeGreaterThan(0);
     for (const tool of tools) {

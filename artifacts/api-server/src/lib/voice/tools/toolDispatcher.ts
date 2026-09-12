@@ -27,12 +27,29 @@ import {
   type CancelAppointmentArgs,
   type CheckAvailabilityArgs,
   type RescheduleAppointmentArgs,
+  type SaveMessageArgs,
 } from "./toolCatalog.js";
 
 export interface ToolCallRequest {
   toolCallId: string;
   name: string;
   args: unknown;
+}
+
+/**
+ * The call a tool batch arrived on, as established by the WEBHOOK — never by a
+ * tool argument.
+ *
+ * Both fields come from provider-verified context: `providerCallId` from the
+ * authenticated payload's own call object, and `assistantRowId` from our
+ * voice_assistants lookup of the provider assistant id (the same lookup that
+ * produced firmId). A model cannot influence either, which is what makes a
+ * saved message reliably attributable to the right business and the right call.
+ */
+export interface ToolCallContext {
+  provider: string;
+  providerCallId: string;
+  assistantRowId: number | null;
 }
 
 export interface ToolCallResult {
@@ -61,6 +78,25 @@ export interface ToolSchedulingDeps {
     now: Date,
   ) => Promise<SlotMutation>;
   cancelAppointmentRequestByPublicId: (firmId: number, publicId: string) => Promise<boolean>;
+  /**
+   * V7: persists a message for the business. Resolves only on a durable write;
+   * anything else must reject, because the spoken confirmation is emitted
+   * strictly after this resolves.
+   */
+  saveVoiceMessage?: (input: {
+    firmId: number;
+    provider: string;
+    providerCallId: string;
+    assistantId: number | null;
+    toolCallId: string;
+    callerName: string;
+    callbackPhone: string | null;
+    callbackEmail: string | null;
+    topic: string;
+    details: string;
+    urgency: "normal" | "urgent";
+    emailAckRequested: boolean;
+  }) => Promise<{ inserted: boolean }>;
   /** P5: best-effort confirmation enqueue after a successful booking; consent-gated inside the outbox service. */
   enqueueBookingConfirmation?: (input: {
     firmId: number;
@@ -103,6 +139,11 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
     enqueueBookingConfirmation: async (input) => {
       const outbox = await import("../../voiceSms/outboxService.js");
       return outbox.enqueueBookingConfirmation(input);
+    },
+    saveVoiceMessage: async (input) => {
+      const messages = await import("../../voiceMessages/messageRepository.js");
+      const result = await messages.saveVoiceMessage(input);
+      return { inserted: result.inserted };
     },
     openIssue: (input) => issues.openVoiceIssue(input),
   };
@@ -253,11 +294,57 @@ async function runRescheduleAppointment(
   return `Rescheduled, pending the office's confirmation. New reference id ${created.request.publicId}.`;
 }
 
+/**
+ * V7: take a message for the business.
+ *
+ * The one rule that shapes this function: the caller is told their message is
+ * saved ONLY after the write has succeeded. So there is no optimistic
+ * confirmation, no "we'll take care of it" before the await, and the failure
+ * path says the office will be told by another route rather than implying a
+ * record exists. A duplicate delivery of the same tool call confirms the same
+ * single message, which is both idempotent and true.
+ */
+async function runSaveMessage(
+  firmId: number,
+  toolCallId: string,
+  args: SaveMessageArgs,
+  context: ToolCallContext,
+  deps: ToolSchedulingDeps,
+): Promise<string> {
+  if (!deps.saveVoiceMessage) {
+    // The capability is attached but unwired. Say nothing that implies a save.
+    return "I can't save that to the system right now. Please hold the details and the office will follow up.";
+  }
+
+  const { inserted } = await deps.saveVoiceMessage({
+    firmId,
+    provider: context.provider,
+    providerCallId: context.providerCallId,
+    assistantId: context.assistantRowId,
+    // The provider's own id for this tool call — the idempotency key. It is
+    // taken from the authenticated webhook envelope, never from `args`.
+    toolCallId,
+    callerName: args.callerName,
+    callbackPhone: args.callbackPhone ?? null,
+    callbackEmail: args.callbackEmail ?? null,
+    topic: args.topic,
+    details: args.details,
+    urgency: args.urgency ?? "normal",
+    emailAckRequested: args.emailCopyRequested === true,
+  });
+
+  deps.logger?.("voice_tool_message_saved", { firmId, inserted });
+  return args.callbackPhone
+    ? "Saved. Tell the caller their message is with the office and someone will follow up on the number they gave."
+    : "Saved. Tell the caller their message is with the office and someone will follow up.";
+}
+
 // ── dispatcher ───────────────────────────────────────────────────────────────
 
 export async function dispatchToolCalls(
   firmId: number,
   calls: readonly ToolCallRequest[],
+  context: ToolCallContext,
   deps?: ToolSchedulingDeps,
 ): Promise<ToolCallResult[]> {
   const resolved = deps ?? (await defaultDeps());
@@ -265,7 +352,7 @@ export async function dispatchToolCalls(
   const results: ToolCallResult[] = [];
 
   for (const call of calls) {
-    results.push({ toolCallId: call.toolCallId, result: await executeOne(firmId, call, resolved, now) });
+    results.push({ toolCallId: call.toolCallId, result: await executeOne(firmId, call, context, resolved, now) });
   }
   return results;
 }
@@ -273,6 +360,7 @@ export async function dispatchToolCalls(
 async function executeOne(
   firmId: number,
   call: ToolCallRequest,
+  context: ToolCallContext,
   deps: ToolSchedulingDeps,
   now: Date,
 ): Promise<string> {
@@ -307,6 +395,8 @@ async function executeOne(
         return await runCancelAppointment(firmId, parsed.data as CancelAppointmentArgs, deps);
       case "reschedule_appointment":
         return await runRescheduleAppointment(firmId, parsed.data as RescheduleAppointmentArgs, deps, now);
+      case "save_message":
+        return await runSaveMessage(firmId, call.toolCallId, parsed.data as SaveMessageArgs, context, deps);
     }
   } catch (err) {
     deps.logger?.("voice_tool_execution_failed", {

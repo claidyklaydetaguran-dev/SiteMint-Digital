@@ -25,9 +25,18 @@ import { PublishFoundationError } from "../../voicePublishing/errors.js";
 import { validateVapiRuntimeConfig } from "../providers/vapi/types.js";
 import { buildVapiAssistantRequestBody } from "../providers/vapi/mapper.js";
 import { TOOL_NAMES } from "./toolCatalog.js";
+import {
+  CAPABILITY_BY_TOOL,
+  TOOL_CAPABILITIES,
+  VOICE_TOOLS_CAPABILITIES_ENV_VAR,
+} from "./toolCapabilities.js";
 import type { SchedulingAppointmentRequest } from "@workspace/db/schema/scheduling";
 
 const FIRM = 7;
+
+// The call context the WEBHOOK establishes. Present in every dispatch here
+// because the dispatcher must never be able to obtain it from tool arguments.
+const CTX = { provider: "vapi", providerCallId: "call_test_1", assistantRowId: 11 } as const;
 const NOW = new Date("2026-08-31T15:00:00.000Z");
 const SERVER = { url: "https://staging.example.com/api/voice/webhooks/vapi", credentialId: "cred-0123456789abcdef" };
 
@@ -151,7 +160,7 @@ describe("toolDispatcher", () => {
         throw new Error("must not be called");
       },
     });
-    const results = await dispatchToolCalls(FIRM, [{ toolCallId: "t1", name: "transfer_money", args: {} }], deps);
+    const results = await dispatchToolCalls(FIRM, [{ toolCallId: "t1", name: "transfer_money", args: {} }], CTX, deps);
     expect(results).toHaveLength(1);
     expect(results[0]!.result).toContain("office");
     expect(log.submits).toHaveLength(0);
@@ -162,6 +171,7 @@ describe("toolDispatcher", () => {
     const results = await dispatchToolCalls(
       FIRM,
       [{ toolCallId: "t1", name: "book_appointment", args: { appointmentTypeId: "3" } }],
+      CTX,
       deps,
     );
     expect(results[0]!.result).toContain("office");
@@ -174,6 +184,7 @@ describe("toolDispatcher", () => {
     const results = await dispatchToolCalls(
       FIRM,
       [{ toolCallId: "t1", name: "check_availability", args: { date: "2026-09-01" } }],
+      CTX,
       deps,
     );
     const spoken = results[0]!.result;
@@ -201,6 +212,7 @@ describe("toolDispatcher", () => {
           },
         },
       ],
+      CTX,
       deps,
     );
     const spoken = results[0]!.result;
@@ -231,6 +243,7 @@ describe("toolDispatcher", () => {
           args: { appointmentTypeId: "3", startIso: "2026-09-01T14:00:00.000Z", customerName: "Pat" },
         },
       ],
+      CTX,
       deps,
     );
     expect(results[0]!.result).toContain("just taken");
@@ -247,6 +260,7 @@ describe("toolDispatcher", () => {
         { toolCallId: "t1", name: "cancel_appointment", args: { requestId: "22222222-2222-4222-8222-222222222222" } },
         { toolCallId: "t2", name: "cancel_appointment", args: { requestId: "33333333-3333-4333-8333-333333333333" } },
       ],
+      CTX,
       deps,
     );
     expect(ok!.result).toContain("cancelled");
@@ -267,6 +281,7 @@ describe("toolDispatcher", () => {
           args: { requestId: OLD.publicId, newStartIso: "2026-09-01T15:00:00.000Z" },
         },
       ],
+      CTX,
       deps,
     );
     expect(log.submits).toEqual([
@@ -296,6 +311,7 @@ describe("toolDispatcher", () => {
     const results = await dispatchToolCalls(
       FIRM,
       [{ toolCallId: "t1", name: "reschedule_appointment", args: { requestId: OLD.publicId, newStartIso: "2026-09-01T15:00:00.000Z" } }],
+      CTX,
       deps,
     );
     expect(log.cancels).toEqual([OLD.publicId, NEW_PUBLIC]);
@@ -311,6 +327,7 @@ describe("toolDispatcher", () => {
     const results = await dispatchToolCalls(
       FIRM,
       [{ toolCallId: "t1", name: "check_availability", args: { date: "2026-09-01" } }],
+      CTX,
       deps,
     );
     expect(results[0]!.result).toContain("office will follow up");
@@ -336,8 +353,8 @@ describe("toolsConfig", () => {
     expect((thrown as PublishFoundationError).code).toBe("TOOLS_CONFIG_INVALID");
   });
 
-  it("emits the whole closed catalog with per-tool server attachment", () => {
-    const defs = buildVoiceToolDefinitions(SERVER);
+  it("emits exactly the named tools with per-tool server attachment", () => {
+    const defs = buildVoiceToolDefinitions(SERVER, TOOL_NAMES);
     expect(defs).toHaveLength(TOOL_NAMES.length);
     for (const def of defs) {
       expect(def.type).toBe("function");
@@ -351,8 +368,64 @@ describe("toolsConfig", () => {
     }
   });
 
+  // V7. The hazard this guards: before capability gating, the single
+  // VOICE_TOOLS_ATTACH_ENABLED flag attached the WHOLE catalog, so turning on
+  // finished message-taking would also have published four scheduling actions.
+  describe("capability gating", () => {
+    const ON = { [VOICE_TOOLS_ATTACH_ENABLED_ENV_VAR]: "true" };
+
+    it("maps every catalog tool to exactly one capability", () => {
+      for (const name of TOOL_NAMES) {
+        expect(TOOL_CAPABILITIES).toContain(CAPABILITY_BY_TOOL[name]);
+      }
+    });
+
+    it("attaches only the authorized capability, not the whole catalog", () => {
+      const defs = loadVoiceToolsConfigFromEnv(SERVER, {
+        ...ON,
+        [VOICE_TOOLS_CAPABILITIES_ENV_VAR]: "messages",
+      });
+      const names = (defs ?? []).map((d) => (d.function as Record<string, unknown>).name);
+      expect(names).toEqual(["save_message"]);
+      expect(names).not.toContain("book_appointment");
+    });
+
+    it("orders and de-duplicates the allowlist so the payload hash is stable", () => {
+      const a = loadVoiceToolsConfigFromEnv(SERVER, {
+        ...ON,
+        [VOICE_TOOLS_CAPABILITIES_ENV_VAR]: " Scheduling , messages ,scheduling",
+      });
+      const b = loadVoiceToolsConfigFromEnv(SERVER, {
+        ...ON,
+        [VOICE_TOOLS_CAPABILITIES_ENV_VAR]: "messages,scheduling",
+      });
+      expect(a).toEqual(b);
+      expect(a).toHaveLength(TOOL_NAMES.length);
+    });
+
+    it("fails closed when the allowlist is absent, empty, or unknown", () => {
+      for (const value of [undefined, "", "   ", ",,", "bookings", "messages,bookings"]) {
+        const env = value === undefined ? { ...ON } : { ...ON, [VOICE_TOOLS_CAPABILITIES_ENV_VAR]: value };
+        let thrown: unknown;
+        try {
+          loadVoiceToolsConfigFromEnv(SERVER, env);
+        } catch (err) {
+          thrown = err;
+        }
+        expect(thrown, `value ${JSON.stringify(value)} must fail closed`).toBeInstanceOf(PublishFoundationError);
+        expect((thrown as PublishFoundationError).code).toBe("TOOLS_CONFIG_INVALID");
+      }
+    });
+
+    it("still attaches nothing at all while the master switch is off", () => {
+      expect(
+        loadVoiceToolsConfigFromEnv(SERVER, { [VOICE_TOOLS_CAPABILITIES_ENV_VAR]: "messages,scheduling" }),
+      ).toBeNull();
+    });
+  });
+
   it("passes the Vapi validator and reaches the request body verbatim", () => {
-    const tools = buildVoiceToolDefinitions(SERVER);
+    const tools = buildVoiceToolDefinitions(SERVER, TOOL_NAMES);
     const validated = validateVapiRuntimeConfig({
       model: { provider: "p", model: "m" },
       voice: { provider: "vp", voiceId: "vid" },
@@ -376,7 +449,7 @@ describe("toolsConfig", () => {
       systemInstructions: "Hello.",
       server: SERVER,
     };
-    const goodTool = buildVoiceToolDefinitions(SERVER)[0]!;
+    const goodTool = buildVoiceToolDefinitions(SERVER, TOOL_NAMES)[0]!;
     const foreign = { ...goodTool, function: { ...(goodTool.function as object), name: "wire_money" } };
     const extraKey = { ...goodTool, dangerous: true };
     const many = Array.from({ length: 9 }, () => goodTool);

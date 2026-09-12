@@ -308,8 +308,19 @@ router.get(
       return;
     }
 
+    // Controlled recovery, opt-in per request: the dashboard sets replace=1
+    // only after the provider actually refused the stored credential, so an
+    // ordinary Start Browser Test never discards a working token. The
+    // replacement is scoped identically — there is no fallback to a broader key.
+    const replaceExistingToken = req.query["replace"] === "1";
+
     try {
-      const result = await getBrowserTestSession(req.firmId!, assistantId);
+      const result = await getBrowserTestSession(
+        req.firmId!,
+        assistantId,
+        undefined,
+        { replaceExistingToken },
+      );
       if (result.ok) {
         res.status(200).json({ session: result.session });
         return;

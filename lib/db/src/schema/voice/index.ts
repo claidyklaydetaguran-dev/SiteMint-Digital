@@ -33,3 +33,7 @@ export * from "./voiceInvites";
 // directive 2026-09-10 §3). Rollback committed at
 // drizzle/voice-rollback/0008_rollback.sql.
 export * from "./voiceSignupJobs";
+// V7 (migration 0010): saved caller requests and the durable notification
+// outbox that tells a business about them. Rollback committed at
+// drizzle/voice-rollback/0010_rollback.sql.
+export * from "../voiceMessages";

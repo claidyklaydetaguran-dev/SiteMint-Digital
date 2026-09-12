@@ -23,6 +23,7 @@ export const TOOL_NAMES = [
   "book_appointment",
   "reschedule_appointment",
   "cancel_appointment",
+  "save_message",
 ] as const;
 export type VoiceToolName = (typeof TOOL_NAMES)[number];
 
@@ -87,17 +88,51 @@ export const cancelAppointmentArgs = z
   })
   .strict();
 
+/**
+ * V7: take a message for the business.
+ *
+ * Nothing here identifies a tenant, names a destination, or carries a
+ * credential — the firm comes exclusively from the webhook's assistant linkage,
+ * exactly as for every other tool. `callbackPhone` and `callbackEmail` are
+ * contact details for a human to act on, never used for routing or dialling.
+ *
+ * `emailCopyRequested` exists so the caller's explicit "yes, email me a copy"
+ * is carried as its own fact. An address the caller merely stated is not
+ * consent to be emailed, so the acknowledgement path reads this flag and never
+ * infers permission from the address being present.
+ */
+export const saveMessageArgs = z
+  .object({
+    callerName: boundedText(120),
+    topic: boundedText(120),
+    details: boundedText(2000),
+    callbackPhone: boundedText(32).optional(),
+    callbackEmail: z.string().trim().max(200).email().optional(),
+    urgency: z.enum(["normal", "urgent"]).optional(),
+    emailCopyRequested: z.boolean().optional(),
+  })
+  .strict()
+  // Structural guarantee for the schema's own promise above: the flag cannot be
+  // true without an address to honour it, so a malformed pair is rejected
+  // before persistence rather than silently downgraded.
+  .refine(
+    (v) => v.emailCopyRequested !== true || typeof v.callbackEmail === "string",
+    { message: "an email copy requires the caller's email address" },
+  );
+
 export const TOOL_ARG_SCHEMAS: Record<VoiceToolName, z.ZodType> = {
   check_availability: checkAvailabilityArgs,
   book_appointment: bookAppointmentArgs,
   reschedule_appointment: rescheduleAppointmentArgs,
   cancel_appointment: cancelAppointmentArgs,
+  save_message: saveMessageArgs,
 };
 
 export type CheckAvailabilityArgs = z.infer<typeof checkAvailabilityArgs>;
 export type BookAppointmentArgs = z.infer<typeof bookAppointmentArgs>;
 export type RescheduleAppointmentArgs = z.infer<typeof rescheduleAppointmentArgs>;
 export type CancelAppointmentArgs = z.infer<typeof cancelAppointmentArgs>;
+export type SaveMessageArgs = z.infer<typeof saveMessageArgs>;
 
 // ── provider-facing definitions (payload-side) ───────────────────────────────
 
@@ -143,6 +178,32 @@ export const TOOL_PARAMETER_SCHEMAS: Record<VoiceToolName, JsonObject> = {
       requestId: { type: "string", description: "The appointment reference id given when it was booked." },
     },
   },
+  save_message: {
+    type: "object",
+    additionalProperties: false,
+    required: ["callerName", "topic", "details"],
+    properties: {
+      callerName: { type: "string", description: "The caller's name, as they gave it and you read it back to them." },
+      topic: { type: "string", description: "A short subject line for the office, e.g. 'Quote for kitchen rewire'." },
+      details: {
+        type: "string",
+        description:
+          "What the caller asked for, in their own terms. Include only what they actually said — never add prices, dates, hours, or commitments they did not state.",
+      },
+      callbackPhone: { type: "string", description: "Callback number the caller states, if any. Read it back before saving." },
+      callbackEmail: { type: "string", description: "Email address the caller states, if any. Read it back before saving." },
+      urgency: {
+        type: "string",
+        enum: ["normal", "urgent"],
+        description: "Use 'urgent' only if the caller says it is urgent or time-critical.",
+      },
+      emailCopyRequested: {
+        type: "boolean",
+        description:
+          "True only if the caller explicitly asks to be emailed a copy AND has given their email address. Never true otherwise.",
+      },
+    },
+  },
 };
 
 export const TOOL_DESCRIPTIONS: Record<VoiceToolName, string> = {
@@ -150,4 +211,6 @@ export const TOOL_DESCRIPTIONS: Record<VoiceToolName, string> = {
   book_appointment: "Book one offered slot for the caller after they confirm a specific time.",
   reschedule_appointment: "Move an existing appointment the caller references to a new confirmed slot.",
   cancel_appointment: "Cancel an existing appointment the caller references.",
+  save_message:
+    "Save the caller's request as a message for the business to follow up. Call this after confirming their name and the details back to them, and only say it is saved once this tool has answered successfully.",
 };

@@ -640,8 +640,10 @@ check(
   // Update this pin ONLY alongside a reviewed migration that changes
   // the inventory.
   // voice 0008 added voice_signup_jobs (durable registration -> CRM -> email).
-  "the committed migrations create exactly thirty domain tables",
-  domainTables.length === 30,
+  // voice 0010 added voice_messages (saved caller requests) and
+  // voice_notifications (the durable post-call email outbox).
+  "the committed migrations create exactly thirty-two domain tables",
+  domainTables.length === 32,
   domainTables.join(","),
 );
 check(

@@ -33,4 +33,16 @@ export interface VoiceProvider {
    * Optional: absence means this provider offers no scoped browser credential.
    */
   createBrowserToken?(input: VoiceBrowserTokenInput): Promise<VoiceBrowserTokenResult>;
+
+  /**
+   * Revokes a credential previously minted by `createBrowserToken`.
+   *
+   * Required for two things a mint-only contract cannot do: cleaning up a token
+   * that was created but lost a write race (it would otherwise stay live at the
+   * provider, referenced by nothing), and replacing a token the provider has
+   * stopped accepting. Optional for the same reason `createBrowserToken` is —
+   * absence degrades cleanup to "the token stays until an operator removes it",
+   * which is reported honestly rather than assumed away.
+   */
+  deleteBrowserToken?(tokenId: string): Promise<void>;
 }

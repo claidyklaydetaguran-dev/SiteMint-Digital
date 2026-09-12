@@ -74,6 +74,18 @@ export const voiceAssistants = pgTable("voice_assistants", {
   browserTokenId:       text("browser_token_id"),
   browserTokenValue:    text("browser_token_value"),
   browserTokenIssuedAt: timestamp("browser_token_issued_at", { withTimezone: true }),
+  /**
+   * V7 (0010): the mint LEASE, not the issue time. A conditional write alone
+   * cannot prevent duplicate minting — two concurrent requests can both see an
+   * empty token, both call the provider, and only one can win the write, which
+   * leaves the loser's provider-side token live and referenced by nothing.
+   *
+   * So the slot is claimed BEFORE the provider is contacted: an atomic update
+   * stamps this column only when it is null or its lease has expired, and only
+   * that winner mints. An expired lease is what makes a crashed attempt
+   * retryable instead of permanently wedged.
+   */
+  browserTokenMintLeaseAt: timestamp("browser_token_mint_lease_at", { withTimezone: true }),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

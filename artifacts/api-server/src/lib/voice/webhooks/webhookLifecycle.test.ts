@@ -439,6 +439,7 @@ function assistantRow(): VoiceAssistant {
     browserTokenId: null,
     browserTokenValue: null,
     browserTokenIssuedAt: null,
+    browserTokenMintLeaseAt: null,
     createdAt: new Date("2026-08-29T00:00:00Z"),
     updatedAt: new Date("2026-08-29T00:00:00Z"),
   } as VoiceAssistant;

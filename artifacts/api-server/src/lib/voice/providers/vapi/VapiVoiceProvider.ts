@@ -277,6 +277,16 @@ export class VapiVoiceProvider implements VoiceProvider {
     return { tokenId, tokenValue };
   }
 
+  async deleteBrowserToken(tokenId: string): Promise<void> {
+    const id = typeof tokenId === "string" ? tokenId.trim() : "";
+    if (id.length === 0) {
+      throw new VoiceProviderError("VALIDATION_FAILED", "A token id is required to revoke a browser token.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+    await this.request("DELETE", `/token/${encodeURIComponent(id)}`);
+  }
+
   async getAssistant(providerAssistantId: string): Promise<VoiceAssistantResult> {
     const id = validateProviderAssistantId(providerAssistantId);
     const raw = await this.request("GET", `/assistant/${encodeURIComponent(id)}`);

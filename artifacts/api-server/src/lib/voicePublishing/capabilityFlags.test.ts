@@ -342,7 +342,10 @@ describe("publish and synchronization are independent", () => {
 // ─── Browser-test session boundary ─────────────────────────────────────────
 
 describe("browser-test session metadata", () => {
-  function sessionDeps(row: unknown, spy: { count: number; mints?: number }) {
+  function sessionDeps(
+    row: unknown,
+    spy: { count: number; mints?: number; claims?: number; revokes?: number },
+  ) {
     return {
       isEnabled: isVoiceBrowserTestEnabled,
       findByIdForFirm: async (firmId: number, id: number) => {
@@ -354,10 +357,25 @@ describe("browser-test session metadata", () => {
       // AR-001V.3: a scoped browser token is minted only for an assistant that
       // has none. The counter lets a test prove no provider call happens on the
       // denied path or when a token already exists.
+      //
+      // V7: minting is now preceded by a CLAIM, so the claim counter is what
+      // proves the provider is contacted at most once per assistant even under
+      // concurrency — a conditional write after the fact could not.
+      claimBrowserTokenMint: async (firmId: number, id: number) => {
+        spy.claims = (spy.claims ?? 0) + 1;
+        const r = row as { firmId: number; id: number } | null;
+        if (!r || r.firmId !== firmId || r.id !== id) return null;
+        return row as never;
+      },
       setBrowserToken: async () => row as never,
+      clearBrowserToken: async () => row as never,
       mintBrowserToken: async () => {
         spy.mints = (spy.mints ?? 0) + 1;
         return { tokenId: "tok_test", tokenValue: "pk_test_value" };
+      },
+      revokeBrowserToken: async () => {
+        spy.revokes = (spy.revokes ?? 0) + 1;
+        return true;
       },
     };
   }
