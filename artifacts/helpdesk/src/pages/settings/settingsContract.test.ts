@@ -24,6 +24,8 @@ import {
   buildProfilePatch,
   calendarBannerCopy,
   destinations,
+  EMAIL_CHANGE,
+  emailChangeDetail,
   isKnownPlan,
   memberSince,
   MIN_NEW_PASSWORD_LENGTH,
@@ -34,6 +36,7 @@ import {
   sessionCopy,
   signOutLabel,
   SIGN_OUT_TIMEOUT_MS,
+  validateEmailChange,
   validatePasswordChange,
   validateProfile,
   type AccountSource,
@@ -186,6 +189,50 @@ section("configuration destinations");
 
 eq("destinations include Receptionist, Assistant and Billing, at their 2026-09 owner replan D-2 paths", destinations().map((d) => d.href), ["/channels/sms", "/assistants", "/account/billing"]);
 check("every destination is a real Link, not a button standing in for one", pageSrc.includes("sg-place__action"));
+
+section("changing the sign-in / notification address");
+
+// Why this section exists: the address is the login identity AND the only
+// destination for every message the product sends, and there was no way to
+// change it. Staging proved the cost — its address ends in `.invalid`, which
+// can never receive mail, so the account was permanently unreachable with no
+// route out from inside the product.
+
+check("the page has an email-change form", pageSrc.includes("handleEmailSubmit") && pageSrc.includes('id="em-new"'));
+check("it asks for the current password", pageSrc.includes('id="em-pw"') && pageSrc.includes('autoComplete="current-password"'));
+check("it points at the page that finishes the job", pageSrc.includes("EMAIL_CHANGE.verifyHref"));
+eq("which is the verify-email route", EMAIL_CHANGE.verifyHref, "/verify-email");
+
+check("the client sends a PATCH to the account email endpoint", accountApiSrc.includes('EMAIL_CHANGE_ENDPOINT = "/api/receptionist/account/email"') && accountApiSrc.includes('method: "PATCH"'));
+
+// The two outcomes are different facts and the page must not merge them:
+// "changed" without "code sent" leaves a business waiting for mail that is
+// not coming.
+check("the success copy distinguishes code-sent from code-not-sent", emailChangeDetail(true) !== emailChangeDetail(false));
+check("the not-sent copy says what to do next", /verify email/i.test(emailChangeDetail(false)));
+
+eq("a valid address and password are accepted", validateEmailChange({ email: " Owner@Business.CO.UK ", currentPassword: "pw" }), {
+  ok: true,
+  payload: { email: "owner@business.co.uk", currentPassword: "pw" },
+});
+check("an empty address is refused", validateEmailChange({ email: "", currentPassword: "pw" }).ok === false);
+check("a missing password is refused", validateEmailChange({ email: "a@b.co.uk", currentPassword: "" }).ok === false);
+check("a malformed address is refused", validateEmailChange({ email: "owner@", currentPassword: "pw" }).ok === false);
+
+// The exact shape staging was stuck in. Accepting it would look like a fix and
+// leave the account just as unreachable.
+for (const undeliverable of ["owner@staging.sitemint.invalid", "owner@my.test", "owner@x.example"]) {
+  const result = validateEmailChange({ email: undeliverable, currentPassword: "pw" });
+  check(`${undeliverable} is refused as undeliverable`, result.ok === false);
+  // These pass every shape check, so "invalid address" would read as a bug in
+  // the form rather than as a fact about the domain.
+  if (!result.ok) check(`${undeliverable} is explained, not just rejected`, /never receive mail/i.test(result.errors.email ?? ""));
+}
+// `owner@localhost` has no dot, so the shape check catches it first. Still
+// refused — just with the ordinary message, which is the honest one for it.
+check("owner@localhost is refused", validateEmailChange({ email: "owner@localhost", currentPassword: "pw" }).ok === false);
+check("a real domain that merely resembles one is accepted", validateEmailChange({ email: "owner@invalid-name.co.uk", currentPassword: "pw" }).ok === true);
+
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

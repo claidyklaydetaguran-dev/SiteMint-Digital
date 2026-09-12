@@ -13,6 +13,7 @@ import {
   requestEmailVerification,
   requestPasswordReset,
 } from "../lib/accountSecurity/accountTokens.js";
+import { changeAccountEmail, productionEmailChangeDeps } from "../lib/accountSecurity/emailChange.js";
 import { acceptInvitation, inviteMember, listFirmMembers, revokeMemberById } from "../lib/voiceAccounts/membership.js";
 import { resolveEntitlementsForFirm } from "../lib/voiceBilling/entitlements.js";
 import {
@@ -112,6 +113,52 @@ router.post("/receptionist/account/verify-email/request", requireReceptionistAut
     res.status(500).json({ error: "Internal error" });
   }
 });
+
+/**
+ * Change the address the account signs in with, and that every notification is
+ * sent to.
+ *
+ * Session-gated AND password-gated: the address is the login identity, so a
+ * borrowed session alone must not be enough to take the account over. Rate
+ * limited on top, because this is a password-guessing surface.
+ *
+ * The response says what actually happened to BOTH halves. The address change
+ * is durable the moment it returns; whether a verification code reached the new
+ * address is a separate fact, and reporting only the first would leave a
+ * business believing mail was on its way when it was not.
+ */
+router.patch("/receptionist/account/email", requireReceptionistAuth, async (req: Request, res: Response) => {
+  if (limited(req, res, "email-change")) return;
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const deps = await productionEmailChangeDeps();
+    const result = await changeAccountEmail(req.firmId!, { newEmail: body.email, currentPassword: body.currentPassword }, deps);
+    if (!result.ok) {
+      const status = result.reason === "wrong_password" ? 401 : result.reason === "duplicate_email" ? 409 : 400;
+      res.status(status).json({ error: EMAIL_CHANGE_MESSAGES[result.reason], reason: result.reason });
+      return;
+    }
+    res.json({
+      email: result.email,
+      emailVerified: false,
+      verificationSent: result.verificationSent,
+      detail: result.verificationSent
+        ? "Your address was changed. Check that inbox for the verification code."
+        : "Your address was changed, but the verification email could not be sent. Request a new code from this page.",
+    });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] email change failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+const EMAIL_CHANGE_MESSAGES: Record<string, string> = {
+  invalid_email: "Enter a real email address you can receive mail at. Placeholder domains such as .invalid, .test and .example are not accepted.",
+  same_email: "That is already the address on this account.",
+  duplicate_email: "Another account already uses that address.",
+  wrong_password: "That password is not correct.",
+  delivery_unavailable: "Email delivery is not available right now.",
+};
 
 router.post("/receptionist/account/verify-email/confirm", async (req: Request, res: Response) => {
   if (limited(req, res, "verify")) return;

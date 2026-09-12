@@ -206,12 +206,20 @@ console.log("no command re-reads an ambient DATABASE_URL");
   const stripComments = (source: string) =>
     source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
-  for (const file of ["src/migrate-guard.mjs", "src/migrate-preflight.mjs", "src/db-identity.mjs"]) {
+  for (const file of ["src/migrate-guard.mjs", "src/migrate-preflight.mjs", "src/db-identity.mjs", "src/db-backup.mjs"]) {
     const code = stripComments(read(file));
     const reads = [...code.matchAll(/process\.env\.DATABASE_URL/g)];
     check(`${file} does not read process.env.DATABASE_URL`, reads.length === 0, reads.length ? `${reads.length} occurrence(s) in code` : "");
     check(`${file} resolves its connection through resolveDbTarget`, code.includes("resolveDbTarget"));
   }
+
+  // A backup of the wrong database is worse than no backup, because it is the
+  // thing you rely on when a migration goes wrong — so it verifies too.
+  const backup = stripComments(read("src/db-backup.mjs"));
+  check("the backup verifies the identity before running pg_dump",
+    backup.indexOf("verifyDbIdentity") < backup.indexOf("spawn(\"pg_dump\""));
+  check("the backup dumps the resolved connection, not an ambient one",
+    backup.includes("pgEnvFromUrl(target.url)"));
 
   const guard = read("src/migrate-guard.mjs");
   check(

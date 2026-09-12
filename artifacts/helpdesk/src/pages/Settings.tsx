@@ -19,15 +19,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "wouter";
 import { ArrowRight } from "lucide-react";
-import { useSession, useLogout } from "@/hooks/useSession";
+import { useSession, useLogout, SESSION_KEY } from "@/hooks/useSession";
 import { useQueryClient } from "@tanstack/react-query";
-import { fetchAgentConfig, readAccountProfile, updateAccountProfile, changePassword } from "@/lib/accountApi";
+import { fetchAgentConfig, readAccountProfile, updateAccountProfile, changePassword, changeAccountEmail } from "@/lib/accountApi";
 import {
   accountFields,
   accountNote,
   buildProfilePatch,
   calendarBannerCopy,
   destinations,
+  EMAIL_CHANGE,
+  emailChangeDetail,
+  EMPTY_EMAIL_CHANGE_FORM,
   EMPTY_PASSWORD_FORM,
   NOT_AVAILABLE,
   pageCopy,
@@ -38,8 +41,11 @@ import {
   signOutLabel,
   SIGN_OUT_TIMEOUT_MS,
   TIMEZONE_OPTIONS,
+  validateEmailChange,
   validatePasswordChange,
   validateProfile,
+  type EmailChangeForm,
+  type EmailChangeFieldErrors,
   type PasswordFormValues,
   type ProfileFormValues,
   type SaveState,
@@ -182,6 +188,39 @@ export default function Settings() {
     } else {
       setPwState("idle");
       setPwError(result.message);
+    }
+  };
+
+  // ── changing the sign-in / notification address ──────────────────────────
+  const [emailForm, setEmailForm] = useState<EmailChangeForm>(EMPTY_EMAIL_CHANGE_FORM);
+  const [emailFieldErrors, setEmailFieldErrors] = useState<EmailChangeFieldErrors>({});
+  const [emailError, setEmailError] = useState("");
+  const [emailState, setEmailState] = useState<"idle" | "saving" | "done">("idle");
+  // Held separately from the form: the outcome has to survive the form being
+  // cleared, and "changed" and "code sent" are two different facts.
+  const [emailOutcome, setEmailOutcome] = useState<{ email: string; verificationSent: boolean } | null>(null);
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError("");
+    setEmailFieldErrors({});
+    const validation = validateEmailChange(emailForm);
+    if (!validation.ok) {
+      setEmailFieldErrors(validation.errors);
+      return;
+    }
+    setEmailState("saving");
+    const result = await changeAccountEmail(validation.payload.email, validation.payload.currentPassword);
+    if (result.ok) {
+      setEmailState("done");
+      setEmailOutcome({ email: result.email, verificationSent: result.verificationSent });
+      setEmailForm(EMPTY_EMAIL_CHANGE_FORM);
+      // The session's cached firm still carries the old address, and this page
+      // shows it in the Account block above.
+      void qc.invalidateQueries({ queryKey: SESSION_KEY });
+    } else {
+      setEmailState("idle");
+      setEmailError(result.message);
     }
   };
 
@@ -380,6 +419,75 @@ export default function Settings() {
       </section>
 
       {/* Change password (S-2). */}
+      {/*
+        Changing the sign-in / notification address. Placed before the password
+        section because it is the one that unblocks everything else: nothing is
+        ever sent to an unverified address, so a business whose address cannot
+        receive mail hears nothing from the product at all.
+      */}
+      <section className="sd-section" aria-labelledby="sg-email-title">
+        <div className="sd-section__head">
+          <div>
+            <h2 className="sd-h2" id="sg-email-title">{EMAIL_CHANGE.heading}</h2>
+            <p className="sg-note">{EMAIL_CHANGE.note}</p>
+          </div>
+        </div>
+        <form className="si-form" onSubmit={handleEmailSubmit} noValidate>
+          {emailError !== "" && (
+            <div className="si-alert" role="alert">
+              <span className="si-alert__label">{EMAIL_CHANGE.failedTitle}</span>
+              <span className="si-alert__text">{emailError}</span>
+            </div>
+          )}
+          {emailState === "done" && emailOutcome !== null && (
+            <div className="si-alert" role="status" data-tone={emailOutcome.verificationSent ? "confirmed" : undefined}>
+              <span className="si-alert__label">{EMAIL_CHANGE.changedTitle}</span>
+              <span className="si-alert__text">
+                {emailOutcome.email} — {emailChangeDetail(emailOutcome.verificationSent)}
+              </span>
+            </div>
+          )}
+
+          <div className="si-field">
+            <label htmlFor="em-new" className="si-label">
+              {EMAIL_CHANGE.newLabel} <span className="si-req">Required</span>
+            </label>
+            <input
+              id="em-new"
+              className={`si-input${emailFieldErrors.email ? " si-input--invalid" : ""}`}
+              type="email"
+              autoComplete="email"
+              value={emailForm.email}
+              onChange={(e) => setEmailForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            {emailFieldErrors.email && <p className="si-error">{emailFieldErrors.email}</p>}
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="em-pw" className="si-label">
+              {EMAIL_CHANGE.passwordLabel} <span className="si-req">Required</span>
+            </label>
+            <input
+              id="em-pw"
+              className={`si-input${emailFieldErrors.currentPassword ? " si-input--invalid" : ""}`}
+              type="password"
+              autoComplete="current-password"
+              value={emailForm.currentPassword}
+              aria-describedby="em-pw-help"
+              onChange={(e) => setEmailForm((f) => ({ ...f, currentPassword: e.target.value }))}
+            />
+            {emailFieldErrors.currentPassword
+              ? <p className="si-error">{emailFieldErrors.currentPassword}</p>
+              : <p className="sg-note" id="em-pw-help">{EMAIL_CHANGE.passwordHelp}</p>}
+          </div>
+
+          <button type="submit" className="si-submit" disabled={emailState === "saving"}>
+            {emailState === "saving" ? EMAIL_CHANGE.submitPending : EMAIL_CHANGE.submit}
+          </button>
+        </form>
+        <Link href={EMAIL_CHANGE.verifyHref} className="sd-link">{EMAIL_CHANGE.verifyLinkLabel}</Link>
+      </section>
+
       <section className="sd-section" aria-labelledby="sg-password-title">
         <div className="sd-section__head">
           <h2 className="sd-h2" id="sg-password-title">

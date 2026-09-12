@@ -99,6 +99,43 @@ export function updateAccountProfile(patch: AccountProfilePatch): Promise<AgentC
   });
 }
 
+// ─── Email address ───────────────────────────────────────────────────────
+
+export const EMAIL_CHANGE_ENDPOINT = "/api/receptionist/account/email";
+
+export type ChangeEmailResult =
+  | { ok: true; email: string; verificationSent: boolean }
+  | { ok: false; message: string };
+
+/**
+ * Changes the address the account signs in with, and that every notification
+ * goes to.
+ *
+ * The success shape carries TWO facts, because they can differ: the address
+ * changed, and whether a confirmation code actually reached it. Collapsing them
+ * would leave a business waiting for mail that was never sent.
+ *
+ * The server's own sentence is passed through on refusal — it knows things the
+ * browser cannot, such as whether another account already holds the address.
+ */
+export async function changeAccountEmail(email: string, currentPassword: string): Promise<ChangeEmailResult> {
+  try {
+    const res = await fetch(EMAIL_CHANGE_ENDPOINT, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, currentPassword }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string; email?: string; verificationSent?: boolean };
+    if (!res.ok) {
+      return { ok: false, message: data.error?.trim() ? data.error : "Could not change your email address." };
+    }
+    return { ok: true, email: data.email ?? email, verificationSent: data.verificationSent === true };
+  } catch {
+    return { ok: false, message: "We couldn't reach the server. Try again." };
+  }
+}
+
 // ─── Password ────────────────────────────────────────────────────────────
 
 export const PASSWORD_RESET_REQUEST_ENDPOINT = "/api/receptionist/account/password-reset/request";

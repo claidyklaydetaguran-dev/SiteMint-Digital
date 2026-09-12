@@ -48,6 +48,9 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "PATCH /api/crm/tasks/:id": "admin",
   "PATCH /api/helpdesk/contacts/:id": "admin",
   "PATCH /api/helpdesk/tickets/:id": "admin",
+  // Session AND the current password: the address is the login identity, so a
+  // borrowed session alone must not be able to take the account over.
+  "PATCH /api/receptionist/account/email": "session",
   "PATCH /api/receptionist/agent-config": "session",
   "PATCH /api/receptionist/voice/assistants/:id": "session",
   "PATCH /api/receptionist/voice/messages/:id": "session",
