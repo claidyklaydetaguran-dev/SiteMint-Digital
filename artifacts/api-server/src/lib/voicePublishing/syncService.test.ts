@@ -475,7 +475,7 @@ describe("no provider request when nothing provider-relevant changed", () => {
 
     expect(result.ok).toBe(true);
     expect(provider.updates).toHaveLength(0);
-    expect(deriveProviderSyncState(seeded as never, { loadCatalog: catalog, loadArtifactPolicy: () => "none", clock: fixedClock })).toBe(
+    expect(deriveProviderSyncState(seeded as never, { loadServerConfig: () => null, loadToolsConfig: () => null, loadCallPolicy: () => null, loadCatalog: catalog, loadArtifactPolicy: () => "none", clock: fixedClock })).toBe(
       "synchronized",
     );
   });
@@ -673,7 +673,7 @@ describe("responses and recorded state carry nothing sensitive", () => {
 // ─── 15/16 support: the derived state never over-claims ────────────────────
 
 describe("derived synchronization state never over-claims", () => {
-  const stateDeps = { loadCatalog: catalog, loadArtifactPolicy: (): VoiceArtifactPolicy => "none", clock: fixedClock };
+  const stateDeps = { loadServerConfig: () => null, loadToolsConfig: () => null, loadCallPolicy: () => null, loadCatalog: catalog, loadArtifactPolicy: (): VoiceArtifactPolicy => "none", clock: fixedClock };
 
   it("reports local_changes when no digest was ever recorded", () => {
     expect(deriveProviderSyncState(row() as never, stateDeps)).toBe("local_changes");
@@ -697,6 +697,68 @@ describe("derived synchronization state never over-claims", () => {
     for (const status of ["draft", "publishing", "error", "publish_uncertain"]) {
       expect(deriveProviderSyncState(row({ status }) as never, stateDeps)).toBe("not_published");
     }
+  });
+
+  // V7 regression. The derived state digests "what we would send right now",
+  // and sync digests the payload it actually sends. If those two build
+  // different objects the digests can never match, and an assistant reads as
+  // "changes not published" forever — observed on staging within seconds of a
+  // sync that answered providerConfigSynchronized: true.
+  //
+  // So the property under test is agreement between the two, with an
+  // attachment enabled. The stub loaders below are what the old code silently
+  // omitted.
+  describe("agrees with the payload sync actually digests", () => {
+    const SERVER = { url: "https://example.test/api/voice/webhooks/vapi", credentialId: "cred_abcdefgh" };
+    const TOOLS = [
+      {
+        type: "function",
+        function: { name: "save_message", description: "Take a message.", parameters: { type: "object", additionalProperties: false, properties: {} } },
+        server: SERVER,
+      },
+    ];
+    const attachedDeps = {
+      loadServerConfig: () => SERVER,
+      loadToolsConfig: () => TOOLS,
+      loadCallPolicy: () => null,
+      loadCatalog: catalog,
+      loadArtifactPolicy: (): VoiceArtifactPolicy => "none",
+      clock: fixedClock,
+    };
+
+    /** The digest sync would store, built exactly the way sync builds it. */
+    function syncDigest() {
+      const input = buildSyncProviderInput(row() as never, catalog(), SERVER, TOOLS as never, null);
+      return computeProviderPayloadHash(input, "none");
+    }
+
+    it("reports synchronized when the stored digest is the one sync would store", () => {
+      const r = row({ providerConfigHash: syncDigest() });
+      expect(deriveProviderSyncState(r as never, attachedDeps)).toBe("synchronized");
+    });
+
+    it("still reports local_changes for a digest built without the attachment", () => {
+      // The pre-V7 comparison: catalog only, no tools. It must NOT be accepted
+      // as agreement once tools are attached.
+      const withoutTools = computeProviderPayloadHash(
+        buildSyncProviderInput(row() as never, catalog()),
+        "none",
+      );
+      expect(withoutTools).not.toBe(syncDigest());
+      expect(deriveProviderSyncState(row({ providerConfigHash: withoutTools }) as never, attachedDeps)).toBe(
+        "local_changes",
+      );
+    });
+
+    it("degrades to unknown rather than claiming agreement when an attachment cannot be loaded", () => {
+      const throwing = {
+        ...attachedDeps,
+        loadToolsConfig: () => {
+          throw new Error("VOICE_TOOLS_CAPABILITIES is empty");
+        },
+      };
+      expect(deriveProviderSyncState(row({ providerConfigHash: syncDigest() }) as never, throwing)).toBe("unknown");
+    });
   });
 
   it("reports interrupted for a claim older than the bounded threshold", () => {

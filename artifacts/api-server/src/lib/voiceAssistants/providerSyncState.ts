@@ -17,6 +17,9 @@ import type { VoiceAssistant } from "@workspace/db/schema/voice";
 import { systemClock, type Clock } from "../voice/types.js";
 import { loadVoiceArtifactPolicyFromEnv } from "../voice/providers/vapi/artifactPolicy.js";
 import { loadRuntimeCatalogFromEnv } from "../voicePublishing/runtimeCatalog.js";
+import { loadVoiceServerConfigFromEnv } from "../voicePublishing/serverConfig.js";
+import { loadVoiceToolsConfigFromEnv } from "../voicePublishing/toolsConfig.js";
+import { loadVoiceCallPolicyFromEnv } from "../voicePublishing/callPolicyConfig.js";
 import { computeProviderPayloadHash } from "../voicePublishing/providerPayloadHash.js";
 import { buildSyncProviderInput } from "../voicePublishing/syncService.js";
 import { STALE_PROVIDER_SYNC_THRESHOLD_MS } from "./repository.js";
@@ -47,6 +50,15 @@ export type ProviderSyncState = (typeof PROVIDER_SYNC_STATES)[number];
 export interface ProviderSyncStateDependencies {
   loadCatalog: typeof loadRuntimeCatalogFromEnv;
   loadArtifactPolicy: typeof loadVoiceArtifactPolicyFromEnv;
+  /**
+   * V7: the SAME three attachments the sync path puts into the payload it
+   * digests. They are dependencies of this module, not of sync alone, because
+   * "what we would send right now" is only meaningful if both places mean the
+   * same payload — see the note on buildComparisonInput below.
+   */
+  loadServerConfig: typeof loadVoiceServerConfigFromEnv;
+  loadToolsConfig: typeof loadVoiceToolsConfigFromEnv;
+  loadCallPolicy: typeof loadVoiceCallPolicyFromEnv;
   /** Injected so stale-versus-fresh is deterministic under test, never wall-clock-dependent. */
   clock: Clock;
 }
@@ -54,8 +66,37 @@ export interface ProviderSyncStateDependencies {
 export const defaultProviderSyncStateDependencies: ProviderSyncStateDependencies = {
   loadCatalog: loadRuntimeCatalogFromEnv,
   loadArtifactPolicy: loadVoiceArtifactPolicyFromEnv,
+  loadServerConfig: loadVoiceServerConfigFromEnv,
+  loadToolsConfig: loadVoiceToolsConfigFromEnv,
+  loadCallPolicy: loadVoiceCallPolicyFromEnv,
   clock: systemClock,
 };
+
+/**
+ * Builds the payload this server WOULD send right now, for comparison against
+ * the digest the provider last accepted.
+ *
+ * It must pass the server, tools and call-policy attachments, because the sync
+ * path digests a payload that includes them. Omitting them here — which is what
+ * this module did until V7 — makes the two sides digest different objects, so
+ * the digests can never match while any attachment is enabled. The visible
+ * symptom was an assistant stuck on "changes not published" forever, reported
+ * within seconds of a sync that had just answered
+ * `providerConfigSynchronized: true, providerRequestSent: false`.
+ *
+ * Same failure family as the publish digest that was never recorded (5cbc462):
+ * a status derived from an input that does not match what was actually sent.
+ */
+function buildComparisonInput(row: VoiceAssistant, deps: ProviderSyncStateDependencies) {
+  const serverConfig = deps.loadServerConfig();
+  return buildSyncProviderInput(
+    row,
+    deps.loadCatalog(),
+    serverConfig,
+    deps.loadToolsConfig(serverConfig),
+    deps.loadCallPolicy(),
+  );
+}
 
 export function deriveProviderSyncState(
   row: VoiceAssistant,
@@ -76,8 +117,7 @@ export function deriveProviderSyncState(
 
   let currentHash: string;
   try {
-    const input = buildSyncProviderInput(row, deps.loadCatalog());
-    currentHash = computeProviderPayloadHash(input, deps.loadArtifactPolicy());
+    currentHash = computeProviderPayloadHash(buildComparisonInput(row, deps), deps.loadArtifactPolicy());
   } catch {
     // Cannot compute what we would send, so we cannot claim agreement.
     return row.providerSyncError !== null ? "sync_failed" : "unknown";
