@@ -83,6 +83,13 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
    */
   async function resetThrottle() {
     const { db, crmStaffLoginAttempts } = await import("@workspace/db");
+    // Unqualified below: whole tables. Against the owner preview that would
+    // delete real staff accounts, so ask the database what it is rather than
+    // trusting an environment variable.
+    {
+      const { assertDisposableDatabase } = await import("../lib/disposableDatabase.js");
+      await assertDisposableDatabase("crmStaffAuth.test.ts cleanup");
+    }
     await db.delete(crmStaffLoginAttempts);
   }
 

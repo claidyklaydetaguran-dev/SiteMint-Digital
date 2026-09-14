@@ -131,6 +131,13 @@ suite("M4 reminder delivery recovery (real DB)", () => {
       crmReminderDeliveries, crmDeliveryRecoveryActions,
     } = await import("@workspace/db");
     const { sql } = await import("drizzle-orm");
+    // Everything below is unqualified — it clears whole tables, including
+    // crm_staff, because this suite needs a zero-staff database to exercise
+    // the bootstrap path. Against the owner preview that would delete the
+    // real accounts somebody signs in with, so ask the database what it is
+    // before touching it rather than trusting an environment variable.
+    const { assertDisposableDatabase } = await import("../lib/disposableDatabase.js");
+    await assertDisposableDatabase("crmDeliveries.test.ts table cleanup");
     await db.delete(crmDeliveryRecoveryActions);
     await db.delete(crmReminderDeliveries);
     await db.delete(crmScheduledJobs);

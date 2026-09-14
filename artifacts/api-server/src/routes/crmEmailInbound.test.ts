@@ -158,6 +158,13 @@ suite("inbound email (real DB)", () => {
   }, 120_000);
 
   afterAll(async () => {
+    // Unqualified below: whole tables. Against the owner preview that would
+    // delete real staff accounts, so ask the database what it is rather than
+    // trusting an environment variable.
+    {
+      const { assertDisposableDatabase } = await import("../lib/disposableDatabase.js");
+      await assertDisposableDatabase("crmEmailInbound.test.ts cleanup");
+    }
     await db.delete(schema.crmInboundEmailEvents);
     await db.delete(schema.crmUnmatchedEmails);
     await db.delete(schema.crmEmailSuppressions);

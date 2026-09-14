@@ -67,6 +67,13 @@ suite("M2 operations, reminders and command center (real DB)", () => {
       crmComments, crmApprovals, crmProjectTemplates,
     } = await import("@workspace/db");
     const { sql } = await import("drizzle-orm");
+    // Unqualified below: whole tables. Against the owner preview that would
+    // delete real staff accounts, so ask the database what it is rather than
+    // trusting an environment variable.
+    {
+      const { assertDisposableDatabase } = await import("../lib/disposableDatabase.js");
+      await assertDisposableDatabase("crmOperations.test.ts cleanup");
+    }
     await db.delete(crmScheduledJobs);
     await db.delete(crmNotifications);
     await db.delete(crmProjectMilestones);
