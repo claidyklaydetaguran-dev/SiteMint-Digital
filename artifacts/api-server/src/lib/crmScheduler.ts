@@ -41,6 +41,7 @@ import { AUTOMATION_JOB_KIND, runAutomationJob } from "./automationEngine.js";
 import {
   AUTOMATION_SWEEP_JOB_KIND, AUTOMATION_EVENTS_JOB_KIND,
   runAutomationSweepJob, runAutomationEventsJob, ensureAutomationWorkersScheduled,
+  isOverdueInZone,
 } from "./automationSweep.js";
 import { startDueCampaigns, marketingAutosendEnabled } from "../routes/crmMarketing.js";
 import { processDueSupportDeliveries, ingestSupportReplies } from "./supportDelivery.js";
@@ -1382,7 +1383,13 @@ async function runDailyDigest(job: CrmScheduledJob): Promise<void> {
   ));
   if (open.length === 0) return;
 
-  const overdue = open.filter((t) => t.dueDate && t.dueDate.getTime() < Date.now()).length;
+  // The same rule My Day and the automation sweep use, not a third one. The
+  // digest is the first thing the person reads each morning, so "2 overdue"
+  // here and "nothing overdue" on the screen they open next would be the CRM
+  // arguing with itself about their own work.
+  const digestNow = new Date();
+  const overdue = open.filter((t) =>
+    t.dueDate && isOverdueInZone(staff.timezone, t.dueDate, t.dueKind, digestNow)).length;
   await notify({
     staffId, kind: "daily_digest",
     title: `${open.length} task${open.length === 1 ? "" : "s"} for today`,

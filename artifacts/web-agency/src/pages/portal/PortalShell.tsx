@@ -22,8 +22,12 @@ const TABS = [
   { href: "/portal", label: "Overview" },
   { href: "/portal/projects", label: "Projects" },
   { href: "/portal/documents", label: "Documents" },
-  { href: "/portal/proposals", label: "Proposals" },
-  { href: "/portal/invoices", label: "Payments" },
+  // M5. Both labels changed when the pages stopped being what they were called:
+  // /portal/proposals now carries itemised quotes as well as headline
+  // proposals, and /portal/invoices carries actual invoices rather than only
+  // the payments received against nothing in particular.
+  { href: "/portal/proposals", label: "Quotes" },
+  { href: "/portal/invoices", label: "Invoices" },
   { href: "/portal/support", label: "Support" },
 ];
 

@@ -23,11 +23,21 @@
 --     `ADD CONSTRAINT IF NOT EXISTS`.
 --   * Safe inside one transaction.
 --
+-- HAND EDITS SINCE THE DUMP
+--   The dump is a snapshot, so anything added to the schema afterwards has to
+--   be carried here by hand or a virgin install silently starts life a column
+--   short. Each such edit is listed, newest first:
+--     * crm_tasks.due_kind + ck_crm_tasks_due_kind (see M5-task-due-kind.sql)
+--   NOT yet carried here: everything in M5-automation-sweep.sql — the
+--   crm_automation_events table and crm_automation_rules.inactivity_days. A
+--   first install must still run that file. Until it is folded in, this
+--   artifact is 60 tables and the schema is 61.
+--
 -- WHEN TO USE THIS FILE
 --   * First installation → this file alone. It already contains every column
 --     the M3 and M4 upgrade files add, so do NOT also run those afterwards.
 --     They would be no-ops, but running them invites the belief that a first
---     install is an upgrade.
+--     install is an upgrade. The M5 files are the exception noted above.
 --   * Existing CRM → do NOT use this file. Apply the incremental upgrade
 --     artifacts (M3-*.sql, M4-*.sql) in the order §5 of RELEASE-PACKAGE.md
 --     gives.
@@ -1653,6 +1663,7 @@ CREATE TABLE IF NOT EXISTS public.crm_tasks (
     title text NOT NULL,
     description text,
     due_date timestamp with time zone,
+    due_kind text DEFAULT 'date'::text NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
     completed_at timestamp with time zone,
     created_by text DEFAULT 'admin'::text NOT NULL,
@@ -1664,7 +1675,8 @@ CREATE TABLE IF NOT EXISTS public.crm_tasks (
     recurrence text,
     blocked_reason text,
     checklist jsonb DEFAULT '[]'::jsonb,
-    archived_at timestamp with time zone
+    archived_at timestamp with time zone,
+    CONSTRAINT ck_crm_tasks_due_kind CHECK ((due_kind = ANY (ARRAY['date'::text, 'time'::text])))
 );
 
 CREATE SEQUENCE IF NOT EXISTS public.crm_tasks_id_seq

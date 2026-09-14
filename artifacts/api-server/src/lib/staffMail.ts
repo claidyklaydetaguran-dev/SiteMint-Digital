@@ -146,6 +146,24 @@ export function classifyThrownMailError(err: unknown): MailFailure {
 }
 
 /**
+ * A file travelling with the message.
+ *
+ * Added for calendar invitations, which are only an invitation because they
+ * carry an iCalendar payload the recipient's mail client recognises — a
+ * message that merely describes a meeting is a note about one.
+ *
+ * `content` is base64. Resend derives a content type from the filename when
+ * `contentType` is absent, which is not good enough here: an invitation needs
+ * `text/calendar; method=REQUEST` for a client to offer the Add/Update buttons.
+ */
+export interface StaffMailAttachment {
+  filename: string;
+  /** base64-encoded bytes. */
+  content: string;
+  contentType?: string;
+}
+
+/**
  * Attempts a send. Never throws: a mail failure must not fail the action that
  * triggered it, and must never be mistaken for success.
  */
@@ -163,6 +181,13 @@ export async function trySendStaffMail(args: {
    * exactly-once claim on top of it — see `docs/crm-ops/DELIVERY-GUARANTEE.md`.
    */
   idempotencyKey?: string;
+  /**
+   * Files to send with it. Part of the idempotency contract: the same key with
+   * a DIFFERENT attachment is the "same key, different payload" Resend answers
+   * with `invalid_idempotent_request`, so a caller that varies the attachment
+   * must vary the key too.
+   */
+  attachments?: StaffMailAttachment[];
 }): Promise<MailOutcome> {
   const blocked = staffMailBlockedReason();
   if (blocked) return { sent: false, failure: "not_configured", reason: blocked, configured: false };
@@ -173,6 +198,7 @@ export async function trySendStaffMail(args: {
       {
         from: FROM(), to: args.to, subject: args.subject,
         text: args.text, ...(args.html ? { html: args.html } : {}),
+        ...(args.attachments?.length ? { attachments: args.attachments } : {}),
       },
       args.idempotencyKey ? { idempotencyKey: args.idempotencyKey } : undefined,
     );

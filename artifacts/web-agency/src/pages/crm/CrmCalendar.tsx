@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
   AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock,
-  Download, Link2, Loader2, MapPin, Plus, RefreshCw, Trash2, Users, X,
+  Download, Link2, Loader2, MapPin, Plus, RefreshCw, Send, Trash2, Users, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
 
@@ -20,13 +20,32 @@ import { adminFetch } from "@/lib/adminFetch";
 //   Tasks due     a task's due date. Read-only here; All Tasks owns it.
 //   Follow-ups    a lead's nextFollowUpAt. Read-only here; the lead owns it.
 //
-// Two things this calendar deliberately does not claim:
-//   * Adding an attendee records who is expected. No invitation is emailed —
-//     attendee mail does not exist yet, and the API says so on every create.
-//   * The .ics button is an export. It copies the event into another calendar
-//     once; later edits here do not follow it. That is not synchronisation.
+// Attendees are now actually invited: each one is emailed an iCalendar
+// message, a reschedule sends the same event with a higher revision number so
+// their calendar replaces it, and cancelling withdraws it.
+//
+// Three things this calendar still deliberately does not claim:
+//   * That an invitation ARRIVED. Every screen below reports what the mail
+//     provider said — including "there is no mail provider on this server",
+//     which is the answer today — and never dresses that up as success.
+//   * That anybody ACCEPTED. Nothing reads replies, so "Who is expected" is
+//     what staff recorded, not what an attendee answered.
+//   * That this is synchronisation. The .ics button is still an export: it
+//     copies the event once, and later edits here do not follow it.
 
 // ── Types (the live API contract) ────────────────────────────────────────────
+
+/** What the mail seam reported, in the seam's own vocabulary. */
+type InvitationOutcome = "sent" | "not_configured" | "rejected" | "failed" | "uncertain";
+
+interface AttendeeInvitation {
+  /** null means no invitation has ever been attempted for this person. */
+  outcome: InvitationOutcome | null;
+  reason: string | null;
+  method: "REQUEST" | "CANCEL" | null;
+  sequence: number | null;
+  at: string | null;
+}
 
 interface Attendee {
   id: number;
@@ -35,6 +54,68 @@ interface Attendee {
   email?: string | null;
   external: boolean;
   responseStatus: string;
+  invitation?: AttendeeInvitation | null;
+}
+
+interface InvitationReport {
+  invitationsSent: boolean;
+  attempted: number;
+  accepted: number;
+  status: InvitationOutcome | "none_to_send";
+  note: string;
+}
+
+/**
+ * How one attendee's invitation reads on screen.
+ *
+ * `not_configured` is deliberately amber rather than red: nothing is broken,
+ * nothing was lost, and nobody was told — an operator needs an API key, not a
+ * bug report. A refusal or an unknown outcome IS red, because somebody has to
+ * act on it.
+ */
+function invitationBadge(inv: AttendeeInvitation | null | undefined): {
+  label: string; className: string; title: string;
+} {
+  const outcome = inv?.outcome ?? null;
+  const cancelled = inv?.method === "CANCEL";
+  switch (outcome) {
+    case "sent":
+      return {
+        label: cancelled ? "Cancellation sent" : "Invited",
+        className: "bg-teal-50 text-teal-800 border-teal-200",
+        title: `Accepted by the mail provider${inv?.at ? ` on ${new Date(inv.at).toLocaleString()}` : ""}.`,
+      };
+    case "not_configured":
+      return {
+        label: "Not emailed",
+        className: "bg-amber-50 text-amber-800 border-amber-200",
+        title: inv?.reason ?? "Mail is not configured on this server, so nothing was sent.",
+      };
+    case "rejected":
+      return {
+        label: "Refused",
+        className: "bg-red-50 text-red-700 border-red-200",
+        title: inv?.reason ?? "The mail provider refused the message. Nothing was delivered.",
+      };
+    case "failed":
+      return {
+        label: "Not delivered",
+        className: "bg-red-50 text-red-700 border-red-200",
+        title: inv?.reason ?? "The message never reached the mail provider, so nothing was delivered.",
+      };
+    case "uncertain":
+      return {
+        label: "Unknown",
+        className: "bg-red-50 text-red-700 border-red-200",
+        title: inv?.reason ?? "This may or may not have been delivered. Ask before sending again.",
+      };
+    default:
+      return {
+        label: "Not invited",
+        className: "bg-muted text-muted-foreground border-border",
+        title: "No invitation has been sent to this person.",
+      };
+  }
 }
 
 interface Appointment {
@@ -161,6 +242,19 @@ function blankForm(day: string): FormState {
     attendeeStaffIds: [],
     externalEmail: "",
   };
+}
+
+/**
+ * One sentence about what the invitations did, taken from the server rather
+ * than guessed at here. The server always sends a note; the fallback exists
+ * only so an older response cannot produce an empty reassurance.
+ */
+function describeInvitations(report: InvitationReport | undefined, note: unknown): string {
+  if (typeof note === "string" && note) return note;
+  if (!report) return "Attendees are recorded. No invitation status was reported.";
+  return report.invitationsSent
+    ? `${report.accepted} invitation${report.accepted === 1 ? "" : "s"} accepted by the mail provider.`
+    : "No invitation was confirmed sent.";
 }
 
 function formFrom(a: Appointment): FormState {
@@ -409,11 +503,13 @@ export default function CrmCalendar() {
       if (!res.ok) { setFormError(data.error || `Save failed (${res.status}).`); return; }
 
       setSelected(keyOfInstant(data.appointment.startAt));
-      setNotice(
-        editing
-          ? "Appointment updated. Its reminder was rescheduled to match."
-          : "Appointment created. Attendees are recorded — no invitation email was sent.",
-      );
+      // The server's own words. It reports what the mail seam said — including
+      // "nothing was sent, and here is why" — so this never invents a cheerful
+      // summary the backend did not stand behind.
+      const base = editing
+        ? "Appointment updated. Its reminder was rescheduled to match."
+        : "Appointment created.";
+      setNotice(`${base} ${describeInvitations(data.invitations, data.invitationNote)}`);
       closeForm();
       await refresh(true);
     } catch {
@@ -424,25 +520,62 @@ export default function CrmCalendar() {
   }
 
   async function setStatus(a: Appointment, status: "completed" | "cancelled" | "scheduled") {
+    const invitedSomebody = a.attendees.some(x => x.invitation?.outcome === "sent");
     if (status === "cancelled" && !window.confirm(
-      `Cancel "${a.title}"?\n\nIt stays on the record as cancelled and its reminder is withdrawn.`,
+      `Cancel "${a.title}"?\n\nIt stays on the record as cancelled and its reminder is withdrawn.`
+      + (invitedSomebody
+        ? "\n\nEveryone who was invited is emailed a cancellation, so it leaves their calendar."
+        : ""),
     )) return;
     setRefreshing(true);
     try {
       const res = await adminFetch(`/api/crm/appointments/${a.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         setError(data.error || `That change was refused (${res.status}).`);
         return;
       }
-      setNotice(
-        status === "cancelled" ? "Appointment cancelled and its reminder withdrawn."
-          : status === "completed" ? "Marked as held."
-          : "Reopened as scheduled.",
-      );
+      const base = status === "cancelled" ? "Appointment cancelled and its reminder withdrawn."
+        : status === "completed" ? "Marked as held."
+        : "Reopened as scheduled.";
+      setNotice(`${base} ${describeInvitations(data.invitations, data.invitationNote)}`);
       await refresh(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  /**
+   * Sends the current invitation again, to everybody on the appointment.
+   *
+   * This is what makes "not emailed" recoverable rather than permanent: every
+   * meeting booked while this server had no mail key has attendees who were
+   * never told, and this is how they get told once it does.
+   */
+  async function sendInvitations(a: Appointment) {
+    const alreadySent = a.attendees.some(x => x.invitation?.outcome === "sent");
+    if (alreadySent && !window.confirm(
+      `Send "${a.title}" to all ${a.attendees.length} attendee(s) again?\n\n`
+      + "Anyone already invited will receive a second copy — this is a deliberate "
+      + "re-send, so the mail provider will not collapse it into the first.",
+    )) return;
+
+    setRefreshing(true);
+    try {
+      const res = await adminFetch(`/api/crm/appointments/${a.id}/invitations`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || `The invitations could not be sent (${res.status}).`);
+        return;
+      }
+      setNotice(describeInvitations(data.invitations, data.invitationNote));
+      await refresh(true);
+    } catch {
+      setError("The invitations could not be sent. Check your connection and try again.");
     } finally {
       setRefreshing(false);
     }
@@ -665,12 +798,34 @@ export default function CrmCalendar() {
                           </Link>
                         )}
                         {a.attendees.length > 0 && (
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Users className="w-3 h-3 shrink-0" />
-                            <span className="truncate">
-                              {a.attendees.map(x => x.name || x.email || "unnamed").join(", ")}
-                            </span>
-                          </p>
+                          <div className="mt-1">
+                            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <Users className="w-3 h-3 shrink-0" />
+                              <span className="truncate">
+                                {a.attendees.length} expected
+                              </span>
+                            </p>
+                            {/* Per person, because "invitations sent" as one
+                                number hides the one address that bounced. The
+                                list wraps rather than scrolls, so it still
+                                reads at 375px. */}
+                            <ul className="mt-1 space-y-0.5">
+                              {a.attendees.map(x => {
+                                const badge = invitationBadge(x.invitation);
+                                return (
+                                  <li key={x.id} className="flex flex-wrap items-center gap-1">
+                                    <span className="text-[11px] text-foreground truncate max-w-[150px]">
+                                      {x.name || x.email || "unnamed"}
+                                    </span>
+                                    <span title={badge.title}
+                                      className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${badge.className}`}>
+                                      {badge.label}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
                         )}
                       </div>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${STATUS_STYLE[a.status] ?? STATUS_STYLE.scheduled}`}>
@@ -695,6 +850,18 @@ export default function CrmCalendar() {
                         <button onClick={() => void setStatus(a, "scheduled")}
                           className="px-2 py-0.5 text-[11px] border border-border rounded hover:bg-accent transition-colors">
                           Reopen
+                        </button>
+                      )}
+                      {a.attendees.length > 0 && (
+                        <button onClick={() => void sendInvitations(a)} disabled={refreshing}
+                          title={
+                            a.status === "cancelled"
+                              ? "Email everyone the cancellation again, so it leaves their calendar."
+                              : "Email everyone the current invitation. Anyone already invited gets a second copy."
+                          }
+                          className="flex items-center gap-1 px-2 py-0.5 text-[11px] border border-teal-200 text-teal-700 bg-teal-50 rounded hover:bg-teal-100 transition-colors disabled:opacity-50">
+                          <Send className="w-3 h-3" />
+                          {a.attendees.some(x => x.invitation?.outcome === "sent") ? "Send again" : "Send invites"}
                         </button>
                       )}
                       <button onClick={() => void exportIcs(a)}
@@ -892,11 +1059,21 @@ export default function CrmCalendar() {
                   className="mt-1 w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-teal-500 resize-y" />
               </label>
 
-              <p className="text-[11px] text-muted-foreground border-t border-border pt-3">
-                Attendees are recorded on the appointment so the team knows who is expected.
-                No invitation email is sent — attendee mail is not built yet. The reminder
-                above goes to you through the CRM's own reminder queue.
-              </p>
+              <div className="text-[11px] text-muted-foreground border-t border-border pt-3 space-y-1.5">
+                <p>
+                  {editing
+                    ? "Saving emails everyone an updated invitation only if this changes their "
+                      + "calendar entry — the time, place, join link, title, organiser or guest "
+                      + "list. Changing the notes or the reminder below tells nobody."
+                    : "Everyone listed is emailed an invitation their calendar can add. "
+                      + "The reminder above is separate, and goes to you through the CRM's "
+                      + "own reminder queue."}
+                </p>
+                <p>
+                  Whether an invitation actually went out is reported per person on the
+                  appointment afterwards — including when nothing could be sent.
+                </p>
+              </div>
             </div>
 
             <div className="sticky bottom-0 bg-background flex items-center gap-2 px-4 py-3 border-t border-border">

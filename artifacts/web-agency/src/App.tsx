@@ -113,6 +113,7 @@ const CrmPipeline = lazyRoute(() => import("@/pages/crm/CrmPipeline"));
 const CrmTasks = lazyRoute(() => import("@/pages/crm/CrmTasks"));
 const CrmEmailTemplates = lazyRoute(() => import("@/pages/crm/CrmEmailTemplates"));
 const CrmImport = lazyRoute(() => import("@/pages/crm/CrmImport"));
+const CrmDuplicates = lazyRoute(() => import("@/pages/crm/CrmDuplicates"));
 const CrmSettings = lazyRoute(() => import("@/pages/crm/CrmSettings"));
 const CrmInbox = lazyRoute(() => import("@/pages/crm/CrmInbox"));
 const CrmCalendar = lazyRoute(() => import("@/pages/crm/CrmCalendar"));
@@ -217,6 +218,7 @@ function AdminRoutes() {
       <Route path="/admin/crm/receptionist-accounts" component={CrmReceptionistAccounts} />
       <Route path="/admin/crm/email-templates" component={CrmEmailTemplates} />
       <Route path="/admin/crm/import" component={CrmImport} />
+      <Route path="/admin/crm/duplicates" component={CrmDuplicates} />
       <Route path="/admin/crm/settings" component={CrmSettings} />
       <Route path="/admin/crm/people" component={CrmStaffAdmin} />
       <Route path="/admin/crm/account" component={CrmMyAccount} />

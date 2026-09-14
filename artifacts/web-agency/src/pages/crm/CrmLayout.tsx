@@ -13,7 +13,7 @@ import {
   Layers, Activity, Download,
   ClipboardList, Briefcase, ListTodo, TrendingUp,
   BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft, LifeBuoy,
-  ExternalLink, Building2, FileText,
+  ExternalLink, Building2, FileText, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminFetch, adminProbe, adminLogout, getAdminToken, bindDraftOwner } from "@/lib/adminFetch";
@@ -96,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Sales Workspace", href: "/admin/crm/workspace", icon: LayoutGrid },
       { label: "Contacts",     href: "/admin/crm/leads",    icon: Users },
+      { label: "Duplicate Review", href: "/admin/crm/duplicates", icon: Copy },
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },
       { label: "Transactions", href: "/admin/crm/transactions", icon: CreditCard },

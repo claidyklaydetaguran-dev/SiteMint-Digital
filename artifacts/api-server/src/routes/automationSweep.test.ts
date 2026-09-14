@@ -381,16 +381,16 @@ suite("automation sweep and durable events (real DB)", () => {
   }, 120_000);
 
   it("decides 'overdue' in the assignee's timezone, not the server's", async () => {
-    // Two people each set "due on the 10th" in their own zone — which is what
-    // a bare date through a datetime input stores: local midnight. Those are
+    // Two people each set "due on the 10th" in their own zone. Those are
     // DIFFERENT instants, and that is the point: at 04:00Z on the 11th the 10th
     // is over in Manila and still running in California.
     //
-    // This test used to use one shared 12:00Z instant, which is not midnight in
-    // either zone. Under the corrected rule that is a TIMED deadline and is
-    // overdue for everybody once it passes, so it no longer demonstrates
-    // anything about zones. Date-only deadlines are the case where the zone
-    // actually decides.
+    // Both tasks say `dueKind: "date"` rather than leaving it to be inferred
+    // from the stored clock time. That inference is what was removed: it read
+    // the same row as a date for one person and a moment for another, so which
+    // zone "decided" depended on who was asking. A day is still a local thing —
+    // that is why the zone still matters here — but WHICH KIND of deadline it
+    // is no longer moves.
     clockMs = PIVOT;
     const dueManila = new Date(Date.parse("2026-09-10T00:00:00.000+08:00"));
     const duePacific = new Date(Date.parse("2026-09-10T00:00:00.000-07:00"));
@@ -404,17 +404,17 @@ suite("automation sweep and durable events (real DB)", () => {
 
     const leadId = await makeLead();
     const manilaTask = await makeTask({
-      leadId, title: "[CRM-TEST] due in Manila", dueDate: dueManila,
+      leadId, title: "[CRM-TEST] due in Manila", dueDate: dueManila, dueKind: "date",
       assignedToStaffId: staffIds[MANILA.email],
     });
     const pacificTask = await makeTask({
-      leadId, title: "[CRM-TEST] due in California", dueDate: duePacific,
+      leadId, title: "[CRM-TEST] due in California", dueDate: duePacific, dueKind: "date",
       assignedToStaffId: staffIds[PACIFIC.email],
     });
 
     // The helper says it plainly, before any of the machinery is involved.
-    expect(sweep.isOverdueInZone("Asia/Manila", dueManila, clock())).toBe(true);
-    expect(sweep.isOverdueInZone("America/Los_Angeles", duePacific, clock())).toBe(false);
+    expect(sweep.isOverdueInZone("Asia/Manila", dueManila, "date", clock())).toBe(true);
+    expect(sweep.isOverdueInZone("America/Los_Angeles", duePacific, "date", clock())).toBe(false);
 
     await tick();
 
@@ -438,6 +438,46 @@ suite("automation sweep and durable events (real DB)", () => {
     const later = (await executionsFor(rule["id"])).filter(mineOnly);
     expect(later).toHaveLength(2);
     expect(later.map((r) => r.recordId).sort()).toEqual([manilaTask, pacificTask].sort());
+  }, 120_000);
+
+  it("announces an explicit midnight deadline on its own morning, and a date-only one never", async () => {
+    // The distinction end to end, through the real sweep rather than the pure
+    // helper. Two tasks, the SAME stored instant — 00:00 on the 11th, UTC, for
+    // a person whose zone is UTC — differing only in what their author meant.
+    //
+    // Under the old heuristic this pair was impossible to express: both rows
+    // looked like midnight, so both were treated as "the day must end" and the
+    // person who asked for 00:00 was quietly given until 23:59.
+    clockMs = Date.parse("2026-09-11T00:01:00.000Z");
+    const midnight = new Date(Date.parse("2026-09-11T00:00:00.000Z"));
+
+    const rule = await makeRule({
+      name: `[CRM-TEST] midnight kinds ${STAMP}`,
+      trigger: "task_overdue",
+      actions: [{ type: "add_note", config: { body: "midnight passed" } }],
+    });
+    await enableOnly(rule["id"]);
+
+    const leadId = await makeLead();
+    const timed = await makeTask({
+      leadId, title: "[CRM-TEST] by midnight", dueDate: midnight, dueKind: "time",
+      assignedToStaffId: staffIds[OWNER.email],
+    });
+    const dated = await makeTask({
+      leadId, title: "[CRM-TEST] on the 11th", dueDate: midnight, dueKind: "date",
+      assignedToStaffId: staffIds[OWNER.email],
+    });
+
+    await tick();
+
+    expect(await eventsFor("task", timed), "00:00 has passed").toHaveLength(1);
+    expect(await eventsFor("task", dated), "the day has barely started").toHaveLength(0);
+
+    // ...and the date-only one becomes overdue when its day actually ends, so
+    // the difference is a day's grace rather than a permanent exemption.
+    clockMs = Date.parse("2026-09-12T00:01:00.000Z");
+    await tick();
+    expect(await eventsFor("task", dated), "now the 11th is over").toHaveLength(1);
   }, 120_000);
 
   // ── Gap 1: no_activity_for_days ───────────────────────────────────────────

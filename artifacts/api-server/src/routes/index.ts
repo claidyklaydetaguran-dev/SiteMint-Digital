@@ -5,12 +5,14 @@ import discoveryV1Router from "./discoveryV1";
 import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
+import crmContactsRouter from "./crmContacts";
 import crmProjectsRouter from "./crmProjects";
 import crmDiscoveryRouter from "./crmDiscovery";
 import crmStaffRouter from "./crmStaff";
 import crmOperationsRouter from "./crmOperations";
 import crmCommandCenterRouter from "./crmCommandCenter";
 import crmDocumentsRouter from "./crmDocuments";
+import crmBillingRouter from "./crmBilling";
 import crmCalendarRouter from "./crmCalendar";
 import crmInboxRouter from "./crmInbox";
 import crmEmailInboundRouter from "./crmEmailInbound";
@@ -66,6 +68,9 @@ router.use(crmStaffRouter);
 router.use(crmOperationsRouter);
 router.use(crmCommandCenterRouter);
 router.use(crmDocumentsRouter);
+// Before crmRouter: /crm/quotes/* and /crm/invoices/* must match their own
+// handlers rather than falling into a legacy parameterised /crm/:something.
+router.use(crmBillingRouter);
 router.use(crmCalendarRouter);
 router.use(crmInboxRouter);
 router.use(crmEmailInboundRouter);
@@ -83,6 +88,11 @@ router.use(crmReportsRouter);
 // falling into one of the legacy parameterised /crm/:something routes.
 router.use(crmMarketingRouter);
 router.use(crmAutomationRouter);
+// Before crmRouter, and for exactly the reason 3508a43 documents: crm.ts owns
+// several parameterised `/crm/:something/...` routes, so a literal path such as
+// `/crm/contacts/export.csv` registered after it would be resolved as one of
+// those routes' `:id` and answered 400 instead of reaching its own handler.
+router.use(crmContactsRouter);
 router.use(crmRouter);
 router.use(crmProjectsRouter);
 router.use(crmDiscoveryRouter);

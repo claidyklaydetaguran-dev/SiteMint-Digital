@@ -7,7 +7,7 @@ import {
 } from "@/lib/crmTaxonomy";
 import {
   AlertCircle, Archive, ArchiveRestore, ArrowDown, ArrowUp, CalendarDays, Check,
-  CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Copy, FileText, Flag,
+  CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Copy, Cpu, FileText, Flag,
   HelpCircle, LayoutGrid, List, Mail, MessageSquare, Milestone as MilestoneIcon,
   Plus, RefreshCw, Send, ShieldCheck, User, X,
 } from "lucide-react";
@@ -95,6 +95,12 @@ interface OpsTask {
   description: string | null;
   status: string;
   dueDate: string | null;
+  /**
+   * "date" (a day) or "time" (a moment), from `crm_tasks.due_kind`. Anything
+   * else — including a row written before the column existed — is a day, which
+   * is what the server falls back to as well.
+   */
+  dueKind: string | null;
   priority: string | null;
   assignedToStaffId: number | null;
   type: string | null;
@@ -704,12 +710,483 @@ function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void 
   );
 }
 
+// ── Automation failures ─────────────────────────────────────────────────────
+//
+// The same shape as Delivery above, and deliberately so: the question is the
+// same one — "this did not happen, and what am I supposed to do about it?" —
+// and an operator should not have to learn a second set of words for it.
+//
+// Two verbs, not one button. Retry re-runs it and is OFFERED ONLY where
+// re-running cannot repeat a side effect; the server decides that and sends the
+// reason, which is rendered verbatim rather than re-derived here where it could
+// drift. Acknowledge records a decision and re-runs nothing.
+
+type FailureKind = "event" | "run";
+type FailureVerb = "retry" | "acknowledge";
+
+interface FailureStep {
+  actionIndex: number;
+  actionType: string;
+  status: string;
+  attempts: number;
+  detail: string | null;
+}
+
+interface FailureRow {
+  key: string;
+  kind: FailureKind;
+  id: number;
+  failure: string;
+  failureLabel: string;
+  /** Null on an event — it never reached rule evaluation, so no rule fired. */
+  ruleId: number | null;
+  ruleName: string | null;
+  trigger: string;
+  recordType: string;
+  recordId: number;
+  status: string;
+  stopReason: string | null;
+  attempts: number;
+  maxAttempts: number | null;
+  nextAttemptAt: string | null;
+  willRetryAutomatically: boolean;
+  error: string | null;
+  steps: FailureStep[];
+  availableActions: FailureVerb[];
+  retryWithheldReason: string;
+  retryMeans: string;
+  guidance: string;
+  at: string;
+  resolvedAt: string | null;
+  resolvedByLabel: string | null;
+  resolutionNote: string | null;
+}
+
+const FAILURE_PILL: Record<string, string> = {
+  event_retrying: "bg-amber-100 text-amber-700",
+  run_retrying: "bg-amber-100 text-amber-700",
+  event_gave_up: "bg-red-100 text-red-700",
+  run_failed_definitively: "bg-red-100 text-red-700",
+  // The one nobody can resolve by pressing a button. Ringed so it reads
+  // differently from the states a machine is still working on.
+  run_outcome_unknown: "bg-amber-100 text-amber-800 ring-1 ring-amber-400",
+  run_stopped_by_loop_protection: "bg-sky-100 text-sky-700",
+};
+
+const FAILURE_FILTERS: { value: string; label: string }[] = [
+  { value: "", label: "Everything unresolved" },
+  { value: "kind=run", label: "Rule runs only" },
+  { value: "kind=event", label: "Events only" },
+  { value: "scope=all", label: "Including acknowledged" },
+];
+
+const VERB_LABEL: Record<FailureVerb, string> = {
+  retry: "Retry",
+  acknowledge: "Acknowledge",
+};
+
+const VERB_ICON: Record<FailureVerb, React.ElementType> = {
+  retry: RefreshCw,
+  acknowledge: CheckCircle2,
+};
+
+const STEP_PILL: Record<string, string> = {
+  succeeded: "bg-emerald-100 text-emerald-700",
+  skipped: "bg-muted text-muted-foreground",
+  failed: "bg-red-100 text-red-700",
+  unknown: "bg-amber-100 text-amber-800",
+  awaiting_approval: "bg-amber-100 text-amber-700",
+  rejected: "bg-red-100 text-red-700",
+};
+
+function failureSubject(row: FailureRow): string {
+  return row.ruleName ?? "No rule ran — the event never got that far";
+}
+
+/** One row's recovery panel: pick a verb, say why, do it. */
+function FailureRecoveryPanel({ row, onDone, onCancel }: {
+  row: FailureRow; onDone: () => void; onCancel: () => void;
+}) {
+  const [verb, setVerb] = useState<FailureVerb>(row.availableActions[0] ?? "acknowledge");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const allowed = row.availableActions.includes(verb);
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await adminFetch(
+        `/api/crm/automation/failures/${row.kind}/${row.id}/${verb}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        },
+      );
+      if (!res.ok) {
+        setError(await errorFrom(res, "That didn't work. Try again."));
+        return;
+      }
+      onDone();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3 space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {(["retry", "acknowledge"] as FailureVerb[]).map(v => {
+          const on = row.availableActions.includes(v);
+          const Icon = VERB_ICON[v];
+          return (
+            <button
+              key={v}
+              type="button"
+              disabled={!on}
+              aria-pressed={verb === v}
+              onClick={() => { setVerb(v); setError(""); }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                verb === v
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-white text-muted-foreground hover:bg-accent"
+              } ${on ? "" : "opacity-40 cursor-not-allowed"}`}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" /> {VERB_LABEL[v]}
+            </button>
+          );
+        })}
+      </div>
+
+      {verb === "retry" && allowed && (
+        <p className="text-xs text-muted-foreground">{row.retryMeans}</p>
+      )}
+      {verb === "acknowledge" && allowed && (
+        <p className="text-xs text-muted-foreground">
+          Records that you decided nothing more is needed. It re-runs nothing and changes no
+          automation state — only the fact that you closed it is new.
+        </p>
+      )}
+
+      {!allowed && (
+        <p className="flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span>That isn&rsquo;t available for this one.</span>
+        </p>
+      )}
+
+      <div>
+        <label className={LABEL} htmlFor={`fail-reason-${row.key}`}>
+          Why (recorded against this automation)
+        </label>
+        <textarea
+          id={`fail-reason-${row.key}`}
+          className={INPUT}
+          rows={2}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="e.g. Checked the contact — the task is already there."
+        />
+      </div>
+
+      {error && <InlineError message={error} />}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={!allowed || busy || reason.trim().length < 3}
+          onClick={() => void submit()}
+        >
+          {busy ? "Working…" : VERB_LABEL[verb]}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        {reason.trim().length < 3 && (
+          <span className="text-[11px] text-muted-foreground">A reason is required.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FailureCard({ row, open, onToggle, onDone }: {
+  row: FailureRow; open: boolean; onToggle: () => void; onDone: () => void;
+}) {
+  return (
+    <div className="bg-white border border-border rounded-xl p-3">
+      <div className="flex flex-wrap items-start gap-2">
+        <Pill className={FAILURE_PILL[row.failure] ?? "bg-muted text-muted-foreground"}>
+          {row.failureLabel}
+        </Pill>
+        <span className="text-sm font-medium text-foreground min-w-0 break-words">
+          {failureSubject(row)}
+        </span>
+        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+          {row.maxAttempts === null
+            ? `Attempt ${row.attempts}`
+            : `Attempt ${row.attempts} of ${row.maxAttempts}`}
+        </span>
+      </div>
+
+      <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Triggered by</dt>
+          <dd className="text-foreground truncate">{row.trigger.replace(/_/g, " ")}</dd>
+        </div>
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">On</dt>
+          <dd className="text-foreground truncate">
+            {row.recordType.replace(/_/g, " ")} #{row.recordId}
+          </dd>
+        </div>
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Last change</dt>
+          <dd className="text-foreground tabular-nums">{fmtMoment(row.at)}</dd>
+        </div>
+        <div className="flex gap-1.5 min-w-0">
+          <dt className="text-muted-foreground shrink-0">Next attempt</dt>
+          <dd className="text-foreground tabular-nums">
+            {row.willRetryAutomatically && row.nextAttemptAt
+              ? fmtMoment(row.nextAttemptAt)
+              : "None scheduled"}
+          </dd>
+        </div>
+      </dl>
+
+      {row.error && (
+        <p className="mt-2 text-xs text-foreground break-words">
+          <span className="text-muted-foreground">Error: </span>{row.error}
+        </p>
+      )}
+
+      {row.steps.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {row.steps.map(step => (
+            <li key={step.actionIndex} className="flex flex-wrap items-start gap-1.5 text-xs">
+              <Pill className={STEP_PILL[step.status] ?? "bg-muted text-muted-foreground"}>
+                {step.status.replace(/_/g, " ")}
+              </Pill>
+              <span className="text-foreground">
+                Step {step.actionIndex + 1}: {step.actionType.replace(/_/g, " ")}
+              </span>
+              {step.detail && (
+                <span className="text-muted-foreground min-w-0 break-words w-full sm:w-auto">
+                  {step.detail}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+        <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-px" /> <span>{row.guidance}</span>
+      </p>
+
+      {/* Why retry is not on offer, on the CARD rather than inside the panel.
+          The Retry button for such a row is disabled, so a reason shown only
+          when Retry is selected could never be read — the one question the
+          operator actually has ("why can't I just run it again?") would have
+          had no answer anywhere. The server's own words, verbatim, so the
+          screen cannot drift from the rule the API enforces. */}
+      {!row.resolvedAt && row.retryWithheldReason && (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span><strong>Retry is not available.</strong> {row.retryWithheldReason}</span>
+        </p>
+      )}
+
+      {row.resolvedAt ? (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span>
+            Acknowledged by {row.resolvedByLabel ?? "somebody"} on {fmtMoment(row.resolvedAt)}
+            {row.resolutionNote ? ` — “${row.resolutionNote}”` : ""}
+          </span>
+        </p>
+      ) : open ? (
+        <FailureRecoveryPanel row={row} onDone={onDone} onCancel={onToggle} />
+      ) : row.availableActions.length > 0 ? (
+        <div className="mt-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={onToggle}>
+            <ShieldCheck className="w-3.5 h-3.5" /> What do you want to do?
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Nothing to decide yet — this has not finished.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The whole automation failure queue, walked page by page.
+ *
+ * Events and rule runs are two tables, so the API pages them as two keyset
+ * streams and hands back one cursor for each. "Load more" advances whichever
+ * still has a page, because a failure nobody can find is a failure nobody will
+ * fix — a list that can silently drop one is worse than no list at all, since
+ * it looks complete.
+ */
+function AutomationFailures({ onCountChange }: { onCountChange: (n: number) => void }) {
+  const [filter, setFilter] = useState("");
+  const [rows, setRows] = useState<FailureRow[]>([]);
+  const [cursor, setCursor] = useState<{ run: number | null; event: number | null }>(
+    { run: null, event: null },
+  );
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
+  const seq = useRef(0);
+
+  const load = useCallback(async (after: { run: number | null; event: number | null } | null = null) => {
+    const mine = ++seq.current;
+    if (after === null) setLoading(true); else setLoadingMore(true);
+    setError("");
+    try {
+      const p = new URLSearchParams(filter);
+      p.set("limit", "25");
+      if (after?.run != null) p.set("runCursor", String(after.run));
+      if (after?.event != null) p.set("eventCursor", String(after.event));
+      const res = await adminFetch(`/api/crm/automation/failures?${p.toString()}`);
+      if (mine !== seq.current) return;
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json() as {
+        failures?: FailureRow[];
+        nextCursor?: { run: number | null; event: number | null };
+        hasMore?: boolean;
+        counts?: { matchingFilters?: number };
+      };
+      const page = data.failures ?? [];
+      setRows(prev => (after === null ? page : [...prev, ...page]));
+      setCursor(data.nextCursor ?? { run: null, event: null });
+      setHasMore(!!data.hasMore);
+      setTotal(Number(data.counts?.matchingFilters ?? 0));
+      if (filter === "") onCountChange(Number(data.counts?.matchingFilters ?? 0));
+    } catch {
+      if (mine === seq.current) {
+        setError("Couldn't load automation failures. Check your connection and try again.");
+      }
+    } finally {
+      if (mine === seq.current) { setLoading(false); setLoadingMore(false); }
+    }
+  }, [filter, onCountChange]);
+
+  useEffect(() => { void load(null); }, [load]);
+
+  const afterRecovery = () => { setOpenKey(null); void load(null); };
+
+  return (
+    <div className="flex-1 p-4 space-y-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-full sm:w-56">
+          <label className={LABEL} htmlFor="automation-filter">Show</label>
+          <select
+            id="automation-filter"
+            className={INPUT}
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          >
+            {FAILURE_FILTERS.map(f => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-muted-foreground sm:pb-2.5 tabular-nums">
+          {total} in total · showing {rows.length}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="px-2 sm:ml-auto sm:pb-2.5"
+          aria-label="Refresh automation failures"
+          onClick={() => void load(null)}
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+          </div>
+          <p className="text-muted-foreground font-medium max-w-sm">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => void load(null)}>Retry</Button>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+          <Cpu className="w-10 h-10 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-medium">Every automation is accounted for.</p>
+          <p className="text-sm text-muted-foreground/70 max-w-md">
+            Nothing here means no rule run failed and no event went unprocessed. Runs that finished,
+            and ones a rule deliberately stopped, are not listed — only the ones somebody has to
+            decide about.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {rows.map(row => (
+              <FailureCard
+                key={row.key}
+                row={row}
+                open={openKey === row.key}
+                onToggle={() => setOpenKey(k => (k === row.key ? null : row.key))}
+                onDone={afterRecovery}
+              />
+            ))}
+          </div>
+          {hasMore ? (
+            <div className="flex flex-col items-center gap-1 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loadingMore}
+                onClick={() => void load(cursor)}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+              <p className="text-center text-[11px] text-muted-foreground">
+                Showing {rows.length} of {total}. This is a page, not the whole list — keep loading
+                to reach the rest.
+              </p>
+            </div>
+          ) : (
+            <p className="text-center text-xs text-muted-foreground pt-1">
+              That is all {rows.length} of them — nothing is hidden by the page size.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function CrmOperations() {
-  const [mode, setMode] = useState<"board" | "list" | "deliveries">("board");
+  const [mode, setMode] = useState<"board" | "list" | "deliveries" | "automation">("board");
   /** Open delivery problems, so the badge is visible from the other two views. */
   const [deliveryCount, setDeliveryCount] = useState<number | null>(null);
+  /** Unresolved automation failures, for the same reason. */
+  const [automationCount, setAutomationCount] = useState<number | null>(null);
 
   const [stage, setStage] = useState("");
   const [ownerStaffId, setOwnerStaffId] = useState("");
@@ -794,6 +1271,22 @@ export default function CrmOperations() {
         if (!live || !res.ok) return;
         const data = await res.json() as { counts?: { matchingFilters?: number } };
         setDeliveryCount(Number(data.counts?.matchingFilters ?? 0));
+      } catch { /* a missing badge must never hide the projects */ }
+    })();
+    return () => { live = false; };
+  }, []);
+
+  // The same cheap read for automation. It is a SELECT on the server and is not
+  // allowed to be anything else — no view of this list may retry, emit or
+  // release anything as a side effect of being looked at.
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const res = await adminFetch("/api/crm/automation/failures?limit=1");
+        if (!live || !res.ok) return;
+        const data = await res.json() as { counts?: { matchingFilters?: number } };
+        setAutomationCount(Number(data.counts?.matchingFilters ?? 0));
       } catch { /* a missing badge must never hide the projects */ }
     })();
     return () => { live = false; };
@@ -889,11 +1382,30 @@ export default function CrmOperations() {
                     </span>
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("automation")}
+                  aria-pressed={mode === "automation"}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border-l border-input transition-colors ${
+                    mode === "automation" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Cpu className="w-3.5 h-3.5" /> Automation
+                  {automationCount !== null && automationCount > 0 && (
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
+                        mode === "automation" ? "bg-white/25 text-primary-foreground" : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {automationCount}
+                    </span>
+                  )}
+                </button>
               </div>
               <Button
                 variant="ghost" size="sm" className="px-2" aria-label="Refresh"
                 onClick={() => void load()}
-                disabled={mode === "deliveries"}
+                disabled={mode === "deliveries" || mode === "automation"}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </Button>
@@ -908,10 +1420,21 @@ export default function CrmOperations() {
             </p>
           )}
 
+          {mode === "automation" && (
+            <p className="mt-2 text-xs text-muted-foreground max-w-2xl">
+              Automation that did not happen: an event no rule ever got to act on, or a rule run that
+              failed. <strong>Retry</strong> is offered only where re-running cannot repeat what it
+              already did — a step with an <strong>unknown</strong> outcome, and anything loop
+              protection stopped, cannot be retried and say so.{" "}
+              <strong>Acknowledge</strong> re-runs nothing; it records that you decided. Looking at
+              this list releases nothing.
+            </p>
+          )}
+
           {/* Filters — stacked at 375px, inline from sm up. Project filters do
-              not apply to the delivery queue, which has its own. */}
+              not apply to the delivery or automation queues, which have their own. */}
           <div className={`mt-3 flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 ${
-            mode === "deliveries" ? "hidden" : "flex"
+            mode === "deliveries" || mode === "automation" ? "hidden" : "flex"
           }`}>
             <div className="sm:w-52">
               <label className={LABEL} htmlFor="ops-stage">Stage</label>
@@ -971,6 +1494,8 @@ export default function CrmOperations() {
         {/* ── Body ─────────────────────────────────────────────────────── */}
         {mode === "deliveries" ? (
           <DeliveryIssues onCountChange={setDeliveryCount} />
+        ) : mode === "automation" ? (
+          <AutomationFailures onCountChange={setAutomationCount} />
         ) : loading ? (
           mode === "board" ? (
             <div className="flex-1 flex gap-3 p-4 overflow-x-auto">
@@ -2053,6 +2578,10 @@ function TasksTab({ projectId, tasks, assignees, nameOf, afterWrite }: {
         projectId,
         assignedToStaffId: assignedTo ? Number(assignedTo) : null,
         dueDate: dueDate || null,
+        // This composer only ever collected a day, so it says so rather than
+        // letting the server infer it. Project work is owed by a date; a task
+        // that needs a moment is set from My Day, which offers both.
+        dueKind: "date",
         remindAt: localInputToIso(remindAt),
         priority: priority || null,
       }),
@@ -2114,7 +2643,10 @@ function TasksTab({ projectId, tasks, assignees, nameOf, afterWrite }: {
                           {assignees.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
                         </select>
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          Due {fmtDay(t.dueDate)}
+                          {/* Only a task somebody set as a moment shows one.
+                              Printing 12:00 AM against a task due "Friday"
+                              would put a decision in their mouth. */}
+                          Due {t.dueKind === "time" ? fmtMoment(t.dueDate) : fmtDay(t.dueDate)}
                         </span>
                         <span className="text-xs text-muted-foreground/70 truncate">
                           {nameOf(t.assignedToStaffId)}

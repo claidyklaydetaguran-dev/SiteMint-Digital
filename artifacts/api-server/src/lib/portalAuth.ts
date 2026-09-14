@@ -32,6 +32,7 @@ import {
   crmPortalAccounts, crmPortalSessions, crmPortalDocumentGrants,
   crmLeads, crmProjects, crmDeals, crmTransactions,
   crmAttachments, crmDocumentRequests,
+  crmQuotes, crmQuoteLineItems, crmInvoices, crmInvoiceLineItems,
   crmSupportTickets, crmSupportMessages, crmStaffLoginAttempts,
   type CrmPortalAccount,
 } from "@workspace/db";
@@ -495,6 +496,103 @@ export async function scopedTicket(leadId: number, ticketId: number) {
  * customer through a body, a count, a preview or an error — the rows are never
  * fetched in the first place.
  */
+// ── M5: quotes and invoices ─────────────────────────────────────────────────
+//
+// TWO conditions on every one of these, both built into the query rather than
+// left to a route: the record must belong to this contact, AND it must have
+// left draft.
+//
+// The second is not a nicety. A draft is a figure somebody is still arguing
+// about internally — a price that has not been agreed, a discount being
+// considered, a line item about to be removed. Showing one to a customer would
+// be worse than showing them nothing, and "the route remembers to filter on
+// status" is exactly the guarantee that stops being true the day somebody adds
+// a second route.
+
+/** Quote statuses a customer may see. `draft` is deliberately absent. */
+const PORTAL_VISIBLE_QUOTE_STATUSES = ["sent", "accepted", "declined", "expired"] as const;
+
+/** Invoice statuses a customer may see. `draft` is deliberately absent. */
+const PORTAL_VISIBLE_INVOICE_STATUSES = ["issued", "part_paid", "paid", "void"] as const;
+
+export async function scopedQuotes(leadId: number) {
+  return db.select().from(crmQuotes)
+    .where(and(
+      eq(crmQuotes.leadId, leadId),
+      inArray(crmQuotes.status, [...PORTAL_VISIBLE_QUOTE_STATUSES]),
+    ))
+    .orderBy(desc(crmQuotes.id));
+}
+
+export async function scopedQuote(leadId: number, quoteId: number) {
+  const [row] = await db.select().from(crmQuotes)
+    .where(and(
+      eq(crmQuotes.id, quoteId),
+      eq(crmQuotes.leadId, leadId),
+      inArray(crmQuotes.status, [...PORTAL_VISIBLE_QUOTE_STATUSES]),
+    ))
+    .limit(1);
+  return row;
+}
+
+/**
+ * Line items for this contact's quotes, fetched in one pass.
+ *
+ * The join to `crm_quotes` carries the tenant AND the visibility filter, so a
+ * draft's lines are never selected even though the caller asked only for a
+ * quote id list.
+ */
+export async function scopedQuoteLines(leadId: number, quoteIds: number[]) {
+  if (quoteIds.length === 0) return [];
+  return db.select({
+    id: crmQuoteLineItems.id,
+    quoteId: crmQuoteLineItems.quoteId,
+    position: crmQuoteLineItems.position,
+    description: crmQuoteLineItems.description,
+    quantity: crmQuoteLineItems.quantity,
+    unitPrice: crmQuoteLineItems.unitPrice,
+    lineTotal: crmQuoteLineItems.lineTotal,
+  })
+    .from(crmQuoteLineItems)
+    .innerJoin(crmQuotes, eq(crmQuoteLineItems.quoteId, crmQuotes.id))
+    .where(and(
+      inArray(crmQuoteLineItems.quoteId, quoteIds),
+      eq(crmQuotes.leadId, leadId),
+      inArray(crmQuotes.status, [...PORTAL_VISIBLE_QUOTE_STATUSES]),
+    ))
+    .orderBy(crmQuoteLineItems.position);
+}
+
+export async function scopedInvoices(leadId: number) {
+  return db.select().from(crmInvoices)
+    .where(and(
+      eq(crmInvoices.leadId, leadId),
+      inArray(crmInvoices.status, [...PORTAL_VISIBLE_INVOICE_STATUSES]),
+    ))
+    .orderBy(desc(crmInvoices.id));
+}
+
+export async function scopedInvoiceLines(leadId: number, invoiceIds: number[]) {
+  if (invoiceIds.length === 0) return [];
+  return db.select({
+    id: crmInvoiceLineItems.id,
+    invoiceId: crmInvoiceLineItems.invoiceId,
+    position: crmInvoiceLineItems.position,
+    description: crmInvoiceLineItems.description,
+    quantity: crmInvoiceLineItems.quantity,
+    unitPrice: crmInvoiceLineItems.unitPrice,
+    lineTotal: crmInvoiceLineItems.lineTotal,
+  })
+    .from(crmInvoiceLineItems)
+    .innerJoin(crmInvoices, eq(crmInvoiceLineItems.invoiceId, crmInvoices.id))
+    .where(and(
+      inArray(crmInvoiceLineItems.invoiceId, invoiceIds),
+      eq(crmInvoices.leadId, leadId),
+      inArray(crmInvoices.status, [...PORTAL_VISIBLE_INVOICE_STATUSES]),
+    ))
+    .orderBy(crmInvoiceLineItems.position);
+}
+
 export async function scopedTicketMessages(leadId: number, ticketId: number) {
   return db.select({
     id: crmSupportMessages.id,

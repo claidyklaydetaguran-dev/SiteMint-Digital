@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, List } from "lucide-react";
+import { Search, Plus, RefreshCw, Download, FileDown, Users, Phone, MessageSquare, List } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
 import { LEAD_STATUSES, PROJECT_TYPES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
@@ -159,6 +159,8 @@ export default function CrmLeads() {
     typeof window === "undefined" || window.matchMedia("(min-width: 768px)").matches);
   const [listQuery, setListQuery] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -249,6 +251,49 @@ export default function CrmLeads() {
       const d = await r.json().catch(() => ({})) as { error?: string };
       setFormErrors({ name: d.error || "Failed to create lead. Please try again." });
     }
+  };
+
+  /**
+   * Export exactly the list on screen.
+   *
+   * The ids of the currently-visible rows are sent rather than the filter
+   * values, because several of these smart lists are computed in the browser
+   * from the lead score — "score ≥ 80" has no server-side equivalent, and
+   * exporting "everything with status X" while somebody is looking at that list
+   * would be a different file wearing the right name.
+   *
+   * The response is fetched rather than linked so the request carries the
+   * session, and so a refusal (this needs `data.export`, which not every role
+   * holds) can be shown instead of opening a page of JSON.
+   */
+  const exportVisible = async () => {
+    if (leads.length === 0) return;
+    setExporting(true); setExportMsg("");
+    try {
+      const ids = leads.map(l => l.id).join(",");
+      const r = await adminFetch(`/api/crm/contacts/export.csv?ids=${ids}`);
+      if (r.status === 401) { setExporting(false); return; }
+      if (r.status === 403) {
+        setExportMsg("You do not have permission to export contacts.");
+        setExporting(false);
+        setTimeout(() => setExportMsg(""), 6000);
+        return;
+      }
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sitemint-contacts-${activeList.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportMsg(`Exported ${r.headers.get("X-Export-Rows") ?? leads.length} contacts`);
+      setTimeout(() => setExportMsg(""), 5000);
+    } catch {
+      setExportMsg("The export could not be produced.");
+      setTimeout(() => setExportMsg(""), 6000);
+    }
+    setExporting(false);
   };
 
   const importDiscovery = async () => {
@@ -373,9 +418,20 @@ export default function CrmLeads() {
                   {importMsg}
                 </span>
               )}
+              {exportMsg && (
+                <span className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                  {exportMsg}
+                </span>
+              )}
               <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
                 <Download className="w-3.5 h-3.5" />
                 {importingDiscovery ? "Importing…" : "Import"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportVisible} disabled={exporting || leads.length === 0}
+                title={`Export the ${leads.length} contact(s) in "${activeList.label}"`}
+                className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
+                <FileDown className="w-3.5 h-3.5" />
+                {exporting ? "Exporting…" : `Export ${leads.length}`}
               </Button>
               <Button size="sm" className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8" onClick={() => setShowCreate(true)}>
                 <Plus className="w-3.5 h-3.5" /> + New Lead

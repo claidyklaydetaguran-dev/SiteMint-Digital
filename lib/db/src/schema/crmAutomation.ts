@@ -722,6 +722,102 @@ export const crmAutomationApprovals = pgTable("crm_automation_approvals", {
 
 export type CrmAutomationApproval = typeof crmAutomationApprovals.$inferSelect;
 
+// ── Recovery actions (M6) ───────────────────────────────────────────────────
+//
+// ── The gap this closes ─────────────────────────────────────────────────────
+//
+// Everything above records what the MACHINE did. Nothing recorded what a PERSON
+// did about it. An event that gave up, or a run that failed, sat in its table
+// with an error on it and no way for anybody to say "I have dealt with this" —
+// so the only two possible states were "broken" and "broken, and somebody may
+// or may not have looked at it". That is the same silent-loss shape the
+// delivery work fixed for reminder mail, one layer over.
+//
+// This is the same answer, and deliberately the same vocabulary as
+// `crm_delivery_recovery_actions` (see docs/crm-ops/DELIVERY-GUARANTEE.md §6):
+// a recovery is a ROW, with the person, the reason, and the state the thing was
+// in when they acted. `crm_admin_audit_log` is written too, but it swallows its
+// own failures and carries no reason — fine for an audit trail, disqualifying
+// for the record that proves a case was closed.
+//
+// ── Two verbs, and they are not the same act ────────────────────────────────
+//
+//   retry        re-runs it. Offered ONLY where re-running cannot repeat a
+//                side effect — see `availableActions` in
+//                `artifacts/api-server/src/lib/automationFailures.ts`, which
+//                withholds it from a run with an `unknown` step, from anything
+//                a worker is still going to attempt by itself, and from a run
+//                a loop brake stopped.
+//   acknowledge  records that a person decided nothing more is needed. It
+//                re-runs NOTHING and changes no automation state at all.
+//
+// Conflating them is how "I have seen this" silently becomes "do it again".
+//
+// ── Why resolution is derived rather than stamped ───────────────────────────
+//
+// There is no `resolved_at` column on `crm_automation_events` or
+// `crm_automation_executions`, and deliberately so: those tables are the
+// machine's record and this change is additive to them in the strictest sense —
+// it does not touch them at all. An item is RESOLVED when its most recent
+// recovery row is an `acknowledge`, and un-resolved again the moment somebody
+// retries it. One ordered list per target, and the latest entry is the answer.
+
+/** What a recovery action can be about. Closed, so a typo cannot orphan a row. */
+export const CRM_AUTOMATION_FAILURE_TARGETS = ["event", "run"] as const;
+export type CrmAutomationFailureTarget = (typeof CRM_AUTOMATION_FAILURE_TARGETS)[number];
+
+/**
+ * The two things a person may do. The same words the delivery queue uses, minus
+ * `resend` — there is no outbound channel in the automation action vocabulary,
+ * so "deliberately send a second copy" is not a thing that exists here.
+ */
+export const CRM_AUTOMATION_RECOVERY_ACTIONS = ["retry", "acknowledge"] as const;
+export type CrmAutomationRecoveryAction = (typeof CRM_AUTOMATION_RECOVERY_ACTIONS)[number];
+
+export const crmAutomationRecoveryActions = pgTable("crm_automation_recovery_actions", {
+  id: serial("id").primaryKey(),
+
+  /** Which table the target lives in — `event` or `run` (an execution). */
+  targetKind: text("target_kind").notNull(),
+  targetId:   integer("target_id").notNull(),
+
+  action: text("action").notNull(),
+  /** Why the person did it. Required — an unexplained recovery is not a record. */
+  reason: text("reason").notNull(),
+
+  actorStaffId: integer("actor_staff_id"),
+  actorLabel:   text("actor_label").notNull(),
+
+  /** The state the target was in when the action was taken. */
+  previousStatus:   text("previous_status").notNull(),
+  previousAttempts: integer("previous_attempts").notNull().default(0),
+  /** Our closed failure classification at the time — see automationFailures.ts. */
+  previousFailure:  text("previous_failure"),
+
+  /** What the action actually did, in the words the operator was shown. */
+  detail: text("detail"),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  // "What has been done about this one", newest last. The ordering column is
+  // the id rather than the timestamp because two actions inside the same
+  // millisecond must still have a defined 'latest'.
+  index("ix_crm_automation_recovery_actions_target").on(table.targetKind, table.targetId, table.id),
+  index("ix_crm_automation_recovery_actions_actor").on(table.actorStaffId, table.id),
+
+  check("ck_crm_automation_recovery_actions_target",
+    sql`${table.targetKind} IN ('event', 'run')`),
+  check("ck_crm_automation_recovery_actions_action",
+    sql`${table.action} IN ('retry', 'acknowledge')`),
+  // A recovery with no reason teaches nobody anything, and the next person to
+  // find this row needs to know what was decided and why.
+  check("ck_crm_automation_recovery_actions_reason",
+    sql`length(btrim(${table.reason})) >= 3`),
+  check("ck_crm_automation_recovery_actions_attempts", sql`${table.previousAttempts} >= 0`),
+]);
+
+export type CrmAutomationRecoveryActionRow = typeof crmAutomationRecoveryActions.$inferSelect;
+
 // ── Shared helpers (used by the API, the engine and their tests) ────────────
 
 /** The fields a rule may compare, per record type. */

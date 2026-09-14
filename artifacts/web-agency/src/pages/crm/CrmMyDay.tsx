@@ -19,12 +19,31 @@ import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types (the live API contract) ────────────────────────────────────────────
 
+/**
+ * What the person who set the deadline meant: a day, or a moment.
+ *
+ * Stored on the task — `crm_tasks.due_kind` — rather than read back out of the
+ * timestamp. Guessing from the clock time could not tell a deliberate "by
+ * midnight" from a bare date, and gave a different answer to each colleague
+ * depending on their own timezone.
+ */
+type DueKind = "date" | "time";
+
+/**
+ * The server's fallback, repeated here so this page never draws a "00:00" the
+ * server does not believe in: anything that is not the word "time" is a day.
+ */
+function dueKindOf(raw: string | null | undefined): DueKind {
+  return raw === "time" ? "time" : "date";
+}
+
 interface DayTask {
   id: number;
   title: string;
   description?: string | null;
   status: string;
   dueDate?: string | null;
+  dueKind?: string | null;
   remindAt?: string | null;
   priority?: string | null;
   type?: string | null;
@@ -140,6 +159,46 @@ function toInputValue(iso: string | null | undefined, zone: string): string {
   return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
 }
 
+/**
+ * What the Due control shows, for either kind.
+ *
+ * A date-only task feeds a `type="date"` input, which wants just the day. Handing
+ * it the full "…T00:00" would render a midnight nobody chose — the misleading
+ * "00:00" this whole distinction exists to stop.
+ */
+function toDueInputValue(iso: string | null | undefined, zone: string, kind: DueKind): string {
+  const full = toInputValue(iso, zone);
+  return kind === "date" ? full.slice(0, 10) : full;
+}
+
+/**
+ * What the Due control sends back.
+ *
+ * A day still has to be STORED as an instant, because the column is a
+ * timestamp. Local midnight in this person's zone is the instant that names
+ * that day for them, and `due_kind` is what stops the server reading it as a
+ * deadline of 00:00.
+ */
+function fromDueInputValue(value: string, zone: string, kind: DueKind): string | null {
+  if (!value) return null;
+  return fromInputValue(kind === "date" ? `${value.slice(0, 10)}T00:00` : value, zone);
+}
+
+/**
+ * The same choice, re-shaped for the other kind's input.
+ *
+ * Switching to "a date and time" keeps the day and offers 00:00. That reads
+ * oddly on purpose: "by midnight" is precisely the deadline this control now
+ * makes sayable, and putting it in front of the person is how they see what
+ * they have chosen before they leave the field.
+ */
+function reshapeDue(raw: string, kind: DueKind): string {
+  const day = raw.slice(0, 10);
+  if (!day) return "";
+  if (kind === "date") return day;
+  return raw.length > 10 ? raw : `${day}T00:00`;
+}
+
 /** "YYYY-MM-DDTHH:mm" read as wall-clock in `zone` → an ISO instant. */
 function fromInputValue(value: string, zone: string): string | null {
   if (!value) return null;
@@ -177,18 +236,29 @@ function sameZoneDay(a: Date, b: Date, zone: string): boolean {
   return x.year === y.year && x.month === y.month && x.day === y.day;
 }
 
-/** "Today 14:30" / "Tomorrow 09:00" / "Mon, 14 Sep · 09:00". */
-function formatWhen(iso: string | null | undefined, zone: string, today: Date): string {
+/**
+ * "Today 14:30" / "Tomorrow 09:00" / "Mon, 14 Sep · 09:00" — and without the
+ * clock when `showTime` is false.
+ *
+ * A date-only deadline has a time in the database only because the column has
+ * one. Printing it would tell the reader something nobody decided, and it is
+ * the reason a "due Friday" task used to look like it was due at midnight.
+ */
+function formatWhen(
+  iso: string | null | undefined, zone: string, today: Date, showTime: boolean,
+): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
-  const time = formatClock(d, zone);
-  if (sameZoneDay(d, today, zone)) return `Today ${time}`;
+  const time = showTime ? ` ${formatClock(d, zone)}` : "";
+  if (sameZoneDay(d, today, zone)) return `Today${time}`;
   const tomorrow = new Date(today.getTime() + 86_400_000);
-  if (sameZoneDay(d, tomorrow, zone)) return `Tomorrow ${time}`;
+  if (sameZoneDay(d, tomorrow, zone)) return `Tomorrow${time}`;
   const yesterday = new Date(today.getTime() - 86_400_000);
-  if (sameZoneDay(d, yesterday, zone)) return `Yesterday ${time}`;
-  return `${formatShortDate(d, zone)} · ${time}`;
+  if (sameZoneDay(d, yesterday, zone)) return `Yesterday${time}`;
+  return showTime
+    ? `${formatShortDate(d, zone)} · ${formatClock(d, zone)}`
+    : formatShortDate(d, zone);
 }
 
 function relativeTime(iso: string | null | undefined, now: number): string {
@@ -251,6 +321,35 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 const INPUT = "w-full px-2.5 py-2 text-sm border border-input rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60";
+
+/**
+ * "A date" or "a date and time", asked plainly.
+ *
+ * The option labels spell out the consequence rather than leaving it to a
+ * tooltip, because the consequence is the entire reason the choice exists: one
+ * of these is late when the day ends and the other is late when the clock
+ * passes, and nobody should have to find that out by being nagged.
+ */
+function DueKindChoice({ id, value, disabled, onChange }: {
+  id: string;
+  value: DueKind;
+  disabled: boolean;
+  onChange: (next: DueKind) => void;
+}) {
+  return (
+    <select
+      id={id}
+      className={INPUT}
+      aria-label="What the due date means"
+      value={value}
+      disabled={disabled}
+      onChange={e => onChange(dueKindOf(e.target.value))}
+    >
+      <option value="date">A date — due by the end of that day</option>
+      <option value="time">A date and time — due at that moment</option>
+    </select>
+  );
+}
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
@@ -527,7 +626,9 @@ export default function CrmMyDay() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xs font-medium text-foreground tabular-nums">
-                          {formatWhen(f.nextFollowUpAt, zone, today) || "No date"}
+                          {/* A lead follow-up carries no kind of its own; it has
+                              always been a moment, and is shown as one. */}
+                          {formatWhen(f.nextFollowUpAt, zone, today, true) || "No date"}
                         </p>
                         {f.status && <p className="text-[11px] text-muted-foreground">{f.status}</p>}
                       </div>
@@ -682,7 +783,7 @@ function Section({
 // ── Task row + inline editor ─────────────────────────────────────────────────
 
 type EditorValues = {
-  dueDate: string; remindAt: string; priority: string;
+  dueDate: string; dueKind: DueKind; remindAt: string; priority: string;
   assignedToStaffId: string; blockedReason: string;
 };
 
@@ -690,6 +791,7 @@ type EditorValues = {
 function withField(values: EditorValues, field: keyof EditorValues, raw: string): EditorValues {
   switch (field) {
     case "dueDate": return { ...values, dueDate: raw };
+    case "dueKind": return { ...values, dueKind: dueKindOf(raw) };
     case "remindAt": return { ...values, remindAt: raw };
     case "priority": return { ...values, priority: raw };
     case "assignedToStaffId": return { ...values, assignedToStaffId: raw };
@@ -698,8 +800,10 @@ function withField(values: EditorValues, field: keyof EditorValues, raw: string)
 }
 
 function seedValues(task: DayTask, zone: string): EditorValues {
+  const kind = dueKindOf(task.dueKind);
   return {
-    dueDate: toInputValue(task.dueDate, zone),
+    dueDate: toDueInputValue(task.dueDate, zone, kind),
+    dueKind: kind,
     remindAt: toInputValue(task.remindAt, zone),
     priority: task.priority ?? "",
     assignedToStaffId: task.assignedToStaffId != null ? String(task.assignedToStaffId) : "",
@@ -731,6 +835,9 @@ function TaskRow({
   const late = accent === "urgent" ? daysLate(task.dueDate, new Date(now)) : 0;
   const done = task.checklist?.filter(c => c.done).length ?? 0;
   const steps = task.checklist?.length ?? 0;
+  // The row reads the task, not the editor: the editor's copy only exists while
+  // the disclosure is open, and the row is drawn either way.
+  const rowKind = dueKindOf(task.dueKind);
 
   function openEditor() {
     if (!open) {
@@ -742,7 +849,17 @@ function TaskRow({
     setOpen(o => !o);
   }
 
-  async function save(field: keyof EditorValues, raw: string) {
+  /** Applies whatever the server actually stored, or the local edit if it said nothing. */
+  function settle(field: keyof EditorValues, fallback: EditorValues, saved?: DayTask) {
+    const seeded = saved ? seedValues(saved, zone) : fallback;
+    setValues(seeded);
+    setBase(seeded);
+    setSavedField(field);
+    window.setTimeout(() => setSavedField(null), 1800);
+    onSaved();
+  }
+
+  async function save(field: Exclude<keyof EditorValues, "dueDate" | "dueKind">, raw: string) {
     if (raw === base[field]) return;          // nothing actually changed
     if (savingField === field) return;        // a commit for this field is already in flight
     // Never send an empty assignee: the API coerces a null id to 0, which is
@@ -755,8 +872,7 @@ function TaskRow({
     setRowError("");
 
     const body: Record<string, unknown> =
-      field === "dueDate" || field === "remindAt"
-        ? { [field]: raw ? fromInputValue(raw, zone) : null }
+      field === "remindAt" ? { remindAt: raw ? fromInputValue(raw, zone) : null }
         : field === "priority" ? { priority: raw || null }
         : field === "assignedToStaffId" ? { assignedToStaffId: raw ? Number(raw) : null }
         : { blockedReason: raw };
@@ -769,12 +885,34 @@ function TaskRow({
       setRowError(res.error);
       return;
     }
-    const seeded = res.task ? seedValues(res.task, zone) : withField(values, field, raw);
-    setValues(seeded);
-    setBase(seeded);
-    setSavedField(field);
-    window.setTimeout(() => setSavedField(null), 1800);
-    onSaved();
+    settle(field, withField(values, field, raw), res.task);
+  }
+
+  /**
+   * The deadline and what it means are ONE decision, so they are ONE write.
+   *
+   * Sent as two, whichever lost the race would decide the task's fate: the row
+   * would say "a day" about an instant somebody chose as a time, or the
+   * reverse, and the overdue rule reads exactly that pair.
+   */
+  async function saveDue(kind: DueKind, raw: string) {
+    if (kind === base.dueKind && raw === base.dueDate) return;
+    if (savingField === "dueDate") return;
+    setSavingField("dueDate");
+    setRowError("");
+
+    const res = await onPatch(task.id, {
+      dueDate: fromDueInputValue(raw, zone, kind),
+      dueKind: kind,
+    });
+    setSavingField(null);
+
+    if (!res.ok) {
+      setValues(v => ({ ...v, dueDate: base.dueDate, dueKind: base.dueKind }));
+      setRowError(res.error);
+      return;
+    }
+    settle("dueDate", { ...values, dueDate: raw, dueKind: kind }, res.task);
   }
 
   /**
@@ -782,13 +920,21 @@ function TaskRow({
    * save as "no date" and quietly lose the one that was there. The browser
    * flags that case as `badInput`, so put the stored value back instead.
    */
-  async function commitDate(field: "dueDate" | "remindAt", el: HTMLInputElement) {
-    if (el.validity.badInput) {
-      setValues(v => withField(v, field, base[field]));
-      setRowError("That date could not be read, so it was left as it was.");
-      return;
-    }
-    await save(field, el.value);
+  function unreadable(el: HTMLInputElement, restore: () => void): boolean {
+    if (!el.validity.badInput) return false;
+    restore();
+    setRowError("That date could not be read, so it was left as it was.");
+    return true;
+  }
+
+  async function commitDue(el: HTMLInputElement) {
+    if (unreadable(el, () => setValues(v => ({ ...v, dueDate: base.dueDate })))) return;
+    await saveDue(values.dueKind, el.value);
+  }
+
+  async function commitRemindAt(el: HTMLInputElement) {
+    if (unreadable(el, () => setValues(v => withField(v, "remindAt", base.remindAt)))) return;
+    await save("remindAt", el.value);
   }
 
   const edge = accent === "urgent" ? "border-red-200" : accent === "warm" ? "border-amber-200" : "border-border";
@@ -824,8 +970,12 @@ function TaskRow({
                 <span className={`inline-flex items-center gap-1 text-[11px] font-medium tabular-nums ${
                   accent === "urgent" ? "text-red-600" : "text-muted-foreground"
                 }`}>
-                  <Clock className="w-3 h-3" />
-                  {formatWhen(task.dueDate, zone, today)}
+                  {/* A day-shaped deadline gets the calendar icon; only a
+                      deadline with a chosen time gets the clock. */}
+                  {rowKind === "time"
+                    ? <Clock className="w-3 h-3" />
+                    : <CalendarClock className="w-3 h-3" />}
+                  {formatWhen(task.dueDate, zone, today, rowKind === "time")}
                   {late > 0 && ` · ${late}d late`}
                 </span>
               ) : (
@@ -833,7 +983,7 @@ function TaskRow({
               )}
               {task.remindAt && (
                 <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
-                  <Bell className="w-3 h-3" /> {formatWhen(task.remindAt, zone, today)}
+                  <Bell className="w-3 h-3" /> {formatWhen(task.remindAt, zone, today, true)}
                 </span>
               )}
               {task.type && <span className="text-[11px] text-muted-foreground">{task.type}</span>}
@@ -889,14 +1039,24 @@ function TaskRow({
               <FieldLabel>
                 Due <SaveHint field="dueDate" saving={savingField} saved={savedField} />
               </FieldLabel>
+              <DueKindChoice
+                id={`due-kind-${task.id}`}
+                value={values.dueKind}
+                disabled={savingField === "dueDate"}
+                onChange={next => {
+                  setValues(v => ({ ...v, dueKind: next, dueDate: reshapeDue(v.dueDate, next) }));
+                  void saveDue(next, reshapeDue(values.dueDate, next));
+                }}
+              />
               <input
-                type="datetime-local"
-                className={INPUT}
+                type={values.dueKind === "date" ? "date" : "datetime-local"}
+                className={`${INPUT} mt-1.5`}
+                aria-label={values.dueKind === "date" ? "Due date" : "Due date and time"}
                 value={values.dueDate}
                 disabled={savingField === "dueDate"}
                 onChange={e => setValues(v => withField(v, "dueDate", e.target.value))}
-                onBlur={e => void commitDate("dueDate", e.target)}
-                onKeyDown={e => { if (e.key === "Enter") void commitDate("dueDate", e.currentTarget); }}
+                onBlur={e => void commitDue(e.target)}
+                onKeyDown={e => { if (e.key === "Enter") void commitDue(e.currentTarget); }}
               />
             </div>
 
@@ -910,8 +1070,8 @@ function TaskRow({
                 value={values.remindAt}
                 disabled={savingField === "remindAt"}
                 onChange={e => setValues(v => withField(v, "remindAt", e.target.value))}
-                onBlur={e => void commitDate("remindAt", e.target)}
-                onKeyDown={e => { if (e.key === "Enter") void commitDate("remindAt", e.currentTarget); }}
+                onBlur={e => void commitRemindAt(e.target)}
+                onKeyDown={e => { if (e.key === "Enter") void commitRemindAt(e.currentTarget); }}
               />
             </div>
 
@@ -1007,6 +1167,9 @@ function AddTaskComposer({ zone, assignees, signedInId, onCreated }: {
 }) {
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  // A day unless somebody says otherwise: most work is owed by a day, and it is
+  // the answer that cannot produce a false "you are late" on the morning of.
+  const [dueKind, setDueKind] = useState<DueKind>("date");
   const [remindAt, setRemindAt] = useState("");
   const [priority, setPriority] = useState("Medium");
   const [assignedTo, setAssignedTo] = useState("");
@@ -1021,7 +1184,8 @@ function AddTaskComposer({ zone, assignees, signedInId, onCreated }: {
     setOk("");
     const body: Record<string, unknown> = {
       title: title.trim(),
-      dueDate: dueDate ? fromInputValue(dueDate, zone) : null,
+      dueDate: fromDueInputValue(dueDate, zone, dueKind),
+      dueKind,
       remindAt: remindAt ? fromInputValue(remindAt, zone) : null,
       priority: priority || null,
     };
@@ -1039,7 +1203,7 @@ function AddTaskComposer({ zone, assignees, signedInId, onCreated }: {
         : message);
       return;
     }
-    setTitle(""); setDueDate(""); setRemindAt(""); setPriority("Medium"); setAssignedTo("");
+    setTitle(""); setDueDate(""); setDueKind("date"); setRemindAt(""); setPriority("Medium"); setAssignedTo("");
     setOk("Task added.");
     window.setTimeout(() => setOk(""), 2500);
     onCreated();
@@ -1063,7 +1227,19 @@ function AddTaskComposer({ zone, assignees, signedInId, onCreated }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
         <div>
           <FieldLabel>Due (optional)</FieldLabel>
-          <input type="datetime-local" className={INPUT} value={dueDate} onChange={e => setDueDate(e.target.value)} />
+          <DueKindChoice
+            id="add-task-due-kind"
+            value={dueKind}
+            disabled={busy}
+            onChange={next => { setDueKind(next); setDueDate(d => reshapeDue(d, next)); }}
+          />
+          <input
+            type={dueKind === "date" ? "date" : "datetime-local"}
+            className={`${INPUT} mt-1.5`}
+            aria-label={dueKind === "date" ? "Due date" : "Due date and time"}
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+          />
         </div>
         <div>
           <FieldLabel>Reminder (optional)</FieldLabel>

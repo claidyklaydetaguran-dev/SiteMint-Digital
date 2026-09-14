@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, decimal, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -41,13 +41,32 @@ export const crmTransactions = pgTable("crm_transactions", {
   dealId: integer("deal_id").notNull(),
   leadId: integer("lead_id"),
 
+  /**
+   * M5, additive and nullable: the invoice this payment settles, when it
+   * settles one.
+   *
+   * Deliberately a new NULLABLE column rather than any change to the two above.
+   * Every "money received" figure in this system sums `amount` filtered on
+   * `status` and reads neither of these keys, so nothing existing moves — and
+   * an invoice payment lands in the SAME table as every other payment rather
+   * than in a parallel ledger that would have to be reconciled by hand.
+   *
+   * Null means the payment was recorded without an invoice, which is what every
+   * row written before M5 is and what the Stripe and manual routes still write.
+   */
+  invoiceId: integer("invoice_id"),
+
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   method: text("method").notNull(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   status: text("status").default("pending").notNull(),
   receivedAt: timestamp("received_at", { withTimezone: true }),
   notes: text("notes"),
-});
+}, (table) => [
+  // The only index on this table, and it exists for one query: recomputing an
+  // invoice's settled total from the transactions that settled it.
+  index("ix_crm_transactions_invoice").on(table.invoiceId),
+]);
 
 export const insertCrmTransactionSchema = createInsertSchema(crmTransactions).omit({
   id: true, createdAt: true, updatedAt: true,

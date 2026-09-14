@@ -13,6 +13,7 @@ import {
   crmProjectTemplates, crmNotifications, crmScheduledJobs,
   crmReminderDeliveries, crmDeliveryRecoveryActions,
   CRM_COMMENT_ENTITIES, CRM_DELIVERY_STATES,
+  CRM_TASK_DUE_KIND_FALLBACK, isCrmTaskDueKind, type CrmTaskDueKind,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import {
@@ -132,13 +133,13 @@ router.get("/crm/my-day", requireCrmAuth(), async (req: Request, res: Response) 
     if (!t.dueDate) { buckets.unscheduled.push(d); continue; }
     const ms = t.dueDate.getTime();
     // Overdue uses the same rule the automation sweep uses, so the two surfaces
-    // cannot disagree about the same task: a deadline with a real time is
-    // overdue once that instant has passed, and one stored at local midnight —
-    // which is what a bare date looks like through a datetime input — is
-    // overdue only once its day has ended. Previously both were day-based, so a
-    // task the person deliberately set for 09:00 sat in "Due today" all
-    // afternoon while its own row displayed the time they had chosen.
-    if (isOverdueInZone(zone, t.dueDate, nowInstant)) buckets.overdue.push(d);
+    // cannot disagree about the same task. The task's own `dueKind` decides: a
+    // deadline somebody set as a moment is overdue once that moment has passed,
+    // and one set as a day is overdue only once the day has ended in this
+    // person's zone. Neither is inferred from the stored clock time any more —
+    // that inference could not tell a real midnight deadline from a bare date,
+    // and gave different answers to two people looking at the same row.
+    if (isOverdueInZone(zone, t.dueDate, t.dueKind, nowInstant)) buckets.overdue.push(d);
     else if (ms < end.getTime()) buckets.dueToday.push(d);
     else if (ms < soon.getTime()) buckets.upcoming.push(d);
   }
@@ -176,6 +177,21 @@ function parseDate(v: unknown): Date | null | undefined {
   return Number.isFinite(d.getTime()) ? d : undefined;
 }
 
+const DUE_KIND_ERROR = 'A due date is either "date" (a day) or "time" (a moment). Nothing else.';
+
+/**
+ * The due kind the body states, `undefined` when it states none.
+ *
+ * "invalid" is a third answer on purpose. Silently falling back on an
+ * unrecognised value is how the column would start lying: a client that sends
+ * `"datetime"` would be told 201 and then find its task treated as date-only.
+ * A body that mentions the kind must mean one of the two.
+ */
+function parseDueKind(v: unknown): CrmTaskDueKind | "invalid" | undefined {
+  if (v === undefined || v === null || v === "") return undefined;
+  return isCrmTaskDueKind(v) ? v : "invalid";
+}
+
 router.post("/crm/operations/tasks", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   const b = req.body as Record<string, unknown>;
   const title = typeof b["title"] === "string" ? b["title"].trim() : "";
@@ -195,6 +211,12 @@ router.post("/crm/operations/tasks", requireCrmAuth("tasks.write"), async (req: 
   const remindAt = parseDate(b["remindAt"]);
   if (dueDate === undefined && b["dueDate"] !== undefined) { res.status(400).json({ error: "Invalid due date." }); return; }
 
+  // A client that says nothing gets the fallback rather than a refusal: every
+  // task-creating route in this codebase predates the column, and a lead-screen
+  // form that only ever collected a day is still right about what it meant.
+  const dueKind = parseDueKind(b["dueKind"]);
+  if (dueKind === "invalid") { res.status(400).json({ error: DUE_KIND_ERROR }); return; }
+
   const [task] = await db.insert(crmTasks).values({
     title,
     description: typeof b["description"] === "string" ? b["description"] : null,
@@ -202,6 +224,7 @@ router.post("/crm/operations/tasks", requireCrmAuth("tasks.write"), async (req: 
     leadId: num(b["leadId"]) ?? null,
     projectId: num(b["projectId"]) ?? null,
     dueDate: dueDate ?? null,
+    dueKind: dueKind ?? CRM_TASK_DUE_KIND_FALLBACK,
     remindAt: remindAt ?? null,
     priority: typeof b["priority"] === "string" ? b["priority"] : null,
     recurrence: typeof b["recurrence"] === "string" ? b["recurrence"] : null,
@@ -237,6 +260,14 @@ router.patch("/crm/operations/tasks/:id", requireCrmAuth("tasks.write"), async (
     const parsed = parseDate(b[field]);
     if (parsed === undefined) { res.status(400).json({ error: `Invalid ${field}.` }); return; }
     updates[field] = parsed;
+  }
+
+  // Stricter than create: the column is NOT NULL, so a PATCH that mentions the
+  // kind and then leaves it blank is asking for something that does not exist.
+  if ("dueKind" in b) {
+    const kind = parseDueKind(b["dueKind"]);
+    if (kind === undefined || kind === "invalid") { res.status(400).json({ error: DUE_KIND_ERROR }); return; }
+    updates["dueKind"] = kind;
   }
 
   if ("assignedToStaffId" in b) {

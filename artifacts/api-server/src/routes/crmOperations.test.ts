@@ -432,6 +432,75 @@ suite("M2 operations, reminders and command center (real DB)", () => {
     expect(allTitles).not.toContain("[CRM-TEST] unassign me");
   }, 30_000);
 
+  // ── What a due date MEANS ─────────────────────────────────────────────────
+  //
+  // `due_kind` is stored because it cannot be inferred. The pure rule is pinned
+  // in `overdueSemantics.test.ts`; this is the same distinction all the way
+  // through the API and My Day's buckets, on ONE stored instant, so a change
+  // that only fixes the helper cannot pass.
+
+  it("refuses a due kind that is not one of the two meanings", async () => {
+    const bad = await owner.call("POST", "/api/crm/operations/tasks", {
+      title: "[CRM-TEST] bad kind", assignedToStaffId: ids["owner"], dueKind: "datetime",
+    });
+    expect(bad.status).toBe(400);
+    expect(String(bad.json["error"])).toContain("date");
+
+    const ok = await owner.call("POST", "/api/crm/operations/tasks", {
+      title: "[CRM-TEST] good kind", assignedToStaffId: ids["owner"], dueKind: "time",
+      dueDate: new Date(Date.now() + 3600_000).toISOString(),
+    });
+    expect(ok.status).toBe(201);
+    expect(ok.json["task"].dueKind).toBe("time");
+
+    // A PATCH is held to the same two words, and cannot blank the column.
+    const taskId = ok.json["task"].id as number;
+    const patched = await owner.call("PATCH", `/api/crm/operations/tasks/${taskId}`, { dueKind: "whenever" });
+    expect(patched.status).toBe(400);
+    const cleared = await owner.call("PATCH", `/api/crm/operations/tasks/${taskId}`, { dueKind: null });
+    expect(cleared.status).toBe(400);
+
+    const changed = await owner.call("PATCH", `/api/crm/operations/tasks/${taskId}`, { dueKind: "date" });
+    expect(changed.status).toBe(200);
+    expect(changed.json["task"].dueKind).toBe("date");
+  }, 30_000);
+
+  it("says nothing about the kind and gets a day, the way every older client does", async () => {
+    const created = await owner.call("POST", "/api/crm/operations/tasks", {
+      title: "[CRM-TEST] silent client", assignedToStaffId: ids["owner"],
+    });
+    expect(created.status).toBe(201);
+    expect(created.json["task"].dueKind).toBe("date");
+  }, 30_000);
+
+  it("buckets one stored instant by what its author meant, not by its clock time", async () => {
+    // The instant is local midnight TODAY for the signed-in person — the one
+    // value the old heuristic could only read one way. `dayStart` is the
+    // server's own answer for where this person's day begins, so this holds in
+    // any timezone the account happens to be set to.
+    const before = await owner.call("GET", "/api/crm/my-day");
+    const midnight = before.json["dayStart"] as string;
+
+    await owner.call("POST", "/api/crm/operations/tasks", {
+      title: "[CRM-TEST] by midnight today", assignedToStaffId: ids["owner"],
+      dueDate: midnight, dueKind: "time",
+    });
+    await owner.call("POST", "/api/crm/operations/tasks", {
+      title: "[CRM-TEST] on today", assignedToStaffId: ids["owner"],
+      dueDate: midnight, dueKind: "date",
+    });
+
+    const day = await owner.call("GET", "/api/crm/my-day");
+    const titles = (bucket: string) => (day.json[bucket] as { title: string }[]).map((t) => t.title);
+
+    // Asked for by midnight, and midnight has gone.
+    expect(titles("overdue")).toContain("[CRM-TEST] by midnight today");
+    expect(titles("dueToday")).not.toContain("[CRM-TEST] by midnight today");
+    // Asked for today, and today is not over.
+    expect(titles("dueToday")).toContain("[CRM-TEST] on today");
+    expect(titles("overdue")).not.toContain("[CRM-TEST] on today");
+  }, 30_000);
+
   it("exposes reminder preferences on the staff record so the UI can seed them", async () => {
     const me = await owner.call("GET", "/api/crm/staff/me");
     expect(me.status).toBe(200);

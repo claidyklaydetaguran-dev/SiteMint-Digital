@@ -59,7 +59,7 @@ import {
   db,
   crmAutomationRules, crmAutomationEvents, crmScheduledJobs,
   crmStaff, crmTasks, crmLeads,
-  CRM_AUTOMATION_TRIGGER_RECORD, isSweepTrigger,
+  CRM_AUTOMATION_TRIGGER_RECORD, isSweepTrigger, resolveCrmTaskDueKind,
   type CrmAutomationChain, type CrmAutomationEvent, type CrmAutomationTriggerEvent,
   type CrmScheduledJob,
 } from "@workspace/db";
@@ -151,7 +151,12 @@ export function calendarDaysBetween(from: string, to: string): number {
 /**
  * Local wall-clock time of an instant, as "HH:mm", in `zone`.
  *
- * Used only to tell a date-only deadline from a timed one — see below.
+ * This is what the old midnight heuristic looked at, and it no longer decides
+ * anything: `due_kind` does. It survives because it is still the right question
+ * for CLASSIFYING a legacy row — "what clock time does this land on for the
+ * person who owns it" is exactly what the reviewed backfill asks — and because
+ * the tests use it to show that the answer differs by zone while overdue-ness
+ * now does not.
  */
 export function localClockTime(zone: string, at: Date): string {
   const fmt = (z: string) => new Intl.DateTimeFormat("en-GB", {
@@ -165,48 +170,47 @@ export function localClockTime(zone: string, at: Date): string {
 }
 
 /**
- * Is a task with this due instant overdue, for somebody in this zone, now?
+ * Is a task with this deadline overdue, for somebody in this zone, now?
  *
- * ── Why this is not simply `dueAt < now` ────────────────────────────────────
+ * ── The author decides, not the value ───────────────────────────────────────
  *
  * `crm_tasks.due_date` is a `timestamp with time zone`: it always carries a
  * time, whether or not anybody chose one. So the column cannot, by itself,
- * distinguish "due on the 15th" from "due at 00:00 on the 15th". Comparing
+ * distinguish "due on the 15th" from "due at 00:00 on the 15th", and comparing
  * instants would make every date-only task overdue one minute into the very day
- * it is due, which is wrong and would be the more annoying failure of the two.
+ * it is due.
  *
- * An earlier version solved that by comparing calendar days only. That was
- * wrong in the other direction: the composer collects a time with a
- * `datetime-local` input and My Day displays it ("Today 14:30"), so somebody
- * who deliberately sets 09:00 is told their task is not overdue all afternoon.
- * The explanation given for it — "the person still has the day" — described a
- * design nobody had chosen; it was a limitation presented as an intention.
+ * This used to be guessed — local midnight meant date-only, any other local
+ * time meant timed — and the guess was wrong twice over. It had no way to
+ * express "by 00:00 Friday": somebody who genuinely meant that was quietly
+ * given until Friday ended. And it was answered in the zone of whoever was
+ * asking, so the same stored instant was date-only for a colleague in Manila
+ * and timed for one in California. A meaning that changes with the reader is
+ * not a meaning.
  *
- * The rule now matches what the data can actually support:
+ * So `due_kind` carries what the author chose, and this reads it:
  *
- *   - **Midnight local means date-only.** The day has to END before the task is
- *     overdue. This is what a bare date stored through a datetime input looks
- *     like, and treating it as "due at 00:00" would be a false alarm.
- *   - **Any other local time means timed.** The instant has to have PASSED. A
- *     task due 09:00 is overdue at 09:01, which is what the person who typed
- *     09:00 meant.
+ *   - **"date"** — the day has to END. `localCalendarDay` names that day in the
+ *     assignee's zone, because a day is a local thing.
+ *   - **"time"** — the instant has to have PASSED. An instant is the same
+ *     everywhere, so no zone is consulted and none is needed.
  *
- * Midnight is judged in the assignee's own zone, because 00:00 local is a
- * different instant in every zone — reading it in UTC would misclassify
- * everyone outside UTC.
+ * `resolveCrmTaskDueKind` decides what an unset or unrecognised kind means, in
+ * one named place, rather than each caller improvising a default.
  *
- * Daylight saving is handled by construction. The timed branch compares
- * instants, which have no wall-clock ambiguity. The date-only branch compares
- * day labels produced by `Intl` in the target zone, which is correct across a
- * transition — including the spring-forward day that has no 02:00 and the
- * autumn day that has two 01:30s.
+ * Daylight saving is handled by construction, unchanged. The timed branch
+ * compares instants, which have no wall-clock ambiguity. The date branch
+ * compares day labels produced by `Intl` in the target zone, which is correct
+ * across a transition — including the spring-forward day that has no 02:00 and
+ * the autumn day that has two 01:30s.
  */
-export function isOverdueInZone(zone: string, dueAt: Date, now: Date): boolean {
-  const dateOnly = localClockTime(zone, dueAt) === "00:00";
-  if (dateOnly) {
-    return localCalendarDay(zone, dueAt) < localCalendarDay(zone, now);
+export function isOverdueInZone(
+  zone: string, dueAt: Date, dueKind: unknown, now: Date,
+): boolean {
+  if (resolveCrmTaskDueKind(dueKind) === "time") {
+    return dueAt.getTime() < now.getTime();
   }
-  return dueAt.getTime() < now.getTime();
+  return localCalendarDay(zone, dueAt) < localCalendarDay(zone, now);
 }
 
 /** Active staff timezones, by id and by display name. */
@@ -524,7 +528,7 @@ async function taskOverdueStillTrue(event: CrmAutomationEvent, now: Date): Promi
   const zone = (task.assignedToStaffId != null ? byId.get(task.assignedToStaffId) : undefined)
     ?? AUTOMATION_FALLBACK_TIMEZONE;
 
-  if (!isOverdueInZone(zone, task.dueDate, now)) {
+  if (!isOverdueInZone(zone, task.dueDate, task.dueKind, now)) {
     return { ok: false, reason: "the task's due date moved and it is no longer overdue" };
   }
   const fresh = taskOverdueOccurrenceKey(zone, task.id, task.dueDate);
@@ -781,7 +785,7 @@ async function sweepTaskOverdue(now: Date): Promise<number> {
     if (!task.dueDate) continue;
     const zone = (task.assignedToStaffId != null ? byId.get(task.assignedToStaffId) : undefined)
       ?? AUTOMATION_FALLBACK_TIMEZONE;
-    if (!isOverdueInZone(zone, task.dueDate, now)) continue;
+    if (!isOverdueInZone(zone, task.dueDate, task.dueKind, now)) continue;
 
     const recorded = await recordAutomationEvent({
       trigger: "task_overdue",

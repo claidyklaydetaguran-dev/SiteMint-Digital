@@ -29,6 +29,41 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/document-requests": "admin",
   "PATCH /api/crm/document-requests/:id": "admin",
 
+  // ── M5: quotes and invoices (routes/crmBilling.ts) ───────────────────────
+  //
+  // All behind requireCrmAuth with a named permission — `deals.write` for every
+  // one of them, `deals.read` for the (non-mutating, therefore unlisted) reads.
+  // They read "admin" while the legacy bearer fallback stands, like every other
+  // CRM route.
+  //
+  // `deals.write` rather than `documents.write`, because a quote and an invoice
+  // are sales records that happen to produce a document, not files that happen
+  // to carry figures. The person allowed to change what the business is selling
+  // is the person allowed to price it.
+  //
+  // Two of these deserve naming individually:
+  //
+  //   `.../invoices/:id/payments` writes a `crm_transactions` row with
+  //   TRANSACTION_RECEIVED_STATUS. It is therefore a route that changes the
+  //   "money received" figure on FOUR surfaces at once (Command Center,
+  //   forecast, per-contact chain, customer portal), which is a heavier act
+  //   than its neighbours and is audited with the transaction id. It is also
+  //   strictly tighter than the older `POST /api/crm/deals/:id/transactions/
+  //   manual`, which asserts no permission at all.
+  //
+  //   `.../quotes/:id/send` and `.../invoices/:id/issue` write into
+  //   `crm_attachments` AND grant the customer sight of the result. Nothing is
+  //   emailed by either — that line stays at `communications.send`.
+  "POST /api/crm/quotes": "admin",
+  "PATCH /api/crm/quotes/:id": "admin",
+  "POST /api/crm/quotes/:id/send": "admin",
+  "POST /api/crm/quotes/:id/status": "admin",
+  "POST /api/crm/invoices": "admin",
+  "PATCH /api/crm/invoices/:id": "admin",
+  "POST /api/crm/invoices/:id/issue": "admin",
+  "POST /api/crm/invoices/:id/payments": "admin",
+  "POST /api/crm/invoices/:id/void": "admin",
+
   // ── The inbox ───────────────────────────────────────────────────────────
   // Read position records which conversations a person has opened; it sends
   // nothing, and the worst a caller can do is clear their own badge. Assign,
@@ -69,6 +104,10 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/appointments": "admin",
   "PATCH /api/crm/appointments/:id": "admin",
   "DELETE /api/crm/appointments/:id": "admin",
+  // Re-sends the current revision to every attendee. It contacts people
+  // outside the company, so it carries the same `tasks.write` grant as the
+  // booking itself — never a lesser one.
+  "POST /api/crm/appointments/:id/invitations": "admin",
 
   // ── M4: Support (routes/crmSupport.ts) ───────────────────────────────────
   // All behind requireCrmAuth with a named permission — support.write for the
@@ -112,6 +151,21 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "DELETE /api/crm/automation/rules/:id": "admin",
   "POST /api/crm/automation/rules/:id/run": "admin",
   "POST /api/crm/automation/approvals/:id/decide": "admin",
+
+  // ── M6 Automation failure recovery ────────────────────────────────────
+  //
+  // The two verbs an operator has over an automation that did not happen, and
+  // they are not the same act. `retry` re-runs it and is OFFERED ONLY where
+  // re-running cannot repeat a side effect — never for a run whose step came
+  // back unknown, never for one a loop brake stopped, never for anything a
+  // worker will attempt by itself — and the refusal says which. `acknowledge`
+  // records that a person decided nothing more is needed and re-runs nothing.
+  // Both require `settings.write` and a reason, and both write a
+  // `crm_automation_recovery_actions` row with the person on it; the listing
+  // and detail reads beside them need only `settings.read`, because seeing why
+  // an automation did not happen is not the authority to make it happen.
+  "POST /api/crm/automation/failures/:kind/:id/retry": "admin",
+  "POST /api/crm/automation/failures/:kind/:id/acknowledge": "admin",
 
   "POST /api/crm/support/tickets": "admin",
   "POST /api/crm/support/service-requests": "admin",
@@ -211,6 +265,12 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/portal/logout": "portal",
   "POST /api/portal/documents": "portal",
   "POST /api/portal/proposals/:dealId/accept": "portal",
+  // M5. The same act as the line above, on the itemised document: a customer
+  // accepting a quote. It is "portal" for the same reason, and it records the
+  // same thing — `PORTAL_NOT_A_SIGNATURE`, never a signature. The quote's own
+  // state machine and a `crm_quotes` check constraint additionally refuse an
+  // acceptance that is not bound to a deal.
+  "POST /api/portal/quotes/:id/accept": "portal",
   "POST /api/portal/tickets": "portal",
   "POST /api/portal/tickets/:id/messages": "portal",
 
@@ -271,6 +331,29 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/staff/:id/invite": "staff",
   "PATCH /api/crm/staff/:id": "staff",
   "POST /api/crm/staff/:id/password-reset": "staff",
+
+  // ── M6: contact import and duplicate review (routes/crmContacts.ts) ───────
+  // All behind requireCrmAuth with a named permission.
+  //
+  // `preview` writes nothing — it exists so the operator sees what an import
+  // would do before it does it — but it still reads the whole contact book to
+  // decide, so it is gated exactly as the commit is rather than left open as
+  // "only a preview".
+  //
+  // `merge` carries `leads.write`, not `leads.delete`, and that is correct
+  // BECAUSE a merge deletes nothing: the merged-away contact row is retained
+  // and recorded in crm_contact_merges, and the contact list hides it with a
+  // NOT EXISTS join. If a merge ever starts deleting the losing row it becomes
+  // an owner-only act and this entry has to change with it.
+  //
+  // Not listed, because this contract covers mutating routes only:
+  // `GET /api/crm/contacts/export.csv` is a read — but it is bulk egress of
+  // customer data, so it is the one contact route gated on `data.export`
+  // (owner and technical_admin), and every call is audited with its row count.
+  "POST /api/crm/contacts/import/preview": "admin",
+  "POST /api/crm/contacts/import/commit": "admin",
+  "POST /api/crm/contacts/duplicates/dismiss": "admin",
+  "POST /api/crm/contacts/duplicates/merge": "admin",
 
   "DELETE /api/crm/campaigns/:id": "admin",
   "DELETE /api/crm/campaigns/:id/steps/:stepId": "admin",

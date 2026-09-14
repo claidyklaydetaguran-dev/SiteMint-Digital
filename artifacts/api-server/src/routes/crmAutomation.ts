@@ -22,15 +22,20 @@ import {
   CRM_AUTOMATION_TRIGGERS, CRM_AUTOMATION_OPERATORS, CRM_AUTOMATION_ACTION_TYPES,
   CRM_AUTOMATION_RECORD_TYPES, CRM_AUTOMATION_TRIGGER_RECORD, CRM_AUTOMATION_FIELDS,
   CRM_AUTOMATION_WRITABLE_FIELDS, CRM_AUTOMATION_EXECUTION_STATUSES,
-  CRM_AUTOMATION_STOP_REASONS, CRM_AUTOMATION_COMBINERS,
+  CRM_AUTOMATION_STOP_REASONS, CRM_AUTOMATION_COMBINERS, CRM_AUTOMATION_FAILURE_TARGETS,
   isAutomationField, isAutomationWritableField,
   type CrmAutomationAction, type CrmAutomationActionType, type CrmAutomationConditionGroup,
   type CrmAutomationRecordType, type CrmAutomationTrigger,
+  type CrmAutomationFailureTarget, type CrmAutomationRecoveryAction,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import {
   decideAutomationApproval, drainAutomationJobs, runRuleManually,
 } from "../lib/automationEngine.js";
+import {
+  AUTOMATION_FAILURE_DEFINITIONS, getAutomationFailure, listAutomationFailures,
+  recoverAutomationFailure, recoveryHistory,
+} from "../lib/automationFailures.js";
 
 const router: IRouter = Router();
 
@@ -623,5 +628,131 @@ router.get("/crm/automation/health", requireCrmAuth("settings.read"), async (_re
       (stops["chain_depth_exceeded"] ?? 0) + (stops["rate_cap_exceeded"] ?? 0),
   });
 });
+
+// ── M6: failures, and the two things a person may do about them ─────────────
+//
+// Until this existed, a failed automation was visible only by querying the
+// table — `docs/crm-ops/COMPLETENESS-2026-09-14.md` area 10. The classification,
+// the refusals and the recovery all live in `lib/automationFailures.ts`; these
+// routes are the permission gate, the body handling and nothing else.
+//
+// Reading is `settings.read` and recovering is `settings.write`, the same split
+// the rest of this file uses and the same one the reminder-delivery queue uses:
+// being able to SEE why an automation did not happen is not the same authority
+// as making it happen.
+
+function failureTarget(req: Request, res: Response): CrmAutomationFailureTarget | null {
+  const kind = String(req.params["kind"]);
+  if (!(CRM_AUTOMATION_FAILURE_TARGETS as readonly string[]).includes(kind)) {
+    res.status(400).json({
+      error: `"${kind}" is not a kind of automation failure.`,
+      accepted: CRM_AUTOMATION_FAILURE_TARGETS,
+    });
+    return null;
+  }
+  return kind as CrmAutomationFailureTarget;
+}
+
+/**
+ * Everything automation did not manage to do.
+ *
+ * Two tables, two keyset streams, merged for display and paged independently —
+ * so an unresolved failure can never be hidden by there being too many of them,
+ * and `counts.matchingFilters` is the whole set rather than the page.
+ *
+ * This is a SELECT and only a SELECT. Looking at the list retries nothing,
+ * emits nothing and releases nothing.
+ */
+router.get("/crm/automation/failures", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
+  const q = req.query as Record<string, unknown>;
+  const kind = typeof q["kind"] === "string"
+    && (CRM_AUTOMATION_FAILURE_TARGETS as readonly string[]).includes(q["kind"])
+    ? q["kind"] as CrmAutomationFailureTarget
+    : null;
+
+  const result = await listAutomationFailures({
+    scope: q["scope"] === "all" ? "all" : "unresolved",
+    kind,
+    limit: num(q["limit"]),
+    runCursor: num(q["runCursor"]) ?? null,
+    eventCursor: num(q["eventCursor"]) ?? null,
+  });
+
+  res.json({ ...result, definitions: AUTOMATION_FAILURE_DEFINITIONS });
+});
+
+/** One failure in full, plus every recovery anybody has performed on it. */
+router.get("/crm/automation/failures/:kind/:id", requireCrmAuth("settings.read"),
+  async (req: Request, res: Response) => {
+    const kind = failureTarget(req, res);
+    if (!kind) return;
+    const id = num(req.params["id"]);
+    if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
+
+    const failure = await getAutomationFailure(kind, id);
+    if (!failure) {
+      res.status(404).json({
+        error: "Nothing by that id is a failed automation. It may have succeeded, been retried by a "
+          + "worker, or never have failed at all.",
+      });
+      return;
+    }
+
+    res.json({
+      failure,
+      recoveryActions: await recoveryHistory(kind, id),
+      definitions: AUTOMATION_FAILURE_DEFINITIONS,
+    });
+  });
+
+/** Shared body handling for the two recovery verbs. */
+async function runFailureRecovery(
+  req: Request, res: Response, action: CrmAutomationRecoveryAction,
+): Promise<void> {
+  const kind = failureTarget(req, res);
+  if (!kind) return;
+  const id = num(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
+
+  const me = actor(req);
+  const body = req.body as Record<string, unknown>;
+  const result = await recoverAutomationFailure({
+    kind, id, action,
+    reason: typeof body["reason"] === "string" ? body["reason"] : "",
+    actorStaffId: me.id,
+    actorLabel: me.label,
+  });
+
+  if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+
+  await auditAction(req, `automation.failure_${action}`, `${kind}:${id}`);
+  res.json({
+    failure: result.failure,
+    recoveryAction: result.action,
+    definitions: AUTOMATION_FAILURE_DEFINITIONS,
+  });
+}
+
+/**
+ * Re-runs one failure. Offered only where re-running cannot repeat a side
+ * effect — `automationFailures.ts` withholds it from a run with an unknown
+ * step, from anything a worker will attempt by itself, and from a run a loop
+ * brake stopped, and the refusal says which.
+ *
+ * It re-queues the ONE item named and does not drain the queue: running the
+ * queue here would release every other pending execution as a side effect of
+ * somebody pressing a button about one row.
+ */
+router.post("/crm/automation/failures/:kind/:id/retry", requireCrmAuth("settings.write"),
+  (req: Request, res: Response) => runFailureRecovery(req, res, "retry"));
+
+/**
+ * Records that a person decided nothing more is needed.
+ *
+ * It re-runs NOTHING and changes no automation state — not the status, not the
+ * attempt count, not even `updated_at`. Only the decision is new.
+ */
+router.post("/crm/automation/failures/:kind/:id/acknowledge", requireCrmAuth("settings.write"),
+  (req: Request, res: Response) => runFailureRecovery(req, res, "acknowledge"));
 
 export default router;

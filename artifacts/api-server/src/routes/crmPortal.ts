@@ -31,9 +31,11 @@ import {
   crmPortalProposalAcceptances,
   crmAttachments, crmAttachmentBlobs, crmDocumentRequests,
   crmLeads, crmSupportTickets, crmSupportMessages,
+  crmQuotes, crmActivities,
   CRM_SUPPORT_REQUEST_TYPES,
   TRANSACTION_RECEIVED_STATUS,
   PORTAL_ACCEPTANCE_LABEL,
+  canTransitionQuote, invoiceReference, quoteReference,
   portalSignatureDisclosure, portalTicketReference,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction, deriveClientIp } from "../lib/staffAuth.js";
@@ -49,6 +51,8 @@ import {
   scopedContact, scopedProjects, scopedProject, scopedDeals, scopedDeal,
   scopedTransactions, scopedDocuments, scopedDocument,
   scopedDocumentRequests, scopedDocumentRequest,
+  scopedQuotes, scopedQuote, scopedQuoteLines,
+  scopedInvoices, scopedInvoiceLines,
   scopedTickets, scopedTicket, scopedTicketMessages,
 } from "../lib/portalAuth.js";
 
@@ -166,6 +170,94 @@ function customerTicket(
     resolution: t.resolution,
     createdAt: t.createdAt,
     lastUpdateAt,
+  };
+}
+
+// ── M5: quotes and invoices, as the customer may see them ───────────────────
+//
+// Both serialisers DROP rather than filter, the same discipline `customerTicket`
+// uses. `internalNotes` is the field that matters: it is staff writing to staff
+// ("their budget is soft, hold the discount back"), and it must not be able to
+// reach a customer through a body, a preview, a count or an error. It is not
+// redacted here — it is simply never read into the payload.
+
+const asMoney = (stored: string | null) => Number(stored ?? 0) || 0;
+
+function customerLine(line: {
+  id: number; position: number; description: string;
+  quantity: string; unitPrice: string; lineTotal: string;
+}) {
+  return {
+    id: line.id,
+    position: line.position,
+    description: line.description,
+    quantity: asMoney(line.quantity),
+    unitPrice: asMoney(line.unitPrice),
+    lineTotal: asMoney(line.lineTotal),
+  };
+}
+
+function customerQuote(
+  quote: Awaited<ReturnType<typeof scopedQuotes>>[number],
+  lines: Awaited<ReturnType<typeof scopedQuoteLines>>,
+) {
+  const expired = quote.status === "expired"
+    || (quote.status === "sent" && quote.validUntil != null && quote.validUntil.getTime() < Date.now());
+  return {
+    id: quote.id,
+    reference: quoteReference(quote.id),
+    title: quote.title,
+    status: quote.status,
+    currency: quote.currency,
+    subtotal: asMoney(quote.subtotal),
+    discountAmount: asMoney(quote.discountAmount),
+    total: asMoney(quote.total),
+    // The customer-facing note only. `internalNotes` is not read.
+    notes: quote.notes,
+    validUntil: quote.validUntil,
+    sentAt: quote.sentAt,
+    lineItems: lines.filter((l) => l.quoteId === quote.id).map(customerLine),
+    /** Only a live, unexpired, unanswered quote can be accepted. */
+    canAccept: quote.status === "sent" && !expired,
+    expired,
+    acceptance: quote.acceptedAt
+      ? {
+          acceptedAt: quote.acceptedAt,
+          typedName: quote.acceptedTypedName,
+          // Never "signed", in any field, on any path.
+          label: PORTAL_ACCEPTANCE_LABEL,
+          ...portalSignatureDisclosure(),
+        }
+      : null,
+    documentId: quote.documentAttachmentId,
+  };
+}
+
+function customerInvoice(
+  invoice: Awaited<ReturnType<typeof scopedInvoices>>[number],
+  lines: Awaited<ReturnType<typeof scopedInvoiceLines>>,
+) {
+  const total = asMoney(invoice.total);
+  const paid = asMoney(invoice.amountPaid);
+  const outstanding = invoice.status === "void" ? 0 : Math.max(total - paid, 0);
+  return {
+    id: invoice.id,
+    reference: invoiceReference(invoice.id),
+    title: invoice.title,
+    status: invoice.status,
+    currency: invoice.currency,
+    subtotal: asMoney(invoice.subtotal),
+    discountAmount: asMoney(invoice.discountAmount),
+    total,
+    amountPaid: paid,
+    amountOutstanding: outstanding,
+    notes: invoice.notes,
+    issuedAt: invoice.issuedAt,
+    dueDate: invoice.dueDate,
+    paidAt: invoice.paidAt,
+    overdue: outstanding > 0 && invoice.dueDate != null && invoice.dueDate.getTime() < Date.now(),
+    lineItems: lines.filter((l) => l.invoiceId === invoice.id).map(customerLine),
+    documentId: invoice.documentAttachmentId,
   };
 }
 
@@ -544,12 +636,14 @@ router.get("/portal/overview", requirePortalAuth(), async (req: Request, res: Re
   const contact = await scopedContact(leadId);
   if (!contact) { refuse(res); return; }
 
-  const [projects, documents, requests, tickets, transactions] = await Promise.all([
+  const [projects, documents, requests, tickets, transactions, quotes, invoices] = await Promise.all([
     scopedProjects(leadId),
     scopedDocuments(leadId),
     scopedDocumentRequests(leadId),
     scopedTickets(leadId),
     scopedTransactions(leadId),
+    scopedQuotes(leadId),
+    scopedInvoices(leadId),
   ]);
 
   const outstanding = requests.filter((r) => r.status === "pending");
@@ -558,6 +652,16 @@ router.get("/portal/overview", requirePortalAuth(), async (req: Request, res: Re
     .filter((t) => t.status === TRANSACTION_RECEIVED_STATUS)
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
+  // M5. Only invoices that were actually issued count here — `scopedInvoices`
+  // never returns a draft — so this is a balance somebody asked for, not a gap
+  // inferred between a deal's value and the money received.
+  const amountOutstanding = invoices
+    .filter((i) => i.status !== "void")
+    .reduce((sum, i) => sum + Math.max((Number(i.total) || 0) - (Number(i.amountPaid) || 0), 0), 0);
+  const awaitingAnswer = quotes.filter(
+    (q) => q.status === "sent" && (q.validUntil == null || q.validUntil.getTime() >= Date.now()),
+  );
+
   res.json({
     contact: { name: contact.name, company: contact.company },
     counts: {
@@ -565,14 +669,25 @@ router.get("/portal/overview", requirePortalAuth(), async (req: Request, res: Re
       documents: documents.length,
       documentsRequested: outstanding.length,
       openRequests: openTickets.length,
+      quotesAwaitingYou: awaitingAnswer.length,
+      invoicesOutstanding: invoices.filter((i) => ["issued", "part_paid"].includes(i.status)).length,
     },
     // Named for what it is. "Paid to date" is money that arrived, and it is not
     // netted against anything or presented as a balance the portal cannot know.
     paidToDate: received,
-    // The one thing the customer is being asked to do, if there is one.
-    nextActionForYou: outstanding.length
-      ? { kind: "document", title: outstanding[0].title, id: outstanding[0].id }
-      : null,
+    amountOutstanding,
+    definitions: {
+      paidToDate: "Money we have actually received from you.",
+      amountOutstanding: "Invoices issued to you, less what has arrived against them.",
+    },
+    // The one thing the customer is being asked to do, if there is one. A quote
+    // waiting on them comes first: it is the item where nothing moves until
+    // they answer.
+    nextActionForYou: awaitingAnswer.length
+      ? { kind: "quote", title: awaitingAnswer[0].title, id: awaitingAnswer[0].id }
+      : outstanding.length
+        ? { kind: "document", title: outstanding[0].title, id: outstanding[0].id }
+        : null,
   });
 });
 
@@ -743,7 +858,15 @@ router.get("/portal/proposals", requirePortalAuth(), async (req: Request, res: R
     .where(eq(crmPortalProposalAcceptances.leadId, leadId));
   const byDeal = new Map(acceptances.map((a) => [a.dealId, a]));
 
+  // M5: quotes are the itemised version of the same conversation — a headline
+  // deal value says what the work costs, a quote says what it is made of. They
+  // are returned together rather than on a second page, because a customer
+  // looking at "what have you offered me" wants one answer.
+  const quotes = await scopedQuotes(leadId);
+  const quoteLines = await scopedQuoteLines(leadId, quotes.map((q) => q.id));
+
   res.json({
+    quotes: quotes.map((q) => customerQuote(q, quoteLines)),
     proposals: deals.map((d) => {
       const accepted = byDeal.get(d.id);
       return {
@@ -817,6 +940,130 @@ router.post("/portal/proposals/:dealId/accept", requirePortalAuth(), async (req:
   });
 });
 
+/**
+ * A customer accepting a QUOTE.
+ *
+ * Same act, same wording, same refusal to overstate it as accepting a proposal
+ * — and two additional rules the quote carries that a bare deal cannot:
+ *
+ *  1. The transition goes through `canTransitionQuote`, the ONE declared state
+ *     machine, so a customer cannot accept a draft, an expired quote, or one
+ *     that has already been declined.
+ *  2. The acceptance is bound to a deal. `crm_quotes` has a check constraint
+ *     saying an accepted quote names one, so "which deal did they agree to"
+ *     always has an answer.
+ *
+ * Like the proposal route, this does NOT move the deal to Won. Closing a deal
+ * is a staff act with its own route, permission and audit entry.
+ */
+router.post("/portal/quotes/:id/accept", requirePortalAuth(), async (req: Request, res: Response) => {
+  const leadId = portalScope(req);
+  const id = num(req.params["id"]);
+  if (!id) { refuse(res); return; }
+
+  // Somebody else's quote — and a draft nobody has sent — are indistinguishable
+  // from a quote that does not exist, because `scopedQuote` never selects them.
+  const quote = await scopedQuote(leadId, id);
+  if (!quote) { refuse(res); return; }
+
+  // A double-click is not two agreements, and it is not an error either. This
+  // is checked BEFORE the state machine: `accepted → accepted` is correctly not
+  // a transition, so the machine would refuse a second click with a 409 that
+  // reads like something went wrong. Report the original instead, exactly as
+  // the proposal route does.
+  if (quote.status === "accepted") {
+    res.status(200).json({
+      acceptance: {
+        quoteId: quote.id,
+        dealId: quote.acceptedDealId,
+        acceptedAt: quote.acceptedAt,
+        typedName: quote.acceptedTypedName,
+        label: PORTAL_ACCEPTANCE_LABEL,
+        ...portalSignatureDisclosure(),
+      },
+      created: false,
+      note: "You had already accepted this quote. Nothing was recorded twice.",
+    });
+    return;
+  }
+
+  if (!canTransitionQuote(quote.status as "sent", "accepted")) {
+    res.status(409).json({ error: "That quote is not open for acceptance." }); return;
+  }
+  if (quote.validUntil != null && quote.validUntil.getTime() < Date.now()) {
+    res.status(409).json({ error: "That quote has passed its expiry date. Ask us for a fresh one." }); return;
+  }
+  if (!quote.dealId) {
+    // The check constraint would refuse the write anyway; saying so here gives
+    // the customer an answer they can act on instead of a 500.
+    res.status(409).json({
+      error: "That quote is not ready to be accepted yet. Your SiteMint contact can sort it out.",
+    });
+    return;
+  }
+
+  const typedName = str((req.body as Record<string, unknown>)["typedName"]);
+  if (typedName.length < 2) {
+    res.status(400).json({ error: "Type your name to confirm." }); return;
+  }
+
+  const now = new Date();
+  // Conditional on the quote still being `sent`, so two simultaneous clicks
+  // cannot both record an acceptance.
+  const [accepted] = await db.update(crmQuotes).set({
+    status: "accepted",
+    acceptedAt: now,
+    acceptedDealId: quote.dealId,
+    acceptedTypedName: typedName,
+    acceptedFromIp: deriveClientIp(req),
+    acceptedByPortalAccountId: req.portalAuth?.accountId ?? null,
+    updatedAt: now,
+  }).where(and(
+    eq(crmQuotes.id, quote.id),
+    eq(crmQuotes.leadId, leadId),
+    eq(crmQuotes.status, "sent"),
+  )).returning();
+
+  if (!accepted) {
+    const current = await scopedQuote(leadId, id);
+    res.status(200).json({
+      acceptance: current?.acceptedAt
+        ? {
+            quoteId: id,
+            acceptedAt: current.acceptedAt,
+            typedName: current.acceptedTypedName,
+            label: PORTAL_ACCEPTANCE_LABEL,
+            ...portalSignatureDisclosure(),
+          }
+        : null,
+      created: false,
+      note: "This quote had already been answered. Nothing was recorded twice.",
+    });
+    return;
+  }
+
+  await db.insert(crmActivities).values({
+    leadId,
+    type: "quote_accepted",
+    title: `Quote ${quoteReference(accepted.id)} accepted by the customer: ${accepted.title}`,
+    description: `${accepted.currency} ${accepted.total}. Recorded as agreement in writing, not as a signature.`,
+    createdBy: `Customer: ${typedName}`,
+  });
+
+  res.status(201).json({
+    acceptance: {
+      quoteId: accepted.id,
+      dealId: accepted.acceptedDealId,
+      acceptedAt: accepted.acceptedAt,
+      typedName: accepted.acceptedTypedName,
+      label: PORTAL_ACCEPTANCE_LABEL,
+      ...portalSignatureDisclosure(),
+    },
+    created: true,
+    note: "Your acceptance has been recorded. This is not an electronic signature.",
+  });
+});
+
 // ── Money ───────────────────────────────────────────────────────────────────
 
 router.get("/portal/invoices", requirePortalAuth(), async (req: Request, res: Response) => {
@@ -840,15 +1087,32 @@ router.get("/portal/invoices", requirePortalAuth(), async (req: Request, res: Re
     forDeal: dealNames.get(t.dealId) ?? null,
   }));
 
+  // M5: the invoices themselves, alongside the payments they were settled by.
+  // Before this the page could only answer "what have you paid us"; a customer
+  // asking "what do I owe" had to ring somebody.
+  const invoices = await scopedInvoices(leadId);
+  const invoiceLines = await scopedInvoiceLines(leadId, invoices.map((i) => i.id));
+  const customerInvoices = invoices.map((i) => customerInvoice(i, invoiceLines));
+
   res.json({
+    invoices: customerInvoices,
     payments,
     totals: {
       paidToDate: payments.filter((p) => p.settled).reduce((s, p) => s + p.amount, 0),
       pending: payments.filter((p) => p.status === "pending").reduce((s, p) => s + p.amount, 0),
+      // Only now that invoices exist is this a figure anybody computed. It is
+      // the sum of what was actually invoiced and not yet settled — not a guess
+      // at the difference between a deal's value and the money received, which
+      // is what a "balance" would have been before M5 and why the page refused
+      // to show one.
+      outstanding: customerInvoices.reduce((s, i) => s + i.amountOutstanding, 0),
+      overdue: customerInvoices.filter((i) => i.overdue).reduce((s, i) => s + i.amountOutstanding, 0),
     },
     definitions: {
       paidToDate: "Money we have actually received from you.",
       pending: "Payments started but not yet settled. Not a balance owed.",
+      outstanding: "Invoices we have issued to you, less what has arrived against them. Voided invoices are excluded.",
+      overdue: "The part of that which is past its due date.",
     },
   });
 });

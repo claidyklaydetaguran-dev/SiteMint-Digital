@@ -1,13 +1,14 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms, isCrmTaskDueKind, crmContactMerges } from "@workspace/db";
 import { voiceSignupJobs } from "@workspace/db/schema/voice";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
-import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray, type SQL } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
+import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
 import { getResend } from "../lib/email.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
@@ -219,14 +220,21 @@ router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Reque
 router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { search, status, priority, source } = req.query as Record<string, string>;
-    const conditions = [];
+    // A contact that has been merged into another one is not part of the book
+    // any more. It is RETAINED rather than deleted (destroying a contact needs
+    // `leads.delete`, which is owner-only), so the list has to exclude it here
+    // or a merge would visibly do nothing. `crm_contact_merges.merged_lead_id`
+    // is unique, which is what keeps this a plain NOT EXISTS.
+    const conditions: SQL[] = [
+      sql`NOT EXISTS (SELECT 1 FROM ${crmContactMerges} m WHERE m.merged_lead_id = ${crmLeads.id})`,
+    ];
     if (search) {
       conditions.push(or(
         ilike(crmLeads.name, `%${search}%`),
         ilike(crmLeads.email, `%${search}%`),
         ilike(crmLeads.company, `%${search}%`),
         ilike(crmLeads.phone, `%${search}%`),
-      ));
+      )!);
     }
     if (status) conditions.push(eq(crmLeads.status, status));
     if (priority) conditions.push(eq(crmLeads.priority, priority));
@@ -284,12 +292,19 @@ router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) =
     const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
     if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
 
-    const [activities, tasks] = await Promise.all([
+    const [activities, tasks, mergedInto] = await Promise.all([
       db.select().from(crmActivities).where(eq(crmActivities.leadId, id)).orderBy(desc(crmActivities.createdAt)),
       db.select().from(crmTasks).where(eq(crmTasks.leadId, id)).orderBy(desc(crmTasks.createdAt)),
+      // A merged-away contact is hidden from the list but still reachable by
+      // id, because old links, bookmarks and audit entries point at it. Saying
+      // so beats a page that looks like an ordinary contact whose history has
+      // mysteriously moved somewhere else.
+      db.select({ primaryLeadId: crmContactMerges.primaryLeadId, mergedAt: crmContactMerges.createdAt,
+        mergedByLabel: crmContactMerges.mergedByLabel })
+        .from(crmContactMerges).where(eq(crmContactMerges.mergedLeadId, id)).limit(1),
     ]);
 
-    res.json({ lead, activities, tasks });
+    res.json({ lead, activities, tasks, mergedInto: mergedInto[0] ?? null });
   } catch (err) {
     req.log.error({ err }, "Error fetching lead");
     res.status(500).json({ error: "Failed to fetch lead" });
@@ -424,12 +439,21 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
       ? Number(data.assignedToStaffId)
       : staff?.id ?? null;
 
+    // Same two words the Operations route accepts, refused the same way. The
+    // lead screen only ever collects a day, so it says nothing and gets the
+    // column default; a client that does say something must mean one of them.
+    if (data.dueKind !== undefined && !isCrmTaskDueKind(data.dueKind)) {
+      res.status(400).json({ error: 'A due date is either "date" (a day) or "time" (a moment). Nothing else.' });
+      return;
+    }
+
     const [task] = await db.insert(crmTasks).values({
       leadId: id,
       type: data.type ? String(data.type) : "Follow Up",
       title: String(data.title),
       description: data.description ? String(data.description) : undefined,
       dueDate: data.dueDate ? new Date(String(data.dueDate)) : undefined,
+      dueKind: isCrmTaskDueKind(data.dueKind) ? data.dueKind : undefined,
       remindAt: data.remindAt ? new Date(String(data.remindAt)) : undefined,
       priority: data.priority ? String(data.priority) : undefined,
       assignedToStaffId,
@@ -467,6 +491,15 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
     if (data.dueDate !== undefined) updates.dueDate = data.dueDate ? new Date(String(data.dueDate)) : null;
+    if (data.dueKind !== undefined) {
+      // The column is NOT NULL, so there is no "clear it" here — only the two
+      // meanings, or a refusal.
+      if (!isCrmTaskDueKind(data.dueKind)) {
+        res.status(400).json({ error: 'A due date is either "date" (a day) or "time" (a moment). Nothing else.' });
+        return;
+      }
+      updates.dueKind = data.dueKind;
+    }
     if (data.remindAt !== undefined) updates.remindAt = data.remindAt ? new Date(String(data.remindAt)) : null;
     if (data.type !== undefined) updates.type = data.type;
 
@@ -508,17 +541,28 @@ router.get("/crm/tasks", requireAdmin, async (req: Request, res: Response) => {
     const tasks = await db.select({
       id: crmTasks.id, leadId: crmTasks.leadId, type: crmTasks.type,
       title: crmTasks.title, description: crmTasks.description,
-      dueDate: crmTasks.dueDate, status: crmTasks.status,
+      dueDate: crmTasks.dueDate, dueKind: crmTasks.dueKind, status: crmTasks.status,
       completedAt: crmTasks.completedAt, createdAt: crmTasks.createdAt,
       leadName: crmLeads.name, leadCompany: crmLeads.company,
     }).from(crmTasks).leftJoin(crmLeads, eq(crmTasks.leadId, crmLeads.id))
       .orderBy(crmTasks.dueDate);
 
-    // Auto-mark overdue
-    const overdueTasks = tasks.filter(t => t.status === "pending" && t.dueDate && new Date(t.dueDate) < now);
-    if (overdueTasks.length) {
+    // Auto-mark overdue, by the one shared rule rather than a bare `due_date <
+    // now()`. That comparison stamped every date-only task "overdue" one minute
+    // into the day it was due — the false alarm this whole distinction exists
+    // to stop — and it stamped it on a GET, so the label stuck.
+    //
+    // This list has no person in it, so the zone is the same fallback the sweep
+    // names when a record has no owner. My Day, which does know whose task it
+    // is, answers in that person's zone and is the surface to believe.
+    const overdueIds = tasks
+      .filter(t => t.status === "pending" && t.dueDate
+        && isOverdueInZone(AUTOMATION_FALLBACK_TIMEZONE, t.dueDate, t.dueKind, now))
+      .map(t => t.id);
+    if (overdueIds.length) {
       await db.update(crmTasks).set({ status: "overdue" })
-        .where(and(eq(crmTasks.status, "pending"), lt(crmTasks.dueDate!, now)));
+        .where(inArray(crmTasks.id, overdueIds));
+      for (const t of tasks) if (overdueIds.includes(t.id)) t.status = "overdue";
     }
 
     res.json({ tasks });

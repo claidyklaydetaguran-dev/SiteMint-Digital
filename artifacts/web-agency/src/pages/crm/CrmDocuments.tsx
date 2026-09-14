@@ -6,6 +6,7 @@ import {
   Link2, Loader2, Plus, RefreshCw, Shield, Trash2, Upload, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import CrmBillingPanel from "./CrmBillingPanel";
 
 // ── M3: Documents ────────────────────────────────────────────────────────────
 //
@@ -609,6 +610,17 @@ export default function CrmDocuments() {
                 a signed document — no e-signature provider is connected.
               </p>
             </div>
+
+            {/* M5: quotes and invoices for the same contact.
+                They sit here rather than on a page of their own because a sent
+                quote and an issued invoice ARE documents — they render into the
+                file list above and reach the client through the same portal
+                grant every other file uses. */}
+            <CrmBillingPanel
+              leadId={subject?.kind === "lead" ? subject.id : null}
+              subjectLabel={subject?.label ?? "this contact"}
+              onDocumentsChanged={() => { void refresh(true); }}
+            />
 
             {/* Requests on this record */}
             <div className="bg-background border border-border rounded-xl overflow-hidden">

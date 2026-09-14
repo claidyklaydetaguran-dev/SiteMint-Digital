@@ -133,6 +133,20 @@ export const crmAppointments = pgTable("crm_appointments", {
   /** Minutes before start to remind attendees. Null means no reminder. */
   reminderMinutesBefore: integer("reminder_minutes_before"),
 
+  /**
+   * M4: the iCalendar SEQUENCE this appointment is currently at.
+   *
+   * RFC 5545 §3.8.7.4. An attendee's calendar replaces an event it already
+   * holds only when the incoming message carries the SAME UID and a HIGHER
+   * sequence — otherwise it either ignores the update or files a duplicate.
+   * Bumped once per material change (see `crmAppointmentInvites.ts`), never
+   * for a note tweak, and never reset.
+   *
+   * The UID needs no column: it is derived from `id`, so it is stable for the
+   * life of the row by construction.
+   */
+  icalSequence:     integer("ical_sequence").notNull().default(0),
+
   cancelledAt:      timestamp("cancelled_at", { withTimezone: true }),
   cancelledByStaffId: integer("cancelled_by_staff_id"),
   cancelReason:     text("cancel_reason"),
@@ -163,8 +177,32 @@ export const crmAppointmentAttendees = pgTable("crm_appointment_attendees", {
   staffId:       integer("staff_id"),
   externalEmail: text("external_email"),
   externalName:  text("external_name"),
-  /** Invitations are not sent yet — this is set by staff, not by a reply. */
+  /**
+   * What staff recorded, NOT what the attendee answered. Nothing ingests an
+   * RSVP reply, so this stays a human note even now that invitations are sent
+   * — `invitationOutcome` below is the field that reflects a machine fact.
+   */
   responseStatus: text("response_status").notNull().default("invited"),
+
+  // ── M4: what the mail seam actually said about this person's invitation ───
+  //
+  // These record DELIVERY, not acceptance, and they use `staffMail.ts`'s own
+  // vocabulary unchanged so there is one set of words in the system rather
+  // than two. NULL means no invitation has ever been attempted for this row —
+  // deliberately not a sixth word meaning the same thing.
+
+  /** `sent` | `not_configured` | `rejected` | `failed` | `uncertain`, or NULL. */
+  invitationOutcome:    text("invitation_outcome"),
+  /** Why, in the provider's or the seam's own words. */
+  invitationReason:     text("invitation_reason"),
+  /** `REQUEST` or `CANCEL` — what the last message asked their calendar to do. */
+  invitationMethod:     text("invitation_method"),
+  /** The SEQUENCE that message carried, so a stale attendee is visible. */
+  invitationSequence:   integer("invitation_sequence"),
+  invitationAt:         timestamp("invitation_at", { withTimezone: true }),
+  /** The provider's message id, when there was one. Traceability, not proof of reading. */
+  invitationProviderId: text("invitation_provider_id"),
+
   createdAt:     timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("ix_crm_appointment_attendees_appointment").on(table.appointmentId),
@@ -173,6 +211,11 @@ export const crmAppointmentAttendees = pgTable("crm_appointment_attendees", {
     sql`(${table.staffId} IS NOT NULL) <> (${table.externalEmail} IS NOT NULL)`),
   check("ck_crm_appointment_attendees_response",
     sql`${table.responseStatus} IN ('invited', 'accepted', 'declined', 'tentative')`),
+  // NULL passes: a row that has never been invited is not a bad row.
+  check("ck_crm_appointment_attendees_invitation_outcome",
+    sql`${table.invitationOutcome} IS NULL OR ${table.invitationOutcome} IN ('sent', 'not_configured', 'rejected', 'failed', 'uncertain')`),
+  check("ck_crm_appointment_attendees_invitation_method",
+    sql`${table.invitationMethod} IS NULL OR ${table.invitationMethod} IN ('REQUEST', 'CANCEL')`),
 ]);
 
 export type CrmAppointmentAttendee = typeof crmAppointmentAttendees.$inferSelect;

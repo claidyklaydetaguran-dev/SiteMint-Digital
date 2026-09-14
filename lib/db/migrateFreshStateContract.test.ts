@@ -166,17 +166,42 @@ const INITIALIZED_DATABASE = {
 // Everything else M5 added is columns on existing tables: the marketing
 // campaign's inline audience, and support message delivery state.
 //
+// 81: seven more, in three independent pieces of work, every one a new `crm_*`
+// barrel table, additive, with no existing table altered. They are listed
+// separately rather than merged into one number so the arithmetic below can be
+// checked line by line rather than taken on trust.
+//
+//   quotes and invoices (4): crm_quotes, crm_quote_line_items, crm_invoices,
+//                 crm_invoice_line_items. The gap area 9 of
+//                 COMPLETENESS-2026-09-14.md named — "invoices and quotes not
+//                 built". A quote is priced from line items the SERVER totals
+//                 (artifacts/api-server/src/lib/crmMoney.ts, integer minor
+//                 units) and an invoice raised from an accepted one carries
+//                 those line items across. Reviewed DDL:
+//                 docs/crm-ops/schema/M5-billing.sql.
+//                 The only change to an existing table is the nullable
+//                 `crm_transactions.invoice_id` — a payment against an invoice
+//                 is an ordinary `crm_transactions` row with
+//                 TRANSACTION_RECEIVED_STATUS, so it is counted by the same
+//                 `sum(amount)` every money figure in this system already
+//                 reads, and `crmMoneyContract.test.ts` keeps being true.
+//                 That column is NOT a new table and is not in this count.
+//   contacts  (2): crm_contact_merges, crm_duplicate_dismissals — the
+//                 duplicate-review records (area 1's "no duplicate review").
+//   automation(1): crm_automation_recovery_actions — the recovery trail beside
+//                 the durable event log.
+//
 // This number is a guard, not bookkeeping: it is what makes a table added
 // without review visible. Raise it only alongside the list above, so the
 // arithmetic can be checked rather than taken on trust.
-check("the shared barrel derives 74 base tables", BARREL.length === 74, `${BARREL.length}`);
+check("the shared barrel derives 81 base tables", BARREL.length === 81, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 check("the committed migrations derive 30 domain tables", DOMAIN.length === 30, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 104 public tables", // 30 domain + 74 barrel
-  APPLICATION.length === 104,
+  "the application owns exactly 111 public tables", // 30 domain + 81 barrel
+  APPLICATION.length === 111,
   `${APPLICATION.length}`,
 );
 check(
