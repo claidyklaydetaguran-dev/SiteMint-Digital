@@ -1,5 +1,10 @@
 # Verified completeness — 2026-09-14
 
+> **Superseded by `COMPLETENESS-2026-09-15.md`.** Kept as the snapshot it was,
+> because parts of it were later corrected by evidence rather than by opinion —
+> most of all the page table, where 31 of 46 pages had never been opened. Do not
+> cite these numbers as current.
+
 Two tables, as asked. Read the method first, because the numbers mean nothing
 without it.
 
