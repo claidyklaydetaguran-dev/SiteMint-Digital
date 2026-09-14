@@ -55,14 +55,31 @@ all return 404. The deployment could not be updated this session — see
 | 12 | Interaction history | 6 / 6 | **100%** | L, T | 23 sources merged, keyset-paged; "What the client can see" drops an internal note while keeping the customer reply; unattributed rows labelled | — |
 | 13 | Calendar & scheduling | 7 / 8 | **88%** | L, T | Create, reschedule, mark held, cancel, `.ics` export, reminders. **Attendee invitations built**: stable UID, incrementing SEQUENCE so an update replaces rather than duplicates, `METHOD:CANCEL` on cancellation, a non-material edit mails nobody, attendee in another timezone gets the right instant. 24 tests | **`.ics` is an export, not two-way calendar sync.** No invitation has been sent through the live provider |
 | 14 | Integrations | 0 / 5 | **0%** | — | — | No connectors. Needs owner decisions on providers |
-| 15 | Mobile / offline / push | 5 / 8 | **63%** | L | **30 CRM pages checked at a real emulated 375×812 viewport: none scrolls horizontally.** Discovery and Settings now confirmed rendering populated, not just source-fixed. Deals edit tapped and the dialog opened on a touch device | **Offline editing deferred by owner decision**; **push not built** — no service worker, Workbox, VitePWA, web-push, PushManager or VAPID anywhere |
-| 16 | Customer portal | 6 / 8 | **75%** | T, L | 21 tests, 12/12 isolation mutations caught; cross-contact access returns 404 not 403; documents default-deny; accepted proposal never labelled signed. All 8 portal pages render with customer chrome and **no staff chrome leaked** | **No staff UI could issue an invitation** — found today, the API had no caller anywhere in the frontend. Being built; not counted until verified. **Never exercised by a real customer session end to end** |
+| 15 | Mobile / offline / push | 5 / 8 | **63%** | L | **26 CRM pages measured for CLIPPED content at a real emulated 375×812 viewport: nothing clipped, nothing unreachable.** See the correction below — the first pass asked the wrong question and missed a real defect. Discovery and Settings confirmed rendering populated, not just source-fixed. Deals edit tapped and the dialog opened on a touch device | **Offline editing deferred by owner decision**; **push not built** — no service worker, Workbox, VitePWA, web-push, PushManager or VAPID anywhere |
+| 16 | Customer portal | 7 / 8 | **88%** | T, L | 21 + 7 tests, 12/12 isolation mutations caught; cross-contact access returns 404 not 403; documents default-deny; accepted proposal never labelled signed. All 8 portal pages render with customer chrome and **no staff chrome leaked**. **Staff can now issue an invitation** — the API had no caller anywhere in the frontend until today. Walked in a browser: invite → emailed (token withheld) → restart without mail credentials → hand-delivered link → redeem → account Active and marked "Email address never confirmed" → revoke → `/api/portal/me` flips 200 → 401 | **No customer has browsed the portal pages end to end** — a session was proven at the API level, not a journey through the screens |
 | 17 | Security | 7 / 9 | **78%** | L, T | MFA + audit; webhook signature enforcement verified live (unsigned 400, forged 400, signed 200, hour-old replay 400); destructive-cleanup guard prevents a suite deleting real accounts, and now aborts the whole test run if pointed at the preview database. **The 14 Sept "unexplained activation" is resolved** — see §Account below | Transport/at-rest encryption are hosting properties, unevidenced; **no restore rehearsal on a real target** |
 | 18 | Dashboard | 6 / 6 | **100%** | L, T | 11 clickable panels, counts from one server function, filters, polling that pauses when hidden; uninstrumented metrics say why rather than showing zero | — |
 
-**Totals: 118 / 143 criteria = 82.5% verified locally** (was 108 / 143 = 75.5%).
+**Totals: 119 / 143 criteria = 83.2% verified locally** (was 108 / 143 = 75.5%).
 **0% verified in production.** One capability — outbound email — is now verified
 at the real provider.
+
+### A correction worth keeping, about how mobile was measured
+
+The first 375px sweep asked whether each page **scrolls horizontally**, found
+that none did, and recorded that as clean. That question was wrong, and it hid a
+real defect.
+
+`<main>` is `overflow-x-hidden`. That does not make content fit — it hides the
+overflow. On `/admin/crm/leads/:id` the content column resolved to **618px in a
+375px viewport**, so **220 elements sat off-screen with no scrollbar to reach
+them**. By the "does the page scroll" test the page looked perfect.
+
+The right question is whether any element extends past the viewport *without a
+scrollable ancestor* — i.e. whether it is clipped and unreachable. Re-measured
+that way: two pages were affected (the lead page badly, Settings by a single
+unbreakable Twilio SID), both are fixed, and the other 24 were genuinely clean
+all along. **"No horizontal scrolling" is not evidence that a page fits.**
 
 ---
 
@@ -88,7 +105,7 @@ staff session. The 375px column is a real emulated 375×812 viewport.
 | 2 | `/admin/crm/dashboard` | **Walked** | clean | Money panel cross-checked against forecast + transactions; $16,000 / 4 transactions agreed |
 | 3 | `/admin/crm/my-day` | **Walked** | clean | Two tasks created, **reloaded**, bucketing and display confirmed for both deadline kinds; invalid kind refused 400 |
 | 4 | `/admin/crm/leads` | **Walked** | clean | Export sent exactly the 16 visible ids; filtered to `Client` sent 9 |
-| 5 | `/admin/crm/leads/:id` (`/6`) | **Walked** | clean | Full History tab; "What the client can see" drops the internal note. Controls enumerated — this is how the missing portal invitation was found |
+| 5 | `/admin/crm/leads/:id` (`/6`) | **Walked** | **fixed** | Full History tab; "What the client can see" drops the internal note. Controls enumerated — this is how the missing portal invitation was found. **Was clipping 220 elements at 375px; now 0.** Customer portal panel walked invite → redeem → revoke |
 | 6 | `/admin/crm/leads/:id/dna` | Signed in, rendered | clean | 727 chars, Lead DNA for a named contact |
 | 7 | `/admin/crm/duplicates` | **Walked** | clean | 10 real duplicate pairs in preview data; merge preserves history from both sides |
 | 8 | `/admin/crm/import` | **Walked** | clean | Upload → preview (2 create / 2 error with per-row reasons, 1 ignored column) → mapping editor → commit → "2 Created, 2 Failed" |
@@ -105,7 +122,7 @@ staff session. The 375px column is a real emulated 375×812 viewport.
 | 19 | `/admin/crm/reporting` | Signed in, rendered | clean | 7,447 chars — 39 figures with definitions; "cannot measure" section present |
 | 20 | `/admin/crm/transactions` | **Walked** | clean | 4 rows, $16,000 total, count matches list |
 | 21 | `/admin/crm/discovery` | Signed in, rendered | clean | Renders; the 10-column table fix now confirmed live, not only in source |
-| 22 | `/admin/crm/settings` | Signed in, rendered | clean | 4,346 chars populated; the clipped-table fix now confirmed live |
+| 22 | `/admin/crm/settings` | Signed in, rendered | **fixed** | 4,346 chars populated; the clipped-table fix confirmed live. One element clipped at 375px (an unbreakable 34-char Twilio SID); now 0 |
 | 23 | `/admin/crm/campaign-builder` | **Walked** | clean | Create → step 1 Audience; 13 contacts listed, nobody pre-ticked, suppression shown inline; **duplicate-address exclusion verified on real data (5 in, 1 eligible, 4 excluded)**; AI drafting refuses with a plain-language 503 |
 | 24 | `/admin/crm/campaigns` | Signed in, rendered | clean | Sequence builder |
 | 25 | `/admin/crm/campaign-queue` | Signed in, rendered | clean | Sequence message queue |
@@ -144,8 +161,10 @@ looked at, not used.
 
 The 7 portal content pages were rendered **signed out**. Their 401s are correct
 behaviour, not a defect — but it means no portal page has been seen with a
-customer's real data, because until today nothing in the CRM could issue an
-invitation. That is the single biggest remaining hole in this table.
+customer's real data. Staff can now issue an invitation and a redeemed session
+was proven to answer `200` and to stop answering after a revoke, so the
+mechanism works; **what is still missing is a person walking the portal
+screens.** That is the single biggest remaining hole in this table.
 
 ### Legacy auth — 3 pages a staff session cannot use
 
