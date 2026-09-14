@@ -28,7 +28,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   db,
   crmPortalAccounts, crmPortalInvitations, crmPortalDocumentGrants,
-  crmPortalProposalAcceptances,
+  crmPortalProposalAcceptances, crmPortalSessions,
   crmAttachments, crmAttachmentBlobs, crmDocumentRequests,
   crmLeads, crmSupportTickets, crmSupportMessages,
   crmQuotes, crmActivities,
@@ -42,7 +42,9 @@ import { requireCrmAuth, auditAction, deriveClientIp } from "../lib/staffAuth.js
 import {
   generateToken, hashToken, hashPassword, verifyPassword, refusePassword,
 } from "../lib/staffCredentials.js";
-import { trySendStaffMail } from "../lib/staffMail.js";
+import {
+  trySendStaffMail, staffMailConfigured, staffMailBlockedReason,
+} from "../lib/staffMail.js";
 import {
   PORTAL_COOKIE_NAME, PORTAL_INVITE_DEFAULT_HOURS,
   portalCookieOptions, createPortalSession, destroyPortalSession,
@@ -124,6 +126,33 @@ function portalAcceptUrl(token: string): string | null {
   if (!base) return null;
   return `${base.replace(/\/+$/, "")}/portal/accept?token=${encodeURIComponent(token)}`;
 }
+
+/**
+ * Did the invitation that created this login actually travel to the mailbox?
+ *
+ * This is the only thing a portal account knows about the address on it, and it
+ * is narrower than it looks. `deliveryState === "sent"` means the provider
+ * accepted a message addressed to that mailbox and somebody who could read that
+ * mailbox then set the password. That chain is what makes the address proven.
+ *
+ * Every other delivery state — mail not configured, refused, failed, or an
+ * outcome we never learned — means the link reached the customer some other way:
+ * read down the phone, pasted into a chat, forwarded by a colleague. The person
+ * who redeemed it proved they were handed a link, and NOTHING about the mailbox.
+ * Password resets and notices sent to that address may go nowhere, and the
+ * account may belong to somebody the address does not.
+ *
+ * It is derived, never stored: there is no column here that could drift away
+ * from the delivery record it is supposed to summarise.
+ */
+function mailboxProven(deliveryState: string | null): boolean {
+  return deliveryState === "sent";
+}
+
+const MAILBOX_UNPROVEN_NOTE =
+  "The link was handed over rather than emailed, so nobody has checked that this "
+  + "address reaches them. Anything we later send there — a password reset, a "
+  + "notice — may go nowhere.";
 
 /**
  * Always an attachment, never inline. Serving customer- or staff-uploaded bytes
@@ -344,8 +373,13 @@ router.post("/crm/portal/invitations", requireCrmAuth("leads.write"), async (req
     deliveryDetail: outcome.sent ? null : outcome.reason.slice(0, 500),
   }).where(eq(crmPortalInvitations.id, invitation.id));
 
-  // The target names the contact and the invitation, never the token.
-  await auditAction(req, "portal.invited", `lead:${leadId} invitation:${invitation.id}`);
+  // The target names the contact and the invitation, never the token. The
+  // delivery outcome is part of it: "we invited them" and "we emailed them" are
+  // different facts, and the audit trail has to be able to tell them apart.
+  await auditAction(
+    req, "portal.invited",
+    `lead:${leadId} invitation:${invitation.id} delivery:${outcome.sent ? "sent" : outcome.failure}`,
+  );
 
   res.status(201).json({
     invitation: {
@@ -354,10 +388,25 @@ router.post("/crm/portal/invitations", requireCrmAuth("leads.write"), async (req
       delivery: outcome.sent ? "sent" : outcome.failure,
       deliveryDetail: outcome.sent ? null : outcome.reason,
     },
-    // Returned exactly once, here, so a staff member can hand the link over
-    // themselves when mail is not configured.
-    inviteToken: token,
-    invitePath: url ?? "/portal/accept?token=<token>",
+    /**
+     * The raw token, returned ONLY when the server could not deliver it — the
+     * same rule `crmStaff.ts`'s `issueAndDeliver` follows for a staff
+     * activation link, and for the same reason. When the message went out, the
+     * link is in the customer's mailbox and there is no honest reason for a
+     * second copy to exist in a browser tab, a screenshot or a chat message.
+     * When it did not, an operator needs the link or the customer is stuck.
+     */
+    inviteToken: outcome.sent ? undefined : token,
+    invitePath: outcome.sent ? undefined : (url ?? "/portal/accept?token=<token>"),
+    /**
+     * What redeeming this link will and will not prove. A hand-delivered link
+     * creates a working login over an address nobody has checked — see
+     * `mailboxProven`. Said here, at the moment the operator is deciding
+     * whether to paste it into a chat window.
+     */
+    handDelivered: !outcome.sent,
+    mailboxWillBeProven: outcome.sent,
+    mailboxNote: outcome.sent ? null : MAILBOX_UNPROVEN_NOTE,
   });
 });
 
@@ -386,6 +435,166 @@ router.get("/crm/portal/invitations", requireCrmAuth("leads.read"), async (req: 
   res.json({ invitations: rows, account: account ?? null });
 });
 
+/**
+ * Everything the staff-side portal panel needs about ONE contact, in one call.
+ *
+ * It exists because the answer to "can this customer see anything, and what?"
+ * was spread over three routes with three different permissions, and a panel
+ * that has to make three calls to draw one box is a panel that will be drawn
+ * from whichever of the three answered — which is how an operator ends up
+ * inviting somebody while looking at a stale document list.
+ *
+ * `leads.read`, like its neighbour `GET /crm/portal/invitations`: this is a
+ * fact about one contact's relationship with us.
+ *
+ * ── What it deliberately does NOT widen ──────────────────────────────────────
+ *
+ * The document GRANT LIST still needs `documents.read`. Somebody who may read a
+ * contact but not their files does not become able to read filenames by asking
+ * a differently-named route. What they do get is the COUNT, because the one
+ * thing nobody may do is invite a customer without knowing that something is
+ * exposed to them — a number says that much and names nothing.
+ *
+ * No token, hash or password material appears here, at any permission level.
+ */
+router.get("/crm/portal/access/:leadId", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
+  const leadId = num(req.params["leadId"]);
+  if (!leadId) { res.status(400).json({ error: "Invalid id." }); return; }
+
+  const [lead] = await db.select({
+    id: crmLeads.id, name: crmLeads.name, email: crmLeads.email,
+  }).from(crmLeads).where(eq(crmLeads.id, leadId)).limit(1);
+  if (!lead) { res.status(404).json({ error: "That contact does not exist." }); return; }
+
+  const email = normalizeEmail(lead.email);
+  const usableEmail = Boolean(email) && email.includes("@");
+
+  const [invitations, accounts, grants, clashes] = await Promise.all([
+    db.select({
+      id: crmPortalInvitations.id,
+      email: crmPortalInvitations.email,
+      createdByLabel: crmPortalInvitations.createdByLabel,
+      createdAt: crmPortalInvitations.createdAt,
+      expiresAt: crmPortalInvitations.expiresAt,
+      acceptedAt: crmPortalInvitations.acceptedAt,
+      revokedAt: crmPortalInvitations.revokedAt,
+      deliveryState: crmPortalInvitations.deliveryState,
+      deliveryDetail: crmPortalInvitations.deliveryDetail,
+    }).from(crmPortalInvitations)
+      .where(eq(crmPortalInvitations.leadId, leadId))
+      .orderBy(desc(crmPortalInvitations.id)),
+    db.select({
+      id: crmPortalAccounts.id,
+      email: crmPortalAccounts.email,
+      status: crmPortalAccounts.status,
+      lastSignInAt: crmPortalAccounts.lastSignInAt,
+      createdAt: crmPortalAccounts.createdAt,
+      updatedAt: crmPortalAccounts.updatedAt,
+    }).from(crmPortalAccounts).where(eq(crmPortalAccounts.leadId, leadId)).limit(1),
+    db.select({
+      id: crmPortalDocumentGrants.id,
+      attachmentId: crmPortalDocumentGrants.attachmentId,
+      filename: crmAttachments.filename,
+      grantedByLabel: crmPortalDocumentGrants.grantedByLabel,
+      createdAt: crmPortalDocumentGrants.createdAt,
+    }).from(crmPortalDocumentGrants)
+      .innerJoin(crmAttachments, eq(crmPortalDocumentGrants.attachmentId, crmAttachments.id))
+      .where(and(
+        eq(crmPortalDocumentGrants.leadId, leadId),
+        isNull(crmPortalDocumentGrants.revokedAt),
+        isNull(crmAttachments.deletedAt),
+      ))
+      .orderBy(desc(crmPortalDocumentGrants.id)),
+    usableEmail
+      ? db.select({ leadId: crmPortalAccounts.leadId })
+          .from(crmPortalAccounts).where(eq(crmPortalAccounts.email, email)).limit(1)
+      : Promise.resolve([] as { leadId: number }[]),
+  ]);
+
+  const account = accounts[0];
+  const now = Date.now();
+
+  // The one invitation a customer could still redeem, if there is one.
+  const outstanding = invitations.find(
+    (i) => !i.acceptedAt && !i.revokedAt && i.expiresAt.getTime() > now,
+  );
+  // An unaccepted, unrevoked invitation whose clock has run out. Worth showing
+  // separately: "nothing outstanding" and "they were sent one and it lapsed"
+  // lead to different next actions.
+  const lapsed = invitations.find(
+    (i) => !i.acceptedAt && !i.revokedAt && i.expiresAt.getTime() <= now,
+  );
+
+  // The invitation this account was actually built from — see `mailboxProven`.
+  const redeemed = invitations
+    .filter((i) => i.acceptedAt != null)
+    .sort((a, b) => (b.acceptedAt as Date).getTime() - (a.acceptedAt as Date).getTime())[0];
+
+  const clash = clashes[0] && clashes[0].leadId !== leadId ? clashes[0] : undefined;
+  const blockedReason = !usableEmail
+    ? "This contact has no email address, so there is nobody to send an invitation to. Add one first."
+    : clash
+      ? "Another contact already uses that email address for portal access."
+      : null;
+
+  const permissions = req.staffAuth?.permissions;
+  // No `staffAuth` means the legacy shared bearer got through, which is the
+  // all-permissions caller. Only a resolved person can be short of a grant.
+  const canSeeDocuments = !permissions || permissions.has("documents.read");
+
+  res.json({
+    contact: { id: lead.id, name: lead.name, email: lead.email ?? null },
+    /** Whether the Send button should exist at all, and why not when it should not. */
+    canInvite: blockedReason === null,
+    blockedReason,
+    /**
+     * Whether an invitation sent right now would actually be emailed. Reported
+     * before the click, so "you will have to pass this on yourself" is not a
+     * surprise discovered afterwards.
+     */
+    mail: { configured: staffMailConfigured(), blockedReason: staffMailBlockedReason() },
+    account: account
+      ? {
+          id: account.id,
+          email: account.email,
+          status: account.status,
+          active: account.status === "active",
+          lastSignInAt: account.lastSignInAt,
+          createdAt: account.createdAt,
+          updatedAt: account.updatedAt,
+          mailboxProven: mailboxProven(redeemed?.deliveryState ?? null),
+          mailboxNote: mailboxProven(redeemed?.deliveryState ?? null) ? null : MAILBOX_UNPROVEN_NOTE,
+          acceptedAt: redeemed?.acceptedAt ?? null,
+        }
+      : null,
+    invitation: outstanding
+      ? {
+          id: outstanding.id,
+          email: outstanding.email,
+          createdAt: outstanding.createdAt,
+          createdByLabel: outstanding.createdByLabel,
+          expiresAt: outstanding.expiresAt,
+          delivery: outstanding.deliveryState,
+          deliveryDetail: outstanding.deliveryDetail,
+          emailed: mailboxProven(outstanding.deliveryState),
+        }
+      : null,
+    lapsedInvitationAt: lapsed?.expiresAt ?? null,
+    invitationCount: invitations.length,
+    documents: {
+      /** Always answered: nobody invites a customer without seeing this number. */
+      granted: grants.length,
+      canList: canSeeDocuments,
+      items: canSeeDocuments
+        ? grants.map((g) => ({
+            id: g.id, attachmentId: g.attachmentId, filename: g.filename,
+            grantedByLabel: g.grantedByLabel, createdAt: g.createdAt,
+          }))
+        : null,
+    },
+  });
+});
+
 router.post("/crm/portal/invitations/:id/revoke", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const id = num(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id." }); return; }
@@ -404,10 +613,27 @@ router.post("/crm/portal/invitations/:id/revoke", requireCrmAuth("leads.write"),
  *
  * Disabling the account AND bumping its epoch, so every session already issued
  * dies on its next request rather than living out its fortnight.
+ *
+ * The count of sessions that were live when the epoch moved is read first and
+ * reported back. It is what turns "the button greyed out" into "two signed-in
+ * browsers stopped working", which is the difference the operator pressing this
+ * needs to be sure of.
  */
 router.post("/crm/portal/accounts/:leadId/revoke", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const leadId = num(req.params["leadId"]);
   if (!leadId) { res.status(400).json({ error: "Invalid id." }); return; }
+
+  const live = await db.select({ id: crmPortalSessions.id })
+    .from(crmPortalSessions)
+    .innerJoin(crmPortalAccounts, eq(crmPortalSessions.portalAccountId, crmPortalAccounts.id))
+    .where(and(
+      eq(crmPortalAccounts.leadId, leadId),
+      eq(crmPortalAccounts.status, "active"),
+      isNull(crmPortalSessions.revokedAt),
+      sql`${crmPortalSessions.expiresAt} > now()`,
+      sql`${crmPortalSessions.epoch} = ${crmPortalAccounts.sessionEpoch}`,
+    ));
+
   const [account] = await db.update(crmPortalAccounts)
     .set({ status: "disabled", sessionEpoch: sql`${crmPortalAccounts.sessionEpoch} + 1`, updatedAt: new Date() })
     .where(eq(crmPortalAccounts.leadId, leadId))
@@ -416,8 +642,8 @@ router.post("/crm/portal/accounts/:leadId/revoke", requireCrmAuth("leads.write")
   await db.update(crmPortalInvitations)
     .set({ revokedAt: new Date() })
     .where(and(eq(crmPortalInvitations.leadId, leadId), isNull(crmPortalInvitations.acceptedAt), isNull(crmPortalInvitations.revokedAt)));
-  await auditAction(req, "portal.access_revoked", `lead:${leadId} account:${account.id}`);
-  res.json({ ok: true });
+  await auditAction(req, "portal.access_revoked", `lead:${leadId} account:${account.id} sessions:${live.length}`);
+  res.json({ ok: true, sessionsEnded: live.length });
 });
 
 /** Make one document visible to one contact's portal. Default-deny until this. */

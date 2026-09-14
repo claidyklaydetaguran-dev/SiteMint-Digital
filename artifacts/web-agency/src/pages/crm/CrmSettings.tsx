@@ -647,10 +647,14 @@ export default function CrmSettings() {
                 ["FORWARD_TO_PHONE_NUMBER", "+19495551234"],
                 ["CRM_BASE_URL", "https://yourdomain.replit.app"],
               ].map(([k, v]) => (
-                <div key={k} className="flex gap-2">
+                // These example values are unbreakable tokens — a 34-character
+                // Twilio SID has no space or hyphen in it — so without
+                // `break-all` the row sets a 427px min-content width that the
+                // page then clips on a phone rather than scrolling.
+                <div key={k} className="flex flex-wrap gap-2 min-w-0">
                   <span className="text-foreground font-semibold">{k}</span>
                   <span className="text-muted-foreground">=</span>
-                  <span className="text-blue-600">{v}</span>
+                  <span className="text-blue-600 break-all min-w-0">{v}</span>
                 </div>
               ))}
             </div>

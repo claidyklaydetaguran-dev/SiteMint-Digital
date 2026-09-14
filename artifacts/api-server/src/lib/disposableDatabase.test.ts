@@ -96,5 +96,18 @@ describe("destructive test cleanup is guarded", () => {
       setup.indexOf("assertDisposableDatabase("),
       "assertDisposableDatabase must run before any delete",
     ).toBeLessThan(setup.indexOf("db.delete("));
+
+    // And the reset is itself destructive to a CONCURRENT run: two overlapping
+    // runs would delete each other's live staff session, which surfaces as
+    // inexplicable 401s in whichever suite happens to be mid-flight. The lock
+    // must be taken before the delete too, or the race is still open.
+    expect(setup, "the reset must refuse to run alongside another run").toContain(
+      "pg_try_advisory_lock",
+    );
+    expect(
+      setup.indexOf("pg_try_advisory_lock"),
+      "the advisory lock must be taken before any delete",
+    ).toBeLessThan(setup.indexOf("db.delete("));
+    expect(setup, "and must release it afterwards").toContain("pg_advisory_unlock");
   });
 });

@@ -35,6 +35,7 @@ import {
 } from "@/lib/relationshipIntelligence";
 import { adminFetch } from "@/lib/adminFetch";
 import CustomerTimeline from "@/components/crm/CustomerTimeline";
+import CustomerPortalPanel from "@/components/crm/CustomerPortalPanel";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -939,9 +940,20 @@ export default function CrmLeadDetail() {
         </div>
 
         {/* ── Main Grid ────────────────────────────────────────────────────── */}
+        {/*
+          `min-w-0` on both columns is load-bearing on a phone, not tidying.
+          A grid item defaults to `min-width: auto`, so it refuses to shrink
+          below its content's min-content width. One wide child inside then
+          sets the whole column: at 375px this grid's single column resolved to
+          618px, and because the page's <main> is `overflow-x-hidden` the page
+          did NOT scroll — it silently clipped, so 220 elements were off-screen
+          and unreachable with no scrollbar to reveal them. "No horizontal
+          scrolling" is therefore not evidence that a page fits; it can equally
+          mean the overflow is being hidden.
+        */}
         <div className="grid lg:grid-cols-[1fr_300px] gap-5">
           {/* Main panel */}
-          <div className="space-y-5">
+          <div className="space-y-5 min-w-0">
             {/* Tab panel */}
             <div className="bg-white rounded-xl border border-border shadow-sm">
               <div className="flex border-b border-border px-4 overflow-x-auto">
@@ -1408,7 +1420,7 @@ export default function CrmLeadDetail() {
           </div>
 
           {/* ── Sidebar ───────────────────────────────────────────────────── */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
 
             {/* ── Lead Health Score ──────────────────────────────────────── */}
             {health && (
@@ -2022,6 +2034,11 @@ export default function CrmLeadDetail() {
                 </Link>
               )}
             </div>
+
+            {/* ── Customer portal ─────────────────────────────────────────── */}
+            {/* Sits directly under Pipeline Docs on purpose: both answer "what
+                has this client actually been given sight of". */}
+            <CustomerPortalPanel leadId={lead.id} contactEmail={lead.email} />
 
             {/* Lead info */}
             <div className="bg-white rounded-xl border border-border shadow-sm p-4">
