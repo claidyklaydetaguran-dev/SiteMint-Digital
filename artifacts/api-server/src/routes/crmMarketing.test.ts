@@ -549,6 +549,108 @@ suite("marketing: audience, exclusions, sending, and honest numbers (real DB)", 
     expect(companyWarning.count).toBeGreaterThanOrEqual(1);
   }, 60_000);
 
+  it("mails one inbox once when several contacts share it, and says which contact got it", async () => {
+    // Two contact rows for one person is the ordinary state of a CRM before
+    // anybody has merged an import — the owner-preview database currently shows
+    // one contact five times in the audience picker. Without this, that is five
+    // identical emails to a customer and a "delivered" figure five times the
+    // number of people reached.
+    const shared = `mktg-twin-${STAMP}@example.test`;
+    const twins: number[] = [];
+    for (const name of ["Twin One", "Twin Two", "Twin Three"]) {
+      const [row] = await db.insert(schema.crmLeads).values({
+        name: `[CRM-TEST] ${name}`, company: "Twin Co", email: shared,
+        status: "Qualified", source: "Manual Entry", tags: [TAG],
+      }).returning();
+      twins.push(row.id);
+    }
+    const kept = Math.min(...twins);
+
+    try {
+      const created = await owner.call("POST", "/api/crm/marketing/campaigns", {
+        name: `[CRM-TEST] Twins ${STAMP}`,
+        subject: "One inbox",
+        segmentId,
+        blocks: goodBlocks(),
+      });
+      expect(created.status).toBe(201);
+      const twinCampaign = created.json["campaign"].id;
+
+      const check = await owner.call("GET", `/api/crm/marketing/campaigns/${twinCampaign}/preflight`);
+      expect(check.status).toBe(200);
+
+      const dup = (check.json["excludedByReason"] as any[]).find((b) => b.reason === "duplicate_address");
+      expect(dup, "the two extra rows must be excluded as duplicates").toBeTruthy();
+      expect(dup.count).toBe(2);
+      expect(dup.contacts.map((c: any) => c.id).sort()).toEqual(twins.filter((id) => id !== kept).sort());
+
+      // A silent drop is the failure this exists to prevent: the reason has to
+      // name the contact that IS receiving it, so the operator can act on it.
+      for (const c of dup.contacts) {
+        expect(c.detail).toContain(shared);
+        expect(c.detail).toContain(`#${kept}`);
+      }
+      expect(check.json["audienceSize"]).toBe(check.json["sendable"] + check.json["excluded"]);
+
+      // And the send agrees with the preflight, rather than the two disagreeing.
+      sends.length = 0;
+      const sent = await owner.call("POST", `/api/crm/marketing/campaigns/${twinCampaign}/send`, { batchSize: 500 });
+      expect(sent.status).toBe(200);
+      expect(
+        sends.filter((s) => s.to === shared),
+        "one person, one copy",
+      ).toHaveLength(1);
+
+      const ledger = await db.select().from(schema.crmMarketingRecipients)
+        .where(eq(schema.crmMarketingRecipients.campaignId, twinCampaign));
+      const twinRows = ledger.filter((r) => twins.includes(r.leadId));
+      expect(twinRows).toHaveLength(3);
+      expect(twinRows.filter((r) => r.status === "excluded").map((r) => r.exclusionReason))
+        .toEqual(["duplicate_address", "duplicate_address"]);
+    } finally {
+      for (const id of twins) {
+        await db.delete(schema.crmMarketingRecipients).where(eq(schema.crmMarketingRecipients.leadId, id));
+        await db.delete(schema.crmLeads).where(eq(schema.crmLeads.id, id));
+      }
+    }
+  }, 120_000);
+
+  it("calls a shared address unsubscribed rather than duplicate, when it has opted out", async () => {
+    // Ordering matters for what the operator reads. If the shared address has
+    // opted out, every row carrying it should say so — "duplicate" would bury
+    // the fact that actually decides the send.
+    const shared = `mktg-twin-unsub-${STAMP}@example.test`;
+    const twins: number[] = [];
+    for (const name of ["Opted One", "Opted Two"]) {
+      const [row] = await db.insert(schema.crmLeads).values({
+        name: `[CRM-TEST] ${name}`, company: "Opted Co", email: shared,
+        status: "Qualified", source: "Manual Entry", tags: [TAG],
+      }).returning();
+      twins.push(row.id);
+    }
+    await db.insert(schema.crmEmailSuppressions).values({
+      address: shared, reason: "unsubscribe", detail: "Asked to stop.", source: "recipient",
+    }).onConflictDoNothing();
+
+    try {
+      const created = await owner.call("POST", "/api/crm/marketing/campaigns", {
+        name: `[CRM-TEST] Opted twins ${STAMP}`, subject: "One inbox", segmentId, blocks: goodBlocks(),
+      });
+      const check = await owner.call("GET", `/api/crm/marketing/campaigns/${created.json["campaign"].id}/preflight`);
+      const reasons = Object.fromEntries((check.json["excludedByReason"] as any[]).map((b) => [b.reason, b]));
+      const unsubIds = reasons["unsubscribed"].contacts.map((c: any) => c.id);
+      for (const id of twins) expect(unsubIds).toContain(id);
+      const dupIds = (reasons["duplicate_address"]?.contacts ?? []).map((c: any) => c.id);
+      for (const id of twins) expect(dupIds).not.toContain(id);
+    } finally {
+      for (const id of twins) {
+        await db.delete(schema.crmMarketingRecipients).where(eq(schema.crmMarketingRecipients.leadId, id));
+        await db.delete(schema.crmLeads).where(eq(schema.crmLeads.id, id));
+      }
+      await db.delete(schema.crmEmailSuppressions).where(eq(schema.crmEmailSuppressions.address, shared));
+    }
+  }, 120_000);
+
   // ── Segment re-evaluation ─────────────────────────────────────────────────
 
   it("resolves the audience when the send starts, not when the segment was saved", async () => {

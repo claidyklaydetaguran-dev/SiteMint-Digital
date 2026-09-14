@@ -670,8 +670,55 @@ function parseBlocks(raw: unknown): CrmEmailBlock[] {
 // ── Exclusions ──────────────────────────────────────────────────────────────
 
 export interface ExclusionVerdict {
-  reason: "suppressed" | "unsubscribed" | "campaign_excluded" | "no_address" | null;
+  reason: "suppressed" | "unsubscribed" | "campaign_excluded" | "no_address" | "duplicate_address" | null;
   detail: string | null;
+}
+
+/**
+ * Which contact receives the message when several of them share one address.
+ *
+ * Contacts are per-person records; a mailbox is not. Two rows for the same
+ * person — the ordinary result of an import before anybody has merged them —
+ * are two audience members with one inbox between them, and without this every
+ * one of them is mailed. The audience picker in the preview database currently
+ * shows one contact five times, which is five identical emails to a customer
+ * and a "delivered" figure five times the number of people reached.
+ *
+ * Suppression is unaffected either way: it is keyed on the address, so an
+ * unsubscribe already covers every duplicate. This is about not sending the
+ * same thing repeatedly to somebody who has NOT opted out.
+ *
+ * The kept row is the lowest id — the oldest record, deterministic regardless
+ * of the order the audience query returned, and stable between the preflight
+ * the operator reads and the send that follows it. The others are excluded with
+ * a reason that NAMES the contact who is receiving it, so this reads as a
+ * decision the operator can see and undo (by merging the duplicates, or by
+ * picking a different contact) rather than as messages silently going missing.
+ */
+function duplicateAddressLosers(leads: readonly CrmLead[]): Map<number, string> {
+  const byAddress = new Map<string, CrmLead[]>();
+  for (const lead of leads) {
+    const address = normalizeEmail(lead.email);
+    if (!looksLikeAddress(address)) continue;
+    const list = byAddress.get(address) ?? [];
+    list.push(lead);
+    byAddress.set(address, list);
+  }
+
+  const losers = new Map<number, string>();
+  for (const [address, sharing] of byAddress) {
+    if (sharing.length < 2) continue;
+    const kept = sharing.reduce((a, b) => (a.id <= b.id ? a : b));
+    for (const lead of sharing) {
+      if (lead.id === kept.id) continue;
+      losers.set(
+        lead.id,
+        `${sharing.length} contacts share ${address}. It is being sent once, to "${kept.name}" (#${kept.id}). `
+        + "Merge the duplicates in Duplicate Review if they are the same person.",
+      );
+    }
+  }
+  return losers;
 }
 
 /**
@@ -681,12 +728,17 @@ export interface ExclusionVerdict {
  * "not them, not this time" is what gets reported, rather than being masked by
  * a suppression that also happens to apply. Everything after it is a fact about
  * the address rather than a judgement about the send.
+ *
+ * Duplicates are checked LAST, after suppression, deliberately: when a shared
+ * address has opted out, every row carrying it should say so. "Unsubscribed" is
+ * the fact the operator needs; "duplicate" would bury it.
  */
 function verdictFor(
   lead: CrmLead,
   excludedLeadIds: Set<number>,
   excludedDetail: Map<number, string | null>,
   suppressions: Map<string, { reason: string; detail: string | null }>,
+  duplicateLosers: Map<number, string> = new Map(),
 ): ExclusionVerdict {
   if (excludedLeadIds.has(lead.id)) {
     return {
@@ -715,6 +767,8 @@ function verdictFor(
         : "This address hard-bounced, so mail to it will not arrive."),
     };
   }
+  const duplicate = duplicateLosers.get(lead.id);
+  if (duplicate) return { reason: "duplicate_address", detail: duplicate };
   return { reason: null, detail: null };
 }
 
@@ -732,6 +786,7 @@ const EXCLUSION_LABELS: Record<string, string> = {
   campaign_excluded: "Excluded from this campaign by a member of staff",
   no_address: "No usable email address on the contact record",
   missing_merge_field: "A merge field this copy needs has no value and no fallback",
+  duplicate_address: "Duplicate — another contact in this audience has the same email address",
 };
 
 interface PreflightResult {
@@ -769,13 +824,14 @@ async function preflight(campaign: CrmMarketingCampaign): Promise<PreflightResul
   ]);
   const excludedIds = new Set(exclusionRows.map((r) => r.leadId));
   const excludedDetail = new Map(exclusionRows.map((r) => [r.leadId, r.reason]));
+  const duplicateLosers = duplicateAddressLosers(leads);
 
   const buckets = new Map<string, { id: number; name: string; email: string | null; detail: string | null }[]>();
   const fallbackCounts = new Map<string, number>();
   let sendable = 0;
 
   for (const lead of leads) {
-    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions);
+    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions, duplicateLosers);
     if (verdict.reason) {
       const list = buckets.get(verdict.reason) ?? [];
       list.push({ id: lead.id, name: lead.name, email: lead.email, detail: verdict.detail });
@@ -866,9 +922,11 @@ async function materialiseAudience(campaign: CrmMarketingCampaign): Promise<{ re
   const excludedIds = new Set(exclusionRows.map((r) => r.leadId));
   const excludedDetail = new Map(exclusionRows.map((r) => [r.leadId, r.reason]));
 
+  const duplicateLosers = duplicateAddressLosers(leads);
+
   let excluded = 0;
   const values = leads.map((lead) => {
-    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions);
+    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions, duplicateLosers);
     if (verdict.reason) excluded += 1;
     return {
       campaignId: campaign.id,
@@ -1167,9 +1225,10 @@ router.post("/crm/marketing/audience/preview", requireCrmAuth("campaigns.read"),
 
   const eligible: { id: number; name: string; email: string | null; company: string | null }[] = [];
   const buckets = new Map<string, { id: number; name: string; email: string | null; detail: string | null }[]>();
+  const duplicateLosers = duplicateAddressLosers(resolved.leads);
 
   for (const lead of resolved.leads) {
-    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions);
+    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions, duplicateLosers);
     if (verdict.reason) {
       const list = buckets.get(verdict.reason) ?? [];
       list.push({ id: lead.id, name: lead.name, email: lead.email, detail: verdict.detail });
