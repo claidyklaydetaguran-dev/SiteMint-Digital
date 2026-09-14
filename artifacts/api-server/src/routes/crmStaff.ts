@@ -349,6 +349,24 @@ router.get("/crm/staff/me", requireStaff(), (req: Request, res: Response) => {
   res.json({ staff: publicStaff(req.staffAuth!.staff) });
 });
 
+/**
+ * Whether a string names a real IANA timezone.
+ *
+ * `Intl.DateTimeFormat` throws `RangeError` on anything it does not recognise,
+ * which is the cheapest reliable check and uses the same database the overdue
+ * rules resolve against. Validating matters more here than it looks: a stored
+ * zone nobody checked silently falls back to UTC in the sweep, which is exactly
+ * the bug this field exists to fix, wearing a different hat.
+ */
+function isRealTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 router.patch("/crm/staff/me", requireStaff(), async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const displayName = typeof body["displayName"] === "string" ? body["displayName"].trim() : undefined;
@@ -356,10 +374,42 @@ router.patch("/crm/staff/me", requireStaff(), async (req: Request, res: Response
     res.status(400).json({ error: "Display name must be at least 2 characters." });
     return;
   }
+
+  // Timezone was readable but not settable, so every account sat on the "UTC"
+  // default forever — and the zone is what decides whether a task is overdue,
+  // when a reminder fires, and when the daily digest is sent. For a team eight
+  // hours from UTC that made every deadline eight hours wrong, and a date-only
+  // task turn red on the morning it was actually due.
+  let timezone: string | undefined;
+  if (body["timezone"] !== undefined) {
+    const raw = typeof body["timezone"] === "string" ? body["timezone"].trim() : "";
+    if (!raw || !isRealTimezone(raw)) {
+      res.status(400).json({
+        error: `"${raw}" is not a timezone this server recognises. Use an IANA name like "Asia/Manila" or "Europe/London".`,
+      });
+      return;
+    }
+    timezone = raw;
+  }
+
+  const staff = req.staffAuth!.staff;
   const [updated] = await db.update(crmStaff)
-    .set({ ...(displayName !== undefined ? { displayName } : {}), updatedAt: new Date() })
-    .where(eq(crmStaff.id, req.staffAuth!.staff.id))
+    .set({
+      ...(displayName !== undefined ? { displayName } : {}),
+      ...(timezone !== undefined ? { timezone } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(crmStaff.id, staff.id))
     .returning();
+
+  if (timezone !== undefined && timezone !== staff.timezone) {
+    await recordStaffAudit({
+      actorStaffId: staff.id, actorLabel: staff.email,
+      action: "staff.timezone.changed",
+      target: `${staff.timezone ?? "unset"} -> ${timezone}`,
+      ip: deriveClientIp(req),
+    });
+  }
   res.json({ staff: publicStaff(updated) });
 });
 

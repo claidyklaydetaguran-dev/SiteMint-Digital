@@ -198,6 +198,42 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
     expect(r.status).toBe(403);
   });
 
+  // ── Timezone ──────────────────────────────────────────────────────────────
+
+  it("lets somebody set their own timezone, and refuses one that is not real", async () => {
+    // This field decides whether a task is overdue, when its reminder fires and
+    // when the daily digest is sent. It was readable but not settable, so every
+    // account sat on the "UTC" default forever — which for a team eight hours
+    // from UTC made a date-only task turn red on the morning it was due.
+    const before = await owner.call("GET", "/api/crm/staff/me");
+    expect(before.json["staff"].timezone).toBe("UTC");
+
+    const ok = await owner.call("PATCH", "/api/crm/staff/me", { timezone: "Asia/Manila" });
+    expect(ok.status).toBe(200);
+    expect(ok.json["staff"].timezone).toBe("Asia/Manila");
+
+    // Persisted, not just echoed.
+    const after = await owner.call("GET", "/api/crm/staff/me");
+    expect(after.json["staff"].timezone).toBe("Asia/Manila");
+
+    // A zone nobody validated silently degrades to UTC inside the sweep, which
+    // is the very bug this field exists to fix. So it is refused at the door.
+    for (const bad of ["Mars/Olympus", "GMT+8", "", "   "]) {
+      const r = await owner.call("PATCH", "/api/crm/staff/me", { timezone: bad });
+      expect(r.status, `"${bad}" should be refused`).toBe(400);
+      expect(String(r.json["error"])).toMatch(/timezone/i);
+    }
+    const unchanged = await owner.call("GET", "/api/crm/staff/me");
+    expect(unchanged.json["staff"].timezone).toBe("Asia/Manila");
+
+    // Changing it is auditable — it moves other people's deadlines.
+    const audit = await owner.call("GET", "/api/crm/staff/audit?limit=50");
+    expect((audit.json["entries"] ?? audit.json["rows"] ?? [])
+      .some((e: any) => e.action === "staff.timezone.changed")).toBe(true);
+
+    await owner.call("PATCH", "/api/crm/staff/me", { timezone: "UTC" });
+  });
+
   // ── Inviting the other two ────────────────────────────────────────────────
 
   it("invites the technical administrator and the operations manager", async () => {

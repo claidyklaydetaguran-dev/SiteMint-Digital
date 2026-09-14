@@ -15,7 +15,13 @@ interface Me {
   role: string;
   mfaEnrolled: boolean;
   permissions: string[];
+  timezone: string | null;
 }
+
+/** What the browser thinks, offered as a suggestion rather than applied silently. */
+const browserZone = (() => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; }
+})();
 
 interface SessionRow {
   id: number;
@@ -50,6 +56,7 @@ export default function CrmMyAccount() {
   const [error, setError] = useState("");
 
   const [displayName, setDisplayName] = useState("");
+  const [timezone, setTimezone] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -74,6 +81,7 @@ export default function CrmMyAccount() {
       const m = ((await meRes.json()) as { staff: Me }).staff;
       setMe(m);
       setDisplayName(m.displayName);
+      setTimezone(m.timezone ?? "");
       if (sessRes.ok) {
         const d = await sessRes.json() as { sessions: SessionRow[]; currentSessionId: number };
         setSessions(d.sessions);
@@ -95,6 +103,17 @@ export default function CrmMyAccount() {
     const d = await r.json().catch(() => ({})) as { error?: string };
     if (!r.ok) { setError(d.error ?? "Could not save your name."); return; }
     setNotice("Name updated.");
+    void load();
+  }
+
+  async function saveTimezone() {
+    setError(""); setNotice("");
+    const r = await adminFetch("/api/crm/staff/me", {
+      method: "PATCH", body: JSON.stringify({ timezone: timezone.trim() }),
+    });
+    const d = await r.json().catch(() => ({})) as { error?: string };
+    if (!r.ok) { setError(d.error ?? "Could not save your timezone."); return; }
+    setNotice(`Timezone set to ${timezone.trim()}. Deadlines and reminders now follow it.`);
     void load();
   }
 
@@ -178,6 +197,39 @@ export default function CrmMyAccount() {
                       Save
                     </Button>
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Your timezone</label>
+                  <div className="flex flex-wrap gap-2">
+                    <input className="flex-1 min-w-0 px-3 py-2 text-sm border border-input rounded-lg"
+                      value={timezone} onChange={e => setTimezone(e.target.value)}
+                      placeholder="Asia/Manila" />
+                    <Button size="sm" onClick={() => void saveTimezone()}
+                      disabled={!timezone.trim() || timezone === me.timezone}>
+                      Save
+                    </Button>
+                  </div>
+                  {/*
+                    This decides whether a task is overdue, when its reminder
+                    fires, and when the daily digest arrives — so a wrong value
+                    is not cosmetic. Every account defaulted to UTC because
+                    nothing could change it; for a team eight hours from UTC
+                    that made a date-only task turn red on the morning it was
+                    actually due.
+                  */}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Decides when a task counts as overdue, when reminders fire, and when your daily
+                    digest arrives.
+                    {browserZone && browserZone !== me.timezone && (
+                      <>
+                        {" "}This device says you are in <strong>{browserZone}</strong>.{" "}
+                        <button type="button" className="underline text-primary"
+                          onClick={() => setTimezone(browserZone)}>
+                          Use that
+                        </button>
+                      </>
+                    )}
+                  </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {me.email} · {me.role.replace(/_/g, " ")}
