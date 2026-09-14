@@ -21,7 +21,7 @@ import { Link, useLocation, useSearchParams } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { useSession, useLogout, SESSION_KEY } from "@/hooks/useSession";
 import { useQueryClient } from "@tanstack/react-query";
-import { fetchAgentConfig, readAccountProfile, updateAccountProfile, changePassword, changeAccountEmail } from "@/lib/accountApi";
+import { fetchBusinessProfile, readBusinessProfile, updateAccountProfile, changePassword, changeAccountEmail } from "@/lib/accountApi";
 import {
   accountFields,
   accountNote,
@@ -59,9 +59,6 @@ const EMPTY_PROFILE_FORM: ProfileFormValues = {
   name: "",
   industry: "",
   timezone: "",
-  primaryContactName: "",
-  primaryContactEmail: "",
-  defaultLocation: "",
 };
 
 function browserTimezone(): string {
@@ -113,17 +110,16 @@ export default function Settings() {
   useEffect(() => {
     if (!me) return;
     let cancelled = false;
-    fetchAgentConfig()
+    fetchBusinessProfile()
       .then((body) => {
         if (cancelled) return;
-        const account = readAccountProfile(body);
+        const account = readBusinessProfile(body);
         setProfile({
           name: account.name,
           industry: account.industry,
+          // The stored timezone wins. The browser's is only a first guess for a
+          // business that has never chosen one — never an override of one it has.
           timezone: account.timezone || browserTimezone(),
-          primaryContactName: account.primaryContact.name,
-          primaryContactEmail: account.primaryContact.email,
-          defaultLocation: account.defaultLocation,
         });
         setProfileLoaded(true);
       })
@@ -154,6 +150,12 @@ export default function Settings() {
       await updateAccountProfile(buildProfilePatch(profile));
       setSaveState("saved");
       qc.invalidateQueries({ queryKey: ["agent-config"] });
+      // The business day's timezone lives in the scheduling settings, and
+      // Setup's "Business information" step reads name + industry — both are
+      // now stale. Without these, saving here leaves Availability showing the
+      // old timezone and Setup still calling step 1 unfinished.
+      qc.invalidateQueries({ queryKey: ["availability"] });
+      qc.invalidateQueries({ queryKey: ["setup"] });
       window.setTimeout(() => setSaveState("idle"), 2500);
     } catch {
       setSaveState("error");
@@ -348,34 +350,6 @@ export default function Settings() {
           </div>
 
           <div className="si-field">
-            <label htmlFor="settings-contact-name" className="si-label">
-              Primary contact name <span className="si-req">Optional</span>
-            </label>
-            <input
-              id="settings-contact-name"
-              className="si-input"
-              type="text"
-              value={profile.primaryContactName}
-              onChange={(e) => setProfile((f) => ({ ...f, primaryContactName: e.target.value }))}
-              disabled={!profileLoaded}
-            />
-          </div>
-
-          <div className="si-field">
-            <label htmlFor="settings-contact-email" className="si-label">
-              Primary contact email <span className="si-req">Optional</span>
-            </label>
-            <input
-              id="settings-contact-email"
-              className="si-input"
-              type="email"
-              value={profile.primaryContactEmail}
-              onChange={(e) => setProfile((f) => ({ ...f, primaryContactEmail: e.target.value }))}
-              disabled={!profileLoaded}
-            />
-          </div>
-
-          <div className="si-field">
             <label htmlFor="settings-timezone" className="si-label">
               Timezone <span className="si-req">Optional</span>
             </label>
@@ -395,21 +369,6 @@ export default function Settings() {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="si-field">
-            <label htmlFor="settings-location" className="si-label">
-              Default business location <span className="si-req">Optional</span>
-            </label>
-            <input
-              id="settings-location"
-              className="si-input"
-              type="text"
-              value={profile.defaultLocation}
-              onChange={(e) => setProfile((f) => ({ ...f, defaultLocation: e.target.value }))}
-              disabled={!profileLoaded}
-              placeholder="e.g. 123 Main St, Austin, TX"
-            />
           </div>
 
           <button type="submit" className="si-submit" disabled={!profileLoaded || saveState === "saving"}>

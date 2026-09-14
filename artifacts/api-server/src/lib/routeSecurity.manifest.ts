@@ -51,6 +51,10 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   // Session AND the current password: the address is the login identity, so a
   // borrowed session alone must not be able to take the account over.
   "PATCH /api/receptionist/account/email": "session",
+  // Business name, trade and timezone. Session only — unlike the address
+  // above, none of these is the login identity, so changing one cannot take
+  // the account over.
+  "PATCH /api/receptionist/account/profile": "session",
   "PATCH /api/receptionist/agent-config": "session",
   "PATCH /api/receptionist/voice/assistants/:id": "session",
   "PATCH /api/receptionist/voice/messages/:id": "session",

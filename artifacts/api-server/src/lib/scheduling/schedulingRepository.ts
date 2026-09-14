@@ -800,6 +800,20 @@ export async function setPublicSlug(firmId: number, slug: string | null): Promis
     .where(eq(schedulingAvailabilitySettings.firmId, firmId));
 }
 
+/**
+ * The business day's timezone, editable from Settings as well as from
+ * Availability. Deliberately the SAME row both pages already read, so the two
+ * screens cannot drift into disagreeing about when this business is open.
+ * Only the timezone is touched — hours, buffers and limits are untouched.
+ */
+export async function setBusinessTimezone(firmId: number, timezone: string): Promise<void> {
+  await getOrCreateSettingsRow(firmId);
+  await db
+    .update(schedulingAvailabilitySettings)
+    .set({ timezone, updatedAt: new Date() })
+    .where(eq(schedulingAvailabilitySettings.firmId, firmId));
+}
+
 export async function getPublicAppointmentTypes(firmId: number): Promise<AppointmentType[]> {
   const rows = await db
     .select()

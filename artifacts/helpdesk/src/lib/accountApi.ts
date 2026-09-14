@@ -84,16 +84,52 @@ export function fetchAgentConfig(): Promise<AgentConfigResponse> {
   return apiFetch<AgentConfigResponse>("/receptionist/agent-config");
 }
 
+// ─── Business profile ────────────────────────────────────────────────────
+//
+// Its own endpoint, not `agent-config`. That route configures the SMS
+// receptionist's *agent* (greeting, description, qualifying questions) and
+// accepts nothing else: sending it `name`/`industry`/`timezone` produced
+// `400 No fields to update`, so this form never once saved, and Setup step 1
+// — complete only when name AND industry are set — could never be finished.
+//
+// `primaryContact` and `defaultLocation` are gone: the account has no column
+// for either, so they were being discarded on every submit.
+
+export const PROFILE_ENDPOINT = "/receptionist/account/profile";
+
+export interface BusinessProfile {
+  name: string;
+  industry: string;
+  timezone: string;
+}
+
+export interface BusinessProfileResponse {
+  profile: Partial<BusinessProfile>;
+}
+
+const EMPTY_BUSINESS_PROFILE: BusinessProfile = { name: "", industry: "", timezone: "" };
+
+export function readBusinessProfile(body: BusinessProfileResponse | null | undefined): BusinessProfile {
+  const p = body?.profile ?? {};
+  return {
+    name: typeof p.name === "string" ? p.name : EMPTY_BUSINESS_PROFILE.name,
+    industry: typeof p.industry === "string" ? p.industry : EMPTY_BUSINESS_PROFILE.industry,
+    timezone: typeof p.timezone === "string" ? p.timezone : EMPTY_BUSINESS_PROFILE.timezone,
+  };
+}
+
+export function fetchBusinessProfile(): Promise<BusinessProfileResponse> {
+  return apiFetch<BusinessProfileResponse>(PROFILE_ENDPOINT);
+}
+
 export interface AccountProfilePatch {
   name?: string;
   industry?: string;
   timezone?: string;
-  primaryContact?: { name: string; email: string };
-  defaultLocation?: string;
 }
 
-export function updateAccountProfile(patch: AccountProfilePatch): Promise<AgentConfigResponse> {
-  return apiFetch<AgentConfigResponse>("/receptionist/agent-config", {
+export function updateAccountProfile(patch: AccountProfilePatch): Promise<BusinessProfileResponse> {
+  return apiFetch<BusinessProfileResponse>(PROFILE_ENDPOINT, {
     method: "PATCH",
     body: JSON.stringify(patch),
   });

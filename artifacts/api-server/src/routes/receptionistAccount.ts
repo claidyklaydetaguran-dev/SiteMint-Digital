@@ -14,6 +14,7 @@ import {
   requestPasswordReset,
 } from "../lib/accountSecurity/accountTokens.js";
 import { changeAccountEmail, productionEmailChangeDeps } from "../lib/accountSecurity/emailChange.js";
+import { applyProfilePatch, readBusinessProfile, validateProfilePatch } from "../lib/accountProfile/profileService.js";
 import { resolveVerifiedBusinessRecipient } from "../lib/voiceNotifications/recipient.js";
 import { acceptInvitation, inviteMember, listFirmMembers, revokeMemberById } from "../lib/voiceAccounts/membership.js";
 import { resolveEntitlementsForFirm } from "../lib/voiceBilling/entitlements.js";
@@ -122,6 +123,41 @@ router.get("/receptionist/account/email-status", requireReceptionistAuth, async 
     );
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] email status failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── business profile ─────────────────────────────────────────────────────────
+//
+// What the business is called, what trade it is in, and the timezone its day
+// runs on. Settings used to send these to the agent-config route, which is the
+// SMS *agent's* configuration and accepts none of them — so the form answered
+// "400 No fields to update" and the customer's first setup step could never be
+// completed. See lib/accountProfile/profileService.ts for where each field is
+// stored and why.
+
+router.get("/receptionist/account/profile", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    res.json({ profile: await readBusinessProfile(req.firmId!) });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] profile read failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+router.patch("/receptionist/account/profile", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const validated = validateProfilePatch(req.body);
+    if (!validated.ok) {
+      res.status(400).json({ error: validated.message, reason: validated.code });
+      return;
+    }
+    await applyProfilePatch(req.firmId!, validated.patch);
+    // Answer with what was actually stored, read back — so the form shows the
+    // saved state rather than the state it hoped for.
+    res.json({ profile: await readBusinessProfile(req.firmId!) });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] profile update failed");
     res.status(500).json({ error: "Internal error" });
   }
 });

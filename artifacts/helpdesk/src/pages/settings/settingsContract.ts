@@ -144,13 +144,16 @@ export function emailChangeDetail(verificationSent: boolean): string {
 
 // ─── Editable business profile (D-7) ───────────────────────────────────────
 
+// Three fields, because three fields is what the account can actually store.
+// A "primary contact" and a "default business location" were offered here
+// before and had nowhere to be saved: the account row has no column for
+// either, so whatever the customer typed was discarded on submit. An input
+// that silently throws away what you typed is worse than one that isn't
+// there — they come back when there is somewhere to put them.
 export interface ProfileFormValues {
   name: string;
   industry: string;
   timezone: string;
-  primaryContactName: string;
-  primaryContactEmail: string;
-  defaultLocation: string;
 }
 
 /** Every field the form submits is optional client-side — the server is authoritative on what it requires. */
@@ -158,15 +161,11 @@ export function buildProfilePatch(form: ProfileFormValues): {
   name: string;
   industry: string;
   timezone: string;
-  primaryContact: { name: string; email: string };
-  defaultLocation: string;
 } {
   return {
     name: form.name.trim(),
     industry: form.industry.trim(),
     timezone: form.timezone,
-    primaryContact: { name: form.primaryContactName.trim(), email: form.primaryContactEmail.trim() },
-    defaultLocation: form.defaultLocation.trim(),
   };
 }
 
