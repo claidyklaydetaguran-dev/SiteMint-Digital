@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { CalendarReturnBanner } from "@/pages/calendar/CalendarReturnBanner";
+import { CalendarPicker } from "@/pages/calendar/CalendarPicker";
 import {
   CONNECT,
   HEALTH_FIELDS,
@@ -252,6 +253,10 @@ export default function CalendarPage() {
               </div>
             )}
           </dl>
+
+          {/* Where appointments go. Sits above Disconnect because choosing a
+              calendar is the ordinary action and disconnecting is the rare one. */}
+          <CalendarPicker onReconnect={handleConnect} />
 
           {disconnectFailed && (
             <div className="sd-error" role="alert">

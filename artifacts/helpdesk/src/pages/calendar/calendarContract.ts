@@ -263,3 +263,28 @@ export function everyRenderableString(): string[] {
     lastCheckedLabel(Date.now()),
   ];
 }
+
+/* ── Choosing the calendar ─────────────────────────────────────────────────
+   The control exists because "primary" was never a decision the business
+   made. The copy has to carry two awkward truths: a read-only calendar is
+   visible but unusable, and a business that connected before this scope
+   existed has to reconnect to grant one more permission — which is not the
+   same as its calendar being broken. */
+
+export const CALENDAR_PICKER = {
+  heading: "Where appointments are saved",
+  detail: "Approved appointments are written to this calendar. Busy times are read from it too.",
+  label: "Calendar",
+  save: "Save calendar",
+  savePending: "Saving…",
+  saved: "Calendar saved",
+  savedDetail: "New appointments will be written here. Appointments already booked stay where they are.",
+  loading: "Reading your calendars…",
+  readOnlySuffix: "(view only — can't save appointments here)",
+  needsPermissionTitle: "One more permission is needed",
+  needsPermissionDetail:
+    "SiteMint can book into your calendar but hasn't been allowed to see the list of calendars on this account, so it can't offer you a choice. Reconnect to grant that, and your current connection keeps working if you decide not to.",
+  unavailableTitle: "Your calendars couldn't be listed",
+  unavailableDetail: "This is usually temporary. The calendar already chosen keeps being used.",
+  failedTitle: "That calendar wasn't saved",
+} as const;

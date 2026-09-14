@@ -164,3 +164,36 @@ export function rescheduleBookedAppointment(publicId: string, startUtc: string):
 export function reconcileCalendar(): Promise<ReconcileResult> {
   return calendarFetch("/receptionist/calendar/reconcile", { method: "POST" });
 }
+
+/* ── Which calendar receives appointments ─────────────────────────────────
+   Until this existed, everything went to Google's "primary" — not a choice
+   anyone made, just the only calendar the old scopes could name. A business
+   connected under that older grant gets `needs_permission` here, which means
+   "reconnect to grant one more permission", NOT "your calendar is broken". */
+
+export interface CalendarChoice {
+  id: string;
+  name: string;
+  primary: boolean;
+  /** False for a calendar shared read-only: offered for context, never selectable. */
+  writable: boolean;
+  accessRole: string;
+}
+
+export interface CalendarChoicesResponse {
+  calendars: CalendarChoice[];
+  selectedCalendarId: string;
+}
+
+/** `GET /calendar/calendars` — 403 when the connection predates the listing scope. */
+export function fetchCalendarChoices(): Promise<CalendarChoicesResponse> {
+  return calendarFetch("/receptionist/calendar/calendars");
+}
+
+/** `PUT /calendar/selection` — validated server-side against the live list. */
+export function selectCalendar(calendarId: string): Promise<{ ok: true; selectedCalendarId: string }> {
+  return calendarFetch("/receptionist/calendar/selection", {
+    method: "PUT",
+    body: JSON.stringify({ calendarId }),
+  });
+}
