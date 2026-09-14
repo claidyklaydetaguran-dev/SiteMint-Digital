@@ -13,7 +13,8 @@
  */
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type RouteAudience =
   /** Internal staff, behind the CRM session and the permission model. */
@@ -30,7 +31,11 @@ export interface InventoryRoute {
   audience: RouteAudience;
 }
 
-const APP_TSX = join(__dirname, "..", "App.tsx");
+// `import.meta.url` rather than `__dirname`: this module is read by the vitest
+// suite (which provides CJS globals) AND run directly under tsx as ESM (which
+// does not). Using __dirname worked in one and threw in the other.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const APP_TSX = join(HERE, "..", "App.tsx");
 
 /**
  * Every `<Route path=…>` registered in the application.

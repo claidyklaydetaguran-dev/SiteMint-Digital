@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readRegisteredRoutes, classify, buildInventory, staffSweepPaths } from "./routeInventory.js";
 
-const source = readFileSync(join(__dirname, "..", "App.tsx"), "utf8");
+const source = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
 
 describe("route inventory", () => {
   const inventory = buildInventory(source);
