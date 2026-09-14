@@ -21,6 +21,9 @@ import {
   listDeliveriesNeedingAttention, deliveryNeedsAttention, deliveryAttentionShape,
   resendDuplicateRisk, recoverDelivery,
 } from "../lib/crmScheduler.js";
+// One overdue rule, shared with the automation sweep, so My Day and a rule
+// firing on `task_overdue` can never disagree about the same task.
+import { isOverdueInZone } from "../lib/automationSweep.js";
 
 const router: IRouter = Router();
 
@@ -82,6 +85,7 @@ router.get("/crm/my-day", requireCrmAuth(), async (req: Request, res: Response) 
   const zone = actorTimezone(req);
   const { start, end } = localDayBounds(zone);
   const soon = new Date(end.getTime() + 7 * 24 * 3600_000);
+  const nowInstant = new Date();
 
   // "Mine" means assigned to me. On the legacy bearer there is no person, so
   // the honest answer is the unassigned queue rather than a pretend inbox.
@@ -127,7 +131,14 @@ router.get("/crm/my-day", requireCrmAuth(), async (req: Request, res: Response) 
     if (t.blockedReason) { buckets.blocked.push(d); continue; }
     if (!t.dueDate) { buckets.unscheduled.push(d); continue; }
     const ms = t.dueDate.getTime();
-    if (ms < start.getTime()) buckets.overdue.push(d);
+    // Overdue uses the same rule the automation sweep uses, so the two surfaces
+    // cannot disagree about the same task: a deadline with a real time is
+    // overdue once that instant has passed, and one stored at local midnight —
+    // which is what a bare date looks like through a datetime input — is
+    // overdue only once its day has ended. Previously both were day-based, so a
+    // task the person deliberately set for 09:00 sat in "Due today" all
+    // afternoon while its own row displayed the time they had chosen.
+    if (isOverdueInZone(zone, t.dueDate, nowInstant)) buckets.overdue.push(d);
     else if (ms < end.getTime()) buckets.dueToday.push(d);
     else if (ms < soon.getTime()) buckets.upcoming.push(d);
   }

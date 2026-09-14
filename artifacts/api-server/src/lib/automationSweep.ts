@@ -149,15 +149,64 @@ export function calendarDaysBetween(from: string, to: string): number {
 }
 
 /**
+ * Local wall-clock time of an instant, as "HH:mm", in `zone`.
+ *
+ * Used only to tell a date-only deadline from a timed one — see below.
+ */
+export function localClockTime(zone: string, at: Date): string {
+  const fmt = (z: string) => new Intl.DateTimeFormat("en-GB", {
+    timeZone: z, hour12: false, hour: "2-digit", minute: "2-digit",
+  }).format(at);
+  try {
+    return fmt(zone);
+  } catch {
+    return fmt(AUTOMATION_FALLBACK_TIMEZONE);
+  }
+}
+
+/**
  * Is a task with this due instant overdue, for somebody in this zone, now?
  *
- * The day the task was due has to have ENDED. A task due at 09:00 today is late
- * this afternoon but it is not overdue — the person still has the day to do it,
- * and a rule that shouted at them at 09:01 would be describing a clock, not a
- * problem.
+ * ── Why this is not simply `dueAt < now` ────────────────────────────────────
+ *
+ * `crm_tasks.due_date` is a `timestamp with time zone`: it always carries a
+ * time, whether or not anybody chose one. So the column cannot, by itself,
+ * distinguish "due on the 15th" from "due at 00:00 on the 15th". Comparing
+ * instants would make every date-only task overdue one minute into the very day
+ * it is due, which is wrong and would be the more annoying failure of the two.
+ *
+ * An earlier version solved that by comparing calendar days only. That was
+ * wrong in the other direction: the composer collects a time with a
+ * `datetime-local` input and My Day displays it ("Today 14:30"), so somebody
+ * who deliberately sets 09:00 is told their task is not overdue all afternoon.
+ * The explanation given for it — "the person still has the day" — described a
+ * design nobody had chosen; it was a limitation presented as an intention.
+ *
+ * The rule now matches what the data can actually support:
+ *
+ *   - **Midnight local means date-only.** The day has to END before the task is
+ *     overdue. This is what a bare date stored through a datetime input looks
+ *     like, and treating it as "due at 00:00" would be a false alarm.
+ *   - **Any other local time means timed.** The instant has to have PASSED. A
+ *     task due 09:00 is overdue at 09:01, which is what the person who typed
+ *     09:00 meant.
+ *
+ * Midnight is judged in the assignee's own zone, because 00:00 local is a
+ * different instant in every zone — reading it in UTC would misclassify
+ * everyone outside UTC.
+ *
+ * Daylight saving is handled by construction. The timed branch compares
+ * instants, which have no wall-clock ambiguity. The date-only branch compares
+ * day labels produced by `Intl` in the target zone, which is correct across a
+ * transition — including the spring-forward day that has no 02:00 and the
+ * autumn day that has two 01:30s.
  */
 export function isOverdueInZone(zone: string, dueAt: Date, now: Date): boolean {
-  return localCalendarDay(zone, dueAt) < localCalendarDay(zone, now);
+  const dateOnly = localClockTime(zone, dueAt) === "00:00";
+  if (dateOnly) {
+    return localCalendarDay(zone, dueAt) < localCalendarDay(zone, now);
+  }
+  return dueAt.getTime() < now.getTime();
 }
 
 /** Active staff timezones, by id and by display name. */

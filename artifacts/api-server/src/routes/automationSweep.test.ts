@@ -381,11 +381,19 @@ suite("automation sweep and durable events (real DB)", () => {
   }, 120_000);
 
   it("decides 'overdue' in the assignee's timezone, not the server's", async () => {
-    // Same due instant, same server clock, two people. At 04:00Z on the 11th it
-    // is 12:00 on the 11th in Manila — the 10th is over — and 21:00 on the 10th
-    // in California, where there are three hours left to do it.
+    // Two people each set "due on the 10th" in their own zone — which is what
+    // a bare date through a datetime input stores: local midnight. Those are
+    // DIFFERENT instants, and that is the point: at 04:00Z on the 11th the 10th
+    // is over in Manila and still running in California.
+    //
+    // This test used to use one shared 12:00Z instant, which is not midnight in
+    // either zone. Under the corrected rule that is a TIMED deadline and is
+    // overdue for everybody once it passes, so it no longer demonstrates
+    // anything about zones. Date-only deadlines are the case where the zone
+    // actually decides.
     clockMs = PIVOT;
-    const dueAt = new Date(Date.parse("2026-09-10T12:00:00.000Z"));
+    const dueManila = new Date(Date.parse("2026-09-10T00:00:00.000+08:00"));
+    const duePacific = new Date(Date.parse("2026-09-10T00:00:00.000-07:00"));
 
     const rule = await makeRule({
       name: `[CRM-TEST] overdue zones ${STAMP}`,
@@ -396,24 +404,28 @@ suite("automation sweep and durable events (real DB)", () => {
 
     const leadId = await makeLead();
     const manilaTask = await makeTask({
-      leadId, title: "[CRM-TEST] due in Manila", dueDate: dueAt,
+      leadId, title: "[CRM-TEST] due in Manila", dueDate: dueManila,
       assignedToStaffId: staffIds[MANILA.email],
     });
     const pacificTask = await makeTask({
-      leadId, title: "[CRM-TEST] due in California", dueDate: dueAt,
+      leadId, title: "[CRM-TEST] due in California", dueDate: duePacific,
       assignedToStaffId: staffIds[PACIFIC.email],
     });
 
     // The helper says it plainly, before any of the machinery is involved.
-    expect(sweep.isOverdueInZone("Asia/Manila", dueAt, clock())).toBe(true);
-    expect(sweep.isOverdueInZone("America/Los_Angeles", dueAt, clock())).toBe(false);
+    expect(sweep.isOverdueInZone("Asia/Manila", dueManila, clock())).toBe(true);
+    expect(sweep.isOverdueInZone("America/Los_Angeles", duePacific, clock())).toBe(false);
 
     await tick();
 
     expect(await eventsFor("task", manilaTask), "the day has ended in Manila").toHaveLength(1);
     expect(await eventsFor("task", pacificTask), "California still has the day").toHaveLength(0);
 
-    const runs = await executionsFor(rule["id"]);
+    // Scoped to this test's two tasks: the sweep also picks up any other
+    // overdue task in the shared database, which is correct behaviour and not
+    // what is being measured here.
+    const mineOnly = (r: { recordId: number }) => r.recordId === manilaTask || r.recordId === pacificTask;
+    const runs = (await executionsFor(rule["id"])).filter(mineOnly);
     expect(runs).toHaveLength(1);
     expect(runs[0].recordId).toBe(manilaTask);
 
@@ -423,7 +435,7 @@ suite("automation sweep and durable events (real DB)", () => {
     await tick();
 
     expect(await eventsFor("task", pacificTask), "now it is the 11th there too").toHaveLength(1);
-    const later = await executionsFor(rule["id"]);
+    const later = (await executionsFor(rule["id"])).filter(mineOnly);
     expect(later).toHaveLength(2);
     expect(later.map((r) => r.recordId).sort()).toEqual([manilaTask, pacificTask].sort());
   }, 120_000);
@@ -548,7 +560,12 @@ suite("automation sweep and durable events (real DB)", () => {
       if (claimed === 0) break;
     }
 
-    expect(await executionsFor(rule["id"])).toHaveLength(1);
+    // Scoped to the contested task rather than to every execution of the rule.
+    // The sweep legitimately picks up any other overdue task in the database,
+    // and this test is about one occurrence not running twice — not about the
+    // rule being the only thing that ever fired.
+    const mine = (await executionsFor(rule["id"])).filter((r) => r.recordId === taskId);
+    expect(mine, "one occurrence, one execution").toHaveLength(1);
     const notes = await db.select().from(schema.crmActivities)
       .where(eq(schema.crmActivities.leadId, leadId));
     expect(notes, "the action ran once").toHaveLength(1);
