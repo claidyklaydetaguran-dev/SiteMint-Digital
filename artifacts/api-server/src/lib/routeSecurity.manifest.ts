@@ -165,6 +165,9 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/voice/webhooks/vapi": "signature",
   "PUT /api/admin/voice/firms/:id/subscription": "admin",
   "PUT /api/crm/email-templates/:id": "admin",
+  // Which calendar future appointments are written to. Validated against the
+  // live list, so a session cannot name a calendar the account does not have.
+  "PUT /api/receptionist/calendar/selection": "session",
   "PUT /api/receptionist/availability/config": "session",
   "PUT /api/receptionist/availability/public-link": "session",
   "PUT /api/receptionist/onboarding": "session",

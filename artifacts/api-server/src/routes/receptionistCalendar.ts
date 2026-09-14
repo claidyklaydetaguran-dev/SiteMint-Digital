@@ -28,8 +28,11 @@ import {
   markConnectionRevoked,
   getActiveConnection,
   findAnyConnection,
+  setSelectedCalendar,
 } from "../lib/calendar/calendarConnectionsRepository.js";
 import { assessConnectionHealth } from "../lib/calendar/connectionHealth.js";
+import { listCalendars, validateSelection } from "../lib/calendar/calendarList.js";
+import { calendarAccessToken } from "../lib/calendar/accessToken.js";
 import {
   approveRequestToBooked,
   cancelBookedRequest,
@@ -141,6 +144,60 @@ router.get("/receptionist/calendar/health", requireReceptionistAuth, async (req:
     res.json({ health: assessConnectionHealth(connection), writeEnabled: isCalendarWriteEnabled() });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] health read failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /api/receptionist/calendar/calendars ─────────────────────────────────
+//
+// Which calendars this account has, so the business can choose where its
+// appointments land instead of silently getting "primary". A 403 from Google
+// means the older two-scope grant is in place — that is a missing permission,
+// not a broken calendar, and the answer says so.
+
+router.get("/receptionist/calendar/calendars", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const connection = await getActiveConnection(req.firmId!);
+    if (!connection) {
+      res.status(404).json({ error: "No calendar is connected.", reason: "no_connection" });
+      return;
+    }
+    const result = await listCalendars(connection, { accessTokenFor: calendarAccessToken });
+    if (!result.ok) {
+      res.status(result.reason === "needs_permission" ? 403 : 503).json({ error: result.detail, reason: result.reason });
+      return;
+    }
+    res.json({ calendars: result.calendars, selectedCalendarId: connection.calendarId });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] list failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PUT /api/receptionist/calendar/selection ─────────────────────────────────
+//
+// Validated against the live list, never trusted from the request: this value
+// is the address every future appointment is written to. Appointments already
+// booked keep their own calendar reference and are untouched.
+
+router.put("/receptionist/calendar/selection", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const connection = await getActiveConnection(req.firmId!);
+    if (!connection) {
+      res.status(404).json({ error: "No calendar is connected.", reason: "no_connection" });
+      return;
+    }
+    const listing = await listCalendars(connection, { accessTokenFor: calendarAccessToken });
+    const validated = validateSelection((req.body ?? {}).calendarId, listing);
+    if (!validated.ok) {
+      res.status(validated.reason === "unreadable" ? 503 : 400).json({ error: validated.detail, reason: validated.reason });
+      return;
+    }
+    await setSelectedCalendar(req.firmId!, validated.calendarId);
+    const updated = await findAnyConnection(req.firmId!);
+    res.json({ ok: true, selectedCalendarId: validated.calendarId, health: assessConnectionHealth(updated) });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] selection failed");
     res.status(500).json({ error: "Internal error" });
   }
 });

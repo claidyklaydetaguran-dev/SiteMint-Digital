@@ -130,11 +130,16 @@ describe("authorization URL", () => {
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
-  it("requests exactly the two narrow scopes and nothing broader", () => {
+  it("requests exactly the three narrow scopes and nothing broader", () => {
+    // The third scope reads the LIST of calendars and nothing in them. It is
+    // what lets a business choose where its appointments land instead of
+    // silently getting "primary" — neither of the other two can name a
+    // calendar. It is still nowhere near full-calendar access.
     expect(url.searchParams.get("scope")).toBe(GOOGLE_CALENDAR_SCOPES.join(" "));
     expect([...GOOGLE_CALENDAR_SCOPES]).toEqual([
       "https://www.googleapis.com/auth/calendar.freebusy",
       "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
     ]);
     // Never the full-calendar or readonly-everything scopes.
     for (const scope of GOOGLE_CALENDAR_SCOPES) {

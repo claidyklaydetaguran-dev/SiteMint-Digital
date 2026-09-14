@@ -14,6 +14,7 @@ import type { SchedulingCalendarConnection } from "@workspace/db/schema/scheduli
 import { decryptToken, loadCalendarTokenKey } from "./tokenCrypto.js";
 import { loadGoogleOAuthConfig, refreshAccessToken, type OAuthTransport } from "./googleOAuth.js";
 import { encryptToken } from "./tokenCrypto.js";
+import { resolveCalendarAccessToken } from "./accessToken.js";
 
 export const GOOGLE_EVENTS_ENDPOINT_BASE = "https://www.googleapis.com/calendar/v3/calendars";
 
@@ -154,27 +155,16 @@ export class GoogleCalendarEventWriter implements CalendarEventWriter {
     this.deps = deps;
   }
 
+  /**
+   * Delegates to the shared refresh path so the writer and the calendar
+   * listing can never disagree about what `invalid_grant` means.
+   */
   private async accessTokenFor(connection: SchedulingCalendarConnection): Promise<string | undefined> {
-    const key = loadCalendarTokenKey();
-    const now = this.deps.now?.() ?? new Date();
-    if (
-      connection.accessTokenEnc &&
-      connection.accessTokenExpiresAt &&
-      connection.accessTokenExpiresAt.getTime() - now.getTime() > 60_000
-    ) {
-      return decryptToken(connection.accessTokenEnc, key);
-    }
-    const refreshToken = decryptToken(connection.refreshTokenEnc, key);
-    const result = await refreshAccessToken(loadGoogleOAuthConfig(), refreshToken, this.deps.oauthTransport);
-    if (!result.ok) return result.reason === "invalid_grant" ? undefined : Promise.reject(new Error("refresh failed"));
-    if (this.deps.updateAccessToken) {
-      await this.deps.updateAccessToken(
-        connection.firmId,
-        encryptToken(result.accessToken, key),
-        new Date(now.getTime() + result.expiresInSec * 1000),
-      );
-    }
-    return result.accessToken;
+    return resolveCalendarAccessToken(connection, {
+      ...(this.deps.now ? { now: this.deps.now } : {}),
+      ...(this.deps.oauthTransport ? { oauthTransport: this.deps.oauthTransport } : {}),
+      ...(this.deps.updateAccessToken ? { updateAccessToken: this.deps.updateAccessToken } : {}),
+    });
   }
 
   async insertEvent(connection: SchedulingCalendarConnection, input: CalendarEventInput): Promise<EventWriteResult> {

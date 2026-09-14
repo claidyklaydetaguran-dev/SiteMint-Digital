@@ -85,12 +85,38 @@ describe("the calendar writer is reachable from a route", () => {
     expect(calendarRoutes).toMatch(/const firmId = req\.firmId!/);
   });
 
-  it("returns no provider identifier, token, or caller detail in a response", () => {
+  it("returns no provider event identifier, token, or caller detail in a response", () => {
+    // Event ids, tokens and caller details never leave the server.
+    //
+    // A CALENDAR id is the one deliberate exception, and only where it is the
+    // point: the picker cannot let a business choose between its calendars
+    // without naming them, and these are the business's own calendars shown
+    // to that same business. Everything else stays banned.
     const bodies = [...calendarRoutes.matchAll(/res\.(?:status\(\d+\)\.)?json\(([^;]*)\);/g)].map((m) => m[1] as string);
     expect(bodies.length).toBeGreaterThan(0);
     for (const body of bodies) {
-      expect(body).not.toMatch(/providerEventId|providerCalendarId|calendarId|accessToken|refreshToken|customerName|customerPhone|customerEmail/);
+      expect(body).not.toMatch(/providerEventId|accessToken|refreshToken|customerName|customerPhone|customerEmail/);
+      const namesACalendar = /calendars|selectedCalendarId/.test(body);
+      if (!namesACalendar) expect(body).not.toMatch(/providerCalendarId|calendarId/);
     }
+  });
+
+  it("exposes calendar ids only on the listing and selection routes", () => {
+    const listing = calendarRoutes.match(/router\.get\(\s*["'][^"']*calendar\/calendars["'][\s\S]*?^\}\);/m);
+    const selection = calendarRoutes.match(/router\.put\(\s*["'][^"']*calendar\/selection["'][\s\S]*?^\}\);/m);
+    expect(listing).not.toBeNull();
+    expect(selection).not.toBeNull();
+    // Both are session-authenticated, so a calendar id can only ever reach the
+    // business that owns the connection.
+    expect(listing![0]).toContain("requireReceptionistAuth");
+    expect(selection![0]).toContain("requireReceptionistAuth");
+  });
+
+  it("validates a chosen calendar against the live list rather than trusting the body", () => {
+    // The selection becomes the address every future appointment is written
+    // to. A well-formed id is not the same as one this account can use.
+    expect(calendarRoutes).toMatch(/validateSelection\(\(req\.body \?\? \{\}\)\.calendarId, listing\)/);
+    expect(calendarRoutes).toMatch(/const listing = await listCalendars\(connection/);
   });
 });
 

@@ -93,6 +93,21 @@ export async function updateAccessToken(
     .where(and(eq(schedulingCalendarConnections.firmId, firmId), eq(schedulingCalendarConnections.provider, "google")));
 }
 
+/**
+ * Changes which calendar future appointments are written to.
+ *
+ * Only future ones. Every booked appointment already carries its own
+ * `provider_calendar_id`, so an appointment that exists in one calendar is
+ * never re-addressed to another by a later change of mind — cancelling or
+ * rescheduling it still goes back to the calendar it is actually in.
+ */
+export async function setSelectedCalendar(firmId: number, calendarId: string): Promise<void> {
+  await db
+    .update(schedulingCalendarConnections)
+    .set({ calendarId, updatedAt: new Date() })
+    .where(and(eq(schedulingCalendarConnections.firmId, firmId), eq(schedulingCalendarConnections.provider, "google")));
+}
+
 export async function touchFreebusy(firmId: number): Promise<void> {
   await db
     .update(schedulingCalendarConnections)

@@ -18,11 +18,23 @@ export const GOOGLE_OAUTH_REDIRECT_URI_ENV_VAR = "GOOGLE_OAUTH_REDIRECT_URI";
 export const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-/** freebusy read + events write; the narrowest pair that books appointments. */
+/**
+ * freebusy read + events write; the narrowest pair that books appointments.
+ *
+ * `calendar.calendarlist.readonly` is a THIRD, separate scope: neither of the
+ * two above can enumerate which calendars an account has, which is why the
+ * product silently used "primary" before. It is requested alongside them so a
+ * business can choose where its appointments land, and it grants nothing
+ * beyond the list of calendars and their access roles — no event content.
+ */
 export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.freebusy",
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ] as const;
+
+/** The scope that makes listing possible. Absent from an older grant. */
+export const GOOGLE_CALENDAR_LIST_SCOPE = "https://www.googleapis.com/auth/calendar.calendarlist.readonly";
 
 export function isCalendarConnectEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env[CALENDAR_CONNECT_ENABLED_ENV_VAR] === "true";
