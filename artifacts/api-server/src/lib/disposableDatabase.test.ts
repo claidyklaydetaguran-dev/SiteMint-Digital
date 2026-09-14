@@ -70,4 +70,31 @@ describe("destructive test cleanup is guarded", () => {
     expect(DISPOSABLE_DATABASES).not.toContain("crm_preview");
     expect(DISPOSABLE_DATABASES).toContain("crm_test");
   });
+
+  it("resets staff residue before the run, and guards that reset too", () => {
+    // Why this is pinned: ~25 suites bootstrap an owner, which only works on an
+    // empty crm_staff. A suite that FAILS may skip its afterAll and leave its
+    // actor behind, and every later bootstrap then fails with an unrelated 401
+    // — one red test presenting as twenty. The global reset makes a failure
+    // stay local to the suite that caused it.
+    //
+    // It is also the loudest possible place to catch a misaimed DATABASE_URL:
+    // it runs before any suite, so a wrong database aborts the run with a
+    // message naming it instead of producing a wall of mystery 401s.
+    const root = join(SRC, "..");
+    const config = readFileSync(join(root, "vitest.config.ts"), "utf8");
+    expect(config, "vitest.config.ts must register the global reset").toMatch(
+      /globalSetup:\s*\[\s*["']\.\/vitest\.globalSetup\.ts["']/,
+    );
+
+    const setup = readFileSync(join(root, "vitest.globalSetup.ts"), "utf8");
+    expect(setup, "the reset must refuse a non-disposable database").toContain(
+      "assertDisposableDatabase",
+    );
+    // The assertion has to come BEFORE the delete, or the guard is decoration.
+    expect(
+      setup.indexOf("assertDisposableDatabase("),
+      "assertDisposableDatabase must run before any delete",
+    ).toBeLessThan(setup.indexOf("db.delete("));
+  });
 });

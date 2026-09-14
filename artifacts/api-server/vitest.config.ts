@@ -17,5 +17,10 @@ export default defineConfig({
     // Everything else here is pure and unaffected; the cost is a few seconds
     // of wall clock against a whole class of false failures.
     fileParallelism: false,
+
+    // Clears staff residue a previously-failed run left behind, so one red test
+    // cannot present as twenty. See the file's own comment — it refuses any
+    // database not on the disposable allowlist.
+    globalSetup: ["./vitest.globalSetup.ts"],
   },
 });
