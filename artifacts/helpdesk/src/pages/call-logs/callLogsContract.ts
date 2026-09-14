@@ -447,3 +447,63 @@ export function everyRenderableString(): string[] {
     listOrMissing(null),
   ];
 }
+
+/* ── Transfer outcome ──────────────────────────────────────────────────────
+   The states are levels of evidence, not steps in a progress bar, and the
+   copy has to survive the gap between them. "The provider accepted it" is the
+   most an acknowledgement proves; it is not a person answering, and saying so
+   plainly is the point of this block.
+
+   `connectionKnowable` is false for a blind transfer — the assistant leaves
+   the call, so nothing after the handover is observable. Where that is true,
+   "unknown" is the correct and final answer, not a fault, and the note says
+   so rather than leaving a business wondering what went wrong. */
+
+export type TransferStateKey = "none" | "requested" | "accepted" | "connected" | "failed" | "unknown";
+
+export const TRANSFER = {
+  heading: "Transfer to a person",
+  destinationLabel: "Put through to",
+  evidenceLabel: "What the provider reported",
+  blindNote:
+    "Once a call is handed over, the assistant leaves it. Nothing after that point is visible to SiteMint, so \u201cwe don\u2019t know\u201d is the most this can honestly say.",
+} as const;
+
+export const TRANSFER_STATE: Record<TransferStateKey, { label: string; detail: string; tone: "settled" | "open" | "attention" | "failed" }> = {
+  none: {
+    label: "No transfer",
+    detail: "Nobody asked to be put through on this call.",
+    tone: "settled",
+  },
+  requested: {
+    label: "Transfer requested",
+    detail: "SiteMint chose one of your contacts and asked the phone provider to put the caller through.",
+    tone: "open",
+  },
+  accepted: {
+    label: "Provider accepted it",
+    detail:
+      "The phone provider confirmed it acted on the transfer. That is not the same as someone answering \u2014 it only means the request was taken.",
+    tone: "attention",
+  },
+  connected: {
+    label: "Connected",
+    detail: "The provider confirmed the two people were put through to each other.",
+    tone: "settled",
+  },
+  failed: {
+    label: "Transfer failed",
+    detail: "The provider reported that the transfer did not work.",
+    tone: "failed",
+  },
+  unknown: {
+    label: "Outcome unknown",
+    detail: "The call was handed over and nothing conclusive came back.",
+    tone: "attention",
+  },
+};
+
+/** The one-word form for the Calls list. */
+export function transferStateLabel(state: TransferStateKey): string {
+  return TRANSFER_STATE[state].label;
+}

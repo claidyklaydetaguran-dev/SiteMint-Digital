@@ -24,6 +24,9 @@ function serializeSummary(call: RealCallRecord) {
     startedAt: call.firstEventAt.toISOString(),
     endedAt: call.endedAt?.toISOString() ?? null,
     durationSec: call.durationSec ?? null,
+    // Only the word, on the list. The evidence behind it belongs on the
+    // detail, where there is room to say why.
+    transferState: call.transfer.state,
   };
 }
 
@@ -39,6 +42,7 @@ function serializeDetail(call: RealCallRecord) {
     summary: call.summary ?? null,
     analysisAvailability,
     structuredOutcome: analysisAvailability === "available" ? call.structuredOutcome ?? null : null,
+    transfer: call.transfer,
   };
 }
 

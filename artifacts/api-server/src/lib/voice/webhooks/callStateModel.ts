@@ -4,6 +4,8 @@
 // one call id already loaded from storage.
 
 import type { ParsedVapiMessage, VapiCallStatus } from "./vapiServerMessage.js";
+import type { TransferOutcome } from "../types.js";
+import { deriveVapiTransferOutcome } from "../providers/vapi/transferOutcome.js";
 import {
   parseStructuredOutcome,
   type StructuredOutcome,
@@ -136,6 +138,12 @@ export interface RealCallRecord {
    * receipt-time approximation; metering must prefer this field.
    */
   providerDurationSec: number | undefined;
+  /**
+   * What is known about handing this caller to a person. Derived from the
+   * same stored events, so it needs no table of its own and cannot drift
+   * from the call it describes.
+   */
+  transfer: TransferOutcome;
 }
 
 /**
@@ -261,5 +269,13 @@ export function foldEventsIntoCallRecord(
     structuredOutcome,
     hasEndOfCallReport,
     providerDurationSec,
+    // Derived from the same events, so the transfer answer and the call it
+    // belongs to can never disagree. `requestedByUs` is the presence of the
+    // destination request WE answered; the provider's acknowledgement is a
+    // separate, weaker signal and is ranked as such.
+    transfer: deriveVapiTransferOutcome({
+      requestedByUs: ordered.some((e) => e.message.type === "transfer-destination-request"),
+      events: ordered.map((e) => e.message),
+    }),
   };
 }

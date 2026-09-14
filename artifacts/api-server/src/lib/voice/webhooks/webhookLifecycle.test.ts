@@ -293,6 +293,8 @@ function callRecord(overrides: Partial<RealCallRecord>): RealCallRecord {
     structuredOutcome: undefined,
     hasEndOfCallReport: false,
     providerDurationSec: undefined,
+    // No transfer was involved in these lifecycle fixtures.
+    transfer: { state: "none", evidence: null, connectionKnowable: false, destinationMasked: null },
   };
   return { ...base, ...overrides };
 }

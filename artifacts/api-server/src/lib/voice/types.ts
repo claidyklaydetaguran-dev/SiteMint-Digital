@@ -107,6 +107,44 @@ export interface VoicePhoneNumberRecord {
   assignedAssistantId: string | null;
 }
 
+/**
+ * What is actually known about handing one caller to a person.
+ *
+ * The states are deliberately not a progress bar. They are levels of
+ * EVIDENCE, and the gap between two of them is the whole point:
+ *
+ *   requested  — we resolved one of the business's approved contacts and gave
+ *                the provider a destination. Ours alone; the provider has not
+ *                spoken yet.
+ *   accepted   — the provider acknowledged a transfer for this call. This is
+ *                the ceiling of what an acknowledgement proves. It does NOT
+ *                mean a telephone rang, and it certainly does not mean a
+ *                person answered.
+ *   connected  — positive provider evidence that the two parties were joined.
+ *                Reachable only where a provider supplies it.
+ *   failed     — the provider named a failure: nobody was reachable, the
+ *                transfer errored, or the caller hung up first.
+ *   unknown    — a transfer happened and then nothing conclusive arrived.
+ *                The honest answer, and a common one for a blind transfer.
+ *   none       — no transfer was involved in this call.
+ */
+export type TransferOutcomeState = "none" | "requested" | "accepted" | "connected" | "failed" | "unknown";
+
+export interface TransferOutcome {
+  state: TransferOutcomeState;
+  /** The provider's own words for why we say that, or null when we are the only source. */
+  evidence: string | null;
+  /**
+   * Whether this provider can, even in principle, tell us a person answered.
+   * False for a blind transfer: the assistant leaves the call, so nothing
+   * downstream is observable. Surfaces are expected to SAY so rather than
+   * leaving "unknown" looking like a fault.
+   */
+  connectionKnowable: boolean;
+  /** Masked destination, when one was reported. Never the raw digits. */
+  destinationMasked: string | null;
+}
+
 /** Injectable clock, used so tests can produce deterministic timestamps. */
 export interface Clock {
   now(): Date;

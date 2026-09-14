@@ -52,6 +52,15 @@ export interface ParsedVapiMessage {
   durationSeconds?: number;
   /** P3: extracted tool invocations for type "tool-calls". Arguments stay unknown — the dispatcher validates them. */
   toolCallList?: Array<{ id: string; name: string; arguments: unknown }>;
+  /**
+   * Where a transfer was aimed, as the provider reported it
+   * (`transfer-update` carries a `destination` of type assistant | number |
+   * sip — the only field that message is documented to carry).
+   *
+   * The digits are kept because they are the business's OWN configured
+   * contact, never something a caller said; every display of them is masked.
+   */
+  transferDestination?: { type: string; number?: string; sipUri?: string };
 }
 
 export type ParseVapiServerMessageResult =
@@ -121,6 +130,20 @@ export function parseVapiServerMessage(body: unknown): ParseVapiServerMessageRes
   const duration = message.durationSeconds ?? (isPlainObject(call) ? call.durationSeconds : undefined);
   if (typeof duration === "number" && Number.isFinite(duration) && duration >= 0) {
     parsed.durationSeconds = duration;
+  }
+
+  // Transfer destination, on the two message types documented to carry one.
+  // Extracted defensively: an unrecognised shape is dropped rather than
+  // guessed at, because this value is later shown to a business as where its
+  // caller was sent.
+  if (parsed.type === "transfer-update" || parsed.type === "transfer-destination-request") {
+    const dest = isPlainObject(message.destination) ? message.destination : undefined;
+    if (dest && isNonEmptyString(dest.type)) {
+      const extracted: { type: string; number?: string; sipUri?: string } = { type: dest.type };
+      if (isNonEmptyString(dest.number)) extracted.number = dest.number;
+      if (isNonEmptyString(dest.sipUri)) extracted.sipUri = dest.sipUri;
+      parsed.transferDestination = extracted;
+    }
   }
 
   if (parsed.type === "tool-calls") {
