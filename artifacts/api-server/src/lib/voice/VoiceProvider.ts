@@ -17,6 +17,7 @@ import type {
   VoiceAssistantResult,
   VoiceBrowserTokenInput,
   VoiceBrowserTokenResult,
+  VoicePhoneNumberRecord,
 } from "./types";
 
 export interface VoiceProvider {
@@ -45,4 +46,19 @@ export interface VoiceProvider {
    * which is reported honestly rather than assumed away.
    */
   deleteBrowserToken?(tokenId: string): Promise<void>;
+
+  /**
+   * Reads the telephone numbers the provider organisation holds.
+   *
+   * READ ONLY, and optional for the same reason `createBrowserToken` is: a
+   * provider that cannot enumerate its stock simply omits it, and the caller
+   * reports "cannot be read" rather than reporting an empty organisation.
+   * That distinction matters — an empty list and an unanswerable question look
+   * identical to a customer and mean opposite things to an operator.
+   *
+   * Acquiring, importing and releasing numbers are NOT here. Those spend money
+   * and change where live calls land; they stay behind the separate,
+   * owner-gated acquisition seam.
+   */
+  listPhoneNumbers?(): Promise<VoicePhoneNumberRecord[]>;
 }

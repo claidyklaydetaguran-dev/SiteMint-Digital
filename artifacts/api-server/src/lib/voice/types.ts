@@ -81,6 +81,32 @@ export interface VoiceAssistantDeleteResult {
   deleted: true;
 }
 
+/**
+ * One telephone number as the provider organisation holds it.
+ *
+ * Provider-neutral on purpose: no vendor field names reach a caller. It is a
+ * READ of the organisation's stock, and it is what settles questions an empty
+ * per-business list cannot — whether a number exists at all, who owns it, and
+ * whether the provider already routes it somewhere.
+ *
+ * `assignedAssistantId` is the provider's own routing answer, not ours. When it
+ * is set, that number already sends calls to an assistant at the provider, and
+ * assigning it to a business here would be taking over live routing.
+ */
+export interface VoicePhoneNumberRecord {
+  providerNumberId: string;
+  /** E.164 as the provider reports it; never reformatted here. */
+  e164: string;
+  /** How it reached the provider, in the provider's own words (e.g. "twilio", "vapi"). */
+  origin: string | null;
+  /** Provider lifecycle word (e.g. "active"). Passed through, never interpreted as health. */
+  status: string | null;
+  /** The provider organisation that owns it. */
+  orgId: string | null;
+  /** Non-null when the provider already routes this number to an assistant. */
+  assignedAssistantId: string | null;
+}
+
 /** Injectable clock, used so tests can produce deterministic timestamps. */
 export interface Clock {
   now(): Date;

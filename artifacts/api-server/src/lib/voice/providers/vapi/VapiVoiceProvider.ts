@@ -18,6 +18,7 @@ import type {
   VoiceAssistantResult,
   VoiceBrowserTokenInput,
   VoiceBrowserTokenResult,
+  VoicePhoneNumberRecord,
 } from "../../types";
 import { VAPI_PROVIDER_KEY, type VapiProviderConfig } from "./config";
 import { buildVapiArtifactPlan, loadVoiceArtifactPolicyFromEnv } from "./artifactPolicy";
@@ -285,6 +286,51 @@ export class VapiVoiceProvider implements VoiceProvider {
       });
     }
     await this.request("DELETE", `/token/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Reads the organisation's telephone numbers (`GET /phone-number`).
+   *
+   * Read only. Every field is passed through as the provider reported it and
+   * normalized into the neutral record shape; nothing here interprets a status
+   * word as health, and nothing here changes routing. An entry that carries no
+   * usable id or number is skipped rather than guessed at — a half-parsed
+   * number is worse than a shorter list, because the caller would go on to
+   * assign it.
+   */
+  async listPhoneNumbers(): Promise<VoicePhoneNumberRecord[]> {
+    const raw = await this.request("GET", "/phone-number");
+    // The documented shape is a bare array; a paginated envelope is tolerated
+    // so a provider-side change does not read to us as "no numbers exist".
+    const entries = Array.isArray(raw)
+      ? raw
+      : Array.isArray((raw as { results?: unknown } | null)?.results)
+        ? ((raw as { results: unknown[] }).results)
+        : null;
+
+    if (entries === null) {
+      throw new VoiceProviderError("PROVIDER_ERROR", "Vapi returned a phone-number list in an unrecognized shape.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+
+    const out: VoicePhoneNumberRecord[] = [];
+    for (const entry of entries) {
+      if (entry === null || typeof entry !== "object") continue;
+      const row = entry as Record<string, unknown>;
+      const providerNumberId = typeof row.id === "string" ? row.id.trim() : "";
+      const e164 = typeof row.number === "string" ? row.number.trim() : "";
+      if (providerNumberId === "" || e164 === "") continue;
+      out.push({
+        providerNumberId,
+        e164,
+        origin: typeof row.provider === "string" ? row.provider : null,
+        status: typeof row.status === "string" ? row.status : null,
+        orgId: typeof row.orgId === "string" ? row.orgId : null,
+        assignedAssistantId: typeof row.assistantId === "string" ? row.assistantId : null,
+      });
+    }
+    return out;
   }
 
   async getAssistant(providerAssistantId: string): Promise<VoiceAssistantResult> {

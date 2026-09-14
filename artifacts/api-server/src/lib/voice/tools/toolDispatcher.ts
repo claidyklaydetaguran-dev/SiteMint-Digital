@@ -82,6 +82,19 @@ export interface ToolSchedulingDeps {
   ) => Promise<SlotMutation>;
   cancelAppointmentRequestByPublicId: (firmId: number, publicId: string) => Promise<boolean>;
   /**
+   * Turns a just-created request into a confirmed booking, on the call.
+   *
+   * This is the SAME service the dashboard's Approve button calls — not a
+   * second booking path. That matters for more than tidiness: the duplicate
+   * guard, the single-insert rule and the "never retry an unanswered write"
+   * rule all live in there, and a parallel implementation would have to earn
+   * them again and would eventually disagree.
+   *
+   * Absent (or returning anything but "booked") means the business still
+   * confirms by hand, and the caller is told so. It is never assumed.
+   */
+  confirmRequest?: (firmId: number, publicId: string) => Promise<string>;
+  /**
    * V7: persists a message for the business. Resolves only on a durable write;
    * anything else must reject, because the spoken confirmation is emitted
    * strictly after this resolves.
@@ -150,6 +163,17 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
     submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId) =>
       repo.submitAppointmentRequest(firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, undefined, toolCallId),
     cancelAppointmentRequestByPublicId: (firmId, publicId) => repo.cancelAppointmentRequestByPublicId(firmId, publicId),
+    // The dashboard's Approve, called from the call instead of from a click.
+    // It answers "disabled" when calendar writing is off and "no_connection"
+    // when the business has not connected one — both of which simply mean the
+    // caller is told the time is requested, which is the truth.
+    confirmRequest: async (firmId, publicId) => {
+      const sync = await import("../../calendar/calendarEventSync.js");
+      // The same dependency bundle the calendar router hands it, so the call
+      // path and the dashboard path are the same code with the same gates.
+      const { calendarSyncDeps } = await import("../../calendar/calendarSyncDeps.js");
+      return sync.approveRequestToBooked(firmId, publicId, calendarSyncDeps());
+    },
     enqueueBookingConfirmation: async (input) => {
       const outbox = await import("../../voiceSms/outboxService.js");
       return outbox.enqueueBookingConfirmation(input);
@@ -254,6 +278,21 @@ async function runBookAppointment(
   if (result.duplicate === true) {
     return `Already requested — this is the same request, not a new one. Reference id ${result.request.publicId}. Repeat what you already told the caller; do not say it is booked.`;
   }
+  // Try to finish the job while the caller is still on the line. Only a
+  // "booked" answer counts; every other outcome — no calendar, write refused,
+  // and above all an UNANSWERED write — leaves the request pending and the
+  // caller correctly told it is not confirmed. An unanswered write is never
+  // retried here, exactly as it is never retried from the dashboard.
+  let confirmed = false;
+  if (deps.confirmRequest) {
+    try {
+      confirmed = (await deps.confirmRequest(firmId, result.request.publicId)) === "booked";
+    } catch {
+      // A confirmation that throws is a confirmation that did not happen.
+      confirmed = false;
+    }
+  }
+
   // P5: consent-gated confirmation text (best-effort; the outbox enforces
   // consent and the send-time flag — a failure here never fails the booking).
   try {
@@ -261,11 +300,17 @@ async function runBookAppointment(
       firmId,
       rawPhone: args.customerPhone ?? null,
       requestPublicId: result.request.publicId,
-      spokenSummary: `Your appointment request is in — reference ${result.request.publicId}. The office will confirm shortly. Reply STOP to opt out.`,
+      spokenSummary: confirmed
+        ? `Your appointment is confirmed — reference ${result.request.publicId}. Reply STOP to opt out.`
+        : `Your appointment request is in — reference ${result.request.publicId}. The office will confirm shortly. Reply STOP to opt out.`,
       callerConsented: args.smsConsent === true,
     });
   } catch {
     // outbox unavailability must not undo a successful booking
+  }
+
+  if (confirmed) {
+    return `Confirmed and in the calendar. Reference id ${result.request.publicId}. Tell the caller the appointment is booked.`;
   }
   // A request is not a booking. This path writes a `pending_review` row that a
   // human still has to accept, so the caller must not be told a time is theirs

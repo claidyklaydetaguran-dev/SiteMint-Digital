@@ -40,6 +40,7 @@ import receptionistContactsRouter from "./receptionistContacts";
 import receptionistInvitesRouter from "./receptionistInvites";
 import publicBetaRequestsRouter from "./publicBetaRequests";
 import publicDemoRouter from "./publicDemo";
+import adminVoiceNumbersRouter from "./adminVoiceNumbers";
 import adminVoiceIssuesRouter from "./adminVoiceIssues";
 
 const router: IRouter = Router();
@@ -86,5 +87,6 @@ router.use(receptionistInvitesRouter);
 router.use(publicBetaRequestsRouter);
 router.use(publicDemoRouter);
 router.use(adminVoiceIssuesRouter);
+router.use(adminVoiceNumbersRouter);
 
 export default router;

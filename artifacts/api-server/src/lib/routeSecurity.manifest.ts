@@ -122,6 +122,10 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/public/beta-requests": "feature-flag",
   "POST /api/public/demo/session": "feature-flag",
   "POST /api/public/schedule/:slug/requests": "feature-flag",
+  // Operator-only telephone stock. A business can never name a number it does
+  // not hold: assignment takes an explicit firm id behind bearer-admin auth.
+  "POST /api/admin/voice/phone-numbers/:providerNumberId/assign": "admin",
+  "POST /api/admin/voice/phone-numbers/:providerNumberId/release": "admin",
   "POST /api/receptionist/account/members": "session",
   "POST /api/receptionist/account/members/accept": "token-proven",
   "POST /api/receptionist/account/password-reset/complete": "token-proven",
