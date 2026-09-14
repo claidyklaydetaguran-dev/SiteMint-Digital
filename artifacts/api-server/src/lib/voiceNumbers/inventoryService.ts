@@ -158,6 +158,14 @@ export interface AssignDeps extends InventoryDeps {
    * telephone that rings out.
    */
   findPublishedAssistantId: (firmId: number) => Promise<number | null>;
+  /** The provider's own id for that assistant — what the number must be pointed at. */
+  findProviderAssistantId: (firmId: number) => Promise<string | null>;
+  /**
+   * Points the number at the assistant AT THE PROVIDER, which is what actually
+   * routes calls. Absent means routing cannot be changed, and the assignment
+   * stays paused rather than claiming a telephone that does not ring.
+   */
+  routeNumber?: (providerNumberId: string, providerAssistantId: string | null) => Promise<VoicePhoneNumberRecord>;
   upsertAssignment: (input: {
     firmId: number;
     phoneE164: string;
@@ -253,13 +261,30 @@ export async function assignNumberToFirm(input: AssignInput, deps: AssignDeps): 
     pausedReason: "assignment_unconfirmed",
   });
 
-  if (!deps.confirmProviderNumber) {
+  const providerAssistantId = await deps.findProviderAssistantId(input.firmId);
+  if (providerAssistantId === null) return refuse("no_published_assistant");
+
+  if (!deps.routeNumber || !deps.confirmProviderNumber) {
     return {
       ok: true,
       state: "paused",
       phoneE164: record.e164,
       pausedReason: "assignment_unconfirmed",
-      detail: "The number was recorded but the provider could not be re-read, so it is not live.",
+      detail: "The number was recorded but its routing could not be changed, so it does not ring yet.",
+    };
+  }
+
+  // The write that makes the telephone ring. Everything before this was
+  // bookkeeping; a number recorded but not routed answers to nobody.
+  try {
+    await deps.routeNumber(providerNumberId, providerAssistantId);
+  } catch {
+    return {
+      ok: true,
+      state: "paused",
+      phoneE164: record.e164,
+      pausedReason: "routing_failed",
+      detail: "The number was recorded, but the provider refused to route it to this assistant. It stays paused.",
     };
   }
 
@@ -281,6 +306,19 @@ export async function assignNumberToFirm(input: AssignInput, deps: AssignDeps): 
     };
   }
 
+  // The provider must agree about WHERE it routes, not merely that the number
+  // exists. Anything else and "assigned" would again mean less than it says.
+  if (confirmed.assignedAssistantId !== providerAssistantId) {
+    return {
+      ok: true,
+      state: "paused",
+      phoneE164: record.e164,
+      pausedReason: "routing_unconfirmed",
+      detail:
+        "The number was recorded, but the provider does not report it routed to this assistant. It stays paused.",
+    };
+  }
+
   await deps.upsertAssignment({
     firmId: input.firmId,
     phoneE164: record.e164,
@@ -294,7 +332,7 @@ export async function assignNumberToFirm(input: AssignInput, deps: AssignDeps): 
   return { ok: true, state: "assigned", phoneE164: record.e164 };
 }
 
-/** The firm's published assistant, if it has one. */
+/** The firm's published assistant row id, if it has one. */
 export const productionFindPublishedAssistantId: AssignDeps["findPublishedAssistantId"] = async (firmId) => {
   const { voiceAssistants } = await import("@workspace/db/schema/voice");
   const [row] = await db
@@ -303,6 +341,18 @@ export const productionFindPublishedAssistantId: AssignDeps["findPublishedAssist
     .where(and(eq(voiceAssistants.firmId, firmId), eq(voiceAssistants.status, "published")))
     .limit(1);
   return row?.id ?? null;
+};
+
+/** The PROVIDER's id for that assistant — the value a number must be pointed at. */
+export const productionFindProviderAssistantId: AssignDeps["findProviderAssistantId"] = async (firmId) => {
+  const { voiceAssistants } = await import("@workspace/db/schema/voice");
+  const [row] = await db
+    .select({ providerAssistantId: voiceAssistants.providerAssistantId })
+    .from(voiceAssistants)
+    .where(and(eq(voiceAssistants.firmId, firmId), eq(voiceAssistants.status, "published")))
+    .limit(1);
+  const id = row?.providerAssistantId ?? null;
+  return typeof id === "string" && id.trim() !== "" ? id : null;
 };
 
 /** The production write: one row per telephone line, matched by provider id or number. */
@@ -347,7 +397,52 @@ export const productionAssignWrite: AssignDeps["upsertAssignment"] = async (inpu
   });
 };
 
-/** Releases a business's hold without touching the provider. Operator recovery path. */
+export type ReleaseResult =
+  | { ok: true; routingCleared: true }
+  | { ok: true; routingCleared: false; detail: string }
+  | { ok: false; reason: "not_held" };
+
+/**
+ * Returns a number to stock — BOTH halves.
+ *
+ * Provider routing is cleared first, then the local row. That order is the
+ * whole point: a number released locally while still pointed at the assistant
+ * would keep delivering that business's calls to a business that gave it up.
+ * If the provider refuses, the local row is left alone and the caller is told,
+ * because a half-release that only we know about is worse than none.
+ */
+export async function releaseNumber(
+  firmId: number,
+  providerNumberId: string,
+  deps: {
+    routeNumber?: (id: string, assistantId: string | null) => Promise<unknown>;
+    releaseLocal?: (firmId: number, providerNumberId: string) => Promise<boolean>;
+  } = {},
+): Promise<ReleaseResult> {
+  if (deps.routeNumber) {
+    try {
+      await deps.routeNumber(providerNumberId, null);
+    } catch {
+      return {
+        ok: true,
+        routingCleared: false,
+        detail:
+          "The provider would not stop routing that number, so nothing was released. The business still holds it.",
+      };
+    }
+  } else {
+    return {
+      ok: true,
+      routingCleared: false,
+      detail: "Routing cannot be changed from here, so nothing was released.",
+    };
+  }
+
+  const released = await (deps.releaseLocal ?? releaseFirmNumber)(firmId, providerNumberId);
+  return released ? { ok: true, routingCleared: true } : { ok: false, reason: "not_held" };
+}
+
+/** The local half of a release. Callers should prefer `releaseNumber`, which clears routing first. */
 export async function releaseFirmNumber(firmId: number, providerNumberId: string): Promise<boolean> {
   const now = new Date();
   const rows = await db

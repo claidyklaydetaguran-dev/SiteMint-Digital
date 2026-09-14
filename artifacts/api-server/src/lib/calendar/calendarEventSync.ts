@@ -36,6 +36,16 @@ export interface CalendarSyncDeps {
   markBooked: (firmId: number, requestId: number, providerEventId: string, providerCalendarId: string) => Promise<boolean>;
   /** Clears both provider ids (after a successful event delete). Never touches status. */
   clearProviderEvent: (firmId: number, requestId: number) => Promise<void>;
+  /**
+   * Records that the calendar answered us successfully.
+   *
+   * Writing an event proves the connection works at least as well as reading
+   * free/busy does, but only the read used to record it. A business could
+   * therefore have a real appointment sitting in its calendar while the
+   * Calendar page still said "Connected, not yet used" — the product
+   * disbelieving something it had just done itself.
+   */
+  markConnectionUsed?: (firmId: number) => Promise<void>;
   openIssue: (input: {
     firmId: number;
     level: "warning" | "error";
@@ -154,6 +164,13 @@ export async function approveRequestToBooked(
     // blocks the firm's calendar.
     await deps.writer.deleteEvent(connection, eventId);
     return "conflict_after_write";
+  }
+  // Best-effort, and deliberately after the booking is safe: a bookkeeping
+  // failure must never undo an appointment that is already in the calendar.
+  try {
+    await deps.markConnectionUsed?.(firmId);
+  } catch {
+    /* health bookkeeping is not worth failing a booking over */
   }
   deps.logger?.("calendar_event_booked", { firmId, requestId: request.id });
   return "booked";

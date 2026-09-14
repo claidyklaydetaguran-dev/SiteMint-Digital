@@ -17,10 +17,11 @@ import { recordAuditEvent } from "../lib/voiceAccounts/auditLog.js";
 import {
   assignNumberToFirm,
   productionAssignWrite,
+  productionFindProviderAssistantId,
   productionFindPublishedAssistantId,
   productionInventoryDeps,
   readInventory,
-  releaseFirmNumber,
+  releaseNumber,
   type AssignDeps,
 } from "../lib/voiceNumbers/inventoryService.js";
 import type { VoicePhoneNumberRecord } from "../lib/voice/types.js";
@@ -61,6 +62,10 @@ async function buildDeps(): Promise<AssignDeps> {
   return {
     ...productionInventoryDeps(list),
     findPublishedAssistantId: productionFindPublishedAssistantId,
+    findProviderAssistantId: productionFindProviderAssistantId,
+    ...(provider.setPhoneNumberAssistant
+      ? { routeNumber: (id, aid) => provider.setPhoneNumberAssistant!(id, aid) }
+      : {}),
     upsertAssignment: productionAssignWrite,
     ...(confirmProviderNumber ? { confirmProviderNumber } : {}),
   };
@@ -136,13 +141,22 @@ router.post("/admin/voice/phone-numbers/:providerNumberId/release", requireAdmin
       res.status(400).json({ error: "A firm id is required." });
       return;
     }
-    const released = await releaseFirmNumber(firmId, String(req.params.providerNumberId ?? ""));
-    if (!released) {
+    const deps = await buildDeps();
+    const result = await releaseNumber(firmId, String(req.params.providerNumberId ?? ""), {
+      ...(deps.routeNumber ? { routeNumber: deps.routeNumber } : {}),
+    });
+    if (!result.ok) {
       res.status(404).json({ error: "That business does not hold that number." });
       return;
     }
+    if (!result.routingCleared) {
+      // Nothing was released: saying otherwise would leave a business believing
+      // it had given a number up while calls still arrived.
+      res.status(409).json({ error: result.detail, reason: "routing_not_cleared" });
+      return;
+    }
     await recordAuditEvent({ actor: "admin", firmId, action: "voice_number_release", context: {} });
-    res.json({ ok: true, state: "inventory" });
+    res.json({ ok: true, state: "inventory", routingCleared: true });
   } catch (err) {
     req.log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[admin numbers] release failed");
     res.status(500).json({ error: "Internal error" });

@@ -61,4 +61,25 @@ export interface VoiceProvider {
    * owner-gated acquisition seam.
    */
   listPhoneNumbers?(): Promise<VoicePhoneNumberRecord[]>;
+
+  /**
+   * Points one telephone number at one assistant, or at nothing.
+   *
+   * This is the write that makes a number actually ring. Recording an
+   * assignment in our own table does not route a single call: until the
+   * provider is told, the number answers to nobody, and a business would be
+   * looking at a dashboard that says "connected" beside a telephone that does
+   * not work.
+   *
+   * Passing `null` detaches it. That is the other half of rollback — a number
+   * we have released locally must stop routing at the provider too, or a
+   * business that gave a number up keeps receiving its calls.
+   *
+   * Still not acquisition: this re-points a number the organisation already
+   * owns, and buys, imports and releases nothing.
+   */
+  setPhoneNumberAssistant?(
+    providerNumberId: string,
+    providerAssistantId: string | null,
+  ): Promise<VoicePhoneNumberRecord>;
 }

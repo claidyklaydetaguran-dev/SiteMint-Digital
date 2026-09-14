@@ -128,6 +128,16 @@ export const HEALTH_FIELDS = {
   calendarLabel: "Calendar",
   connectedAtLabel: "Connected",
   lastSuccessLabel: "Last successful check",
+  /**
+   * Shown when the server has recorded no successful use at all.
+   *
+   * The alternative — falling back to when this browser last re-read the
+   * status — puts a fresh timestamp under the words "Last successful check"
+   * for a calendar nothing has ever touched. That is the page telling the
+   * customer their calendar is working on the strength of the page having
+   * loaded.
+   */
+  lastSuccessNever: "Not used yet",
   lastErrorLabel: "Last failure",
   none: "Not recorded",
   defaultCalendar: "Primary calendar",

@@ -14,6 +14,7 @@ import {
   assignNumberToFirm,
   findLocalMatch,
   readInventory,
+  releaseNumber,
   type AssignDeps,
   type LocalNumberRow,
 } from "./inventoryService.js";
@@ -33,8 +34,10 @@ function deps(options: {
   local?: LocalNumberRow[];
   assistantId?: number | null;
   confirm?: VoicePhoneNumberRecord | null | "throws" | "absent";
+  route?: "throws" | "absent";
 } = {}) {
   const writes: Array<{ state: string; pausedReason: string | null; assignedAssistantId: number }> = [];
+  const routed: Array<string | null> = [];
   const provider = options.provider ?? [NUMBER];
 
   const d: AssignDeps = {
@@ -48,6 +51,16 @@ function deps(options: {
         }),
     readLocalNumbers: async () => options.local ?? [],
     findPublishedAssistantId: async () => (options.assistantId === undefined ? 7 : options.assistantId),
+    findProviderAssistantId: async () => (options.assistantId === null ? null : "asst_pilot"),
+    ...(options.route === "absent"
+      ? {}
+      : {
+          routeNumber: async (_id, assistantId) => {
+            routed.push(assistantId);
+            if (options.route === "throws") throw new Error("ProviderRefused");
+            return { ...NUMBER, assignedAssistantId: assistantId };
+          },
+        }),
     upsertAssignment: async (input) => {
       writes.push({
         state: input.state,
@@ -60,11 +73,13 @@ function deps(options: {
       : {
           confirmProviderNumber: async (): Promise<VoicePhoneNumberRecord | null> => {
             if (options.confirm === "throws") throw new Error("ProviderDown");
-            return options.confirm === undefined ? NUMBER : (options.confirm as VoicePhoneNumberRecord | null);
+            return options.confirm === undefined
+              ? { ...NUMBER, assignedAssistantId: "asst_pilot" }
+              : (options.confirm as VoicePhoneNumberRecord | null);
           },
         }),
   };
-  return { deps: d, writes };
+  return { deps: d, writes, routed };
 }
 
 const held = (over: Partial<LocalNumberRow> = {}): LocalNumberRow => ({
@@ -133,6 +148,35 @@ describe("assigning a number", () => {
     expect(h.writes.every((w) => w.assignedAssistantId === 7)).toBe(true);
   });
 
+  it("points the number at the assistant at the provider", async () => {
+    // The write that makes the telephone ring. Recording an assignment in our
+    // own table routes exactly zero calls.
+    const h = deps();
+    await assignNumberToFirm({ providerNumberId: NUMBER.providerNumberId, firmId: 4 }, h.deps);
+    expect(h.routed).toEqual(["asst_pilot"]);
+  });
+
+  it("stays paused when the provider refuses to route it", async () => {
+    const h = deps({ route: "throws" });
+    const result = await assignNumberToFirm({ providerNumberId: NUMBER.providerNumberId, firmId: 4 }, h.deps);
+    expect(result).toMatchObject({ ok: true, state: "paused", pausedReason: "routing_failed" });
+    expect(h.writes.some((w) => w.state === "assigned")).toBe(false);
+  });
+
+  it("stays paused when routing cannot be changed at all", async () => {
+    const h = deps({ route: "absent" });
+    const result = await assignNumberToFirm({ providerNumberId: NUMBER.providerNumberId, firmId: 4 }, h.deps);
+    expect(result).toMatchObject({ ok: true, state: "paused", pausedReason: "assignment_unconfirmed" });
+  });
+
+  it("stays paused when the provider does not agree about where it routes", async () => {
+    // Existing is not the same as routed here. Without this check, "assigned"
+    // would again promise a telephone that rings somewhere else.
+    const h = deps({ confirm: { ...NUMBER, assignedAssistantId: "asst_someone_else" } });
+    const result = await assignNumberToFirm({ providerNumberId: NUMBER.providerNumberId, firmId: 4 }, h.deps);
+    expect(result).toMatchObject({ ok: true, state: "paused", pausedReason: "routing_unconfirmed" });
+  });
+
   it("refuses when the business has no published assistant", async () => {
     const h = deps({ assistantId: null });
     const result = await assignNumberToFirm({ providerNumberId: NUMBER.providerNumberId, firmId: 4 }, h.deps);
@@ -184,7 +228,9 @@ describe("what assignment refuses", () => {
 
   it("takes over that routing only when it is said out loud", async () => {
     const routed = { ...NUMBER, assignedAssistantId: "asst_live" };
-    const h = deps({ provider: [routed], confirm: routed });
+    // After the takeover the provider must report the NEW assistant; echoing
+    // the old one back would mean the routing never actually moved.
+    const h = deps({ provider: [routed], confirm: { ...NUMBER, assignedAssistantId: "asst_pilot" } });
     const result = await assignNumberToFirm(
       { providerNumberId: NUMBER.providerNumberId, firmId: 4, takeOverProviderRouting: true },
       h.deps,
@@ -204,5 +250,36 @@ describe("what assignment refuses", () => {
       const result = await assignNumberToFirm(bad, deps().deps);
       expect(result, JSON.stringify(bad)).toMatchObject({ ok: false, reason: "shape_rejected" });
     }
+  });
+});
+
+describe("giving a number back", () => {
+  it("stops the provider routing it before releasing it locally", async () => {
+    // The order is the point. A number released locally while still pointed at
+    // the assistant keeps delivering that business's calls to a business that
+    // gave it up.
+    const order: string[] = [];
+    const result = await releaseNumber(4, NUMBER.providerNumberId, {
+      routeNumber: async (_id, assistantId) => {
+        order.push("route:" + String(assistantId));
+        return NUMBER;
+      },
+      releaseLocal: async () => { order.push("releaseLocal"); return true; },
+    });
+    expect(order).toEqual(["route:null", "releaseLocal"]);
+    expect(result).toMatchObject({ ok: true, routingCleared: true });
+  });
+
+  it("releases nothing when the provider will not stop routing it", async () => {
+    const result = await releaseNumber(4, NUMBER.providerNumberId, {
+      routeNumber: async () => { throw new Error("ProviderRefused"); },
+      releaseLocal: async () => { throw new Error("must not be reached"); },
+    });
+    expect(result).toMatchObject({ ok: true, routingCleared: false });
+  });
+
+  it("releases nothing when routing cannot be changed from here", async () => {
+    const result = await releaseNumber(4, NUMBER.providerNumberId, {});
+    expect(result).toMatchObject({ ok: true, routingCleared: false });
   });
 });

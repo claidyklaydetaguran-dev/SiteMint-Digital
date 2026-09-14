@@ -314,6 +314,39 @@ export class VapiVoiceProvider implements VoiceProvider {
       });
     }
 
+    const out: VoicePhoneNumberRecord[] = this.mapNumbers(entries);
+    return out;
+  }
+
+  /**
+   * Re-points one number at one assistant (`PATCH /phone-number/{id}`), or
+   * detaches it with `null`. The provider's own answer is mapped and returned,
+   * so the caller can check what actually happened rather than assume.
+   */
+  async setPhoneNumberAssistant(
+    providerNumberId: string,
+    providerAssistantId: string | null,
+  ): Promise<VoicePhoneNumberRecord> {
+    const id = typeof providerNumberId === "string" ? providerNumberId.trim() : "";
+    if (id === "") {
+      throw new VoiceProviderError("VALIDATION_FAILED", "A phone number id is required.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+    const raw = await this.request("PATCH", `/phone-number/${encodeURIComponent(id)}`, {
+      assistantId: providerAssistantId,
+    });
+    const [mapped] = this.mapNumbers([raw]);
+    if (!mapped) {
+      throw new VoiceProviderError("PROVIDER_ERROR", "Vapi returned an unusable phone-number response.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+    return mapped;
+  }
+
+  /** Shared normalization for both the list and the single-number responses. */
+  private mapNumbers(entries: readonly unknown[]): VoicePhoneNumberRecord[] {
     const out: VoicePhoneNumberRecord[] = [];
     for (const entry of entries) {
       if (entry === null || typeof entry !== "object") continue;

@@ -234,13 +234,14 @@ export default function CalendarPage() {
             </div>
             <div className="sd-figure">
               {/*
-                When the SERVER recorded a successful check, that is the fact
-                worth showing. `lastCheckedLabel` only says when this browser
-                last re-read the status, which is not the same thing and reads
-                as reassurance it cannot give.
+                Only the SERVER's recorded success is shown here. It used to
+                fall back to when this browser last re-read the status, which
+                put a fresh timestamp under "Last successful check" for a
+                calendar nothing had ever touched — reassurance the page had
+                no way to earn.
               */}
               <span className="sd-figure__value">
-                {health?.lastSuccessAt != null ? healthTimestamp(health.lastSuccessAt) : lastCheckedLabel(statusQuery.dataUpdatedAt)}
+                {health?.lastSuccessAt != null ? healthTimestamp(health.lastSuccessAt) : HEALTH_FIELDS.lastSuccessNever}
               </span>
               <span className="sd-figure__label">{HEALTH_FIELDS.lastSuccessLabel}</span>
             </div>

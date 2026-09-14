@@ -18,7 +18,7 @@ import {
   type BookedLifecycleDeps,
 } from "./calendarEventSync.js";
 import { GoogleCalendarEventWriter } from "./eventWriter.js";
-import { getActiveConnection, updateAccessToken } from "./calendarConnectionsRepository.js";
+import { getActiveConnection, touchFreebusy, updateAccessToken } from "./calendarConnectionsRepository.js";
 import {
   listAppointmentRequests,
   submitAppointmentRequest,
@@ -46,6 +46,10 @@ export function calendarSyncDeps(): BookedLifecycleDeps {
     findRequest: async (firmId, publicId) =>
       (await listAppointmentRequests(firmId)).find((r) => r.publicId === publicId),
     markBooked: markBookedInDb,
+    // A successful write is evidence the connection works, and is recorded as
+    // such. Without it the Calendar page goes on saying "Connected, not yet
+    // used" while a real appointment sits in the customer's calendar.
+    markConnectionUsed: touchFreebusy,
     clearProviderEvent: clearProviderEventInDb,
     cancelBooked: cancelBookedInDb,
     markRescheduled: markRescheduledInDb,
