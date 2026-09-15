@@ -407,6 +407,19 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "DELETE /api/receptionist/voice/calls/:callId/review": "session",
   "DELETE /api/receptionist/voice/transfer-contacts/:id": "session",
   "DELETE /api/receptionist/voice/transfer-destinations/:id": "session",
+  // ── The legacy Discovery Portal (routes/admin.ts) ────────────────────────
+  //
+  // These two, the two proposal/SOW writers below, and the reads beside them
+  // moved off the shared-password admin's own gate onto
+  // `requireOperator(permission)` — leads.write for the writes, leads.read for
+  // the list and one submission, data.export for the CSV, which is bulk egress.
+  //
+  // They still read "admin" because that gate keeps accepting the legacy shared
+  // admin (bearer or admin_session cookie) until CRM_LEGACY_BEARER_ENABLED is
+  // "false". What changed is the other side: a per-person crm_staff_session is
+  // now judged as that person — CSRF, MFA, the named permission — instead of
+  // being refused 401, which is what left the portal showing zeros it did not
+  // have. routes/adminSubmissionsAuth.test.ts holds both halves in place.
   "PATCH /api/admin/form-submissions/:id": "admin",
   "PATCH /api/admin/submissions/:id": "admin",
   "PATCH /api/crm/campaigns/:id": "admin",
