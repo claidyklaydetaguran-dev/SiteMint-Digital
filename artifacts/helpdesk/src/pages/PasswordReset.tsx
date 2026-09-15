@@ -5,9 +5,13 @@
  * whether or not the address has an account (`REQUEST_CONFIRMATION` in
  * `password-reset/passwordResetContract.ts`) because the backend contract is
  * non-enumerating by design — this page must never create a signal the
- * server does not send. The only other outcome the server defines is 503,
- * shown as "Password reset is not available yet — contact SiteMint" while
- * the feature is flagged off.
+ * server does not send. The server answers 200 (any 2xx reads as confirmed);
+ * the only other outcome it defines is 503, shown as "Password reset is not
+ * available yet — contact SiteMint" while the feature is flagged off.
+ *
+ * The confirmation also links to the code-entry page: the email always carries
+ * a code, and a one-click link only when the server has a public address
+ * configured, so the code needs somewhere to go.
  *
  * Presentation reuses the sign-in page's stylesheet (`v2-signin.css`) rather
  * than adding a new one — same auth-surface visual language, no new palette,
@@ -19,6 +23,8 @@ import { Link } from "wouter";
 import { publicSiteUrl } from "@/lib/routes";
 import {
   EMPTY_REQUEST_FORM,
+  ENTER_CODE_HREF,
+  ENTER_CODE_LABEL,
   REQUEST_CONFIRMATION,
   REQUEST_CREDENTIALS,
   REQUEST_ENDPOINT,
@@ -110,7 +116,7 @@ export default function PasswordReset() {
 
           <h1 className="si-title">Reset your password</h1>
           <p className="si-lede">
-            Enter the email address on your account and we&rsquo;ll send you a link to choose a
+            Enter the email address on your account and we&rsquo;ll email you a code to choose a
             new password.
           </p>
 
@@ -119,7 +125,12 @@ export default function PasswordReset() {
               {outcome === "confirmed" ? (
                 <div className="si-alert" role="status" data-tone="confirmed">
                   <span className="si-alert__label">Check your email</span>
-                  <span className="si-alert__text">{REQUEST_CONFIRMATION}</span>
+                  <span className="si-alert__text">
+                    {REQUEST_CONFIRMATION}{" "}
+                    <Link href={ENTER_CODE_HREF} className="si-alt__link">
+                      {ENTER_CODE_LABEL}
+                    </Link>
+                  </span>
                 </div>
               ) : outcome === "unavailable" ? (
                 <div className="si-alert" role="alert">
@@ -161,7 +172,7 @@ export default function PasswordReset() {
                   </div>
 
                   <button type="submit" className="si-submit" disabled={submitting}>
-                    {submitting ? "Sending…" : "Send reset link"}
+                    {submitting ? "Sending…" : "Send reset email"}
                   </button>
                 </form>
               )}

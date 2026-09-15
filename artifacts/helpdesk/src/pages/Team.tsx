@@ -1,10 +1,9 @@
 /**
- * Team — who else can sign in to this account.
+ * Team — the people a business has invited to its account.
  *
- * The invite / list / revoke endpoints have existed since P8 and nothing
- * called them, so the only way to give a colleague access was to share the
- * owner's password. That cannot be revoked without locking the owner out, and
- * leaves no record of who did what.
+ * Invite, list and remove work. Invited people cannot sign in yet, there is no
+ * screen to accept an invitation, and roles are labels only — the copy says so
+ * rather than promising any of it.
  *
  * See `pages/team/teamContract.ts` for every string and rule.
  */

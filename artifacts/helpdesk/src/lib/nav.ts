@@ -339,7 +339,7 @@ export function navGroupsWith(voice: VoiceNavSlots): NavGroup[] {
         {
           key: "team", label: "Team", href: "/account/team", icon: Users,
           state: "live", voiceGated: false,
-          description: "Who else can sign in.",
+          description: "People you have invited. Team sign-in is not available yet.",
         },
         {
           key: "support", label: "Support", href: "/account/support", icon: LifeBuoy,

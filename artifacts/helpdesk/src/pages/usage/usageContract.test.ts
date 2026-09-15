@@ -2,6 +2,11 @@
  * V5 PR-8 — committed contract tests for the Usage screen.
  * Run via: tsx artifacts/helpdesk/src/pages/usage/usageContract.test.ts
  */
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { SUPPORT_EMAIL, supportMailto } from "../support/supportContract.js";
 import {
   COPY,
   PAGE,
@@ -59,6 +64,35 @@ section("Paused wording is exact");
 eq("the paused sentence matches the approved copy exactly", COPY.pausedTitle, "Your receptionist is paused because the current usage limit was reached.");
 eq("the paused action is exactly one action", COPY.pausedAction, "Contact SiteMint to continue");
 check("the paused action is a mailto link", COPY.pausedMailto.startsWith("mailto:"));
+
+section("One support address");
+
+// Support said info.sitemint@gmail.com while this link said
+// support@sitemintdigital.com — an address used nowhere else in the repo.
+eq("the paused action writes to the shared support address", COPY.pausedMailto, `mailto:${SUPPORT_EMAIL}?subject=Usage%20limit%20reached`);
+eq("the shared address is the one every other SiteMint surface uses", SUPPORT_EMAIL, "info.sitemint@gmail.com");
+eq("a mailto without a subject is just the address", supportMailto(), `mailto:${SUPPORT_EMAIL}`);
+eq("a blank subject is dropped", supportMailto("   "), `mailto:${SUPPORT_EMAIL}`);
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const helpdeskSrc = path.resolve(here, "../..");
+const supportPageSrc = readFileSync(path.join(helpdeskSrc, "pages/Support.tsx"), "utf8");
+check("Support reads the shared constant", supportPageSrc.includes('from "@/pages/support/supportContract"'));
+check("Support hardcodes no address of its own", !/[\w.+-]+@[\w-]+\.[\w.]+/.test(supportPageSrc));
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) return sourceFiles(full);
+    return /\.(ts|tsx)$/.test(name) && !name.endsWith(".test.ts") ? [full] : [];
+  });
+}
+const strays = sourceFiles(helpdeskSrc).filter((file) => {
+  if (file.endsWith(path.join("support", "supportContract.ts"))) return false;
+  const src = readFileSync(file, "utf8");
+  return src.includes("support@sitemintdigital.com") || src.includes(SUPPORT_EMAIL);
+});
+eq("no other dashboard file spells a support address itself", strays.map((f) => path.relative(helpdeskSrc, f)), []);
 
 section("Rail indicator labels");
 

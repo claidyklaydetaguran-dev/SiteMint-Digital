@@ -4,7 +4,14 @@
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
-import { listOpenVoiceIssues, resolveVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
+import {
+  customerResolveDecision,
+  findOpenVoiceIssue,
+  isCustomerResolvableIssueCode,
+  listOpenVoiceIssues,
+  OPERATOR_ONLY_ISSUE_MESSAGE,
+  resolveVoiceIssue,
+} from "../lib/voiceIssues/voiceIssueService.js";
 import { setCallReview, clearCallReview, listCallReviews } from "../lib/voiceReviews/reviewService.js";
 import { aggregateUsageForPeriod, computePeriodYm, loadUsageCapMinutesFromEnv } from "../lib/voiceUsage/usageService.js";
 
@@ -25,6 +32,9 @@ router.get("/receptionist/voice/issues", requireReceptionistAuth, async (req: Re
         code: issue.code,
         message: issue.message,
         occurrences: typeof issue.context["occurrences"] === "number" ? issue.context["occurrences"] : 1,
+        // Whether the resolve route below will accept this one. The dashboard
+        // reads this rather than keeping its own copy of the allowlist.
+        customerResolvable: isCustomerResolvableIssueCode(issue.code),
         createdAt: issue.createdAt,
         updatedAt: issue.updatedAt,
       })),
@@ -43,6 +53,19 @@ router.post("/receptionist/voice/issues/:id/resolve", requireReceptionistAuth, a
     return;
   }
   try {
+    // Firm-scoped lookup first: another firm's issue is a 404, exactly like a
+    // missing one, and is never classified. Only then is the code checked —
+    // operator-level issues (billing suspension, usage pause, platform faults)
+    // are not the customer's to clear. See CUSTOMER_RESOLVABLE_ISSUE_CODES.
+    const decision = customerResolveDecision(await findOpenVoiceIssue(req.firmId!, id));
+    if (decision === "not_found") {
+      res.status(404).json({ error: "Issue not found or already resolved." });
+      return;
+    }
+    if (decision === "operator_only") {
+      res.status(403).json({ error: OPERATOR_ONLY_ISSUE_MESSAGE });
+      return;
+    }
     const resolved = await resolveVoiceIssue(req.firmId!, id);
     if (!resolved) {
       res.status(404).json({ error: "Issue not found or already resolved." });

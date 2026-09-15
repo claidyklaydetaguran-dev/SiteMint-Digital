@@ -10,9 +10,8 @@
 import { Link } from "wouter";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ROUTES } from "@/lib/routes";
+import { SUPPORT_EMAIL, supportMailto } from "@/pages/support/supportContract";
 import "@/styles/v2-dashboard.css";
-
-const SUPPORT_EMAIL = "info.sitemint@gmail.com";
 
 export default function Support() {
   return (
@@ -27,7 +26,7 @@ export default function Support() {
         <h2 className="text-sm font-medium text-foreground">Contact SiteMint</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Email{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="sd-link">
+          <a href={supportMailto()} className="sd-link">
             {SUPPORT_EMAIL}
           </a>{" "}
           and we'll get back to you.
