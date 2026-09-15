@@ -23,7 +23,7 @@
 // idempotency identity, i.e. an unprotected duplicate send.
 
 import {
-  pgTable, serial, text, integer, timestamp, index, uniqueIndex, check,
+  pgTable, serial, text, integer, timestamp, index, unique, check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { crmScheduledJobs } from "./crmOperations";
@@ -184,13 +184,21 @@ export const crmReminderDeliveries = pgTable("crm_reminder_deliveries", {
 }, (table) => [
   // One occurrence + recipient has exactly one record.
   //
-  // The DDL creates this index with NULLS NOT DISTINCT, which is load-bearing
-  // rather than an edge case: `recipient_address` is NULL on every staff row,
-  // and under PostgreSQL's default NULLS DISTINCT that alone would make two
-  // otherwise identical rows count as different and the constraint would never
-  // fire. See docs/crm-ops/schema/M4-deliveries.sql.
-  uniqueIndex("uq_crm_reminder_deliveries_occurrence")
-    .on(table.jobId, table.occurrenceAt, table.recipientStaffId, table.recipientAddress),
+  // NULLS NOT DISTINCT is load-bearing rather than an edge case:
+  // `recipient_address` is NULL on every staff row, and under PostgreSQL's
+  // default NULLS DISTINCT two otherwise identical rows count as different, so
+  // the rule would never fire on exactly the rows it exists to protect.
+  //
+  // It is a UNIQUE CONSTRAINT because drizzle-orm 0.45 can express NULLS NOT
+  // DISTINCT only there, not on an index. Declared as a plain `uniqueIndex`
+  // (until 2026-09-16), every push-built database got an index that never
+  // fired: re-running the packed migration duplicated rows, and two racing
+  // workers could both create one delivery. Databases built from
+  // M4-deliveries.sql reach this same declaration through
+  // docs/crm-ops/schema/M7-reminder-delivery-uniqueness.sql.
+  unique("uq_crm_reminder_deliveries_occurrence")
+    .on(table.jobId, table.occurrenceAt, table.recipientStaffId, table.recipientAddress)
+    .nullsNotDistinct(),
 
   index("ix_crm_reminder_deliveries_job").on(table.jobId),
   // The unresolved list.
