@@ -213,10 +213,11 @@ check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARRE
 // pin is derived arithmetic over it, not an independent assertion.
 // 34: voice 0010 (+voice_messages, +voice_notifications), scheduling 0002
 // (+scheduling_date_exceptions), voice 0011 (+voice_business_profiles).
-check("the committed migrations derive 34 domain tables", DOMAIN.length === 34, `${DOMAIN.length}`);
+// 36: voice 0013 (+voice_support_requests, +voice_support_messages).
+check("the committed migrations derive 36 domain tables", DOMAIN.length === 36, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 116 public tables", // 34 domain + 82 barrel
-  APPLICATION.length === 116,
+  "the application owns exactly 118 public tables", // 36 domain + 82 barrel
+  APPLICATION.length === 118,
   `${APPLICATION.length}`,
 );
 check(

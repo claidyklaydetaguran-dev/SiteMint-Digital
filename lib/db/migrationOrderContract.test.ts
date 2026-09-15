@@ -647,8 +647,11 @@ check(
   // scheduling 0002 added scheduling_date_exceptions.
   // voice 0011 added voice_business_profiles (primary contact and default
   // location, which the frozen intake_firms row has no columns for).
-  "the committed migrations create exactly thirty-four domain tables",
-  domainTables.length === 34,
+  // voice 0013 added voice_support_requests and voice_support_messages, so a
+  // business's request to SiteMint is a record with a state rather than an
+  // email nobody can see afterwards.
+  "the committed migrations create exactly thirty-six domain tables",
+  domainTables.length === 36,
   domainTables.join(","),
 );
 check(

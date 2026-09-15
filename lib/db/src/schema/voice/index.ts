@@ -41,3 +41,7 @@ export * from "../voiceMessages";
 // intake_firms row has no columns for. Rollback committed at
 // drizzle/voice-rollback/0011_rollback.sql.
 export * from "./voiceBusinessProfiles";
+// Migration 0013: support requests a business sends, and their threads, so
+// Support is a record rather than a promise. Rollback committed at
+// drizzle/voice-rollback/0013_rollback.sql.
+export * from "./voiceSupportRequests";
