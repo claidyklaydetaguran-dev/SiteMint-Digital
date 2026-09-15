@@ -267,6 +267,14 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/portal/invitations/accept": "token-proven",
   "POST /api/portal/login": "credential",
   "POST /api/portal/logout": "portal",
+  // A fresh CSRF token for a live portal session. The portal keeps its token in
+  // per-tab sessionStorage, so a customer who opens the portal in a new tab has
+  // a valid cookie and no token; this is how that tab gets one. Not open: it
+  // resolves crm_portal_session exactly as requirePortalAuth does (401 without a
+  // live session) and replaces the token check with the custom header, Origin
+  // and per-session limits in lib/csrfRecovery.ts. It rotates only that
+  // session's own hash and reads no customer record.
+  "POST /api/portal/session/csrf": "portal",
   "POST /api/portal/documents": "portal",
   "POST /api/portal/proposals/:dealId/accept": "portal",
   // M5. The same act as the line above, on the itemised document: a customer
@@ -319,6 +327,16 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/staff/activation": "token-proven",
   "POST /api/crm/staff/password-reset": "token-proven",
   "POST /api/crm/staff/logout": "staff",
+  // The one staff route that cannot demand the CSRF header, because it issues a
+  // fresh token to a session that lost its own. It is NOT open: it resolves the
+  // crm_staff_session cookie exactly as requireStaff does (401 without a live
+  // session), and in place of the token check it requires the custom
+  // `X-SiteMint-Request` header (a cross-origin script cannot send it without a
+  // preflight the CORS allowlist refuses), an Origin that policy or this host
+  // approves, and a per-session limit (lib/csrfRecovery.ts). The token grants
+  // nothing by itself — every other route still runs the full gate, MFA
+  // included — so "staff" is the honest class.
+  "POST /api/crm/staff/session/csrf": "staff",
   "PATCH /api/crm/staff/me": "staff",
   "DELETE /api/crm/staff/me/sessions/:id": "staff",
   "POST /api/crm/staff/me/sessions/revoke-all": "staff",

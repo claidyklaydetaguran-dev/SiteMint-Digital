@@ -56,7 +56,9 @@ import {
   scopedQuotes, scopedQuote, scopedQuoteLines,
   scopedInvoices, scopedInvoiceLines,
   scopedTickets, scopedTicket, scopedTicketMessages,
+  requirePortalSessionForCsrfReissue, reissuePortalCsrfToken, type PortalCsrfReissueContext,
 } from "../lib/portalAuth.js";
+import { sendReissuedToken } from "../lib/csrfRecovery.js";
 
 const router: IRouter = Router();
 
@@ -843,6 +845,29 @@ router.post("/portal/logout", requirePortalAuth(), async (req: Request, res: Res
   await destroyPortalSession(cookies?.[PORTAL_COOKIE_NAME] ?? "");
   res.clearCookie(PORTAL_COOKIE_NAME, portalCookieOptions(0));
   res.json({ ok: true });
+});
+
+// A fresh security token for a live portal session. The portal keeps its token
+// in per-tab sessionStorage, so a customer who opens the portal in a new tab has
+// a live session and no token; `portalFetch` asks here, once, when a write is
+// refused for its token, then replays that write once. It cannot require the
+// token it replaces — `requirePortalSessionForCsrfReissue` stands in for that
+// check (lib/portalAuth.ts, lib/csrfRecovery.ts).
+router.post("/portal/session/csrf", requirePortalSessionForCsrfReissue(), async (_req: Request, res: Response) => {
+  const session = res.locals["portalCsrfReissue"] as PortalCsrfReissueContext;
+  let csrfToken: string | undefined;
+  try {
+    csrfToken = await reissuePortalCsrfToken(session.sessionId);
+  } catch {
+    res.status(503).json({ error: "We could not renew this page's security token. Try again shortly." });
+    return;
+  }
+  if (!csrfToken) {
+    // Signed out between the gate and the write.
+    res.status(401).json({ error: "Sign in to see your account." });
+    return;
+  }
+  sendReissuedToken(res, csrfToken);
 });
 
 router.get("/portal/me", requirePortalAuth(), async (req: Request, res: Response) => {

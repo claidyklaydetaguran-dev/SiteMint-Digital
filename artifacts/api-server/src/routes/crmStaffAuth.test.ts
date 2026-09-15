@@ -717,14 +717,28 @@ suite("M1 staff accounts, sessions and permissions (real DB)", () => {
       "/crm/staff/bootstrap", "/crm/staff/recovery", "/crm/staff/login",
       "/crm/staff/login/mfa", "/crm/staff/activation", "/crm/staff/password-reset",
     ];
+    // The one route that must not demand a CSRF token, because re-issuing it is
+    // its job. It carries its own live-session gate instead, pinned here so that
+    // gate cannot quietly disappear either.
+    const tokenReissue: Record<string, RegExp> = {
+      "/crm/staff/session/csrf": /requireStaffSessionForCsrfReissue\s*\(/,
+    };
     const re = /router\.(post|patch|delete|put)\(\s*"([^"]+)"\s*,\s*([^)]*)/g;
     const unguarded: string[] = [];
+    const seenReissue: string[] = [];
     for (const m of src.matchAll(re)) {
       const [, , routePath, rest] = m;
       if (preSession.includes(routePath)) continue;
+      const reissueGate = tokenReissue[routePath];
+      if (reissueGate) {
+        seenReissue.push(routePath);
+        if (!reissueGate.test(rest)) unguarded.push(`${m[1].toUpperCase()} ${routePath}`);
+        continue;
+      }
       if (!/requireStaff\s*\(/.test(rest)) unguarded.push(`${m[1].toUpperCase()} ${routePath}`);
     }
     expect(unguarded).toEqual([]);
+    expect(seenReissue).toEqual(Object.keys(tokenReissue));
   });
 });
 

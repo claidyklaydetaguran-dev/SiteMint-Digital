@@ -20,6 +20,9 @@ import { generateToken, hashToken } from "./staffCredentials.js";
 import {
   effectivePermissions, hasPermission, type Permission,
 } from "./staffPermissions.js";
+import {
+  createReissueLimiter, refuseCrossSiteReissue, refuseInvalidCsrfToken, refuseTooManyReissues,
+} from "./csrfRecovery.js";
 
 export const STAFF_COOKIE_NAME = "crm_staff_session";
 export const CSRF_HEADER = "x-csrf-token";
@@ -305,7 +308,7 @@ export function requireStaff(permission?: Permission) {
       return;
     }
     if (csrfRejected(req, resolved)) {
-      res.status(403).json({ error: "Request could not be verified. Refresh the page and try again." });
+      refuseInvalidCsrfToken(res);
       return;
     }
     // When MFA is enrolled, a session that has not satisfied it is only good
@@ -392,7 +395,7 @@ export function requireCrmAuth(permission?: Permission) {
     const resolved = await resolveStaffSession(req);
     if (resolved) {
       if (csrfRejected(req, resolved)) {
-        res.status(403).json({ error: "Request could not be verified. Refresh the page and try again." });
+        refuseInvalidCsrfToken(res);
         return;
       }
       if (resolved.staff.mfaEnrolledAt && !resolved.mfaSatisfied) {
@@ -418,5 +421,76 @@ export function requireCrmAuth(permission?: Permission) {
       return;
     }
     res.status(401).json({ error: "Unauthorized" });
+  };
+}
+
+// ── Security-token re-issue ─────────────────────────────────────────────────
+//
+// The CSRF token is handed out once, at sign-in, and only its hash is kept on
+// the session row, so the server can never give the same token back. A browser
+// that lost it — another tab signed out and cleared storage, a cleanup, an
+// extension — used to be stuck with a perfectly live session that could not
+// write anything. lib/csrfRecovery.ts explains what stands in for the CSRF check
+// on the endpoint that fixes that.
+
+/**
+ * Rotates the CSRF token of ONE live session and returns the new raw value, or
+ * undefined when the session is gone. Stored exactly as sign-in stores it — only
+ * the hash, on the session row — and the previous token stops working at once.
+ */
+export async function reissueStaffCsrfToken(sessionId: number): Promise<string | undefined> {
+  const csrfToken = generateToken();
+  const rows = await db.update(crmStaffSessions)
+    .set({ csrfHash: hashToken(csrfToken) })
+    .where(and(eq(crmStaffSessions.id, sessionId), isNull(crmStaffSessions.revokedAt)))
+    .returning({ id: crmStaffSessions.id });
+  return rows.length > 0 ? csrfToken : undefined;
+}
+
+/** What the re-issue gate hands its handler. Deliberately not `req.staffAuth`. */
+export interface StaffCsrfReissueContext {
+  sessionId: number;
+  staffId: number;
+  email: string;
+}
+
+const staffCsrfReissueLimiter = createReissueLimiter();
+
+/**
+ * The gate for `POST /api/crm/staff/session/csrf`, and deliberately NOT
+ * `requireStaff`: that gate demands a valid CSRF token on every POST, which is
+ * exactly what the caller has lost.
+ *
+ * What it requires instead: a request that plausibly came from our own pages
+ * (the custom header and Origin checks), then a LIVE staff session resolved from
+ * the cookie by the same `resolveStaffSession` every staff route uses — so a
+ * revoked, idle, expired, disabled or stale-epoch session gets nothing — then a
+ * per-session limit.
+ *
+ * It does not set `req.staffAuth`, and it does not ask whether MFA is complete.
+ * That is not a bypass: a CSRF token is never authority on its own. Every
+ * protected route still runs `requireStaff`/`requireCrmAuth`, which refuse a
+ * session that has not satisfied MFA right after the CSRF check, whatever token
+ * it carries — and sign-in already hands an MFA-pending session its token.
+ */
+export function requireStaffSessionForCsrfReissue() {
+  return async function staffCsrfReissueGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    if (refuseCrossSiteReissue(req, res)) return;
+    const resolved = await resolveStaffSession(req);
+    if (!resolved) {
+      res.status(401).json({ error: "Not signed in." });
+      return;
+    }
+    const key = `staff-session:${resolved.sessionId}`;
+    if (staffCsrfReissueLimiter.isOverLimit(key)) {
+      refuseTooManyReissues(res);
+      return;
+    }
+    staffCsrfReissueLimiter.record(key);
+    const context: StaffCsrfReissueContext = {
+      sessionId: resolved.sessionId, staffId: resolved.staff.id, email: resolved.staff.email,
+    };
+    res.locals["staffCsrfReissue"] = context;
+    next();
   };
 }
