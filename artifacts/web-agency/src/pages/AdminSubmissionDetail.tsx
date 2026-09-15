@@ -5,9 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, FileText, ClipboardList, Save, Printer, Copy, LogOut, Download,
   Star, Tag, Package, Clock, DollarSign, User, Building, Mail, Phone,
-  CheckCircle2, AlertCircle, ExternalLink, Loader2,
+  CheckCircle2, AlertCircle, ExternalLink, Loader2, RotateCw,
 } from "lucide-react";
 import { adminFetch, adminLogout } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
 interface Submission {
@@ -139,14 +140,80 @@ function DocModal({ html, title, company, onClose }: { html: string; title: stri
   );
 }
 
+// ── Load failure ──────────────────────────────────────────────────────────────
+
+/**
+ * What the page says instead of a submission it could not load. Never blank:
+ * a session that ended, a missing permission, a submission that does not exist
+ * and a server failure each get their own words, and only the ones a retry can
+ * fix offer one.
+ */
+function LoadFailure({ httpStatus, reason, onRetry, retrying }: {
+  httpStatus: number | null;
+  reason: string;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
+  const notFound = httpStatus === 404 || httpStatus === 400;
+  const denied = httpStatus === 403;
+  const title = httpStatus === 401 ? "Your session has ended"
+    : denied ? "You don't have access to this submission"
+    : notFound ? "Submission not found"
+    : httpStatus === null ? "The server could not be reached"
+    : "This submission could not be loaded";
+  const detail = httpStatus === 404 ? "It may have been deleted, or the link may be wrong."
+    : httpStatus === 400 ? "That isn't a valid submission link."
+    : httpStatus === 401 ? "Sign in again, then try again. Nothing on this page was changed."
+    : reason;
+  const canRetry = !notFound && !denied;
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6">
+      <div role="alert" className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
+          <div className="min-w-0">
+            <h1 className="font-semibold text-foreground">{title}</h1>
+            <p className="mt-1 break-words text-sm text-muted-foreground">{detail}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {canRetry && (
+            <Button size="sm" className="gap-1.5" onClick={onRetry} disabled={retrying}>
+              {retrying
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                : <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />}
+              {retrying ? "Trying again…" : "Try again"}
+            </Button>
+          )}
+          <Link href="/admin/dashboard">
+            <Button size="sm" variant="outline" className="gap-1.5">
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> Back to the Discovery Portal
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface Toast {
+  message: string;
+  tone: "success" | "error";
+}
+
+function pickSubmission(body: unknown): Submission | undefined {
+  const submission = body && typeof body === "object" ? (body as { submission?: unknown }).submission : undefined;
+  return submission && typeof submission === "object" ? submission as Submission : undefined;
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function AdminSubmissionDetailInner() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const [submission, setSubmission] = useState<Submission | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [load, setLoad] = useState<Load<Submission>>({ status: "loading" });
+  const [retrying, setRetrying] = useState(false);
   const [status, setStatus] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -154,48 +221,61 @@ function AdminSubmissionDetailInner() {
   const [generatingProp, setGeneratingProp] = useState(false);
   const [generatingSOW, setGeneratingSOW] = useState(false);
   const [docModal, setDocModal] = useState<{ html: string; title: string; company: string } | null>(null);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<Toast | null>(null);
   const [crmLeadId, setCrmLeadId] = useState<number | null>(null);
   const [sendingToCrm, setSendingToCrm] = useState(false);
+  const toastTimer = useRef<number | null>(null);
+  const alive = useRef(true);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 3000);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  const submission = load.status === "ready" ? load.data : null;
+  const updateSubmission = (patch: Partial<Submission>) =>
+    setLoad(prev => (prev.status === "ready" ? { status: "ready", data: { ...prev.data, ...patch } } : prev));
+
+  const showToast = (message: string, tone: Toast["tone"]) => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    setToast({ message, tone });
+    toastTimer.current = window.setTimeout(() => setToast(null), tone === "error" ? 8000 : 3000);
   };
 
-  const load = useCallback(async () => {
+  const fetchSubmission = useCallback(async () => {
+    const next = await readAdminResource(`/api/admin/submissions/${params.id}`, pickSubmission);
+    if (!alive.current) return;
+    setLoad(next);
+    if (next.status !== "ready") return;
+    setStatus(next.data.status);
+    setNotes(next.data.internalNotes || "");
+    // Check if this submission is already in CRM
     try {
-      const res = await adminFetch(`/api/admin/submissions/${params.id}`);
-      if (res.status === 401) return;
-      if (!res.ok) { setError("Submission not found."); return; }
-      const data = await res.json() as { submission: Submission };
-      setSubmission(data.submission);
-      setStatus(data.submission.status);
-      setNotes(data.submission.internalNotes || "");
-      // Check if this submission is already in CRM
-      try {
-        const crmRes = await adminFetch(
-          `/api/crm/leads?search=${encodeURIComponent(data.submission.email)}`,
+      const crmRes = await adminFetch(
+        `/api/crm/leads?search=${encodeURIComponent(next.data.email)}`,
+      );
+      if (crmRes.ok && alive.current) {
+        const crmData = await crmRes.json() as { leads?: { id: number; email?: string | null; discoverySubmissionId: number | null }[] };
+        const match = (crmData.leads ?? []).find(l =>
+          l.discoverySubmissionId === Number(params.id) ||
+          (typeof l.email === "string" && l.email.toLowerCase() === next.data.email.toLowerCase())
         );
-        if (crmRes.ok) {
-          const crmData = await crmRes.json() as { leads: { id: number; email: string; discoverySubmissionId: number | null }[] };
-          const match = crmData.leads.find(l =>
-            l.discoverySubmissionId === Number(params.id) ||
-            l.email.toLowerCase() === data.submission.email.toLowerCase()
-          );
-          if (match) setCrmLeadId(match.id);
-        }
-      } catch {
-        // non-critical — CRM check failure does not block the page
+        if (match) setCrmLeadId(match.id);
       }
     } catch {
-      setError("Failed to load submission.");
-    } finally {
-      setLoading(false);
+      // non-critical — CRM check failure does not block the page
     }
   }, [params.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void fetchSubmission(); }, [fetchSubmission]);
+
+  const retry = async () => {
+    setRetrying(true);
+    try { await fetchSubmission(); } finally { if (alive.current) setRetrying(false); }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -205,12 +285,16 @@ function AdminSubmissionDetailInner() {
         method: "PATCH",
         body: JSON.stringify({ status, internalNotes: notes }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        // The edits stay in the form, so nothing typed is lost by a refusal.
+        setSaveMsg(`Not saved. ${await responseFailureReason(res)}`);
+        return;
+      }
       const data = await res.json() as { submission: Submission };
-      setSubmission(data.submission);
-      showToast("Changes saved successfully.");
+      updateSubmission(data.submission);
+      showToast("Changes saved.", "success");
     } catch {
-      setSaveMsg("Failed to save.");
+      setSaveMsg(`Not saved. ${failureReason(null)}`);
     } finally {
       setSaving(false);
     }
@@ -222,14 +306,17 @@ function AdminSubmissionDetailInner() {
       const res = await adminFetch(`/api/admin/submissions/${params.id}/proposal`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        showToast(`The proposal was not generated. ${await responseFailureReason(res)}`, "error");
+        return;
+      }
       const data = await res.json() as { proposal: string };
-      setSubmission(prev => prev ? { ...prev, generatedProposal: data.proposal, status: "Proposal Generated" } : prev);
+      updateSubmission({ generatedProposal: data.proposal, status: "Proposal Generated" });
       setStatus("Proposal Generated");
       setDocModal({ html: data.proposal, title: "Project Proposal", company: submission?.companyName ?? "" });
-      showToast("Proposal generated and saved.");
+      showToast("Proposal generated and saved.", "success");
     } catch {
-      showToast("Failed to generate proposal.");
+      showToast(`The proposal was not generated. ${failureReason(null)}`, "error");
     } finally {
       setGeneratingProp(false);
     }
@@ -241,13 +328,16 @@ function AdminSubmissionDetailInner() {
       const res = await adminFetch(`/api/admin/submissions/${params.id}/sow`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        showToast(`The scope of work was not generated. ${await responseFailureReason(res)}`, "error");
+        return;
+      }
       const data = await res.json() as { sow: string };
-      setSubmission(prev => prev ? { ...prev, generatedSow: data.sow } : prev);
+      updateSubmission({ generatedSow: data.sow });
       setDocModal({ html: data.sow, title: "Scope of Work", company: submission?.companyName ?? "" });
-      showToast("Scope of Work generated and saved.");
+      showToast("Scope of Work generated and saved.", "success");
     } catch {
-      showToast("Failed to generate SOW.");
+      showToast(`The scope of work was not generated. ${failureReason(null)}`, "error");
     } finally {
       setGeneratingSOW(false);
     }
@@ -259,15 +349,18 @@ function AdminSubmissionDetailInner() {
       const res = await adminFetch(`/api/crm/import-discovery/${params.id}`, {
         method: "POST",
       });
-      const data = await res.json() as { imported: boolean; existing: boolean; leadId: number; message: string };
-      if (res.ok) {
-        setCrmLeadId(data.leadId);
-        showToast(data.existing ? "Already in CRM — linked above." : data.message);
-      } else {
-        showToast("Failed to send to CRM. Please try again.");
+      if (!res.ok) {
+        showToast(`Not sent to the CRM. ${await responseFailureReason(res)}`, "error");
+        return;
       }
+      const data = await res.json().catch(() => null) as { existing?: boolean; leadId?: unknown; message?: unknown } | null;
+      if (typeof data?.leadId === "number") setCrmLeadId(data.leadId);
+      showToast(
+        data?.existing ? "Already in the CRM — linked below." : typeof data?.message === "string" ? data.message : "Sent to the CRM.",
+        "success",
+      );
     } catch {
-      showToast("Connection error. Please try again.");
+      showToast(`Not sent to the CRM. ${failureReason(null)}`, "error");
     } finally {
       setSendingToCrm(false);
     }
@@ -275,13 +368,21 @@ function AdminSubmissionDetailInner() {
 
   const logout = async () => { await adminLogout(); navigate("/admin"); };
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-muted-foreground">Loading...</div>
+  if (load.status === "loading") return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-muted-foreground" role="status" aria-live="polite">
+      <span className="flex items-center gap-2">
+        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading submission…
+      </span>
+    </div>
   );
-  if (error) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
+  if (load.status === "error" || !submission) return (
+    <LoadFailure
+      httpStatus={load.status === "error" ? load.httpStatus : null}
+      reason={load.status === "error" ? load.reason : failureReason(null)}
+      onRetry={() => { void retry(); }}
+      retrying={retrying}
+    />
   );
-  if (!submission) return null;
 
   const fd = submission.formData;
   const arr = (k: string): string[] => (fd[k] as string[]) || [];
@@ -293,12 +394,21 @@ function AdminSubmissionDetailInner() {
       {/* Document modal */}
       {docModal && <DocModal html={docModal.html} title={docModal.title} company={docModal.company} onClose={() => setDocModal(null)} />}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-green-400" /> {toast}
-        </div>
-      )}
+      {/* Toast — always mounted, so a message is announced when it appears */}
+      <div aria-live="polite" role="status">
+        {toast && (
+          <div
+            className={`fixed bottom-6 left-6 right-6 sm:left-auto z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 ${
+              toast.tone === "error" ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"
+            }`}
+          >
+            {toast.tone === "error"
+              ? <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              : <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" aria-hidden="true" />}
+            <span className="min-w-0">{toast.message}</span>
+          </div>
+        )}
+      </div>
 
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
@@ -439,8 +549,9 @@ function AdminSubmissionDetailInner() {
                 <h3 className="font-serif font-bold text-sm text-foreground mb-4">Lead Management</h3>
 
                 <div className="mb-4">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Status</label>
+                  <label htmlFor="submission-status" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Status</label>
                   <select
+                    id="submission-status"
                     value={status}
                     onChange={e => setStatus(e.target.value)}
                     className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -450,8 +561,9 @@ function AdminSubmissionDetailInner() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Internal Notes</label>
+                  <label htmlFor="submission-notes" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">Internal Notes</label>
                   <Textarea
+                    id="submission-notes"
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                     placeholder="Add notes, next steps, or follow-up reminders..."
@@ -459,7 +571,11 @@ function AdminSubmissionDetailInner() {
                   />
                 </div>
 
-                {saveMsg && <p className="text-xs text-red-500 mb-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {saveMsg}</p>}
+                {saveMsg && (
+                  <p role="alert" className="text-xs text-destructive mb-2 flex items-start gap-1">
+                    <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" /> <span className="min-w-0">{saveMsg}</span>
+                  </p>
+                )}
 
                 <Button onClick={save} disabled={saving} className="w-full gap-2 mb-3" size="sm">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Changes"}
