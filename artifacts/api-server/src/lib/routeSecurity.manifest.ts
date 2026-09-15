@@ -390,6 +390,31 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/contacts/duplicates/dismiss": "admin",
   "POST /api/crm/contacts/duplicates/merge": "admin",
 
+  // ── M7: companies and accounts (routes/crmCompanies.ts) ──────────────────
+  // All behind requireCrmAuth with a named permission, so they read "admin"
+  // while the legacy bearer fallback stands.
+  //
+  // A company is part of the contact book, so it is governed by the contact
+  // book's grants rather than a new permission nobody holds: `leads.write` to
+  // create, change, archive and restore one, and to apply reviewed
+  // suggestions; `leads.delete` — OWNER_ONLY — to destroy one, which is the
+  // same class of act as destroying a contact and is refused outright while any
+  // current contact is still linked.
+  //
+  // `.../suggestions/apply` is the only route here that writes to contacts. It
+  // links ONLY the contact ids the caller lists, in one transaction, and a
+  // contact already linked to a company is left alone and reported.
+  //
+  // Not listed, because this contract covers mutating routes only:
+  // `GET /api/crm/companies`, `GET /api/crm/companies/:id` and
+  // `GET /api/crm/companies/suggestions` are `leads.read` reads.
+  "POST /api/crm/companies": "admin",
+  "PATCH /api/crm/companies/:id": "admin",
+  "POST /api/crm/companies/:id/archive": "admin",
+  "POST /api/crm/companies/:id/restore": "admin",
+  "DELETE /api/crm/companies/:id": "admin",
+  "POST /api/crm/companies/suggestions/apply": "admin",
+
   "DELETE /api/crm/campaigns/:id": "admin",
   "DELETE /api/crm/campaigns/:id/steps/:stepId": "admin",
   "DELETE /api/crm/campaigns/queue/:messageId": "admin",

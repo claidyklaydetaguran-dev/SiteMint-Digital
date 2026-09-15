@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { crmStaff } from "./crmStaff";
+import { crmCompanies } from "./crmCompanies";
 
 // Canonical SiteMint Digital agency lead lifecycle statuses.
 export const CRM_STATUSES = [
@@ -107,10 +108,31 @@ export const crmLeads = pgTable("crm_leads", {
   // Generated sales documents (stored as full HTML)
   generatedProposal: text("generated_proposal"),
   generatedSow: text("generated_sow"),
+
+  /**
+   * M7: the company this person works at, when a person has said so.
+   *
+   * NULL is a real state — "not linked to a company record" — and it is the
+   * state every existing contact starts in. `company` above is NOT replaced: it
+   * is the name as it was typed or imported (the receptionist signup pipeline
+   * writes it), and it stays the raw material for the suggestions somebody
+   * reviews before contacts are linked. Nothing derives this id from that text.
+   *
+   * ON DELETE SET NULL: the CRM refuses to delete a company while a current
+   * contact is linked, so this only ever clears merged-away contact rows, which
+   * are retained history rather than part of the book.
+   *
+   * Last in the column list on purpose: an upgraded table gains it at the end
+   * (docs/crm-ops/schema/M7-companies.sql), and a fresh push should agree.
+   */
+  companyId: integer("company_id")
+    .references(() => crmCompanies.id, { onDelete: "set null" }),
 }, (table) => [
   // "whose contacts are these" — the query the assignment surfaces run, and the
   // one the unresolved-mappings panel runs the negation of.
   index("ix_crm_leads_assigned_to_staff_id").on(table.assignedToStaffId),
+  // "who works at this company" — the company record and the contact filter.
+  index("ix_crm_leads_company_id").on(table.companyId),
 ]);
 
 export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({

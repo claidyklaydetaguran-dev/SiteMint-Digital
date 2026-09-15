@@ -744,6 +744,10 @@ suite("contacts: import, export and duplicate review (real DB)", () => {
       "crm_activities", "crm_messages", "crm_conversations", "crm_tasks", "crm_deals",
       "crm_projects", "crm_transactions", "crm_support_tickets", "crm_appointments",
       "crm_document_requests", "crm_attachments", "crm_comments",
+      // M7 closed a real hole: quotes and invoices name a contact with a NOT
+      // NULL lead_id and were not being repointed, so a merge stranded the
+      // priced work and the money owed on the contact the book stops showing.
+      "crm_quotes", "crm_invoices",
     ]) {
       expect(tables, `${required} must be covered by a merge`).toContain(required);
     }

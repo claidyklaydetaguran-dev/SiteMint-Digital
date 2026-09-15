@@ -98,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Sales Workspace", href: "/admin/crm/workspace", icon: LayoutGrid },
       { label: "Contacts",     href: "/admin/crm/leads",    icon: Users },
+      { label: "Companies",    href: "/admin/crm/companies", icon: Building2 },
       { label: "Duplicate Review", href: "/admin/crm/duplicates", icon: Copy },
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },

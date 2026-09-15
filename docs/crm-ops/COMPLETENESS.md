@@ -42,7 +42,7 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 
 ## Table 2 — every CRM page, one row per registered route
 
-50 routes derived from the router (41 staff, 7 customer, 2 token-landing). Each is scored against the same 6 checks:
+52 routes derived from the router (43 staff, 7 customer, 2 token-landing). Each is scored against the same 6 checks:
 
 - **open** — Opens in a browser with a real session and populated data, with no console errors
 - **action** — Its main action was performed in a browser and the result checked
@@ -51,18 +51,18 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**142 / 300 page checks = 47.3%.** Pages passing all 6: 1. Pages passing none: 2.
+**144 / 312 page checks = 46.2%.** Pages passing all 6: 1. Pages passing none: 2.
 
-By status: Passed 142 · Built, not proven 156 · Not passed 2 · Deferred by decision 0.
+By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
-| open | 41 / 50 (82.0%) |
-| action | 21 / 50 (42.0%) |
-| persist | 10 / 50 (20.0%) |
-| permission | 20 / 50 (40.0%) |
-| recovery | 2 / 50 (4.0%) |
-| mobile | 48 / 50 (96.0%) |
+| open | 41 / 52 (78.8%) |
+| action | 21 / 52 (40.4%) |
+| persist | 10 / 52 (19.2%) |
+| permission | 22 / 52 (42.3%) |
+| recovery | 2 / 52 (3.8%) |
+| mobile | 48 / 52 (92.3%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
 |---|---|---|---|---|---|---|
@@ -74,48 +74,50 @@ By status: Passed 142 · Built, not proven 156 · Not passed 2 · Deferred by de
 | 6 | `/admin/crm/leads/:id/dna` | Lead DNA | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 7 | `/admin/crm/leads/:id` | Contact record | 4 / 6 | 66.7% | L, T, R | persist, recovery |
 | 8 | `/admin/crm/leads` | Contacts | 4 / 6 | 66.7% | L, T | persist, recovery |
-| 9 | `/admin/crm/communications` | Communications | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 10 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 11 | `/admin/crm/intelligence/automation-queue` | Automation queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 12 | `/admin/crm/inbox` | Inbox | 4 / 6 | 66.7% | L | permission, recovery |
-| 13 | `/admin/crm/tasks` | All tasks | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 14 | `/admin/crm/calendar` | Calendar | 4 / 6 | 66.7% | L, R | permission, recovery |
-| 15 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 16 | `/admin/crm/transactions` | Transactions | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 17 | `/admin/crm/projects` | Projects | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 18 | `/admin/crm/documents` | Documents | 4 / 6 | 66.7% | L | permission, recovery |
-| 19 | `/admin/crm/support` | Support | 5 / 6 | 83.3% | L, T | recovery |
-| 20 | `/admin/crm/pipeline` | Pipeline | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 21 | `/admin/crm/reporting` | Reporting | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 22 | `/admin/crm/admin` | Admin hub | 4 / 6 | 66.7% | L | permission, recovery |
-| 23 | `/admin/crm/workspace` | Sales workspace | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 24 | `/admin/crm/campaigns` | Sequences | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 25 | `/admin/crm/campaign-builder` | Marketing | 6 / 6 | 100.0% | L, T, R | — |
-| 26 | `/admin/crm/campaign-queue` | Sequence queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 27 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 28 | `/admin/crm/intake-cases` | Intake cases | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 29 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 30 | `/admin/crm/email-templates` | Email templates | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 31 | `/admin/crm/import` | Import contacts | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 32 | `/admin/crm/duplicates` | Duplicate review | 3 / 6 | 50.0% | L, T | persist, permission, recovery |
-| 33 | `/admin/crm/settings` | Settings | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 34 | `/admin/crm/people` | People | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 35 | `/admin/crm/account` | My account | 4 / 6 | 66.7% | L | permission, recovery |
-| 36 | `/admin/crm/operations` | Operations | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 37 | `/admin/crm/my-day` | My Day | 5 / 6 | 83.3% | L | permission |
-| 38 | `/admin/ops/firms/:id` | Receptionist firm detail | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 39 | `/admin/ops/firms` | Receptionist firms | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 40 | `/admin/ops/issues` | Receptionist issues | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
-| 41 | `/admin/ops/usage` | Receptionist usage | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
-| 42 | `/admin/ops/numbers` | Receptionist numbers | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
-| 43 | `/portal/sign-in` | Portal sign-in | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 44 | `/portal/accept` | Portal invitation landing | 4 / 6 | 66.7% | L, T, R | persist, recovery |
-| 45 | `/portal` | Portal home | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 46 | `/portal/projects` | Portal projects | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 47 | `/portal/documents` | Portal documents | 4 / 6 | 66.7% | L, T | persist, recovery |
-| 48 | `/portal/proposals` | Portal quotes and proposals | 4 / 6 | 66.7% | L, T | persist, recovery |
-| 49 | `/portal/invoices` | Portal invoices | 4 / 6 | 66.7% | L, T | persist, recovery |
-| 50 | `/portal/support` | Portal support | 5 / 6 | 83.3% | L, T | recovery |
+| 9 | `/admin/crm/companies` | Companies | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 10 | `/admin/crm/companies/:id` | Company record | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 11 | `/admin/crm/communications` | Communications | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 12 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 13 | `/admin/crm/intelligence/automation-queue` | Automation queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 14 | `/admin/crm/inbox` | Inbox | 4 / 6 | 66.7% | L | permission, recovery |
+| 15 | `/admin/crm/tasks` | All tasks | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 16 | `/admin/crm/calendar` | Calendar | 4 / 6 | 66.7% | L, R | permission, recovery |
+| 17 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 18 | `/admin/crm/transactions` | Transactions | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 19 | `/admin/crm/projects` | Projects | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 20 | `/admin/crm/documents` | Documents | 4 / 6 | 66.7% | L | permission, recovery |
+| 21 | `/admin/crm/support` | Support | 5 / 6 | 83.3% | L, T | recovery |
+| 22 | `/admin/crm/pipeline` | Pipeline | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 23 | `/admin/crm/reporting` | Reporting | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 24 | `/admin/crm/admin` | Admin hub | 4 / 6 | 66.7% | L | permission, recovery |
+| 25 | `/admin/crm/workspace` | Sales workspace | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 26 | `/admin/crm/campaigns` | Sequences | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 27 | `/admin/crm/campaign-builder` | Marketing | 6 / 6 | 100.0% | L, T, R | — |
+| 28 | `/admin/crm/campaign-queue` | Sequence queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 29 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 30 | `/admin/crm/intake-cases` | Intake cases | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 31 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 32 | `/admin/crm/email-templates` | Email templates | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 33 | `/admin/crm/import` | Import contacts | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 34 | `/admin/crm/duplicates` | Duplicate review | 3 / 6 | 50.0% | L, T | persist, permission, recovery |
+| 35 | `/admin/crm/settings` | Settings | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 36 | `/admin/crm/people` | People | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 37 | `/admin/crm/account` | My account | 4 / 6 | 66.7% | L | permission, recovery |
+| 38 | `/admin/crm/operations` | Operations | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 39 | `/admin/crm/my-day` | My Day | 5 / 6 | 83.3% | L | permission |
+| 40 | `/admin/ops/firms/:id` | Receptionist firm detail | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 41 | `/admin/ops/firms` | Receptionist firms | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 42 | `/admin/ops/issues` | Receptionist issues | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
+| 43 | `/admin/ops/usage` | Receptionist usage | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
+| 44 | `/admin/ops/numbers` | Receptionist numbers | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
+| 45 | `/portal/sign-in` | Portal sign-in | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 46 | `/portal/accept` | Portal invitation landing | 4 / 6 | 66.7% | L, T, R | persist, recovery |
+| 47 | `/portal` | Portal home | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 48 | `/portal/projects` | Portal projects | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 49 | `/portal/documents` | Portal documents | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 50 | `/portal/proposals` | Portal quotes and proposals | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 51 | `/portal/invoices` | Portal invoices | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 52 | `/portal/support` | Portal support | 5 / 6 | 83.3% | L, T | recovery |
 
 ## Criteria added after the baseline
 
@@ -464,6 +466,28 @@ By status: Passed 142 · Built, not proven 156 · Not passed 2 · Deferred by de
 | permission | Passed | T | Export requires data.export; a user without it is refused (crmContacts.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
+
+### `/admin/crm/companies` — Companies
+
+| Check | Status | Env | Evidence |
+|---|---|---|---|
+| open | Built, not proven | — | Built in this change and not opened in a browser by its author: the list, the search, the owner filter, the archived toggle and the paging are exercised through the API by crmCompanies.test.ts, which cannot prove a page renders |
+| action | Built, not proven | — | Adding a company and applying reviewed suggestions are proven at the API (22 cases in crmCompanies.test.ts, including that applying twice creates nothing the second time); performing them in a browser is the reviewer's step |
+| persist | Built, not proven | — | Every write is read back from the database in the API suite, never from a reloaded page |
+| permission | Passed | T | An operations manager with leads.write revoked is refused create, edit, archive and apply with 403 and the database is then checked unchanged; deleting a company needs leads.delete, which is owner-only and refused for an operations manager (crmCompanies.test.ts) |
+| recovery | Built, not proven | — | The page carries an error panel with Try again for the list, for the suggestions dialog and for each action, but no failed request was induced in a browser to watch it recover |
+| mobile | Built, not proven | — | Written as stacked cards below md with wrapping controls, and one horizontally scrollable table above it, but not measured at 375px with the clipped-content metric |
+
+### `/admin/crm/companies/:id` — Company record
+
+| Check | Status | Env | Evidence |
+|---|---|---|---|
+| open | Built, not proven | — | Built in this change and not opened in a browser: the record, its people and the five derived summaries are asserted through the API, which cannot prove the page renders them |
+| action | Built, not proven | — | Linking and unlinking a contact, editing, archiving, restoring and deleting are proven at the API; none was performed in a browser |
+| persist | Built, not proven | — | The API suite re-reads each row after the write; no page was reloaded |
+| permission | Passed | T | Deleting is refused to an operations manager (owner-only leads.delete) and refused outright while a contact is still linked (409); a revoked leads.write is refused every edit (crmCompanies.test.ts) |
+| recovery | Built, not proven | — | A failed load shows an error with Try again and a missing company shows its own panel, but neither was induced in a browser |
+| mobile | Built, not proven | — | Single-column layout with wrapping action rows and no table; not measured at 375px |
 
 ### `/admin/crm/communications` — Communications
 
