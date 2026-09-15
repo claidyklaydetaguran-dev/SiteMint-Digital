@@ -1,0 +1,180 @@
+#!/usr/bin/env node
+// Packages one staging release from GitHub-recorded commits.
+//
+// Why this exists: the staging workspace has no git remote, so code reached it
+// by hand-typed chunks and one-off patches. That is how staging ended up with a
+// three-week-old test file nobody had sent, and how "deployed" and "pushed"
+// drifted apart. This script makes a release a reproducible artifact of two
+// commits, and makes "is the deployment this commit?" a question with a
+// checkable answer.
+//
+//   node scripts/release/package-release.mjs --from <deployed-commit> --to <commit> [--out <dir>]
+//
+// Refuses unless <to> is already on origin (a release is always of pushed
+// source). Writes two files to --out:
+//
+//   release-<to12>.b64         gzip'd `git diff --binary from..to`, base64
+//   apply-release-<to12>.mjs   self-contained applier with the manifest inline
+//
+// The manifest covers EVERY file of the shipped source at <to>, not just the
+// changed ones, hashed with CR stripped (applied migration .sql files on staging
+// keep the CRLF bytes their journal hash was taken from, and must never be
+// rewritten). Upload both files to the workspace, then in the workspace shell:
+//
+//   node apply-release-<to12>.mjs <path-to-release.b64>     apply + verify + record
+//   node apply-release-<to12>.mjs --verify-only             verify only
+//
+// Apply refuses a payload whose sha256 differs from the one recorded here,
+// applies only when `git apply --check` passes, verifies every manifest entry
+// afterwards, and records the commit in .release/SOURCE.json. See
+// docs/ai-receptionist/RELEASE_PROCESS.md.
+
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
+
+const SHIPPED_ROOTS = [
+  "artifacts/api-server/src",
+  "artifacts/api-server/package.json",
+  "artifacts/api-server/build.mjs",
+  "artifacts/helpdesk/src",
+  "artifacts/helpdesk/package.json",
+  "artifacts/helpdesk/index.html",
+  "artifacts/helpdesk/vite.config.ts",
+  "lib/db/src",
+  "lib/db/drizzle",
+  "lib/db/package.json",
+  "pnpm-lock.yaml",
+];
+
+function arg(name, fallback) {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+}
+
+function git(args, opts = {}) {
+  return execFileSync("git", args, { encoding: opts.buffer ? undefined : "utf8", maxBuffer: 512 * 1024 * 1024 });
+}
+
+const from = arg("from");
+const to = arg("to", "HEAD");
+const out = resolve(arg("out", "."));
+// Files the deployment is known to hold at a DIFFERENT content than <from>
+// (e.g. one never sent by an earlier hand transfer). A diff cannot repair
+// those, so their full content at <to> is embedded and written after the
+// patch. Comma-separated repo paths; each must be a shipped file.
+const refreshPaths = (arg("refresh", "") || "").split(",").map((p) => p.trim()).filter(Boolean);
+if (!from) {
+  console.error("usage: package-release.mjs --from <deployed-commit> --to <commit> [--out <dir>]");
+  process.exit(2);
+}
+
+const toSha = git(["rev-parse", `${to}^{commit}`]).trim();
+const fromSha = git(["rev-parse", `${from}^{commit}`]).trim();
+
+git(["fetch", "origin", "--quiet"]);
+const onOrigin = git(["branch", "-r", "--contains", toSha]).trim();
+if (onOrigin === "") {
+  console.error(`refusing: ${toSha.slice(0, 12)} is not on any origin branch — push it first`);
+  process.exit(1);
+}
+
+// Every shipped file at <to>, hashed with CR stripped.
+const listing = git(["ls-tree", "-r", "--name-only", toSha, "--", ...SHIPPED_ROOTS])
+  .split("\n")
+  .filter(Boolean)
+  .sort();
+const manifest = {};
+for (const path of listing) {
+  const bytes = git(["show", `${toSha}:${path}`], { buffer: true });
+  const stripped = Buffer.from(bytes.toString("latin1").replace(/\r/g, ""), "latin1");
+  manifest[path] = createHash("sha256").update(stripped).digest("hex");
+}
+const manifestDigest = createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
+
+const patch = git(["diff", "--binary", fromSha, toSha, "--", ...SHIPPED_ROOTS], { buffer: true });
+const payload = gzipSync(patch, { level: 9 }).toString("base64");
+const payloadSha = createHash("sha256").update(payload).digest("hex");
+const changed = git(["diff", "--name-only", fromSha, toSha, "--", ...SHIPPED_ROOTS]).split("\n").filter(Boolean);
+
+const refresh = {};
+for (const path of refreshPaths) {
+  if (!(path in manifest)) {
+    console.error(`refusing: --refresh ${path} is not a shipped file at ${toSha.slice(0, 12)}`);
+    process.exit(1);
+  }
+  const bytes = git(["show", `${toSha}:${path}`], { buffer: true });
+  refresh[path] = Buffer.from(bytes.toString("latin1").replace(/\r/g, ""), "latin1").toString("base64");
+}
+
+const tag = toSha.slice(0, 12);
+mkdirSync(out, { recursive: true });
+writeFileSync(join(out, `release-${tag}.b64`), payload);
+
+const applier = `#!/usr/bin/env node
+// Generated by scripts/release/package-release.mjs — do not edit.
+// Release ${tag} (from ${fromSha.slice(0, 12)}): ${changed.length} changed file(s), ${listing.length} verified.
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
+
+const RELEASE = ${JSON.stringify({ to: toSha, from: fromSha, payloadSha, manifestDigest, changed })};
+const MANIFEST = ${JSON.stringify(manifest)};
+const REFRESH = ${JSON.stringify(refresh)};
+
+function sha(buf) { return createHash("sha256").update(buf).digest("hex"); }
+function strippedSha(path) {
+  const bytes = readFileSync(path);
+  return sha(Buffer.from(bytes.toString("latin1").replace(/\\r/g, ""), "latin1"));
+}
+function verify() {
+  const bad = [];
+  for (const [path, want] of Object.entries(MANIFEST)) {
+    if (!existsSync(path)) { bad.push("missing " + path); continue; }
+    if (strippedSha(path) !== want) bad.push("differs " + path);
+  }
+  return bad;
+}
+
+const verifyOnly = process.argv.includes("--verify-only");
+if (!verifyOnly) {
+  const payloadPath = process.argv[2];
+  if (!payloadPath) { console.error("usage: node apply-release-${tag}.mjs <release-${tag}.b64> | --verify-only"); process.exit(2); }
+  const payload = readFileSync(payloadPath, "utf8").trim();
+  if (sha(payload) !== RELEASE.payloadSha) { console.error("REFUSED payload hash mismatch"); process.exit(1); }
+  const refreshing = new Set(Object.keys(REFRESH));
+  const before = verify().filter((b) => !refreshing.has(b.replace(/^(missing|differs) /, "")));
+  if (before.length === 0) {
+    console.log("already at release ${tag}; nothing to apply");
+  } else {
+    const patchPath = "/tmp/release-${tag}.patch";
+    writeFileSync(patchPath, gunzipSync(Buffer.from(payload, "base64")));
+    try { execFileSync("git", ["apply", "--check", patchPath], { stdio: "pipe" }); }
+    catch (e) { console.error("REFUSED git apply --check failed; tree is not at " + RELEASE.from.slice(0, 12)); console.error(String(e.stderr || "").slice(0, 2000)); process.exit(1); }
+    execFileSync("git", ["apply", patchPath], { stdio: "pipe" });
+    console.log("applied " + RELEASE.changed.length + " changed file(s)");
+  }
+  for (const [path, b64] of Object.entries(REFRESH)) {
+    if (existsSync(path) && strippedSha(path) === MANIFEST[path]) continue;
+    writeFileSync(path, Buffer.from(b64, "base64"));
+    console.log("refreshed " + path);
+  }
+}
+const bad = verify();
+if (bad.length > 0) {
+  console.error("VERIFY FAILED " + bad.length + " file(s):");
+  for (const b of bad.slice(0, 40)) console.error("  " + b);
+  process.exit(1);
+}
+if (!verifyOnly) {
+  mkdirSync(".release", { recursive: true });
+  writeFileSync(".release/SOURCE.json", JSON.stringify({ commit: RELEASE.to, manifestDigest: RELEASE.manifestDigest, files: Object.keys(MANIFEST).length, recordedAt: new Date().toISOString() }, null, 2) + "\\n");
+}
+console.log("VERIFIED release ${tag}: " + Object.keys(MANIFEST).length + " files match commit " + RELEASE.to);
+`;
+writeFileSync(join(out, `apply-release-${tag}.mjs`), applier);
+
+console.log(JSON.stringify({ to: toSha, from: fromSha, changed: changed.length, verified: listing.length, payloadBytes: payload.length, payloadSha: payloadSha.slice(0, 16), manifestDigest: manifestDigest.slice(0, 16), out }, null, 2));
