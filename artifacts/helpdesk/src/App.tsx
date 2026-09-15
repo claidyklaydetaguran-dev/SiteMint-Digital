@@ -79,17 +79,36 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient();
 
+/**
+ * The query string a legacy path arrived with, or "".
+ *
+ * These redirects used to drop it, which silently broke every flow that
+ * returns to the dashboard with a result in the URL — the Google Calendar
+ * callback's `?calendar=connected` among them, which landed on `/settings` and
+ * was discarded before any component could read it.
+ */
+function currentSearch(): string {
+  return typeof window === "undefined" ? "" : window.location.search;
+}
+
+function withSearch(to: string): string {
+  const search = currentSearch();
+  // A destination that carries its own query wins — it was written
+  // deliberately, and merging two query strings is not this helper's job.
+  return search !== "" && !to.includes("?") ? `${to}${search}` : to;
+}
+
 function InSpaRedirect({ to }: { to: string }) {
   const [, navigate] = useLocation();
-  useEffect(() => { navigate(to, { replace: true }); }, []);
+  useEffect(() => { navigate(withSearch(to), { replace: true }); }, []);
   return null;
 }
 
-/** Preserves the `:id` param across a legacy-path redirect. */
+/** Preserves the `:id` param — and the query string — across a legacy-path redirect. */
 function InSpaRedirectToId({ base }: { base: string }) {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  useEffect(() => { navigate(`${base}/${params.id}`, { replace: true }); }, []);
+  useEffect(() => { navigate(withSearch(`${base}/${params.id}`), { replace: true }); }, []);
   return null;
 }
 

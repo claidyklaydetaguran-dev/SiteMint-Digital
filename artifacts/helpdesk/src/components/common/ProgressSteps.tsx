@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import { Check, ArrowRight } from "lucide-react";
 import { StatusChip, type StatusTone } from "@/components/common/StatusChip";
 
-export type ProgressStepStatus = "done" | "next" | "pending" | "blocked";
+export type ProgressStepStatus = "done" | "next" | "pending" | "blocked" | "unknown";
 
 export interface ProgressStepItem {
   key: string;
@@ -27,6 +27,9 @@ const STATUS_LABEL: Record<ProgressStepStatus, string> = {
   next: "Next",
   pending: "Pending",
   blocked: "Blocked",
+  // Said plainly, because it is a different fact from "Pending": SiteMint
+  // could not read what this step depends on, so it does not know either way.
+  unknown: "Not checked",
 };
 
 const STATUS_TONE: Record<ProgressStepStatus, StatusTone> = {
@@ -34,6 +37,7 @@ const STATUS_TONE: Record<ProgressStepStatus, StatusTone> = {
   next: "next",
   pending: "pending",
   blocked: "blocked",
+  unknown: "neutral",
 };
 
 export interface ProgressStepsProps {

@@ -206,6 +206,38 @@ export const BUILDER = {
   notLinkedNote: "Not linked to a voice provider.",
 } as const;
 
+/* ── Keeping the provider in step with what is saved ───────────────────────
+   Publishing CREATES the provider's assistant; synchronising UPDATES one that
+   already exists. The builder disables Publish the moment an assistant is
+   published, and the synchronise control exists only when
+   `VITE_VOICE_SYNC_ENABLED` is on — so in a build without that flag there is no
+   control at all that can carry a later edit to the provider. The edit is saved
+   here, the provider keeps serving the configuration it last confirmed, and
+   nothing on screen said so. These sentences say it. */
+
+export const SYNC = {
+  /* Replaces "This configuration is saved here but has not been sent to the
+     voice provider." That was accurate for a genuine pending update, but the
+     same banner also appeared when the only difference was tool readiness
+     SiteMint had recomputed by itself — telling an owner their edits had not
+     been sent when they had been. The wording now describes the state of the
+     provider rather than accusing the owner's last save of never arriving. */
+  localChangesTitle: "The voice provider is running an earlier version",
+  localChangesDetail:
+    "What is saved here differs from what the provider last confirmed. Callers hear the version the provider has until an update is sent.",
+
+  /* Shown in place of a control this build does not have. Naming the
+     dependency is the honest answer: the owner cannot fix it from here, and a
+     disabled button with a tooltip would imply they could. */
+  unavailableDetail:
+    "Sending a saved change to the provider is a separate capability, and it isn't switched on for this workspace. Publish is already finished for this assistant, so contact SiteMint to have this update applied.",
+
+  /* The browser test always dials the provider's assistant, so it plays back
+     the last confirmed configuration — not what is on screen. */
+  testUsesPublished:
+    "This test uses the configuration the provider last confirmed, which is not what is saved here now. Recent changes won't be part of it.",
+} as const;
+
 /* ── Unsaved-changes prompt ────────────────────────────────────────────────
 
    AR-001J owner review, correction B.
@@ -434,6 +466,7 @@ export function everyRenderableString(): string[] {
     ...Object.values(LIST),
     ...Object.values(CARD),
     ...Object.values(BUILDER),
+    ...Object.values(SYNC),
     ...Object.values(PRESET_RECOVERY),
     ...Object.values(VOICE_MODEL),
     ...Object.values(CONFIGURATION),

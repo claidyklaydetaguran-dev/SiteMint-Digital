@@ -68,6 +68,7 @@ import {
   NEW_PATH,
   PRESET_RECOVERY,
   PROVIDER_LINKED,
+  SYNC,
   PROVIDER_NOT_LINKED,
   RETIRED_VOICE_PRESET_IDS,
   SAVE_PROMPT_EITHER,
@@ -1647,6 +1648,89 @@ check(
   "every request this file made was a same-origin /api path",
   requests.every((r) => r.url.startsWith("/api/receptionist/voice/assistants")),
 );
+
+// ═══════════════════════════════════════════════════════════════════════════
+section("Keeping the voice provider in step with what is saved");
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Publishing CREATES the provider's assistant; synchronising UPDATES one that
+// already exists. The builder disables Publish the moment an assistant is
+// published, and the synchronise control is built only under
+// VITE_VOICE_SYNC_ENABLED — so in a build without that flag no control on this
+// page can carry a later edit to the provider. The edit is saved here, the
+// provider keeps serving what it last confirmed, and nothing said so.
+{
+  const hereDir = path.dirname(fileURLToPath(import.meta.url));
+  const root = path.resolve(hereDir, "../../../../..");
+  const rd = (rel: string) => readFileSync(path.join(root, rel), "utf8");
+  const builder = rd("artifacts/helpdesk/src/pages/AssistantBuilder.tsx");
+  const dialog = rd("artifacts/helpdesk/src/components/common/BrowserTestConfirmDialog.tsx");
+  const elig = rd("artifacts/helpdesk/src/lib/browserVoice/eligibility.ts");
+
+  check(
+    "Publish is still spent once an assistant is published",
+    builder.includes('return "This assistant has already been published."'),
+  );
+  check(
+    "and the synchronise control is still built only under its own flag",
+    /const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;/.test(builder) &&
+      /syncControl=\{syncInBuild \?/.test(builder),
+  );
+
+  // Instead of a dead control, the dependency is named — and only in the build
+  // that lacks the capability, so a sync-enabled build folds the sentence away.
+  check(
+    "the missing capability is explained exactly where the control cannot exist",
+    /\{!syncInBuild && <> \{SYNC\.unavailableDetail\}<\/>\}/.test(builder),
+  );
+  check("the explanation says it is a separate capability", /separate capability/i.test(SYNC.unavailableDetail));
+  check("and names who can apply the update", /SiteMint/.test(SYNC.unavailableDetail));
+  check(
+    "it never tells the owner to press a control that cannot help",
+    !/press publish|publish again|try publishing/i.test(SYNC.unavailableDetail),
+  );
+
+  // The reworded banner. The old sentence said the saved configuration "has not
+  // been sent to the voice provider", which was also shown when the only
+  // difference was tool readiness SiteMint had recomputed by itself — telling an
+  // owner their edits never left when they had.
+  check("the banner describes the provider's version rather than a failed send", /earlier version/i.test(SYNC.localChangesTitle));
+  check(
+    "it does not accuse the last save of never arriving",
+    !/has not been sent/i.test(`${SYNC.localChangesTitle} ${SYNC.localChangesDetail}`),
+  );
+  check("it says what a caller actually hears", /callers hear/i.test(SYNC.localChangesDetail));
+  check(
+    "the builder renders that wording",
+    builder.includes("SYNC.localChangesTitle") && builder.includes("SYNC.localChangesDetail"),
+  );
+  check("and the old sentence is gone", !builder.includes("saved here but has not been sent to the voice provider"));
+
+  // A browser test dials the PROVIDER's assistant, so it plays back the last
+  // confirmed configuration — not what is on screen.
+  check("the confirmation dialog can carry an out-of-sync warning", dialog.includes("syncWarning"));
+  check("the builder supplies it from the assistant's own sync state", /syncWarning=\{browserTestSyncWarning\(assistant\)\}/.test(builder));
+  check("the warning names which version will be heard", /provider last confirmed/i.test(SYNC.testUsesPublished));
+  check(
+    "it is produced only for a published assistant",
+    /if \(!assistant \|\| assistant\.status !== "published"\) return undefined;/.test(elig),
+  );
+  check(
+    "and only when the provider is genuinely behind",
+    /providerSyncState === "synchronized" \? undefined : SYNC\.testUsesPublished/.test(elig),
+  );
+  // A warning, not a gate: the eligibility rules keep their own function and
+  // their own list of reasons, and sync state is not among them.
+  check(
+    "it warns rather than blocks",
+    /export function browserTestDisabledReason/.test(elig) &&
+      /export function browserTestSyncWarning/.test(elig),
+  );
+  check(
+    "and the disabled-reason list still ends at the provider/flag checks",
+    /if \(testActive\) return "A browser test is already active\.";/.test(elig),
+  );
+}
 
 // ─── Honest limitations ────────────────────────────────────────────────────
 //

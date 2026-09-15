@@ -1,5 +1,6 @@
 import type { AssistantDto } from "@/lib/assistantsApi";
 import { voiceBrowserTestEnabled } from "@/lib/featureFlags";
+import { SYNC } from "@/pages/assistants/assistantsContract";
 
 export interface BrowserTestEligibilityInput {
   /** Undefined/null for the new-unsaved builder route. */
@@ -46,4 +47,25 @@ export function browserTestDisabledReason(input: BrowserTestEligibilityInput): s
 
 export function isBrowserTestEligible(input: BrowserTestEligibilityInput): boolean {
   return browserTestDisabledReason(input) === undefined;
+}
+
+/**
+ * A warning, not a blocker.
+ *
+ * A browser test dials the PROVIDER's assistant — `fetchBrowserTestSession`
+ * hands the SDK a provider assistant id — so it always plays back the
+ * configuration the provider last confirmed. When the saved configuration has
+ * moved on, the call the owner is about to hear is not the one they just
+ * wrote, and without this they would reasonably read the result as a verdict
+ * on their latest changes.
+ *
+ * It deliberately does not disable the test: testing the assistant callers
+ * actually reach is a legitimate thing to do, and is often exactly what is
+ * wanted. It only says which version is being heard.
+ */
+export function browserTestSyncWarning(
+  assistant: Pick<AssistantDto, "status" | "providerSyncState"> | null | undefined,
+): string | undefined {
+  if (!assistant || assistant.status !== "published") return undefined;
+  return assistant.providerSyncState === "synchronized" ? undefined : SYNC.testUsesPublished;
 }

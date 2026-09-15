@@ -1,21 +1,25 @@
 /**
  * V5 customer-shell foundation — data access for the redesigned Overview
- * (D-1). Combines the receptionist-state signals (onboarding progress,
- * assistant status, assigned number), the needs-attention counts (open
- * issues, pending appointment requests) and today's call count.
+ * (D-1), narrowed to the counts this page owns.
  *
- * Setup progress here is read from the **saved** onboarding state only — it
- * does not re-run the Setup hub's real-data inference
- * (`pages/setup/setupContract.ts`), so it never duplicates the availability/
- * calendar/agent-config queries that page already owns. Once a visit to
- * `/setup` writes an inferred step back with `PUT`, this reads the same
- * saved fact on the next load — the two pages converge without either one
- * re-deriving the other's signals.
+ * Readiness itself is no longer measured here. Overview used to answer "is my
+ * receptionist ready?" from the saved onboarding ticks alone while the Setup
+ * hub answered it from real configuration, so the two screens could disagree —
+ * and did, because the ticks were never being saved at all. Both now read
+ * `pages/setup/setupApi.ts` → `useSetupData()` and
+ * `pages/setup/setupContract.ts` → `deriveStepStatuses()`, one measurement
+ * shared by both. The onboarding-progress, assistant-status, assigned-number,
+ * calendar-connection and email-status queries that used to live here moved
+ * there with it.
+ *
+ * What remains is Overview's own: open issues, pending appointment requests,
+ * and the recent-calls list. `useRecentCalls` is also the single calls query
+ * for the whole dashboard — `setupApi` reads it for the "has a real call
+ * happened?" signal rather than issuing a second request for the same rows.
  *
  * Every voice-platform query here is gated on `voicePlatformEnabled`
  * (`lib/featureFlags.ts`) with fold-guarded endpoint literals, so a gated-out
- * itself — so Overview degrades to its non-voice sections in the canonical
- * (voice-off) build, per the task brief.
+ * build carries neither the request nor the endpoint string.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -23,113 +27,8 @@ import { apiFetch } from "@/lib/api";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { useAppointmentRequests } from "@/hooks/useAvailability";
-import { fetchOnboardingState } from "@/lib/onboardingApi";
-import { SETUP_STEPS } from "@/pages/setup/setupContract";
 
 const ROOT = "overview" as const;
-
-// ─── Onboarding progress (saved state only) ─────────────────────────────────
-
-export function useOnboardingProgress() {
-  const firmId = useAuthenticatedFirmId();
-  const query = useQuery({
-    queryKey: firmId !== undefined ? [ROOT, "onboarding", firmId] : [ROOT, "onboarding", "unresolved"],
-    queryFn: fetchOnboardingState,
-    enabled: firmId !== undefined,
-    retry: 1,
-  });
-
-  const nonReviewKeys = SETUP_STEPS.filter((s) => s.key !== "review").map((s) => s.key);
-  const doneCount = query.data
-    ? nonReviewKeys.filter((key) => query.data!.steps[key]?.status === "done").length
-    : 0;
-
-  return {
-    isLoading: query.isLoading,
-    isError: query.isError,
-    doneCount,
-    total: nonReviewKeys.length,
-    anyStepDone: doneCount > 0,
-    setupComplete: doneCount === nonReviewKeys.length,
-  };
-}
-
-// ─── Assistant status ────────────────────────────────────────────────────
-
-export function useAssistantPublished(): boolean {
-  const firmId = useAuthenticatedFirmId();
-  const query = useQuery<{ items: Array<{ status?: string }>; count: number } | null>({
-    queryKey: firmId !== undefined ? [ROOT, "assistants-lite", firmId] : [ROOT, "assistants-lite", "unresolved"],
-    queryFn: () => {
-      if (!voicePlatformEnabled) {
-        // AR-001M: the endpoint literal must not survive into a gated-out build.
-        return Promise.resolve(null);
-      }
-      return apiFetch<{ items: Array<{ status?: string }>; count: number }>("/receptionist/voice/assistants");
-    },
-    enabled: firmId !== undefined && voicePlatformEnabled,
-    retry: 1,
-  });
-  return (query.data?.items ?? []).some((a) => a.status === "published");
-}
-
-// ─── Phone numbers ──────────────────────────────────────────────────────
-
-export interface VoiceNumberSummary {
-  id: number | string;
-  phoneNumberDisplay: string;
-  state: string;
-}
-
-function fetchVoiceNumbers(): Promise<{ items: VoiceNumberSummary[]; count: number }> {
-  if (!voicePlatformEnabled) {
-    // AR-001M: the endpoint literal must not survive into a gated-out build.
-    return Promise.resolve(null as never);
-  }
-  return apiFetch("/receptionist/voice/numbers");
-}
-
-export function useAssignedNumber() {
-  const firmId = useAuthenticatedFirmId();
-  return useQuery({
-    queryKey: firmId !== undefined ? [ROOT, "numbers", firmId] : [ROOT, "numbers", "unresolved"],
-    queryFn: fetchVoiceNumbers,
-    enabled: firmId !== undefined && voicePlatformEnabled,
-    retry: 1,
-  });
-}
-
-// ─── Calendar connection ────────────────────────────────────────────────
-
-export function useCalendarConnectedFlag(): boolean | null {
-  const firmId = useAuthenticatedFirmId();
-  const query = useQuery({
-    queryKey: firmId !== undefined ? [ROOT, "calendar-status", firmId] : [ROOT, "calendar-status", "unresolved"],
-    queryFn: () => apiFetch<{ connected: boolean; provider: string }>("/receptionist/availability/calendar-status"),
-    enabled: firmId !== undefined,
-    retry: 1,
-  });
-  if (query.isLoading || query.isError) return null;
-  return query.data?.connected ?? null;
-}
-
-/**
- * Whether the account can actually receive email.
- *
- * `null` while loading or on failure: "we could not ask" must not be shown as
- * a problem, and must not be shown as fine either.
- */
-export function useCanReceiveEmail(): boolean | null {
-  const firmId = useAuthenticatedFirmId();
-  const query = useQuery({
-    queryKey: firmId !== undefined ? [ROOT, "email-status", firmId] : [ROOT, "email-status", "unresolved"],
-    queryFn: () => apiFetch<{ canReceiveEmail: boolean }>("/receptionist/account/email-status"),
-    enabled: firmId !== undefined,
-    retry: 1,
-  });
-  if (query.isLoading || query.isError) return null;
-  return query.data?.canReceiveEmail ?? null;
-}
 
 // ─── Open issues ────────────────────────────────────────────────────────
 
@@ -145,7 +44,7 @@ export function useOpenIssuesCount(): number | null {
   return query.data?.count ?? null;
 }
 
-// ─── Today's calls ──────────────────────────────────────────────────────
+// ─── Calls ──────────────────────────────────────────────────────────────
 
 export interface RealCallLite {
   callId: string;
@@ -154,6 +53,12 @@ export interface RealCallLite {
   startedAt: string;
 }
 
+/**
+ * The dashboard's one calls query.
+ *
+ * Read twice over — here for the recent-calls list, and by `setupApi` for the
+ * test-call signal — but fetched once, under one key.
+ */
 export function useRecentCalls(): { items: RealCallLite[]; isError: boolean; isLoading: boolean } {
   const firmId = useAuthenticatedFirmId();
   const query = useQuery({
@@ -185,11 +90,14 @@ export function countCallsToday(calls: RealCallLite[], now: number = Date.now())
 
 /**
  * `availabilityApi.ts` has no literal `"pending"` state — `requested` and
- * `pending_review` are the two states awaiting an owner decision;
- * `held` is a transient in-flight booking-flow reservation, not a request
- * waiting on the owner, so it is not counted here.
+ * `pending_review` are the two states awaiting an owner decision.
+ *
+ * `held` is counted too: the server approves a held row exactly as it approves
+ * a pending_review one (`calendarEventSync.ts`), so a held slot is genuinely
+ * waiting on the owner rather than being an in-flight reservation nobody has
+ * to look at.
  */
-const AWAITING_DECISION = new Set(["requested", "pending_review"]);
+const AWAITING_DECISION = new Set(["requested", "pending_review", "held"]);
 
 export function usePendingAppointmentRequestsCount(): number | null {
   const { data, isLoading, isError } = useAppointmentRequests();

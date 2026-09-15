@@ -12,6 +12,11 @@ import {
 interface BrowserTestConfirmDialogProps {
   open: boolean;
   assistantName: string;
+  /**
+   * Present only when the provider is running something other than what is
+   * saved here, so the owner knows which version this call will play back.
+   */
+  syncWarning?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -23,7 +28,7 @@ interface BrowserTestConfirmDialogProps {
  * focus-restore behavior — none of that is reimplemented here. Never
  * renders a provider id, credential, or assistant config/prompt.
  */
-export function BrowserTestConfirmDialog({ open, assistantName, onCancel, onConfirm }: BrowserTestConfirmDialogProps) {
+export function BrowserTestConfirmDialog({ open, assistantName, syncWarning, onCancel, onConfirm }: BrowserTestConfirmDialogProps) {
   return (
     <AlertDialog
       open={open}
@@ -46,6 +51,9 @@ export function BrowserTestConfirmDialog({ open, assistantName, onCancel, onConf
                 The test runs the configuration last sent to the voice provider. Anything you have saved but not
                 published yet is not part of it.
               </p>
+              {syncWarning && (
+                <p className="font-medium text-warning-foreground dark:text-warning">{syncWarning}</p>
+              )}
               <p>Ending or closing the test stops the browser voice session.</p>
               <p>
                 Whether audio or a transcript is recorded depends on the voice provider's configuration for this
