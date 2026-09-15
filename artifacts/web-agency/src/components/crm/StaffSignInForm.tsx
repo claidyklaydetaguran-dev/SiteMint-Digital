@@ -114,7 +114,9 @@ export function StaffSignInFields({
   /** Keeps label/field ids unique when two forms could exist in one document. */
   idPrefix: string;
   /** The email field, for a caller that moves focus itself (the dialog). */
-  firstFieldRef?: RefObject<HTMLInputElement>;
+  // Nullable, because that is what `useRef<HTMLInputElement>(null)` produces
+  // under these React types, and the dialog passes exactly that.
+  firstFieldRef?: RefObject<HTMLInputElement | null>;
   autoFocus?: boolean;
 }) {
   const codeRef = useRef<HTMLInputElement>(null);
