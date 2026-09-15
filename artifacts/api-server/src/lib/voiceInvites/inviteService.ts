@@ -28,10 +28,28 @@ export function generateInviteCode(): string {
   return out;
 }
 
+/** Bounds for an operator-chosen lifetime: at least one hour, never longer than the default. */
+export const INVITE_MIN_TTL_HOURS = 1;
+export const INVITE_MAX_TTL_HOURS = INVITE_TTL_MS / (60 * 60 * 1000);
+
+/**
+ * An operator may ask for a shorter-lived invite (a QA account, a one-off
+ * demo) but never a longer one: the default is already the ceiling on how long
+ * a leaked code can stay live. Anything absent, non-integer or out of range
+ * falls back to the default rather than guessing.
+ */
+export function resolveInviteTtlMs(expiresInHours: unknown): number {
+  if (typeof expiresInHours !== "number" || !Number.isInteger(expiresInHours)) return INVITE_TTL_MS;
+  if (expiresInHours < INVITE_MIN_TTL_HOURS || expiresInHours > INVITE_MAX_TTL_HOURS) return INVITE_TTL_MS;
+  return expiresInHours * 60 * 60 * 1000;
+}
+
 export interface CreateInviteInput {
   email?: string | null;
   note?: string | null;
   createdBy: string;
+  /** Lifetime in ms; defaults to INVITE_TTL_MS. Use resolveInviteTtlMs to derive it from input. */
+  ttlMs?: number;
 }
 
 export interface CreatedInvite {
@@ -43,7 +61,8 @@ export interface CreatedInvite {
 export async function createInvite(input: CreateInviteInput): Promise<CreatedInvite> {
   const now = new Date();
   const code = generateInviteCode();
-  const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
+  const ttl = input.ttlMs !== undefined && input.ttlMs > 0 && input.ttlMs <= INVITE_TTL_MS ? input.ttlMs : INVITE_TTL_MS;
+  const expiresAt = new Date(now.getTime() + ttl);
   const [row] = await db
     .insert(voiceInvites)
     .values({

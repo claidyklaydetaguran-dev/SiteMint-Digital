@@ -11,7 +11,7 @@ import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import { createSession, COOKIE_NAME, COOKIE_OPTIONS } from "../lib/receptionistAuth.js";
 import { requireAdmin } from "../lib/admin-session.js";
 import { isInviteSignupEnabled, INVITE_SIGNUP_DISABLED_MESSAGE } from "../lib/publicWriteFlags.js";
-import { consumeInviteCode, attachInviteToFirm, createInvite, listInvites } from "../lib/voiceInvites/inviteService.js";
+import { consumeInviteCode, attachInviteToFirm, createInvite, listInvites, resolveInviteTtlMs } from "../lib/voiceInvites/inviteService.js";
 import { createFirmForInviteSignup } from "../lib/voiceInvites/inviteSignup.js";
 import { SlidingWindowLimiter, getClientIp } from "../lib/contactProtection.js";
 
@@ -112,7 +112,9 @@ router.post("/admin/voice/invites", requireAdmin, async (req: Request, res: Resp
   const email = typeof body.email === "string" && body.email.trim().length > 0 ? body.email.trim() : null;
   const note = typeof body.note === "string" && body.note.trim().length > 0 ? body.note.trim().slice(0, 500) : null;
   try {
-    const invite = await createInvite({ email, note, createdBy: "admin" });
+    // Optional `expiresInHours` (1–336) shortens the lifetime; it can never
+    // lengthen it past the default.
+    const invite = await createInvite({ email, note, createdBy: "admin", ttlMs: resolveInviteTtlMs(body.expiresInHours) });
     // The raw code is returned EXACTLY ONCE, here, to the admin who created
     // it — never logged, never retrievable again.
     res.status(201).json({ invite: { id: invite.id, code: invite.code, expiresAt: invite.expiresAt.toISOString() } });
