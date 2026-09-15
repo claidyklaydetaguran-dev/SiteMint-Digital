@@ -1,5 +1,13 @@
-// Platform-operator telephone inventory. Bearer-admin only, the same
-// `validateToken` the other admin routes use.
+// Platform-operator telephone inventory, behind the shared operator gate.
+//
+// It used to accept only the in-memory bearer token, which is minted afresh
+// every time the server starts. That token dies on every restart and deploy,
+// and on a deployment with more than one instance a token minted by one
+// instance is refused by the next — so an operator could sign in and still be
+// turned away assigning a number. The shared gate also accepts the persistent,
+// hashed `admin_session` cookie the same login issues, which survives both.
+// Nothing about WHO may call these routes changed: operator sign-in only, never
+// a customer session.
 //
 // This is deliberately NOT on the customer surface. A business may read and
 // manage the numbers it holds (`receptionistNumbers.ts`); it may never
@@ -10,9 +18,9 @@
 // Nothing here buys or imports a number. Acquisition remains the separate,
 // owner-gated stop; this only hands out what the organisation already owns.
 
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 
-import { validateToken } from "../lib/admin-session.js";
+import { requireAdmin } from "../lib/admin-session.js";
 import { recordAuditEvent } from "../lib/voiceAccounts/auditLog.js";
 import {
   assignNumberToFirm,
@@ -27,16 +35,6 @@ import {
 import type { VoicePhoneNumberRecord } from "../lib/voice/types.js";
 
 const router: IRouter = Router();
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  if (!validateToken(token)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  next();
-}
 
 /**
  * Builds the provider-backed dependencies.

@@ -1,13 +1,15 @@
 // P8: internal-operator diagnostics + the ONE way a firm↔Stripe mapping
-// comes to exist. Auth: the same validateToken bearer as the other admin
-// routes. Every mutation is audited with actor 'admin'.
+// comes to exist. Auth: the shared operator gate (in-memory bearer OR the
+// persistent `admin_session` cookie), so an operator is not signed out by a
+// restart or refused by a second instance. Every mutation is audited with
+// actor 'admin'.
 //
 // Setting a subscription mapping here is deliberate design, not
 // convenience: the billing webhook refuses to attach events to firms by
 // anything found in a request body, so the mapping must pre-exist as an
 // audited internal action.
 
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
@@ -17,23 +19,13 @@ import {
   voiceUsageLedger,
   voiceUsageCapStates,
 } from "@workspace/db/schema/voice";
-import { validateToken } from "../lib/admin-session.js";
+import { requireAdmin } from "../lib/admin-session.js";
 import { recordAuditEvent } from "../lib/voiceAccounts/auditLog.js";
 import { computePeriodYm } from "../lib/voiceUsage/usageService.js";
 import { loadVoicePlanCatalogFromEnv, findPlan } from "../lib/voiceBilling/entitlements.js";
 import { SUBSCRIPTION_STATES, type SubscriptionState } from "../lib/voiceBilling/subscriptionState.js";
 
 const router: IRouter = Router();
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  if (!validateToken(token)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  next();
-}
 
 // ── GET /api/admin/voice/firms/:id/diagnostics ───────────────────────────────
 
