@@ -642,8 +642,10 @@ check(
   // voice 0008 added voice_signup_jobs (durable registration -> CRM -> email).
   // voice 0010 added voice_messages (saved caller requests) and
   // voice_notifications (the durable post-call email outbox).
-  "the committed migrations create exactly thirty-three domain tables",
-  domainTables.length === 33, // scheduling 0002: +scheduling_date_exceptions
+  // voice 0011 added voice_business_profiles (primary contact and default
+  // location, which the frozen intake_firms row has no columns for).
+  "the committed migrations create exactly thirty-four domain tables",
+  domainTables.length === 34, // scheduling 0002: +scheduling_date_exceptions; voice 0011: +voice_business_profiles
   domainTables.join(","),
 );
 check(
