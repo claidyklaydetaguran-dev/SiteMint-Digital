@@ -19,6 +19,7 @@ import {
   healthTimestamp,
   lastCheckedLabel,
   parseCalendarReturn,
+  resolveSelectedCalendarId,
 } from "./calendarContract.js";
 
 let passed = 0;
@@ -147,6 +148,19 @@ eq("an unparseable timestamp is not invented either", healthTimestamp("not-a-dat
 check("a real timestamp is formatted", healthTimestamp("2026-09-11T15:04:00.000Z") !== HEALTH_FIELDS.none);
 
 check("the write-disabled note says busy times are still read", /busy times are still read/i.test(HEALTH_FIELDS.writeDisabledDetail));
+
+section("which calendar the picker shows as chosen");
+
+// Found live: a connection made before the picker stored the alias "primary",
+// the select showed the account's calendar, and Save could never enable.
+const LISTED = [
+  { id: "owner@example.com", primary: true },
+  { id: "team@group.calendar.google.com", primary: false },
+];
+eq("Google's 'primary' alias resolves to the calendar Google flags as primary", resolveSelectedCalendarId("primary", LISTED), "owner@example.com");
+eq("an explicit selection is kept exactly", resolveSelectedCalendarId("team@group.calendar.google.com", LISTED), "team@group.calendar.google.com");
+eq("the alias is left alone when no listed calendar is flagged primary", resolveSelectedCalendarId("primary", [{ id: "team@group.calendar.google.com", primary: false }]), "primary");
+eq("no selection is not invented", resolveSelectedCalendarId(null, LISTED), null);
 
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);

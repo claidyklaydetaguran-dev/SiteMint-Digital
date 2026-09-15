@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { fetchCalendarChoices, selectCalendar, isCalendarActionError } from "@/lib/calendarApi";
-import { CALENDAR_PICKER } from "@/pages/calendar/calendarContract";
+import { CALENDAR_PICKER, resolveSelectedCalendarId } from "@/pages/calendar/calendarContract";
 import { Button } from "@/components/ui/button";
 
 export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): React.ReactElement | null {
@@ -32,7 +32,9 @@ export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): Re
   // The server's selection is the truth until the business picks something;
   // seeding state from it avoids a control that starts on the wrong calendar.
   useEffect(() => {
-    if (choices.data && chosen === null) setChosen(choices.data.selectedCalendarId);
+    if (choices.data && chosen === null) {
+      setChosen(resolveSelectedCalendarId(choices.data.selectedCalendarId, choices.data.calendars));
+    }
   }, [choices.data, chosen]);
 
   const save = useMutation({
@@ -101,7 +103,11 @@ export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): Re
       <Button
         type="button"
         onClick={() => { if (chosen) save.mutate(chosen); }}
-        disabled={save.isPending || chosen === null || chosen === choices.data?.selectedCalendarId}
+        disabled={
+          save.isPending ||
+          chosen === null ||
+          chosen === resolveSelectedCalendarId(choices.data?.selectedCalendarId ?? null, calendars)
+        }
       >
         {save.isPending ? CALENDAR_PICKER.savePending : CALENDAR_PICKER.save}
       </Button>

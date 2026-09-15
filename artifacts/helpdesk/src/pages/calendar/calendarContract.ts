@@ -271,6 +271,26 @@ export function everyRenderableString(): string[] {
    existed has to reconnect to grant one more permission — which is not the
    same as its calendar being broken. */
 
+/**
+ * Which listed calendar the stored selection actually names.
+ *
+ * A connection made before the picker existed stores Google's alias
+ * "primary", which is not the id of any listed calendar. Fed straight into the
+ * select, it matched no option: the browser displayed the first calendar
+ * anyway, the component's state stayed "primary", and re-choosing the calendar
+ * already on screen fires no change event — so Save stayed disabled on a
+ * control that looked selected. Resolving the alias to the calendar Google
+ * flags as primary makes what is shown and what is stored agree.
+ */
+export function resolveSelectedCalendarId(
+  selectedCalendarId: string | null,
+  calendars: readonly { id: string; primary?: boolean }[],
+): string | null {
+  if (selectedCalendarId === null) return null;
+  if (selectedCalendarId !== "primary") return selectedCalendarId;
+  return calendars.find((c) => c.primary === true)?.id ?? selectedCalendarId;
+}
+
 export const CALENDAR_PICKER = {
   heading: "Where appointments are saved",
   detail: "Approved appointments are written to this calendar. Busy times are read from it too.",
