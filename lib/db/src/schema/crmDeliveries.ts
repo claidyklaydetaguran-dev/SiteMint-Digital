@@ -94,8 +94,13 @@ export const CRM_DELIVERY_ORIGINS = [
 ] as const;
 export type CrmDeliveryOrigin = (typeof CRM_DELIVERY_ORIGINS)[number];
 
+// The values are inlined as quoted literals, not bound. A CHECK constraint is
+// DDL, which has no parameters: `sql\`${v}\`` rendered `IN ($1, $2)`, and
+// `drizzle-kit push` failed on the first such table with "there is no parameter
+// $1" (42P02) — leaving a fresh database with only the tables created before it.
+// Every value here is a constant from this file, never input.
 const inList = (column: unknown, values: readonly string[]) =>
-  sql`${column} IN (${sql.join(values.map((v) => sql`${v}`), sql`, `)})`;
+  sql`${column} IN (${sql.raw(values.map((v) => `'${v.replace(/'/g, "''")}'`).join(", "))})`;
 
 // ── One record per (occurrence, recipient) ──────────────────────────────────
 
