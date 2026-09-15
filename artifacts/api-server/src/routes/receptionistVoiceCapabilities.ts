@@ -30,6 +30,14 @@ const CAPABILITY_COPY: Record<string, { label: string; active: string }> = {
     label: "Book appointments",
     active: "Callers can check open times and ask for an appointment. You confirm each request.",
   },
+  transfer: {
+    label: "Put callers through to a person",
+    // Says what the caller gets AND what it costs, because both change whether
+    // a business wants it on. It stops short of promising someone answers:
+    // once the call is handed over, the assistant has left it.
+    active:
+      "When a caller asks for someone, your assistant can hand the call to a transfer contact who is available right now. That places an outbound call billable on your telephone account, and once the caller is handed over the assistant leaves the call.",
+  },
 };
 
 const REASON_COPY: Record<CapabilityBlockReason, string> = {
@@ -40,6 +48,8 @@ const REASON_COPY: Record<CapabilityBlockReason, string> = {
   needs_opening_hours:
     "Set your opening hours first. With no open days the assistant would tell every caller you are closed.",
   needs_timezone: "Set your business timezone first, so offered times are correct.",
+  needs_transfer_contact:
+    "Add a transfer contact first, and confirm that they agreed to receive transferred calls. Nobody is called without that.",
 };
 
 /** Where the owner goes to clear each blocker, when they can clear it themselves. */
@@ -47,6 +57,7 @@ const REASON_FIX_PATH: Partial<Record<CapabilityBlockReason, string>> = {
   needs_appointment_type: "/scheduling/appointment-types",
   needs_opening_hours: "/scheduling/availability",
   needs_timezone: "/scheduling/availability",
+  needs_transfer_contact: "/channels/transfer-contacts",
 };
 
 // ── GET /api/receptionist/voice/capabilities ──────────────────────────────────
