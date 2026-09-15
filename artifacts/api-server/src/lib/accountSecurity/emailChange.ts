@@ -35,6 +35,7 @@
 // the same thing with one.
 
 import type { TokenPurpose } from "./accountTokens.js";
+import { verificationEmailText } from "./accountEmailLinks.js";
 
 export type EmailChangeFailure =
   | "invalid_email"
@@ -56,6 +57,8 @@ export interface EmailChangeDeps {
   sendEmail: (to: string, subject: string, text: string) => Promise<{ ok: boolean }>;
   issueToken: (firmId: number, purpose: TokenPurpose) => Promise<{ rawToken: string }>;
   recordAudit: (firmId: number, action: string, subject: string) => Promise<void>;
+  /** Where the verification link's public origin is read from; defaults to process.env. */
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -144,11 +147,7 @@ export async function changeAccountEmail(
     const sent = await deps.sendEmail(
       email,
       "Verify your SiteMint AI Receptionist email",
-      [
-        "Confirm this address to secure your account.",
-        "",
-        `Your verification code (valid 24 hours): ${rawToken}`,
-      ].join("\n"),
+      verificationEmailText(rawToken, deps.env ?? process.env),
     );
     verificationSent = sent.ok;
   } catch {
@@ -165,7 +164,7 @@ export async function productionEmailChangeDeps(): Promise<EmailChangeDeps> {
   const { eq } = await import("drizzle-orm");
   const { createAlertTransportFromEnv } = await import("../voiceAlerts/alertTransport.js");
   const { recordAuditEvent } = await import("../voiceAccounts/auditLog.js");
-  const { issueAccountToken } = await import("./accountTokens.js");
+  const { issueAccountToken, verifyAccountPassword } = await import("./accountTokens.js");
 
   return {
     loadFirm: async (firmId) => {
@@ -178,11 +177,7 @@ export async function productionEmailChangeDeps(): Promise<EmailChangeDeps> {
       // change proceeds, and `same_email` simply cannot match.
       return row ? { email: row.email ?? "", passwordHash: row.passwordHash ?? "" } : undefined;
     },
-    verifyPassword: async (password, passwordHash) => {
-      if (passwordHash === "") return false;
-      const bcrypt = (await import("bcryptjs")).default;
-      return bcrypt.compare(password, passwordHash);
-    },
+    verifyPassword: verifyAccountPassword,
     findFirmIdByEmail: async (email) => {
       const [row] = await db.select({ id: intakeFirms.id }).from(intakeFirms).where(eq(intakeFirms.email, email)).limit(1);
       return row?.id;
