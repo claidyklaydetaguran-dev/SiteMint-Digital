@@ -6,8 +6,23 @@
  * the copy drifted: that an email reached someone, and that a call with no saved
  * message was dealt with.
  */
-import { COPY, PAGE, TABS, everyRenderableString, followUpLabel, notificationLabel } from "./inquiriesContract.js";
-import { FOLLOW_UP_STATUSES, NOTIFICATION_STATES } from "../../lib/inquiriesApi.js";
+import {
+  ACTIONS,
+  CAPABILITY,
+  COPY,
+  DELIVERY,
+  PAGE,
+  TABS,
+  URGENCY_FILTERS,
+  deliveryLine,
+  everyRenderableString,
+  followUpLabel,
+  mailtoHref,
+  matchesUrgency,
+  notificationLabel,
+  telHref,
+} from "./inquiriesContract.js";
+import { DELIVERY_STATUSES, FOLLOW_UP_STATUSES, NOTIFICATION_STATES } from "../../lib/inquiriesApi.js";
 
 let passed = 0;
 const failures: string[] = [];
@@ -53,6 +68,71 @@ eq(
 check(
   "the section explains what accepted does and does not mean",
   /accepted/i.test(COPY.notificationsDetail) && /not proof/i.test(COPY.notificationsDetail),
+);
+
+section("Delivery evidence is separate from acceptance");
+
+eq(
+  "accepted with no event claims a hand-off and nothing more",
+  deliveryLine({ state: "accepted", deliveryStatus: null }),
+  DELIVERY.acceptedNoEvent,
+);
+check(
+  "that sentence says delivery is not yet confirmed",
+  /not yet confirmed/i.test(DELIVERY.acceptedNoEvent),
+);
+eq(
+  "a delivered event is the one case that may say delivered",
+  deliveryLine({ state: "accepted", deliveryStatus: "delivered" }),
+  DELIVERY.delivered,
+);
+eq("an unconfirmed send warns it will not retry itself", deliveryLine({ state: "unconfirmed" }), DELIVERY.unconfirmed);
+check(
+  "the unconfirmed sentence tells the reader it will not be sent again automatically",
+  /will not be sent again automatically/i.test(DELIVERY.unconfirmed),
+);
+eq("an abandoned send says plainly that it was not sent", deliveryLine({ state: "abandoned" }), DELIVERY.abandoned);
+
+check(
+  "every delivery status the backend can store has its own sentence",
+  DELIVERY_STATUSES.every((s) => {
+    const line = deliveryLine({ state: "accepted", deliveryStatus: s });
+    return typeof line === "string" && line !== DELIVERY.acceptedNoEvent && line !== DELIVERY.unrecognised;
+  }),
+);
+check(
+  "each problem sentence states the problem AND what to check",
+  [DELIVERY.bounced, DELIVERY.complained, DELIVERY.deliveryFailed].every((s) => /check/i.test(s)),
+);
+check(
+  "no delivery sentence claims an inbox we cannot observe, except where an event said so",
+  [DELIVERY.acceptedNoEvent, DELIVERY.unconfirmed, DELIVERY.abandoned, DELIVERY.queued, DELIVERY.sending].every(
+    (s) => !/\bdelivered\b/i.test(s),
+  ),
+);
+eq("an unrecognised state is stated, never guessed", deliveryLine({ state: "teleported" }), DELIVERY.unrecognised);
+
+section("Follow-up actions use the caller's own details");
+
+eq("a phone link keeps digits and a leading plus", telHref("+1 (555) 010-2231"), "tel:+15550102231");
+check("a mail link carries the topic as its subject", mailtoHref("a@b.test", "Broken tap").includes("subject="));
+check(
+  "neither action label claims SiteMint contacts anyone",
+  !/\bwe (sent|texted|emailed|called)\b/i.test(`${ACTIONS.callLabel} ${ACTIONS.emailLabel}`),
+);
+
+section("Urgency filter");
+
+check("the filter keeps everything on 'all'", matchesUrgency({ urgency: "normal" }, "all"));
+check("urgent only keeps urgent", matchesUrgency({ urgency: "urgent" }, "urgent"));
+check("urgent only drops normal", !matchesUrgency({ urgency: "normal" }, "urgent"));
+check("every filter option has a label", URGENCY_FILTERS.every((f) => f.label.trim() !== ""));
+
+section("Message-taking that is not attached");
+
+check(
+  "an unavailable capability is stated rather than shown as an empty list",
+  /isn't switched on/i.test(CAPABILITY.offTitle) && CAPABILITY.offFallback.trim() !== "",
 );
 
 section("Empty states");
