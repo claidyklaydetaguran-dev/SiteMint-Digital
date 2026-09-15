@@ -30,15 +30,21 @@ suite("support requests belong to one business (real DB)", () => {
     schema = await import("@workspace/db");
     db = schema.db;
     service = await import("./supportService.js");
-    const rows = await db
-      .insert(schema.intakeFirms)
-      .values([
-        { name: `[TEST] Support A ${STAMP}`, notifyEmail: `support-a-${STAMP}@example.test`, email: `support-a-${STAMP}@example.test` },
-        { name: `[TEST] Support B ${STAMP}`, notifyEmail: `support-b-${STAMP}@example.test`, email: `support-b-${STAMP}@example.test` },
-      ])
-      .returning({ id: schema.intakeFirms.id });
-    firmA = rows[0]!.id;
-    firmB = rows[1]!.id;
+    // intake_firms still carries the original law-firm columns as NOT NULL, so
+    // a test row has to fill them even though the receptionist never reads them.
+    const firmRow = (suffix: string) => ({
+      name: `[TEST] Support ${suffix} ${STAMP}`,
+      practiceAreas: [] as string[],
+      statesServed: [] as string[],
+      statuteOfLimitationsDays: 0,
+      notifyEmail: `support-${suffix}-${STAMP}@example.test`,
+      twilioNumber: `+1555000${suffix === "A" ? "1" : "2"}${String(STAMP).slice(-4)}`,
+      email: `support-${suffix}-${STAMP}@example.test`,
+    });
+    const [rowA] = await db.insert(schema.intakeFirms).values(firmRow("A")).returning({ id: schema.intakeFirms.id });
+    const [rowB] = await db.insert(schema.intakeFirms).values(firmRow("B")).returning({ id: schema.intakeFirms.id });
+    firmA = rowA!.id;
+    firmB = rowB!.id;
   });
 
   afterAll(async () => {
@@ -139,7 +145,7 @@ suite("support requests belong to one business (real DB)", () => {
       expect(src).toContain(fn);
     }
     // Every route in that file is gated, and the writes need the write grant.
-    const routes = src.match(/router\.(get|post)\("\/admin\/[^"]*",[^\n]*/g) ?? [];
+    const routes: string[] = src.match(/router\.(get|post)\("\/admin\/[^"]*",[^\n]*/g) ?? [];
     expect(routes.length).toBeGreaterThanOrEqual(4);
     for (const route of routes) expect(route).toMatch(/requireOperator\("support\.(read|write)"\)/);
     for (const route of routes.filter((r) => r.startsWith("router.post"))) {
