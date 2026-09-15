@@ -498,8 +498,10 @@ eq(
   planFields(planLabel("trial"), usageModel("trial", 12, 20)),
   [
     { label: "Current plan", value: "Free Trial" },
-    { label: "Conversation usage", value: "12 of 20" },
-    { label: "Trial conversation limit", value: "20 conversations" },
+    // Relabelled deliberately: this allowance counts text-message (SMS) intake
+    // conversations for the life of the account, not calls and not per period.
+    { label: "SMS conversation usage", value: "12 of 20" },
+    { label: "Trial SMS conversation limit", value: "20 SMS conversations, all time" },
   ],
 );
 
@@ -508,7 +510,7 @@ eq(
   planFields(planLabel("paid"), usageModel("paid", 512, 20)),
   [
     { label: "Current plan", value: "Paid plan" },
-    { label: "Conversation usage", value: "512" },
+    { label: "SMS conversation usage", value: "512" },
   ],
 );
 
@@ -517,14 +519,14 @@ eq(
   planFields(planLabel("legacy_2019"), usageModel("legacy_2019", 9, 20)),
   [
     { label: "Current plan", value: "legacy_2019" },
-    { label: "Conversation usage", value: "9" },
+    { label: "SMS conversation usage", value: "9" },
   ],
 );
 
 eq(
   "a blank plan omits the plan row entirely rather than guessing",
   planFields(planLabel(""), usageModel("", 9, 20)).map((f) => f.label),
-  ["Conversation usage"],
+  ["SMS conversation usage"],
 );
 
 check(
@@ -808,7 +810,12 @@ check(
   "the meter's exact counts survive the clamp via valuetext",
   /aria-valuetext=/.test(pageCode),
 );
-eq("the meter has a real accessible name", METER_LABEL, "Trial conversation usage");
+eq("the meter has a real accessible name", METER_LABEL, "Trial SMS conversation usage, all time");
+check(
+  "the allowance copy names the channel it counts and never claims a period",
+  [METER_LABEL, LIMIT_REACHED_DETAIL, PAID_LIMIT_DETAIL].every((s) => !/this period|per month|monthly/i.test(s)) &&
+    /SMS/.test(METER_LABEL),
+);
 check(
   "the meter is drawn only where there is a denominator",
   /model\.kind === "measured" && \(\s*<div\s*\n?\s*className="sb-meter"/.test(pageCode) ||

@@ -123,16 +123,20 @@ function UsageMeter({
 
   const percent = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
+  // This meter counts text-message (SMS) intake conversations for the life of
+  // the account — not calls, and not "this period". Saying so is the whole
+  // point: beside a call product, the bare word "conversations" read as a
+  // voice business's call allowance for the month, which it never was.
   return (
     <Link
       href="/billing"
       className="sd-usage"
       onClick={onNavigate}
-      aria-label={`Trial usage: ${used} of ${limit} conversations used. Open billing.`}
+      aria-label={`Trial usage: ${used} of ${limit} SMS conversations used, all time. Open billing.`}
     >
       <span className="sd-usage__row">
         <span className="sd-usage__count">
-          {used} of {limit} conversations
+          {used} of {limit} SMS conversations, all time
         </span>
         <span className="sd-usage__cta" aria-hidden="true">
           Billing
