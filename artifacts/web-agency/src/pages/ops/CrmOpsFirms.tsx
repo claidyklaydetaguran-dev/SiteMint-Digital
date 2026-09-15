@@ -28,18 +28,20 @@ export default function CrmOpsFirms() {
   const [firms, setFirms] = useState<OpsFirm[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [denied, setDenied] = useState(false);
+  // The refusal itself, not just the fact of one, so the page can name the
+  // permission a signed-in person is missing.
+  const [denied, setDenied] = useState<AdminApiError | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setDenied(false);
+    setDenied(null);
     try {
       const data = await adminGet<FirmsResponse>("/api/admin/receptionist-accounts");
       setFirms(data?.accounts ?? []);
     } catch (err) {
       if (isDenied(err)) {
-        setDenied(true);
+        setDenied(err as AdminApiError);
       } else if (err instanceof AdminApiError) {
         setError(err.message);
       } else {
@@ -77,7 +79,7 @@ export default function CrmOpsFirms() {
         </div>
 
         {loading && <OpsSpinner />}
-        {!loading && denied && <OpsDenied />}
+        {!loading && denied && <OpsDenied error={denied} />}
         {!loading && !denied && error && <OpsError message={error} onRetry={() => void load()} />}
         {!loading && !denied && !error && firms.length === 0 && (
           <OpsEmpty

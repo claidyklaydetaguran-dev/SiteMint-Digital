@@ -32,6 +32,7 @@ import {
   getCampaignStrategyHints,
 } from "@/lib/campaignTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -236,7 +237,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
 
   // Send completion
   if (totals.recipients === 0) {
-    ins.push("Add recipients to start sending this campaign.");
+    ins.push("Add recipients to start sending this sequence.");
   } else if (totals.sendRate === 100) {
     ins.push("Campaign fully delivered — all recipients reached successfully.");
   } else if (totals.sendRate === 0 && totals.selected > 0) {
@@ -246,7 +247,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
   } else if (totals.sendRate < 50) {
     ins.push(`Only ${totals.sendRate}% of recipients were reached. Review failed and skipped contacts before resending.`);
   } else if (totals.sendRate >= 80) {
-    ins.push(`Strong delivery — ${totals.sendRate}% of recipients received this campaign.`);
+    ins.push(`Strong delivery — ${totals.sendRate}% of recipients received this sequence.`);
   }
 
   // Data quality / skipped
@@ -268,10 +269,10 @@ function generateInsights(a: CampaignAnalytics): string[] {
     const top = activeDisc[0];
     const pct = Math.round((top.count / totals.recipients) * 100);
     const COPY: Record<string, string> = {
-      Driver:     "Keep future campaigns concise with a direct CTA and clear next step.",
+      Driver:     "Keep future sequences concise with a direct CTA and clear next step.",
       Expressive: "Use energetic language and big-picture outcomes to engage this audience.",
       Amiable:    "Lead with relationship and trust. A warmer, reassuring CTA may perform better.",
-      Analytical: "Support future campaigns with proof, data points, timelines, and pricing details.",
+      Analytical: "Support future sequences with proof, data points, timelines, and pricing details.",
     };
     ins.push(`Most recipients (${pct}%) are ${top.style}-style leads. ${COPY[top.style] ?? ""}`);
   }
@@ -283,7 +284,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
     const worst = [...discBreakdown.filter(d => d.count > 0)].sort((x, y) => {
       return ((y.failed + y.skipped) / y.count) - ((x.failed + x.skipped) / x.count);
     })[0];
-    ins.push(`${best.style} leads had the highest delivery success in this campaign.`);
+    ins.push(`${best.style} leads had the highest delivery success in this sequence.`);
     if (worst.style !== best.style && (worst.failed + worst.skipped) > 0) {
       ins.push(`${worst.style} leads had the most delivery issues — review their contact records.`);
     }
@@ -294,7 +295,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
     if (replyEstimate.rate >= 10) {
       ins.push(`Strong estimated reply activity — ${replyEstimate.rate}% of sent recipients have since sent inbound messages.`);
     } else if (replyEstimate.count === 0) {
-      ins.push("No estimated replies detected yet. Consider a follow-up campaign or a direct SMS touchpoint to re-engage.");
+      ins.push("No estimated replies detected yet. Consider a follow-up sequence or a direct SMS touchpoint to re-engage.");
     }
   }
 
@@ -314,7 +315,7 @@ function computeQualityScore(a: CampaignAnalytics): QualityScore {
   const reasons: string[] = [];
 
   if (totals.recipients === 0) {
-    return { score: 0, badge: "Risky", reasons: ["No recipients added to this campaign"] };
+    return { score: 0, badge: "Risky", reasons: ["No recipients added to this sequence"] };
   }
 
   let score = 0;
@@ -1886,25 +1887,37 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         <div className="flex flex-col h-full">
 
           {/* ── Page header ── */}
-          <div className="px-6 py-4 border-b border-border/60 bg-white flex items-center justify-between shrink-0">
-            <div>
-              <h1 className="text-lg font-bold font-serif text-foreground">Campaigns</h1>
+          {/* Wraps below the title on a phone: at 375px the three buttons did not
+              fit beside it, and "New sequence" ran past the right edge. */}
+          <div className="px-4 sm:px-6 py-4 border-b border-border/60 bg-white flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold font-serif text-foreground">Sequences</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Build sequences, enroll contacts, and automate follow-up.
+                {MESSAGING_CONCEPTS.sequence.summary} To send one email once, use Marketing.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* M4 — the broadcast workspace is a separate page with its own
+                  tables. Sequences on this screen are unaffected by it, and it
+                  is linked rather than merged so neither engine writes the
+                  other's status column. */}
+              <button
+                onClick={() => navigate("/admin/crm/campaign-builder")}
+                className="flex items-center gap-2 px-3 py-2 border border-teal-300 bg-teal-50 text-sm font-semibold rounded-lg hover:bg-teal-100 text-teal-800 transition-colors"
+              >
+                <Mail className="w-4 h-4" /> <span className="hidden sm:inline">Marketing</span>
+              </button>
               <button
                 onClick={() => navigate("/admin/crm/campaign-queue")}
                 className="flex items-center gap-2 px-3 py-2 border border-border text-sm font-semibold rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               >
-                <Calendar className="w-4 h-4" /> Queue
+                <Calendar className="w-4 h-4" /> {MESSAGING_CONCEPTS.queue.name}
               </button>
               <button
                 onClick={newCampaign}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
               >
-                <Plus className="w-4 h-4" /> New Campaign
+                <Plus className="w-4 h-4" /> New sequence
               </button>
             </div>
           </div>
@@ -1921,7 +1934,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab === "campaigns" ? `Campaigns (${campaigns.length})` : "Email Activity"}
+                {tab === "campaigns" ? `Sequences (${campaigns.length})` : "Email Activity"}
               </button>
             ))}
           </div>
@@ -1977,11 +1990,11 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   <div className="bg-white border border-border rounded-xl shadow-sm py-16 text-center">
                     <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
                     <p className="text-sm font-medium text-foreground mb-1">
-                      {campaigns.length === 0 ? "No campaigns yet" : "No campaigns match your filter"}
+                      {campaigns.length === 0 ? "No sequences yet" : "No sequences match your filter"}
                     </p>
                     <p className="text-xs text-muted-foreground mb-4">
                       {campaigns.length === 0
-                        ? "Create your first campaign to start building automated sequences."
+                        ? "Create your first sequence: several messages over days, each on its own schedule."
                         : "Try a different status filter or search term."}
                     </p>
                     {campaigns.length === 0 && (
@@ -1989,7 +2002,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         onClick={newCampaign}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
                       >
-                        <Plus className="w-4 h-4" /> New Campaign
+                        <Plus className="w-4 h-4" /> New sequence
                       </button>
                     )}
                   </div>
@@ -2080,7 +2093,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
                   <h2 className="text-sm font-bold text-foreground">Email Activity</h2>
-                  <span className="text-xs text-muted-foreground ml-1">— per-campaign send totals</span>
+                  <span className="text-xs text-muted-foreground ml-1">— send totals per sequence</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -2097,7 +2110,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       {campaigns.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">
-                            No campaigns yet. Create one to see email activity.
+                            No sequences yet. Create one to see its email activity.
                           </td>
                         </tr>
                       ) : campaigns.map(c => {

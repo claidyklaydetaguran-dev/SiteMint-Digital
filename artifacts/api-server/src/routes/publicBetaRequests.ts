@@ -2,7 +2,7 @@
 // list/update surface.
 
 import { Router, type Request, type Response } from "express";
-import { requireAdmin } from "../lib/admin-session.js";
+import { requireOperator } from "../lib/operatorGate.js";
 import { isPublicBetaRequestsEnabled, PUBLIC_BETA_REQUESTS_DISABLED_MESSAGE } from "../lib/publicWriteFlags.js";
 import { isHoneypotTripped, isImplausiblyFast, HONEYPOT_FIELD } from "../lib/scheduling/publicSchedulingProtection.js";
 import { SlidingWindowLimiter, getClientIp } from "../lib/contactProtection.js";
@@ -69,7 +69,7 @@ router.post("/public/beta-requests", async (req: Request, res: Response) => {
 
 // ── Admin: list / update ──────────────────────────────────────────────────────
 
-router.get("/admin/voice/beta-requests", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/voice/beta-requests", requireOperator("settings.read"), async (req: Request, res: Response) => {
   try {
     const rows = await listBetaRequests();
     res.json({
@@ -93,7 +93,7 @@ router.get("/admin/voice/beta-requests", requireAdmin, async (req: Request, res:
   }
 });
 
-router.patch("/admin/voice/beta-requests/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/admin/voice/beta-requests/:id", requireOperator("settings.write"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid id." });

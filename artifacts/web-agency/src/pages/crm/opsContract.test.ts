@@ -74,6 +74,12 @@ const crmFiles = walk(crmDir).filter(f => path.basename(f) !== "opsContract.test
 // "Receptionist Operations must share the same theme").
 const opsDir = path.join(repoRoot, "artifacts/web-agency/src/pages/ops");
 crmFiles.push(...walk(opsDir));
+// Shared CRM components are held to the same rules as the pages. The inbox
+// moved here when the two duplicate screens were collapsed into one component,
+// and a guard that only scanned `pages/` would have stopped covering the
+// single most-used CRM surface at exactly that moment.
+const crmComponentsDir = path.join(repoRoot, "artifacts/web-agency/src/components/crm");
+crmFiles.push(...walk(crmComponentsDir));
 
 console.log("\n--- O-10: no raw fetch(\"/api/...\") literal under src/pages/crm/** ---");
 {
@@ -91,6 +97,35 @@ console.log("\n--- O-10: no raw fetch(\"/api/...\") literal under src/pages/crm/
   }
   check("at least one CRM page file was scanned", crmFiles.length > 10, `${crmFiles.length} files found`);
   check("zero offending files overall", offenders === 0, `${offenders} file(s) still using raw fetch`);
+}
+
+console.log("\n--- O-10 hardening: no platform fetch or direct token read at all ---");
+{
+  // The original guard only matched a string literal starting with "/api/",
+  // which a local `const API = (p) => \`/api${p}\`` wrapper sidestepped
+  // (CrmDiscovery.tsx did exactly that until 2026-09-11). Ban the platform
+  // call itself: any bare `fetch(` — including `window.fetch(` / `.fetch(`
+  // but not the different identifier `adminFetch(` — and any direct read of
+  // the stored admin token. Pages have no business seeing the token; only
+  // src/lib/adminFetch.ts may touch either.
+  const bareFetch = /\bfetch\(/;
+  const tokenRead = /adminToken|ADMIN_TOKEN_KEY/;
+  let offenders = 0;
+  for (const file of crmFiles) {
+    const rel = path.relative(repoRoot, file).replace(/\\/g, "/");
+    const src = readFileSync(file, "utf8");
+    const fetchHit = bareFetch.test(src);
+    const tokenHit = tokenRead.test(src);
+    if (fetchHit || tokenHit) {
+      offenders++;
+      check(
+        `${rel} does not call platform fetch or read the admin token`,
+        false,
+        `${fetchHit ? "bare fetch(" : ""}${fetchHit && tokenHit ? " + " : ""}${tokenHit ? "token read" : ""}`,
+      );
+    }
+  }
+  check("zero files bypass adminFetch", offenders === 0, `${offenders} file(s)`);
 }
 
 // ── NAV_GROUPS structural checks ─────────────────────────────────────────────

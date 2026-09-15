@@ -94,7 +94,14 @@ check(
 // ── 3. Expected pairs derive from the committed folders ──────────────────────
 
 const expectedAll = readAllExpectedMigrations();
-check("the committed folders describe seventeen migrations", expectedAll.length === 17, String(expectedAll.length)); // voice 0011 voice_business_profiles; V5 voice 0007; 0008 voice_signup_jobs; 0009 per-assistant browser token columns; 0010 voice_messages + voice_notifications + transfer-contact detail; scheduling 0002 date exceptions + per-type rule overrides; 0003 tool-call idempotency key
+// Raised from eleven by voice migration 0008 (voice_signup_jobs), then to
+// thirteen by voice 0009 (per-assistant browser token columns). Derived from
+// the committed folders, so update it only alongside a reviewed migration.
+// Seventeen: voice 0010 (voice_messages + voice_notifications + transfer-contact
+// detail), voice 0011 (voice_business_profiles), scheduling 0002 (date
+// exceptions + per-type rule overrides), scheduling 0003 (tool-call idempotency
+// key).
+check("the committed folders describe seventeen migrations", expectedAll.length === 17, String(expectedAll.length));
 check(
   "expected migrations are unique by created_at",
   new Set(expectedAll.map((e) => e.createdAt)).size === expectedAll.length,

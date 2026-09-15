@@ -637,15 +637,18 @@ check(
   // P4 raised this from ten: scheduling 0001 adds calendar_connections
   // and calendar_oauth_states. V5 0007 raised it from twenty-six:
   // voice_onboarding_states, voice_beta_requests, voice_invites.
+  // Voice 0008 raised it from twenty-nine: voice_signup_jobs.
   // Update this pin ONLY alongside a reviewed migration that changes
   // the inventory.
-  // voice 0008 added voice_signup_jobs (durable registration -> CRM -> email).
+  // Voice 0009 adds columns only (per-assistant browser tokens), so it
+  // leaves this count unchanged.
   // voice 0010 added voice_messages (saved caller requests) and
   // voice_notifications (the durable post-call email outbox).
+  // scheduling 0002 added scheduling_date_exceptions.
   // voice 0011 added voice_business_profiles (primary contact and default
   // location, which the frozen intake_firms row has no columns for).
   "the committed migrations create exactly thirty-four domain tables",
-  domainTables.length === 34, // scheduling 0002: +scheduling_date_exceptions; voice 0011: +voice_business_profiles
+  domainTables.length === 34,
   domainTables.join(","),
 );
 check(

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, decimal, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,25 @@ export type TransactionMethod = typeof TRANSACTION_METHODS[number];
 export const TRANSACTION_STATUSES = ["pending", "completed", "failed", "refunded"] as const;
 export type TransactionStatus = typeof TRANSACTION_STATUSES[number];
 
+/**
+ * The one status that means the money is actually in the bank.
+ *
+ * Import this rather than writing the literal.
+ *
+ * The vocabulary above has always been the right one, and every write path —
+ * the Stripe checkout row, the Stripe webhook that settles it, and the manual
+ * payment route — stores `"completed"` when money arrives. But two read paths,
+ * the Command Center's money panel and the transactions summary, filtered on
+ * `"received"`: a value that is not in this list and that nothing has ever
+ * written. The result was a "Money received" figure that was structurally zero
+ * no matter how much the business had actually been paid, sitting next to a
+ * revenue figure elsewhere that used `"completed"` and was right.
+ *
+ * That is how two numbers answering one question came to disagree: each caller
+ * spelled the status out for itself. Naming it once is the fix.
+ */
+export const TRANSACTION_RECEIVED_STATUS: TransactionStatus = "completed";
+
 export const crmTransactions = pgTable("crm_transactions", {
   id: serial("id").primaryKey(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -22,13 +41,32 @@ export const crmTransactions = pgTable("crm_transactions", {
   dealId: integer("deal_id").notNull(),
   leadId: integer("lead_id"),
 
+  /**
+   * M5, additive and nullable: the invoice this payment settles, when it
+   * settles one.
+   *
+   * Deliberately a new NULLABLE column rather than any change to the two above.
+   * Every "money received" figure in this system sums `amount` filtered on
+   * `status` and reads neither of these keys, so nothing existing moves — and
+   * an invoice payment lands in the SAME table as every other payment rather
+   * than in a parallel ledger that would have to be reconciled by hand.
+   *
+   * Null means the payment was recorded without an invoice, which is what every
+   * row written before M5 is and what the Stripe and manual routes still write.
+   */
+  invoiceId: integer("invoice_id"),
+
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   method: text("method").notNull(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   status: text("status").default("pending").notNull(),
   receivedAt: timestamp("received_at", { withTimezone: true }),
   notes: text("notes"),
-});
+}, (table) => [
+  // The only index on this table, and it exists for one query: recomputing an
+  // invoice's settled total from the transactions that settled it.
+  index("ix_crm_transactions_invoice").on(table.invoiceId),
+]);
 
 export const insertCrmTransactionSchema = createInsertSchema(crmTransactions).omit({
   id: true, createdAt: true, updatedAt: true,

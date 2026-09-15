@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "./CrmLayout";
 import { adminFetch } from "@/lib/adminFetch";
+import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -422,17 +423,17 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              {campaignId ? "Campaign" : "All Campaigns"}
+              {campaignId ? "Sequence" : "All sequences"}
             </button>
             <span className="text-muted-foreground/40">/</span>
             <div>
               <h1 className="text-lg font-bold font-serif text-foreground leading-tight">
-                {campaignName ? `${campaignName} — Queue` : "Message Queue"}
+                {campaignName ? `${campaignName} — Queue` : MESSAGING_CONCEPTS.queue.name}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {campaignName
-                  ? `Scheduled messages for this campaign.`
-                  : "All scheduled campaign and manual messages."}
+                  ? "Every message this sequence has scheduled, one row per message per contact."
+                  : MESSAGING_CONCEPTS.queue.summary}
               </p>
             </div>
           </div>

@@ -1,8 +1,16 @@
 // P8: internal-operator diagnostics + the ONE way a firm↔Stripe mapping
-// comes to exist. Auth: the shared operator gate (in-memory bearer OR the
-// persistent `admin_session` cookie), so an operator is not signed out by a
-// restart or refused by a second instance. Every mutation is audited with
-// actor 'admin'.
+// comes to exist.
+//
+// Auth: `requireOperator` (lib/operatorGate.ts) — a per-person
+// `crm_staff_session` with its CSRF check, MFA challenge and named permission,
+// or the legacy shared admin in its bearer or persistent `admin_session`
+// cookie form while `CRM_LEGACY_BEARER_ENABLED` is not "false". The cookie
+// form is what keeps an operator signed in across a restart and across
+// instances.
+//
+// Every mutation is still audited in the voice trail with actor 'admin' (that
+// trail's actor vocabulary is fixed), and additionally in the CRM trail with
+// the real person, so full access is not unlogged access.
 //
 // Setting a subscription mapping here is deliberate design, not
 // convenience: the billing webhook refuses to attach events to firms by
@@ -19,7 +27,8 @@ import {
   voiceUsageLedger,
   voiceUsageCapStates,
 } from "@workspace/db/schema/voice";
-import { requireAdmin } from "../lib/admin-session.js";
+import { requireOperator } from "../lib/operatorGate.js";
+import { auditAction } from "../lib/staffAuth.js";
 import { recordAuditEvent } from "../lib/voiceAccounts/auditLog.js";
 import { computePeriodYm } from "../lib/voiceUsage/usageService.js";
 import { loadVoicePlanCatalogFromEnv, findPlan } from "../lib/voiceBilling/entitlements.js";
@@ -28,8 +37,12 @@ import { SUBSCRIPTION_STATES, type SubscriptionState } from "../lib/voiceBilling
 const router: IRouter = Router();
 
 // ── GET /api/admin/voice/firms/:id/diagnostics ───────────────────────────────
+//
+// Permission: `settings.read` — operational state about one firm's service,
+// the same class as `/crm/operations/jobs` and `/crm/phone/status`. Held by
+// every staff role, so anyone who can run the operation can open the page.
 
-router.get("/admin/voice/firms/:id/diagnostics", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/voice/firms/:id/diagnostics", requireOperator("settings.read"), async (req: Request, res: Response) => {
   const firmId = Number(req.params.id);
   if (!Number.isInteger(firmId)) {
     res.status(400).json({ error: "Invalid firm id." });
@@ -76,8 +89,14 @@ router.get("/admin/voice/firms/:id/diagnostics", requireAdmin, async (req: Reque
 });
 
 // ── PUT /api/admin/voice/firms/:id/subscription ──────────────────────────────
+//
+// Permission: `billing.manage`. This is not an operational read — it sets a
+// firm's plan, its subscription state, and the firm↔Stripe customer mapping
+// that every later billing event is attached by. That is billing
+// administration, and `billing.manage` is OWNER_ONLY, so it cannot be
+// side-loaded onto a non-owner by a per-person grant either.
 
-router.put("/admin/voice/firms/:id/subscription", requireAdmin, async (req: Request, res: Response) => {
+router.put("/admin/voice/firms/:id/subscription", requireOperator("billing.manage"), async (req: Request, res: Response) => {
   const firmId = Number(req.params.id);
   const body = (req.body ?? {}) as Record<string, unknown>;
   if (!Number.isInteger(firmId)) {
@@ -133,6 +152,16 @@ router.put("/admin/voice/firms/:id/subscription", requireAdmin, async (req: Requ
         subject: planCode,
         context: { state, hasStripeMapping: stripeCustomerId !== null },
       });
+    } catch {
+      // audit best-effort
+    }
+    // The voice trail's actor vocabulary is a fixed union ("owner" | "system" |
+    // "admin"), so it cannot name the person. The CRM trail can, and this is
+    // exactly the act worth attributing: falls back to an explicit
+    // "legacy-shared-bearer" label when the caller used the shared token, so
+    // the pre-cutover gap is visible rather than attributed to nobody.
+    try {
+      await auditAction(req, "voice.subscription.mapping_set", `firm:${firmId} plan:${planCode}`);
     } catch {
       // audit best-effort
     }

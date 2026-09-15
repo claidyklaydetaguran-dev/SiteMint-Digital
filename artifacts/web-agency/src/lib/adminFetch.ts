@@ -23,9 +23,37 @@
  * throw `AdminApiError` for non-2xx responses.
  */
 
+import { reportRequestFailed, reportRequestSucceeded } from "./connectionState";
+import { clearAllDrafts, setDraftOwner } from "./draftVault";
+
 export const ADMIN_TOKEN_KEY = "adminToken";
 export const ADMIN_UNAUTHORIZED_EVENT = "admin:unauthorized";
 export const ADMIN_LOGIN_PATH = "/admin";
+
+/**
+ * M1 CSRF token for the per-person staff session.
+ *
+ * The session itself lives in an httpOnly cookie the browser sends
+ * automatically — which is exactly why a cross-site page could otherwise
+ * trigger authenticated writes. The server therefore also demands this value
+ * in a header on every mutating request. It is deliberately readable by our
+ * own JavaScript and useless to anybody who cannot run script on this origin.
+ */
+export const CSRF_TOKEN_KEY = "crmStaffCsrf";
+export const CSRF_HEADER = "X-CSRF-Token";
+
+export function getCsrfToken(): string | null {
+  return storage()?.getItem(CSRF_TOKEN_KEY) ?? null;
+}
+
+export function setCsrfToken(token: string): void {
+  storage()?.setItem(CSRF_TOKEN_KEY, token);
+  unauthorizedNotified = false;
+}
+
+export function clearCsrfToken(): void {
+  storage()?.removeItem(CSRF_TOKEN_KEY);
+}
 
 export class AdminApiError extends Error {
   readonly status: number;
@@ -47,6 +75,59 @@ export function isNotProvided(err: unknown): boolean {
 /** True when the failure is an authorization failure (401/403). */
 export function isDenied(err: unknown): boolean {
   return err instanceof AdminApiError && (err.status === 401 || err.status === 403);
+}
+
+/**
+ * The permission a 403 names, or null.
+ *
+ * The CRM gate answers a signed-in person who lacks a grant with
+ * `{ error, permission }`. A 403 without that field is a different refusal —
+ * in this CRM usually the CSRF check — and must not be presented as a missing
+ * permission.
+ */
+export function missingPermission(err: unknown): string | null {
+  if (!(err instanceof AdminApiError) || err.status !== 403) return null;
+  const body = err.body;
+  if (!body || typeof body !== "object") return null;
+  const permission = (body as { permission?: unknown }).permission;
+  return typeof permission === "string" && permission.length > 0 ? permission : null;
+}
+
+/** Plain-language copy for a refusal. */
+export interface RefusalCopy {
+  title: string;
+  detail: string;
+  /** The grant the server named, when it named one. */
+  permission: string | null;
+}
+
+/**
+ * Words for a 401/403, or null when the error is not a refusal.
+ *
+ * Several different answers share those two codes and need different words: a
+ * person missing a named grant, a request the server could not verify, an
+ * unfinished multi-factor step, and a session that has ended. "You don't have
+ * access" for all of them sends people to ask an owner for a permission they
+ * may already hold.
+ */
+export function describeRefusal(err: unknown): RefusalCopy | null {
+  if (!(err instanceof AdminApiError) || (err.status !== 401 && err.status !== 403)) return null;
+  const permission = missingPermission(err);
+  if (permission) {
+    return {
+      title: "Your account doesn't have permission for this.",
+      detail: `It needs the ${permission} permission — ask an owner if you need it.`,
+      permission,
+    };
+  }
+  if (err.status === 401) {
+    const body = err.body;
+    const mfa = !!body && typeof body === "object" && (body as { mfaRequired?: unknown }).mfaRequired === true;
+    return mfa
+      ? { title: "Multi-factor verification is required.", detail: "Sign in again and complete the verification step.", permission: null }
+      : { title: "Your session has ended.", detail: "Sign in again to continue.", permission: null };
+  }
+  return { title: "This request was refused.", detail: err.message, permission: null };
 }
 
 // ── Token storage ─────────────────────────────────────────────────────────────
@@ -93,6 +174,7 @@ export function resetUnauthorizedNotice(): void {
 
 function notifyUnauthorized(): void {
   clearAdminToken();
+  clearCsrfToken();
   if (unauthorizedNotified) return;
   unauthorizedNotified = true;
   if (typeof window !== "undefined") {
@@ -102,6 +184,53 @@ function notifyUnauthorized(): void {
 
 // ── Core request ──────────────────────────────────────────────────────────────
 
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Routes whose 401 must NOT be read as "your session ended".
+ *
+ * Two groups, and neither is this workstream's to change:
+ *
+ *  - Receptionist-owned admin routes that still accept only the shared admin
+ *    credential: the invite and beta-request queues under `/api/admin/voice/`
+ *    (lib/admin-session.ts's own `requireAdmin`). The Receptionist Ops
+ *    console's routes — `/api/admin/receptionist-accounts` and
+ *    `/api/admin/voice/{firms,issues,usage,numbers}` — accept staff sessions
+ *    now, so a 401 from them means the session really ended, and they are no
+ *    longer listed.
+ *  - CLAUDE.md-protected files: `routes/phone.ts` serves the CRM's SMS and
+ *    call reads (`/crm/conversations`, `/crm/phone/*`, a lead's messages and
+ *    send paths) and `routes/intakeAgent.ts` serves `/api/intake/*`. Both keep
+ *    their own bearer-only guard, so a staff session is refused there.
+ *
+ * Without this, signing in as a person and opening the Command Center — which
+ * asks for conversations, receptionist health and voice issues as optional
+ * extras — bounced straight back to the login page. Every caller already
+ * treats these as best-effort and renders an unavailable state instead.
+ *
+ * Remove an entry the moment its route accepts staff sessions. The protected
+ * files need an owner-named authorization first; see docs/crm-ops/.
+ */
+const TRANSITIONAL_FOREIGN_AUTH: RegExp[] = [
+  /^\/api\/admin\/voice\/(invites|beta-requests)(\/|\?|$)/,
+  // The legacy Discovery Portal (`/admin/dashboard`, `/admin/submissions/:id`,
+  // linked from the CRM sidebar) reads `/api/admin/submissions`, still guarded
+  // by the shared admin credential in routes/admin.ts. Its 401 used to count as
+  // a sign-out: it wiped the CSRF token of a perfectly valid staff session, so
+  // every later change in the CRM was refused as "could not be verified" until
+  // the person signed out and in. (The portal's other calls, `/api/crm/stats`
+  // and `/api/crm/import-discovery`, accept staff sessions and stay unlisted.)
+  /^\/api\/admin\/submissions(\/|\?|$)/,
+  /^\/api\/crm\/conversations/,
+  /^\/api\/crm\/phone\//,
+  /^\/api\/crm\/leads\/\d+\/(messages|sms|call|sms-consent)/,
+  /^\/api\/intake\//,
+];
+
+function ownsSessionSignal(path: string): boolean {
+  return !TRANSITIONAL_FOREIGN_AUTH.some((re) => re.test(path));
+}
+
 export async function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers ?? undefined);
   const token = getAdminToken();
@@ -109,9 +238,41 @@ export async function adminFetch(path: string, init: RequestInit = {}): Promise<
   if (typeof init.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(path, { ...init, headers, credentials: "include" });
-  if (res.status === 401) notifyUnauthorized();
+  const method = (init.method ?? "GET").toUpperCase();
+  const csrf = getCsrfToken();
+  if (csrf && MUTATING_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
+    headers.set(CSRF_HEADER, csrf);
+  }
+  // A completed request proves the transport works, whatever the server said;
+  // a rejected fetch is the only thing that means "we could not reach it". An
+  // HTTP 500 is a server problem, not a connection problem, and telling
+  // somebody they are offline when they are not sends them to fix the wrong
+  // thing.
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, credentials: "include" });
+  } catch (err) {
+    reportRequestFailed();
+    throw err;
+  }
+  reportRequestSucceeded();
+  if (res.status === 401 && ownsSessionSignal(path)) notifyUnauthorized();
   return res;
+}
+
+/**
+ * A read that must NOT be treated as a sign-out when it 401s.
+ *
+ * Used to ask "is there a staff session?" while a legacy shared-bearer session
+ * may still be the valid one. Routing that probe through `adminFetch` would
+ * clear the stored token and fire `admin:unauthorized`, bouncing a
+ * legitimately signed-in user to the login page.
+ */
+export async function adminProbe(path: string): Promise<Response> {
+  const headers = new Headers();
+  const token = getAdminToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(path, { method: "GET", headers, credentials: "include" });
 }
 
 // ── Typed JSON helpers ────────────────────────────────────────────────────────
@@ -164,14 +325,35 @@ export function adminDelete<T>(path: string, init: RequestInit = {}): Promise<T>
  * older backend is ignored), then clear the legacy token.
  */
 export async function adminLogout(): Promise<void> {
+  // M1: end the per-person staff session first (it is the real session now),
+  // then the legacy admin cookie. A 401/404 from either is fine — the point is
+  // that the server forgets the session, not just this browser.
+  try {
+    await adminFetch("/api/crm/staff/logout", { method: "POST" });
+  } catch { /* fall through */ }
   try {
     await fetch("/api/admin/logout", { method: "POST", credentials: "include", headers: authHeaderOnly() });
   } catch {
     // Network failure must never keep a user signed in client-side.
   } finally {
     clearAdminToken();
+    clearCsrfToken();
+    // Unsent scratch content belongs to the person who typed it, and a shared
+    // machine is normal in a three-person agency. It goes at sign-out, before
+    // the next person can reach an editor — not "eventually".
+    clearAllDrafts();
     unauthorizedNotified = false;
   }
+}
+
+/**
+ * Bind preserved drafts to the signed-in person.
+ *
+ * Call this once the staff identity is known. Switching accounts on a shared
+ * machine discards the previous person's unsent content; see `draftVault`.
+ */
+export function bindDraftOwner(staffId: number | string | null): void {
+  setDraftOwner(staffId);
 }
 
 function authHeaderOnly(): HeadersInit {

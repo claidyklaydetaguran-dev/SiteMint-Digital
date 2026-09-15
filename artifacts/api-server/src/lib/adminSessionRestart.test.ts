@@ -150,12 +150,23 @@ describe("the fix: the persistent operator session survives it", () => {
 });
 
 describe("the operator routes use the shared gate", () => {
-  for (const file of ["adminVoiceNumbers.ts", "adminVoiceDiagnostics.ts", "receptionistInvites.ts", "adminVoiceIssues.ts"]) {
-    it(`${file} imports requireAdmin from admin-session and defines no bearer-only gate of its own`, () => {
+  // Every operator voice route goes through `requireOperator`, which accepts a
+  // CRM staff session with a named permission or the cookie-or-bearer
+  // `requireAdmin` path above (see operatorGate.test.ts for its ordering).
+  for (const file of [
+    "adminVoiceNumbers.ts", "adminVoiceDiagnostics.ts", "receptionistInvites.ts",
+    "adminVoiceIssues.ts", "publicBetaRequests.ts",
+  ]) {
+    it(`${file} uses requireOperator and defines no gate of its own`, () => {
       const src = readFileSync(resolve(ROUTES, file), "utf8");
-      expect(src).toMatch(/import \{[^}]*\brequireAdmin\b[^}]*\} from "\.\.\/lib\/admin-session\.js"/);
+      expect(src).toMatch(/import \{[^}]*\brequireOperator\b[^}]*\} from "\.\.\/lib\/operatorGate\.js"/);
       expect(src).not.toMatch(/function requireAdmin\s*\(/);
+      expect(src).not.toMatch(/function orLegacyAdminSession\s*\(/);
       expect(src).not.toMatch(/validateToken\(/);
+      // Every /admin route in the file is gated — none is left open.
+      const adminRoutes = src.match(/router\.(get|post|put|patch|delete)\("\/admin\/[^"]*",[^\n]*/g) ?? [];
+      expect(adminRoutes.length).toBeGreaterThan(0);
+      for (const line of adminRoutes) expect(line).toMatch(/requireOperator\("[a-z_.]+"\)/);
     });
   }
 });

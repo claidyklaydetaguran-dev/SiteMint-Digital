@@ -131,11 +131,92 @@ const INITIALIZED_DATABASE = {
 
 // ── 0. The derived inventory is the one staging is expected to hold ──────────
 
-check("the shared barrel derives 29 base tables", BARREL.length === 29, `${BARREL.length}`); // V5: +crm_admin_sessions, +crm_admin_audit_log
-check("the committed migrations derive 34 domain tables", DOMAIN.length === 34, `${DOMAIN.length}`); // V5 0007: +onboarding/beta/invites; 0008: +voice_signup_jobs; 0010: +voice_messages/+voice_notifications; 0011: +voice_business_profiles
+// V5 raised this to 29 (+crm_admin_sessions, +crm_admin_audit_log). M1 raised
+// it to 33 (crm_staff, crm_staff_sessions, crm_staff_tokens,
+// crm_staff_login_attempts). M2 raises it to 41: crm_project_milestones,
+// crm_project_updates, crm_comments, crm_attachments, crm_approvals,
+// crm_project_templates, crm_notifications, crm_scheduled_jobs — the
+// Operations, My Day and reminder-engine tables. All push-mode barrel tables
+// like every other crm_*, and additive; no existing table was altered.
+// M3 raises it to 46: crm_attachment_blobs, crm_document_requests,
+// crm_document_shares, crm_appointments, crm_appointment_attendees — the
+// document store, document requests, share links and internal calendar.
+// 54: the conversation foundation (conversations, participants, drafts,
+// per-person reads) plus inbound email (webhook events, suppressions,
+// unmatched mail, the reply-loop counter).
+// M4 raises it to 73, adding exactly 19 across five areas — every one a new
+// `crm_*` barrel table, additive, with no existing table altered:
+//   support  (3): crm_support_tickets, crm_support_messages, crm_kb_articles
+//   marketing(5): crm_marketing_segments, crm_marketing_designs,
+//                 crm_marketing_campaigns, crm_marketing_exclusions,
+//                 crm_marketing_recipients
+//   automation(4): crm_automation_rules, crm_automation_executions,
+//                 crm_automation_action_runs, crm_automation_approvals
+//   delivery (2): crm_reminder_deliveries, crm_delivery_recovery_actions
+//   portal   (5): crm_portal_accounts, crm_portal_invitations,
+//                 crm_portal_sessions, crm_portal_document_grants,
+//                 crm_portal_proposal_acceptances
+// M5 raises it to 74, adding exactly one:
+//   automation (1): crm_automation_events — the durable event log. A business
+//                   write used to hand an automation trigger straight to an
+//                   in-memory call, so a process that died in that moment lost
+//                   the event with nothing recording that it had. The row is
+//                   written first and drained by a worker, which makes the
+//                   guarantee at-least-once with dedup rather than best-effort.
+// Everything else M5 added is columns on existing tables: the marketing
+// campaign's inline audience, and support message delivery state.
+//
+// 81: seven more, in three independent pieces of work, every one a new `crm_*`
+// barrel table, additive, with no existing table altered. They are listed
+// separately rather than merged into one number so the arithmetic below can be
+// checked line by line rather than taken on trust.
+//
+//   quotes and invoices (4): crm_quotes, crm_quote_line_items, crm_invoices,
+//                 crm_invoice_line_items. The gap area 9 of
+//                 COMPLETENESS-2026-09-14.md named — "invoices and quotes not
+//                 built". A quote is priced from line items the SERVER totals
+//                 (artifacts/api-server/src/lib/crmMoney.ts, integer minor
+//                 units) and an invoice raised from an accepted one carries
+//                 those line items across. Reviewed DDL:
+//                 docs/crm-ops/schema/M5-billing.sql.
+//                 The only change to an existing table is the nullable
+//                 `crm_transactions.invoice_id` — a payment against an invoice
+//                 is an ordinary `crm_transactions` row with
+//                 TRANSACTION_RECEIVED_STATUS, so it is counted by the same
+//                 `sum(amount)` every money figure in this system already
+//                 reads, and `crmMoneyContract.test.ts` keeps being true.
+//                 That column is NOT a new table and is not in this count.
+//   contacts  (2): crm_contact_merges, crm_duplicate_dismissals — the
+//                 duplicate-review records (area 1's "no duplicate review").
+//   automation(1): crm_automation_recovery_actions — the recovery trail beside
+//                 the durable event log.
+//
+// 82: one more, additive, with no existing table altered.
+//
+//   contacts  (1): crm_lead_owner_mappings — the record of every decision that
+//                 pointed contacts carrying a free-text owner name at a member
+//                 of staff: which matching rule or which person decided, when,
+//                 and how many contacts it moved. It is what makes the mapping
+//                 of the existing owner names reviewable rather than something
+//                 that silently happened (Admin → "Unmapped lead owners").
+//                 Reviewed DDL, and the backfill that writes its first rows:
+//                 docs/crm-ops/schema/M6-lead-assignee.sql.
+//                 Its companion `crm_leads.assigned_to_staff_id` is a COLUMN on
+//                 an existing table and is not in this count.
+//
+// This number is a guard, not bookkeeping: it is what makes a table added
+// without review visible. Raise it only alongside the list above, so the
+// arithmetic can be checked rather than taken on trust.
+check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARREL.length}`);
+// Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
+// -> CRM -> email queue. The owning migration is committed and reviewed; this
+// pin is derived arithmetic over it, not an independent assertion.
+// 34: voice 0010 (+voice_messages, +voice_notifications), scheduling 0002
+// (+scheduling_date_exceptions), voice 0011 (+voice_business_profiles).
+check("the committed migrations derive 34 domain tables", DOMAIN.length === 34, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 63 public tables", // voice 0011: 34 domain + 29 barrel
-  APPLICATION.length === 63,
+  "the application owns exactly 116 public tables", // 34 domain + 82 barrel
+  APPLICATION.length === 116,
   `${APPLICATION.length}`,
 );
 check(
@@ -420,7 +501,9 @@ check(
     }
   }
   check(
-    "every one of the 29 barrel-owned tables is a required sentinel",
+    // Counted from BARREL rather than written in, so this label cannot go stale
+    // the way a hardcoded number does the next time the schema grows.
+    `every one of the ${BARREL.length} barrel-owned tables is a required sentinel`,
     allFailClosed,
     survivors.join(","),
   );

@@ -22,6 +22,7 @@ import {
   adminLoginPath,
   getAdminToken,
   resetUnauthorizedNotice,
+  adminProbe,
 } from "@/lib/adminFetch";
 
 type GuardState = "checking" | "allowed" | "denied";
@@ -40,6 +41,12 @@ async function verifyAccess(): Promise<boolean> {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
+      // M1: a per-person staff session is the primary credential. Ask for it
+      // first so the workspace reflects who is actually signed in. This is a
+      // probe, not a request: a 401 here means "no staff session", not "signed
+      // out", because the legacy bearer path may still be the valid one.
+      const staff = await adminProbe("/api/crm/staff/me");
+      if (staff.ok) return true;
       const res = await adminFetch("/api/admin/me");
       if (res.ok) return true;
       if (res.status === 404) return !!getAdminToken();

@@ -7,9 +7,16 @@ import { adminFetch } from "@/lib/adminFetch";
 
 interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
-  dueDate?:string; status:string; completedAt?:string; createdAt:string;
+  dueDate?:string; dueKind?:string; status:string; completedAt?:string; createdAt:string;
   leadName?:string; leadCompany?:string;
 }
+
+/**
+ * What the deadline means, from the task's own `dueKind` — never guessed from
+ * its clock time. Anything but the word "time" is a day, matching the server's
+ * fallback for rows written before the column existed.
+ */
+const isTimedDue = (t: Task) => t.dueKind === "time";
 
 const tabFilters = ["due-today","overdue","upcoming","completed"] as const;
 type TabFilter = typeof tabFilters[number];
@@ -30,14 +37,22 @@ export default function CrmTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabFilter>("due-today");
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await adminFetch("/api/crm/tasks");
-    if (r.status === 401) return;
-    const d = await r.json() as { tasks: Task[] };
-    setTasks(d.tasks || []);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const r = await adminFetch("/api/crm/tasks");
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const d = await r.json() as { tasks: Task[] };
+      setTasks(d.tasks || []);
+    } catch {
+      setLoadError("Couldn't load tasks. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -54,11 +69,24 @@ export default function CrmTasks() {
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  /**
+   * Late by the task's own kind: a moment is late once it has passed, a day is
+   * late only once the day has ended. Comparing every deadline to the start of
+   * today called a task due at 16:00 today "overdue" all morning; comparing
+   * every deadline to this instant called a task due "today" overdue at 00:01.
+   * Neither is a guess any more.
+   */
+  const isLate = (t: Task) => {
+    const due = t.dueDate ? new Date(t.dueDate) : null;
+    if (!due || t.status === "completed") return false;
+    return isTimedDue(t) ? due < now : due < todayStart;
+  };
+
   const filtered = tasks.filter(t => {
     const due = t.dueDate ? new Date(t.dueDate) : null;
     if (tab === "due-today") return t.status !== "completed" && due && due >= todayStart && due < todayEnd;
     if (tab === "upcoming") return t.status !== "completed" && due && due >= todayEnd;
-    if (tab === "overdue") return t.status === "overdue" || (t.status !== "completed" && due && due < todayStart);
+    if (tab === "overdue") return t.status === "overdue" || isLate(t);
     if (tab === "completed") return t.status === "completed";
     return true;
   });
@@ -67,7 +95,7 @@ export default function CrmTasks() {
     all: tasks.length,
     "due-today": tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status !== "completed" && d && d >= todayStart && d < todayEnd; }).length,
     upcoming: tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status !== "completed" && d && d >= todayEnd; }).length,
-    overdue: tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status === "overdue" || (t.status !== "completed" && d && d < todayStart); }).length,
+    overdue: tasks.filter(t => t.status === "overdue" || isLate(t)).length,
     completed: tasks.filter(t => t.status === "completed").length,
   };
 
@@ -75,6 +103,15 @@ export default function CrmTasks() {
     <CrmLayout>
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+      </div>
+    </CrmLayout>
+  );
+
+  if (loadError) return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground font-medium">{loadError}</p>
+        <button onClick={load} className="text-sm border border-input rounded-lg px-4 py-1.5 hover:bg-accent transition-colors">Retry</button>
       </div>
     </CrmLayout>
   );
@@ -124,7 +161,7 @@ export default function CrmTasks() {
           ) : (
             filtered.map(task => {
               const due = task.dueDate ? new Date(task.dueDate) : null;
-              const isOverdue = task.status !== "completed" && due && due < todayStart;
+              const isOverdue = isLate(task);
               return (
                 <div key={task.id} className={`bg-white rounded-xl border shadow-sm flex items-start gap-3 p-4 ${
                   task.status==="completed"?"border-border/60 opacity-60":isOverdue?"border-red-200":"border-border"
@@ -159,7 +196,8 @@ export default function CrmTasks() {
                           {due && (
                             <span className={`flex items-center gap-1 text-xs font-medium ${isOverdue?"text-red-600":"text-muted-foreground"}`}>
                               {isOverdue ? <AlertTriangle className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
-                              {due.toLocaleDateString()}
+                              {/* A time appears only when somebody chose one. */}
+                              {isTimedDue(task) ? due.toLocaleString() : due.toLocaleDateString()}
                               {isOverdue && " · Overdue"}
                             </span>
                           )}

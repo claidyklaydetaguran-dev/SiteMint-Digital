@@ -1,23 +1,26 @@
 import { Link, useLocation } from "wouter";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
+import { ConnectionBanner } from "@/components/crm/ConnectionBanner";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
   Search, Mail, Phone, MessageSquare, Bell, LogOut,
   ChevronDown, LayoutDashboard, X, UserPlus, Send,
   AlertCircle, ChevronRight, Check, Plus, Clock, AlertTriangle, UserCheck,
-  Home, Users, Megaphone, Share2, FolderOpen, BarChart2, Settings,
+  Home, Users, UserCog, ListChecks, Megaphone, Share2, FolderOpen, BarChart2, Settings,
   Menu, LayoutGrid, CheckSquare, Inbox, CalendarDays, Globe,
   GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon,
   Layers, Activity, Download,
   ClipboardList, Briefcase, ListTodo, TrendingUp,
-  BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft,
-  ExternalLink, Building2,
+  BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft, LifeBuoy,
+  ExternalLink, Building2, FileText, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { adminFetch, adminLogout, getAdminToken } from "@/lib/adminFetch";
+import { adminFetch, adminProbe, adminLogout, getAdminToken, bindDraftOwner } from "@/lib/adminFetch";
 import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
+import { OwnerPicker } from "@/components/crm/OwnerPicker";
+import { useCrmAssignees } from "@/lib/crmAssignees";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CrmLead {
@@ -73,7 +76,9 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Home,
     items: [
       { label: "Command Center",     href: "/admin/crm/dashboard",        icon: LayoutGrid },
-      { label: "My Day / Tasks",     href: "/admin/crm/tasks",            icon: CheckSquare },
+      { label: "My Day",             href: "/admin/crm/my-day",           icon: CheckSquare },
+      { label: "Operations",         href: "/admin/crm/operations",       icon: FolderOpen },
+      { label: "All Tasks",          href: "/admin/crm/tasks",            icon: ListChecks },
       { label: "Calendar",           href: "/admin/crm/calendar",         icon: CalendarDays },
     ],
   },
@@ -93,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Sales Workspace", href: "/admin/crm/workspace", icon: LayoutGrid },
       { label: "Contacts",     href: "/admin/crm/leads",    icon: Users },
+      { label: "Duplicate Review", href: "/admin/crm/duplicates", icon: Copy },
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },
       { label: "Transactions", href: "/admin/crm/transactions", icon: CreditCard },
@@ -102,11 +108,17 @@ const NAV_GROUPS: NavGroup[] = [
     id: "marketing",
     label: "Marketing",
     icon: Megaphone,
+    // Naming, not decoration. Two different things were both called "campaign"
+    // — one-off broadcasts and multi-step nurture sequences — and each had a
+    // "New campaign" button, so somebody wanting to send one email had to know
+    // that "Campaigns" was the wrong door. Marketing is now the front door and
+    // is listed first; the sequence system keeps its own name and its own
+    // queue, which is what it actually is.
     items: [
-      { label: "Campaigns",        href: "/admin/crm/campaigns",         icon: Zap },
-      { label: "Campaign Builder", href: "/admin/crm/campaign-builder", icon: Layers },
-      { label: "Campaign Queue",   href: "/admin/crm/campaign-queue",   icon: Activity },
-      { label: "Email Templates",  href: "/admin/crm/email-templates", icon: MailIcon },
+      { label: "Marketing",       href: "/admin/crm/campaign-builder", icon: MailIcon },
+      { label: "Sequences",       href: "/admin/crm/campaigns",        icon: Zap },
+      { label: "Sequence Queue",  href: "/admin/crm/campaign-queue",   icon: Activity },
+      { label: "Email Templates", href: "/admin/crm/email-templates",  icon: Layers },
     ],
   },
   {
@@ -125,6 +137,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Discovery CRM",  href: "/admin/crm/discovery",    icon: ClipboardList },
       { label: "Discovery Portal", href: "/admin/dashboard",      icon: Globe, exact: true },
       { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
+      { label: "Documents",      href: "/admin/crm/documents",     icon: FileText },
+      { label: "Support",        href: "/admin/crm/support",       icon: LifeBuoy },
       { label: "AI Intake Scoring",      href: "/admin/crm/intake-cases",          icon: BotMessageSquare },
       { label: "Receptionist Accounts",  href: "/admin/crm/receptionist-accounts", icon: Building2 },
     ],
@@ -155,8 +169,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Settings",
     icon: Settings,
     items: [
-      { label: "Settings",  href: "/admin/crm/settings", icon: Wrench },
-      { label: "Admin Hub", href: "/admin/crm/admin",    icon: LayoutDashboard },
+      { label: "Settings",   href: "/admin/crm/settings", icon: Wrench },
+      { label: "People",     href: "/admin/crm/people",   icon: Users },
+      { label: "My Account", href: "/admin/crm/account",  icon: UserCog },
+      { label: "Admin Hub",  href: "/admin/crm/admin",    icon: LayoutDashboard },
     ],
   },
 ];
@@ -592,7 +608,9 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
 function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClose: () => void; onCreated: () => void }) {
   const [step, setStep] = useState<"search" | "form">("search");
   const [q, setQ] = useState("");
-  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedTo:"", notes:"" });
+  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedToStaffId: null as number | null, notes:"" });
+  // M6: a picker over real staff accounts, not three names typed into the source.
+  const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
   const [dupWarning, setDupWarning] = useState("");
 
@@ -674,7 +692,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                 <input type={type} placeholder={ph}
                   className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  value={(form as Record<string, string>)[key]}
+                  value={String(form[key as keyof typeof form] ?? "")}
                   onChange={e => {
                     const v = e.target.value;
                     setForm(f => ({ ...f, [key]: v }));
@@ -700,14 +718,16 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-              <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
-                value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                <option value="">Unassigned</option>
-                <option>Claidy Taguran</option>
-                <option>Shasta Greene</option>
-                <option>Saisa Lorraigne</option>
-              </select>
+              <label htmlFor="quick-add-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+              <OwnerPicker
+                id="quick-add-owner"
+                value={form.assignedToStaffId}
+                onChange={next => setForm(f => ({ ...f, assignedToStaffId: typeof next === "number" ? next : null }))}
+                assignees={people.assignees}
+                loading={people.loading}
+                error={people.error}
+                onRetry={people.reload}
+              />
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setStep("search")} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Back</button>
@@ -960,6 +980,31 @@ function SidebarContent({
 export function CrmLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [modal, setModal] = useState<"email" | "phone" | "sms" | "person" | "bell" | "profile" | null>(null);
+
+  // M1: show who is actually signed in. Falls back to the generic chip when
+  // the session is still the legacy shared admin, which has no person behind it.
+  const [signedIn, setSignedIn] = useState<{ displayName: string; email: string; role: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await adminProbe("/api/crm/staff/me");
+        if (!r.ok || cancelled) return;
+        const d = await r.json() as { staff?: { id?: number; displayName: string; email: string; role: string } };
+        if (d.staff) {
+          setSignedIn(d.staff);
+          // Scope preserved editor content to this person. Switching accounts
+          // on a shared machine discards the previous one's unsent text before
+          // they can reach an editor.
+          bindDraftOwner(d.staff.id ?? d.staff.email);
+        }
+      } catch { /* leave the generic chip */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const initials = signedIn
+    ? signedIn.displayName.replace(/\[[^\]]*\]/g, "").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?"
+    : "SM";
   const [allLeads, setAllLeads] = useState<CrmLead[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -1135,9 +1180,13 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
           <Menu className="w-4 h-4" />
         </button>
 
-        {/* Logo */}
+        {/* Logo — hidden below `sm`. At 375px the wordmark and the action
+            row do not both fit: the actions (compose, call, text, add, bell,
+            profile) are `shrink-0`, so they were pushed past the right edge of
+            an overflow-hidden shell, putting the profile menu (sign out, My
+            account) out of reach. The menu drawer still carries the brand. */}
         <Link href="/admin/crm">
-          <div className="cursor-pointer flex items-center shrink-0">
+          <div className="cursor-pointer hidden sm:flex items-center shrink-0">
             <SiteMintLogo variant="ops" iconSize={18} />
           </div>
         </Link>
@@ -1210,17 +1259,27 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
           <div className="relative ml-0.5" ref={profileRef}>
             <button onClick={() => setModal(m => m === "profile" ? null : "profile")}
               className="flex items-center gap-1 focus:outline-none">
-              <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-[11px] font-bold">SM</span>
+              <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center"
+                title={signedIn ? `${signedIn.displayName} (${signedIn.email})` : "Shared admin sign-in"}>
+                <span className="text-white text-[11px] font-bold">{initials}</span>
               </div>
               <ChevronDown className={`w-3 h-3 text-white/40 transition-transform ${modal === "profile" ? "rotate-180" : ""}`} />
             </button>
             {modal === "profile" && (
               <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-border z-[200] overflow-hidden py-1">
                 <div className="px-4 py-2.5 border-b border-border/60">
-                  <p className="text-xs font-semibold text-foreground">SiteMint Digital</p>
-                  <p className="text-xs text-muted-foreground">Admin</p>
+                  <p className="text-xs font-semibold text-foreground truncate">
+                    {signedIn?.displayName ?? "SiteMint Digital"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {signedIn ? signedIn.role.replace(/_/g, " ") : "Shared admin sign-in"}
+                  </p>
                 </div>
+                <Link href="/admin/crm/account">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
+                    <UserCog className="w-3.5 h-3.5 text-muted-foreground" /> My account
+                  </button>
+                </Link>
                 <Link href="/admin/crm/settings">
                   <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
                     <Settings className="w-3.5 h-3.5 text-muted-foreground" /> Settings
@@ -1281,6 +1340,9 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main content ── */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
+          {/* Above the breadcrumbs so a connection problem is visible on every
+              CRM screen rather than only where somebody remembered to add it. */}
+          <ConnectionBanner />
           <CrmBreadcrumbs location={location} />
           <CrmErrorBoundary>
             {children}

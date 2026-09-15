@@ -76,12 +76,33 @@ function DealCard({ deal, onDragStart, onDelete, onEdit }: {
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="font-semibold text-sm text-foreground leading-snug flex-1">{deal.name}</p>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button onClick={() => onEdit(deal)} className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors">
-            <Edit2 className="w-3 h-3" />
+        {/*
+          Edit and delete used to be `opacity-0 group-hover:opacity-100` at
+          24px. On a touch screen there is no hover, so they were not merely
+          small — they were invisible and unreachable, and a phone user could
+          not edit or delete a deal at all.
+
+          The reveal is now keyed on `(hover: hover)` rather than on screen
+          width: what decides is whether the device can hover, not how wide it
+          is. A hover-capable device keeps the tidy reveal; everything else
+          shows the controls permanently at a 40px target.
+        */}
+        <div className="flex items-center gap-1 shrink-0 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
+          <button
+            type="button"
+            aria-label={`Edit ${deal.name}`}
+            onClick={() => onEdit(deal)}
+            className="w-10 h-10 [@media(hover:hover)]:w-7 [@media(hover:hover)]:h-7 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+          >
+            <Edit2 className="w-4 h-4 [@media(hover:hover)]:w-3 [@media(hover:hover)]:h-3" />
           </button>
-          <button onClick={() => onDelete(deal.id)} className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-red-500 rounded transition-colors">
-            <Trash2 className="w-3 h-3" />
+          <button
+            type="button"
+            aria-label={`Delete ${deal.name}`}
+            onClick={() => onDelete(deal.id)}
+            className="w-10 h-10 [@media(hover:hover)]:w-7 [@media(hover:hover)]:h-7 flex items-center justify-center text-muted-foreground hover:text-red-500 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4 [@media(hover:hover)]:w-3 [@media(hover:hover)]:h-3" />
           </button>
         </div>
       </div>

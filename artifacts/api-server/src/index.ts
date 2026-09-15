@@ -3,6 +3,7 @@ import { runMigrations } from "stripe-replit-sync";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
+import { startCrmScheduler } from "./lib/crmScheduler.js";
 import { startSignupJobWorker } from "./lib/signupPipeline/pipeline.js";
 import { startVoiceNotificationWorker } from "./lib/voiceNotifications/notificationOutbox.js";
 import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
@@ -57,6 +58,13 @@ if (Number.isNaN(port) || port <= 0) {
 function startBackgroundWorkers(): void {
   // Campaign auto-send scheduler (60-second tick)
   startScheduler(60_000);
+
+  // M2: CRM reminder engine (30-second tick). This is what makes a task
+  // reminder fire with every browser closed and survive a restart — jobs are
+  // rows in crm_scheduled_jobs, claimed with FOR UPDATE SKIP LOCKED so running
+  // several instances cannot double-send. Always on: an idle tick is one
+  // indexed SELECT against an empty queue.
+  startCrmScheduler(30_000);
 
   // Registration -> CRM -> email pipeline worker (15-second tick). Always on:
   // an idle tick is one indexed SELECT, and rows only exist after a signup

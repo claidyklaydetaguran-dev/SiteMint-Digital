@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal, List, Mail } from "lucide-react";
+import { Search, Plus, RefreshCw, Download, FileDown, Users, Phone, MessageSquare, List } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
 import { LEAD_STATUSES, PROJECT_TYPES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { ownerLabel, useCrmAssignees } from "@/lib/crmAssignees";
+import { OwnerPicker } from "@/components/crm/OwnerPicker";
 
 const STATUSES = [...LEAD_STATUSES];
 const SERVICE_TYPES = [...PROJECT_TYPES];
@@ -39,6 +41,8 @@ interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
   status: string; priority: string; source: string; serviceInterest?: string;
   assignedTo?: string; nextFollowUpAt?: string | null; lastContactedAt?: string | null;
+  /** M6: the staff reference the product reads; `assignedTo` is the name as recorded. */
+  assignedToStaffId?: number | null;
   createdAt: string; updatedAt: string; tags: string[];
   estimatedValue?: string | null;
   proposalStatus?: string;
@@ -48,13 +52,14 @@ interface Lead {
 interface NewLeadForm {
   name: string; email: string; company: string; phone: string; website: string;
   source: string; serviceInterest: string; status: string; priority: string;
-  assignedTo: string; notes: string;
+  /** M6: a staff id from the picker — the server records that person's name beside it. */
+  assignedToStaffId: number | null; notes: string;
 }
 
 const emptyForm: NewLeadForm = {
   name:"", email:"", company:"", phone:"", website:"",
   source:"Manual Entry", serviceInterest:"", status:"New Inquiry", priority:"Medium",
-  assignedTo:"", notes:"",
+  assignedToStaffId: null, notes:"",
 };
 
 const DAY = 86_400_000;
@@ -140,6 +145,7 @@ const PRIORITY_LISTS: SmartList[] = [
 const ALL_LISTS = [...STAGE_LISTS, ...INTELLIGENCE_LISTS, ...PRIORITY_LISTS];
 
 export default function CrmLeads() {
+  const [, navigate] = useLocation();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,19 +155,35 @@ export default function CrmLeads() {
   const [activeList, setActiveList] = useState<SmartList>(STAGE_LISTS[0]);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<NewLeadForm>(emptyForm);
+  // M6: who a contact can be handed to — and whose name to show for a
+  // contact's staff reference in the list.
+  const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [importingDiscovery, setImportingDiscovery] = useState(false);
   const [importMsg, setImportMsg] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Collapsed by default on phones — at 375px the list rail crowded the rows.
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window === "undefined" || window.matchMedia("(min-width: 768px)").matches);
+  const [listQuery, setListQuery] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await adminFetch("/api/crm/leads");
-    if (r.status === 401) return;
-    const d = await r.json() as { leads: Lead[] };
-    setAllLeads(d.leads || []);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const r = await adminFetch("/api/crm/leads");
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const d = await r.json() as { leads: Lead[] };
+      setAllLeads(d.leads || []);
+    } catch {
+      setLoadError("Couldn't load leads. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -216,6 +238,9 @@ export default function CrmLeads() {
     setFilterPriority("");
   };
 
+  const matchesListQuery = (list: SmartList) =>
+    !listQuery || list.label.toLowerCase().includes(listQuery.toLowerCase());
+
   const createLead = async () => {
     const errors: { name?: string; email?: string } = {};
     if (!form.name.trim()) errors.name = "Full name is required.";
@@ -234,6 +259,49 @@ export default function CrmLeads() {
       const d = await r.json().catch(() => ({})) as { error?: string };
       setFormErrors({ name: d.error || "Failed to create lead. Please try again." });
     }
+  };
+
+  /**
+   * Export exactly the list on screen.
+   *
+   * The ids of the currently-visible rows are sent rather than the filter
+   * values, because several of these smart lists are computed in the browser
+   * from the lead score — "score ≥ 80" has no server-side equivalent, and
+   * exporting "everything with status X" while somebody is looking at that list
+   * would be a different file wearing the right name.
+   *
+   * The response is fetched rather than linked so the request carries the
+   * session, and so a refusal (this needs `data.export`, which not every role
+   * holds) can be shown instead of opening a page of JSON.
+   */
+  const exportVisible = async () => {
+    if (leads.length === 0) return;
+    setExporting(true); setExportMsg("");
+    try {
+      const ids = leads.map(l => l.id).join(",");
+      const r = await adminFetch(`/api/crm/contacts/export.csv?ids=${ids}`);
+      if (r.status === 401) { setExporting(false); return; }
+      if (r.status === 403) {
+        setExportMsg("You do not have permission to export contacts.");
+        setExporting(false);
+        setTimeout(() => setExportMsg(""), 6000);
+        return;
+      }
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sitemint-contacts-${activeList.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportMsg(`Exported ${r.headers.get("X-Export-Rows") ?? leads.length} contacts`);
+      setTimeout(() => setExportMsg(""), 5000);
+    } catch {
+      setExportMsg("The export could not be produced.");
+      setTimeout(() => setExportMsg(""), 6000);
+    }
+    setExporting(false);
   };
 
   const importDiscovery = async () => {
@@ -265,7 +333,8 @@ export default function CrmLeads() {
                 <input
                   className="w-full pl-6 pr-2 py-1.5 text-xs border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-foreground/20"
                   placeholder="Search lists…"
-                  readOnly
+                  value={listQuery}
+                  onChange={e => setListQuery(e.target.value)}
                 />
               </div>
             </div>
@@ -273,7 +342,7 @@ export default function CrmLeads() {
             <div className="flex-1 p-2 space-y-0.5">
               {/* Stage-based lists */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 py-1.5">By Stage</p>
-              {STAGE_LISTS.map(list => {
+              {STAGE_LISTS.filter(matchesListQuery).map(list => {
                 const count = countFor(list);
                 const isActive = activeList.label === list.label;
                 return (
@@ -294,7 +363,7 @@ export default function CrmLeads() {
 
               {/* Intelligence-based lists */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 py-1.5 mt-3">Intelligence</p>
-              {INTELLIGENCE_LISTS.map(list => {
+              {INTELLIGENCE_LISTS.filter(matchesListQuery).map(list => {
                 const count = countFor(list);
                 const isActive = activeList.label === list.label;
                 return (
@@ -315,7 +384,7 @@ export default function CrmLeads() {
 
               {/* Priority-based lists */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 py-1.5 mt-3">By Priority</p>
-              {PRIORITY_LISTS.map(list => {
+              {PRIORITY_LISTS.filter(matchesListQuery).map(list => {
                 const count = countFor(list);
                 const isActive = activeList.label === list.label;
                 return (
@@ -357,11 +426,22 @@ export default function CrmLeads() {
                   {importMsg}
                 </span>
               )}
-              <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-8">
+              {exportMsg && (
+                <span className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                  {exportMsg}
+                </span>
+              )}
+              <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
                 <Download className="w-3.5 h-3.5" />
                 {importingDiscovery ? "Importing…" : "Import"}
               </Button>
-              <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => setShowCreate(true)}>
+              <Button variant="outline" size="sm" onClick={exportVisible} disabled={exporting || leads.length === 0}
+                title={`Export the ${leads.length} contact(s) in "${activeList.label}"`}
+                className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
+                <FileDown className="w-3.5 h-3.5" />
+                {exporting ? "Exporting…" : `Export ${leads.length}`}
+              </Button>
+              <Button size="sm" className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8" onClick={() => setShowCreate(true)}>
                 <Plus className="w-3.5 h-3.5" /> + New Lead
               </Button>
             </div>
@@ -394,26 +474,15 @@ export default function CrmLeads() {
               <option value="">All Priorities</option>
               {PRIORITIES.map(p => <option key={p}>{p}</option>)}
             </select>
-            <button className="flex items-center gap-1 text-xs border border-card-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors text-muted-foreground">
-              <SlidersHorizontal className="w-3 h-3" /> Columns
-            </button>
-            <button className="text-xs border border-card-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors text-muted-foreground">Me ▾</button>
-            <Button variant="ghost" size="sm" onClick={load} className="px-2 h-8">
+            <Button variant="ghost" size="sm" onClick={load} className="px-3 h-11 [@media(hover:hover)]:px-2 [@media(hover:hover)]:h-8">
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
           </div>
 
-          {/* Bulk action strip */}
+          {/* Result count strip */}
           {leads.length > 0 && (
             <div className="bg-muted border-b border-border px-4 py-1.5 flex items-center gap-3">
               <span className="text-xs text-muted-foreground">Showing {leads.length} of {allLeads.length}</span>
-              <div className="flex items-center gap-2 ml-auto">
-                {[{icon: Mail, label:"Email"},{icon: Phone, label:"Call"},{icon: MessageSquare, label:"Text"},{icon: Users, label:"Assign"}].map(({icon: Icon, label}) => (
-                  <button key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent transition-colors">
-                    <Icon className="w-3 h-3" /> {label}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
@@ -461,6 +530,11 @@ export default function CrmLeads() {
                   </tbody>
                 </table>
               </>
+            ) : loadError ? (
+              <div className="py-16 text-center">
+                <p className="text-muted-foreground font-medium">{loadError}</p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={load}>Retry</Button>
+              </div>
             ) : leads.length === 0 ? (
               <div className="py-16 text-center">
                 <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
@@ -480,8 +554,12 @@ export default function CrmLeads() {
                 <div className="md:hidden divide-y divide-border/40">
                   {leads.map(lead => {
                     const health = scoreMap.get(lead.id);
+                    // Not a <Link>: the card contains a tel: anchor, and nested
+                    // <a> elements are invalid HTML (hydration errors on mobile).
                     return (
-                      <Link key={lead.id} href={`/admin/crm/leads/${lead.id}`}>
+                      <div key={lead.id} role="link" tabIndex={0}
+                        onClick={() => navigate(`/admin/crm/leads/${lead.id}`)}
+                        onKeyDown={e => { if (e.key === "Enter") navigate(`/admin/crm/leads/${lead.id}`); }}>
                         <div className="p-4 flex items-start gap-3 active:bg-accent cursor-pointer">
                           <div className={`w-9 h-9 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
                             <span className="text-white text-xs font-bold">{initials(lead.name)}</span>
@@ -512,7 +590,7 @@ export default function CrmLeads() {
                             </a>
                           )}
                         </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -566,7 +644,6 @@ export default function CrmLeads() {
                             {lead.lastContactedAt ? (
                               <div>
                                 <p className="text-muted-foreground">{timeAgo(lead.lastContactedAt)}</p>
-                                <p className="text-[10px] text-muted-foreground/60">{normalizeLeadStatus(lead.status) === "Follow-Up Needed" ? "Outgoing call" : "Email"}</p>
                               </div>
                             ) : (
                               <span className="text-muted-foreground/40 text-xs">Never</span>
@@ -581,18 +658,27 @@ export default function CrmLeads() {
                         <td className="px-4 py-2.5">
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>{normalizeLeadStatus(lead.status)}</span>
                         </td>
-                        {/* Assigned */}
+                        {/* Assigned — M6: the staff reference decides; a recorded name that matches nobody is shown as exactly that */}
                         <td className="px-4 py-2.5">
-                          {lead.assignedTo ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-5 h-5 rounded-full ${avatarColor(lead.assignedTo)} flex items-center justify-center shrink-0`}>
-                                <span className="text-white text-[8px] font-bold">{initials(lead.assignedTo)}</span>
+                          {(() => {
+                            const owner = ownerLabel(lead, people.assignees);
+                            if (!owner.label) return <span className="text-xs text-muted-foreground/40">—</span>;
+                            return owner.resolved ? (
+                              <div className="flex items-center gap-1.5 min-w-0" title={owner.label}>
+                                <div className={`w-5 h-5 rounded-full ${avatarColor(owner.label)} flex items-center justify-center shrink-0`}>
+                                  <span className="text-white text-[8px] font-bold">{initials(owner.label)}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground truncate max-w-[70px]">{owner.label.split(" ")[0]}</span>
                               </div>
-                              <span className="text-xs text-muted-foreground truncate max-w-[70px]">{lead.assignedTo.split(" ")[0]}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground/40">—</span>
-                          )}
+                            ) : (
+                              <div className="flex items-center gap-1.5 min-w-0" title={`Recorded as “${owner.label}”, which does not match a person yet`}>
+                                <div className="w-5 h-5 rounded-full border border-dashed border-border flex items-center justify-center shrink-0">
+                                  <span className="text-muted-foreground text-[9px] font-bold">?</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground italic truncate max-w-[70px]">{owner.label.split(" ")[0]}</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         {/* Phone */}
                         <td className="px-4 py-2.5">
@@ -674,14 +760,17 @@ export default function CrmLeads() {
                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                    <option value="">Unassigned</option>
-                    <option>Claidy Taguran</option>
-                    <option>Shasta Greene</option>
-                    <option>Saisa Lorraigne</option>
-                  </select>
+                <div className="min-w-0">
+                  <label htmlFor="new-lead-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+                  <OwnerPicker
+                    id="new-lead-owner"
+                    value={form.assignedToStaffId}
+                    onChange={next => setForm(f => ({ ...f, assignedToStaffId: typeof next === "number" ? next : null }))}
+                    assignees={people.assignees}
+                    loading={people.loading}
+                    error={people.error}
+                    onRetry={people.reload}
+                  />
                 </div>
               </div>
               <div>

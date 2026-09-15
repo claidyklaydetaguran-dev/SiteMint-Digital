@@ -455,6 +455,12 @@ export async function processScheduledMessages(): Promise<{
             title: taskTitle,
             description: taskDesc,
             dueDate: msg.scheduledAt ?? new Date(),
+            // Stated rather than left to the column default, which is "date":
+            // a campaign step's send time IS a moment somebody scheduled, and
+            // this task is that moment's manual half. Everything else that
+            // creates a task derives its due date from a day offset and means
+            // a day, so the default is right for them and wrong for this.
+            dueKind: "time",
             status: "pending",
             createdBy: "campaign-automation",
           }).returning({ id: crmTasks.id });

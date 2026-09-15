@@ -4,12 +4,12 @@
 //
 // Also carries the admin side of invite management (create / list) — kept
 // in the same file because both halves are "invites", and the admin routes
-// use the shared cookie-or-bearer requireAdmin from lib/admin-session.ts.
+// use the shared operator gate, `requireOperator` from lib/operatorGate.ts.
 
 import { Router, type Request, type Response } from "express";
 import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import { createSession, COOKIE_NAME, COOKIE_OPTIONS } from "../lib/receptionistAuth.js";
-import { requireAdmin } from "../lib/admin-session.js";
+import { requireOperator } from "../lib/operatorGate.js";
 import { isInviteSignupEnabled, INVITE_SIGNUP_DISABLED_MESSAGE } from "../lib/publicWriteFlags.js";
 import { consumeInviteCode, attachInviteToFirm, createInvite, listInvites, resolveInviteTtlMs } from "../lib/voiceInvites/inviteService.js";
 import { createFirmForInviteSignup } from "../lib/voiceInvites/inviteSignup.js";
@@ -107,7 +107,7 @@ router.post("/receptionist/auth/invite-signup", async (req: Request, res: Respon
 
 // ── Admin: invite management ──────────────────────────────────────────────────
 
-router.post("/admin/voice/invites", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/voice/invites", requireOperator("settings.write"), async (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const email = typeof body.email === "string" && body.email.trim().length > 0 ? body.email.trim() : null;
   const note = typeof body.note === "string" && body.note.trim().length > 0 ? body.note.trim().slice(0, 500) : null;
@@ -124,7 +124,7 @@ router.post("/admin/voice/invites", requireAdmin, async (req: Request, res: Resp
   }
 });
 
-router.get("/admin/voice/invites", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/voice/invites", requireOperator("settings.read"), async (req: Request, res: Response) => {
   try {
     const items = await listInvites();
     res.json({ items, count: items.length });

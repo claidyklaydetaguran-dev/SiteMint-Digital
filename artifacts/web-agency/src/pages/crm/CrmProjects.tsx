@@ -130,18 +130,27 @@ export default function CrmProjectsPage() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const savingRef = useRef(false);
 
+  const [loadError, setLoadError] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [pRes, lRes] = await Promise.all([
-      adminFetch("/api/crm/projects"),
-      adminFetch("/api/crm/leads"),
-    ]);
-    if (pRes.status === 401) return;
-    const pData = await pRes.json() as { projects: Project[] };
-    const lData = await lRes.json() as { leads: Lead[] };
-    setProjects(pData.projects || []);
-    setLeads(lData.leads || []);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const [pRes, lRes] = await Promise.all([
+        adminFetch("/api/crm/projects"),
+        adminFetch("/api/crm/leads"),
+      ]);
+      if (pRes.status === 401) return;
+      if (!pRes.ok || !lRes.ok) throw new Error("Request failed");
+      const pData = await pRes.json() as { projects: Project[] };
+      const lData = await lRes.json() as { leads: Lead[] };
+      setProjects(pData.projects || []);
+      setLeads(lData.leads || []);
+    } catch {
+      setLoadError("Couldn't load projects. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -239,6 +248,11 @@ export default function CrmProjectsPage() {
             {PROJECT_STAGES.slice(0, 6).map(s => (
               <div key={s} className="w-64 shrink-0 bg-muted rounded-xl animate-pulse h-48" />
             ))}
+          </div>
+        ) : loadError ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16">
+            <p className="text-muted-foreground font-medium">{loadError}</p>
+            <button onClick={load} className="text-sm border border-input rounded-lg px-4 py-1.5 hover:bg-accent transition-colors">Retry</button>
           </div>
         ) : (
           <div className="flex-1 flex gap-4 p-5 overflow-x-auto overflow-y-hidden">

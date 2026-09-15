@@ -10,6 +10,7 @@
  */
 
 import { RefreshCw } from "lucide-react";
+import { describeRefusal } from "@/lib/adminFetch";
 
 // ── Loading / empty / error / denied / not-provided states ────────────────────
 
@@ -44,10 +45,17 @@ export function OpsError({ message, onRetry }: { message: string; onRetry: () =>
   );
 }
 
-export function OpsDenied() {
+/**
+ * A refusal, said precisely. Pass the error the request failed with, and a
+ * signed-in person who lacks a named grant is told which one — rather than a
+ * generic "no access" that sends them to ask an owner for the wrong thing.
+ */
+export function OpsDenied({ error }: { error?: unknown }) {
+  const refusal = describeRefusal(error);
   return (
-    <div className="bg-muted border border-border rounded-xl p-4 text-sm text-muted-foreground">
-      You don't have access to this.
+    <div role="status" className="bg-muted border border-border rounded-xl p-4 text-sm text-muted-foreground min-w-0">
+      <p className="font-medium text-foreground">{refusal?.title ?? "You don't have access to this."}</p>
+      {refusal?.detail && <p className="mt-1 break-words">{refusal.detail}</p>}
     </div>
   );
 }

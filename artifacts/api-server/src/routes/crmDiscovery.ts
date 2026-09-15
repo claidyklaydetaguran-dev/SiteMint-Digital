@@ -5,17 +5,16 @@ import {
 import type { DiscoverySubmission } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const token = auth.substring(7);
-  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+// M1 cutover: the CRM gate now accepts a per-person staff session first and
+// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
+// is not "false". Keeping the name leaves every route below unchanged, and
+// the route-security manifest still reads "admin" for them.
+const requireAdmin = requireCrmAuth();
 
 // ── Task templates (mirrors crmProjects.ts) ───────────────────────────────────
 const DISCOVERY_TASK_TEMPLATES: Record<string, string[]> = {
@@ -277,7 +276,7 @@ router.patch("/crm/discovery-submissions/:id", requireAdmin, async (req: Request
 
 // ── DELETE /api/crm/discovery-submissions/:id ─────────────────────────────────
 
-router.delete("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/discovery-submissions/:id", requireCrmAuth("leads.delete"), async (req: Request, res: Response) => {
   const id = Number(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -286,6 +285,7 @@ router.delete("/crm/discovery-submissions/:id", requireAdmin, async (req: Reques
     .returning();
 
   if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+  await auditAction(req, "discovery_submission.deleted", `submission:${id} ${deleted.companyName ?? ""}`.trim());
   res.json({ ok: true });
 });
 

@@ -23,7 +23,9 @@ import { join } from "node:path";
 /** How a mutating route is allowed to be reachable. */
 export type Protection =
   | "admin" // CRM/admin bearer token middleware
+  | "staff" // M1: per-person CRM staff session + CSRF + permission grant
   | "session" // receptionist httpOnly-cookie session
+  | "portal" // M4: customer portal httpOnly-cookie session, scoped to ONE contact
   | "signature" // provider webhook with a verified signature
   | "credential" // validates a credential presented in the request itself
   | "token-proven" // single-use emailed token proves the caller
@@ -51,16 +53,40 @@ const ANY_ROUTE = /(?:router|app)\.(get|post|put|patch|delete|all|use)\(\s*(["'`
 
 /** Middleware names that establish protection when they appear in the chain. */
 const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
+  // `requireStaff()` / `requireStaff("projects.write")` — resolves the
+  // crm_staff_session cookie, enforces CSRF on mutations, enforces the MFA
+  // challenge, and enforces the named permission. Listed before requireAdmin
+  // so the stronger, per-person class is the one recorded.
+  [/\brequireStaff\s*\(/, "staff"],
+  // `requireCrmAuth("leads.delete")` — the transitional CRM gate: a staff
+  // session (with CSRF, MFA and the named permission) or, until
+  // CRM_LEGACY_BEARER_ENABLED=false, the legacy shared bearer. Classified
+  // "admin" because that bearer is still accepted; it becomes strictly
+  // stronger than the old guard the moment the flag is flipped.
+  [/\brequireCrmAuth\s*\(/, "admin"],
+  // `requireOperator("settings.write")` (lib/operatorGate.ts) — requireCrmAuth
+  // with the legacy admin_session cookie as a fallback for a request carrying
+  // no live staff session. Same class, for the same reason.
+  [/\brequireOperator\s*\(/, "admin"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
+  // `requirePortalAuth()` — resolves the `crm_portal_session` cookie, enforces
+  // CSRF on mutations, and narrows every query to the one contact the session
+  // belongs to. Its own class because it is neither of the other two: it is not
+  // a staff member with permissions, and it is not an intake_firms row.
+  [/\brequirePortalAuth\s*\(/, "portal"],
   [/\bvalidateTwilioWebhook\b/, "signature"],
   [/\bvalidateIntakeTwilioSignature\b/, "signature"],
 ];
 
 /** Guards applied inside the handler rather than as middleware. */
 const BODY_SIGNALS: Array<[RegExp, Protection]> = [
+  [/\brequireStaff\s*\(/, "staff"],
+  [/\brequireCrmAuth\s*\(/, "admin"],
+  [/\brequireOperator\s*\(/, "admin"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
+  [/\brequirePortalAuth\s*\(/, "portal"],
   [/\bauthenticateVapiWebhook\b/, "signature"],
   [/\bverifyTwilioSignature\b/, "signature"],
   [/\bverifyStripeSignature\b/, "signature"],
@@ -73,6 +99,13 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\bvalidateToken\s*\(/, "credential"],
   [/\bverifyPassword\b|\bbcrypt\.compare\b/, "credential"],
   [/\bcompletePasswordReset\b|\bacceptInvitation\b|\bconfirmEmailVerification\b|\bconsumeAccountToken\b/, "token-proven"],
+  // M1 staff onboarding/reset: `consumeableToken` resolves a single-use,
+  // unexpired, unrevoked invite/reset token to its staff row, and the caller
+  // marks it consumed in the same request.
+  [/\bconsumeableToken\s*\(/, "token-proven"],
+  // M1 MFA challenge: a TOTP code (or a single-use recovery code) presented in
+  // the request completes authentication.
+  [/\bverifyTotp\s*\(/, "credential"],
   [/\bisPublic(Registration|FormSubmissions|AnalyticsWrites|SchedulingRequests|BetaRequests|Demo)Enabled\b/, "feature-flag"],
   [/\bisAiToolkitCheckoutEnabled\b/, "feature-flag"],
   [/\bisPasswordResetRequestsEnabled\b/, "feature-flag"],

@@ -3,16 +3,15 @@ import { db, crmProjects, crmTasks, crmLeads, crmActivities, PROJECT_STAGES } fr
 import type { ChecklistItem, ProjectLink } from "@workspace/db";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 
 const router: IRouter = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const token = auth.substring(7);
-  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+// M1 cutover: the CRM gate now accepts a per-person staff session first and
+// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
+// is not "false". Keeping the name leaves every route below unchanged, and
+// the route-security manifest still reads "admin" for them.
+const requireAdmin = requireCrmAuth();
 
 // ── Project delivery task templates by project type ───────────────────────────
 const WEB_BUILD_TASKS = [
@@ -240,12 +239,13 @@ router.patch("/crm/projects/:id", requireAdmin, async (req: Request, res: Respon
 });
 
 // ── Delete project (and its tasks) ────────────────────────────────────────────
-router.delete("/crm/projects/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/projects/:id", requireCrmAuth("projects.delete"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
     await db.delete(crmTasks).where(eq(crmTasks.projectId, id));
     await db.delete(crmProjects).where(eq(crmProjects.id, id));
+    await auditAction(req, "project.deleted", `project:${id}`);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete project" });

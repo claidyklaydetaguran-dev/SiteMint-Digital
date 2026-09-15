@@ -16,6 +16,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { validateIntakeTwilioSignature } from "../lib/intakeTwilio.js";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth } from "../lib/staffAuth.js";
 import { eq, and, asc, desc, sql, gte } from "drizzle-orm";
 import {
   db,
@@ -32,14 +33,15 @@ import { isOptOut, isOptIn, isHelp, normalizeKeyword } from "../lib/intakeOptOut
 
 const router: IRouter = Router();
 
-// ── Admin auth (local — same pattern as crm.ts) ───────────────────────────────
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth  = req.headers.authorization ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  if (!validateToken(token)) { res.status(401).json({ error: "Unauthorized" }); return; }
-  next();
-}
+// ── Admin auth (shared staff session — same gate as crm.ts) ───────────────────
+//
+// Owner-authorized change (2026-09-11), naming this file. The ONLY route here
+// that uses this guard is the read-only `GET /intake/cases` admin list, which
+// the CRM's Intake Cases screen calls; moving it onto the staff session lets
+// the Super Admin accounts read it as themselves and lets restricted roles be
+// refused. The SMS webhook and every intake-pipeline behaviour below are
+// untouched — they never used this guard.
+const requireAdmin = requireCrmAuth("leads.read");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

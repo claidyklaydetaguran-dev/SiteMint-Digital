@@ -1,23 +1,33 @@
 // V5 O-6: cross-firm operator visibility — open issues, usage, and number
 // inventory. Reuses the existing per-firm services (voiceIssueService,
-// usageService) and voiceNumbers; every route here is admin-authenticated
-// (cookie-or-bearer, lib/admin-session.ts) and reads/acts ACROSS firms,
+// usageService) and voiceNumbers; every route here reads/acts ACROSS firms,
 // unlike the firm-scoped receptionist routes.
+//
+// Auth: `requireOperator` (lib/operatorGate.ts) — a per-person
+// `crm_staff_session` with its CSRF check, MFA challenge and named permission,
+// OR the legacy shared bearer and the persistent `admin_session` cookie. That
+// module explains why both halves are kept and why a live staff session is
+// judged with no fallback. It is the same gate every other operator voice
+// route uses.
 
 import { Router, type Request, type Response } from "express";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { intakeFirms } from "@workspace/db/schema";
 import { voiceIssues, voiceNumbers, voiceUsageLedger } from "@workspace/db/schema/voice";
-import { requireAdmin } from "../lib/admin-session.js";
+import { requireOperator } from "../lib/operatorGate.js";
 import { resolveVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
 import { computePeriodYm, loadUsageCapMinutesFromEnv } from "../lib/voiceUsage/usageService.js";
 
 const router = Router();
 
 // ── GET /api/admin/voice/issues ────────────────────────────────────────────────
+//
+// Permission: `settings.read` — the same class as every other operational
+// queue read in this CRM (`/crm/operations/jobs`, `/crm/automation/failures`).
+// Every staff role holds it.
 
-router.get("/admin/voice/issues", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/voice/issues", requireOperator("settings.read"), async (req: Request, res: Response) => {
   try {
     const rows = await db
       .select({
@@ -45,7 +55,13 @@ router.get("/admin/voice/issues", requireAdmin, async (req: Request, res: Respon
   }
 });
 
-router.post("/admin/voice/issues/:id/resolve", requireAdmin, async (req: Request, res: Response) => {
+// Permission: `settings.write` — clearing an item off an operational queue,
+// the same act as `/crm/operations/deliveries/:id/acknowledge` and
+// `/crm/automation/failures/:kind/:id/retry`. Deliberately a step above the
+// read: an operations manager can see what is wrong without being able to
+// declare it handled.
+
+router.post("/admin/voice/issues/:id/resolve", requireOperator("settings.write"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid issue id." });
@@ -71,7 +87,10 @@ router.post("/admin/voice/issues/:id/resolve", requireAdmin, async (req: Request
 
 // ── GET /api/admin/voice/usage ────────────────────────────────────────────────
 
-router.get("/admin/voice/usage", requireAdmin, async (req: Request, res: Response) => {
+// Permission: `settings.read`. Minutes against each firm's cap are watched in
+// order to act (pause, upgrade, stop a runaway assistant) — operational
+// monitoring. `reports.read` is this CRM's business-analytics grant.
+router.get("/admin/voice/usage", requireOperator("settings.read"), async (req: Request, res: Response) => {
   try {
     const periodParam = typeof req.query["period"] === "string" ? (req.query["period"] as string) : undefined;
     const period = periodParam && /^\d{4}-(0[1-9]|1[0-2])$/.test(periodParam) ? periodParam : computePeriodYm(new Date());
@@ -117,7 +136,9 @@ router.get("/admin/voice/usage", requireAdmin, async (req: Request, res: Respons
 
 // ── GET /api/admin/voice/numbers ──────────────────────────────────────────────
 
-router.get("/admin/voice/numbers", requireAdmin, async (req: Request, res: Response) => {
+// Permission: `settings.read` — number inventory and assignment state, the same
+// class of read as `/crm/phone/status`.
+router.get("/admin/voice/numbers", requireOperator("settings.read"), async (req: Request, res: Response) => {
   try {
     const rows = await db
       .select({

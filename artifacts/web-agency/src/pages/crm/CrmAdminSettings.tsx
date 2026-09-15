@@ -1,134 +1,118 @@
-import { useLocation, Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
-  Zap, Bot, Mail, MessageSquare, Download, Key, Globe,
-  Tag, Layers, BarChart2, Users, Settings, TestTube,
-  ChevronRight, AlertCircle,
+  Zap, Bot, Mail, MessageSquare, Download, Globe,
+  Settings, TestTube, ChevronRight, AlertCircle, CheckCircle2, Users,
 } from "lucide-react";
+import { adminFetch } from "@/lib/adminFetch";
+import { UnmappedOwnersPanel } from "@/components/crm/UnmappedOwnersPanel";
 
-const TABS = ["Overview","Action Plans","Automations","Email Templates","Text Templates","Import","Tags","Integrations","API"];
+// Honest admin hub (2026-09-11): every card links to a screen that actually
+// exists. Capabilities that are not built yet are listed as plain text in the
+// "Not built yet" section instead of rendering as dead clickable tiles.
 
 function AdminCard({ icon: Icon, title, description, color, href }: {
-  icon: React.ElementType; title: string; description: string; color: string; href?: string;
+  icon: React.ElementType; title: string; description: string; color: string; href: string;
 }) {
-  const Inner = () => (
-    <div className="bg-white rounded-xl border border-border p-4 hover:shadow-md transition-shadow cursor-pointer group h-full">
-      <div className="flex items-start gap-3">
-        <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center shrink-0`}>
-          <Icon className="w-4 h-4 text-white" />
+  return (
+    <Link href={href}>
+      <div className="h-full">
+        <div className="bg-white rounded-xl border border-border p-4 hover:shadow-md transition-shadow cursor-pointer group h-full">
+          <div className="flex items-start gap-3">
+            <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center shrink-0`}>
+              <Icon className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground group-hover:text-blue-600 transition-colors">{title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors shrink-0 mt-0.5" />
+          </div>
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-foreground group-hover:text-blue-600 transition-colors">{title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
-        </div>
-        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors shrink-0 mt-0.5" />
       </div>
-    </div>
+    </Link>
   );
-
-  if (href) {
-    return <Link href={href}><div className="h-full"><Inner /></div></Link>;
-  }
-  return <div className="h-full"><Inner /></div>;
 }
 
-const FOLLOW_UP = [
-  { icon: Zap, title: "Action Plans", description: "Send personalized drip emails, setup tasks, change stages & more.", color: "bg-blue-500" },
-  { icon: Bot, title: "Automations", description: "Trigger action plans & quick actions when a stage changes or other trigger events.", color: "bg-teal-600" },
-  { icon: Mail, title: "Email Templates", description: "View & edit email templates, see opens & click-through rates.", color: "bg-blue-600", href: "/admin/crm/email-templates" },
-  { icon: MessageSquare, title: "Text Templates", description: "View & edit text templates, track effectiveness based on reply rates.", color: "bg-sky-500" },
+const HUB_CARDS = [
+  { icon: Zap, title: "Campaigns & Sequences", description: "Broadcasts, drip sequences, enrollment, and the send queue.", color: "bg-blue-500", href: "/admin/crm/campaigns" },
+  { icon: Bot, title: "Automation Queue", description: "Workflow steps and scheduled campaign messages, org-wide.", color: "bg-teal-600", href: "/admin/crm/intelligence/automation-queue" },
+  { icon: Mail, title: "Email Templates", description: "View & edit reusable email templates.", color: "bg-blue-600", href: "/admin/crm/email-templates" },
+  { icon: Globe, title: "Discovery Inquiries", description: "Website Discovery form submissions and their pipeline status.", color: "bg-teal-500", href: "/admin/crm/discovery" },
+  { icon: Download, title: "Import", description: "CSV lead import and Discovery-to-CRM import.", color: "bg-muted-foreground", href: "/admin/crm/import" },
+  { icon: MessageSquare, title: "Phone & SMS (Twilio)", description: "Connection status, test SMS, webhooks, and phone data hygiene.", color: "bg-green-500", href: "/admin/crm/settings" },
+  { icon: Users, title: "People & permissions", description: "Individual staff accounts, roles, per-person permissions and sessions.", color: "bg-blue-600", href: "/admin/crm/people" },
 ];
 
-const ACCOUNT = [
-  { icon: Download, title: "Import", description: "Bring your old CRM over? Use our quick import tool.", color: "bg-muted-foreground", href: "/admin/crm/import" },
-];
-
-const INTEGRATIONS = [
-  { icon: Key, title: "API Keys & Lead Email", description: "Access your API keys for integrations & your unique CRM lead-capture email.", color: "bg-yellow-500" },
-  { icon: Globe, title: "Website Forms", description: "Track all your website activity and Discovery form submissions.", color: "bg-teal-500" },
-  { icon: Mail, title: "Resend Email", description: "Configure your email sender domain and manage Resend API integration.", color: "bg-blue-500" },
-  { icon: MessageSquare, title: "SMS Provider", description: "Connect Twilio or Telnyx to enable two-way text messaging with leads.", color: "bg-green-500" },
-  { icon: BarChart2, title: "All Integrations", description: "Email marketing, Zapier, and all other third-party integrations.", color: "bg-cyan-500" },
-];
-
-const CUSTOMIZE = [
-  { icon: Tag, title: "Tags", description: "See all your tags — auto-created & delete unwanted ones.", color: "bg-orange-500" },
-  { icon: Layers, title: "Stages", description: "Customize your pipeline stages to match your sales process.", color: "bg-teal-600" },
-  { icon: Globe, title: "Lead Sources", description: "Manage your lead sources and track where your business comes from.", color: "bg-teal-500" },
-  { icon: Users, title: "Users & Roles", description: "Manage team members, roles, and permissions.", color: "bg-blue-500" },
+const NOT_BUILT = [
+  "Text (SMS) template library",
+  "API keys & lead-capture email",
+  "Third-party integrations (Zapier, email marketing)",
+  "Tag management",
+  "Custom pipeline stages",
+  "Custom lead sources",
 ];
 
 export default function CrmAdminSettings() {
-  const [, navigate_] = useLocation();
+  // Live Twilio status — the old page showed a hardcoded "SMS not connected"
+  // banner regardless of reality.
+  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await adminFetch("/api/crm/phone/status");
+        if (!r.ok) return;
+        const d = await r.json() as { configured?: boolean };
+        if (!cancelled) setSmsConfigured(!!d.configured);
+      } catch { /* leave unknown */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <CrmLayout>
       <div className="max-w-screen-xl mx-auto p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-1">
+        <div className="mb-6">
           <h1 className="text-xl font-bold text-foreground">Admin</h1>
-          <button className="text-xs flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-            Admin Overview →
-          </button>
+          <p className="text-xs text-muted-foreground mt-0.5">Shortcuts to every configuration surface the CRM actually has.</p>
         </div>
 
-        {/* Sub-nav tabs */}
-        <div className="flex gap-0 border-b border-border mb-6 overflow-x-auto no-scrollbar">
-          {TABS.map((t, i) => (
-            <button key={t}
-              className={`px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors relative shrink-0 ${
-                i === 0
-                  ? "text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}>
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {/* SMS notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3 mb-6">
-          <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-yellow-900">SMS not connected</p>
-            <p className="text-xs text-yellow-700 mt-0.5">
-              Connect Twilio or Telnyx below to enable two-way text messaging with your leads. Until then, the "Text" buttons will open your device's default SMS app.
-            </p>
+        {/* SMS status — live, shown only when we know the answer */}
+        {smsConfigured === false && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3 mb-6">
+            <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-yellow-900">SMS not connected</p>
+              <p className="text-xs text-yellow-700 mt-0.5">
+                Twilio credentials are not configured. Until then, "Text" buttons open your device's default SMS app.
+                Set them up from <Link href="/admin/crm/settings" className="underline">Settings</Link>.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+        {smsConfigured === true && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3 mb-6">
+            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-green-900">SMS connected</p>
+              <p className="text-xs text-green-700 mt-0.5">Twilio is configured — two-way texting with leads is available.</p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-6">
-          {/* Follow Up */}
           <div>
-            <h2 className="text-sm font-bold text-foreground mb-3">Follow Up</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {FOLLOW_UP.map(c => <AdminCard key={c.title} {...c} />)}
-            </div>
-          </div>
-
-          {/* Account */}
-          <div>
-            <h2 className="text-sm font-bold text-foreground mb-3">Account</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {ACCOUNT.map(c => <AdminCard key={c.title} {...c} />)}
-            </div>
-          </div>
-
-          {/* Integrations */}
-          <div>
-            <h2 className="text-sm font-bold text-foreground mb-3">Integrations</h2>
+            <h2 className="text-sm font-bold text-foreground mb-3">Manage</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {INTEGRATIONS.map(c => <AdminCard key={c.title} {...c} />)}
+              {HUB_CARDS.map(c => <AdminCard key={c.title} {...c} />)}
             </div>
           </div>
 
-          {/* Customize */}
-          <div>
-            <h2 className="text-sm font-bold text-foreground mb-3">Customize</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {CUSTOMIZE.map(c => <AdminCard key={c.title} {...c} />)}
-            </div>
-          </div>
+          {/* M6: owner names on contacts that do not yet belong to a person */}
+          <UnmappedOwnersPanel />
 
           {/* Quick settings link */}
           <div className="border border-border rounded-xl p-4 bg-white flex items-center justify-between">
@@ -136,7 +120,7 @@ export default function CrmAdminSettings() {
               <Settings className="w-4 h-4 text-muted-foreground" />
               <div>
                 <p className="text-sm font-medium text-foreground">CRM Settings</p>
-                <p className="text-xs text-muted-foreground">Email test mode, notifications, and other CRM configuration.</p>
+                <p className="text-xs text-muted-foreground">System health, email mode, Twilio, webhooks, and phone data hygiene.</p>
               </div>
             </div>
             <Link href="/admin/crm/settings">
@@ -144,6 +128,17 @@ export default function CrmAdminSettings() {
                 <TestTube className="w-3 h-3" /> Open Settings
               </button>
             </Link>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-bold text-foreground mb-2">Not built yet</h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              These capabilities don't exist in the CRM today. They're listed here so nobody goes
+              looking for a screen that isn't there.
+            </p>
+            <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-5">
+              {NOT_BUILT.map(item => <li key={item}>{item}</li>)}
+            </ul>
           </div>
         </div>
       </div>

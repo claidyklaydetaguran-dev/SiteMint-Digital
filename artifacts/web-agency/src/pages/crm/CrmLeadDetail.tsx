@@ -34,13 +34,26 @@ import {
   type RiLead, type RiActivity,
 } from "@/lib/relationshipIntelligence";
 import { adminFetch } from "@/lib/adminFetch";
+import { useCrmAssignees } from "@/lib/crmAssignees";
+import CustomerTimeline from "@/components/crm/CustomerTimeline";
+import CustomerPortalPanel from "@/components/crm/CustomerPortalPanel";
+import { OwnerPicker, type OwnerChoice } from "@/components/crm/OwnerPicker";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUSES = [...LEAD_STATUSES];
 const PRIORITIES = ["Low","Medium","High"];
 const TASK_TYPES = ["Call","Email","Send Proposal","Follow Up","Check Website","Ask for Decision","Send Contract","Other"];
-const TEAM = ["Claidy Taguran","Shasta Greene","Saisa Lorraigne","Unassigned"];
+
+/**
+ * M6: what the owner picker starts on for a contact — the staff id when a
+ * person is resolved; "keep" when only an unmatched name is recorded, so that
+ * saving the status does not erase it; otherwise nobody.
+ */
+function ownerChoiceFor(lead: { assignedTo?: string | null; assignedToStaffId?: number | null }): OwnerChoice {
+  if (lead.assignedToStaffId != null) return lead.assignedToStaffId;
+  return (lead.assignedTo ?? "").trim() ? "keep" : null;
+}
 
 const statusColor: Record<string,string> = Object.fromEntries(
   LEAD_STATUSES.map(s => [s, LEAD_STATUS_STYLES[s].pill]),
@@ -110,6 +123,8 @@ function Modal({
 interface Lead {
   id:number; name:string; company?:string; phone?:string; email:string; website?:string;
   source:string; serviceInterest?:string; status:string; priority:string; assignedTo?:string;
+  /** M6: the staff member this contact belongs to; null when no person is resolved. */
+  assignedToStaffId?:number|null;
   tags:string[]; lastContactedAt?:string; nextFollowUpAt?:string; notes?:string;
   estimatedValue?:string; packageType?:string; discoveryFormStatus:string;
   proposalStatus:string; sowStatus:string; createdAt:string; updatedAt:string;
@@ -274,7 +289,7 @@ export default function CrmLeadDetail() {
     );
   }, [lead, activities, health, ciStats, discProfile, momentum]);
 
-  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"communications"|"opportunity">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline"|"history"|"tasks"|"communications"|"opportunity">("timeline");
   const [commSubTab, setCommSubTab] = useState<"sms"|"calls"|"email">("sms");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
@@ -331,7 +346,10 @@ export default function CrmLeadDetail() {
   // Edit state (sidebar)
   const [editStatus, setEditStatus] = useState("");
   const [editPriority, setEditPriority] = useState("");
-  const [editAssigned, setEditAssigned] = useState("");
+  // M6: the owner is a staff id from the picker ("keep" = leave the unmatched
+  // name that is recorded), never free text.
+  const [editOwner, setEditOwner] = useState<OwnerChoice>(null);
+  const people = useCrmAssignees();
   const [editFollowUp, setEditFollowUp] = useState("");
   const [editEstValue, setEditEstValue] = useState("");
   const [editPackage, setEditPackage] = useState("");
@@ -374,7 +392,7 @@ export default function CrmLeadDetail() {
     setTasks(d.tasks || []);
     setEditStatus(d.lead.status);
     setEditPriority(d.lead.priority);
-    setEditAssigned(d.lead.assignedTo || "");
+    setEditOwner(ownerChoiceFor(d.lead));
     setEditFollowUp(d.lead.nextFollowUpAt ? d.lead.nextFollowUpAt.substring(0,10) : "");
     setEditEstValue(d.lead.estimatedValue || "");
     setEditPackage(d.lead.packageType || "");
@@ -938,13 +956,24 @@ export default function CrmLeadDetail() {
         </div>
 
         {/* ── Main Grid ────────────────────────────────────────────────────── */}
+        {/*
+          `min-w-0` on both columns is load-bearing on a phone, not tidying.
+          A grid item defaults to `min-width: auto`, so it refuses to shrink
+          below its content's min-content width. One wide child inside then
+          sets the whole column: at 375px this grid's single column resolved to
+          618px, and because the page's <main> is `overflow-x-hidden` the page
+          did NOT scroll — it silently clipped, so 220 elements were off-screen
+          and unreachable with no scrollbar to reveal them. "No horizontal
+          scrolling" is therefore not evidence that a page fits; it can equally
+          mean the overflow is being hidden.
+        */}
         <div className="grid lg:grid-cols-[1fr_300px] gap-5">
           {/* Main panel */}
-          <div className="space-y-5">
+          <div className="space-y-5 min-w-0">
             {/* Tab panel */}
             <div className="bg-white rounded-xl border border-border shadow-sm">
               <div className="flex border-b border-border px-4 overflow-x-auto">
-                {(["timeline","tasks","communications","opportunity"] as const).map(tab => (
+                {(["timeline","history","tasks","communications","opportunity"] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -954,7 +983,8 @@ export default function CrmLeadDetail() {
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "timeline" ? "Timeline"
+                    {tab === "timeline" ? "Activity Log"
+                      : tab === "history" ? "Full History"
                       : tab === "tasks" ? `Tasks${pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}`
                       : tab === "communications" ? "Communications"
                       : "Opportunity / Project"}
@@ -1015,6 +1045,12 @@ export default function CrmLeadDetail() {
                   )}
                 </div>
               )}
+
+              {/* ── Full history tab ───
+                  The activity log above is one stream. This is every stream —
+                  messages, notes, meetings, documents, deals, projects,
+                  payments and support — merged into one order. */}
+              {activeTab === "history" && <CustomerTimeline leadId={lead.id} />}
 
               {/* ── Tasks tab ─── */}
               {activeTab === "tasks" && (
@@ -1400,7 +1436,7 @@ export default function CrmLeadDetail() {
           </div>
 
           {/* ── Sidebar ───────────────────────────────────────────────────── */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
 
             {/* ── Lead Health Score ──────────────────────────────────────── */}
             {health && (
@@ -1941,7 +1977,6 @@ export default function CrmLeadDetail() {
               {([
                 { label:"Status", value:editStatus, onChange:setEditStatus, options:STATUSES },
                 { label:"Priority", value:editPriority, onChange:setEditPriority, options:PRIORITIES },
-                { label:"Assigned To", value:editAssigned, onChange:setEditAssigned, options:TEAM },
               ] as const).map(({ label, value, onChange, options }) => (
                 <div key={label}>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
@@ -1954,6 +1989,29 @@ export default function CrmLeadDetail() {
                   </select>
                 </div>
               ))}
+              <div className="min-w-0">
+                <label htmlFor="lead-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+                <OwnerPicker
+                  id="lead-owner"
+                  value={editOwner}
+                  onChange={setEditOwner}
+                  assignees={people.assignees}
+                  loading={people.loading}
+                  error={people.error}
+                  onRetry={people.reload}
+                  currentOwner={lead.assignedToStaffId != null
+                    ? { id: lead.assignedToStaffId, label: lead.assignedTo || "Current owner" }
+                    : null}
+                  unmatchedName={lead.assignedToStaffId == null ? ((lead.assignedTo ?? "").trim() || null) : null}
+                />
+                {lead.assignedToStaffId == null && (lead.assignedTo ?? "").trim() && (
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed break-words">
+                    Recorded as “{(lead.assignedTo ?? "").trim()}”, which does not match a person in this CRM.
+                    Choose who it is here, or map the name for every contact that carries it on{" "}
+                    <Link href="/admin/crm/admin#unmapped-owners" className="underline">Admin → Unmapped lead owners</Link>.
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Next Follow-up</label>
                 <input type="date" className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={editFollowUp} onChange={e=>setEditFollowUp(e.target.value)} />
@@ -1979,7 +2037,11 @@ export default function CrmLeadDetail() {
                 disabled={saving}
                 onClick={() => saveField({
                   status: editStatus, priority: editPriority,
-                  assignedTo: editAssigned !== "Unassigned" ? editAssigned : null,
+                  // M6: the owner is sent only when it changed, and only as a
+                  // staff id; "keep" leaves an unmatched recorded name alone.
+                  ...(editOwner !== "keep" && editOwner !== ownerChoiceFor(lead)
+                    ? { assignedToStaffId: editOwner }
+                    : {}),
                   nextFollowUpAt: editFollowUp || null,
                   estimatedValue: editEstValue || null,
                   packageType: editPackage || null,
@@ -2014,6 +2076,11 @@ export default function CrmLeadDetail() {
                 </Link>
               )}
             </div>
+
+            {/* ── Customer portal ─────────────────────────────────────────── */}
+            {/* Sits directly under Pipeline Docs on purpose: both answer "what
+                has this client actually been given sight of". */}
+            <CustomerPortalPanel leadId={lead.id} contactEmail={lead.email} />
 
             {/* Lead info */}
             <div className="bg-white rounded-xl border border-border shadow-sm p-4">

@@ -4,10 +4,11 @@
 // every time the server starts. That token dies on every restart and deploy,
 // and on a deployment with more than one instance a token minted by one
 // instance is refused by the next — so an operator could sign in and still be
-// turned away assigning a number. The shared gate also accepts the persistent,
-// hashed `admin_session` cookie the same login issues, which survives both.
-// Nothing about WHO may call these routes changed: operator sign-in only, never
-// a customer session.
+// turned away assigning a number. `requireOperator` (lib/operatorGate.ts)
+// accepts a per-person CRM staff session holding the named permission, or the
+// persistent hashed `admin_session` cookie the shared login issues; both
+// survive a restart and every instance accepts them. Nothing about WHO may
+// call these routes changed: operator sign-in only, never a customer session.
 //
 // This is deliberately NOT on the customer surface. A business may read and
 // manage the numbers it holds (`receptionistNumbers.ts`); it may never
@@ -20,7 +21,7 @@
 
 import { Router, type IRouter, type Request, type Response } from "express";
 
-import { requireAdmin } from "../lib/admin-session.js";
+import { requireOperator } from "../lib/operatorGate.js";
 import { recordAuditEvent } from "../lib/voiceAccounts/auditLog.js";
 import {
   assignNumberToFirm,
@@ -73,7 +74,7 @@ async function buildDeps(): Promise<AssignDeps> {
 // Read-only. Answers the three questions a per-business list cannot: does this
 // number exist, who owns it, and does the provider already route it somewhere.
 
-router.get("/admin/voice/phone-numbers", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/voice/phone-numbers", requireOperator("settings.read"), async (req: Request, res: Response) => {
   try {
     const result = await readInventory(await buildDeps());
     if (!result.ok) {
@@ -89,7 +90,7 @@ router.get("/admin/voice/phone-numbers", requireAdmin, async (req: Request, res:
 
 // ── POST /api/admin/voice/phone-numbers/:providerNumberId/assign ─────────────
 
-router.post("/admin/voice/phone-numbers/:providerNumberId/assign", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/voice/phone-numbers/:providerNumberId/assign", requireOperator("integrations.manage"), async (req: Request, res: Response) => {
   try {
     const body = (req.body ?? {}) as { firmId?: unknown; takeOverProviderRouting?: unknown };
     const firmId = Number(body.firmId);
@@ -132,7 +133,7 @@ router.post("/admin/voice/phone-numbers/:providerNumberId/assign", requireAdmin,
 // Recovery: returns a number to stock without touching the provider, so a
 // half-finished or mistaken assignment can be undone without spending anything.
 
-router.post("/admin/voice/phone-numbers/:providerNumberId/release", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/voice/phone-numbers/:providerNumberId/release", requireOperator("integrations.manage"), async (req: Request, res: Response) => {
   try {
     const firmId = Number((req.body ?? {}).firmId);
     if (!Number.isInteger(firmId) || firmId <= 0) {

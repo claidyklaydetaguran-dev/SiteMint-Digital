@@ -1,0 +1,605 @@
+{
+  "asOf": "2026-09-15",
+  "pages": [
+    {
+      "route": "/admin",
+      "title": "Sign-in and first-run setup",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Rendered 2026-09-15 with zero console errors" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "M1 (2026-09-11): first-run bootstrap driven end to end in a browser; not repeated on the current build" },
+        "persist": { "status": "unverified", "env": [], "evidence": "A signed-in session surviving a reload is tested at the API (crmStaffAuth.test.ts), not recorded in a browser" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Wrong passwords refused and sign-in throttled in the database (crmStaffAuth.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/activate",
+      "title": "Staff invitation and password-reset landing",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "The owner's own account was activated through this page on 2026-09-14" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Activation completed: account Active and mailbox verified" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "The activated account signs in afterwards and keeps a live session" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Invitations expire and are consumed atomically; a replayed token answers 404 (crmStaffAuth.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/dashboard",
+      "title": "Legacy Discovery Portal",
+      "checks": {
+        "open": { "status": "fail", "env": [], "evidence": "Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix (c366c75), opening it also wiped the session's CSRF token and bounced the person to sign-in; it now stays open, but shows 0 leads and 0 proposals instead of saying the data could not be loaded — a misleading zero left on this superseded page" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable with a staff session" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Could not be measured as itself: a staff session was redirected to sign-in" }
+      }
+    },
+    {
+      "route": "/admin/submissions/:id",
+      "title": "Legacy submission detail",
+      "checks": {
+        "open": { "status": "fail", "env": [], "evidence": "Its data (/api/admin/submissions/:id) is guarded by the retired shared admin credential and answers 401 to a staff session, so it shows nothing; the CRM's Discovery page is the working equivalent" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable with a staff session" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Could not be measured as itself: a staff session was redirected to sign-in" }
+      }
+    },
+    {
+      "route": "/admin/crm/dashboard",
+      "title": "Command Center",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session and preview data, zero console errors (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Money panel cross-checked against the forecast and transactions: $16,000 across 4 transactions agreed" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Filters and figures after a reload not recorded" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Mine/Team scoping not exercised with a restricted user" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15, measured both before and after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/leads/:id/dna",
+      "title": "Lead DNA",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened for a named contact with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Read-only page; nothing on it was used beyond viewing" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/leads/:id",
+      "title": "Contact record",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session; Full History tab populated (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "Portal invitation issued and delivered to the controlled mailbox, redeemed, then revoked: /api/portal/me went 200 → 401" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The revocation was checked by API response, not by reloading the page" },
+        "permission": { "status": "pass", "env": ["L", "T"], "evidence": "An operations manager was refused deleting a lead, in a test and in the browser (M1)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Clipped 220 elements at 375px; re-measured after the fix with the clipped-content metric: 0" }
+      }
+    },
+    {
+      "route": "/admin/crm/leads",
+      "title": "Contacts",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session and 16 preview contacts (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Export sent exactly the 16 visible ids, and 9 when filtered to Client" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Export requires data.export; a user without it is refused (crmContacts.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/communications",
+      "title": "Communications",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/intelligence/behavioral",
+      "title": "Behavioral intelligence",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/intelligence/automation-queue",
+      "title": "Automation queue",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/inbox",
+      "title": "Inbox",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Read, assign and resolve each changed only their own fact" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "An unsent draft survived a full reload" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/tasks",
+      "title": "All tasks",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated, deadline labels kind-aware (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised on this page (tasks were created on My Day)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/calendar",
+      "title": "Calendar",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload and selecting Sep 17, the card showed the rescheduled 11:00–11:30 time, status cancelled, and “Cancellation sent” for both attendees" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/deals",
+      "title": "Deals",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "The edit dialog was opened but no change was saved in the browser" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "At 375px on a touch device the edit control was tapped and every dialog field was reachable" }
+      }
+    },
+    {
+      "route": "/admin/crm/transactions",
+      "title": "Transactions",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 4 real rows (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Total $16,000 and the count matched the list" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/projects",
+      "title": "Projects",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a populated project pipeline (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/documents",
+      "title": "Documents",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with the billing panel present (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "From the billing panel, INV-00001 was drafted from the accepted quote (POST 201, line items carried across) and issued (200). The due-date prompt was answered with its proposed default, because this browser cannot show native prompts" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/support",
+      "title": "Support",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Ticket created with an internal note and a customer reply. On candidate a3c56b3 a staff reply to SUP-00002 was recorded (POST 201) and shown as “Waiting — not sent”, with the reason: this server has no mail key" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "The reply sent from this page was read back by the customer's own session in the portal thread" },
+        "permission": { "status": "pass", "env": ["L", "T"], "evidence": "The internal note was absent from the customer view; barred by a database CHECK and a route test" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/pipeline",
+      "title": "Pipeline",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a populated pipeline (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/reporting",
+      "title": "Reporting",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 39 figures and their definitions (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Drill-down not exercised in the browser (proven by crmReports.test.ts only)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/admin",
+      "title": "Admin hub",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session on candidate a3c56b3; the Unmapped lead owners panel listed the real ambiguous name “Claidy Taguran” with both candidate accounts" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Mapped that name to the chosen account from the panel: POST answered 200 and 2 contacts were updated" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload: 7 contacts belong to a person, 0 unresolved, and 3 decisions recorded" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/workspace",
+      "title": "Sales workspace",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/campaigns",
+      "title": "Sequences",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/campaign-builder",
+      "title": "Marketing",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 13 real contacts listed and nobody pre-ticked (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient. On candidate a3c56b3 a test send rendered for a chosen contact reached the owner's mailbox (test-send 200), marked as a staff-only test" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "A change restored from the browser's kept copy was saved (PATCH 200) and, after a full reload, the campaign list and the database both held it" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts)" },
+        "recovery": { "status": "pass", "env": ["L"], "evidence": "With the autosave failing like a dropped connection, the page said “Not saved — The server did not answer… Your changes are kept in this browser until they are saved.” After a reload it offered Restore / Discard, and Restore saved the change" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/campaign-queue",
+      "title": "Sequence queue",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/discovery",
+      "title": "Discovery submissions",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Rendered populated and measured at 375px after the 10-column table fix" }
+      }
+    },
+    {
+      "route": "/admin/crm/intake-cases",
+      "title": "Intake cases",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/receptionist-accounts",
+      "title": "Receptionist accounts",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "On candidate a3c56b3 its data calls answered 200 to a staff session (401 before the fix) and it listed a [CRM-TEST] fixture firm with plan, phone and trial limit" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/email-templates",
+      "title": "Email templates",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/import",
+      "title": "Import contacts",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Upload → preview (2 to create, 2 errors with reasons, 1 ignored column) → mapping → commit: 2 created, 2 failed" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The created contacts were not checked after a reload" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "At 375px the plan table scrolls inside its own 342px container" }
+      }
+    },
+    {
+      "route": "/admin/crm/duplicates",
+      "title": "Duplicate review",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 10 real duplicate pairs (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "T"], "evidence": "A merge kept history from both sides and deleted nothing" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded after the merge" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/settings",
+      "title": "Settings",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "One unbreakable Twilio SID was clipped at 375px; re-measured after the fix with the clipped-content metric: 0" }
+      }
+    },
+    {
+      "route": "/admin/crm/people",
+      "title": "People",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised on the current build" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Self-escalation, unauthorised role changes and removing the last owner are refused (crmStaffAuth.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/account",
+      "title": "My account",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Timezone set to Asia/Manila; an invented zone was refused with 400" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "The Asia/Manila timezone persisted" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/operations",
+      "title": "Operations",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session; its tabs showed empty states, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Retry and acknowledge on the Automation tab are proven by tests only" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport with live data, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/crm/my-day",
+      "title": "My Day",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated across all five buckets (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Two tasks created, one due on a day and one at a time" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a reload, the day-only task read Today with no 00:00 and the timed one read Today 09:00" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
+        "recovery": { "status": "pass", "env": ["L"], "evidence": "A forced 500 showed an error state and Retry recovered" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Measured at a real 375×812 viewport: nothing clipped" }
+      }
+    },
+    {
+      "route": "/admin/ops/firms/:id",
+      "title": "Receptionist firm detail",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "On candidate a3c56b3 the fixture firm's diagnostics loaded with a staff session (200, 401 before the fix): usage period, calls and open issues shown, and fields the API does not send read Not reported rather than an invented value" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/ops/firms",
+      "title": "Receptionist firms",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "On candidate a3c56b3 it listed the [CRM-TEST] fixture firm with plan, conversations and health to a staff session (200, 401 before the fix)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/ops/issues",
+      "title": "Receptionist issues",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/ops/usage",
+      "title": "Receptionist usage",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/admin/ops/numbers",
+      "title": "Receptionist numbers",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
+      }
+    },
+    {
+      "route": "/portal/sign-in",
+      "title": "Portal sign-in",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Rendered with customer chrome and no staff chrome (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "The test customer entered through the invitation link, not this form" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Portal sign-in throttling not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal/accept",
+      "title": "Portal invitation landing",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Rendered from a real emailed invitation (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "Invitation delivered by the provider, password set, account became Active" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Session checked by API response, not by reloading the page" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "An invitation redeems exactly once (crmPortal.test.ts, 'redeem it once')" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal",
+      "title": "Portal home",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session; 'Review and accept' shown for the waiting quote (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "The next-action link was shown pointing at the quotes page; following it was not recorded" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Every portal read is scoped to the session's own contact; another customer's records answer 404 (crmPortal.test.ts, 12/12 isolation mutations caught)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal/projects",
+      "title": "Portal projects",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session showing that customer's own project (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Viewing only" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Scoped to the session's contact; cross-customer access answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal/documents",
+      "title": "Portal documents",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session; only granted files listed (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Downloaded Quote-QUO-00001.txt: 200, attachment disposition, nosniff, exact bytes" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Documents are default-deny through explicit grants; cross-customer access answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal/proposals",
+      "title": "Portal quotes and proposals",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session and an itemised $4,200 quote (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "T"], "evidence": "The quote was accepted in writing; the same work offered as a deal could not be accepted a second time (409)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The accepted state after a reload was proven in crmBilling.test.ts, not in the browser" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Scoped to the session's contact; another customer's quote answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal/invoices",
+      "title": "Portal invoices",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with the real customer session on candidate a3c56b3 after staff issued INV-00001: $4,200.00 outstanding, $0.00 paid to date" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "INV-00001's breakdown read and checked: Design 1 × $1,500 and Build 2 × $1,350 sum to the $4,200.00 awaiting payment, due Sep 29, 2026" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Scoped to the session's contact; cross-customer access answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    },
+    {
+      "route": "/portal/support",
+      "title": "Portal support",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session listing SUP-00002 (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "A [CRM-TEST] message added to SUP-00002 from the portal: POST answered 201 and it appeared in the thread" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload the reopened ticket showed both messages" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Tickets are scoped to the session's contact and internal notes never reach it (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller" }
+      }
+    }
+  ]
+}

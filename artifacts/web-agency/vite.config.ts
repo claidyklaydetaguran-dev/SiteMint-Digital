@@ -76,10 +76,23 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Local-only: on Replit an outer proxy maps /api to the api-server, so
+    // dev outside Replit has no backend unless this opt-in target is set
+    // (e.g. API_PROXY_TARGET=http://localhost:8080). Unset → unchanged.
+    ...(process.env.API_PROXY_TARGET
+      ? { proxy: { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: false } } }
+      : {}),
   },
   preview: {
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    // Same opt-in as `server` above. Without this the *built* application
+    // cannot reach a backend locally, so the only thing verifiable outside
+    // Replit was the dev server — and a dev-server-only check cannot catch a
+    // defect that only appears in the built chunk graph.
+    ...(process.env.API_PROXY_TARGET
+      ? { proxy: { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: false } } }
+      : {}),
   },
 });

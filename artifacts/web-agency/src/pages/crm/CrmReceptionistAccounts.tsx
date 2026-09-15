@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { CrmLayout } from "./CrmLayout";
 import { Building2, ArrowUpDown, ArrowUp, ArrowDown, Users, Zap } from "lucide-react";
-import { adminFetch } from "@/lib/adminFetch";
+import { adminFetch, adminGet, AdminApiError, describeRefusal, type RefusalCopy } from "@/lib/adminFetch";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -14,6 +14,23 @@ interface Account {
   trialConversationsLimit: number;
   conversationCount: number;
   createdAt: string;
+}
+
+interface SignupJob {
+  id: number;
+  firmId: number;
+  firmName: string | null;
+  kind: string;
+  status: string;
+  attempts: number;
+  maxAttempts: number;
+  lastError: string | null;
+  updatedAt: string;
+  crmLeadId: number | null;
+}
+interface SignupJobsResponse {
+  jobs: SignupJob[];
+  summary: { total: number; permanentlyFailed: number; retryScheduled: number; pending: number };
 }
 
 type SortKey = "createdAt" | "name" | "conversationCount" | "planTier";
@@ -50,18 +67,34 @@ export default function CrmReceptionistAccounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
+  // A 401/403 is not a failure to load; it is an answer about who is asking.
+  // Kept apart from `error` so the page can name the permission that is
+  // missing instead of "Failed to load accounts: Error: HTTP 403".
+  const [refusal,  setRefusal]  = useState<RefusalCopy | null>(null);
   const [sortKey,  setSortKey]  = useState<SortKey>("createdAt");
   const [sortDir,  setSortDir]  = useState<SortDir>("desc");
 
+  // Registration → CRM pipeline health — best-effort (older backends 404).
+  const [signupJobs, setSignupJobs] = useState<SignupJobsResponse | null>(null);
+
   useEffect(() => {
-    adminFetch("/api/admin/receptionist-accounts")
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ accounts: Account[] }>;
+    adminGet<{ accounts?: Account[] }>("/api/admin/receptionist-accounts")
+      .then((d) => setAccounts(d?.accounts ?? []))
+      .catch((e: unknown) => {
+        const refused = describeRefusal(e);
+        if (refused) setRefusal(refused);
+        else if (e instanceof AdminApiError) setError(e.message);
+        else setError("Could not reach the server. Check your connection and try again.");
       })
-      .then((d) => setAccounts(d.accounts))
-      .catch((e: unknown) => setError(String(e)))
       .finally(() => setLoading(false));
+
+    adminFetch("/api/crm/receptionist-signup-jobs")
+      .then(async (r) => {
+        if (!r.ok) return null;
+        return r.json() as Promise<SignupJobsResponse>;
+      })
+      .then((d) => setSignupJobs(d))
+      .catch(() => setSignupJobs(null));
   }, []);
 
   const sorted = useMemo(() => {
@@ -139,8 +172,9 @@ export default function CrmReceptionistAccounts() {
           </div>
         </div>
 
-        {/* Summary tiles */}
-        {!loading && (
+        {/* Summary tiles — not beside a refusal or a failure, where "0 signups"
+            would be a false statement rather than a count. */}
+        {!loading && !error && !refusal && (
           <div style={{ display: "flex", gap: 12 }}>
             {[
               { label: "Total signups", value: accounts.length, icon: Users, color: "var(--sm-teal-900)" },
@@ -161,9 +195,49 @@ export default function CrmReceptionistAccounts() {
 
       {/* ── Body ── */}
       <div style={{ padding: "24px 32px" }}>
+        {/* Registration → CRM pipeline health */}
+        {signupJobs && signupJobs.summary.permanentlyFailed > 0 && (
+          <div style={{
+            background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)",
+            borderRadius: 10, padding: "14px 18px", marginBottom: 18,
+          }}>
+            <p style={{ fontSize: 13.5, fontWeight: 700, color: "#b91c1c", margin: 0 }}>
+              {signupJobs.summary.permanentlyFailed} signup job{signupJobs.summary.permanentlyFailed !== 1 ? "s" : ""} permanently failed
+            </p>
+            <p style={{ fontSize: 12, color: "#b91c1c", margin: "3px 0 8px" }}>
+              These accounts signed up but their CRM record or email was never completed. The
+              signup pipeline owns retries — flag these to the integration owner.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {signupJobs.jobs.filter(j => j.status === "permanently_failed").slice(0, 8).map(j => (
+                <div key={j.id} style={{ fontSize: 12, color: "var(--sm-teal-900)" }}>
+                  <strong>{j.firmName ?? `Firm #${j.firmId}`}</strong> · {j.kind} ·
+                  {" "}{j.attempts}/{j.maxAttempts} attempts{j.lastError ? ` · ${j.lastError.slice(0, 120)}` : ""}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {signupJobs && signupJobs.summary.permanentlyFailed === 0 && signupJobs.summary.total > 0 && (
+          <p style={{ fontSize: 12, color: "var(--sm-slate-600)", margin: "0 0 16px" }}>
+            Registration → CRM pipeline healthy: {signupJobs.summary.total} job{signupJobs.summary.total !== 1 ? "s" : ""} tracked,
+            {" "}none permanently failed{signupJobs.summary.retryScheduled > 0 ? `, ${signupJobs.summary.retryScheduled} retrying` : ""}.
+          </p>
+        )}
+
         {loading && (
           <div className="flex items-center justify-center py-16">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
+        {refusal && (
+          <div role="status" style={{
+            background: "var(--sm-mist-100)", border: "1px solid color-mix(in oklab, var(--sm-teal-900) 12%, transparent)",
+            borderRadius: 10, padding: "16px 20px", fontSize: 13, minWidth: 0, overflowWrap: "anywhere",
+          }}>
+            <p style={{ margin: 0, fontWeight: 700, color: "var(--sm-teal-900)" }}>{refusal.title}</p>
+            <p style={{ margin: "4px 0 0", color: "var(--sm-slate-600)" }}>{refusal.detail}</p>
           </div>
         )}
 
@@ -176,7 +250,7 @@ export default function CrmReceptionistAccounts() {
           </div>
         )}
 
-        {!loading && !error && accounts.length === 0 && (
+        {!loading && !error && !refusal && accounts.length === 0 && (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             color: "var(--sm-slate-600)",
@@ -192,7 +266,10 @@ export default function CrmReceptionistAccounts() {
         {!loading && !error && accounts.length > 0 && (
           <div style={{
             background: "#fff", border: "1px solid color-mix(in oklab, var(--sm-teal-900) 9%, transparent)",
-            borderRadius: 12, overflow: "hidden",
+            // Was overflow:hidden, which clipped the table on a narrow screen rather
+            // than letting it scroll. auto keeps the rounded corners and makes the
+            // right-hand columns reachable.
+            borderRadius: 12, overflowX: "auto",
           }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>

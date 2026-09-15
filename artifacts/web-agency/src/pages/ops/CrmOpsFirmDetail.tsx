@@ -29,6 +29,8 @@ interface DiagUsage {
 
 interface DiagNumber {
   id?: number | string;
+  /** What the diagnostics route actually returns. */
+  phoneE164?: string;
   phoneNumberDisplay?: string;
   state?: string;
   assistantId?: string;
@@ -36,9 +38,14 @@ interface DiagNumber {
 
 interface Diagnostics {
   firm?: DiagFirm;
+  firmId?: number;
+  /** The route reports the usage period at the top level, not inside `usage`. */
+  period?: string;
   subscription?: DiagSubscription | null;
   usage?: DiagUsage | null;
-  capState?: { state?: string; pauseRequestedAt?: string } | null;
+  capState?: { state?: string; capMinutes?: number | null; pauseRequestedAt?: string } | null;
+  /** The route's name for the count. `openIssueCount` is what this page used to expect. */
+  openIssues?: number;
   openIssueCount?: number;
   numbers?: DiagNumber[];
 }
@@ -50,7 +57,8 @@ export default function CrmOpsFirmDetail() {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [denied, setDenied] = useState(false);
+  // The refusal itself, so the page can name the permission that is missing.
+  const [denied, setDenied] = useState<AdminApiError | null>(null);
   const [notProvided, setNotProvided] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
@@ -58,7 +66,7 @@ export default function CrmOpsFirmDetail() {
     if (!params.id) return;
     setLoading(true);
     setError(null);
-    setDenied(false);
+    setDenied(null);
     setNotProvided(false);
     try {
       const result = await adminGet<Diagnostics>(`/api/admin/voice/firms/${params.id}/diagnostics`);
@@ -67,7 +75,7 @@ export default function CrmOpsFirmDetail() {
       if (isNotProvided(err)) {
         setNotProvided(true);
       } else if (isDenied(err)) {
-        setDenied(true);
+        setDenied(err as AdminApiError);
       } else if (err instanceof AdminApiError) {
         setError(err.message);
       } else {
@@ -84,16 +92,24 @@ export default function CrmOpsFirmDetail() {
 
   const firmName = data?.firm?.name || `Firm #${params.id ?? "?"}`;
   const firstNumber = data?.numbers?.[0];
-  const openIssueCount = data?.openIssueCount ?? 0;
+  // Read the names the diagnostics route actually sends. This page used to read
+  // `openIssueCount`, `usage.period`, `usage.includedMinutes` and
+  // `phoneNumberDisplay` — none of which the route returns — so the moment staff
+  // could load it, it said "0 open issues" and showed no number whatever was
+  // true. A value the route does not report is shown as not reported, not zero.
+  const openIssueCount: number | null = data?.openIssues ?? data?.openIssueCount ?? null;
+  const usagePeriod = data?.period ?? data?.usage?.period;
+  const capMinutes = data?.capState?.capMinutes ?? data?.usage?.includedMinutes ?? null;
+  const numberDisplay = (n: DiagNumber) => n.phoneE164 || n.phoneNumberDisplay || "—";
 
   const copySummary = async () => {
     const lines = [
       `Firm: ${firmName}`,
-      `Plan: ${data?.firm?.planTier || data?.subscription?.planCode || "Not reported"}`,
+      `Plan: ${data?.subscription?.planCode || data?.firm?.planTier || "Not reported"}`,
       `Subscription state: ${data?.subscription?.state || "Not reported"}`,
-      `Usage period: ${data?.usage?.period || "Not reported"}`,
+      `Usage period: ${usagePeriod || "Not reported"}`,
       `Calls this period: ${data?.usage?.callCount ?? "Not reported"}`,
-      `Open issues: ${openIssueCount}`,
+      `Open issues: ${openIssueCount ?? "Not reported"}`,
     ];
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
@@ -125,7 +141,7 @@ export default function CrmOpsFirmDetail() {
         </div>
 
         {loading && <OpsSpinner />}
-        {!loading && denied && <OpsDenied />}
+        {!loading && denied && <OpsDenied error={denied} />}
         {!loading && !denied && notProvided && <OpsNotProvided thing="firm diagnostics" />}
         {!loading && !denied && !notProvided && error && (
           <OpsError message={error} onRetry={() => void load()} />
@@ -151,17 +167,15 @@ export default function CrmOpsFirmDetail() {
               <h2 className="text-sm font-semibold text-foreground mb-2">Assigned number</h2>
               {firstNumber ? (
                 <div className="flex items-center gap-3 flex-wrap text-sm">
-                  <span className="font-mono text-foreground">{firstNumber.phoneNumberDisplay || "—"}</span>
+                  <span className="font-mono text-foreground">{numberDisplay(firstNumber)}</span>
                   {stateBadge(firstNumber.state)}
+                  {/* Only claim an assignment the route reports. It does not
+                      send `assistantId`, so "Not assigned" was never evidence. */}
                   {firstNumber.assistantId ? (
                     <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 border border-green-200 font-semibold">
                       Assigned
                     </span>
-                  ) : (
-                    <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border font-semibold">
-                      Not assigned
-                    </span>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Not reported</p>
@@ -181,7 +195,7 @@ export default function CrmOpsFirmDetail() {
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div>
                     <dt className="text-xs text-muted-foreground">Period</dt>
-                    <dd className="text-foreground font-medium">{data.usage.period || "—"}</dd>
+                    <dd className="text-foreground font-medium">{usagePeriod || "—"}</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Calls</dt>
@@ -192,8 +206,8 @@ export default function CrmOpsFirmDetail() {
                     <dd className="text-foreground font-medium">{formatSeconds(data.usage.totalSeconds)}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted-foreground">Included minutes</dt>
-                    <dd className="text-foreground font-medium">{data.usage.includedMinutes ?? "—"}</dd>
+                    <dt className="text-xs text-muted-foreground">Minute cap</dt>
+                    <dd className="text-foreground font-medium">{capMinutes ?? "—"}</dd>
                   </div>
                 </dl>
               ) : (
@@ -203,9 +217,10 @@ export default function CrmOpsFirmDetail() {
 
             <section className="bg-white rounded-xl border border-border/60 p-4">
               <h2 className="text-sm font-semibold text-foreground mb-2">Limits</h2>
-              {data?.usage?.totalSeconds != null && data?.usage?.includedMinutes != null ? (
+              {data?.usage?.totalSeconds != null && capMinutes != null ? (
                 <p className="text-sm text-foreground">
-                  {formatSeconds(data.usage.totalSeconds)} used of {data.usage.includedMinutes} included minutes
+                  {formatSeconds(data.usage.totalSeconds)} used of a {capMinutes}-minute cap
+                  {data?.capState?.state ? ` (${data.capState.state})` : ""}
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">Not available</p>
@@ -216,7 +231,9 @@ export default function CrmOpsFirmDetail() {
               <h2 className="text-sm font-semibold text-foreground mb-2">Open issues</h2>
               <Link href={`/admin/ops/issues?firmId=${params.id ?? ""}`}>
                 <span className="text-sm text-blue-600 hover:underline cursor-pointer">
-                  {openIssueCount} open issue{openIssueCount === 1 ? "" : "s"}
+                  {openIssueCount == null
+                    ? "Open issues not reported"
+                    : `${openIssueCount} open issue${openIssueCount === 1 ? "" : "s"}`}
                 </span>
               </Link>
             </section>

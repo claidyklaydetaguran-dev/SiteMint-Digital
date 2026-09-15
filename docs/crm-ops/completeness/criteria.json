@@ -1,0 +1,263 @@
+{
+  "asOf": "2026-09-15",
+  "areas": [
+    {
+      "id": 1,
+      "name": "Contact management",
+      "criteria": [
+        { "id": "1.1", "text": "Create, view and edit a contact, and the change persists", "status": "pass", "env": ["L", "T"], "evidence": "Contacts create/edit persisted in the browser; crm.ts lead routes covered by crmM3 and journey suites" },
+        { "id": "1.2", "text": "List, search and filter contacts, including smart lists", "status": "pass", "env": ["L", "T"], "evidence": "18 smart lists on /admin/crm/leads; export sent exactly the 16 visible ids, 9 when filtered to Client" },
+        { "id": "1.3", "text": "A contact shows its complete interaction history", "status": "pass", "env": ["L", "T"], "evidence": "Full History tab on /admin/crm/leads/:id; crmHistory.test.ts" },
+        { "id": "1.4", "text": "CSV import previews before committing, maps columns explicitly, reports per-row errors and does not duplicate on re-import", "status": "pass", "env": ["L", "T"], "evidence": "crmContacts.test.ts (25 tests, 7 deliberate mutations caught); browser walk: 2 created / 2 failed with reasons" },
+        { "id": "1.5", "text": "CSV export respects the current selection and is permission-gated", "status": "pass", "env": ["L", "T"], "evidence": "Export gated on data.export; formula-injection neutralised; crmContacts.test.ts" },
+        { "id": "1.6", "text": "Likely duplicates are found and merged without losing history, with durable dismissal", "status": "pass", "env": ["L", "T"], "evidence": "/admin/crm/duplicates found 10 real pairs; merge repoints 12 history sources and deletes nothing" },
+        { "id": "1.7", "text": "Companies/accounts are modelled separately from the people who work there", "status": "fail", "env": [], "evidence": "Not built: a customer is still a lead with status Client" }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Lead management",
+      "criteria": [
+        { "id": "2.1", "text": "Leads are captured from the website and Discovery forms", "status": "pass", "env": ["L", "T"], "evidence": "Discovery intake → lead, covered by discovery and journey suites" },
+        { "id": "2.2", "text": "Lead status is tracked through the pipeline", "status": "pass", "env": ["L", "T"], "evidence": "Stage/status on lead detail; smart lists by status" },
+        { "id": "2.3", "text": "Leads are scored and prioritised", "status": "pass", "env": ["L", "T"], "evidence": "Locked leadScore engine; score shown on leads and DNA page" },
+        { "id": "2.4", "text": "Changing who owns a lead is permission-gated", "status": "pass", "env": ["T"], "evidence": "Assignment requires leads.assign; restricted users refused in crmStaffAuth.test.ts" },
+        { "id": "2.5", "text": "Leads are assigned to a staff member by reference, not free text", "status": "pass", "env": ["T"], "evidence": "crm_leads.assigned_to_staff_id is written by lead create/edit, imports and merges, and read by My Day, Command Center and the inactivity sweep; crmLeadAssignment.test.ts and every other suite green on the committed candidate a3c56b3" },
+        { "id": "2.6", "text": "Existing free-text owners are mapped by reviewed rules, with a visible list of unresolved names", "status": "pass", "env": ["L", "T"], "evidence": "M6-lead-assignee.sql and the TypeScript backfill agree on one answer table (mutation-checked both ways, green on a3c56b3). On real preview data the panel listed “Claidy Taguran” as matching two accounts, assumed nobody, and a mapping chosen there persisted after reload" }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Sales pipeline",
+      "criteria": [
+        { "id": "3.1", "text": "Deals carry a stage, value and owner", "status": "pass", "env": ["L", "T"], "evidence": "crmSales.test.ts; /admin/crm/deals edit dialog opened on a touch device" },
+        { "id": "3.2", "text": "The pipeline is visualised by stage", "status": "pass", "env": ["L"], "evidence": "/admin/crm/pipeline and deals kanban rendered with real deals" },
+        { "id": "3.3", "text": "Per-deal likelihood feeds a weighted forecast whose basis is stated", "status": "pass", "env": ["T"], "evidence": "crmSales.test.ts: deal likelihood vs stage default reported" },
+        { "id": "3.4", "text": "Won and lost outcomes are recorded, with a closed vocabulary of loss reasons", "status": "pass", "env": ["T"], "evidence": "crmSales.test.ts outcome and loss-reason tests" },
+        { "id": "3.5", "text": "A won deal converts into a project exactly once, even concurrently", "status": "pass", "env": ["L", "T"], "evidence": "3 concurrent conversions → 1 project, verified in browser and crmSales.test.ts" },
+        { "id": "3.6", "text": "Pipeline, weighted, contracted and received stay four separate figures", "status": "pass", "env": ["T"], "evidence": "crmSales.test.ts forecast separation" },
+        { "id": "3.7", "text": "Money agrees across the dashboard, forecast and transactions", "status": "pass", "env": ["L", "T"], "evidence": "$16,000 / 4 transactions agreed on three surfaces; crmMoneyContract.test.ts" }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Customer communication",
+      "criteria": [
+        { "id": "4.1", "text": "Conversations are durable, with per-person read state, assignment and resolution", "status": "pass", "env": ["L", "T"], "evidence": "Read/assign/resolve proven three independent facts in the browser; crmInbox.test.ts" },
+        { "id": "4.2", "text": "One inbox, with drafts that survive a reload", "status": "pass", "env": ["L"], "evidence": "Draft survived reload on /admin/crm/inbox" },
+        { "id": "4.3", "text": "Messages and calls record which staff member sent them", "status": "pass", "env": ["T"], "evidence": "Sender attribution 4/4 in phoneAttribution and inbox suites" },
+        { "id": "4.4", "text": "Outbound email is delivered by the real provider", "status": "pass", "env": ["L", "T", "R"], "evidence": "CRM password-setup email and portal invitation reached claidyklaydetaguran@gmail.com; Resend shows Delivered" },
+        { "id": "4.5", "text": "Bounced and complained addresses are suppressed for all mail", "status": "pass", "env": ["T"], "evidence": "crmEmailInbound.test.ts suppression and case-normalisation tests" },
+        { "id": "4.6", "text": "Reply loops are prevented", "status": "pass", "env": ["T"], "evidence": "looksAutomated + outbound loop control tests" },
+        { "id": "4.7", "text": "An inbound reply is matched to its conversation by an unforgeable token", "status": "pass", "env": ["T"], "evidence": "crmEmailInbound.test.ts token correlation, with the provider fetch mocked" },
+        { "id": "4.8", "text": "Inbound replies arrive through the real provider", "status": "fail", "env": [], "evidence": "Blocked: needs the deployed webhook, a reply.sitemintdigital.com MX record, and a full-access RESEND_RECEIVING_API_KEY" },
+        { "id": "4.9", "text": "Delivery events from the real provider update message state", "status": "fail", "env": [], "evidence": "Blocked: no Resend webhook configured; needs the deployed API" }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Tasks, activities and reminders",
+      "criteria": [
+        { "id": "5.1", "text": "Tasks have staff assignment, priority, recurrence, checklists and blocked reasons", "status": "pass", "env": ["L", "T"], "evidence": "crmOperations.test.ts (22 tests)" },
+        { "id": "5.2", "text": "My Day groups work into overdue, due today, upcoming and more", "status": "pass", "env": ["L", "T"], "evidence": "Five buckets verified in the browser and crmOperations.test.ts" },
+        { "id": "5.3", "text": "A deadline stores whether it is a day or a moment, judged in the assignee's zone, safe across DST", "status": "pass", "env": ["L", "T"], "evidence": "overdueSemantics.test.ts (18); two tasks created, page reloaded, both displayed correctly" },
+        { "id": "5.4", "text": "Each person can set their own timezone", "status": "pass", "env": ["L", "T"], "evidence": "crmStaffAuth.test.ts timezone test; Asia/Manila set and persisted in the browser" },
+        { "id": "5.5", "text": "Reminders are durable: claimed once, deduplicated, cancelled on change, retried", "status": "pass", "env": ["T"], "evidence": "Scheduled-jobs engine suites" },
+        { "id": "5.6", "text": "A failed reminder is visible with safe recovery", "status": "pass", "env": ["L", "T"], "evidence": "Delivery Issues tab; retry/resend/acknowledge distinguished in tests" },
+        { "id": "5.7", "text": "A failed request shows an error state and recovers", "status": "pass", "env": ["L"], "evidence": "Forced 500 on My Day, Retry recovered" },
+        { "id": "5.8", "text": "Usable at 375px", "status": "pass", "env": ["L"], "evidence": "My Day measured at a real 375×812 viewport: nothing clipped" }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Support and knowledge base",
+      "criteria": [
+        { "id": "6.1", "text": "Tickets carry assignment, priority and status", "status": "pass", "env": ["L", "T"], "evidence": "crmSupport.test.ts; ticket created in the browser" },
+        { "id": "6.2", "text": "Internal notes can never reach the customer", "status": "pass", "env": ["L", "T"], "evidence": "Database CHECK plus route test; internal note proven absent from the customer view" },
+        { "id": "6.3", "text": "A customer reply goes through the delivery state machine", "status": "pass", "env": ["T"], "evidence": "crmSupportDelivery.test.ts (19 tests, 10/10 mutations caught)" },
+        { "id": "6.4", "text": "Replies correlate back to the ticket by token", "status": "pass", "env": ["T"], "evidence": "Per-ticket reply token tests" },
+        { "id": "6.5", "text": "Delivery is labelled honestly", "status": "pass", "env": ["L", "T"], "evidence": "Strongest label is 'accepted by the mail provider'; unsent replies read 'Waiting — not sent'" },
+        { "id": "6.6", "text": "Knowledge-base articles can be written and published", "status": "pass", "env": ["T"], "evidence": "crmSupport.test.ts KB routes" },
+        { "id": "6.7", "text": "Customers raise and follow requests in the portal", "status": "pass", "env": ["L", "T"], "evidence": "crmPortal.test.ts tickets; /portal/support listed SUP-00002 for a real customer session" },
+        { "id": "6.8", "text": "A support reply is delivered to a real mailbox", "status": "pass", "env": ["L", "R"], "evidence": "On candidate a3c56b3, a staff reply recorded while the server had no mail key was retried once the key was configured: recovery POST 200, reusing the original idempotency key, shown as Accepted by the mail provider. It arrived in the controlled mailbox at 14:42:43 UTC as “[SUP-00002] [CRM-TEST] Where is my welcome pack?”" },
+        { "id": "6.9", "text": "A customer's emailed reply lands on the right ticket", "status": "fail", "env": [], "evidence": "Blocked with 4.8: inbound not live" }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Marketing automation",
+      "criteria": [
+        { "id": "7.1", "text": "One guided flow: Audience → Email → Preview/test → Send or schedule", "status": "pass", "env": ["L"], "evidence": "Walked on /admin/crm/campaign-builder" },
+        { "id": "7.2", "text": "Audiences by saved segment, filter or hand-picked contacts, with nobody pre-ticked", "status": "pass", "env": ["L", "T"], "evidence": "Three audience modes walked; crmMarketing.test.ts" },
+        { "id": "7.3", "text": "Suppression and unsubscribes hold, even for hand-picked contacts", "status": "pass", "env": ["L", "T"], "evidence": "Hand-picking an unsubscribed contact: size 2, eligible 1, excluded 1 with reason" },
+        { "id": "7.4", "text": "One inbox is mailed once when several contacts share it, and the reason is shown", "status": "pass", "env": ["L", "T"], "evidence": "5 contacts sharing an address → 1 eligible, 4 excluded naming the recipient; mutation-tested" },
+        { "id": "7.5", "text": "Merge fields render with fallbacks and missing values are warned about before sending", "status": "pass", "env": ["T"], "evidence": "crmMarketing.test.ts fallback and merge-token tests" },
+        { "id": "7.6", "text": "Autosave refuses to overwrite a newer version", "status": "pass", "env": ["T"], "evidence": "Version-conflict tests" },
+        { "id": "7.7", "text": "AI copy cannot be sent unapproved, and unavailable drafting says so", "status": "pass", "env": ["L", "T"], "evidence": "Approval gate tests; local drafting refuses with a plain-language 503" },
+        { "id": "7.8", "text": "Pause stops mid-batch; cancel does not claim to un-send", "status": "pass", "env": ["T"], "evidence": "crmMarketing.test.ts pause and cancel" },
+        { "id": "7.9", "text": "A scheduled campaign starts itself only behind a fail-closed flag", "status": "pass", "env": ["T"], "evidence": "Scheduler flag tests" },
+        { "id": "7.10", "text": "A campaign test email is delivered to a real mailbox", "status": "pass", "env": ["L", "R"], "evidence": "From a draft duplicated from a designed campaign, “Send a test” to the owner's staff address (test-send 200) arrived at 14:42:53 UTC as “[TEST] A quicker way to book Vega Family Dentistry”. It was marked as a staff-only test and rendered with the chosen contact's merge fields; no customer received it (candidate a3c56b3)" },
+        { "id": "7.11", "text": "Engagement is measured where the provider supports it", "status": "fail", "env": [], "evidence": "Opens/clicks need a Resend tracking subdomain and event webhook; reported as untracked, not zero" },
+        { "id": "7.12", "text": "Audience preview, preflight and the send apply one eligibility rule", "status": "pass", "env": ["T"], "evidence": "One 13-contact fixture gives the same answer, reason for reason, from preview, preflight and the send ledger (crmMarketingDelivery.test.ts, green on the committed candidate a3c56b3)", "added": "2026-09-15", "why": "Owner brief §4: audience preview and sending use the same eligibility rules" },
+        { "id": "7.13", "text": "A retry or an ambiguous provider outcome never delivers a message twice", "status": "pass", "env": ["T"], "evidence": "Claim-before-send, same-key retry, simultaneous retry and crash-resume tests, plus a provider 5xx stored as unknown and never retried (matching reminders and support); mutation-checked, green on the committed candidate a3c56b3", "added": "2026-09-15", "why": "Owner brief §4: retries and ambiguous outcomes without duplicate delivery" },
+        { "id": "7.14", "text": "An unsaved draft survives a failed save or a lost connection and can be restored", "status": "pass", "env": ["L", "T"], "evidence": "campaignDraft.test.ts (12) and campaignRequests.test.ts (9). In the browser on a test draft, a subject edit whose autosave failed like a dropped connection read “Not saved — The server did not answer… Your changes are kept in this browser until they are saved.”, with no false Saved. After a full reload the campaign offered “This browser kept changes to this campaign that were never saved” with Restore / Discard. Restore saved it (PATCH 200, “Saved”), and a second reload showed the restored subject from the server with no copy left in the browser", "added": "2026-09-15", "why": "Owner brief §4: save and resume drafts, and preserve drafts on failures" },
+        { "id": "7.15", "text": "Templates are editable, and branding and personalisation render identically in preview and delivery", "status": "pass", "env": ["T"], "evidence": "Preview and delivery compared byte for byte (subject, HTML, text, stored copy, branding and fallbacks), and template editing tested; green on the committed candidate a3c56b3", "added": "2026-09-15", "why": "Owner brief §4: template editing, branding and personalisation" },
+        { "id": "7.16", "text": "Marketing, Sequences and the Sequence queue each say plainly what they are", "status": "pass", "env": ["L", "T"], "evidence": "messagingConcepts.test.ts. In the browser, each page opens with a heading and a summary of what it is (“One email, sent once, to a list of people”; “Several messages over days”; “Every message a sequence has scheduled”), and the nav reads Marketing / Sequences / Sequence Queue. The Sequences page's leftover “Campaigns” tab and empty states were renamed (03d339e)", "added": "2026-09-15", "why": "Owner brief §4: campaigns, sequences and queues must be understandable" },
+        { "id": "7.17", "text": "A real AI draft is produced in the campaign editor", "status": "fail", "env": [], "evidence": "The production server's AI integration answered a real request (HTTP 200, 2026-09-15), but no draft has come through the editor: the local server has no AI key and production still runs the old build", "added": "2026-09-15", "why": "Owner brief §2: verify a real draft in the campaign editor" }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Reporting and analytics",
+      "criteria": [
+        { "id": "8.1", "text": "Every figure has a written definition", "status": "pass", "env": ["L", "T"], "evidence": "39 figures with definitions on /admin/crm/reporting; crmReports.test.ts" },
+        { "id": "8.2", "text": "Every figure states its denominator", "status": "pass", "env": ["T"], "evidence": "crmReports.test.ts" },
+        { "id": "8.3", "text": "Every figure drills to the rows behind it, and the count equals the list", "status": "pass", "env": ["T"], "evidence": "Count derived from the detail query in crmReports.test.ts" },
+        { "id": "8.4", "text": "Money figures agree across every surface", "status": "pass", "env": ["L", "T"], "evidence": "crmMoneyContract.test.ts; $16,000 cross-checked in the browser" },
+        { "id": "8.5", "text": "Figures that cannot be measured say so instead of showing zero", "status": "pass", "env": ["L"], "evidence": "'Cannot measure' section present on the reporting page" },
+        { "id": "8.6", "text": "The sales forecast states its basis", "status": "pass", "env": ["T"], "evidence": "crmSales.test.ts" },
+        { "id": "8.7", "text": "Operations and delivery figures are reported", "status": "pass", "env": ["L", "T"], "evidence": "Operations and delivery-issue counts" },
+        { "id": "8.8", "text": "Marketing delivery counts equal their recipient lists", "status": "pass", "env": ["T"], "evidence": "crmMarketing.test.ts counts-equal-lists" },
+        { "id": "8.9", "text": "Email engagement figures come from real provider events", "status": "fail", "env": [], "evidence": "Blocked with 4.9 and 7.11" }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Documents",
+      "criteria": [
+        { "id": "9.1", "text": "Files upload with versioning", "status": "pass", "env": ["L", "T"], "evidence": "crmM3.test.ts" },
+        { "id": "9.2", "text": "Downloads are authenticated and sent with safe headers", "status": "pass", "env": ["L", "T"], "evidence": "Customer download: 200, attachment disposition, nosniff, exact bytes" },
+        { "id": "9.3", "text": "Share links are hashed, expiring, capped and revocable", "status": "pass", "env": ["T"], "evidence": "crmM3.test.ts share tokens" },
+        { "id": "9.4", "text": "Documents can be requested from a customer", "status": "pass", "env": ["T"], "evidence": "Document request routes tested" },
+        { "id": "9.5", "text": "Quotes have line items and totals computed on the server", "status": "pass", "env": ["L", "T"], "evidence": "crmBilling.test.ts tampered totals ignored; $4,200 quote itemised correctly for a customer" },
+        { "id": "9.6", "text": "Invoices come from accepted quotes and payments reconcile with the money figures", "status": "pass", "env": ["T"], "evidence": "crmBilling.test.ts payment moves all four money figures" },
+        { "id": "9.7", "text": "Quotes and invoices become documents the customer can see", "status": "pass", "env": ["L", "T"], "evidence": "Quote-QUO-00001.txt listed and downloadable in the portal" },
+        { "id": "9.8", "text": "Agreements can be signed electronically through a provider", "status": "fail", "env": [], "evidence": "No provider chosen; requirements in E-SIGNATURE-REQUIREMENTS.md; acceptance is explicitly not a signature" }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Workflow automation and approvals",
+      "criteria": [
+        { "id": "10.1", "text": "Rules combine triggers, conditions and actions", "status": "pass", "env": ["T"], "evidence": "crmAutomation.test.ts (19)" },
+        { "id": "10.2", "text": "Time-based triggers fire", "status": "pass", "env": ["T"], "evidence": "automationSweep.test.ts" },
+        { "id": "10.3", "text": "Three loop brakes stop runaway automation", "status": "pass", "env": ["T"], "evidence": "Loop-brake tests" },
+        { "id": "10.4", "text": "Approvals are decided by an identified person", "status": "pass", "env": ["T"], "evidence": "Approval tests" },
+        { "id": "10.5", "text": "Every run is recorded in a durable event log", "status": "pass", "env": ["T"], "evidence": "crm_automation_events tests" },
+        { "id": "10.6", "text": "A trigger occurrence executes at most once", "status": "pass", "env": ["T"], "evidence": "Occurrence-key uniqueness test" },
+        { "id": "10.7", "text": "Failed automation is visible in the product", "status": "pass", "env": ["T"], "evidence": "Automation tab in Operations; crmAutomationFailures.test.ts; component checked at 375px against a stubbed API, not yet clicked live" },
+        { "id": "10.8", "text": "Retry buys exactly one more attempt through the ordinary path", "status": "pass", "env": ["T"], "evidence": "crmAutomationFailures.test.ts" },
+        { "id": "10.9", "text": "Acknowledge records a decision and re-runs nothing", "status": "pass", "env": ["T"], "evidence": "Rows asserted byte-identical after acknowledge" },
+        { "id": "10.10", "text": "Retry is refused where it cannot be made safe, with the reason shown", "status": "pass", "env": ["T"], "evidence": "Unknown outcomes and loop-braked runs refused" }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Users, roles and permissions",
+      "criteria": [
+        { "id": "11.1", "text": "Every person has an individual account with a properly hashed password", "status": "pass", "env": ["L", "T"], "evidence": "scrypt; crmStaffAuth.test.ts" },
+        { "id": "11.2", "text": "Two-step verification with single-use recovery codes", "status": "pass", "env": ["T"], "evidence": "crmStaffAuth.test.ts enrols MFA and consumes a recovery code once" },
+        { "id": "11.3", "text": "Sessions are revocable, and a credential change ends them", "status": "pass", "env": ["L", "T"], "evidence": "Epoch invalidation; all exposed sessions revoked 2026-09-14" },
+        { "id": "11.4", "text": "Mutating requests require a CSRF token", "status": "pass", "env": ["T"], "evidence": "CSRF rejection tests" },
+        { "id": "11.5", "text": "Sign-in attempts are throttled", "status": "pass", "env": ["T"], "evidence": "Throttling tests" },
+        { "id": "11.6", "text": "Actions are audited per person", "status": "pass", "env": ["L", "T"], "evidence": "crm_admin_audit_log entries by real actor" },
+        { "id": "11.7", "text": "The three owners hold identical full access; future hires get role-based access", "status": "pass", "env": ["L", "T"], "evidence": "Activation grants the identical 37-permission owner set; roles for hires" },
+        { "id": "11.8", "text": "A restricted user is refused at every API boundary", "status": "pass", "env": ["T"], "evidence": "Restricted-user tests across suites, including receptionistOpsAuth.test.ts" },
+        { "id": "11.9", "text": "Two-step verification is enrolled on the real owner accounts", "status": "fail", "env": [], "evidence": "Available on My Account; not enrolled on any real account yet" },
+        { "id": "11.10", "text": "Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions", "status": "pass", "env": ["L", "T"], "evidence": "On candidate a3c56b3 Receptionist Accounts loaded with a staff session (200, where it answered 401 before) and listed a fixture firm; receptionistOpsAuth.test.ts green on the same candidate", "added": "2026-09-15", "why": "Owner brief §3: the three pages whose data requests reject staff sessions" }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Interaction history",
+      "criteria": [
+        { "id": "12.1", "text": "Activity from every source is merged into one timeline", "status": "pass", "env": ["L", "T"], "evidence": "23 sources; crmHistory.test.ts" },
+        { "id": "12.2", "text": "Long histories page without dropping entries", "status": "pass", "env": ["T"], "evidence": "Keyset pagination on (occurred_at, source, id)" },
+        { "id": "12.3", "text": "Entries say who acted, and unattributed ones are labelled", "status": "pass", "env": ["L", "T"], "evidence": "Attribution tests" },
+        { "id": "12.4", "text": "A customer-visible view drops internal notes", "status": "pass", "env": ["L"], "evidence": "'What the client can see' verified in the browser" },
+        { "id": "12.5", "text": "History survives merging duplicate contacts", "status": "pass", "env": ["T"], "evidence": "crmContacts.test.ts merge preserves both sides" },
+        { "id": "12.6", "text": "Customer replies and meetings appear in the history", "status": "pass", "env": ["L", "T"], "evidence": "History includes customer replies and appointments" }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Calendar and scheduling",
+      "criteria": [
+        { "id": "13.1", "text": "Appointments can be created, rescheduled and cancelled", "status": "pass", "env": ["L", "T"], "evidence": "Verified in an earlier milestone; crmM3.test.ts" },
+        { "id": "13.2", "text": "A past meeting can be marked held", "status": "pass", "env": ["L", "T"], "evidence": "crmM3.test.ts" },
+        { "id": "13.3", "text": "Appointments export as .ics", "status": "pass", "env": ["L", "T"], "evidence": "Shared generator with invitations" },
+        { "id": "13.4", "text": "Appointment reminders fire", "status": "pass", "env": ["L", "T"], "evidence": "Reminder engine" },
+        { "id": "13.5", "text": "Attendees receive an invitation their calendar can add", "status": "pass", "env": ["L", "T", "R"], "evidence": "crmCalendarInvites.test.ts (24). On candidate a3c56b3, an appointment created in the browser mailed both attendees (201, “2 invitations accepted by the mail provider”). The invitation arrived at 14:42:59 UTC with invite.ics (text/calendar) attached, and was stored as METHOD REQUEST with outcome sent" },
+        { "id": "13.6", "text": "A material change updates the invitation; a trivial edit mails nobody", "status": "pass", "env": ["L", "T", "R"], "evidence": "crmCalendarInvites.test.ts proves SEQUENCE increments and that a non-material edit mails nobody; the silent case was not repeated live. On candidate a3c56b3, rescheduling in the browser (PATCH 200) stored sequence 1 for both attendees, and “Updated: [CRM-TEST] Invitation provider check” arrived at 14:44:40–41 UTC with the new time and what changed" },
+        { "id": "13.7", "text": "A cancellation removes it from attendees' calendars", "status": "pass", "env": ["L", "T", "R"], "evidence": "METHOD:CANCEL tests. On candidate a3c56b3, cancelling in the browser (PATCH 200, after the confirmation naming who is told) stored CANCEL at sequence 2 for both attendees, and “Cancelled: [CRM-TEST] Invitation provider check” arrived at 14:45:33–34 UTC with the calendar file that removes the event. The invitation, update and cancellation share one event at sequences 0, 1 and 2" },
+        { "id": "13.8", "text": "Two-way sync with external calendars", "status": "fail", "env": [], "evidence": "Not built; .ics is an export" }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Integrations",
+      "criteria": [
+        { "id": "14.1", "text": "An accounting or payments connector", "status": "fail", "env": [], "evidence": "Not built for the CRM" },
+        { "id": "14.2", "text": "Calendar provider sync", "status": "fail", "env": [], "evidence": "Not built for the CRM (the receptionist has its own Google calendar connector)" },
+        { "id": "14.3", "text": "An e-signature provider", "status": "fail", "env": [], "evidence": "No provider chosen" },
+        { "id": "14.4", "text": "Team notifications to a chat tool", "status": "fail", "env": [], "evidence": "Not built" },
+        { "id": "14.5", "text": "Outbound webhooks or an API for other systems", "status": "fail", "env": [], "evidence": "Not built" }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Mobile, offline and push",
+      "criteria": [
+        { "id": "15.1", "text": "Staff pages have no clipped or unreachable content at 375px", "status": "pass", "env": ["L"], "evidence": "Every staff route measured at a real 375×812 viewport with the validated clipped-content metric (evening of 2026-09-15). The sweep found two defects the earlier record had missed, both fixed and re-measured: the shared header's action row hid the profile menu (sign out, My account) on every staff page, and the Sequences header hid “New sequence”. Every measurable route now shows 0. The two legacy Discovery Portal pages redirect a staff session, so they could not be measured as themselves" },
+        { "id": "15.2", "text": "Wide tables scroll inside their own container", "status": "pass", "env": ["L"], "evidence": "Import plan table scrolls in a 342px container" },
+        { "id": "15.3", "text": "Controls are reachable by touch", "status": "pass", "env": ["L"], "evidence": "Deals edit tapped and the dialog opened on a touch device" },
+        { "id": "15.4", "text": "Populated Discovery and Settings tables are verified on a phone", "status": "pass", "env": ["L"], "evidence": "Both rendered populated and measured at 375px" },
+        { "id": "15.5", "text": "Connection loss is shown, and unsent work is preserved rather than lost", "status": "pass", "env": ["L", "T"], "evidence": "Online-first connection banner and draft vault" },
+        { "id": "15.6", "text": "Offline editing with a write queue", "status": "deferred", "env": [], "evidence": "Deferred by owner decision: online-first for this release" },
+        { "id": "15.7", "text": "Push notifications", "status": "fail", "env": [], "evidence": "Not built: no service worker, PushManager or VAPID anywhere" },
+        { "id": "15.8", "text": "Portal pages have no clipped or unreachable content at 375px", "status": "pass", "env": ["L"], "evidence": "All 8 portal routes measured at a real 375×812 emulated viewport on candidate a3c56b3 with a customer session: 0 elements clipped without a scrollable ancestor. The metric was validated in the same page: a planted clipped element was flagged, and the same element inside a scroller was not" }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Customer portal",
+      "criteria": [
+        { "id": "16.1", "text": "Customers have their own sign-in and sessions, separate from staff", "status": "pass", "env": ["L", "T"], "evidence": "Portal session coexists with no staff session; crmPortal.test.ts" },
+        { "id": "16.2", "text": "A customer can never see another customer's records", "status": "pass", "env": ["T"], "evidence": "12/12 isolation mutations caught; cross-contact access answers 404" },
+        { "id": "16.3", "text": "Documents are hidden unless explicitly granted", "status": "pass", "env": ["L", "T"], "evidence": "Default-deny tests; only granted files listed for a real customer" },
+        { "id": "16.4", "text": "Staff can invite, re-send and revoke portal access, with honest delivery", "status": "pass", "env": ["L", "T", "R"], "evidence": "Invitation sent from the contact page reached the controlled mailbox; token withheld when emailed; crmPortalAccess.test.ts" },
+        { "id": "16.5", "text": "A customer accepts an offer in writing, once, and it is never called a signature", "status": "pass", "env": ["L", "T"], "evidence": "Quote accepted through the portal; a quoted deal is not separately acceptable (409)" },
+        { "id": "16.6", "text": "Invoices and money received are shown without inventing a balance", "status": "pass", "env": ["L", "T"], "evidence": "Portal invoices page and crmBilling.test.ts" },
+        { "id": "16.7", "text": "The portal says plainly what is waiting on the customer", "status": "pass", "env": ["L"], "evidence": "'Review and accept' for a waiting quote links to the quotes page" },
+        { "id": "16.8", "text": "A customer completes every portal journey end to end with real data", "status": "pass", "env": ["L", "R"], "evidence": "Walked with a real customer session: the emailed invitation (delivered by the provider) and sign-up, projects, a document download, quote acceptance, a support message answered by staff, and an issued invoice with its line items (the last three on candidate a3c56b3)" }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Security",
+      "criteria": [
+        { "id": "17.1", "text": "Two-step verification and an audit trail exist", "status": "pass", "env": ["L", "T"], "evidence": "See 11.2 and 11.6" },
+        { "id": "17.2", "text": "Webhook signatures are enforced, including replays", "status": "pass", "env": ["L"], "evidence": "Unsigned 400, forged 400, signed 200, hour-old replay 400" },
+        { "id": "17.3", "text": "Tests cannot wipe real data or each other's sessions", "status": "pass", "env": ["T"], "evidence": "Disposable-database guard; per-database run lock proven by overlapping runs" },
+        { "id": "17.4", "text": "Cross-origin access is refused unless explicitly allowed", "status": "pass", "env": ["T"], "evidence": "corsPolicy.test.ts; production refuses to start without an allowlist" },
+        { "id": "17.5", "text": "Secrets are never logged or returned", "status": "pass", "env": ["T"], "evidence": "Sanitised boot errors; env contract reports names only" },
+        { "id": "17.6", "text": "Exposed credentials were rotated", "status": "pass", "env": ["L"], "evidence": "Exposed reset token and every live session revoked; epochs bumped" },
+        { "id": "17.7", "text": "The unexplained account activation was resolved with evidence", "status": "pass", "env": ["L"], "evidence": "User-agent strings: the 07:04 session was the assistant's own browser pane; the later setup was the owner's own browser" },
+        { "id": "17.8", "text": "Encryption in transit and at rest is evidenced for production", "status": "unverified", "env": [], "evidence": "HSTS observed on the domain; at-rest encryption is a hosting property not yet evidenced" },
+        { "id": "17.9", "text": "A backup has been restored into an isolated target", "status": "fail", "env": [], "evidence": "Waiting on the owner adding SNAPSHOT_SOURCE; point-in-time recovery is on (7 days)" }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Dashboard",
+      "criteria": [
+        { "id": "18.1", "text": "Panels are clickable and open the rows behind them", "status": "pass", "env": ["L", "T"], "evidence": "11 clickable panels" },
+        { "id": "18.2", "text": "Counts come from one server function", "status": "pass", "env": ["T"], "evidence": "crmCommandCenter tests" },
+        { "id": "18.3", "text": "The dashboard can be filtered", "status": "pass", "env": ["L"], "evidence": "Scope and day filters" },
+        { "id": "18.4", "text": "Refresh pauses when the page is hidden", "status": "pass", "env": ["T"], "evidence": "Polling pause test" },
+        { "id": "18.5", "text": "Metrics without instrumentation explain why instead of showing zero", "status": "pass", "env": ["L"], "evidence": "Uninstrumented panels state their reason" },
+        { "id": "18.6", "text": "The money panel agrees with the ledger", "status": "pass", "env": ["L", "T"], "evidence": "Cross-checked against forecast and transactions" }
+      ]
+    }
+  ]
+}
