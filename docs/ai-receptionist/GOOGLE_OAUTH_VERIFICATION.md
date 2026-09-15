@@ -65,14 +65,24 @@ Google's sensitive-scope verification requires all of the following. Items
 marked **owner** need a decision or an account action SiteMint cannot take on
 its own.
 
-1. **A production OAuth app** (new project or the existing one renamed without
-   "(Staging)"), with its OAuth client's redirect URI on the production host:
-   `https://<production host>/api/receptionist/calendar/google/callback`.
-   *Owner: which host is production — see the production-target decision in the
-   ledger.*
+1. **A production OAuth app.** The production host is decided (2026-09-16):
+   `sitemintdigital.com`, served by the Web Asset Builder deployment. So the
+   OAuth client's redirect URI is exactly
+   `https://sitemintdigital.com/api/receptionist/calendar/google/callback`,
+   and the app is a NEW Google Cloud project, leaving `sitemint-staging`
+   untouched. **Blocked**: creating a project under
+   `claidyklaydetaguran@gmail.com` stops at Google Cloud's Terms of Service,
+   which only the owner may accept. *Owner: accept the terms, or name the
+   Google account that should own the production app.*
 2. **Verified domain ownership** of `sitemintdigital.com` in Google Search
-   Console, added as an authorized domain. *Owner: Search Console access for the
-   domain's DNS.*
+   Console, added as an authorized domain. A domain property was added under
+   `claidyklaydetaguran@gmail.com` on 2026-09-16, and its
+   `google-site-verification` TXT record is saved in the domain's Replit-managed
+   zone alongside the existing `replit-verify` TXT (nine records; nothing else
+   changed). Google had not confirmed it at the time of writing — DNS changes
+   take time to spread — so the check is re-run until it passes. The same
+   account must own the OAuth project, or be added to the property, for the
+   authorized-domain check to see the verification.
 3. **Home page** on that domain describing the AI Receptionist and linking to
    the privacy policy.
 4. **Privacy policy** on that domain that states, specifically, what Google
@@ -81,8 +91,11 @@ its own.
    contents stored beyond SiteMint's own appointment records), retention and
    deletion (disconnect removes the stored token), and that it is not sold or
    used for advertising — the Google API Services User Data Policy "Limited
-   Use" disclosure. *Owner: `/privacy` and `/terms` are drafts awaiting legal
-   sign-off.*
+   Use" disclosure. A section saying exactly that was drafted on 2026-09-16
+   (`artifacts/web-agency/src/pages/LegalPrivacyV3.tsx`, written from the code:
+   the three scopes, AES-256-GCM token storage, tokens cleared on disconnect).
+   It is NOT published: the marketing site ships from its own release.
+   *Owner: `/privacy` and `/terms` are drafts awaiting legal sign-off.*
 5. **Terms of service** on that domain.
 6. **App branding**: name "SiteMint AI Receptionist", a logo (uploading one
    requires verification of the branding itself), support email on a monitored
@@ -97,12 +110,19 @@ its own.
 
 ## 5. Status tracking
 
+**Publishing status and verification status are separate**, and neither implies
+the other. An app can be moved from Testing to In production without being
+verified; what verification adds is the removal of the unverified-app warning
+and of the user cap that applies to sensitive scopes. Both tracks are listed
+separately below and neither is reported as done because the other is.
+
 | Track | Status | Next action | Who |
 |---|---|---|---|
 | Staging OAuth (Testing) | Working, 3 scopes granted, verified live 2026-09-15 | Reconnect when access is withdrawn | Business (you) |
-| Production OAuth app | Not created | Create after the production host is decided | SiteMint + owner |
-| Domain verification | Not started | Search Console for `sitemintdigital.com` | Owner |
-| Privacy policy / terms | Drafts, legal sign-off pending | Approve wording, publish on domain | Owner |
+| Production OAuth app | Not created — blocked on Google Cloud Terms of Service for the owner's account | Accept the terms, or name the owning Google account | Owner |
+| Production publishing status (Testing → In production) | Not applicable yet; no production app exists | Decide once the app exists; independent of verification | Owner |
+| Domain verification | Property added; TXT record saved in the zone 2026-09-16; Google has not confirmed it yet | Re-run the check until it passes | SiteMint |
+| Privacy policy / terms | Google Calendar and Limited Use section drafted in source, not published; legal sign-off pending | Approve wording, then a marketing release publishes it | Owner |
 | Demo video | Not recorded | Record on production host once 1–5 exist | SiteMint |
 | Google verification submission | Not submitted | Submit after 1–8 | Owner (project owner account) |
 | Google review | — | Google's review can take weeks; track in the Verification Center | Google |
