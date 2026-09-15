@@ -83,6 +83,15 @@ export const REPOINTS: readonly RepointSpec[] = [
     describe: "Internal comments left on the contact." },
 
   // ── Everything else that names a contact ──────────────────────────────────
+  //
+  // Quotes and invoices were missing from this list until M7 and it was a real
+  // hole, not a tidy-up: `crm_quotes.lead_id` and `crm_invoices.lead_id` are
+  // NOT NULL and are the customer portal's tenant key, so a merge left the
+  // priced work — and the money owed — on a contact the book no longer shows.
+  { table: "crm_quotes", column: "lead_id", historyCritical: false,
+    describe: "Quotes: drafts, sent, accepted, declined and expired. The customer portal reads them by contact, so they follow the survivor." },
+  { table: "crm_invoices", column: "lead_id", historyCritical: false,
+    describe: "Invoices, and through them the payments recorded against each one." },
   { table: "crm_behavioral_events", column: "lead_id", historyCritical: false,
     describe: "Behavioural signals feeding the lead score." },
   { table: "crm_campaign_recipients", column: "lead_id", uniqueWith: ["campaign_id"], historyCritical: false,
@@ -218,7 +227,7 @@ async function rewriteConversationIdentity(fromId: number, toId: number): Promis
 
 /** Contact fields a merge considers. Identity and audit columns are excluded. */
 export const MERGEABLE_FIELDS = [
-  "name", "company", "phone", "email", "website", "source", "serviceInterest",
+  "name", "company", "companyId", "phone", "email", "website", "source", "serviceInterest",
   "status", "priority", "assignedTo", "packageType", "estimatedValue",
   "lastContactedAt", "nextFollowUpAt", "discoverySubmissionId",
 ] as const;
@@ -312,7 +321,12 @@ export function mergeNoteBlock(args: {
   const discarded = args.conflicts.filter((c) => c.chosen === "primary");
   if (discarded.length > 0) {
     lines.push("Values kept from the merged record for reference (this contact's own values were kept):");
-    for (const c of discarded) lines.push(`  · ${c.field}: ${String(c.discardedFromMerged)}`);
+    for (const c of discarded) {
+      // M7: a company link is an id, and an id in a note tells a person nothing.
+      const label = c.field === "companyId" ? "company record" : c.field;
+      const value = c.field === "companyId" ? `#${String(c.discardedFromMerged)}` : String(c.discardedFromMerged);
+      lines.push(`  · ${label}: ${value}`);
+    }
   }
   const theirNotes = typeof args.duplicate["notes"] === "string" ? (args.duplicate["notes"] as string).trim() : "";
   if (theirNotes) {
