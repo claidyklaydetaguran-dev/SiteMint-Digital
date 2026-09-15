@@ -25,16 +25,16 @@ import { StatusChip, type StatusTone } from "@/components/common/StatusChip";
 import { NextActionCard } from "@/components/common/NextActionCard";
 import { PageHeader } from "@/components/common/PageHeader";
 import {
-  useAssignedNumber,
-  useAssistantPublished,
-  useCalendarConnectedFlag,
-  useCanReceiveEmail,
-  useOnboardingProgress,
   useOpenIssuesCount,
   usePendingAppointmentRequestsCount,
   useRecentCalls,
   countCallsToday,
 } from "@/pages/overview/overviewApi";
+// Readiness is measured once, in the Setup hub's own module, and read here.
+// Overview used to re-derive it from the saved onboarding ticks alone, so the
+// two screens could — and did — disagree about whether an account was ready.
+import { useSetupData } from "@/pages/setup/setupApi";
+import { SETUP_STEPS, deriveStepStatuses, isSetupComplete } from "@/pages/setup/setupContract";
 import {
   buildActivityFigures,
   buildNeedsAttention,
@@ -83,11 +83,12 @@ const STATE_TONE: Record<ReceptionistState, StatusTone> = {
 function StatusHeader({
   state,
   numberDisplay,
-  calendarConnected,
+  calendarReady,
 }: {
   state: ReceptionistState;
   numberDisplay: string | null;
-  calendarConnected: boolean | null;
+  /** null when SiteMint could not check — never shown as either answer. */
+  calendarReady: boolean | null;
 }) {
   return (
     <section className="sd-status" data-state={state === "live" ? "answering" : "incomplete"} aria-labelledby="sd-status-title">
@@ -100,7 +101,11 @@ function StatusHeader({
           <p className="sd-status__detail">
             {numberDisplay ? `Number: ${numberDisplay}` : "No phone number assigned yet."}
             {" — "}
-            {calendarConnected === null ? "Calendar status unavailable." : calendarConnected ? "Calendar connected." : "Calendar not connected."}
+            {calendarReady === null
+              ? "Calendar not checked."
+              : calendarReady
+                ? "Calendar connected and working."
+                : "Calendar isn't ready."}
           </p>
         </div>
         <StatusChip label={RECEPTIONIST_STATE_LABEL[state]} tone={STATE_TONE[state]} />
@@ -121,29 +126,29 @@ export default function Overview() {
 
   const { data: session, isLoading: sessionLoading } = useSession();
 
-  const onboarding = useOnboardingProgress();
-  const canReceiveEmail = useCanReceiveEmail();
-  const assistantPublished = useAssistantPublished();
-  const { data: numbers, isLoading: numbersLoading } = useAssignedNumber();
-  const calendarConnected = useCalendarConnectedFlag();
+  const setup = useSetupData();
   const openIssuesCount = useOpenIssuesCount();
   const pendingRequests = usePendingAppointmentRequestsCount();
   const recentCallsQuery = useRecentCalls();
 
-  if (sessionLoading || convsLoading || onboarding.isLoading || (voicePlatformEnabled && numbersLoading)) {
+  if (sessionLoading || convsLoading || setup.loading) {
     return <OverviewSkeleton />;
   }
   if (!session) return null;
 
   const convs = conversations ?? [];
-  const numberAssigned = Boolean(numbers?.items && numbers.items.length > 0);
-  const numberDisplay = numbers?.items?.[0]?.phoneNumberDisplay ?? null;
+
+  // Exactly the statuses the Setup hub shows, from exactly the same function.
+  const statuses = deriveStepStatuses(setup.saved, setup.signals);
+  const nonReviewSteps = SETUP_STEPS.filter((s) => s.key !== "review");
+  const canReceiveEmail = setup.signals.emailVerified;
 
   const state = deriveReceptionistState({
-    setupComplete: onboarding.setupComplete,
-    anyStepDone: onboarding.anyStepDone,
-    numberAssigned,
-    assistantPublished,
+    setupComplete: isSetupComplete(statuses),
+    anyStepDone: nonReviewSteps.some((s) => statuses[s.key] === "done"),
+    numberAssigned: setup.signals.phoneAssigned === true,
+    assistantPublished: setup.signals.assistantPublished === true,
+    assistantSynchronized: setup.signals.assistantSynchronized === true,
   });
 
   const isPaid = session.firm.planTier === "paid";
@@ -178,7 +183,11 @@ export default function Overview() {
         <span className="sd-page__meta">{todayLabel()}</span>
       </div>
 
-      <StatusHeader state={state} numberDisplay={numberDisplay} calendarConnected={calendarConnected} />
+      <StatusHeader
+        state={state}
+        numberDisplay={setup.assignedNumberDisplay}
+        calendarReady={setup.signals.calendarReady}
+      />
 
       {/* Exactly one next-best-action control (D-1) — its content already
           covers every state (setup incomplete, ready for activation, live

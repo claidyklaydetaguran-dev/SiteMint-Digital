@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import {
   ACTIVATE_DISABLED_REASON,
   EMPTY_SETUP_SIGNALS,
+  PROGRESS_SAVE,
   SETUP_STEPS,
   buildDisplaySteps,
   buildNextAction,
@@ -22,6 +23,7 @@ import {
   progressLabel,
   type SavedSteps,
   type SetupSignals,
+  type SetupStepKey,
 } from "./setupContract.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -40,6 +42,33 @@ function check(name: string, condition: boolean, detail?: string): void {
     console.error(`  FAIL  ${name}${detail ? ` — ${detail}` : ""}`);
   }
 }
+
+/**
+ * Every signal at one value.
+ *
+ * Status comes from live capability now, not from saved ticks, so a test that
+ * wants to describe a finished account has to say every capability is
+ * genuinely in place — and one that wants "not checked" says so with nulls
+ * rather than by leaving fields out.
+ */
+function allSignals(value: boolean | null): SetupSignals {
+  return {
+    businessComplete: value,
+    emailVerified: value,
+    assistantPublished: value,
+    assistantSynchronized: value,
+    promptReady: value,
+    voiceChosen: value,
+    availabilityConfigured: value,
+    appointmentTypesReady: value,
+    calendarReady: value,
+    phoneAssigned: value,
+    testCallMade: value,
+  };
+}
+const NONE_MET = allSignals(false);
+const ALL_MET = allSignals(true);
+const MEASURABLE = SETUP_STEPS.filter((s) => s.key !== "review");
 
 console.log("\n--- the ten steps are in the approved order ---");
 {
@@ -76,88 +105,130 @@ console.log("\n--- the ten steps are in the approved order ---");
   check("phone_number deep-links under channels", SETUP_STEPS.find((s) => s.key === "phone_number")!.href === "/channels/phone-number");
 }
 
-console.log("\n--- status derivation combines saved state and inference ---");
+console.log("\n--- status is derived from live capability, not from stored ticks ---");
 {
-  const empty: SavedSteps = {};
-  const allPending = deriveStepStatuses(empty, EMPTY_SETUP_SIGNALS);
-  check("a brand-new firm has every step pending", Object.values(allPending).every((s) => s === "pending"));
+  const allPending = deriveStepStatuses({}, NONE_MET);
+  check("a brand-new firm has every measurable step pending", MEASURABLE.every((s) => allPending[s.key] === "pending"));
 
-  const savedDone: SavedSteps = { business: { status: "done" } };
-  check("a saved done status is respected with no signal", deriveStepStatuses(savedDone, EMPTY_SETUP_SIGNALS).business === "done");
-
-  const signals: SetupSignals = {
-    businessComplete: true,
-    availabilityConfigured: false,
-    calendarConnected: true,
-    phoneAssigned: null,
-  };
-  const inferred = deriveStepStatuses({}, signals);
-  check("business is inferred done from real data alone", inferred.business === "done");
-  check("calendar is inferred done from real data alone", inferred.calendar === "done");
-  check("availability stays pending when the signal is explicitly false", inferred.availability === "pending");
-  check("a null signal (unknown) never marks a step done", inferred.phone_number === "pending");
+  // The defect this replaces: a stored `done` used to win outright, so a step
+  // stayed ticked long after the thing it described had stopped being true —
+  // a calendar whose access was withdrawn, a number that was released.
   check(
-    "inference never touches assistant/prompt/voice/test_call/review — those come only from saved state",
-    ["assistant", "prompt", "voice", "test_call", "review"].every((k) => inferred[k as keyof typeof inferred] === "pending"),
+    "a stored tick does not survive the capability going away",
+    deriveStepStatuses({ calendar: { status: "done" } }, { ...NONE_MET, calendarReady: false }).calendar === "pending",
+  );
+  check(
+    "and the live answer ticks a step with or without a saved record",
+    deriveStepStatuses({}, { ...NONE_MET, calendarReady: true }).calendar === "done",
   );
 
+  // "We could not ask" is a third answer, shown as neither of the other two.
+  const unreadable = deriveStepStatuses({ calendar: { status: "done" } }, { ...NONE_MET, calendarReady: null });
+  check("an unreadable signal is 'not checked'", unreadable.calendar === "unknown");
+  check("and never done on the strength of an old tick", unreadable.calendar !== "done");
+  check(
+    "nothing is checked when nothing could be read",
+    MEASURABLE.every((s) => deriveStepStatuses({}, allSignals(null))[s.key] === "unknown"),
+  );
+
+  // Each step is answered by its own signal and no other.
+  const oneAtATime: [keyof SetupSignals, SetupStepKey][] = [
+    ["businessComplete", "business"],
+    ["emailVerified", "email_verified"],
+    ["assistantPublished", "assistant"],
+    ["promptReady", "prompt"],
+    ["voiceChosen", "voice"],
+    ["availabilityConfigured", "availability"],
+    ["appointmentTypesReady", "appointment_types"],
+    ["calendarReady", "calendar"],
+    ["testCallMade", "test_call"],
+    ["phoneAssigned", "phone_number"],
+  ];
+  for (const [signal, step] of oneAtATime) {
+    const statuses = deriveStepStatuses({}, { ...NONE_MET, [signal]: true });
+    check(`${step} is settled by ${signal} alone`, statuses[step] === "done");
+    check(
+      `and ${signal} settles nothing else`,
+      MEASURABLE.filter((s) => s.key !== step).every((s) => statuses[s.key] !== "done"),
+    );
+  }
+
+  // A recorded block carries a reason this page cannot reconstruct.
   const savedBlocked: SavedSteps = { calendar: { status: "blocked" } };
-  const blockedWithGoodSignal = deriveStepStatuses(savedBlocked, { ...EMPTY_SETUP_SIGNALS, calendarConnected: false });
-  check("a saved blocked status is preserved when the signal does not contradict it", blockedWithGoodSignal.calendar === "blocked");
-  const blockedButNowTrue = deriveStepStatuses(savedBlocked, { ...EMPTY_SETUP_SIGNALS, calendarConnected: true });
-  check("real data can still resolve a previously-blocked step to done", blockedButNowTrue.calendar === "done");
+  check("a saved block is preserved while the capability is genuinely absent", deriveStepStatuses(savedBlocked, { ...NONE_MET, calendarReady: false }).calendar === "blocked");
+  check("real data can still resolve a previously-blocked step to done", deriveStepStatuses(savedBlocked, { ...NONE_MET, calendarReady: true }).calendar === "done");
+
+  // Requesting activation is an action taken with SiteMint, not a capability.
+  check("review is never derived", deriveStepStatuses({}, ALL_MET).review === "pending");
+  check("and a saved review is honoured", deriveStepStatuses({ review: { status: "done" } }, ALL_MET).review === "done");
 }
 
 console.log("\n--- writing back only what changed (idempotent) ---");
 {
-  const signals: SetupSignals = { businessComplete: true, availabilityConfigured: true, calendarConnected: false, phoneAssigned: false };
+  const signals: SetupSignals = { ...NONE_MET, businessComplete: true, availabilityConfigured: true };
   const firstPass = newlyInferredDone({}, signals);
-  check("both true signals are reported as newly done", JSON.stringify(firstPass.sort()) === JSON.stringify(["availability", "business"]));
+  check("both met capabilities are reported as newly done", JSON.stringify(firstPass.sort()) === JSON.stringify(["availability", "business"]));
 
   const alreadySaved: SavedSteps = { business: { status: "done" }, availability: { status: "done" } };
   const secondPass = newlyInferredDone(alreadySaved, signals);
   check("nothing is reported once the server already has it — idempotent", secondPass.length === 0);
+  check("an unreadable signal is never written back as done", newlyInferredDone({}, allSignals(null)).length === 0);
+  check("a fully-ready account reports every measurable step", newlyInferredDone({}, ALL_MET).length === MEASURABLE.length);
+  check("and never review, which is not a capability", !newlyInferredDone({}, ALL_MET).includes("review"));
 }
 
 console.log("\n--- display steps: exactly one 'next' unless blocked ---");
 {
-  const statuses = deriveStepStatuses({ business: { status: "done" } }, EMPTY_SETUP_SIGNALS);
+  const statuses = deriveStepStatuses({}, { ...NONE_MET, businessComplete: true });
   const display = buildDisplaySteps(statuses);
   const nextCount = display.filter((s) => s.status === "next").length;
   check("exactly one step is marked next", nextCount === 1);
   check("the first incomplete step is the one marked next", display.find((s) => s.status === "next")!.key === "email_verified");
   check("done stays done in the display list", display.find((s) => s.key === "business")!.status === "done");
 
-  const withBlock = buildDisplaySteps(deriveStepStatuses({ business: { status: "done" }, email_verified: { status: "done" }, assistant: { status: "blocked" } }, EMPTY_SETUP_SIGNALS));
+  const withBlock = buildDisplaySteps(
+    deriveStepStatuses({ assistant: { status: "blocked" } }, { ...NONE_MET, businessComplete: true, emailVerified: true }),
+  );
   check("a blocked step is never relabelled next", withBlock.find((s) => s.key === "assistant")!.status === "blocked");
   check("no step is marked next when the first incomplete one is blocked", withBlock.filter((s) => s.status === "next").length === 0);
   check("a blocked step carries a reason", Boolean(withBlock.find((s) => s.key === "assistant")!.blockedReason));
+
+  // An unchecked step is not "next" either: naming it the next thing to do
+  // would assert it is outstanding, which is exactly what could not be shown.
+  const withUnknown = buildDisplaySteps(deriveStepStatuses({}, { ...NONE_MET, businessComplete: null }));
+  check("an unchecked step keeps its own label", withUnknown.find((s) => s.key === "business")!.status === "unknown");
+  check("and is never promoted to next", withUnknown.filter((s) => s.status === "next").length === 0);
 }
 
 console.log("\n--- progress label and completion ---");
 {
-  check("nothing done for a brand-new firm", progressLabel(deriveStepStatuses({}, EMPTY_SETUP_SIGNALS)) === "0 of 11");
-  const nineDone: SavedSteps = Object.fromEntries(
-    SETUP_STEPS.filter((s) => s.key !== "review").map((s) => [s.key, { status: "done" }]),
-  );
-  check("every non-review step done reads as all but review", progressLabel(deriveStepStatuses(nineDone, EMPTY_SETUP_SIGNALS)) === "10 of 11");
-  check("setup is 'complete' once every step but review is done", isSetupComplete(deriveStepStatuses(nineDone, EMPTY_SETUP_SIGNALS)) === true);
-  check("setup is not complete with one step outstanding", isSetupComplete(deriveStepStatuses({}, EMPTY_SETUP_SIGNALS)) === false);
+  check("nothing done for a brand-new firm", progressLabel(deriveStepStatuses({}, NONE_MET)) === "0 of 11");
+  const everythingMet = deriveStepStatuses({}, ALL_MET);
+  check("every measurable capability in place reads as all but review", progressLabel(everythingMet) === "10 of 11");
+  check("setup is 'complete' once every step but review is done", isSetupComplete(everythingMet) === true);
+  check("setup is not complete with one step outstanding", isSetupComplete(deriveStepStatuses({}, NONE_MET)) === false);
+  check("nor with one capability that could not be checked", isSetupComplete(deriveStepStatuses({}, { ...ALL_MET, calendarReady: null })) === false);
+
+  // The heart of it: ticks alone can no longer report a ready receptionist.
+  const everyTick = Object.fromEntries(SETUP_STEPS.map((s) => [s.key, { status: "done" }])) as SavedSteps;
+  check("a full set of saved ticks never completes setup on its own", isSetupComplete(deriveStepStatuses(everyTick, allSignals(null))) === false);
 }
 
 console.log("\n--- next action and review summary ---");
 {
-  const statuses = deriveStepStatuses({}, EMPTY_SETUP_SIGNALS);
+  const statuses = deriveStepStatuses({}, NONE_MET);
   const display = buildDisplaySteps(statuses);
   const action = buildNextAction(display);
   check("the next action targets the first incomplete step", action.href === "/account/settings");
 
-  const nineDone: SavedSteps = Object.fromEntries(
-    SETUP_STEPS.filter((s) => s.key !== "review").map((s) => [s.key, { status: "done" }]),
-  );
-  const doneDisplay = buildDisplaySteps(deriveStepStatuses(nineDone, EMPTY_SETUP_SIGNALS));
+  const doneDisplay = buildDisplaySteps(deriveStepStatuses({}, ALL_MET));
   const doneAction = buildNextAction(doneDisplay);
   check("once everything else is done, the next action points at review", doneAction.href === null || doneAction.href === "#review");
+
+  // A page that could not check a step must not congratulate the customer on
+  // a setup it never verified.
+  const unknownAction = buildNextAction(buildDisplaySteps(deriveStepStatuses({}, allSignals(null))));
+  check("an unchecked step is offered as somewhere to go, not reported as complete", !/complete/i.test(unknownAction.title));
 
   const review = buildReviewSummary(doneDisplay);
   check("review lists every done step but itself", review.doneTitles.length === SETUP_STEPS.length - 1);
@@ -188,22 +259,67 @@ console.log("\n--- confirming the email address ---");
   check("it links to the page that finishes it", step?.href === "/verify-email");
   check("it says what is lost without it", /nothing is sent/i.test(step?.detail ?? ""));
 
-  const verified = deriveStepStatuses({}, { ...EMPTY_SETUP_SIGNALS, emailVerified: true });
+  const verified = deriveStepStatuses({}, { ...NONE_MET, emailVerified: true });
   check("a verified address ticks it without a saved record", verified.email_verified === "done");
-  const unverified = deriveStepStatuses({}, { ...EMPTY_SETUP_SIGNALS, emailVerified: false });
+  const unverified = deriveStepStatuses({}, { ...NONE_MET, emailVerified: false });
   check("an unverified one leaves it outstanding", unverified.email_verified === "pending");
-  // "We could not ask" is not "not verified". Inference only ever upgrades, so
-  // a failed read must leave the step exactly as the server last recorded it.
-  const unknown = deriveStepStatuses({ email_verified: { status: "done" } }, { ...EMPTY_SETUP_SIGNALS, emailVerified: null });
-  check("a failed read never un-ticks a step the server recorded done", unknown.email_verified === "done");
+  // "We could not ask" is not "not verified" — and it is not "verified"
+  // either, however the server last recorded it.
+  const unreadableEmail = deriveStepStatuses({ email_verified: { status: "done" } }, { ...NONE_MET, emailVerified: null });
+  check("a failed read is reported as not checked", unreadableEmail.email_verified === "unknown");
+  check("and never as confirmed on the strength of an old tick", unreadableEmail.email_verified !== "done");
+  check("the exported empty signal set is the all-unknown one", deriveStepStatuses({}, EMPTY_SETUP_SIGNALS).email_verified === "unknown");
 
   check(
     "a newly-verified address is written back to the server",
-    newlyInferredDone({}, { ...EMPTY_SETUP_SIGNALS, emailVerified: true }).includes("email_verified"),
+    newlyInferredDone({}, { ...NONE_MET, emailVerified: true }).includes("email_verified"),
   );
   check(
     "and an already-saved one is not written again",
-    !newlyInferredDone({ email_verified: { status: "done" } }, { ...EMPTY_SETUP_SIGNALS, emailVerified: true }).includes("email_verified"),
+    !newlyInferredDone({ email_verified: { status: "done" } }, { ...NONE_MET, emailVerified: true }).includes("email_verified"),
+  );
+}
+
+console.log("\n--- progress is actually recorded (the client speaks the route's shape) ---");
+{
+  // The defect: this client sent `{ steps: { business: { status: "done" } } }`
+  // to a route that reads two top-level scalars, `body.step` and `body.status`.
+  // Every write was answered 400 invalid_step, and the caller fired it with
+  // `void`, so the page reported success and no progress was ever saved.
+  const clientSrc = read("artifacts/helpdesk/src/lib/onboardingApi.ts");
+  const routeSrc = read("artifacts/api-server/src/routes/receptionistOnboarding.ts");
+  const apiSrc = read("artifacts/helpdesk/src/pages/setup/setupApi.ts");
+
+  check(
+    "the route still reads one step and one status as top-level fields",
+    /body\.step/.test(routeSrc) && /body\.status/.test(routeSrc),
+  );
+  check(
+    "the client sends exactly those two fields",
+    /JSON\.stringify\(\{ step: update\.step, status: update\.status \}\)/.test(clientSrc),
+  );
+  check(
+    "and no longer sends a `steps` map the route cannot read",
+    !/steps:\s*\{/.test(clientSrc) && !/\{ steps: patch \}/.test(apiSrc),
+  );
+  check(
+    "one request per step, so a partial failure is attributable",
+    /for \(const step of newlyDone\)/.test(apiSrc) &&
+      /updateOnboardingState\(\{ step, status: "done" \}\)/.test(apiSrc),
+  );
+
+  // A rejected write must be observable. Fire-and-forget is what made the
+  // original defect survive in production.
+  check("the write-back is no longer fired and forgotten", !/void sync\(/.test(pageSrc));
+  check(
+    "a failed write is recorded as state and shown",
+    /setSaveFailed/.test(pageSrc) && pageSrc.includes("PROGRESS_SAVE.failedTitle"),
+  );
+  check("and it can be retried", pageSrc.includes("PROGRESS_SAVE.retryLabel"));
+  check(
+    "the failure sentence does not claim the customer's setup was lost",
+    /still correct/i.test(PROGRESS_SAVE.failedDetail) &&
+      !/lost|deleted/i.test(PROGRESS_SAVE.failedDetail),
   );
 }
 

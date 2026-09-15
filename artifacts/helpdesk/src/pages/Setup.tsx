@@ -15,13 +15,14 @@
  * `PUT` once per data change, not on every render — see the effect below.
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { NextActionCard } from "@/components/common/NextActionCard";
 import { ProgressSteps } from "@/components/common/ProgressSteps";
 import { useSetupData, useSyncInferredSteps } from "@/pages/setup/setupApi";
 import {
   ACTIVATE_DISABLED_REASON,
+  PROGRESS_SAVE,
   buildDisplaySteps,
   buildNextAction,
   buildReviewSummary,
@@ -49,6 +50,30 @@ export default function Setup() {
   const data = useSetupData();
   const sync = useSyncInferredSteps();
   const syncedKey = useRef<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  // One place that performs the write and records what happened. A rejection
+  // is state, not a swallowed promise: the previous version fired this with
+  // `void`, so the 400 every one of these requests returned was invisible.
+  const runSync = useCallback(
+    async (saved: typeof data.saved, signals: typeof data.signals) => {
+      try {
+        const outcome = await sync(saved, signals);
+        setSaveFailed(outcome.failed.length > 0);
+      } catch {
+        setSaveFailed(true);
+      }
+    },
+    [sync],
+  );
+
+  const retrySync = useCallback(() => {
+    setSaveFailed(false);
+    // Clearing the guard lets the same signal snapshot be written again —
+    // otherwise a retry after a failure would be a no-op.
+    syncedKey.current = null;
+    void runSync(data.saved, data.signals);
+  }, [runSync, data.saved, data.signals]);
 
   const statuses = deriveStepStatuses(data.saved, data.signals);
   const display = buildDisplaySteps(statuses);
@@ -65,7 +90,7 @@ export default function Setup() {
     const key = JSON.stringify(data.signals);
     if (syncedKey.current === key) return;
     syncedKey.current = key;
-    void sync(data.saved, data.signals);
+    void runSync(data.saved, data.signals);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.ready, JSON.stringify(data.signals)]);
 
@@ -74,6 +99,22 @@ export default function Setup() {
   return (
     <div className="sd-page sd-enter">
       <PageHeader eyebrow={page.eyebrow} title={page.title} description={page.detail} />
+
+      {saveFailed && (
+        <div
+          className="sd-error"
+          role="alert"
+          style={{ marginBottom: "var(--sd-space-4, 1rem)" }}
+        >
+          <div className="sd-error__body">
+            <span className="sd-error__title">{PROGRESS_SAVE.failedTitle}</span>
+            <p className="sd-error__detail">{PROGRESS_SAVE.failedDetail}</p>
+          </div>
+          <button type="button" className="sd-error__action" onClick={retrySync}>
+            {PROGRESS_SAVE.retryLabel}
+          </button>
+        </div>
+      )}
 
       <NextActionCard
         title={next.title}

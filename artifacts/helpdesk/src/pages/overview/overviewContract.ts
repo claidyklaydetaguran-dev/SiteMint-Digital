@@ -73,21 +73,36 @@ export interface ReceptionistStateInput {
   setupComplete: boolean;
   /** At least one Setup step is done — distinguishes "not started" from "in progress". */
   anyStepDone: boolean;
-  /** A phone number is assigned to this firm (from `voice/numbers`). */
+  /** A number whose state is exactly `assigned` (from `voice/numbers`). */
   numberAssigned: boolean;
   /** The assistant's own status is "published" (from `voice/assistants`). */
   assistantPublished: boolean;
+  /**
+   * The voice provider is running the configuration saved here
+   * (`providerSyncState === "synchronized"`).
+   */
+  assistantSynchronized: boolean;
 }
 
 /**
- * "Live" requires both an assigned number and a published assistant — either
- * one alone is not enough to answer a real call. Short of that, completed
- * setup reads as "ready for activation" (S-3: activation itself only ever
- * happens with SiteMint, never automatically), any progress reads as
- * "in progress", and a blank slate reads as "not set up".
+ * "Live" is the strongest claim this dashboard makes, so it requires all three
+ * things a real call actually depends on: a number in the `assigned` state, an
+ * assistant whose status is `published`, and a provider that is running that
+ * saved configuration.
+ *
+ * The third condition is the one that was missing. A published assistant whose
+ * edits have not reached the provider is answering callers with an older
+ * configuration — the provider keeps serving the last payload it confirmed —
+ * so calling that "Live" tells a business its current setup is in use when it
+ * demonstrably is not. Short of all three, completed setup reads as "ready for
+ * activation" (S-3: activation itself only ever happens with SiteMint, never
+ * automatically), any progress reads as "in progress", and a blank slate reads
+ * as "not set up".
  */
 export function deriveReceptionistState(input: ReceptionistStateInput): ReceptionistState {
-  if (input.numberAssigned && input.assistantPublished) return "live";
+  if (input.numberAssigned && input.assistantPublished && input.assistantSynchronized) {
+    return "live";
+  }
   if (input.setupComplete) return "ready_for_activation";
   if (input.anyStepDone) return "setup_in_progress";
   return "not_set_up";
