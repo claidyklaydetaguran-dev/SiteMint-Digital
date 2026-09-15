@@ -37,3 +37,7 @@ export * from "./voiceSignupJobs";
 // outbox that tells a business about them. Rollback committed at
 // drizzle/voice-rollback/0010_rollback.sql.
 export * from "../voiceMessages";
+// Migration 0011: primary contact and default location, which the frozen
+// intake_firms row has no columns for. Rollback committed at
+// drizzle/voice-rollback/0011_rollback.sql.
+export * from "./voiceBusinessProfiles";

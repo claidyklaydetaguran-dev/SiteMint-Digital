@@ -50,6 +50,7 @@ import {
   type ProfileFormValues,
   type SaveState,
   type SignOutState,
+  PROFILE_FIELD_LIMITS,
 } from "@/pages/settings/settingsContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-settings.css";
@@ -59,6 +60,9 @@ const EMPTY_PROFILE_FORM: ProfileFormValues = {
   name: "",
   industry: "",
   timezone: "",
+  contactName: "",
+  contactEmail: "",
+  defaultLocation: "",
 };
 
 function browserTimezone(): string {
@@ -105,6 +109,7 @@ export default function Settings() {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileFieldError, setProfileFieldError] = useState<string | undefined>(undefined);
+  const [contactEmailError, setContactEmailError] = useState<string | undefined>(undefined);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   useEffect(() => {
@@ -120,6 +125,9 @@ export default function Settings() {
           // The stored timezone wins. The browser's is only a first guess for a
           // business that has never chosen one — never an override of one it has.
           timezone: account.timezone || browserTimezone(),
+          contactName: account.primaryContact.name,
+          contactEmail: account.primaryContact.email,
+          defaultLocation: account.defaultLocation,
         });
         setProfileLoaded(true);
       })
@@ -139,15 +147,27 @@ export default function Settings() {
     e.preventDefault();
     setProfileError("");
     setProfileFieldError(undefined);
+    setContactEmailError(undefined);
     const validation = validateProfile(profile);
     if (!validation.ok) {
       setProfileError(validation.formError);
       setProfileFieldError(validation.fieldErrors.name);
+      setContactEmailError(validation.fieldErrors.contactEmail);
       return;
     }
     setSaveState("saving");
     try {
-      await updateAccountProfile(buildProfilePatch(profile));
+      const saved = readBusinessProfile(await updateAccountProfile(buildProfilePatch(profile)));
+      // Show what the server stored, not what was typed: it trims, lowercases
+      // the email, and turns an emptied field into "not set".
+      setProfile((f) => ({
+        ...f,
+        name: saved.name || f.name,
+        industry: saved.industry,
+        contactName: saved.primaryContact.name,
+        contactEmail: saved.primaryContact.email,
+        defaultLocation: saved.defaultLocation,
+      }));
       setSaveState("saved");
       qc.invalidateQueries({ queryKey: ["agent-config"] });
       // The business day's timezone lives in the scheduling settings, and
@@ -369,6 +389,61 @@ export default function Settings() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="settings-contact-name" className="si-label">
+              Primary contact name <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-contact-name"
+              className="si-input"
+              type="text"
+              autoComplete="name"
+              maxLength={PROFILE_FIELD_LIMITS.contactName}
+              value={profile.contactName}
+              onChange={(e) => setProfile((f) => ({ ...f, contactName: e.target.value }))}
+              disabled={!profileLoaded}
+            />
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="settings-contact-email" className="si-label">
+              Primary contact email <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-contact-email"
+              className={`si-input${contactEmailError ? " si-input--invalid" : ""}`}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              maxLength={PROFILE_FIELD_LIMITS.contactEmail}
+              value={profile.contactEmail}
+              onChange={(e) => setProfile((f) => ({ ...f, contactEmail: e.target.value }))}
+              disabled={!profileLoaded}
+              aria-invalid={contactEmailError ? true : undefined}
+              aria-describedby="settings-contact-email-help"
+            />
+            <p className="si-help" id="settings-contact-email-help">
+              Who your team should reach about this account. This is not the address you sign in with.
+            </p>
+            {contactEmailError && <p className="si-error">{contactEmailError}</p>}
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="settings-location" className="si-label">
+              Default business location <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-location"
+              className="si-input"
+              type="text"
+              autoComplete="street-address"
+              maxLength={PROFILE_FIELD_LIMITS.defaultLocation}
+              value={profile.defaultLocation}
+              onChange={(e) => setProfile((f) => ({ ...f, defaultLocation: e.target.value }))}
+              disabled={!profileLoaded}
+            />
           </div>
 
           <button type="submit" className="si-submit" disabled={!profileLoaded || saveState === "saving"}>

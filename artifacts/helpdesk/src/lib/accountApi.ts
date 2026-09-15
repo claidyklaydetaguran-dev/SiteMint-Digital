@@ -92,8 +92,8 @@ export function fetchAgentConfig(): Promise<AgentConfigResponse> {
 // `400 No fields to update`, so this form never once saved, and Setup step 1
 // — complete only when name AND industry are set — could never be finished.
 //
-// `primaryContact` and `defaultLocation` are gone: the account has no column
-// for either, so they were being discarded on every submit.
+// `primaryContact` and `defaultLocation` are stored in their own firm-scoped
+// table (voice migration 0011) and returned by the same endpoint.
 
 export const PROFILE_ENDPOINT = "/receptionist/account/profile";
 
@@ -101,20 +101,25 @@ export interface BusinessProfile {
   name: string;
   industry: string;
   timezone: string;
+  primaryContact: { name: string; email: string };
+  defaultLocation: string;
 }
 
 export interface BusinessProfileResponse {
-  profile: Partial<BusinessProfile>;
+  profile: Partial<Omit<BusinessProfile, "primaryContact">> & {
+    primaryContact?: Partial<BusinessProfile["primaryContact"]>;
+  };
 }
-
-const EMPTY_BUSINESS_PROFILE: BusinessProfile = { name: "", industry: "", timezone: "" };
 
 export function readBusinessProfile(body: BusinessProfileResponse | null | undefined): BusinessProfile {
   const p = body?.profile ?? {};
+  const text = (v: unknown): string => (typeof v === "string" ? v : "");
   return {
-    name: typeof p.name === "string" ? p.name : EMPTY_BUSINESS_PROFILE.name,
-    industry: typeof p.industry === "string" ? p.industry : EMPTY_BUSINESS_PROFILE.industry,
-    timezone: typeof p.timezone === "string" ? p.timezone : EMPTY_BUSINESS_PROFILE.timezone,
+    name: text(p.name),
+    industry: text(p.industry),
+    timezone: text(p.timezone),
+    primaryContact: { name: text(p.primaryContact?.name), email: text(p.primaryContact?.email) },
+    defaultLocation: text(p.defaultLocation),
   };
 }
 
@@ -126,6 +131,8 @@ export interface AccountProfilePatch {
   name?: string;
   industry?: string;
   timezone?: string;
+  primaryContact?: { name?: string; email?: string };
+  defaultLocation?: string;
 }
 
 export function updateAccountProfile(patch: AccountProfilePatch): Promise<BusinessProfileResponse> {

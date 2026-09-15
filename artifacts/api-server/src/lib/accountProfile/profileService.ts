@@ -1,5 +1,6 @@
 // The business profile a customer edits in Settings: what this business is
-// called, what trade it is in, and which timezone its day runs on.
+// called, what trade it is in, which timezone its day runs on, who to contact,
+// and where it is.
 //
 // Why this exists as its own service rather than more fields on the agent-config
 // route: that route is the SMS receptionist's *agent* configuration (greeting,
@@ -11,26 +12,41 @@
 // setup journey was stuck on its first step.
 //
 // Storage, deliberately:
-//   name, industry → intake_firms (columns that already exist; no migration)
-//   timezone       → scheduling_availability_settings.timezone, which is
-//                    already the one place a business day's timezone lives.
-//                    Two editors (Settings and Availability) of ONE value —
-//                    never a second copy that can disagree with the first.
-//
-// primaryContact and defaultLocation have nowhere to be stored and are not
-// accepted here. A field that silently discards what the customer typed is
-// worse than a field that isn't offered, so the form no longer offers them.
+//   name, industry     → intake_firms (columns that already exist)
+//   timezone           → scheduling_availability_settings.timezone, which is
+//                        already the one place a business day's timezone lives.
+//                        Two editors (Settings and Availability) of ONE value —
+//                        never a second copy that can disagree with the first.
+//   primary contact,   → voice_business_profiles (voice migration 0011). The
+//   default location     frozen intake_firms row has no columns for them, and
+//                        adding any would mean a push against a protected
+//                        table; a firm-scoped side table does not.
 
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { intakeFirms } from "@workspace/db/schema";
+import {
+  voiceBusinessProfiles,
+  PROFILE_CONTACT_EMAIL_MAX,
+  PROFILE_CONTACT_NAME_MAX,
+  PROFILE_LOCATION_MAX,
+} from "@workspace/db/schema/voice";
 
 import { getSerializedAvailabilitySettings, setBusinessTimezone } from "../scheduling/schedulingRepository.js";
 
 export const MAX_NAME = 120;
 export const MAX_INDUSTRY = 80;
+export { PROFILE_CONTACT_EMAIL_MAX, PROFILE_CONTACT_NAME_MAX, PROFILE_LOCATION_MAX };
 
-export type ProfileValidationCode = "name_empty" | "name_too_long" | "industry_too_long" | "timezone_unknown" | "no_fields";
+export type ProfileValidationCode =
+  | "name_empty"
+  | "name_too_long"
+  | "industry_too_long"
+  | "timezone_unknown"
+  | "contact_name_too_long"
+  | "contact_email_invalid"
+  | "location_too_long"
+  | "no_fields";
 
 export interface ProfileValidationError {
   ok: false;
@@ -42,9 +58,18 @@ export interface BusinessProfile {
   name: string;
   industry: string;
   timezone: string;
+  primaryContact: { name: string; email: string };
+  defaultLocation: string;
 }
 
-export interface ProfilePatch {
+/** A field set to `null` is being cleared; an absent field is left alone. */
+export interface ProfileDetailsPatch {
+  primaryContactName?: string | null;
+  primaryContactEmail?: string | null;
+  defaultLocation?: string | null;
+}
+
+export interface ProfilePatch extends ProfileDetailsPatch {
   name?: string;
   industry?: string;
   timezone?: string;
@@ -65,8 +90,28 @@ export function isKnownTimezone(tz: string): boolean {
 }
 
 /**
+ * Deliberately modest. It catches what a person actually mistypes — no "@",
+ * nothing either side of it, a space, no dot in the domain — without refusing
+ * a real address because it is unusual. Deliverability is not provable here.
+ */
+export function isPlausibleEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/** Trimmed text, with an emptied field meaning "clear it". */
+function optionalText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
  * Validates the patch and returns exactly the fields that were present.
  * Absent means "leave alone"; it never means "clear".
+ *
+ * Settings sends the primary contact nested (`primaryContact: { name, email }`)
+ * because that is how the form groups it; each part is still optional on its
+ * own, so a business can record a name without an email.
  */
 export function validateProfilePatch(
   body: unknown,
@@ -109,6 +154,48 @@ export function validateProfilePatch(
     patch.timezone = timezone;
   }
 
+  const contact = input.primaryContact;
+  if (contact !== undefined && contact !== null && typeof contact === "object") {
+    const parts = contact as Record<string, unknown>;
+    if (parts.name !== undefined) {
+      const contactName = optionalText(parts.name);
+      if (contactName !== null && contactName.length > PROFILE_CONTACT_NAME_MAX) {
+        return {
+          ok: false,
+          code: "contact_name_too_long",
+          message: `Contact name must be ${PROFILE_CONTACT_NAME_MAX} characters or fewer.`,
+        };
+      }
+      patch.primaryContactName = contactName;
+    }
+    if (parts.email !== undefined) {
+      const contactEmail = optionalText(parts.email);
+      if (
+        contactEmail !== null &&
+        (contactEmail.length > PROFILE_CONTACT_EMAIL_MAX || !isPlausibleEmail(contactEmail))
+      ) {
+        return {
+          ok: false,
+          code: "contact_email_invalid",
+          message: "Enter a contact email like name@example.com, or leave it blank.",
+        };
+      }
+      patch.primaryContactEmail = contactEmail === null ? null : contactEmail.toLowerCase();
+    }
+  }
+
+  if (input.defaultLocation !== undefined) {
+    const location = optionalText(input.defaultLocation);
+    if (location !== null && location.length > PROFILE_LOCATION_MAX) {
+      return {
+        ok: false,
+        code: "location_too_long",
+        message: `Business location must be ${PROFILE_LOCATION_MAX} characters or fewer.`,
+      };
+    }
+    patch.defaultLocation = location;
+  }
+
   if (Object.keys(patch).length === 0) {
     return { ok: false, code: "no_fields", message: "Nothing was changed." };
   }
@@ -118,6 +205,8 @@ export function validateProfilePatch(
 export interface ProfileDeps {
   updateFirm: (firmId: number, values: { name?: string; industry?: string | null }) => Promise<void>;
   setTimezone: (firmId: number, timezone: string) => Promise<void>;
+  /** Writes only the detail fields present; creates the row on first save. */
+  upsertDetails: (firmId: number, values: ProfileDetailsPatch) => Promise<void>;
 }
 
 export const productionProfileDeps: ProfileDeps = {
@@ -125,12 +214,23 @@ export const productionProfileDeps: ProfileDeps = {
     await db.update(intakeFirms).set(values).where(eq(intakeFirms.id, firmId));
   },
   setTimezone: setBusinessTimezone,
+  async upsertDetails(firmId, values) {
+    const now = new Date();
+    await db
+      .insert(voiceBusinessProfiles)
+      .values({ firmId, ...values, createdAt: now, updatedAt: now })
+      .onConflictDoUpdate({
+        target: voiceBusinessProfiles.firmId,
+        set: { ...values, updatedAt: now },
+      });
+  },
 };
 
 /**
- * Applies a validated patch. The firm row and the scheduling timezone are two
- * separate writes because they live in two tables; the firm row goes first, so
- * a timezone failure can never leave a business renamed to nothing.
+ * Applies a validated patch. The firm row, the scheduling timezone and the
+ * profile details are separate writes because they live in separate tables;
+ * the firm row goes first, so a later failure can never leave a business
+ * renamed to nothing.
  */
 export async function applyProfilePatch(
   firmId: number,
@@ -143,8 +243,14 @@ export async function applyProfilePatch(
   // check asks whether industry is set, and an empty string would read as set.
   if (patch.industry !== undefined) firmValues.industry = patch.industry === "" ? null : patch.industry;
 
+  const details: ProfileDetailsPatch = {};
+  if (patch.primaryContactName !== undefined) details.primaryContactName = patch.primaryContactName;
+  if (patch.primaryContactEmail !== undefined) details.primaryContactEmail = patch.primaryContactEmail;
+  if (patch.defaultLocation !== undefined) details.defaultLocation = patch.defaultLocation;
+
   if (Object.keys(firmValues).length > 0) await deps.updateFirm(firmId, firmValues);
   if (patch.timezone !== undefined) await deps.setTimezone(firmId, patch.timezone);
+  if (Object.keys(details).length > 0) await deps.upsertDetails(firmId, details);
 }
 
 /**
@@ -159,10 +265,24 @@ export async function readBusinessProfile(firmId: number): Promise<BusinessProfi
     .from(intakeFirms)
     .where(eq(intakeFirms.id, firmId))
     .limit(1);
+  const [details] = await db
+    .select({
+      primaryContactName: voiceBusinessProfiles.primaryContactName,
+      primaryContactEmail: voiceBusinessProfiles.primaryContactEmail,
+      defaultLocation: voiceBusinessProfiles.defaultLocation,
+    })
+    .from(voiceBusinessProfiles)
+    .where(eq(voiceBusinessProfiles.firmId, firmId))
+    .limit(1);
   const settings = await getSerializedAvailabilitySettings(firmId);
   return {
     name: row?.name ?? "",
     industry: row?.industry ?? "",
     timezone: settings.timezone,
+    primaryContact: {
+      name: details?.primaryContactName ?? "",
+      email: details?.primaryContactEmail ?? "",
+    },
+    defaultLocation: details?.defaultLocation ?? "",
   };
 }

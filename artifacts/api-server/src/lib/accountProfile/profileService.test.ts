@@ -10,18 +10,26 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 
-import { applyProfilePatch, isKnownTimezone, validateProfilePatch, type ProfileDeps } from "./profileService.js";
+import {
+  applyProfilePatch,
+  isKnownTimezone,
+  validateProfilePatch,
+  type ProfileDeps,
+  type ProfileDetailsPatch,
+} from "./profileService.js";
 
 const FIRM = 4;
 
 function recorder() {
   const firmWrites: Array<{ name?: string; industry?: string | null }> = [];
   const timezoneWrites: string[] = [];
+  const detailWrites: ProfileDetailsPatch[] = [];
   const deps: ProfileDeps = {
     updateFirm: async (_f, values) => { firmWrites.push(values); },
     setTimezone: async (_f, tz) => { timezoneWrites.push(tz); },
+    upsertDetails: async (_f, values) => { detailWrites.push(values); },
   };
-  return { deps, firmWrites, timezoneWrites };
+  return { deps, firmWrites, timezoneWrites, detailWrites };
 }
 
 function ok(body: unknown) {
@@ -76,11 +84,48 @@ describe("what the profile accepts", () => {
     if (!result.ok) expect(result.code).toBe("no_fields");
   });
 
-  it("ignores fields that have nowhere to be stored", () => {
-    // The old form sent these. Accepting them silently is what made the bug
-    // invisible: the customer typed an address, got "Saved", and lost it.
-    const patch = ok({ name: "Northgate", primaryContact: { name: "Jamie" }, defaultLocation: "123 Main St" });
-    expect(patch).toEqual({ name: "Northgate" });
+  it("accepts the primary contact and default location now that they have storage", () => {
+    // These were once silently ignored because nothing could hold them: the
+    // customer typed an address, got "Saved", and lost it.
+    const patch = ok({
+      name: "Northgate",
+      primaryContact: { name: "  Jamie Rivera ", email: " Jamie@Northgate.Example " },
+      defaultLocation: " 123 Main St ",
+    });
+    expect(patch).toEqual({
+      name: "Northgate",
+      primaryContactName: "Jamie Rivera",
+      primaryContactEmail: "jamie@northgate.example",
+      defaultLocation: "123 Main St",
+    });
+  });
+
+  it("treats an emptied contact or location as clearing it, stored as null", () => {
+    const patch = ok({ primaryContact: { name: "   ", email: "" }, defaultLocation: "" });
+    expect(patch).toEqual({ primaryContactName: null, primaryContactEmail: null, defaultLocation: null });
+  });
+
+  it("leaves the half of the contact that was not sent alone", () => {
+    const patch = ok({ primaryContact: { name: "Jamie" } });
+    expect(patch).toEqual({ primaryContactName: "Jamie" });
+    expect("primaryContactEmail" in patch).toBe(false);
+  });
+
+  it("refuses a contact email that is not an address", () => {
+    for (const email of ["jamie", "jamie@", "@example.com", "jamie at example.com", "jamie@example"]) {
+      const result = validateProfilePatch({ primaryContact: { email } });
+      expect(result.ok, email).toBe(false);
+      if (!result.ok) expect(result.code).toBe("contact_email_invalid");
+    }
+  });
+
+  it("refuses an over-long contact name or location instead of truncating it", () => {
+    const longName = validateProfilePatch({ primaryContact: { name: "x".repeat(121) } });
+    expect(longName.ok).toBe(false);
+    if (!longName.ok) expect(longName.code).toBe("contact_name_too_long");
+    const longPlace = validateProfilePatch({ defaultLocation: "x".repeat(301) });
+    expect(longPlace.ok).toBe(false);
+    if (!longPlace.ok) expect(longPlace.code).toBe("location_too_long");
   });
 });
 
@@ -116,8 +161,22 @@ describe("where each field is written", () => {
     const deps: ProfileDeps = {
       updateFirm: async () => { order.push("firm"); },
       setTimezone: async () => { order.push("timezone"); },
+      upsertDetails: async () => { order.push("details"); },
     };
-    await applyProfilePatch(FIRM, { name: "Northgate", timezone: "UTC" }, deps);
-    expect(order).toEqual(["firm", "timezone"]);
+    await applyProfilePatch(FIRM, { name: "Northgate", timezone: "UTC", defaultLocation: "Main St" }, deps);
+    expect(order).toEqual(["firm", "timezone", "details"]);
+  });
+
+  it("writes the contact and location to the profile table, never the firm row", async () => {
+    const r = recorder();
+    await applyProfilePatch(FIRM, { primaryContactName: "Jamie", primaryContactEmail: null, defaultLocation: "Main St" }, r.deps);
+    expect(r.firmWrites).toEqual([]);
+    expect(r.detailWrites).toEqual([{ primaryContactName: "Jamie", primaryContactEmail: null, defaultLocation: "Main St" }]);
+  });
+
+  it("does not touch the profile table when no detail was sent", async () => {
+    const r = recorder();
+    await applyProfilePatch(FIRM, { name: "Northgate" }, r.deps);
+    expect(r.detailWrites).toEqual([]);
   });
 });

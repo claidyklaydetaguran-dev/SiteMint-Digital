@@ -144,41 +144,69 @@ export function emailChangeDetail(verificationSent: boolean): string {
 
 // ─── Editable business profile (D-7) ───────────────────────────────────────
 
-// Three fields, because three fields is what the account can actually store.
-// A "primary contact" and a "default business location" were offered here
-// before and had nowhere to be saved: the account row has no column for
-// either, so whatever the customer typed was discarded on submit. An input
-// that silently throws away what you typed is worse than one that isn't
-// there — they come back when there is somewhere to put them.
+// A "primary contact" and a "default business location" were once offered here
+// with nowhere to be saved, so whatever the customer typed was discarded on
+// submit and the inputs were removed. They are back because they now have
+// storage (voice_business_profiles, migration 0011) and the server reads them
+// back after every save.
 export interface ProfileFormValues {
   name: string;
   industry: string;
   timezone: string;
+  contactName: string;
+  contactEmail: string;
+  defaultLocation: string;
 }
 
-/** Every field the form submits is optional client-side — the server is authoritative on what it requires. */
+export const PROFILE_FIELD_LIMITS = { contactName: 120, contactEmail: 254, defaultLocation: 300 } as const;
+
+/**
+ * Every field the form submits is optional client-side — the server is
+ * authoritative on what it requires. An emptied contact or location is sent as
+ * an empty string, which the server stores as "not set".
+ */
 export function buildProfilePatch(form: ProfileFormValues): {
   name: string;
   industry: string;
   timezone: string;
+  primaryContact: { name: string; email: string };
+  defaultLocation: string;
 } {
   return {
     name: form.name.trim(),
     industry: form.industry.trim(),
     timezone: form.timezone,
+    primaryContact: { name: form.contactName.trim(), email: form.contactEmail.trim() },
+    defaultLocation: form.defaultLocation.trim(),
   };
 }
 
 export interface ProfileValidation {
   ok: boolean;
   formError: string;
-  fieldErrors: { name?: string };
+  fieldErrors: { name?: string; contactEmail?: string };
 }
 
-/** One client-side rule: the business name must not be blank. Everything else is optional. */
+/** Same modest rule as the server: catches a typo, never refuses an unusual real address. */
+export function isPlausibleEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/**
+ * The business name must not be blank, and a contact email, when one is given,
+ * must look like an address. Everything else is optional.
+ */
 export function validateProfile(form: ProfileFormValues): ProfileValidation {
   if (!form.name.trim()) {
     return { ok: false, formError: "Enter your business name.", fieldErrors: { name: "Required." } };
+  }
+  const email = form.contactEmail.trim();
+  if (email !== "" && !isPlausibleEmail(email)) {
+    return {
+      ok: false,
+      formError: "Check the contact email.",
+      fieldErrors: { contactEmail: "Enter an email like name@example.com, or leave it blank." },
+    };
   }
   return { ok: true, formError: "", fieldErrors: {} };
 }

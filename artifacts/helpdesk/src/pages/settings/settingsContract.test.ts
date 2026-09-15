@@ -82,6 +82,9 @@ const validProfile: ProfileFormValues = {
   name: "Northgate Plumbing",
   industry: "Home Services",
   timezone: "America/Chicago",
+  contactName: "Jamie Rivera",
+  contactEmail: "jamie@northgate.example",
+  defaultLocation: "123 Main St, Springfield",
 };
 
 // ─── Read-only account values (unchanged from Phase 11/12) ─────────────────
@@ -107,18 +110,20 @@ check("the account note explains provenance, not a restriction", !/cannot|can't|
 section("editable business profile (D-7)");
 
 check("a blank business name is rejected", validateProfile({ ...validProfile, name: "   " }).ok === false);
-check("every other field is optional", validateProfile({ ...validProfile, industry: "", timezone: "" }).ok === true);
+check("every other field is optional", validateProfile({ ...validProfile, industry: "", timezone: "", contactName: "", contactEmail: "", defaultLocation: "" }).ok === true);
 check("a complete form validates", validateProfile(validProfile).ok === true);
+check("a mistyped contact email is caught before submit", validateProfile({ ...validProfile, contactEmail: "jamie at northgate" }).fieldErrors.contactEmail !== undefined);
+check("an unusual but real contact email is not refused", validateProfile({ ...validProfile, contactEmail: "o'neil+ops@sub.example.co.uk" }).ok === true);
 
 const patch = buildProfilePatch(validProfile);
-// Exactly the three fields the account can store. This assertion used to
-// require five, which is how a form that could never save passed its own
-// contract test: `primaryContact` and `defaultLocation` had no column behind
-// them, and the route the other three were sent to accepted none of them and
-// answered "400 No fields to update" every single time.
-eq("the patch carries exactly the three fields the account can store", Object.keys(patch).sort(), ["industry", "name", "timezone"]);
-check("nothing unstorable is submitted", !("primaryContact" in patch) && !("defaultLocation" in patch));
+// The primary contact and default location were once removed from this patch
+// because nothing could store them — this test then pinned exactly three
+// fields. They have storage now (voice migration 0011), so all five are sent,
+// and the server's read-back is what the form displays afterwards.
+eq("the patch carries every field the profile can store", Object.keys(patch).sort(), ["defaultLocation", "industry", "name", "primaryContact", "timezone"]);
+eq("the contact is sent grouped, as the server reads it", patch.primaryContact, { name: "Jamie Rivera", email: "jamie@northgate.example" });
 check("values are trimmed before submission", buildProfilePatch({ ...validProfile, name: "  Padded Co  " }).name === "Padded Co");
+eq("an emptied location is sent as empty, which the server stores as not set", buildProfilePatch({ ...validProfile, defaultLocation: "   " }).defaultLocation, "");
 
 eq("the save button reads 'Save changes' while idle", saveButtonLabel("idle"), "Save changes");
 eq("the save button announces the in-flight state", saveButtonLabel("saving"), "Saving…");
@@ -140,13 +145,17 @@ check("the page reads the business profile to populate the form", pageSrc.includ
 check("the page writes through updateAccountProfile, not a hand-rolled request", pageSrc.includes("updateAccountProfile(buildProfilePatch(profile))"));
 check("saving invalidates the shared agent-config cache entry", pageSrc.includes('queryKey: ["agent-config"]'));
 check("business name is required in the UI", pageSrc.includes('id="settings-name"') && pageSrc.includes('htmlFor="settings-name"'));
-check("every storable field is present", ["settings-name", "settings-industry", "settings-timezone"].every((id) => pageSrc.includes(`id="${id}"`)));
 check(
-  "the fields with nowhere to save are gone rather than silently discarding input",
-  !pageSrc.includes('id="settings-contact-name"') &&
-    !pageSrc.includes('id="settings-contact-email"') &&
-    !pageSrc.includes('id="settings-location"'),
+  "every storable field is present, including the contact and location that now have storage",
+  ["settings-name", "settings-industry", "settings-timezone", "settings-contact-name", "settings-contact-email", "settings-location"].every((id) =>
+    pageSrc.includes(`id="${id}"`),
+  ),
 );
+check(
+  "after saving, the form shows what the server stored rather than what was typed",
+  pageSrc.includes("readBusinessProfile(await updateAccountProfile(buildProfilePatch(profile)))"),
+);
+check("a contact email error is shown beside its field", pageSrc.includes("contactEmailError &&") && pageSrc.includes('aria-describedby="settings-contact-email-help"'));
 check(
   "saving refreshes the timezone's real home and the setup step that reads these fields",
   pageSrc.includes('queryKey: ["availability"]') && pageSrc.includes('queryKey: ["setup"]'),
