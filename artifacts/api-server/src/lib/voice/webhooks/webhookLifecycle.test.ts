@@ -269,6 +269,36 @@ describe("event key + call-state fold", () => {
     expect(record!.state).toBe("completed");
     expect(record!.isFinal).toBe(true);
   });
+
+  // Found on the staging deployment: the display value defaults to the
+  // placeholder "Unknown", and a consumer that tested it for truthiness
+  // announced every browser test as a phone call.
+  it("records that a browser call reached us by no number, and knows no caller", () => {
+    const record = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report", endedReason: "customer-ended-call" }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(record!.reachedViaNumber).toBe(false);
+    expect(record!.callerNumberKnown).toBe(false);
+    expect(record!.callerNumberDisplay).toBe("Unknown");
+  });
+
+  it("treats a withheld caller ID on a phone number as a telephone call with no known caller", () => {
+    const record = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "status-update", status: "ringing", call: { id: "call-1", assistantId: "asst-1", phoneNumberId: "pn-1" } }), "2026-08-30T11:00:00Z"),
+      stored(msg({ type: "end-of-call-report", endedReason: "customer-ended-call" }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(record!.reachedViaNumber).toBe(true);
+    expect(record!.callerNumberKnown).toBe(false);
+  });
+
+  it("marks the caller known, and the call telephone, once a customer number arrives", () => {
+    const record = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report", call: { id: "call-1", assistantId: "asst-1", customerNumber: "+15550102030" } }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(record!.reachedViaNumber).toBe(true);
+    expect(record!.callerNumberKnown).toBe(true);
+    expect(record!.callerNumberDisplay).not.toBe("Unknown");
+  });
 });
 
 // ── 4. reconciliation ────────────────────────────────────────────────────────
@@ -282,6 +312,8 @@ function callRecord(overrides: Partial<RealCallRecord>): RealCallRecord {
     state: "in_progress",
     isFinal: false,
     callerNumberDisplay: "•••• 1234",
+    callerNumberKnown: true,
+    reachedViaNumber: true,
     firstEventAt: new Date("2026-08-30T10:00:00Z"),
     lastEventAt: new Date("2026-08-30T10:00:00Z"),
     endedAt: undefined,

@@ -55,7 +55,19 @@ export interface AlertMessage {
   text: string;
   /** Overrides the configured operator inbox (e.g. account emails to the firm's own address). */
   to?: string;
+  /**
+   * Makes a retry of this exact message safe. Resend keeps a key for 24 hours
+   * and answers a repeat with the original response instead of sending again
+   * (docs: resend.com/docs/dashboard/emails/idempotency-keys). Without one, a
+   * send whose response was lost — a timeout, a dropped connection — cannot be
+   * told apart from one that never happened, and retrying it emails the
+   * recipient twice. 1–256 characters; `<event-type>/<entity-id>`.
+   */
+  idempotencyKey?: string;
 }
+
+/** Resend's bound on an idempotency key's length. */
+export const IDEMPOTENCY_KEY_MAX = 256;
 
 /**
  * `ok` means the provider ACCEPTED the message, which is the strongest thing we
@@ -93,12 +105,15 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
   const doFetch: FetchLike = fetchImpl ?? (fetch as unknown as FetchLike);
   return {
     async send(message: AlertMessage): Promise<AlertSendResult> {
+      const key = message.idempotencyKey;
+      const useKey = typeof key === "string" && key.length >= 1 && key.length <= IDEMPOTENCY_KEY_MAX;
       try {
         const response = await doFetch(RESEND_EMAILS_URL, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${config.apiKey}`,
             "Content-Type": "application/json",
+            ...(useKey ? { "Idempotency-Key": key } : {}),
           },
           body: JSON.stringify({
             from: config.from,
@@ -106,7 +121,10 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
             subject: message.subject,
             text: message.text,
           }),
-          signal: AbortSignal.timeout(10_000),
+          // Long enough that a slow-but-working provider is not cut off. A cut-off
+          // send may still have been delivered — which is why a keyed retry, not
+          // a shorter timeout, is what prevents the duplicate.
+          signal: AbortSignal.timeout(20_000),
         });
         if (response.ok) {
           // The provider's receipt id, when it gives one. Read defensively: a
@@ -124,10 +142,30 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
           }
           return providerMessageId === undefined ? { ok: true } : { ok: true, providerMessageId };
         }
+        if (response.status === 409 && useKey) {
+          // Only the provider's fixed error NAME is read, never its message.
+          let name: unknown;
+          try {
+            name = ((await response.json?.()) as { name?: unknown } | undefined)?.name;
+          } catch {
+            name = undefined;
+          }
+          // This key already produced a processed send. Our payload for a key
+          // never changes once a send has been attempted, so this can only mean
+          // the earlier attempt went through: treat it as accepted, never resend.
+          if (name === "invalid_idempotent_request") return { ok: true };
+          // The first request with this key is still being processed. Safe to
+          // retry later; nothing is sent twice.
+          if (name === "concurrent_idempotent_requests") return { ok: false, reason: "provider_idempotency_in_progress" };
+        }
         // Status only — response bodies never enter logs or issues.
         return { ok: false, reason: `provider_status_${response.status}` };
-      } catch {
-        return { ok: false, reason: "transport_error" };
+      } catch (err) {
+        const name = err instanceof Error ? err.name : "";
+        // A timeout is the case that emailed a business twice: the provider
+        // accepted the send, the response did not arrive in time, and the
+        // unkeyed retry sent it again. Named separately so it is visible.
+        return { ok: false, reason: name === "TimeoutError" || name === "AbortError" ? "transport_timeout" : "transport_error" };
       }
     },
   };

@@ -114,6 +114,14 @@ export interface RealCallRecord {
   /** True once any terminal state has been observed for this call. */
   isFinal: boolean;
   callerNumberDisplay: string;
+  /** True only when a customer number was actually received; `callerNumberDisplay` is a placeholder otherwise. */
+  callerNumberKnown: boolean;
+  /**
+   * True when any event carried a phone-number id or a customer number — the
+   * call reached us by telephone. A browser (web) call carries neither. A
+   * withheld caller ID still arrives on a phone number, so it stays true.
+   */
+  reachedViaNumber: boolean;
   firstEventAt: Date;
   lastEventAt: Date;
   endedAt: Date | undefined;
@@ -165,6 +173,8 @@ export function foldEventsIntoCallRecord(
 
   let assistantId: string | undefined;
   let callerNumberDisplay = "Unknown";
+  let callerNumberKnown = false;
+  let reachedViaNumber = false;
   let state: InternalCallState = "queued";
   let isFinal = false;
   let endedReason: string | undefined;
@@ -182,7 +192,12 @@ export function foldEventsIntoCallRecord(
   for (const event of ordered) {
     const { message } = event;
     if (message.call.assistantId) assistantId = message.call.assistantId;
-    if (message.call.customerNumber) callerNumberDisplay = maskCallerNumber(message.call.customerNumber);
+    if (message.call.customerNumber) {
+      callerNumberDisplay = maskCallerNumber(message.call.customerNumber);
+      callerNumberKnown = true;
+      reachedViaNumber = true;
+    }
+    if (message.call.phoneNumberId) reachedViaNumber = true;
     lastEventAt = event.createdAt;
 
     if (message.type === "status-update" && message.status) {
@@ -258,6 +273,8 @@ export function foldEventsIntoCallRecord(
     state,
     isFinal,
     callerNumberDisplay,
+    callerNumberKnown,
+    reachedViaNumber,
     firstEventAt,
     lastEventAt,
     endedAt,

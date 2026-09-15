@@ -31,6 +31,7 @@
 
 import { and, eq, inArray, lte, or, isNull } from "drizzle-orm";
 import type { AlertTransport } from "../voiceAlerts/alertTransport.js";
+import type { RealCallRecord } from "../voice/webhooks/callStateModel.js";
 import {
   composePostCallEmail,
   type PostCallFacts,
@@ -57,6 +58,24 @@ export function postCallDedupeKey(providerCallId: string): string {
 
 export function callerAckDedupeKey(messageId: number): string {
   return `caller_ack:${messageId}`;
+}
+
+/**
+ * The provider-side idempotency key for one outbox row. Stable for the row's
+ * whole life, so every retry of the same notification carries the same key.
+ *
+ * Found by exercising the staging deployment: a send that outlived the
+ * transport timeout was recorded as failed although the provider had accepted
+ * it, and the retry emailed the business a second copy 33 seconds later. The
+ * dedupe key stops a second ROW; only this stops a second SEND. It is safe
+ * because a row's subject and body can change only while it is still 'queued'
+ * (refreshQueuedNotification), i.e. before any send was attempted — so a retry
+ * always repeats the exact payload the key was first used with. Every retry
+ * falls well inside the provider's 24-hour key window: six attempts with a
+ * 30-minute backoff ceiling.
+ */
+export function notificationIdempotencyKey(notificationId: number): string {
+  return `voice-notification/${notificationId}`;
 }
 
 async function wdb() {
@@ -167,6 +186,34 @@ export function dashboardCallUrl(providerCallId: string, env: Record<string, str
   return base.length > 0 ? `${base}${path}` : path;
 }
 
+/**
+ * The facts a post-call email may state, from a folded call record. Pure.
+ *
+ * Source used to be `callerNumberDisplay ? "telephone" : "browser_test"`. The
+ * record's display value defaults to the placeholder "Unknown", which is
+ * truthy, so every browser test was announced as a "Phone call" with no test
+ * banner — exactly the mistake the composer's label exists to prevent. Found
+ * by exercising the staging deployment with a labelled test event.
+ *
+ * - A call reached us by telephone when any event carried a phone-number id or
+ *   a customer number. A withheld caller ID is still a telephone call.
+ * - The caller's number is shown only when one was actually received; the
+ *   placeholder never reaches the email as if it were data.
+ * - Duration prefers the provider's own measurement over the receipt-time
+ *   approximation, which reads 0s whenever only one event arrived.
+ */
+export function callFactsFromRecord(call: RealCallRecord): PostCallFacts {
+  return {
+    providerCallId: call.callId,
+    source: call.reachedViaNumber ? "telephone" : "browser_test",
+    startedAt: call.firstEventAt,
+    endedAt: call.endedAt ?? null,
+    durationSec: call.providerDurationSec ?? call.durationSec ?? null,
+    callerNumberDisplay: call.callerNumberKnown ? call.callerNumberDisplay : null,
+    endedReason: call.endedReason ?? null,
+  };
+}
+
 async function productionSourceDeps(): Promise<PostCallSourceDeps> {
   const { db } = await import("@workspace/db");
   const { intakeFirms } = await import("@workspace/db/schema");
@@ -185,19 +232,7 @@ async function productionSourceDeps(): Promise<PostCallSourceDeps> {
     },
     loadCallFacts: async (firmId, providerCallId) => {
       const call = await calls.getRealCallForFirm(firmId, providerCallId);
-      if (!call) return undefined;
-      return {
-        providerCallId: call.callId,
-        // A browser test has no customer number and no inbound phone-number id.
-        // Labelling it is not cosmetic: an unlabelled test call in a business
-        // inbox is indistinguishable from a real customer being ignored.
-        source: call.callerNumberDisplay ? "telephone" : "browser_test",
-        startedAt: call.firstEventAt,
-        endedAt: call.endedAt ?? null,
-        durationSec: call.durationSec ?? null,
-        callerNumberDisplay: call.callerNumberDisplay ?? null,
-        endedReason: call.endedReason ?? null,
-      };
+      return call ? callFactsFromRecord(call) : undefined;
     },
     loadMessages: async (firmId, providerCallId) => {
       const rows = await messages.listVoiceMessagesForCall(firmId, providerCallId);
@@ -457,6 +492,7 @@ export async function processDueNotifications(
         to: row.recipient,
         subject: row.subject,
         text: row.body,
+        idempotencyKey: notificationIdempotencyKey(row.id),
       });
     } catch {
       result = { ok: false, reason: "transport_threw" };
