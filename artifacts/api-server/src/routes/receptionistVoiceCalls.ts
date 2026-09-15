@@ -13,6 +13,37 @@ import type { RealCallRecord } from "../lib/voice/webhooks/callStateModel.js";
 
 const router = Router();
 
+// ── artifact policy, as a non-secret read ─────────────────────────────────────
+//
+// VOICE_ARTIFACT_POLICY is owned by the server and is never accepted in a
+// request body, never read from a persisted assistant config, and never
+// defaulted (the publish path in lib/voice/providers/vapi/artifactPolicy.ts is
+// the authority and fails closed). What this route adds is only the ability to
+// REPORT the resolved policy name, so the dashboard's retention copy can match
+// what is actually configured instead of asserting it.
+//
+// The name is not a secret and no value, length or prefix of any credential is
+// involved. An unset or misspelled policy reports "unknown" rather than
+// throwing or defaulting to a permissive answer.
+const ARTIFACT_POLICIES = ["none", "transcript_only", "full"] as const;
+
+export type ArtifactPolicyReport = (typeof ARTIFACT_POLICIES)[number] | "unknown";
+
+function readArtifactPolicy(): ArtifactPolicyReport {
+  const raw = (process.env["VOICE_ARTIFACT_POLICY"] ?? "").trim();
+  return (ARTIFACT_POLICIES as readonly string[]).includes(raw) ? (raw as ArtifactPolicyReport) : "unknown";
+}
+
+/**
+ * Only `transcript_only` and `full` retain a transcript. An unset or invalid
+ * policy is treated as "not retained" — the safe direction: it can only ever
+ * withhold content, never surface it.
+ */
+function transcriptRetained(): boolean {
+  const policy = readArtifactPolicy();
+  return policy === "transcript_only" || policy === "full";
+}
+
 function serializeSummary(call: RealCallRecord) {
   return {
     callId: call.callId,
@@ -45,7 +76,11 @@ function serializeDetail(call: RealCallRecord) {
     ...serializeSummary(call),
     assistantId: call.assistantId ?? null,
     endedReason: call.endedReason ?? null,
-    transcript: call.transcript ?? null,
+    // Under the approved `none` policy nothing retains a transcript, so this
+    // API must not hand one to the dashboard even if some older row still
+    // carries one. The page's retention wording is driven by the same policy
+    // (reported on provider-status), so copy and content cannot disagree.
+    transcript: transcriptRetained() ? call.transcript ?? null : null,
     summary: call.summary ?? null,
     analysisAvailability,
     structuredOutcome: analysisAvailability === "available" ? call.structuredOutcome ?? null : null,
@@ -99,6 +134,10 @@ router.get("/receptionist/voice/provider-status", requireReceptionistAuth, (_req
     // until that is verified read-only against the provider and recorded
     // deliberately, never inferred.
     developmentPhoneNumberVerified: false,
+    // The resolved artifact policy name (never a credential). "none" is the
+    // only policy approved for AR-001; the dashboard renders its retention
+    // sentence from this rather than asserting a retention claim of its own.
+    artifactPolicy: readArtifactPolicy(),
   });
 });
 
