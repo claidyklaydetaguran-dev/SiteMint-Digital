@@ -265,6 +265,10 @@ function signalFor(key: SetupStepKey, signals: SetupSignals): boolean | null | u
     case "review":
       return undefined;
   }
+  // Unreachable while the switch covers the whole union, and written out so it
+  // stays that way: a step key added without a case here answers "not checked"
+  // rather than silently inheriting the saved tick.
+  return undefined;
 }
 
 export interface SavedStep {
