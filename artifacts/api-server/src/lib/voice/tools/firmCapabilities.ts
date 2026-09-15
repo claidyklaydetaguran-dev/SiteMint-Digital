@@ -47,7 +47,8 @@ export type CapabilityBlockReason =
   | "not_authorized"
   | "needs_appointment_type"
   | "needs_opening_hours"
-  | "needs_timezone";
+  | "needs_timezone"
+  | "needs_transfer_contact";
 
 export type CapabilityState = "active" | "blocked";
 
@@ -75,6 +76,18 @@ export interface FirmReadiness {
   openWeekdays: number;
   /** A usable IANA timezone; without it every slot would be computed wrongly. */
   hasUsableTimezone: boolean;
+  /**
+   * Transfer contacts that could actually be dialled: ACTIVE and with the
+   * business's recorded authorization that this person agreed to receive
+   * transferred calls. An unconsented contact is deliberately not readiness —
+   * the resolver refuses to dial one, so offering transfers on the strength of
+   * it would advertise something every call would then refuse.
+   *
+   * Hours are NOT counted here. A contact who takes calls only in the morning
+   * is a configured business, not an unready one; whether right now is inside
+   * their window is a per-call question the resolver answers.
+   */
+  dialableTransferDestinations: number;
 }
 
 export interface CapabilityEnvironment {
@@ -113,6 +126,12 @@ function readinessGap(
       if (readiness.bookableAppointmentTypes < 1) return "needs_appointment_type";
       if (readiness.openWeekdays < 1) return "needs_opening_hours";
       if (!readiness.hasUsableTimezone) return "needs_timezone";
+      return null;
+    case "transfer":
+      // One dialable contact is the whole requirement. Everything else a
+      // transfer depends on — the hours window, which contact wins the order,
+      // whether a phone number is live — is decided per call.
+      if (readiness.dialableTransferDestinations < 1) return "needs_transfer_contact";
       return null;
   }
 }
@@ -159,11 +178,28 @@ export function resolveFirmToolNames(
   return toolNamesForCapabilities(ready);
 }
 
+/**
+ * The capability keys this business may currently exercise, in declared order.
+ *
+ * The same calculation `describeFirmCapabilities` reports and the payload
+ * builder narrows by — written once so the dashboard, the payload, the
+ * comparison and the runtime gate cannot drift apart.
+ */
+export function resolveFirmCapabilities(
+  env: CapabilityEnvironment,
+  readiness: FirmReadiness,
+): VoiceToolCapability[] {
+  return describeFirmCapabilities(env, readiness)
+    .filter((report) => report.state === "active")
+    .map((report) => report.key);
+}
+
 /** Readiness for a business that has configured nothing. Fail-closed. */
 export const NO_READINESS: FirmReadiness = {
   bookableAppointmentTypes: 0,
   openWeekdays: 0,
   hasUsableTimezone: false,
+  dialableTransferDestinations: 0,
 };
 
 // ── the shared resolution every call site uses ───────────────────────────────
@@ -174,6 +210,14 @@ export interface EffectiveCapabilities {
   reports: FirmCapabilityReport[];
   /** What a payload built right now would carry. */
   toolNames: VoiceToolName[];
+  /**
+   * The active capability keys.
+   *
+   * Exposed alongside `toolNames` because a provider-native capability
+   * (transfer) contributes no tool name: a payload builder given only the names
+   * would have no way to know it is active, and would drop it.
+   */
+  activeCapabilities: VoiceToolCapability[];
 }
 
 export interface CapabilityResolutionDeps {
@@ -196,19 +240,36 @@ function isUsableTimeZone(timezone: unknown): boolean {
 async function productionDeps(): Promise<CapabilityResolutionDeps> {
   return {
     loadReadiness: async (firmId) => {
-      const { buildAvailabilityConfig } = await import("../../scheduling/schedulingRepository.js");
-      try {
-        const config = await buildAvailabilityConfig(firmId);
-        const openWeekdays = Object.values(config.weeklyHours).filter((d) => d !== null).length;
-        return {
-          bookableAppointmentTypes: config.appointmentTypes.length,
-          openWeekdays,
-          hasUsableTimezone: isUsableTimeZone(config.timezone),
-        };
-      } catch {
-        // Unreadable scheduling configuration is not readiness. Fail closed.
-        return NO_READINESS;
-      }
+      // Each capability's readiness is read on its own and fails closed on its
+      // own. One shared try/catch would let an unreadable scheduling
+      // configuration silently switch off transfers, which do not depend on it.
+      const scheduling = await (async (): Promise<Omit<FirmReadiness, "dialableTransferDestinations">> => {
+        try {
+          const { buildAvailabilityConfig } = await import("../../scheduling/schedulingRepository.js");
+          const config = await buildAvailabilityConfig(firmId);
+          return {
+            bookableAppointmentTypes: config.appointmentTypes.length,
+            openWeekdays: Object.values(config.weeklyHours).filter((d) => d !== null).length,
+            hasUsableTimezone: isUsableTimeZone(config.timezone),
+          };
+        } catch {
+          return { bookableAppointmentTypes: 0, openWeekdays: 0, hasUsableTimezone: false };
+        }
+      })();
+
+      const dialableTransferDestinations = await (async (): Promise<number> => {
+        try {
+          const { countDialableTransferDestinations } = await import(
+            "../../voiceTransferContacts/transferContactService.js"
+          );
+          return await countDialableTransferDestinations(firmId);
+        } catch {
+          // An unreadable contact list is not readiness. Fail closed.
+          return 0;
+        }
+      })();
+
+      return { ...scheduling, dialableTransferDestinations };
     },
     isToolsAttachable: async () => {
       try {
@@ -246,5 +307,31 @@ export async function resolveEffectiveCapabilities(
     readiness,
     reports: describeFirmCapabilities(env, readiness),
     toolNames: resolveFirmToolNames(env, readiness),
+    activeCapabilities: resolveFirmCapabilities(env, readiness),
   };
+}
+
+/**
+ * Is ONE capability executable for this business RIGHT NOW?
+ *
+ * The per-call re-check, for a capability the dispatcher never sees. A provider
+ * that is still advertising the transfer tool from an earlier publish will go on
+ * asking us for a destination after the business's authorization is withdrawn or
+ * its last consented contact is removed; this is what refuses at that moment
+ * rather than at the next publish — the same rule the dispatcher applies to
+ * function tools.
+ *
+ * Any failure to resolve authorizes nothing.
+ */
+export async function isCapabilityExecutable(
+  firmId: number,
+  capability: VoiceToolCapability,
+  deps?: CapabilityResolutionDeps,
+): Promise<boolean> {
+  try {
+    const effective = await resolveEffectiveCapabilities(firmId, deps);
+    return effective.activeCapabilities.includes(capability);
+  } catch {
+    return false;
+  }
 }
