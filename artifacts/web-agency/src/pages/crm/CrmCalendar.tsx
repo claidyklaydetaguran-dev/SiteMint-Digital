@@ -6,6 +6,8 @@ import {
   Download, Link2, Loader2, MapPin, Plus, RefreshCw, Send, Trash2, Users, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { describeActionFailure } from "@/components/crm/confirmDialogModel";
 
 // ── M3: the internal calendar ────────────────────────────────────────────────
 //
@@ -287,6 +289,7 @@ export default function CrmCalendar() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const confirmation = useConfirmDialog();
 
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [composing, setComposing] = useState(false);
@@ -519,29 +522,45 @@ export default function CrmCalendar() {
     }
   }
 
+  /** Applies the change, or throws carrying the server's own refusal. */
+  async function changeStatus(a: Appointment, status: "completed" | "cancelled" | "scheduled") {
+    const res = await adminFetch(`/api/crm/appointments/${a.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `That change was refused (${res.status}).`);
+    const base = status === "cancelled" ? "Appointment cancelled and its reminder withdrawn."
+      : status === "completed" ? "Marked as held."
+      : "Reopened as scheduled.";
+    setNotice(`${base} ${describeInvitations(data.invitations, data.invitationNote)}`);
+    await refresh(true);
+  }
+
   async function setStatus(a: Appointment, status: "completed" | "cancelled" | "scheduled") {
-    const invitedSomebody = a.attendees.some(x => x.invitation?.outcome === "sent");
-    if (status === "cancelled" && !window.confirm(
-      `Cancel "${a.title}"?\n\nIt stays on the record as cancelled and its reminder is withdrawn.`
-      + (invitedSomebody
-        ? "\n\nEveryone who was invited is emailed a cancellation, so it leaves their calendar."
-        : ""),
-    )) return;
+    if (status === "cancelled") {
+      const invitedSomebody = a.attendees.some(x => x.invitation?.outcome === "sent");
+      void confirmation.ask({
+        title: `Cancel "${a.title}"?`,
+        description: "It stays on the record as cancelled, and its reminder is withdrawn.",
+        consequences: [
+          invitedSomebody
+            ? "Everyone who was invited is emailed a cancellation, so it leaves their calendar — and that email cannot be taken back."
+            : "Nobody was invited, so no email goes out.",
+          "You can reopen it afterwards if it goes ahead after all.",
+        ],
+        tone: "destructive",
+        confirmLabel: "Cancel appointment",
+        busyLabel: "Cancelling…",
+        cancelLabel: "Keep appointment",
+        action: () => changeStatus(a, status),
+      });
+      return;
+    }
     setRefreshing(true);
     try {
-      const res = await adminFetch(`/api/crm/appointments/${a.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || `That change was refused (${res.status}).`);
-        return;
-      }
-      const base = status === "cancelled" ? "Appointment cancelled and its reminder withdrawn."
-        : status === "completed" ? "Marked as held."
-        : "Reopened as scheduled.";
-      setNotice(`${base} ${describeInvitations(data.invitations, data.invitationNote)}`);
-      await refresh(true);
+      await changeStatus(a, status);
+    } catch (e) {
+      setError(describeActionFailure(e));
     } finally {
       setRefreshing(false);
     }
@@ -554,28 +573,44 @@ export default function CrmCalendar() {
    * meeting booked while this server had no mail key has attendees who were
    * never told, and this is how they get told once it does.
    */
+  async function deliverInvitations(a: Appointment) {
+    const res = await adminFetch(`/api/crm/appointments/${a.id}/invitations`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `The invitations could not be sent (${res.status}).`);
+    setNotice(describeInvitations(data.invitations, data.invitationNote));
+    await refresh(true);
+  }
+
   async function sendInvitations(a: Appointment) {
     const alreadySent = a.attendees.some(x => x.invitation?.outcome === "sent");
-    if (alreadySent && !window.confirm(
-      `Send "${a.title}" to all ${a.attendees.length} attendee(s) again?\n\n`
-      + "Anyone already invited will receive a second copy — this is a deliberate "
-      + "re-send, so the mail provider will not collapse it into the first.",
-    )) return;
+    if (alreadySent) {
+      const count = a.attendees.length;
+      const cancellation = a.status === "cancelled";
+      void confirmation.ask({
+        title: cancellation
+          ? `Send the cancellation for "${a.title}" again?`
+          : `Send "${a.title}" to everyone again?`,
+        description: `All ${count} attendee${count === 1 ? "" : "s"} are emailed ${
+          cancellation ? "the cancellation" : "the current invitation"
+        } again.`,
+        consequences: [
+          "Anyone already emailed gets a second copy: this is a deliberate re-send, so the mail provider will not collapse it into the first.",
+        ],
+        confirmLabel: "Send it again",
+        busyLabel: "Sending…",
+        cancelLabel: "Don't send",
+        action: () => deliverInvitations(a),
+      });
+      return;
+    }
 
     setRefreshing(true);
     try {
-      const res = await adminFetch(`/api/crm/appointments/${a.id}/invitations`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || `The invitations could not be sent (${res.status}).`);
-        return;
-      }
-      setNotice(describeInvitations(data.invitations, data.invitationNote));
-      await refresh(true);
-    } catch {
-      setError("The invitations could not be sent. Check your connection and try again.");
+      await deliverInvitations(a);
+    } catch (e) {
+      setError(describeActionFailure(e));
     } finally {
       setRefreshing(false);
     }
@@ -611,6 +646,8 @@ export default function CrmCalendar() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       <div className="p-4 sm:p-6 space-y-4">
 
         {/* Header */}
