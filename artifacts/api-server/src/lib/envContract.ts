@@ -69,6 +69,7 @@ const SECRETS: Array<[string, string, string]> = [
   ["RESEND_RECEIVING_API_KEY", "M6", "Full-access Resend key used ONLY to fetch received mail (the inbound webhook carries metadata only). Resend has no narrower scope that can read received mail, so it is kept apart from the sending key"],
   ["CRM_INBOUND_EMAIL_DOMAIN", "M3", "Reply subdomain replies come back to, e.g. reply.sitemintdigital.com — without it a reply address cannot be minted and an MX record has nowhere to point"],
   ["RESEND_INBOUND_WEBHOOK_SECRET", "M3", "Endpoint-specific signing secret for the inbound webhook. Falls back to RESEND_WEBHOOK_SECRET, but a separate endpoint in Resend gets its own secret and the sending one will not verify"],
+  ["RESEND_WEBHOOK_SECRET", "M6", "Signing secret for the DELIVERY and ENGAGEMENT webhook endpoint (POST /api/crm/webhooks/resend). Unset means the endpoint answers 503, no delivery state is ever recorded, and open/click figures report as not measured rather than as zero"],
   ["VOICE_METRICS_TOKEN", "P7", "Bearer for /api/metricz (unset = endpoint does not exist)"],
   ["VOICE_BILLING_WEBHOOK_SECRET", "P8", "Stripe signature secret for the voice billing webhook (unset = 503)"],
   ["ADMIN_PASSWORD", "core", "Admin login (unset = admin login 503s)"],

@@ -93,6 +93,13 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\bvalidateTwilioWebhook\b/, "signature"],
   [/\bvalidateIntakeTwilioSignature\b/, "signature"],
   [/RESEND_WEBHOOK_SECRET|\bWebhook\s*\(|\bsvix\b/, "signature"],
+  // `verifySvixSignature` (lib/svixSignature.ts) is the explicit verifier the
+  // delivery-event webhook uses: raw bytes, constant-time comparison, a ±5
+  // minute window, and every `v1,` signature tried so a secret rotation does
+  // not refuse live traffic. Named here rather than matched through the secret
+  // variable, so the signal is the VERIFICATION rather than a mention of the
+  // secret's name.
+  [/\bverifySvixSignature\s*\(/, "signature"],
   [/STRIPE_WEBHOOK_SECRET|stripe-signature/, "signature"],
   [/\bdestroySession\s*\(/, "session"],
   [/\bverifyAdminPassword\b/, "credential"],
