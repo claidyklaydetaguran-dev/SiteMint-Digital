@@ -5,9 +5,10 @@
  * + email), timezone, default business location — all through
  * `GET/PATCH /api/receptionist/agent-config` via `lib/accountApi.ts` — and
  * account password, through `POST /api/receptionist/account/password/change`
- * (which may not exist yet; `changePassword` in `accountApi.ts` reads a 404
- * as "not available yet", never as a password error). Team membership stays
- * out of scope, per the brief ("Team later").
+ * (current password required; other sessions are signed out. A server
+ * without the route answers 404, which `changePassword` in `accountApi.ts`
+ * reads as "not available yet", never as a password error). Team membership
+ * stays out of scope, per the brief ("Team later").
  *
  * Also reads `?calendar=connected|error` (set by the OAuth return trip from
  * Scheduling → Calendar) and renders a one-time banner, per D-7 / B-4.

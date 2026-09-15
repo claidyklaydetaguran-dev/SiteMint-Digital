@@ -493,6 +493,9 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/admin/voice/phone-numbers/:providerNumberId/release": "admin",
   "POST /api/receptionist/account/members": "session",
   "POST /api/receptionist/account/members/accept": "token-proven",
+  // Session AND the current password, rate limited: a borrowed session alone
+  // must not be able to lock the owner out. Signs out every other session.
+  "POST /api/receptionist/account/password/change": "session",
   "POST /api/receptionist/account/password-reset/complete": "token-proven",
   "POST /api/receptionist/account/password-reset/request": "feature-flag",
   "POST /api/receptionist/account/verify-email/confirm": "token-proven",

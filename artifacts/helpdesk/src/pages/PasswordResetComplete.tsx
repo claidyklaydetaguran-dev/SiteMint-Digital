@@ -1,18 +1,24 @@
 /**
  * V5 customer-shell foundation — complete a password reset (S-2).
  *
- * Reached at `/password-reset/complete?token=…`; the token is read from the
- * query string via wouter's `useSearchParams` and never re-typed by the
- * visitor. Two password fields (new + confirm) with the strength hint the
- * signup and account-password-change flows share
- * (`MIN_PASSWORD_LENGTH` / `PASSWORD_STRENGTH_HINT`), a 400 branch for an
- * invalid or expired token, and a success state that links back to sign-in
- * rather than auto-signing-in — this endpoint sets no session cookie.
+ * Reached at `/password-reset/complete?token=…` from the one-click link in the
+ * reset email, or opened bare — in which case a code field takes the code the
+ * same email carries. (The email always has the code; it has the link only
+ * when the server has a public address configured, so a page that could only
+ * read `?token=` left some customers with a code and nowhere to put it.)
+ *
+ * Two password fields (new + confirm) with the strength hint the signup and
+ * account-password-change flows share (`MIN_PASSWORD_LENGTH` /
+ * `PASSWORD_STRENGTH_HINT`), the server's own sentence for an invalid or
+ * expired code, and a success state that links back to sign-in rather than
+ * auto-signing-in — this endpoint sets no session cookie.
  */
 
 import { useRef, useState } from "react";
 import { Link, useSearchParams } from "wouter";
 import {
+  CODE_HELP,
+  CODE_LABEL,
   COMPLETE_CREDENTIALS,
   COMPLETE_ENDPOINT,
   COMPLETE_METHOD,
@@ -21,6 +27,7 @@ import {
   PASSWORD_STRENGTH_HINT,
   buildCompletePayload,
   mapCompleteError,
+  resolveResetToken,
   validateComplete,
   type CompleteFormValues,
 } from "./password-reset/passwordResetContract";
@@ -38,15 +45,17 @@ type Outcome = "idle" | "done" | "error";
 
 export default function PasswordResetComplete() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const urlToken = searchParams.get("token");
+  const hasLinkToken = urlToken !== null && urlToken.trim() !== "";
 
   const [form, setForm] = useState<CompleteFormValues>(EMPTY_COMPLETE_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>("idle");
   const [formError, setFormError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<{ password?: string; confirmPassword?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ token?: string; password?: string; confirmPassword?: string }>({});
 
   const alertRef = useRef<HTMLDivElement | null>(null);
+  const codeRef = useRef<HTMLInputElement | null>(null);
   const passwordRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,12 +65,14 @@ export default function PasswordResetComplete() {
     setFormError("");
     setFieldErrors({});
 
+    const token = resolveResetToken(urlToken, form.code);
     const validation = validateComplete(form, token);
     if (!validation.ok) {
       setFormError(validation.formError);
       setFieldErrors(validation.fieldErrors);
       if (validation.fieldErrors.token) {
-        window.requestAnimationFrame(() => alertRef.current?.focus());
+        if (hasLinkToken) window.requestAnimationFrame(() => alertRef.current?.focus());
+        else codeRef.current?.focus();
       } else {
         passwordRef.current?.focus();
       }
@@ -106,7 +117,11 @@ export default function PasswordResetComplete() {
       <main className="si-main" id="password-reset-complete-main">
         <div className="si-wrap">
           <h1 className="si-title">Choose a new password</h1>
-          <p className="si-lede">Set a new password for your account.</p>
+          <p className="si-lede">
+            {hasLinkToken
+              ? "Set a new password for your account."
+              : "Enter the code from your password reset email, then set a new password."}
+          </p>
 
           <div className="si-card">
             <div className="si-form-pane">
@@ -122,12 +137,38 @@ export default function PasswordResetComplete() {
                 </div>
               ) : (
                 <form className="si-form" onSubmit={handleSubmit} noValidate>
-                  {(formError || !token) && (
+                  {formError && (
                     <div ref={alertRef} className="si-alert" role="alert" tabIndex={-1} aria-live="assertive">
                       <span className="si-alert__label">Error</span>
-                      <span className="si-alert__text">
-                        {!token ? "This reset link is missing its token. Request a new one." : formError}
-                      </span>
+                      <span className="si-alert__text">{formError}</span>
+                    </div>
+                  )}
+
+                  {!hasLinkToken && (
+                    <div className="si-field">
+                      <label htmlFor="reset-code" className="si-label">
+                        {CODE_LABEL} <span className="si-req">Required</span>
+                      </label>
+                      <input
+                        id="reset-code"
+                        ref={codeRef}
+                        className={`si-input${fieldErrors.token ? " si-input--invalid" : ""}`}
+                        type="text"
+                        value={form.code}
+                        onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                        autoComplete="one-time-code"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        required
+                        aria-required="true"
+                        aria-invalid={fieldErrors.token ? true : undefined}
+                        aria-describedby="reset-code-help"
+                      />
+                      {fieldErrors.token && <p className="si-error">{fieldErrors.token}</p>}
+                      <p className="si-hint" id="reset-code-help">
+                        {CODE_HELP}
+                      </p>
                     </div>
                   )}
 
@@ -172,10 +213,19 @@ export default function PasswordResetComplete() {
                     {fieldErrors.confirmPassword && <p className="si-error">{fieldErrors.confirmPassword}</p>}
                   </div>
 
-                  <button type="submit" className="si-submit" disabled={submitting || !token}>
+                  <button type="submit" className="si-submit" disabled={submitting}>
                     {submitting ? "Saving…" : "Save new password"}
                   </button>
                 </form>
+              )}
+
+              {outcome !== "done" && (
+                <p className="si-alt">
+                  Code expired or not working?{" "}
+                  <Link href="/password-reset" className="si-alt__link">
+                    Request a new one
+                  </Link>
+                </p>
               )}
             </div>
           </div>

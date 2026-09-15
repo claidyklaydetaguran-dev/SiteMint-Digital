@@ -9,6 +9,7 @@
  */
 
 import type { UsagePeriod } from "@/lib/usageApi";
+import { supportMailto } from "../support/supportContract";
 
 export const PAGE = {
   eyebrow: "ACCOUNT",
@@ -36,7 +37,8 @@ export const COPY = {
 
   pausedTitle: "Your receptionist is paused because the current usage limit was reached.",
   pausedAction: "Contact SiteMint to continue",
-  pausedMailto: "mailto:support@sitemintdigital.com?subject=Usage%20limit%20reached",
+  // The same address Support shows — see pages/support/supportContract.ts.
+  pausedMailto: supportMailto("Usage limit reached"),
 } as const;
 
 export const WARNING_THRESHOLD = 0.8;

@@ -105,15 +105,22 @@ export async function inviteMember(
   if (!member) return { ok: false, reason: "already_member" };
 
   const { rawToken } = await issueAccountToken(firmId, "member_invitation", resolved.tokens);
+  // The email says exactly what exists. Team members cannot sign in (login
+  // checks only the business's own account, in the protected auth files) and
+  // the dashboard has no screen that accepts an invitation — so there is no
+  // link to send, and the copy must not promise one.
   const sent = await resolved.sendEmail(
     email,
     "You've been invited to a SiteMint AI Receptionist workspace",
     [
-      `You were invited as ${roleInput}.`,
+      `A SiteMint AI Receptionist account added you to its team as ${roleInput}.`,
+      "",
+      "Team sign-in is not available yet, so you cannot sign in with this invitation today.",
+      "Roles are a label for now and do not change what anyone can do.",
       "",
       `Your invitation code (valid 7 days): ${rawToken}`,
       "",
-      `Accept it with your email address (${email}) to join.`,
+      "There is nothing you need to do with this email right now.",
     ].join("\n"),
   );
   if (!sent.ok) {

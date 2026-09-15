@@ -7,7 +7,9 @@
 //     concurrent consumers cannot both win.
 //   - Bounded TTLs per purpose; expiry checked at consumption.
 //   - Raw tokens exist only inside the delivery email; no API response
-//     ever contains one.
+//     ever contains one. The email carries the code, plus a one-click
+//     dashboard link when a public https origin is configured
+//     (accountEmailLinks.ts) — never a relative or localhost link.
 //   - Email delivery goes through the P7 alert transport. While alerts
 //     are disabled (the default) these flows answer 503 — honest and
 //     inert, never a token silently created without a delivery path.
@@ -18,6 +20,7 @@
 // from, never edited.
 
 import crypto from "node:crypto";
+import { passwordResetEmailText, verificationEmailText } from "./accountEmailLinks.js";
 
 export type TokenPurpose = "email_verification" | "password_reset" | "member_invitation";
 
@@ -33,6 +36,34 @@ export function hashToken(raw: string): string {
 
 export function generateRawToken(): string {
   return crypto.randomBytes(32).toString("base64url");
+}
+
+// ── password policy + hashing (shared by reset and change) ───────────────────
+//
+// One rule and one hash for every path that sets a password, so a reset and a
+// change can never disagree about what is acceptable or how it is stored.
+
+export const NEW_PASSWORD_MIN_LENGTH = 8;
+export const NEW_PASSWORD_MAX_LENGTH = 200;
+
+export function isAcceptableNewPassword(password: unknown): password is string {
+  return (
+    typeof password === "string" &&
+    password.length >= NEW_PASSWORD_MIN_LENGTH &&
+    password.length <= NEW_PASSWORD_MAX_LENGTH
+  );
+}
+
+export async function hashAccountPassword(password: string): Promise<string> {
+  const bcrypt = (await import("bcryptjs")).default;
+  return bcrypt.hash(password, 12); // same cost as the protected signup route
+}
+
+/** False for an account with no hash on file — an empty hash can never match. */
+export async function verifyAccountPassword(password: string, passwordHash: string): Promise<boolean> {
+  if (passwordHash === "") return false;
+  const bcrypt = (await import("bcryptjs")).default;
+  return bcrypt.compare(password, passwordHash);
 }
 
 export interface AccountTokenDeps {
@@ -109,6 +140,8 @@ export interface PasswordResetDeps {
   sendEmail: (to: string, subject: string, text: string) => Promise<{ ok: boolean }>;
   recordAudit: (firmId: number, action: string) => Promise<void>;
   hashPassword?: (password: string) => Promise<string>;
+  /** Where the email link's public origin is read from; defaults to process.env. */
+  env?: Record<string, string | undefined>;
 }
 
 async function productionResetDeps(): Promise<Omit<PasswordResetDeps, "tokens" | "hashPassword">> {
@@ -164,13 +197,7 @@ export async function requestPasswordReset(
   const sent = await resolved.sendEmail(
     firm.email,
     "Reset your SiteMint AI Receptionist password",
-    [
-      "A password reset was requested for your account.",
-      "",
-      `Your reset code (valid 30 minutes): ${rawToken}`,
-      "",
-      "If you did not request this, you can ignore this email — nothing changes without the code.",
-    ].join("\n"),
+    passwordResetEmailText(rawToken, resolved.env ?? process.env),
   );
   if (!sent.ok) return { accepted: false, reason: "delivery_unavailable" };
   try {
@@ -190,18 +217,13 @@ export async function completePasswordReset(
   newPassword: unknown,
   deps?: Partial<PasswordResetDeps>,
 ): Promise<ResetCompleteResult> {
-  if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 200) {
+  if (!isAcceptableNewPassword(newPassword)) {
     return { ok: false, reason: "weak_password" };
   }
   const resolved = { ...(deps?.updatePasswordHash ? deps : await productionResetDeps()), ...deps } as PasswordResetDeps;
   const consumed = await consumeAccountToken("password_reset", rawToken, resolved.tokens);
   if (!consumed.ok) return { ok: false, reason: "invalid_or_expired" };
-  const hashPassword =
-    resolved.hashPassword ??
-    (async (password: string) => {
-      const bcrypt = (await import("bcryptjs")).default;
-      return bcrypt.hash(password, 12); // same cost as the protected signup route
-    });
+  const hashPassword = resolved.hashPassword ?? hashAccountPassword;
   const passwordHash = await hashPassword(newPassword);
   await resolved.updatePasswordHash(consumed.firmId, passwordHash);
   await resolved.revokeSessions(consumed.firmId); // every existing session dies with the old password
@@ -222,6 +244,8 @@ export interface EmailVerificationDeps {
   sendEmail: (to: string, subject: string, text: string) => Promise<{ ok: boolean }>;
   recordAudit: (firmId: number, action: string) => Promise<void>;
   now?: () => Date;
+  /** Where the email link's public origin is read from; defaults to process.env. */
+  env?: Record<string, string | undefined>;
 }
 
 async function productionVerificationDeps(): Promise<Omit<EmailVerificationDeps, "tokens">> {
@@ -267,11 +291,7 @@ export async function requestEmailVerification(
   const sent = await resolved.sendEmail(
     email,
     "Verify your SiteMint AI Receptionist email",
-    [
-      "Confirm this address to secure your account.",
-      "",
-      `Your verification code (valid 24 hours): ${rawToken}`,
-    ].join("\n"),
+    verificationEmailText(rawToken, resolved.env ?? process.env),
   );
   return sent.ok ? { sent: true } : { sent: false, reason: "delivery_unavailable" };
 }

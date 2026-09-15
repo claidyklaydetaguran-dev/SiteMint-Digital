@@ -4,9 +4,9 @@
  * Run via: tsx artifacts/helpdesk/src/pages/team/teamContract.test.ts
  *
  * The premise: the invite / list / revoke endpoints have existed since P8 and
- * nothing in the dashboard called them, so the only way to give a colleague
- * access was to share the owner's password — which cannot be revoked without
- * locking the owner out, and leaves no record of who did what.
+ * the page calls them — but invited people cannot sign in (login checks only
+ * the business's own account), there is no accept screen, and roles are not
+ * enforced. The page must say exactly that and promise nothing more.
  */
 
 import { readFileSync } from "node:fs";
@@ -21,6 +21,7 @@ import {
   ROLE_OPTIONS,
   ROSTER,
   STATUS_LABEL,
+  TEAM_SIGN_IN_AVAILABLE,
   canRemove,
   everyRenderableString,
   inviteErrorDetail,
@@ -52,6 +53,7 @@ const apiSrc = read("artifacts/helpdesk/src/lib/accountApi.ts");
 const navSrc = read("artifacts/helpdesk/src/lib/nav.ts");
 const routesSrc = read("artifacts/helpdesk/src/lib/routes.ts");
 const appSrc = read("artifacts/helpdesk/src/App.tsx");
+const membershipSrc = read("artifacts/api-server/src/lib/voiceAccounts/membership.ts");
 
 section("the page is actually reachable");
 
@@ -77,11 +79,11 @@ check("a failed read offers a retry", pageSrc.includes("Try again"));
 
 section("status says what is true of the person");
 
-// "Invited" is not "has access", and that distinction is exactly what an owner
-// needs when working out why a colleague cannot sign in.
-eq("an invitation not yet used", statusLabel("invited"), "Invited, not signed in yet");
-eq("someone who can sign in", statusLabel("active"), "Has access");
-eq("someone removed", statusLabel("revoked"), "Access removed");
+// No status grants sign-in, so no status may say "has access".
+eq("an invitation not yet used", statusLabel("invited"), "Invited — cannot sign in yet");
+eq("an accepted invitation still cannot sign in", statusLabel("active"), "Accepted — cannot sign in yet");
+eq("someone removed", statusLabel("revoked"), "Removed");
+check("no status claims access", Object.values(STATUS_LABEL).every((s) => !/has access|signed in\b(?! yet)/i.test(s)));
 eq("an unrecognised status is not guessed", statusLabel("something_else"), "Unknown");
 check("each status reads differently", new Set(Object.values(STATUS_LABEL)).size === 3);
 eq("an unused invitation draws the eye", statusTone("invited"), "attention");
@@ -93,17 +95,16 @@ const member = (status: string): TeamMember => ({ id: 1, email: "a@b.co.uk", rol
 check("someone with access can be removed", canRemove(member("active")));
 check("an unused invitation can be withdrawn", canRemove(member("invited")));
 check("someone already removed cannot be removed again", !canRemove(member("revoked")));
-check("the confirmation says access ends immediately", /immediately/i.test(ROSTER.removeConfirmDetail));
-check("and that their work is not deleted", /nothing they did is deleted/i.test(ROSTER.removeConfirmDetail));
+check("the confirmation says the invitation code stops working", /code stops working/i.test(ROSTER.removeConfirmDetail));
+check("and does not claim they had access to lose", !/lose access|no longer has access/i.test(ROSTER.removeConfirmDetail + ROSTER.removedAnnouncement));
 
-section("roles are described in terms a business uses");
+section("roles are described as what they are: labels");
 
 eq("two roles, staff offered first", ROLE_OPTIONS.map((o) => o.value), ["staff", "owner"]);
-check("owner includes billing and the team", /billing and the team/i.test(ROLE_DETAIL.owner ?? ""));
-check("staff excludes them", /except billing and the team/i.test(ROLE_DETAIL.staff ?? ""));
+// Nothing on the server reads `role` to allow or refuse anything.
+check("every role says it is a label only", Object.values(ROLE_DETAIL).every((d) => /labels for now/i.test(d)));
+check("no role claims a billing or team restriction", Object.values(ROLE_DETAIL).every((d) => !/billing|except|full access/i.test(d)));
 eq("an unknown role is not guessed", roleLabel("superuser"), "Unknown role");
-// The server enforces exactly one distinction; describing more would imply a
-// permissions system that does not exist.
 check("no role claims per-page permissions", Object.values(ROLE_DETAIL).every((d) => !/per-page|granular|permission level/i.test(d)));
 
 section("inviting");
@@ -117,9 +118,13 @@ if (valid.ok) {
   eq("it is normalised", valid.payload.email, "colleague@business.co.uk");
   eq("the chosen role is carried", valid.payload.role, "owner");
 }
-check("the invite copy says the link is single-use", /works once/i.test(INVITE.detail));
-check("and that it expires", /expires/i.test(INVITE.detail));
-check("the sent copy does not claim they have access yet", /invited until they set their password/i.test(INVITE.sentDetail));
+check("the invite copy says how long the code lasts", /seven days/i.test(INVITE.detail));
+check("and that they cannot sign in with it", /cannot sign in/i.test(INVITE.detail));
+check("the sent copy says they cannot sign in yet", /cannot sign in yet/i.test(INVITE.sentDetail));
+// There is no accept screen and no link in the invitation email.
+check("no invite copy promises a link or a password of their own", !/link|set their (own )?password/i.test(INVITE.detail + INVITE.sentDetail));
+check("the invitation email says team sign-in is not available", membershipSrc.includes("Team sign-in is not available yet"));
+check("and no longer asks them to accept it to join", !/Accept it with your email address/.test(membershipSrc));
 
 // The server knows the member limit and the roster; the browser does not.
 eq("the server's own sentence is shown when it has one", inviteErrorDetail("Member limit reached."), "Member limit reached.");
@@ -138,7 +143,13 @@ check("every renderable string is non-empty", strings.every((s) => typeof s === 
 check("the page title is present", strings.includes(PAGE.title));
 // Nothing here may claim a capability the endpoints do not have.
 check("nothing claims last-seen or activity per member", strings.every((s) => !/last seen|last active|activity log/i.test(s)));
-check("the page explains why sharing a password is not the answer", /nobody needs to share yours/i.test(PAGE.detail));
+eq("team sign-in is recorded as unavailable", TEAM_SIGN_IN_AVAILABLE, false);
+check("the page says invited people cannot sign in", /invited people cannot sign in/i.test(PAGE.detail));
+check(
+  "nothing promises sign-in, a password of their own, or role enforcement",
+  strings.every((s) => !/set their own password|own sign-in|has access|with access|get their own|except billing|full access/i.test(s)),
+);
+check("the nav description no longer says who else can sign in", !navSrc.includes("Who else can sign in"));
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

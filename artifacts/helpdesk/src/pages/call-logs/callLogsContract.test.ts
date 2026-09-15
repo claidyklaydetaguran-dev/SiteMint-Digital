@@ -1299,7 +1299,9 @@ eq(
     ["transfer-contacts", "The people a caller can be put through to when they ask for someone."],
     ["sms", "The SMS channel that texts with your clients."],
     ["usage", "Minutes used, minutes remaining, and your billing period."],
-    ["team", "Who else can sign in."],
+    // Changed deliberately: invited people cannot sign in yet, so the old
+    // description promised something the product does not do.
+    ["team", "People you have invited. Team sign-in is not available yet."],
     ["support", "Get help from SiteMint."],
     ["issues", "Problems SiteMint has flagged that may need your attention."],
     ["tools", "Assign actions your assistant can take during a call, like booking or transferring."],

@@ -1,59 +1,74 @@
 /**
- * Team — who else can get into this account.
+ * Team — the people a business has invited to its account.
  *
  * The backend has carried invite / list / revoke since P8
  * (`POST|GET|DELETE /api/receptionist/account/members`, plus the token-proven
- * `POST .../members/accept`). Nothing in the dashboard called any of it, so a
- * business had exactly one way to let a colleague in: share the owner's
- * password. That is the failure this page removes, and it is worth being
- * explicit about — a shared password cannot be revoked without locking the
- * owner out too, and gives no record of who did what.
+ * `POST .../members/accept`). This page calls the first three.
+ *
+ * What it must NOT claim, because none of it exists yet:
+ *
+ *   - Invited people cannot sign in. Sign-in checks only the business's own
+ *     account (the protected receptionist auth files); a roster row grants no
+ *     login, whatever its status.
+ *   - There is no screen to accept an invitation, and no link in the email —
+ *     so nobody "sets their own password" from it.
+ *   - Roles are labels. Nothing on the server reads `role` to allow or refuse
+ *     anything, so "staff" cannot be kept out of billing or the team.
+ *
+ * An earlier version promised all three. It is corrected here rather than
+ * hidden, because the invite, list and remove controls do work and are worth
+ * keeping: they are a truthful record of who the business intends to let in.
  *
  * This module owns strings and rules only. It claims nothing the endpoints do
- * not support: no last-seen, no per-page permissions, no activity per member.
+ * not support: no sign-in, no permissions, no last-seen, no activity per member.
  */
 
 export const PAGE = {
   eyebrow: "ACCOUNT",
   title: "Team",
-  detail: "Who can sign in to this account. Everyone here gets their own password — nobody needs to share yours.",
+  detail:
+    "Keep a list of the people you plan to give access to. Team sign-in is not available yet: invited people cannot sign in, and only your own email and password work.",
   loading: "Loading your team…",
   failed: "Your team couldn't be loaded. Try again shortly.",
 } as const;
 
 export const ROSTER = {
-  heading: "People with access",
+  heading: "Invited people",
   columnEmail: "Email",
   columnRole: "Role",
   columnStatus: "Status",
   columnInvited: "Invited",
-  emptyTitle: "No one else has access",
-  emptyDetail: "Invite a colleague below and they will get their own sign-in.",
+  emptyTitle: "No one invited yet",
+  emptyDetail: "Invitations you send are listed here. Invited people cannot sign in until team sign-in is available.",
   removeLabel: "Remove",
   removePendingLabel: "Removing…",
   removeConfirmTitle: "Remove this person?",
   removeConfirmDetail:
-    "They lose access immediately, and any invitation they have not used stops working. Nothing they did is deleted.",
+    "They come off this list and their invitation code stops working. Nothing else changes, because they could not sign in.",
   removeConfirmAction: "Remove",
-  removeConfirmDismiss: "Keep access",
-  removedAnnouncement: "That person no longer has access.",
+  removeConfirmDismiss: "Keep them",
+  removedAnnouncement: "That person was removed from your team list.",
   removeFailedTitle: "That person wasn't removed",
   removeFailedDetail: "Nothing changed. Try again.",
 } as const;
 
 export const INVITE = {
   heading: "Invite someone",
-  detail: "They get an email with a link to set their own password. The link works once, and expires after seven days.",
+  detail:
+    "We record the invitation and email them a code that is valid for seven days. They cannot sign in with it yet — team sign-in is not available.",
   emailLabel: "Their email address",
   roleLabel: "Role",
   submitLabel: "Send invitation",
   submitPendingLabel: "Sending…",
   sentTitle: "Invitation sent",
-  sentDetail: "They will appear below as invited until they set their password.",
+  sentDetail: "They appear below as invited. They cannot sign in yet.",
   failedTitle: "The invitation wasn't sent",
   emailRequired: "Enter their email address.",
   emailInvalid: "Enter a valid email address.",
 } as const;
+
+/** The one fact every Team string has to agree with. */
+export const TEAM_SIGN_IN_AVAILABLE = false;
 
 export type MemberRole = "owner" | "staff";
 export type MemberStatus = "invited" | "active" | "revoked";
@@ -68,16 +83,17 @@ export interface TeamMember {
 }
 
 /**
- * What each role can do, in the terms a business thinks in.
+ * What each role means today: nothing is enforced.
  *
- * Deliberately short and true: the server enforces one distinction (owner vs
- * staff), so this describes that one distinction and does not imply a
- * permissions system that does not exist.
+ * The server stores `owner` or `staff` and reads it for nothing else, so the
+ * honest description is that a role is a label. It used to say staff could do
+ * "everything except billing and the team", which the server has never
+ * enforced.
  */
 export const ROLE_LABEL: Record<string, string> = { owner: "Owner", staff: "Staff" };
 export const ROLE_DETAIL: Record<string, string> = {
-  owner: "Full access, including billing and the team.",
-  staff: "Everything except billing and the team.",
+  owner: "Recorded as an owner. Roles are labels for now and do not change what anyone can do.",
+  staff: "Recorded as staff. Roles are labels for now and do not change what anyone can do.",
 };
 
 export function roleLabel(role: string): string {
@@ -92,14 +108,14 @@ export const ROLE_OPTIONS: { value: MemberRole; label: string; detail: string }[
 /**
  * Status wording that says what is TRUE of the person right now.
  *
- * "Invited" is not "has access" — the distinction matters when an owner is
- * working out why a colleague cannot sign in, and a single "pending" label
- * would hide it.
+ * No status grants sign-in, so none may say "has access". "Accepted" is only
+ * reachable through the API (there is no accept screen), and still means the
+ * person cannot sign in.
  */
 export const STATUS_LABEL: Record<string, string> = {
-  invited: "Invited, not signed in yet",
-  active: "Has access",
-  revoked: "Access removed",
+  invited: "Invited — cannot sign in yet",
+  active: "Accepted — cannot sign in yet",
+  revoked: "Removed",
 };
 
 export function statusLabel(status: string): string {
@@ -112,7 +128,7 @@ export function statusTone(status: string): "attention" | "settled" | "muted" {
   return "muted";
 }
 
-/** Only someone who currently has access, or is still waiting to use an invite, can be removed. */
+/** Only someone still on the list (invited or accepted) can be removed. */
 export function canRemove(member: TeamMember): boolean {
   return member.status === "invited" || member.status === "active";
 }
