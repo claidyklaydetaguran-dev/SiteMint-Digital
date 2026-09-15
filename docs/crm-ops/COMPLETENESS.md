@@ -13,9 +13,9 @@
 
 ## Table 1 — the 18 core feature areas
 
-**125 / 150 criteria = 83.3% verified.** At the real provider: 2. In production: **0**.
+**127 / 150 criteria = 84.7% verified.** At the real provider: 3. In production: **0**.
 
-By status: Passed 125 · Built, not proven 4 · Not passed 20 · Deferred by decision 1.
+By status: Passed 127 · Built, not proven 3 · Not passed 19 · Deferred by decision 1.
 
 The denominator is 143 baseline criteria plus 7 added from the owner's brief after the baseline was set; each is listed under "Criteria added after the baseline" with its reason.
 
@@ -35,8 +35,8 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 | 12 | Interaction history | 6 / 6 | **100.0%** | L, T | 0 | — |
 | 13 | Calendar and scheduling | 7 / 8 | **87.5%** | L, T | 0 | 13.8 Two-way sync with external calendars |
 | 14 | Integrations | 0 / 5 | **0.0%** | — | 0 | 14.1 An accounting or payments connector; 14.2 Calendar provider sync; 14.3 An e-signature provider; 14.4 Team notifications to a chat tool; 14.5 Outbound webhooks or an API for other systems |
-| 15 | Mobile, offline and push | 5 / 8 | **62.5%** | L, T | 0 | 15.6 Offline editing with a write queue (deferred); 15.7 Push notifications; 15.8 Portal pages have no clipped or unreachable content at 375px (built, not proven) |
-| 16 | Customer portal | 7 / 8 | **87.5%** | L, T, R | 0 | 16.8 A customer completes every portal journey end to end with real data |
+| 15 | Mobile, offline and push | 6 / 8 | **75.0%** | L, T | 0 | 15.6 Offline editing with a write queue (deferred); 15.7 Push notifications |
+| 16 | Customer portal | 8 / 8 | **100.0%** | L, T, R | 0 | — |
 | 17 | Security | 7 / 9 | **77.8%** | L, T | 0 | 17.8 Encryption in transit and at rest is evidenced for production (built, not proven); 17.9 A backup has been restored into an isolated target |
 | 18 | Dashboard | 6 / 6 | **100.0%** | L, T | 0 | — |
 
@@ -51,18 +51,18 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**90 / 300 page checks = 30.0%.** Pages passing all 6: 0. Pages passing none: 6.
+**105 / 300 page checks = 35.0%.** Pages passing all 6: 0. Pages passing none: 6.
 
-By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by decision 0.
+By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
-| open | 40 / 50 (80.0%) |
-| action | 18 / 50 (36.0%) |
-| persist | 5 / 50 (10.0%) |
+| open | 41 / 50 (82.0%) |
+| action | 21 / 50 (42.0%) |
+| persist | 8 / 50 (16.0%) |
 | permission | 20 / 50 (40.0%) |
 | recovery | 1 / 50 (2.0%) |
-| mobile | 6 / 50 (12.0%) |
+| mobile | 14 / 50 (28.0%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
 |---|---|---|---|---|---|---|
@@ -83,8 +83,8 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | 15 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 16 | `/admin/crm/transactions` | Transactions | 2 / 6 | 33.3% | L | persist, permission, recovery, mobile |
 | 17 | `/admin/crm/projects` | Projects | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 18 | `/admin/crm/documents` | Documents | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 19 | `/admin/crm/support` | Support | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
+| 18 | `/admin/crm/documents` | Documents | 3 / 6 | 50.0% | L | permission, recovery, mobile |
+| 19 | `/admin/crm/support` | Support | 4 / 6 | 66.7% | L, T | recovery, mobile |
 | 20 | `/admin/crm/pipeline` | Pipeline | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 21 | `/admin/crm/reporting` | Reporting | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 22 | `/admin/crm/admin` | Admin hub | 3 / 6 | 50.0% | L | permission, recovery, mobile |
@@ -108,14 +108,14 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | 40 | `/admin/ops/issues` | Receptionist issues | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
 | 41 | `/admin/ops/usage` | Receptionist usage | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
 | 42 | `/admin/ops/numbers` | Receptionist numbers | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
-| 43 | `/portal/sign-in` | Portal sign-in | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 44 | `/portal/accept` | Portal invitation landing | 3 / 6 | 50.0% | L, T, R | persist, recovery, mobile |
-| 45 | `/portal` | Portal home | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
-| 46 | `/portal/projects` | Portal projects | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
-| 47 | `/portal/documents` | Portal documents | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
-| 48 | `/portal/proposals` | Portal quotes and proposals | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
-| 49 | `/portal/invoices` | Portal invoices | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
-| 50 | `/portal/support` | Portal support | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
+| 43 | `/portal/sign-in` | Portal sign-in | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 44 | `/portal/accept` | Portal invitation landing | 4 / 6 | 66.7% | L, T, R | persist, recovery |
+| 45 | `/portal` | Portal home | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 46 | `/portal/projects` | Portal projects | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 47 | `/portal/documents` | Portal documents | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 48 | `/portal/proposals` | Portal quotes and proposals | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 49 | `/portal/invoices` | Portal invoices | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 50 | `/portal/support` | Portal support | 5 / 6 | 83.3% | L, T | recovery |
 
 ## Criteria added after the baseline
 
@@ -335,7 +335,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | 15.5 | Connection loss is shown, and unsent work is preserved rather than lost | Passed | L, T | Online-first connection banner and draft vault |
 | 15.6 | Offline editing with a write queue | Deferred by decision | — | Deferred by owner decision: online-first for this release |
 | 15.7 | Push notifications | Not passed | — | Not built: no service worker, PushManager or VAPID anywhere |
-| 15.8 | Portal pages have no clipped or unreachable content at 375px | Built, not proven | — | Checked in an earlier milestone with the page-scroll metric, which is not sufficient; not re-measured |
+| 15.8 | Portal pages have no clipped or unreachable content at 375px | Passed | L | All 8 portal routes measured at a real 375×812 emulated viewport on candidate a3c56b3 with a customer session: 0 elements clipped without a scrollable ancestor. The metric was validated in the same page: a planted clipped element was flagged, and the same element inside a scroller was not |
 
 ### 16. Customer portal
 
@@ -348,7 +348,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | 16.5 | A customer accepts an offer in writing, once, and it is never called a signature | Passed | L, T | Quote accepted through the portal; a quoted deal is not separately acceptable (409) |
 | 16.6 | Invoices and money received are shown without inventing a balance | Passed | L, T | Portal invoices page and crmBilling.test.ts |
 | 16.7 | The portal says plainly what is waiting on the customer | Passed | L | 'Review and accept' for a waiting quote links to the quotes page |
-| 16.8 | A customer completes every portal journey end to end with real data | Not passed | — | Partly done: invitation, sign-up, projects, download and quote acceptance walked; an issued invoice and a support message are not yet walked |
+| 16.8 | A customer completes every portal journey end to end with real data | Passed | L, R | Walked with a real customer session: the emailed invitation (delivered by the provider) and sign-up, projects, a document download, quote acceptance, a support message answered by staff, and an issued invoice with its line items (the last three on candidate a3c56b3) |
 
 ### 17. Security
 
@@ -569,8 +569,8 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened populated with the billing panel present (2026-09-15) |
-| action | Built, not proven | — | Not exercised in the browser (quotes were created by script) |
-| persist | Built, not proven | — | Not exercised |
+| action | Passed | L | From the billing panel, INV-00001 was drafted from the accepted quote (POST 201, line items carried across) and issued (200). The due-date prompt was answered with its proposed default, because this browser cannot show native prompts |
+| persist | Passed | L | After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
@@ -580,8 +580,8 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
-| action | Passed | L | Ticket created; an internal note and a customer reply posted |
-| persist | Built, not proven | — | Not reloaded |
+| action | Passed | L | Ticket created with an internal note and a customer reply. On candidate a3c56b3 a staff reply to SUP-00002 was recorded (POST 201) and shown as “Waiting — not sent”, with the reason: this server has no mail key |
+| persist | Passed | L | The reply sent from this page was read back by the customer's own session in the portal thread |
 | permission | Passed | L, T | The internal note was absent from the customer view; barred by a database CHECK and a route test |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
@@ -848,7 +848,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Portal sign-in throttling not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal/accept` — Portal invitation landing
 
@@ -859,7 +859,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | persist | Built, not proven | — | Session checked by API response, not by reloading the page |
 | permission | Passed | T | An invitation redeems exactly once (crmPortal.test.ts, 'redeem it once') |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal` — Portal home
 
@@ -870,7 +870,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Every portal read is scoped to the session's own contact; another customer's records answer 404 (crmPortal.test.ts, 12/12 isolation mutations caught) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal/projects` — Portal projects
 
@@ -881,7 +881,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Scoped to the session's contact; cross-customer access answers 404 (crmPortal.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal/documents` — Portal documents
 
@@ -892,7 +892,7 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Documents are default-deny through explicit grants; cross-customer access answers 404 (crmPortal.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal/proposals` — Portal quotes and proposals
 
@@ -903,26 +903,26 @@ By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by dec
 | persist | Built, not proven | — | The accepted state after a reload was proven in crmBilling.test.ts, not in the browser |
 | permission | Passed | T | Scoped to the session's contact; another customer's quote answers 404 (crmPortal.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal/invoices` — Portal invoices
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | No invoice has been issued to the test customer, so the page has not been seen with data |
-| action | Built, not proven | — | Not exercised |
+| open | Passed | L | Opened with the real customer session on candidate a3c56b3 after staff issued INV-00001: $4,200.00 outstanding, $0.00 paid to date |
+| action | Passed | L | INV-00001's breakdown read and checked: Design 1 × $1,500 and Build 2 × $1,350 sum to the $4,200.00 awaiting payment, due Sep 29, 2026 |
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Scoped to the session's contact; cross-customer access answers 404 (crmPortal.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |
 
 ### `/portal/support` — Portal support
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened with a real customer session listing SUP-00002 (2026-09-15) |
-| action | Built, not proven | — | No message has been sent from the portal yet |
-| persist | Built, not proven | — | Not exercised |
+| action | Passed | L | A [CRM-TEST] message added to SUP-00002 from the portal: POST answered 201 and it appeared in the thread |
+| persist | Passed | L | After a full reload the reopened ticket showed both messages |
 | permission | Passed | T | Tickets are scoped to the session's contact and internal notes never reach it (crmPortal.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Portal pages were checked only with the page-scroll metric, which is not sufficient |
+| mobile | Passed | L | Real 375×812 emulated viewport on candidate a3c56b3: 0 elements clipped without a scrollable ancestor; the metric flagged a planted clipped element and passed one inside a scroller |

@@ -215,7 +215,7 @@
         { "id": "15.5", "text": "Connection loss is shown, and unsent work is preserved rather than lost", "status": "pass", "env": ["L", "T"], "evidence": "Online-first connection banner and draft vault" },
         { "id": "15.6", "text": "Offline editing with a write queue", "status": "deferred", "env": [], "evidence": "Deferred by owner decision: online-first for this release" },
         { "id": "15.7", "text": "Push notifications", "status": "fail", "env": [], "evidence": "Not built: no service worker, PushManager or VAPID anywhere" },
-        { "id": "15.8", "text": "Portal pages have no clipped or unreachable content at 375px", "status": "unverified", "env": [], "evidence": "Checked in an earlier milestone with the page-scroll metric, which is not sufficient; not re-measured" }
+        { "id": "15.8", "text": "Portal pages have no clipped or unreachable content at 375px", "status": "pass", "env": ["L"], "evidence": "All 8 portal routes measured at a real 375×812 emulated viewport on candidate a3c56b3 with a customer session: 0 elements clipped without a scrollable ancestor. The metric was validated in the same page: a planted clipped element was flagged, and the same element inside a scroller was not" }
       ]
     },
     {
@@ -229,7 +229,7 @@
         { "id": "16.5", "text": "A customer accepts an offer in writing, once, and it is never called a signature", "status": "pass", "env": ["L", "T"], "evidence": "Quote accepted through the portal; a quoted deal is not separately acceptable (409)" },
         { "id": "16.6", "text": "Invoices and money received are shown without inventing a balance", "status": "pass", "env": ["L", "T"], "evidence": "Portal invoices page and crmBilling.test.ts" },
         { "id": "16.7", "text": "The portal says plainly what is waiting on the customer", "status": "pass", "env": ["L"], "evidence": "'Review and accept' for a waiting quote links to the quotes page" },
-        { "id": "16.8", "text": "A customer completes every portal journey end to end with real data", "status": "fail", "env": [], "evidence": "Partly done: invitation, sign-up, projects, download and quote acceptance walked; an issued invoice and a support message are not yet walked" }
+        { "id": "16.8", "text": "A customer completes every portal journey end to end with real data", "status": "pass", "env": ["L", "R"], "evidence": "Walked with a real customer session: the emailed invitation (delivered by the provider) and sign-up, projects, a document download, quote acceptance, a support message answered by staff, and an issued invoice with its line items (the last three on candidate a3c56b3)" }
       ]
     },
     {
