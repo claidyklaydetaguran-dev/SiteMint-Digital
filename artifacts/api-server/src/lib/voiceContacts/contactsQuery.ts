@@ -6,9 +6,9 @@
 // import or touch lib/voiceContacts/contactLinker.ts (the P5 call-linking
 // module), which stays exactly as it is.
 
-import { and, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { voiceContacts, voiceCallLinks, voiceCallReviews, voiceSmsConsents } from "@workspace/db/schema/voice";
+import { voiceContacts, voiceCallLinks, voiceCallReviews, voiceSmsConsents, voiceMessages } from "@workspace/db/schema/voice";
 import { intakeConversations } from "@workspace/db/schema";
 import { schedulingAppointmentRequests } from "@workspace/db/schema/scheduling";
 import { listRealCallsForFirm } from "../voice/webhooks/realCallsRepository.js";
@@ -34,14 +34,30 @@ export async function listContactsForFirm(
   firmId: number,
   query: string | undefined,
   limit: number | undefined,
+  /**
+   * Narrows the list to the contact linked to ONE call, through the
+   * `voice_call_links` foreign key — never a name or number match. The link
+   * row is itself firm-scoped, so a call id belonging to another firm matches
+   * nothing and the caller gets an empty list rather than a cross-firm row.
+   */
+  callId?: string,
 ): Promise<ContactListItem[]> {
   const boundedLimit = Number.isInteger(limit) && (limit as number) > 0 ? Math.min(limit as number, MAX_LIMIT) : DEFAULT_LIMIT;
   const trimmedQuery = typeof query === "string" ? query.trim() : "";
+  const trimmedCallId = typeof callId === "string" ? callId.trim() : "";
 
   const whereClauses = [eq(voiceContacts.firmId, firmId)];
   if (trimmedQuery.length > 0) {
     const like = `%${trimmedQuery}%`;
     whereClauses.push(or(ilike(voiceContacts.displayName, like), ilike(voiceContacts.phoneE164, like))!);
+  }
+  if (trimmedCallId.length > 0) {
+    whereClauses.push(sql`EXISTS (
+      SELECT 1 FROM ${voiceCallLinks}
+      WHERE ${voiceCallLinks.contactId} = ${voiceContacts.id}
+        AND ${voiceCallLinks.firmId} = ${voiceContacts.firmId}
+        AND ${voiceCallLinks.callId} = ${trimmedCallId}
+    )`);
   }
 
   const rows = await db
@@ -112,10 +128,30 @@ export interface ContactDetail extends ContactListItem {
   createdAt: string;
 }
 
+/** One saved message, reached through this contact's calls by foreign key. */
+export interface ContactInquirySummary {
+  id: number;
+  callId: string;
+  topic: string;
+  urgency: string;
+  followUpStatus: string;
+  createdAt: string;
+}
+
 export interface ContactDetailResult {
   contact: ContactDetail;
   calls: ContactCallSummary[];
   conversations: ContactConversationSummary[];
+  /** Saved messages from this contact's calls, newest first. */
+  inquiries: ContactInquirySummary[];
+  /**
+   * The most recent name a CALLER gave on one of this contact's own calls,
+   * used only when the contact record itself has no name. It is a quoted
+   * value from a saved message, not an inference — null when no saved message
+   * carries one, so the interface can say where the name came from rather
+   * than presenting a guess as the contact's name.
+   */
+  callerNameFromInquiry: string | null;
 }
 
 /** Firm-scoped by construction: a contact belonging to another firm never matches, so the caller sees undefined and answers 404 — never a cross-firm leak. */
@@ -178,6 +214,44 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
     // Call-state enrichment is best-effort; the linkage rows above still stand.
   }
 
+  // Saved messages reached through this contact's OWN calls, by the
+  // (firm_id, provider_call_id) key — never by matching a caller's name.
+  const linkedCallIds = callLinkRows.map((c) => c.callId);
+  const contactHasName = typeof contact.displayName === "string" && contact.displayName.trim() !== "";
+  let inquiries: ContactInquirySummary[] = [];
+  let callerNameFromInquiry: string | null = null;
+
+  if (linkedCallIds.length > 0) {
+    const inquiryRows = await db
+      .select({
+        id: voiceMessages.id,
+        callId: voiceMessages.providerCallId,
+        callerName: voiceMessages.callerName,
+        topic: voiceMessages.topic,
+        urgency: voiceMessages.urgency,
+        followUpStatus: voiceMessages.followUpStatus,
+        createdAt: voiceMessages.createdAt,
+      })
+      .from(voiceMessages)
+      .where(and(eq(voiceMessages.firmId, firmId), inArray(voiceMessages.providerCallId, linkedCallIds)))
+      .orderBy(desc(voiceMessages.createdAt))
+      .limit(50);
+
+    inquiries = inquiryRows.map((r) => ({
+      id: r.id,
+      callId: r.callId,
+      topic: r.topic,
+      urgency: r.urgency,
+      followUpStatus: r.followUpStatus,
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    if (!contactHasName) {
+      const named = inquiryRows.find((r) => typeof r.callerName === "string" && r.callerName.trim() !== "");
+      callerNameFromInquiry = named?.callerName?.trim() ?? null;
+    }
+  }
+
   return {
     contact: {
       id: contact.id,
@@ -194,5 +268,7 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
     },
     calls: callLinkRows.map((c) => ({ callId: c.callId, startedAt: c.createdAt.toISOString(), state: callStateById.get(c.callId) ?? "unknown" })),
     conversations: conversationRows.map((c) => ({ id: c.id, lastMessageAt: c.lastMessageAt.toISOString(), status: c.status })),
+    inquiries,
+    callerNameFromInquiry,
   };
 }

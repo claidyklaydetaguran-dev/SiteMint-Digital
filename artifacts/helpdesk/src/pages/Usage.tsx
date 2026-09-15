@@ -10,6 +10,7 @@ import { PageSkeleton } from "@/components/common/PageSkeleton";
 import {
   COPY,
   PAGE,
+  channelRows,
   isPaused,
   isWarning,
   minutesRemaining,
@@ -98,6 +99,35 @@ export default function Usage() {
               <span className="sd-figure__label">{COPY.remainingLabel}</span>
             </div>
           </dl>
+
+          {/* How the period's minutes were reached. "Call type not reported"
+              holds both the explicit unknown channel and older rows carrying
+              none — neither is counted as a phone call or a browser test. */}
+          {(() => {
+            const rows = channelRows(usageQuery.data);
+            if (rows === null) {
+              return <p className="sd-page__meta">{COPY.channelsUnavailable}</p>;
+            }
+            return (
+              <section className="sd-section" aria-labelledby="sd-usage-channels">
+                <div className="sd-section__head">
+                  <h2 className="sd-h2" id="sd-usage-channels">
+                    {COPY.channelsHeading}
+                  </h2>
+                </div>
+                <dl className="sd-figures">
+                  {rows.map((row) => (
+                    <div className="sd-figure" key={row.key}>
+                      <span className="sd-figure__value">{row.minutes}</span>
+                      <span className="sd-figure__label">
+                        {row.label} ({row.callCount})
+                      </span>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            );
+          })()}
 
           {percentUsed(usageQuery.data) !== null && (
             <div className="sd-usage">

@@ -17,7 +17,10 @@ router.get("/receptionist/contacts", requireReceptionistAuth, async (req: Reques
     const query = typeof req.query["query"] === "string" ? (req.query["query"] as string) : undefined;
     const limitRaw = req.query["limit"];
     const limit = typeof limitRaw === "string" && /^\d+$/.test(limitRaw) ? Number(limitRaw) : undefined;
-    const items = await listContactsForFirm(req.firmId!, query, limit);
+    // `callId` narrows to the contact linked to one call, through the
+    // firm-scoped link row. A call id from another firm matches nothing.
+    const callId = typeof req.query["callId"] === "string" ? (req.query["callId"] as string) : undefined;
+    const items = await listContactsForFirm(req.firmId!, query, limit, callId);
     res.json({ items, count: items.length });
   } catch (err) {
     req.log.error({ err, firmId: req.firmId }, "[contacts] list failed");

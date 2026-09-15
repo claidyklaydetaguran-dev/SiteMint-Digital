@@ -112,6 +112,21 @@ function InSpaRedirectToId({ base }: { base: string }) {
   return null;
 }
 
+/**
+ * The same, but carrying any `?query` the incoming link held. Email links can
+ * arrive with tracking or campaign parameters appended, and dropping them
+ * silently changes the address the reader actually opened.
+ */
+function InSpaRedirectToIdKeepingQuery({ base }: { base: string }) {
+  const params = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    navigate(`${base}/${params.id}${search}`, { replace: true });
+  }, []);
+  return null;
+}
+
 // Mounted at the app root, independent of route, so it observes every
 // session transition (login, logout, expiry, firm switch). Loaded through
 // the voice build boundary so the assistants API graph stays out of a
@@ -231,6 +246,9 @@ function Router() {
             <Route path="/appointments">{() => <InSpaRedirect to={ROUTES.appointments} />}</Route>
             <Route path="/logs">{() => <InSpaRedirect to={ROUTES.calls} />}</Route>
             <Route path="/logs/:id">{() => <InSpaRedirectToId base={ROUTES.calls} />}</Route>
+            {/* Post-call emails sent before the link was corrected point at
+                `/calls/:id`, which matched no route. They keep working. */}
+            <Route path="/calls/:id">{() => <InSpaRedirectToIdKeepingQuery base={ROUTES.calls} />}</Route>
 
             {/* R1 capability states: when the voice platform is NOT enabled, the
                 live voice paths render a neutral capability state instead of

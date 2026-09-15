@@ -219,7 +219,7 @@ export default function AgentConfig() {
     return (
       <div className="sr-page" aria-busy="true">
         <div className="sd-page__head">
-          <h1 className="sd-page__title">SMS receptionist</h1>
+          <h1 className="sd-page__title">SMS receptionist replies</h1>
         </div>
         <p className="sr-loading" role="status">
           Loading your receptionist&rsquo;s settings…
@@ -238,7 +238,7 @@ export default function AgentConfig() {
     return (
       <div className="sr-page sd-enter">
         <div className="sd-page__head">
-          <h1 className="sd-page__title">SMS receptionist</h1>
+          <h1 className="sd-page__title">SMS receptionist replies</h1>
         </div>
         <section className="sd-error" role="alert">
           <AlertTriangle className="sd-error__icon" aria-hidden="true" />
@@ -270,10 +270,11 @@ export default function AgentConfig() {
     <div className="sr-page sd-enter">
       <div className="sd-page__head">
         <h1 className="sd-page__title" id={headingId}>
-          SMS receptionist
+          SMS receptionist replies
         </h1>
         <span className="sd-page__meta">
-          What it says when someone texts your business
+          Write what the SMS receptionist says when someone texts your business. Texting clients for
+          real also needs an SMS number that SiteMint connects for you — this page does not set one up.
         </span>
       </div>
 

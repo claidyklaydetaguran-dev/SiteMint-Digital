@@ -374,9 +374,12 @@ export default function Overview() {
           </Link>
         </div>
         <p style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)", color: "var(--sd-text-muted, #3b5265)" }}>
+          {/* Text-message (SMS) intake conversations, counted for the life of
+              the account. Not calls, and not "this period" — voice minutes are
+              a separate allowance shown on Usage. */}
           {usage.isPaid
-            ? `${usage.used} conversations recorded this period.`
-            : `${usage.used} of ${usage.limit} trial conversations used${usage.percent !== null ? ` (${usage.percent}%)` : ""}.`}
+            ? `${usage.used} SMS conversations recorded, all time.`
+            : `${usage.used} of ${usage.limit} trial SMS conversations used, all time${usage.percent !== null ? ` (${usage.percent}%)` : ""}.`}
         </p>
       </section>
     </div>

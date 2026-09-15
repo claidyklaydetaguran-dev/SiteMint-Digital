@@ -6,12 +6,26 @@
  * Copy lives in `pages/inquiries/inquiriesContract.ts`. Mobile-first: the list
  * is a single column of cards that stays readable at 360px, and the status
  * actions are full-width buttons rather than a dropdown that needs precision.
+ *
+ * ── What this pass adds ───────────────────────────────────────────────────
+ * Each notification now says what is actually known about it, separating a
+ * provider's acceptance from the provider's own later delivery evidence — and
+ * naming the one state that will not be retried on its own.
+ *
+ * Each message carries the two follow-up actions a business actually takes
+ * next, built from the details the CALLER gave. They hand off to the reader's
+ * own phone or mail app; nothing here sends anything.
+ *
+ * And when message-taking is not attached for this business, the screen says
+ * so. A silent empty list was the worst possible answer: it reads as "nobody
+ * called" when the truth is the assistant could never have saved a message.
  */
 
 import { useState } from "react";
 import { Link } from "wouter";
 import { useSession } from "@/hooks/useSession";
 import {
+  useAssistantCapabilities,
   useInquiries,
   useNotificationStatus,
   useUpdateInquiryStatus,
@@ -21,7 +35,23 @@ import { Button } from "@/components/ui/button";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { ROUTES } from "@/lib/routes";
 import type { Inquiry, InquiryStatus } from "@/lib/inquiriesApi";
-import { COPY, PAGE, TABS, followUpLabel, notificationLabel } from "@/pages/inquiries/inquiriesContract";
+import {
+  ACTIONS,
+  CAPABILITY,
+  COPY,
+  DELIVERY,
+  PAGE,
+  TABS,
+  URGENCY_FILTERS,
+  URGENCY_FILTER_LABEL,
+  deliveryLine,
+  followUpLabel,
+  mailtoHref,
+  matchesUrgency,
+  notificationLabel,
+  telHref,
+  type UrgencyFilter,
+} from "@/pages/inquiries/inquiriesContract";
 import "@/styles/v2-dashboard.css";
 
 function formatWhen(iso: string): string {
@@ -48,8 +78,10 @@ const NEXT_ACTIONS: ReadonlyArray<{ status: InquiryStatus; label: string }> = [
 export default function Inquiries() {
   const { data: me, isLoading: sessionLoading } = useSession();
   const [tab, setTab] = useState<InquiryStatus | "all">("all");
+  const [urgency, setUrgency] = useState<UrgencyFilter>("all");
   const inquiriesQuery = useInquiries(tab);
   const notificationsQuery = useNotificationStatus();
+  const capabilitiesQuery = useAssistantCapabilities();
   const updateStatus = useUpdateInquiryStatus();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [failedId, setFailedId] = useState<number | null>(null);
@@ -59,9 +91,15 @@ export default function Inquiries() {
   }
   if (!me) return null;
 
-  const items = inquiriesQuery.data?.items ?? [];
+  const allItems = inquiriesQuery.data?.items ?? [];
+  const items = allItems.filter((inquiry) => matchesUrgency(inquiry, urgency));
   const counts = inquiriesQuery.data?.counts ?? { new: 0, in_progress: 0, resolved: 0 };
   const notifications = notificationsQuery.data?.items ?? [];
+
+  // The server's own capability resolution — the same one the publish payload
+  // uses — so "not attached" here means exactly what it means there.
+  const messagesCapability = capabilitiesQuery.data?.items.find((c) => c.key === "messages");
+  const messageTakingOff = messagesCapability?.state === "blocked";
 
   const handleStatus = async (inquiry: Inquiry, status: InquiryStatus) => {
     setPendingId(inquiry.id);
@@ -108,6 +146,23 @@ export default function Inquiries() {
         ))}
       </div>
 
+      <label className="mb-4 flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          {URGENCY_FILTER_LABEL}
+        </span>
+        <select
+          className="w-fit rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
+          value={urgency}
+          onChange={(e) => setUrgency(e.target.value as UrgencyFilter)}
+        >
+          {URGENCY_FILTERS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       {inquiriesQuery.isError && (
         <section className="sd-error" role="alert">
           <div className="sd-error__body">
@@ -125,10 +180,30 @@ export default function Inquiries() {
         </section>
       )}
 
-      {!inquiriesQuery.isError && items.length === 0 && (
+      {/* An account whose assistant cannot save a message at all is told that,
+          rather than being shown a list that looks like nobody called. */}
+      {!inquiriesQuery.isError && allItems.length === 0 && messageTakingOff && (
+        <div className="sd-empty">
+          <h3 className="sd-empty__title">{CAPABILITY.offTitle}</h3>
+          <p className="sd-empty__detail">
+            {messagesCapability?.detail && messagesCapability.detail.trim() !== ""
+              ? messagesCapability.detail
+              : CAPABILITY.offFallback}
+          </p>
+        </div>
+      )}
+
+      {!inquiriesQuery.isError && allItems.length === 0 && !messageTakingOff && (
         <div className="sd-empty">
           <h3 className="sd-empty__title">{tab === "all" ? COPY.emptyTitle : COPY.emptyFilteredTitle}</h3>
           <p className="sd-empty__detail">{tab === "all" ? COPY.emptyDetail : COPY.emptyFilteredDetail}</p>
+        </div>
+      )}
+
+      {!inquiriesQuery.isError && allItems.length > 0 && items.length === 0 && (
+        <div className="sd-empty">
+          <h3 className="sd-empty__title">{COPY.emptyFilteredTitle}</h3>
+          <p className="sd-empty__detail">{COPY.emptyFilteredDetail}</p>
         </div>
       )}
 
@@ -168,6 +243,25 @@ export default function Inquiries() {
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-muted-foreground">{COPY.detailsLabel}</dt>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{inquiry.details}</p>
+                </div>
+
+                {/* Built from the details the caller gave, and handed to the
+                    reader's own phone or mail app. Nothing is sent from here. */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {inquiry.callbackPhone ? (
+                    <a className="text-sm underline" href={telHref(inquiry.callbackPhone)}>
+                      {ACTIONS.callLabel}
+                    </a>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{ACTIONS.noPhone}</span>
+                  )}
+                  {inquiry.callbackEmail ? (
+                    <a className="text-sm underline" href={mailtoHref(inquiry.callbackEmail, inquiry.topic)}>
+                      {ACTIONS.emailLabel}
+                    </a>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{ACTIONS.noEmail}</span>
+                  )}
                 </div>
 
                 {inquiry.emailAckRequested && (
@@ -233,11 +327,24 @@ export default function Inquiries() {
                   <span className="text-xs text-muted-foreground">{formatWhen(notification.createdAt)}</span>
                 </div>
                 <p className="mt-1 break-words text-foreground">{notification.subject}</p>
+
+                {/* What is actually known. Acceptance and the provider's later
+                    delivery evidence are different claims and stay apart. */}
+                <p className="mt-1 text-foreground">{deliveryLine(notification)}</p>
+                {notification.deliveryEventAt && (
+                  <p className="text-xs text-muted-foreground">{formatWhen(notification.deliveryEventAt)}</p>
+                )}
+                {notification.state === "abandoned" && notification.lastErrorCode && (
+                  <p className="text-xs text-muted-foreground">
+                    {DELIVERY.abandonedReasonLabel}: {notification.lastErrorCode}
+                  </p>
+                )}
+
                 <p className="text-xs text-muted-foreground">
                   {COPY.notificationRecipientLabel} {notification.recipient} · {COPY.notificationAttemptsLabel}{" "}
                   {notification.attempts}
                 </p>
-                {notification.lastErrorCode && (
+                {notification.lastErrorCode && notification.state !== "abandoned" && (
                   <p className="text-xs text-muted-foreground">
                     {COPY.notificationErrorLabel} {notification.lastErrorCode}
                     {notification.state === "failed" ? ` · ${COPY.notificationRetryNote}` : ""}
