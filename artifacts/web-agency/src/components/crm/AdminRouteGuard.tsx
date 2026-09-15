@@ -24,7 +24,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ADMIN_UNAUTHORIZED_EVENT,
@@ -34,11 +34,13 @@ import {
   resetUnauthorizedNotice,
   adminProbe,
 } from "@/lib/adminFetch";
+import { resolveAccess, type AccessOutcome } from "@/lib/adminAccess";
+import { subscribeConnection } from "@/lib/connectionState";
 import { clearAllDrafts } from "@/lib/draftVault";
 import { afterSessionSignIn, type SignedInStaff } from "@/lib/staffSignIn";
 import { SessionEndedDialog } from "./SessionEndedDialog";
 
-type GuardState = "checking" | "allowed" | "denied";
+type GuardState = "checking" | "allowed" | "denied" | "unreachable";
 
 /** Where a different person lands after signing in over somebody else's page. */
 const CRM_HOME = "/admin/crm";
@@ -48,7 +50,7 @@ const SIGNED_IN_AGAIN = "You're signed in again. Try your last action again.";
 let verified = false;
 /** The staff id the cached verification belongs to; null for the legacy shared admin. */
 let verifiedStaffId: number | null = null;
-let inflight: Promise<boolean> | null = null;
+let inflight: Promise<AccessOutcome> | null = null;
 
 /** Drop the cached verification (called on 401 and on logout). */
 export function invalidateAdminAccess(): void {
@@ -65,35 +67,30 @@ async function staffIdFrom(res: Response): Promise<number | null> {
   }
 }
 
-async function verifyAccess(): Promise<boolean> {
-  if (verified) return true;
+/**
+ * M1: a per-person staff session is the primary credential, asked for first so
+ * the workspace reflects who is actually signed in. Its 401 means "no staff
+ * session", not "signed out", because the legacy bearer path may still be the
+ * valid one — and a request that never completed means neither. The three-way
+ * answer lives in `lib/adminAccess` so it can be tested without a browser.
+ */
+async function verifyAccess(): Promise<AccessOutcome> {
+  if (verified) return "allowed";
   if (inflight) return inflight;
-  inflight = (async () => {
-    try {
-      // M1: a per-person staff session is the primary credential. Ask for it
-      // first so the workspace reflects who is actually signed in. This is a
-      // probe, not a request: a 401 here means "no staff session", not "signed
-      // out", because the legacy bearer path may still be the valid one.
-      const staff = await adminProbe("/api/crm/staff/me");
-      if (staff.ok) {
-        verifiedStaffId = await staffIdFrom(staff);
-        return true;
-      }
-      const res = await adminFetch("/api/admin/me");
-      if (res.ok) { verifiedStaffId = null; return true; }
-      if (res.status === 404) { verifiedStaffId = null; return !!getAdminToken(); }
-      return false;
-    } catch {
-      // Network failure: do not lock a working session out; fall back to the
-      // token presence exactly like the older-backend path.
-      return !!getAdminToken();
-    }
-  })();
-  const ok = await inflight;
+  inflight = resolveAccess({
+    probeStaff: () => adminProbe("/api/crm/staff/me"),
+    probeLegacy: () => adminFetch("/api/admin/me"),
+    hasLegacyToken: () => !!getAdminToken(),
+    staffIdFrom,
+  }).then((result) => {
+    if (result.outcome === "allowed") verifiedStaffId = result.staffId;
+    return result.outcome;
+  });
+  const outcome = await inflight;
   inflight = null;
-  verified = ok;
-  if (ok) resetUnauthorizedNotice();
-  return ok;
+  verified = outcome === "allowed";
+  if (verified) resetUnauthorizedNotice();
+  return outcome;
 }
 
 export function AdminRouteGuard({ children }: { children: ReactNode }) {
@@ -112,15 +109,43 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
     navigate(adminLoginPath(), { replace: true });
   };
 
+  /** Apply one answer. Only a real refusal throws the page away. */
+  const applyOutcome = (outcome: AccessOutcome) => {
+    if (outcome === "allowed") { setState("allowed"); return; }
+    if (outcome === "unreachable") { setState("unreachable"); return; }
+    setState("denied");
+    redirectToLogin();
+  };
+
+  const retryAccess = () => {
+    setState("checking");
+    verifyAccess().then(applyOutcome);
+  };
+
   useEffect(() => {
     let cancelled = false;
     if (state !== "allowed") {
-      verifyAccess().then(ok => {
+      verifyAccess().then(outcome => {
         if (cancelled) return;
-        if (ok) setState("allowed");
-        else { setState("denied"); redirectToLogin(); }
+        applyOutcome(outcome);
       });
     }
+    // While the server is unreachable, any other request completing proves the
+    // transport is back — so the page recovers on its own rather than waiting
+    // for somebody to notice the button.
+    const unsubscribe = subscribeConnection(connection => {
+      if (connection.status === "online" && stateRef.current === "unreachable") {
+        verifyAccess().then(outcome => { if (!cancelled) applyOutcome(outcome); });
+      }
+    });
+    // The subscription alone is not enough: when the application is down, the
+    // proxy in front of it ANSWERS (a 500/502), so the transport looks healthy
+    // and no connection event ever fires. Asking again on a timer is what
+    // actually brings the page back without anybody touching it.
+    const poll = window.setInterval(() => {
+      if (stateRef.current !== "unreachable") return;
+      verifyAccess().then(outcome => { if (!cancelled) applyOutcome(outcome); });
+    }, 8_000);
     const onUnauthorized = () => {
       invalidateAdminAccess();
       // Before the page is showing there is nothing to keep, and the check in
@@ -132,6 +157,8 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
     window.addEventListener(ADMIN_UNAUTHORIZED_EVENT, onUnauthorized);
     return () => {
       cancelled = true;
+      unsubscribe();
+      window.clearInterval(poll);
       window.removeEventListener(ADMIN_UNAUTHORIZED_EVENT, onUnauthorized);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,6 +211,48 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
           )}
         </div>
       </>
+    );
+  }
+
+  // A server we could not reach has told us nothing about this person's
+  // credentials, so the page stays and says so. Signing somebody out because
+  // their connection dropped for a moment is how unsaved work disappears.
+  if (state === "unreachable") {
+    return (
+      <div className="min-h-screen bg-crm-content flex items-center justify-center p-4 sm:p-6">
+        <div
+          className="w-full max-w-md rounded-xl border border-border bg-background p-5 shadow-sm sm:p-6"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="mb-4 flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10" aria-hidden="true">
+              <PlugZap className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold leading-snug text-foreground">Can't reach the server</h1>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                This is a connection problem, not a sign-out. Your session is untouched and nothing
+                you were working on has been sent anywhere. This page comes back on its own as soon
+                as the server answers.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" onClick={retryAccess} className="h-11 w-full sm:w-auto">
+              Try again
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 w-full sm:w-auto"
+              onClick={() => navigate(adminLoginPath(), { replace: true })}
+            >
+              Go to the sign-in page
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
