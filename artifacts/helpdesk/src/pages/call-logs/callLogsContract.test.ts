@@ -1297,7 +1297,10 @@ eq(
     ["inquiries", "Messages your assistant took, and what still needs following up."],
     ["phone-number", "The number your assistant answers and makes calls from."],
     ["transfer-contacts", "The people a caller can be put through to when they ask for someone."],
-    ["sms", "The SMS channel that texts with your clients."],
+    // Corrected deliberately: `/channels/sms` opens the editor for the SMS
+    // receptionist's own replies. It is not a connected client channel, and
+    // the sentence now says what live texting still needs.
+    ["sms", "Write what the SMS receptionist replies. Texting clients needs an SMS number SiteMint connects for you."],
     ["usage", "Minutes used, minutes remaining, and your billing period."],
     ["team", "Who else can sign in."],
     ["support", "Get help from SiteMint."],

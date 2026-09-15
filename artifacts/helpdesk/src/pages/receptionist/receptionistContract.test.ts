@@ -765,7 +765,7 @@ const h1Titles = [...pageCode.matchAll(/<h1[^>]*>\s*([^<]+?)\s*<\/h1>/g)].map((m
 eq("every render branch has exactly one h1", h1Count, h1Titles.length);
 check(
   "every branch's h1 is the same, and names the route",
-  h1Titles.length === 3 && h1Titles.every((t) => t === "SMS receptionist"),
+  h1Titles.length === 3 && h1Titles.every((t) => t === "SMS receptionist replies"),
 );
 check("sections below the h1 use h2 — no heading level is skipped", !/<h3|<h4/.test(pageCode));
 check(
