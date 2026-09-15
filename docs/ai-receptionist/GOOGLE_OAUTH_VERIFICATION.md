@@ -121,7 +121,7 @@ separately below and neither is reported as done because the other is.
 | Staging OAuth (Testing) | Working, 3 scopes granted, verified live 2026-09-15 | Reconnect when access is withdrawn | Business (you) |
 | Production OAuth app | Not created — blocked on Google Cloud Terms of Service for the owner's account | Accept the terms, or name the owning Google account | Owner |
 | Production publishing status (Testing → In production) | Not applicable yet; no production app exists | Decide once the app exists; independent of verification | Owner |
-| Domain verification | Property added; TXT record saved in the zone 2026-09-16; Google has not confirmed it yet | Re-run the check until it passes | SiteMint |
+| Domain verification | **Done 2026-09-16.** Search Console → Settings → Ownership verification reads "You are a verified owner" for `sc-domain:sitemintdigital.com`, via the TXT record added to the Replit-managed zone | Keep the TXT record in place; the OAuth project must be owned by the same Google account, or that account added to the property | — |
 | Privacy policy / terms | Google Calendar and Limited Use section drafted in source, not published; legal sign-off pending | Approve wording, then a marketing release publishes it | Owner |
 | Demo video | Not recorded | Record on production host once 1–5 exist | SiteMint |
 | Google verification submission | Not submitted | Submit after 1–8 | Owner (project owner account) |
