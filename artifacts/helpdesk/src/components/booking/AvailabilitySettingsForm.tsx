@@ -38,8 +38,13 @@ import {
   PAGE,
   PUBLIC_LINK,
   SETTINGS,
+  TIMEZONE_INVALID,
+  TYPE_DEPENDENCY,
   TYPES,
+  conflictingExceptionDates,
+  dateConflictError,
   effectiveForType,
+  isValidTimeZone,
   exceptionsSorted,
   fieldForError,
   isAdvancedField,
@@ -58,6 +63,22 @@ import {
 } from "@/pages/availability/availabilityContract";
 
 type SaveState = "idle" | "pending" | "saved" | "invalid" | "failed";
+
+/**
+ * The two rejections this form can see coming.
+ *
+ * Both are refusals the server issues anyway. Catching them here means the
+ * customer is told which date or which field is wrong, instead of spending a
+ * round trip to be handed a generic 400 — and, for the blocked/exception
+ * clash, instead of a contradiction that the availability engine would
+ * otherwise resolve by accident.
+ */
+function preflightError(draft: AvailabilityConfigInput): string | null {
+  if (!isValidTimeZone(draft.timezone)) return TIMEZONE_INVALID;
+  const conflicts = conflictingExceptionDates(draft.blockedDates, draft.dateExceptions);
+  if (conflicts.length > 0) return dateConflictError(conflicts[0]!);
+  return null;
+}
 
 export function AvailabilitySettingsForm({
   config,
@@ -114,6 +135,21 @@ export function AvailabilitySettingsForm({
 
   const handleSave = useCallback(async () => {
     if (!draft || save === "pending") return;
+
+    const clientError = preflightError(draft);
+    if (clientError !== null) {
+      setErrorText(clientError);
+      setSave("invalid");
+      const badField = fieldForError(clientError);
+      if (badField) {
+        if (isAdvancedField(badField)) setAdvancedOpen(true);
+        const tab = tabForField(badField);
+        if (tab !== activeTab) onFieldMoved?.(tab);
+      }
+      resultRef.current?.focus();
+      return;
+    }
+
     setSave("pending");
     setErrorText(null);
     try {
@@ -419,6 +455,22 @@ export function AvailabilitySettingsForm({
             </div>
           </div>
         </section>
+
+        {/*
+          The server refuses an availability config with no appointment types,
+          because the times it computes are always times for a particular type.
+          A business could fill in a whole week of hours before finding that
+          out, so the dependency is stated here rather than in the rejection.
+        */}
+        {draft.appointmentTypes.length === 0 && (
+          <div className="sa-notice" data-tone="neutral" role="note">
+            <p className="sa-notice__title">{TYPE_DEPENDENCY.heading}</p>
+            <p className="sa-notice__detail">{TYPE_DEPENDENCY.detail}</p>
+            <button type="button" className="sa-button" onClick={() => onFieldMoved?.("types")}>
+              {TYPE_DEPENDENCY.linkLabel}
+            </button>
+          </div>
+        )}
 
         {saveBar}
         <PublicLink />

@@ -236,6 +236,40 @@ export function saveErrorDetail(message: string | null | undefined): string {
   return "The server rejected these settings. Check the values and try again.";
 }
 
+/**
+ * Whether a string is a time zone this runtime — and therefore the server's
+ * `Intl.DateTimeFormat` check — will accept.
+ *
+ * The time zone is a free-text field, and it is the value every hour on this
+ * page is interpreted in, so a typo silently moves a business's whole
+ * schedule. `Intl.supportedValuesOf` gives the authoritative list where it
+ * exists; the constructor probe is the fallback for a runtime that lacks it
+ * and is the same test the server applies
+ * (`routes/receptionistAvailability.ts`).
+ */
+export function isValidTimeZone(value: string | null | undefined): boolean {
+  const zone = typeof value === "string" ? value.trim() : "";
+  if (zone === "") return false;
+  const supported = (
+    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+  ).supportedValuesOf;
+  if (typeof supported === "function") {
+    try {
+      if (supported("timeZone").includes(zone)) return true;
+      // Fall through rather than returning false: the list omits some aliases
+      // (for example "UTC" on certain runtimes) that the constructor accepts.
+    } catch {
+      // Unsupported key — fall back to the probe below.
+    }
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Which tab a rejected field lives on, so the error can move the operator there. */
 const ADVANCED_FIELDS: ReadonlySet<ConfigField> = new Set([
   "bufferBeforeMin", "bufferAfterMin", "minNoticeHours", "maxAdvanceDays", "blockedDates", "dateExceptions", "dailyLimit",
@@ -348,6 +382,57 @@ export function wouldDuplicateDate(list: readonly DateException[], index: number
   return list.some((e, i) => i !== index && e.dateKey === dateKey);
 }
 
+/**
+ * Dates that are both blocked AND given their own hours.
+ *
+ * The two are opposite instructions held in different places, so nothing
+ * downstream reconciles them — whichever the availability engine consults
+ * first silently wins, and a business that marked a date closed could still
+ * have it offered to callers. The server rejects the combination
+ * (`routes/receptionistAvailability.ts`); this finds it before the save so the
+ * page can name the date rather than handing back a rejected form.
+ */
+export function conflictingExceptionDates(
+  blockedDates: readonly string[],
+  exceptions: readonly DateException[],
+): string[] {
+  const blocked = new Set(blockedDates);
+  return exceptions.filter((e) => blocked.has(e.dateKey)).map((e) => e.dateKey);
+}
+
+export const DATE_CONFLICT = {
+  message: "is also blocked. A date can be blocked or given different hours, not both.",
+} as const;
+
+/** Names the offending date, and matches the server's own field wording. */
+export function dateConflictError(dateKey: string): string {
+  return `dateExceptions: ${dateKey} ${DATE_CONFLICT.message}`;
+}
+
+/**
+ * The time zone is free text, and it is the value every hour on this page is
+ * interpreted in — a typo silently moves a business's whole schedule. Checked
+ * before the request rather than after a 400.
+ */
+export const TIMEZONE_INVALID =
+  "That isn't a time zone this system recognises. Use an IANA name such as America/New_York.";
+
+/**
+ * Why the hours cannot be saved on their own.
+ *
+ * The server refuses an availability config with no appointment types
+ * (`routes/receptionistAvailability.ts`: "At least one appointment type is
+ * required"), because the times it computes are always times for a particular
+ * type. A business filling in a week of hours had no way to know that until
+ * the save was rejected, so the dependency is stated up front instead.
+ */
+export const TYPE_DEPENDENCY = {
+  heading: "Add an appointment type first",
+  detail:
+    "Hours are only ever offered for a particular appointment type, so this page can't be saved until at least one exists. Add one on the Appointment types tab, then set your hours.",
+  linkLabel: "Go to appointment types",
+} as const;
+
 /* ── Exhaustive string surface ─────────────────────────────────────────── */
 
 export function everyRenderableString(): string[] {
@@ -359,6 +444,9 @@ export function everyRenderableString(): string[] {
     ...Object.values(EXCEPTIONS),
     ...Object.values(CALENDAR_POINTER),
     ...Object.values(PUBLIC_LINK),
+    ...Object.values(TYPE_DEPENDENCY),
+    TIMEZONE_INVALID,
+    dateConflictError("2027-01-01"),
     saveErrorDetail(null),
   ];
 }
