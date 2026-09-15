@@ -367,17 +367,13 @@ export async function synchronizePublishedAssistant(
   }
 
   // P3: tools attachment, validated pre-claim; requires the server config.
-  let toolsConfig: JsonObject[] | null;
+  //
+  // Operator configuration only — no firm — exactly as in publishService: an
+  // enabled-but-invalid setup fails before any claim, and the per-business
+  // narrowing waits until the claim is held so two simultaneous syncs still
+  // reach the claim together and one of them genuinely loses the race.
   try {
-    // One shared capability resolution: the same list the dashboard reports
-    // and the synchronization comparison comes back to.
-    const effective = await (deps.resolveCapabilities ?? resolveEffectiveCapabilities)(firmId);
-    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(
-      serverConfig,
-      process.env,
-      effective.toolNames,
-      effective.activeCapabilities,
-    );
+    (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig, process.env);
   } catch {
     return failure("sync_disabled");
   }
@@ -403,6 +399,22 @@ export async function synchronizePublishedAssistant(
     return classifyClaimConflict(deps, firmId, assistantId);
   }
   const { assistant, providerSyncAttemptId } = claim;
+
+  // STEP 2a — this business's effective capabilities, resolved once the claim
+  // is held. The comparison in deriveProviderSyncState resolves the same way,
+  // so "up to date" means the same thing on both paths.
+  let toolsConfig: JsonObject[] | null;
+  try {
+    const effective = await (deps.resolveCapabilities ?? resolveEffectiveCapabilities)(firmId);
+    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(
+      serverConfig,
+      process.env,
+      effective.toolNames,
+      effective.activeCapabilities,
+    );
+  } catch {
+    return recordErrorAndFail(deps, firmId, assistantId, providerSyncAttemptId, "assistant_config_invalid");
+  }
 
   // STEP 3 — build the payload from the claimed row and digest it.
   let providerInput: VoiceAssistantInput;

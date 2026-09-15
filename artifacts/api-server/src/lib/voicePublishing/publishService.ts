@@ -409,17 +409,17 @@ export async function publishAssistant(
   }
 
   // P3: tools attachment, validated pre-claim; requires the server config.
-  let toolsConfig: JsonObject[] | null;
+  //
+  // This checks the OPERATOR configuration only — no firm is passed — so an
+  // enabled-but-invalid tools setup still fails before any claim, database
+  // write or provider request. The business's own narrowing happens after the
+  // claim (STEP 2a), for two reasons: a publish that is about to be refused
+  // should not read that firm's scheduling and transfer rows at all, and every
+  // caller must reach the atomic claim after the same number of awaits, or two
+  // racing publishes stop racing and the loser reports whichever refusal its
+  // later arrival happens to produce.
   try {
-    // One shared capability resolution: the same list the dashboard reports
-    // and the synchronization comparison comes back to.
-    const effective = await (deps.resolveCapabilities ?? resolveEffectiveCapabilities)(firmId);
-    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(
-      serverConfig,
-      process.env,
-      effective.toolNames,
-      effective.activeCapabilities,
-    );
+    (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig, process.env);
   } catch {
     return failure("publish_disabled");
   }
@@ -444,6 +444,24 @@ export async function publishAssistant(
     return classifyClaimConflict(deps, firmId, assistantId);
   }
   const { assistant, publishAttemptId } = claim;
+
+  // STEP 2a — what THIS business may carry, resolved once, now that the claim
+  // is held. One shared capability resolution: the same answer the dashboard
+  // reports, the synchronization comparison returns to, and the runtime gate
+  // re-checks per call. A failure here is recorded against the claimed attempt
+  // rather than leaving the row claimed.
+  let toolsConfig: JsonObject[] | null;
+  try {
+    const effective = await (deps.resolveCapabilities ?? resolveEffectiveCapabilities)(firmId);
+    toolsConfig = (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(
+      serverConfig,
+      process.env,
+      effective.toolNames,
+      effective.activeCapabilities,
+    );
+  } catch {
+    return recordDefinitiveErrorAndFail(deps, firmId, assistantId, publishAttemptId, "assistant_config_invalid");
+  }
 
   // STEP 3/4 — claimed row as source of truth; build provider input.
   let providerInput: VoiceAssistantInput;
