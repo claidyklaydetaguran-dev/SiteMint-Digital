@@ -39,6 +39,17 @@ function requireVerified(req: Request, res: Response): { config: VoiceSmsConfig;
   try {
     config = loadVoiceSmsConfig();
   } catch {
+    // Without the voice channel's own auth token nothing here can be
+    // authenticated, so the request is refused rather than acted on — a forged
+    // START would otherwise re-consent somebody who had opted out. It is
+    // logged, because the caller is most likely the provider delivering a real
+    // STOP that this deployment cannot record: somebody has pointed a number's
+    // webhooks at us before the credentials were configured, and silence would
+    // leave that opt-out unrecorded with nothing to show for it.
+    req.log.warn(
+      { path: req.originalUrl },
+      "[voice sms] inbound refused: the voice SMS credential set is not configured, so the request cannot be verified",
+    );
     res.status(503).json({ error: "Unavailable" });
     return undefined;
   }
