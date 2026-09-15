@@ -64,6 +64,28 @@ const emptyForm: CreateForm = {
   leadId: "", notes: "", generateTasks: true,
 };
 
+/**
+ * A deep link may name the project to open.
+ *
+ * Discovery's "project created" notice links straight to the project it just
+ * made, rather than leaving somebody to find one card among forty.
+ */
+function projectIdFromLocation(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("project");
+  return raw && /^[1-9]\d*$/.test(raw) ? Number(raw) : null;
+}
+
+function forgetProjectParam(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("project")) return;
+  url.searchParams.delete("project");
+  // Without this, reloading after closing the drawer — or after deleting the
+  // project — reopens a drawer for something that may no longer exist.
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function ProjectCard({ project, onDragStart, onOpen }: {
   project: Project;
   onDragStart: (id: number) => void;
@@ -129,7 +151,7 @@ export default function CrmProjectsPage() {
   const [formError, setFormError] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<ProjectStage | null>(null);
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(() => projectIdFromLocation());
   const savingRef = useRef(false);
   const confirmation = useConfirmDialog();
 
@@ -422,7 +444,7 @@ export default function CrmProjectsPage() {
       {detailId !== null && (
         <ProjectDetailDrawer
           projectId={detailId}
-          onClose={() => setDetailId(null)}
+          onClose={() => { setDetailId(null); forgetProjectParam(); }}
           onChanged={load}
           askConfirm={confirmation.ask}
         />
