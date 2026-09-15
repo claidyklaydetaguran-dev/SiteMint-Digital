@@ -1180,9 +1180,13 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
           <Menu className="w-4 h-4" />
         </button>
 
-        {/* Logo */}
+        {/* Logo — hidden below `sm`. At 375px the wordmark and the action
+            row do not both fit: the actions (compose, call, text, add, bell,
+            profile) are `shrink-0`, so they were pushed past the right edge of
+            an overflow-hidden shell, putting the profile menu (sign out, My
+            account) out of reach. The menu drawer still carries the brand. */}
         <Link href="/admin/crm">
-          <div className="cursor-pointer flex items-center shrink-0">
+          <div className="cursor-pointer hidden sm:flex items-center shrink-0">
             <SiteMintLogo variant="ops" iconSize={18} />
           </div>
         </Link>

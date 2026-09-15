@@ -237,7 +237,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
 
   // Send completion
   if (totals.recipients === 0) {
-    ins.push("Add recipients to start sending this campaign.");
+    ins.push("Add recipients to start sending this sequence.");
   } else if (totals.sendRate === 100) {
     ins.push("Campaign fully delivered — all recipients reached successfully.");
   } else if (totals.sendRate === 0 && totals.selected > 0) {
@@ -247,7 +247,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
   } else if (totals.sendRate < 50) {
     ins.push(`Only ${totals.sendRate}% of recipients were reached. Review failed and skipped contacts before resending.`);
   } else if (totals.sendRate >= 80) {
-    ins.push(`Strong delivery — ${totals.sendRate}% of recipients received this campaign.`);
+    ins.push(`Strong delivery — ${totals.sendRate}% of recipients received this sequence.`);
   }
 
   // Data quality / skipped
@@ -269,10 +269,10 @@ function generateInsights(a: CampaignAnalytics): string[] {
     const top = activeDisc[0];
     const pct = Math.round((top.count / totals.recipients) * 100);
     const COPY: Record<string, string> = {
-      Driver:     "Keep future campaigns concise with a direct CTA and clear next step.",
+      Driver:     "Keep future sequences concise with a direct CTA and clear next step.",
       Expressive: "Use energetic language and big-picture outcomes to engage this audience.",
       Amiable:    "Lead with relationship and trust. A warmer, reassuring CTA may perform better.",
-      Analytical: "Support future campaigns with proof, data points, timelines, and pricing details.",
+      Analytical: "Support future sequences with proof, data points, timelines, and pricing details.",
     };
     ins.push(`Most recipients (${pct}%) are ${top.style}-style leads. ${COPY[top.style] ?? ""}`);
   }
@@ -284,7 +284,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
     const worst = [...discBreakdown.filter(d => d.count > 0)].sort((x, y) => {
       return ((y.failed + y.skipped) / y.count) - ((x.failed + x.skipped) / x.count);
     })[0];
-    ins.push(`${best.style} leads had the highest delivery success in this campaign.`);
+    ins.push(`${best.style} leads had the highest delivery success in this sequence.`);
     if (worst.style !== best.style && (worst.failed + worst.skipped) > 0) {
       ins.push(`${worst.style} leads had the most delivery issues — review their contact records.`);
     }
@@ -295,7 +295,7 @@ function generateInsights(a: CampaignAnalytics): string[] {
     if (replyEstimate.rate >= 10) {
       ins.push(`Strong estimated reply activity — ${replyEstimate.rate}% of sent recipients have since sent inbound messages.`);
     } else if (replyEstimate.count === 0) {
-      ins.push("No estimated replies detected yet. Consider a follow-up campaign or a direct SMS touchpoint to re-engage.");
+      ins.push("No estimated replies detected yet. Consider a follow-up sequence or a direct SMS touchpoint to re-engage.");
     }
   }
 
@@ -315,7 +315,7 @@ function computeQualityScore(a: CampaignAnalytics): QualityScore {
   const reasons: string[] = [];
 
   if (totals.recipients === 0) {
-    return { score: 0, badge: "Risky", reasons: ["No recipients added to this campaign"] };
+    return { score: 0, badge: "Risky", reasons: ["No recipients added to this sequence"] };
   }
 
   let score = 0;
@@ -1932,7 +1932,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab === "campaigns" ? `Campaigns (${campaigns.length})` : "Email Activity"}
+                {tab === "campaigns" ? `Sequences (${campaigns.length})` : "Email Activity"}
               </button>
             ))}
           </div>
@@ -1988,11 +1988,11 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   <div className="bg-white border border-border rounded-xl shadow-sm py-16 text-center">
                     <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
                     <p className="text-sm font-medium text-foreground mb-1">
-                      {campaigns.length === 0 ? "No campaigns yet" : "No campaigns match your filter"}
+                      {campaigns.length === 0 ? "No sequences yet" : "No sequences match your filter"}
                     </p>
                     <p className="text-xs text-muted-foreground mb-4">
                       {campaigns.length === 0
-                        ? "Create your first campaign to start building automated sequences."
+                        ? "Create your first sequence: several messages over days, each on its own schedule."
                         : "Try a different status filter or search term."}
                     </p>
                     {campaigns.length === 0 && (
@@ -2091,7 +2091,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
                   <h2 className="text-sm font-bold text-foreground">Email Activity</h2>
-                  <span className="text-xs text-muted-foreground ml-1">— per-campaign send totals</span>
+                  <span className="text-xs text-muted-foreground ml-1">— send totals per sequence</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -2108,7 +2108,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                       {campaigns.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">
-                            No campaigns yet. Create one to see email activity.
+                            No sequences yet. Create one to see its email activity.
                           </td>
                         </tr>
                       ) : campaigns.map(c => {
