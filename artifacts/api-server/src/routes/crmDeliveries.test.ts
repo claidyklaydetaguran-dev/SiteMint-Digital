@@ -672,6 +672,43 @@ suite("M4 reminder delivery recovery (real DB)", () => {
 
   // ── 10. The old packed records survive the move ───────────────────────────
 
+  it("keeps one delivery record per occurrence and recipient when the address is NULL", async () => {
+    const { db, crmScheduledJobs, crmReminderDeliveries } = await import("@workspace/db");
+    const { eq, sql } = await import("drizzle-orm");
+
+    // The declaration first. Without NULLS NOT DISTINCT a staff row (whose
+    // address is NULL) never conflicts, so the rule below would silently never
+    // fire — which is what every push-built database had until
+    // M7-reminder-delivery-uniqueness.sql.
+    const declared = await db.execute(sql`
+      select x.indisunique as "unique", x.indnullsnotdistinct as "nullsNotDistinct"
+        from pg_class i
+        join pg_index x on x.indexrelid = i.oid
+       where i.relname = 'uq_crm_reminder_deliveries_occurrence'`);
+    expect(declared.rows).toEqual([{ unique: true, nullsNotDistinct: true }]);
+
+    const runAt = new Date("2026-08-02T09:00:00.000Z");
+    const [job] = await db.insert(crmScheduledJobs).values({
+      kind: "task_reminder", dedupeKey: `uniqueness-${STAMP}`, runAt, payload: {}, status: "completed",
+    }).returning();
+    const record = {
+      jobId: job.id, occurrenceAt: runAt, recipientStaffId: ownerId,
+      subject: "uniqueness probe", body: "uniqueness probe",
+      idempotencyKey: `uniqueness-${STAMP}-first`, state: "pending", nextAttemptAt: null,
+    };
+
+    const first = await db.insert(crmReminderDeliveries).values(record).onConflictDoNothing().returning();
+    // A second writer racing for the same occurrence and person, with its own key.
+    const second = await db.insert(crmReminderDeliveries)
+      .values({ ...record, idempotencyKey: `uniqueness-${STAMP}-second` })
+      .onConflictDoNothing().returning();
+
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(0);
+    const rows = await db.select().from(crmReminderDeliveries).where(eq(crmReminderDeliveries.jobId, job.id));
+    expect(rows).toHaveLength(1);
+  });
+
   it("migrates the packed external_ref column without guessing at or dropping anything", async () => {
     const { db, crmScheduledJobs, crmReminderDeliveries } = await import("@workspace/db");
     const { eq } = await import("drizzle-orm");
