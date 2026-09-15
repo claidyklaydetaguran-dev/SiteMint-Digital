@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
   Zap, Bot, Mail, MessageSquare, Download, Globe,
-  Settings, TestTube, ChevronRight, AlertCircle, CheckCircle2,
+  Settings, TestTube, ChevronRight, AlertCircle, CheckCircle2, Users,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
 import { UnmappedOwnersPanel } from "@/components/crm/UnmappedOwnersPanel";
@@ -42,6 +42,7 @@ const HUB_CARDS = [
   { icon: Globe, title: "Discovery Inquiries", description: "Website Discovery form submissions and their pipeline status.", color: "bg-teal-500", href: "/admin/crm/discovery" },
   { icon: Download, title: "Import", description: "CSV lead import and Discovery-to-CRM import.", color: "bg-muted-foreground", href: "/admin/crm/import" },
   { icon: MessageSquare, title: "Phone & SMS (Twilio)", description: "Connection status, test SMS, webhooks, and phone data hygiene.", color: "bg-green-500", href: "/admin/crm/settings" },
+  { icon: Users, title: "People & permissions", description: "Individual staff accounts, roles, per-person permissions and sessions.", color: "bg-blue-600", href: "/admin/crm/people" },
 ];
 
 const NOT_BUILT = [
@@ -51,7 +52,6 @@ const NOT_BUILT = [
   "Tag management",
   "Custom pipeline stages",
   "Custom lead sources",
-  "Users, roles & permissions (everyone shares one admin sign-in today)",
 ];
 
 export default function CrmAdminSettings() {

@@ -213,7 +213,9 @@ export function UnmappedOwnersPanel() {
 
   function mapped(result: OwnerMapResult) {
     setNotice({
-      text: `“${result.value}” is ${result.staff.displayName}: ${result.leadsUpdated} contact${result.leadsUpdated === 1 ? "" : "s"} updated.`,
+      // Named with the email when two people share the display name: the whole
+      // decision was WHICH of them, so the confirmation must say.
+      text: `“${result.value}” is ${personLabel(result.staff, data?.staff ?? [])}: ${result.leadsUpdated} contact${result.leadsUpdated === 1 ? "" : "s"} updated.`,
       detail: result.future.note,
     });
     void load();
@@ -259,7 +261,9 @@ export function UnmappedOwnersPanel() {
         <>
           <dl className="grid grid-cols-3 gap-2 mt-4">
             <Stat label="Belong to a person" value={data.resolvedLeads} />
-            <Stat label="Carry a name that matches nobody yet" value={data.unresolvedLeads} warn={data.unresolvedLeads > 0} />
+            {/* Unresolved covers two reasons — a name matching nobody, and a name
+                matching more than one person — so the label names neither. */}
+            <Stat label="Carry a name not yet tied to one person" value={data.unresolvedLeads} warn={data.unresolvedLeads > 0} />
             <Stat label="No owner recorded" value={data.unassignedLeads} />
           </dl>
 
@@ -332,8 +336,7 @@ export function UnmappedOwnersPanel() {
                 {data.recentMappings.map(m => (
                   <li key={m.id} className="text-xs text-foreground rounded-lg border border-border px-3 py-2 min-w-0">
                     <p className="break-words">
-                      <span className="font-semibold">“{m.value}”</span> → {m.staff.displayName}
-                      {m.staff.status !== "active" ? ` (${m.staff.status})` : ""}
+                      <span className="font-semibold">“{m.value}”</span> → {personLabel(m.staff, data.staff)}
                     </p>
                     <p className="text-muted-foreground mt-0.5 break-words">
                       {DECIDED_BY_RULE[m.rule]} · by {m.decidedBy} · {new Date(m.createdAt).toLocaleString()} ·{" "}

@@ -13,25 +13,25 @@
 
 ## Table 1 — the 18 core feature areas
 
-**119 / 150 criteria = 79.3% verified.** At the real provider: 2. In production: **0**.
+**125 / 150 criteria = 83.3% verified.** At the real provider: 2. In production: **0**.
 
-By status: Passed 119 · Built, not proven 10 · Not passed 20 · Deferred by decision 1.
+By status: Passed 125 · Built, not proven 4 · Not passed 20 · Deferred by decision 1.
 
 The denominator is 143 baseline criteria plus 7 added from the owner's brief after the baseline was set; each is listed under "Criteria added after the baseline" with its reason.
 
 | # | Area | Passed / total | % | Verified in | In production | What is not passed |
 |---|---|---|---|---|---|---|
 | 1 | Contact management | 6 / 7 | **85.7%** | L, T | 0 | 1.7 Companies/accounts are modelled separately from the people who work there |
-| 2 | Lead management | 4 / 6 | **66.7%** | L, T | 0 | 2.5 Leads are assigned to a staff member by reference, not free text (built, not proven); 2.6 Existing free-text owners are mapped by reviewed rules, with a visible list of unresolved names (built, not proven) |
+| 2 | Lead management | 6 / 6 | **100.0%** | L, T | 0 | — |
 | 3 | Sales pipeline | 7 / 7 | **100.0%** | L, T | 0 | — |
 | 4 | Customer communication | 7 / 9 | **77.8%** | L, T, R | 0 | 4.8 Inbound replies arrive through the real provider; 4.9 Delivery events from the real provider update message state |
 | 5 | Tasks, activities and reminders | 8 / 8 | **100.0%** | L, T | 0 | — |
 | 6 | Support and knowledge base | 7 / 9 | **77.8%** | L, T | 0 | 6.8 A support reply is delivered to a real mailbox; 6.9 A customer's emailed reply lands on the right ticket |
-| 7 | Marketing automation | 9 / 17 | **52.9%** | L, T | 0 | 7.10 A campaign test email is delivered to a real mailbox; 7.11 Engagement is measured where the provider supports it; 7.12 Audience preview, preflight and the send apply one eligibility rule (built, not proven); 7.13 A retry or an ambiguous provider outcome never delivers a message twice (built, not proven); 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.15 Templates are editable, and branding and personalisation render identically in preview and delivery (built, not proven); 7.16 Marketing, Sequences and the Sequence queue each say plainly what they are (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
+| 7 | Marketing automation | 12 / 17 | **70.6%** | L, T | 0 | 7.10 A campaign test email is delivered to a real mailbox; 7.11 Engagement is measured where the provider supports it; 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.16 Marketing, Sequences and the Sequence queue each say plainly what they are (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
 | 8 | Reporting and analytics | 8 / 9 | **88.9%** | L, T | 0 | 8.9 Email engagement figures come from real provider events |
 | 9 | Documents | 7 / 8 | **87.5%** | L, T | 0 | 9.8 Agreements can be signed electronically through a provider |
 | 10 | Workflow automation and approvals | 10 / 10 | **100.0%** | T | 0 | — |
-| 11 | Users, roles and permissions | 8 / 10 | **80.0%** | L, T | 0 | 11.9 Two-step verification is enrolled on the real owner accounts; 11.10 Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions (built, not proven) |
+| 11 | Users, roles and permissions | 9 / 10 | **90.0%** | L, T | 0 | 11.9 Two-step verification is enrolled on the real owner accounts |
 | 12 | Interaction history | 6 / 6 | **100.0%** | L, T | 0 | — |
 | 13 | Calendar and scheduling | 7 / 8 | **87.5%** | L, T | 0 | 13.8 Two-way sync with external calendars |
 | 14 | Integrations | 0 / 5 | **0.0%** | — | 0 | 14.1 An accounting or payments connector; 14.2 Calendar provider sync; 14.3 An e-signature provider; 14.4 Team notifications to a chat tool; 14.5 Outbound webhooks or an API for other systems |
@@ -51,16 +51,16 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**79 / 300 page checks = 26.3%.** Pages passing all 6: 0. Pages passing none: 12.
+**90 / 300 page checks = 30.0%.** Pages passing all 6: 0. Pages passing none: 6.
 
-By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by decision 0.
+By status: Passed 90 · Built, not proven 210 · Not passed 0 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
-| open | 37 / 50 (74.0%) |
-| action | 17 / 50 (34.0%) |
-| persist | 4 / 50 (8.0%) |
-| permission | 14 / 50 (28.0%) |
+| open | 40 / 50 (80.0%) |
+| action | 18 / 50 (36.0%) |
+| persist | 5 / 50 (10.0%) |
+| permission | 20 / 50 (40.0%) |
 | recovery | 1 / 50 (2.0%) |
 | mobile | 6 / 50 (12.0%) |
 
@@ -87,14 +87,14 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 | 19 | `/admin/crm/support` | Support | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
 | 20 | `/admin/crm/pipeline` | Pipeline | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 21 | `/admin/crm/reporting` | Reporting | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 22 | `/admin/crm/admin` | Staff administration | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
+| 22 | `/admin/crm/admin` | Admin hub | 3 / 6 | 50.0% | L | permission, recovery, mobile |
 | 23 | `/admin/crm/workspace` | Sales workspace | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 24 | `/admin/crm/campaigns` | Sequences | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 25 | `/admin/crm/campaign-builder` | Marketing | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
 | 26 | `/admin/crm/campaign-queue` | Sequence queue | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 27 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 28 | `/admin/crm/intake-cases` | Intake cases | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 29 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
+| 29 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
 | 30 | `/admin/crm/email-templates` | Email templates | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
 | 31 | `/admin/crm/import` | Import contacts | 3 / 6 | 50.0% | L | persist, permission, recovery |
 | 32 | `/admin/crm/duplicates` | Duplicate review | 2 / 6 | 33.3% | L, T | persist, permission, recovery, mobile |
@@ -103,11 +103,11 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 | 35 | `/admin/crm/account` | My account | 3 / 6 | 50.0% | L | permission, recovery, mobile |
 | 36 | `/admin/crm/operations` | Operations | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
 | 37 | `/admin/crm/my-day` | My Day | 5 / 6 | 83.3% | L | permission |
-| 38 | `/admin/ops/firms/:id` | Receptionist firm detail | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 39 | `/admin/ops/firms` | Receptionist firms | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 40 | `/admin/ops/issues` | Receptionist issues | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 41 | `/admin/ops/usage` | Receptionist usage | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 42 | `/admin/ops/numbers` | Receptionist numbers | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
+| 38 | `/admin/ops/firms/:id` | Receptionist firm detail | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
+| 39 | `/admin/ops/firms` | Receptionist firms | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
+| 40 | `/admin/ops/issues` | Receptionist issues | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 41 | `/admin/ops/usage` | Receptionist usage | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 42 | `/admin/ops/numbers` | Receptionist numbers | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
 | 43 | `/portal/sign-in` | Portal sign-in | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 44 | `/portal/accept` | Portal invitation landing | 3 / 6 | 50.0% | L, T, R | persist, recovery, mobile |
 | 45 | `/portal` | Portal home | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
@@ -121,13 +121,13 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | ID | Criterion | Added | Why | Status |
 |---|---|---|---|---|
-| 7.12 | Audience preview, preflight and the send apply one eligibility rule | 2026-09-15 | Owner brief §4: audience preview and sending use the same eligibility rules | Built, not proven |
-| 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | 2026-09-15 | Owner brief §4: retries and ambiguous outcomes without duplicate delivery | Built, not proven |
+| 7.12 | Audience preview, preflight and the send apply one eligibility rule | 2026-09-15 | Owner brief §4: audience preview and sending use the same eligibility rules | Passed |
+| 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | 2026-09-15 | Owner brief §4: retries and ambiguous outcomes without duplicate delivery | Passed |
 | 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | 2026-09-15 | Owner brief §4: save and resume drafts, and preserve drafts on failures | Built, not proven |
-| 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | 2026-09-15 | Owner brief §4: template editing, branding and personalisation | Built, not proven |
+| 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | 2026-09-15 | Owner brief §4: template editing, branding and personalisation | Passed |
 | 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | 2026-09-15 | Owner brief §4: campaigns, sequences and queues must be understandable | Built, not proven |
 | 7.17 | A real AI draft is produced in the campaign editor | 2026-09-15 | Owner brief §2: verify a real draft in the campaign editor | Not passed |
-| 11.10 | Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions | 2026-09-15 | Owner brief §3: the three pages whose data requests reject staff sessions | Built, not proven |
+| 11.10 | Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions | 2026-09-15 | Owner brief §3: the three pages whose data requests reject staff sessions | Passed |
 
 ## Deferred scope, shown rather than hidden
 
@@ -155,8 +155,8 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 | 2.2 | Lead status is tracked through the pipeline | Passed | L, T | Stage/status on lead detail; smart lists by status |
 | 2.3 | Leads are scored and prioritised | Passed | L, T | Locked leadScore engine; score shown on leads and DNA page |
 | 2.4 | Changing who owns a lead is permission-gated | Passed | T | Assignment requires leads.assign; restricted users refused in crmStaffAuth.test.ts |
-| 2.5 | Leads are assigned to a staff member by reference, not free text | Built, not proven | — | crm_leads.assigned_to_staff_id written by lead create/edit, imports and merges, and read by My Day, Command Center and the inactivity sweep; crmLeadAssignment.test.ts (19) green on a scratch database; not yet committed or used in a browser |
-| 2.6 | Existing free-text owners are mapped by reviewed rules, with a visible list of unresolved names | Built, not proven | — | M6-lead-assignee.sql and the TypeScript backfill agree on one answer table (mutation-checked both ways); every decision recorded in crm_lead_owner_mappings; the Unmapped lead owners panel on /admin/crm/admin has not been opened in a browser |
+| 2.5 | Leads are assigned to a staff member by reference, not free text | Passed | T | crm_leads.assigned_to_staff_id is written by lead create/edit, imports and merges, and read by My Day, Command Center and the inactivity sweep; crmLeadAssignment.test.ts and every other suite green on the committed candidate a3c56b3 |
+| 2.6 | Existing free-text owners are mapped by reviewed rules, with a visible list of unresolved names | Passed | L, T | M6-lead-assignee.sql and the TypeScript backfill agree on one answer table (mutation-checked both ways, green on a3c56b3). On real preview data the panel listed “Claidy Taguran” as matching two accounts, assumed nobody, and a mapping chosen there persisted after reload |
 
 ### 3. Sales pipeline
 
@@ -226,10 +226,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 | 7.9 | A scheduled campaign starts itself only behind a fail-closed flag | Passed | T | Scheduler flag tests |
 | 7.10 | A campaign test email is delivered to a real mailbox | Not passed | — | Not yet exercised against the provider |
 | 7.11 | Engagement is measured where the provider supports it | Not passed | — | Opens/clicks need a Resend tracking subdomain and event webhook; reported as untracked, not zero |
-| 7.12 | Audience preview, preflight and the send apply one eligibility rule | Built, not proven | — | One 13-contact fixture gives the same answer, reason for reason, from all three (crmMarketingDelivery.test.ts); green on a scratch database, not yet on the committed candidate |
-| 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | Built, not proven | — | Claim-before-send, same-key retry, simultaneous retry and crash-resume tests written; a provider 5xx is now treated as unknown, matching reminders and support; not yet on the committed candidate |
+| 7.12 | Audience preview, preflight and the send apply one eligibility rule | Passed | T | One 13-contact fixture gives the same answer, reason for reason, from preview, preflight and the send ledger (crmMarketingDelivery.test.ts, green on the committed candidate a3c56b3) |
+| 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | Passed | T | Claim-before-send, same-key retry, simultaneous retry and crash-resume tests, plus a provider 5xx stored as unknown and never retried (matching reminders and support); mutation-checked, green on the committed candidate a3c56b3 |
 | 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | Built, not proven | — | campaignDraft.test.ts (12) and campaignRequests.test.ts (9) prove the logic; the restore prompt has not been used in a browser |
-| 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | Built, not proven | — | Byte-for-byte preview-versus-send comparison and template-edit tests written; not yet on the committed candidate |
+| 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | Passed | T | Preview and delivery compared byte for byte (subject, HTML, text, stored copy, branding and fallbacks), and template editing tested; green on the committed candidate a3c56b3 |
 | 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | Built, not proven | — | One shared naming module with messagingConcepts.test.ts; not yet seen in a browser |
 | 7.17 | A real AI draft is produced in the campaign editor | Not passed | — | The production server's AI integration answered a real request (HTTP 200, 2026-09-15), but no draft has come through the editor: the local server has no AI key and production still runs the old build |
 
@@ -288,7 +288,7 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 | 11.7 | The three owners hold identical full access; future hires get role-based access | Passed | L, T | Activation grants the identical 37-permission owner set; roles for hires |
 | 11.8 | A restricted user is refused at every API boundary | Passed | T | Restricted-user tests across suites, including receptionistOpsAuth.test.ts |
 | 11.9 | Two-step verification is enrolled on the real owner accounts | Not passed | — | Available on My Account; not enrolled on any real account yet |
-| 11.10 | Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions | Built, not proven | — | Routes moved to the staff session with permission checks, and receptionistOpsAuth.test.ts written; not yet committed, gated, or re-opened in a browser |
+| 11.10 | Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions | Passed | L, T | On candidate a3c56b3 Receptionist Accounts loaded with a staff session (200, where it answered 401 before) and listed a fixture firm; receptionistOpsAuth.test.ts green on the same candidate |
 
 ### 12. Interaction history
 
@@ -608,13 +608,13 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
 
-### `/admin/crm/admin` — Staff administration
+### `/admin/crm/admin` — Admin hub
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Passed | L | Opened populated with a real staff session (2026-09-15) |
-| action | Built, not proven | — | Not exercised |
-| persist | Built, not proven | — | Not exercised |
+| open | Passed | L | Opened with a real staff session on candidate a3c56b3; the Unmapped lead owners panel listed the real ambiguous name “Claidy Taguran” with both candidate accounts |
+| action | Passed | L | Mapped that name to the chosen account from the panel: POST answered 200 and 2 contacts were updated |
+| persist | Passed | L | After a full reload: 7 contacts belong to a person, 0 unresolved, and 3 decisions recorded |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
@@ -689,10 +689,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Not passed | — | Its data call answered 401 to a staff session on 2026-09-15. A staff-session fix is written but not yet committed or re-opened |
+| open | Passed | L | On candidate a3c56b3 its data calls answered 200 to a staff session (401 before the fix) and it listed a [CRM-TEST] fixture firm with plan, phone and trial limit |
 | action | Built, not proven | — | Unreachable until the data call works |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Permission tests are written (receptionistOpsAuth.test.ts) but not yet on the committed candidate |
+| permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Not measured |
 
@@ -788,10 +788,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Not passed | — | Its diagnostics call answered 401 to a staff session on 2026-09-15. Fix and corrected fields are written but not committed or re-opened |
+| open | Passed | L | On candidate a3c56b3 the fixture firm's diagnostics loaded with a staff session (200, 401 before the fix): usage period, calls and open issues shown, and fields the API does not send read Not reported rather than an invented value |
 | action | Built, not proven | — | Unreachable until the data call works |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate |
+| permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Not measured |
 
@@ -799,10 +799,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Not passed | — | Its data call answered 401 to a staff session on 2026-09-15. Fix written, not committed or re-opened |
+| open | Passed | L | On candidate a3c56b3 it listed the [CRM-TEST] fixture firm with plan, conversations and health to a staff session (200, 401 before the fix) |
 | action | Built, not proven | — | Unreachable until the data call works |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate |
+| permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Not measured |
 
@@ -810,10 +810,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Rendered with a real session on 2026-09-15, but whether it showed data was not recorded |
+| open | Built, not proven | — | Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate |
+| permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Not measured |
 
@@ -821,10 +821,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Rendered with a real session on 2026-09-15, but whether it showed data was not recorded |
+| open | Built, not proven | — | Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
+| permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Not measured |
 
@@ -832,10 +832,10 @@ By status: Passed 79 · Built, not proven 218 · Not passed 3 · Deferred by dec
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Rendered with a real session on 2026-09-15, but whether it showed data was not recorded |
+| open | Built, not proven | — | Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
+| permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Built, not proven | — | Not measured |
 

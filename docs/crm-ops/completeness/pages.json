@@ -255,11 +255,11 @@
     },
     {
       "route": "/admin/crm/admin",
-      "title": "Staff administration",
+      "title": "Admin hub",
       "checks": {
-        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
-        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session on candidate a3c56b3; the Unmapped lead owners panel listed the real ambiguous name “Claidy Taguran” with both candidate accounts" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Mapped that name to the chosen account from the panel: POST answered 200 and 2 contacts were updated" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload: 7 contacts belong to a person, 0 unresolved, and 3 decisions recorded" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
@@ -341,10 +341,10 @@
       "route": "/admin/crm/receptionist-accounts",
       "title": "Receptionist accounts",
       "checks": {
-        "open": { "status": "fail", "env": [], "evidence": "Its data call answered 401 to a staff session on 2026-09-15. A staff-session fix is written but not yet committed or re-opened" },
+        "open": { "status": "pass", "env": ["L"], "evidence": "On candidate a3c56b3 its data calls answered 200 to a staff session (401 before the fix) and it listed a [CRM-TEST] fixture firm with plan, phone and trial limit" },
         "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "permission": { "status": "unverified", "env": [], "evidence": "Permission tests are written (receptionistOpsAuth.test.ts) but not yet on the committed candidate" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
       }
@@ -449,10 +449,10 @@
       "route": "/admin/ops/firms/:id",
       "title": "Receptionist firm detail",
       "checks": {
-        "open": { "status": "fail", "env": [], "evidence": "Its diagnostics call answered 401 to a staff session on 2026-09-15. Fix and corrected fields are written but not committed or re-opened" },
+        "open": { "status": "pass", "env": ["L"], "evidence": "On candidate a3c56b3 the fixture firm's diagnostics loaded with a staff session (200, 401 before the fix): usage period, calls and open issues shown, and fields the API does not send read Not reported rather than an invented value" },
         "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "permission": { "status": "unverified", "env": [], "evidence": "Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
       }
@@ -461,10 +461,10 @@
       "route": "/admin/ops/firms",
       "title": "Receptionist firms",
       "checks": {
-        "open": { "status": "fail", "env": [], "evidence": "Its data call answered 401 to a staff session on 2026-09-15. Fix written, not committed or re-opened" },
+        "open": { "status": "pass", "env": ["L"], "evidence": "On candidate a3c56b3 it listed the [CRM-TEST] fixture firm with plan, conversations and health to a staff session (200, 401 before the fix)" },
         "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "permission": { "status": "unverified", "env": [], "evidence": "Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
       }
@@ -473,10 +473,10 @@
       "route": "/admin/ops/issues",
       "title": "Receptionist issues",
       "checks": {
-        "open": { "status": "unverified", "env": [], "evidence": "Rendered with a real session on 2026-09-15, but whether it showed data was not recorded" },
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data" },
         "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "permission": { "status": "unverified", "env": [], "evidence": "Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
       }
@@ -485,10 +485,10 @@
       "route": "/admin/ops/usage",
       "title": "Receptionist usage",
       "checks": {
-        "open": { "status": "unverified", "env": [], "evidence": "Rendered with a real session on 2026-09-15, but whether it showed data was not recorded" },
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data" },
         "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
       }
@@ -497,10 +497,10 @@
       "route": "/admin/ops/numbers",
       "title": "Receptionist numbers",
       "checks": {
-        "open": { "status": "unverified", "env": [], "evidence": "Rendered with a real session on 2026-09-15, but whether it showed data was not recorded" },
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a staff session on candidate a3c56b3 (data call 200), but it showed an empty state, so it has not been seen with data" },
         "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
       }
