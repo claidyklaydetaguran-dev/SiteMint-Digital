@@ -24,6 +24,8 @@ interface Proposal {
   id: number; name: string; value: number; stage: string; closeDate: string | null;
   canAccept: boolean;
   acceptance: { acceptedAt: string; typedName: string; label: string } | null;
+  /** Set when a quote itemises this deal: the quote is where it is answered. */
+  itemisedIn?: { quoteId: number; reference: string; status: string } | null;
 }
 
 interface QuoteLine {
@@ -281,6 +283,12 @@ export default function PortalProposals() {
                             typedName={p.acceptance.typedName}
                             acceptedAt={p.acceptance.acceptedAt}
                           />
+                        ) : p.itemisedIn ? (
+                          <p className="mt-4 text-sm text-muted-foreground">
+                            {p.itemisedIn.status === "accepted"
+                              ? `This is the same work as ${p.itemisedIn.reference} above, which you have already accepted.`
+                              : `This is the same work as ${p.itemisedIn.reference} above — review and accept it there.`}
+                          </p>
                         ) : p.canAccept ? (
                           <AcceptForm id={`proposal-${p.id}`} path={`/api/portal/proposals/${p.id}/accept`} onDone={reload} />
                         ) : (

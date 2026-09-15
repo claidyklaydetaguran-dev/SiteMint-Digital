@@ -27,6 +27,7 @@ process.env.ADMIN_PASSWORD = "inbound-admin-secret-value";
 const SIGNING_SECRET = `whsec_${Buffer.from(crypto.randomBytes(24)).toString("base64")}`;
 process.env.RESEND_INBOUND_WEBHOOK_SECRET = SIGNING_SECRET;
 process.env.RESEND_API_KEY = "re_test_key_not_used_network_is_mocked";
+process.env.RESEND_RECEIVING_API_KEY = "re_test_receiving_key_not_used_network_is_mocked";
 process.env.CRM_INBOUND_EMAIL_DOMAIN = "reply.sitemint.test";
 
 const STAMP = Date.now();
@@ -408,11 +409,24 @@ suite("inbound email (real DB)", () => {
   }, 30_000);
 
   it("names exactly what is missing when it is not configured", () => {
-    expect(inbound.inboundBlockedReason({} as NodeJS.ProcessEnv)).toMatch(/RESEND_API_KEY/);
-    expect(inbound.inboundBlockedReason({ RESEND_API_KEY: "x" } as NodeJS.ProcessEnv)).toMatch(/WEBHOOK_SECRET/);
+    expect(inbound.inboundBlockedReason({} as NodeJS.ProcessEnv)).toMatch(/RESEND_RECEIVING_API_KEY/);
+    // A sending key alone is NOT enough and must not read as configured: it is
+    // exactly the state in which every fetch of a received message is refused.
+    expect(inbound.inboundBlockedReason({ RESEND_API_KEY: "x" } as NodeJS.ProcessEnv)).toMatch(/RESEND_RECEIVING_API_KEY/);
+    expect(inbound.inboundConfigured({
+      RESEND_API_KEY: "x", RESEND_WEBHOOK_SECRET: "y", CRM_INBOUND_EMAIL_DOMAIN: "reply.sitemint.test",
+    } as NodeJS.ProcessEnv)).toBe(false);
+    expect(inbound.inboundBlockedReason({ RESEND_RECEIVING_API_KEY: "x" } as NodeJS.ProcessEnv)).toMatch(/WEBHOOK_SECRET/);
     expect(inbound.inboundBlockedReason({
-      RESEND_API_KEY: "x", RESEND_WEBHOOK_SECRET: "y",
+      RESEND_RECEIVING_API_KEY: "x", RESEND_WEBHOOK_SECRET: "y",
     } as NodeJS.ProcessEnv)).toMatch(/CRM_INBOUND_EMAIL_DOMAIN/);
+  });
+
+  it("explains a refused receiving key as a scope problem, not a bare status", () => {
+    expect(inbound.describeReceivingFailure(401)).toMatch(/full-access/);
+    expect(inbound.describeReceivingFailure(403)).toMatch(/sending-only key cannot read received mail/);
+    expect(inbound.describeReceivingFailure(404)).toMatch(/no received message/);
+    expect(inbound.describeReceivingFailure(500)).toMatch(/500/);
   });
 
   it("refuses a restricted user on every operator surface", async () => {

@@ -27,8 +27,18 @@ import { db } from "@workspace/db";
  *
  * `crm_preview` is deliberately absent and must stay absent: it holds the owner
  * demo data and the real staff accounts.
+ *
+ * `crm_test_a`…`crm_test_d` exist so parallel workstreams each get their own
+ * scratch database. One shared database cannot be shared safely: every run
+ * clears crm_staff at startup, so two overlapping runs delete each other's live
+ * sessions. The run lock now makes that collision loud rather than confusing,
+ * but a loud refusal still stops the second workstream dead — separate
+ * databases let both proceed. They are listed by name, not matched by pattern,
+ * so nothing that merely resembles a test database can ever qualify.
  */
-export const DISPOSABLE_DATABASES = ["crm_test", "crm_install_probe"] as const;
+export const DISPOSABLE_DATABASES = [
+  "crm_test", "crm_test_a", "crm_test_b", "crm_test_c", "crm_test_d", "crm_install_probe",
+] as const;
 
 /** Databases named explicitly so the refusal can say why. */
 const PROTECTED_DATABASES: Record<string, string> = {

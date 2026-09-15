@@ -1091,17 +1091,32 @@ router.get("/portal/proposals", requirePortalAuth(), async (req: Request, res: R
   const quotes = await scopedQuotes(leadId);
   const quoteLines = await scopedQuoteLines(leadId, quotes.map((q) => q.id));
 
+  // A deal that a quote itemises is the SAME offer, not a second one. Offering
+  // both for acceptance asked a customer to agree to one piece of work twice —
+  // and after accepting the quote, the headline deal still waited on them. The
+  // quote is the answer; the deal points at it. `scopedQuotes` already hides
+  // drafts and orders newest first, so an unsent draft never suppresses the
+  // headline offer, and the latest quote wins when there are several.
+  const quoteForDeal = new Map<number, (typeof quotes)[number]>();
+  for (const q of quotes) {
+    if (q.dealId != null && !quoteForDeal.has(q.dealId)) quoteForDeal.set(q.dealId, q);
+  }
+
   res.json({
     quotes: quotes.map((q) => customerQuote(q, quoteLines)),
     proposals: deals.map((d) => {
       const accepted = byDeal.get(d.id);
+      const itemised = quoteForDeal.get(d.id);
       return {
         id: d.id,
         name: d.name,
         value: Number(d.value),
         stage: d.stage,
         closeDate: d.closeDate,
-        canAccept: d.stage === "Proposal" && !accepted,
+        canAccept: d.stage === "Proposal" && !accepted && !itemised,
+        itemisedIn: itemised
+          ? { quoteId: itemised.id, reference: quoteReference(itemised.id), status: itemised.status }
+          : null,
         acceptance: accepted
           ? {
               acceptedAt: accepted.acceptedAt,
@@ -1128,6 +1143,15 @@ router.post("/portal/proposals/:dealId/accept", requirePortalAuth(), async (req:
   if (!deal) { refuse(res); return; }
   if (deal.stage !== "Proposal") {
     res.status(409).json({ error: "That proposal is not open for acceptance." }); return;
+  }
+  // The same offer itemised in a quote is accepted on the quote, once. A second
+  // agreement recorded against the headline figure would leave two records of
+  // one decision, free to disagree about the amount.
+  const itemised = (await scopedQuotes(leadId)).find((q) => q.dealId === dealId);
+  if (itemised) {
+    const reference = quoteReference(itemised.id);
+    res.status(409).json({ error: `This offer is itemised in ${reference}. Accept it there.`, itemisedIn: reference });
+    return;
   }
 
   const typedName = str((req.body as Record<string, unknown>)["typedName"]);

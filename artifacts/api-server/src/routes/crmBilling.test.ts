@@ -265,7 +265,7 @@ suite("quotes and invoices (real DB)", () => {
   }, 180_000);
 
   afterAll(async () => {
-    const leadIds = [A?.leadId, B?.leadId].filter((n): n is number => typeof n === "number");
+    const leadIds = [A?.leadId, B?.leadId, C?.leadId].filter((n): n is number => typeof n === "number");
     if (quoteIds.length) {
       await db.delete(schema.crmQuoteLineItems).where(inArray(schema.crmQuoteLineItems.quoteId, quoteIds));
       await db.delete(schema.crmQuotes).where(inArray(schema.crmQuotes.id, quoteIds));
@@ -815,6 +815,51 @@ suite("quotes and invoices (real DB)", () => {
   }, 120_000);
 
   // ── 5. An acceptance is never a signature ─────────────────────────────────
+
+  // Declared here and read by afterAll's cleanup — a closure that runs after
+  // the describe body has finished, so the declaration has executed by then.
+  let C: Customer | undefined;
+
+  it("offers one piece of work for acceptance once — on its quote, not again as the headline deal", async () => {
+    // A quote itemises a deal: the same offer, not a second one. The portal used
+    // to present both, so a customer could record two agreements to one piece
+    // of work — and after accepting the quote, the headline deal still said it
+    // was waiting on them. Found by walking the portal as a customer.
+    C = await buildCustomer("CCC");
+    const agent = await inviteAndAccept(C.leadId);
+
+    const created = await createQuote({
+      leadId: C.leadId, dealId: C.dealId, title: "[CRM-TEST] Once only",
+      lineItems: [{ description: "Rebuild", quantity: "1", unitPrice: "9000.00" }],
+    });
+    expect(created.status, JSON.stringify(created.json)).toBe(201);
+    const quoteId = created.json["quote"].id as number;
+    expect((await staff.call("POST", `/api/crm/quotes/${quoteId}/send`, {})).status).toBe(200);
+
+    const page = await agent.call("GET", "/api/portal/proposals");
+    const deal = (page.json["proposals"] as any[]).find((p) => p.id === C!.dealId);
+    expect(deal, "the headline deal stays listed, so the customer still sees the figure").toBeTruthy();
+    expect(deal.canAccept).toBe(false);
+    expect(deal.itemisedIn).toMatchObject({ quoteId, status: "sent" });
+    expect(deal.itemisedIn.reference).toMatch(/^QUO-/);
+
+    // The route refuses too, so a stale page or a crafted request cannot record
+    // the second agreement the page no longer offers.
+    const second = await agent.call("POST", `/api/portal/proposals/${C.dealId}/accept`, { typedName: "C. Customer" });
+    expect(second.status).toBe(409);
+    expect(String(second.json["error"])).toMatch(/itemised in QUO-/);
+    const recorded = await db.select().from(schema.crmPortalProposalAcceptances)
+      .where(eq(schema.crmPortalProposalAcceptances.dealId, C.dealId));
+    expect(recorded).toHaveLength(0);
+
+    // Answered on the quote, the deal says so instead of asking again.
+    const accepted = await agent.call("POST", `/api/portal/quotes/${quoteId}/accept`, { typedName: "C. Customer" });
+    expect(accepted.status, JSON.stringify(accepted.json)).toBe(201);
+    const after = await agent.call("GET", "/api/portal/proposals");
+    const dealAfter = (after.json["proposals"] as any[]).find((p) => p.id === C!.dealId);
+    expect(dealAfter.canAccept).toBe(false);
+    expect(dealAfter.itemisedIn.status).toBe("accepted");
+  }, 120_000);
 
   it("records a customer accepting a quote, and never calls it signed", async () => {
     const created = await createQuote({

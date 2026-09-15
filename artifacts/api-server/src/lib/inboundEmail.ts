@@ -56,13 +56,46 @@ export function inboundWebhookSecret(env: NodeJS.ProcessEnv = process.env): stri
   return env["RESEND_INBOUND_WEBHOOK_SECRET"] ?? env["RESEND_WEBHOOK_SECRET"] ?? null;
 }
 
+/**
+ * The key that READS received mail — deliberately not the key that sends it.
+ *
+ * Resend has exactly two API-key scopes: `sending_access` ("can only send
+ * emails") and `full_access` ("create, delete, get, and update any
+ * resource"). Fetching a received message (`GET /emails/receiving/:id`) is a
+ * read, so a sending-only key is refused, and every reply would fail at the one
+ * step that retrieves its content. No narrower scope can read received mail.
+ *
+ * So the read has its own variable, with intentionally no fallback to
+ * `RESEND_API_KEY`. A fallback would report inbound as configured whenever a
+ * sending key exists — precisely the state in which every fetch is refused.
+ * Keeping the full-access key separate also keeps it out of every sending
+ * path: the key that mails customers can stay sending-only, so a leak of it
+ * cannot delete a domain or rotate keys.
+ */
+export function receivingApiKey(env: NodeJS.ProcessEnv = process.env): string | null {
+  return env["RESEND_RECEIVING_API_KEY"] || null;
+}
+
+/** Why fetching a received message failed, naming the fix rather than a status code. */
+export function describeReceivingFailure(status: number): string {
+  if (status === 401 || status === 403) {
+    return `Resend refused RESEND_RECEIVING_API_KEY (${status}). It must be a full-access key — a sending-only key cannot read received mail.`;
+  }
+  if (status === 404) {
+    return "Resend has no received message with that id; it may be older than the provider keeps received mail.";
+  }
+  return `Resend returned ${status} fetching the message body`;
+}
+
 export function inboundConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
-  return !!inboundDomain(env) && !!inboundWebhookSecret(env) && !!env["RESEND_API_KEY"];
+  return !!inboundDomain(env) && !!inboundWebhookSecret(env) && !!receivingApiKey(env);
 }
 
 /** Why inbound cannot run, in words an operator can act on. */
 export function inboundBlockedReason(env: NodeJS.ProcessEnv = process.env): string | null {
-  if (!env["RESEND_API_KEY"]) return "RESEND_API_KEY is not set, so received mail cannot be fetched from the provider.";
+  if (!receivingApiKey(env)) {
+    return "RESEND_RECEIVING_API_KEY is not set, so received mail cannot be fetched from the provider. It must be a full-access key: the sending key cannot read received mail.";
+  }
   if (!inboundWebhookSecret(env)) {
     return "Neither RESEND_INBOUND_WEBHOOK_SECRET nor RESEND_WEBHOOK_SECRET is set, so inbound webhooks cannot be verified.";
   }
@@ -205,12 +238,12 @@ export interface FetchedEmail {
 export type EmailFetcher = (emailId: string) => Promise<FetchedEmail>;
 
 async function defaultFetcher(emailId: string): Promise<FetchedEmail> {
-  const key = process.env["RESEND_API_KEY"];
-  if (!key) throw new Error("RESEND_API_KEY is not set");
+  const key = receivingApiKey();
+  if (!key) throw new Error("RESEND_RECEIVING_API_KEY is not set");
   const res = await fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`, {
     headers: { Authorization: `Bearer ${key}` },
   });
-  if (!res.ok) throw new Error(`Resend returned ${res.status} fetching the message body`);
+  if (!res.ok) throw new Error(describeReceivingFailure(res.status));
   return await res.json() as FetchedEmail;
 }
 

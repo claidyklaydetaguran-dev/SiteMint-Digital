@@ -23,6 +23,34 @@ interface Overview {
 const money = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
+/**
+ * The one thing the customer is being asked to do, worded for what it is.
+ *
+ * A quote is answered on the Quotes page; a document request is fulfilled on
+ * Documents. A single "Send it now" button for both sent somebody who had been
+ * asked to accept a quote to a page that said nothing was outstanding.
+ */
+function NextAction({ action }: { action: NonNullable<Overview["nextActionForYou"]> }) {
+  const isQuote = action.kind === "quote";
+  const Icon = isQuote ? FileText : FileUp;
+  return (
+    <PortalCard className="border-teal-300 bg-teal-50 dark:border-teal-800 dark:bg-teal-950">
+      <div className="flex items-start gap-3">
+        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">We are waiting on one thing from you</p>
+          <p className="mt-1 break-words text-sm text-muted-foreground">{action.title}</p>
+          <Button asChild className="mt-3 min-h-11 w-full sm:w-auto">
+            <Link href={isQuote ? "/portal/proposals" : "/portal/documents"}>
+              {isQuote ? "Review and accept" : "Send it now"}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </PortalCard>
+  );
+}
+
 function Stat({ label, value, href, icon: Icon }: {
   label: string; value: string; href: string; icon: typeof FolderKanban;
 }) {
@@ -53,22 +81,7 @@ export default function PortalHome() {
             Hello {state.data.contact.name.split(" ")[0]}. Here is where everything stands.
           </p>
 
-          {state.data.nextActionForYou && (
-            <PortalCard className="border-teal-300 bg-teal-50 dark:border-teal-800 dark:bg-teal-950">
-              <div className="flex items-start gap-3">
-                <FileUp className="mt-0.5 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">We are waiting on one thing from you</p>
-                  <p className="mt-1 break-words text-sm text-muted-foreground">
-                    {state.data.nextActionForYou.title}
-                  </p>
-                  <Button asChild className="mt-3 min-h-11 w-full sm:w-auto">
-                    <Link href="/portal/documents">Send it now</Link>
-                  </Button>
-                </div>
-              </div>
-            </PortalCard>
-          )}
+          {state.data.nextActionForYou && <NextAction action={state.data.nextActionForYou} />}
 
           {/* One column at 375px, two from 640px. Nothing here can overflow
               sideways: every value is short and every label truncates. */}
