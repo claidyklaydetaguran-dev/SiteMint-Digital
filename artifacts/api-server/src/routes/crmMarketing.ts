@@ -39,9 +39,10 @@
 // `CRM_EMAIL_TEST_MODE` is anything other than the exact string "false"; a test
 // send is additionally refused unless its recipient is an active staff account.
 
+import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
-  and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne,
+  and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne,
   notInArray, or, sql, type SQL,
 } from "drizzle-orm";
 import {
@@ -55,10 +56,11 @@ import {
   type CrmSegmentDefinition, type CrmSegmentCondition, type CrmSegmentField,
   type CrmSegmentOperator, type CrmEmailBlock, type CrmMarketingCampaign,
   type CrmMarketingCampaignStatus, type CrmMarketingAudienceMode,
-  type CrmMergeField, type CrmLead,
+  type CrmMergeField, type CrmLead, type CrmMarketingRecipient,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
-import { trySendStaffMail, staffMailBlockedReason } from "../lib/staffMail.js";
+import { trySendStaffMail, staffMailBlockedReason, type MailFailure } from "../lib/staffMail.js";
+import { NEVER_LEFT_CODES, reasonProvesNeverLeft } from "../lib/mailOutcome.js";
 import { draftCampaign, draftingAvailability } from "../lib/campaignDrafting.js";
 
 const router: IRouter = Router();
@@ -669,9 +671,31 @@ function parseBlocks(raw: unknown): CrmEmailBlock[] {
 
 // ── Exclusions ──────────────────────────────────────────────────────────────
 
+//
+// Who may receive a campaign is decided in exactly one place: `judgeAudience`.
+// The audience preview in the builder, the preflight in front of the Send
+// button, and the ledger the send itself reads are all produced by it, so the
+// list somebody approves and the list that is mailed cannot come from two
+// slightly different readings of the same rules. A private copy of this logic
+// in any one of those callers is how an unsubscribed customer gets mailed by the
+// path nobody re-read.
+
 export interface ExclusionVerdict {
   reason: "suppressed" | "unsubscribed" | "campaign_excluded" | "no_address" | "duplicate_address" | null;
   detail: string | null;
+}
+
+/** What the rule needs besides the contacts themselves, read at the moment it is applied. */
+export interface EligibilityInputs {
+  /** This campaign's deliberate exclusions: contact id → the reason a person gave, if any. */
+  excluded: ReadonlyMap<number, string | null>;
+  /** The live suppression list, keyed by normalised address. */
+  suppressions: ReadonlyMap<string, { reason: string; detail: string | null }>;
+}
+
+export interface JudgedContact {
+  lead: CrmLead;
+  verdict: ExclusionVerdict;
 }
 
 /**
@@ -694,27 +718,39 @@ export interface ExclusionVerdict {
  * a reason that NAMES the contact who is receiving it, so this reads as a
  * decision the operator can see and undo (by merging the duplicates, or by
  * picking a different contact) rather than as messages silently going missing.
+ *
+ * It runs AFTER the per-contact facts, over the contacts still in contention
+ * plus the deliberately excluded ones. A suppressed address already says so on
+ * every row carrying it, and "duplicate" would bury that. A deliberate exclusion
+ * is different: it is a judgement about the person, and the person reads that
+ * inbox. So when the kept row is one somebody excluded from this campaign,
+ * nobody at the address is sent it — and the others say exactly that, naming
+ * who was excluded, instead of claiming it is on its way to that person.
  */
-function duplicateAddressLosers(leads: readonly CrmLead[]): Map<number, string> {
-  const byAddress = new Map<string, CrmLead[]>();
-  for (const lead of leads) {
-    const address = normalizeEmail(lead.email);
+function duplicateAddressLosers(judged: readonly JudgedContact[]): Map<number, string> {
+  const byAddress = new Map<string, JudgedContact[]>();
+  for (const j of judged) {
+    if (j.verdict.reason !== null && j.verdict.reason !== "campaign_excluded") continue;
+    const address = normalizeEmail(j.lead.email);
     if (!looksLikeAddress(address)) continue;
     const list = byAddress.get(address) ?? [];
-    list.push(lead);
+    list.push(j);
     byAddress.set(address, list);
   }
 
   const losers = new Map<number, string>();
   for (const [address, sharing] of byAddress) {
     if (sharing.length < 2) continue;
-    const kept = sharing.reduce((a, b) => (a.id <= b.id ? a : b));
-    for (const lead of sharing) {
-      if (lead.id === kept.id) continue;
+    const kept = sharing.reduce((a, b) => (a.lead.id <= b.lead.id ? a : b));
+    for (const { lead } of sharing) {
+      if (lead.id === kept.lead.id) continue;
       losers.set(
         lead.id,
-        `${sharing.length} contacts share ${address}. It is being sent once, to "${kept.name}" (#${kept.id}). `
-        + "Merge the duplicates in Duplicate Review if they are the same person.",
+        kept.verdict.reason === "campaign_excluded"
+          ? `${sharing.length} contacts share ${address}. Nobody at this address is being sent this campaign: `
+            + `"${kept.lead.name}" (#${kept.lead.id}) uses the same inbox and was excluded from it by a member of staff.`
+          : `${sharing.length} contacts share ${address}. It is being sent once, to "${kept.lead.name}" (#${kept.lead.id}). `
+            + "Merge the duplicates in Duplicate Review if they are the same person.",
       );
     }
   }
@@ -733,17 +769,11 @@ function duplicateAddressLosers(leads: readonly CrmLead[]): Map<number, string> 
  * address has opted out, every row carrying it should say so. "Unsubscribed" is
  * the fact the operator needs; "duplicate" would bury it.
  */
-function verdictFor(
-  lead: CrmLead,
-  excludedLeadIds: Set<number>,
-  excludedDetail: Map<number, string | null>,
-  suppressions: Map<string, { reason: string; detail: string | null }>,
-  duplicateLosers: Map<number, string> = new Map(),
-): ExclusionVerdict {
-  if (excludedLeadIds.has(lead.id)) {
+function verdictFor(lead: CrmLead, inputs: EligibilityInputs): ExclusionVerdict {
+  if (inputs.excluded.has(lead.id)) {
     return {
       reason: "campaign_excluded",
-      detail: excludedDetail.get(lead.id) ?? "Excluded from this campaign by a member of staff.",
+      detail: inputs.excluded.get(lead.id) ?? "Excluded from this campaign by a member of staff.",
     };
   }
   const address = normalizeEmail(lead.email);
@@ -755,7 +785,7 @@ function verdictFor(
         : `"${address}" is not a usable email address.`,
     };
   }
-  const hit = suppressions.get(address);
+  const hit = inputs.suppressions.get(address);
   if (hit) {
     if (hit.reason === "unsubscribe") {
       return { reason: "unsubscribed", detail: hit.detail ?? "This person asked to stop receiving marketing email." };
@@ -767,15 +797,65 @@ function verdictFor(
         : "This address hard-bounced, so mail to it will not arrive."),
     };
   }
-  const duplicate = duplicateLosers.get(lead.id);
-  if (duplicate) return { reason: "duplicate_address", detail: duplicate };
   return { reason: null, detail: null };
+}
+
+/**
+ * THE eligibility rule: every contact in an audience, with whether it is mailed
+ * and, when it is not, the reason and the words for it.
+ *
+ * Pure, so the preview, the preflight and the send cannot differ by anything
+ * but their inputs — and the inputs come from `eligibilityInputs`, which all
+ * three call as well.
+ */
+export function judgeAudience(leads: readonly CrmLead[], inputs: EligibilityInputs): JudgedContact[] {
+  const first = leads.map((lead) => ({ lead, verdict: verdictFor(lead, inputs) }));
+  const losers = duplicateAddressLosers(first);
+  return first.map((j) => {
+    if (j.verdict.reason !== null) return j;
+    const duplicate = losers.get(j.lead.id);
+    return duplicate
+      ? { lead: j.lead, verdict: { reason: "duplicate_address" as const, detail: duplicate } }
+      : j;
+  });
 }
 
 /** Live suppression list, keyed by address. Released rows are not suppressions. */
 async function liveSuppressions(): Promise<Map<string, { reason: string; detail: string | null }>> {
   const rows = await db.select().from(crmEmailSuppressions).where(isNull(crmEmailSuppressions.releasedAt));
   return new Map(rows.map((r) => [r.address, { reason: r.reason, detail: r.detail }]));
+}
+
+/**
+ * What `judgeAudience` needs, read now. Without a campaign there are no
+ * per-campaign exclusions to apply — the builder's preview of an audience that
+ * belongs to no campaign yet.
+ */
+async function eligibilityInputs(campaignId: number | null): Promise<EligibilityInputs> {
+  const exclusions: Promise<Array<{ leadId: number; reason: string | null }>> = campaignId
+    ? db.select({ leadId: crmMarketingExclusions.leadId, reason: crmMarketingExclusions.reason })
+      .from(crmMarketingExclusions).where(eq(crmMarketingExclusions.campaignId, campaignId))
+    : Promise.resolve([]);
+  const [rows, suppressions] = await Promise.all([exclusions, liveSuppressions()]);
+  return { excluded: new Map(rows.map((r) => [r.leadId, r.reason])), suppressions };
+}
+
+interface ExcludedContact { id: number; name: string; email: string | null; detail: string | null }
+
+/** The excluded contacts grouped by reason, largest group first, every one of them named. */
+function exclusionBuckets(
+  judged: readonly JudgedContact[],
+): { reason: string; label: string; count: number; contacts: ExcludedContact[] }[] {
+  const buckets = new Map<string, ExcludedContact[]>();
+  for (const { lead, verdict } of judged) {
+    if (!verdict.reason) continue;
+    const list = buckets.get(verdict.reason) ?? [];
+    list.push({ id: lead.id, name: lead.name, email: lead.email, detail: verdict.detail });
+    buckets.set(verdict.reason, list);
+  }
+  return [...buckets.entries()].map(([reason, contacts]) => ({
+    reason, label: EXCLUSION_LABELS[reason] ?? reason, count: contacts.length, contacts,
+  })).sort((a, b) => b.count - a.count);
 }
 
 // ── Preflight ───────────────────────────────────────────────────────────────
@@ -818,37 +898,17 @@ async function preflight(campaign: CrmMarketingCampaign): Promise<PreflightResul
   const leads = audience.leads;
   if (audience.problem) blockers.push(audience.problem);
 
-  const [exclusionRows, suppressions] = await Promise.all([
-    db.select().from(crmMarketingExclusions).where(eq(crmMarketingExclusions.campaignId, campaign.id)),
-    liveSuppressions(),
-  ]);
-  const excludedIds = new Set(exclusionRows.map((r) => r.leadId));
-  const excludedDetail = new Map(exclusionRows.map((r) => [r.leadId, r.reason]));
-  const duplicateLosers = duplicateAddressLosers(leads);
+  const judged = judgeAudience(leads, await eligibilityInputs(campaign.id));
+  const excludedByReason = exclusionBuckets(judged);
 
-  const buckets = new Map<string, { id: number; name: string; email: string | null; detail: string | null }[]>();
   const fallbackCounts = new Map<string, number>();
   let sendable = 0;
-
-  for (const lead of leads) {
-    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions, duplicateLosers);
-    if (verdict.reason) {
-      const list = buckets.get(verdict.reason) ?? [];
-      list.push({ id: lead.id, name: lead.name, email: lead.email, detail: verdict.detail });
-      buckets.set(verdict.reason, list);
-      continue;
-    }
+  for (const { lead, verdict } of judged) {
+    if (verdict.reason) continue;
     sendable += 1;
     const rendered = renderEmail(campaign, mergeValuesFor(lead));
     for (const f of rendered.fallbacks) fallbackCounts.set(f, (fallbackCounts.get(f) ?? 0) + 1);
   }
-
-  const excludedByReason = [...buckets.entries()].map(([reason, contacts]) => ({
-    reason,
-    label: EXCLUSION_LABELS[reason] ?? reason,
-    count: contacts.length,
-    contacts,
-  })).sort((a, b) => b.count - a.count);
 
   const excluded = excludedByReason.reduce((s, b) => s + b.count, 0);
 
@@ -915,18 +975,10 @@ async function materialiseAudience(campaign: CrmMarketingCampaign): Promise<{ re
   const { leads } = await resolveAudience(audienceOf(campaign));
   if (leads.length === 0) return { resolved: 0, excluded: 0 };
 
-  const [exclusionRows, suppressions] = await Promise.all([
-    db.select().from(crmMarketingExclusions).where(eq(crmMarketingExclusions.campaignId, campaign.id)),
-    liveSuppressions(),
-  ]);
-  const excludedIds = new Set(exclusionRows.map((r) => r.leadId));
-  const excludedDetail = new Map(exclusionRows.map((r) => [r.leadId, r.reason]));
-
-  const duplicateLosers = duplicateAddressLosers(leads);
+  const judged = judgeAudience(leads, await eligibilityInputs(campaign.id));
 
   let excluded = 0;
-  const values = leads.map((lead) => {
-    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions, duplicateLosers);
+  const values = judged.map(({ lead, verdict }) => {
     if (verdict.reason) excluded += 1;
     return {
       campaignId: campaign.id,
@@ -944,12 +996,203 @@ async function materialiseAudience(campaign: CrmMarketingCampaign): Promise<{ re
   return { resolved: leads.length, excluded };
 }
 
+// ── What happened to each attempt ───────────────────────────────────────────
+//
+// A recipient who was attempted and not accepted is `failed`, and `failed`
+// covers two situations an operator must never confuse:
+//
+//   nothing arrived   the provider refused it, the connection never opened, or
+//                     it was never asked because this server sends no mail
+//   nobody knows      the request went out and no answer came back, or the
+//                     provider answered with an error after receiving it
+//
+// Reading the second as the first is how a customer gets a second copy; reading
+// the first as the second leaves undelivered a message that could safely be
+// tried again. The class is the first word of `last_error`, which only this
+// module writes and always as `<class>: <reason>`. The four classes are
+// `lib/staffMail.ts`'s, with `failed` narrowed to what it can prove (see
+// `outcomeOf`). Anything unreadable counts as unknown — the
+// direction in which a wrong guess costs an operator a question rather than a
+// customer a duplicate. (`crm_marketing_recipients.status` is constrained to five
+// values, so the split lives here rather than in a new status.)
+
+export const RECIPIENT_OUTCOMES = {
+  not_configured: {
+    label: "Not sent — this server does not send real mail, so it was never handed over",
+    arrived: "no",
+    retryable: true,
+  },
+  rejected: {
+    label: "Refused by the mail provider",
+    arrived: "no",
+    retryable: true,
+  },
+  failed: {
+    label: "Not sent — the connection to the mail provider never opened",
+    arrived: "no",
+    retryable: true,
+  },
+  uncertain: {
+    label: "Not confirmed by the mail provider — it may or may not have arrived",
+    arrived: "unknown",
+    retryable: false,
+  },
+} as const satisfies Record<MailFailure, { label: string; arrived: "no" | "unknown"; retryable: boolean }>;
+
+export type RecipientOutcome = keyof typeof RECIPIENT_OUTCOMES;
+
+/**
+ * The recorded class of a `failed` row. Unreadable means unknown — never "it did not arrive".
+ *
+ * `lib/staffMail.ts` files two different things under `failed`: a connection
+ * that never opened, and a 5xx or rate-limit ANSWER from a provider that had
+ * already received the request. Only the first proves nothing was sent. So,
+ * exactly as reminders and support replies are judged (`crmScheduler.ts`,
+ * `supportDelivery.ts`), `failed` means "did not arrive" only when its reason
+ * names a transport code that rules the request out, and is otherwise unknown.
+ * Applied on read as well as on write, so a row recorded before this rule is
+ * judged the same way as a new one.
+ */
+export function outcomeOf(lastError: string | null | undefined): RecipientOutcome {
+  const head = (lastError ?? "").split(":", 1)[0] ?? "";
+  if (!Object.prototype.hasOwnProperty.call(RECIPIENT_OUTCOMES, head)) return "uncertain";
+  if (head === "failed" && !reasonProvesNeverLeft(lastError ?? "")) return "uncertain";
+  return head as RecipientOutcome;
+}
+
+// The same reading in SQL, for counting without loading rows; the delivery
+// suite checks that these counts agree with the results route, which
+// classifies with `outcomeOf`. The codes are fixed upper-case identifiers, so
+// joined with `|` they are a literal alternation, matched on the upper-cased
+// reason exactly as `reasonProvesNeverLeft` does.
+const RECORDED_CLASS = sql`coalesce(split_part(${crmMarketingRecipients.lastError}, ':', 1), '')`;
+const NEVER_LEFT_PATTERN = NEVER_LEFT_CODES.join("|");
+const RETRYABLE_FAILURE = sql`(${crmMarketingRecipients.status} = 'failed' AND (${RECORDED_CLASS} IN ('not_configured', 'rejected') OR (${RECORDED_CLASS} = 'failed' AND upper(${crmMarketingRecipients.lastError}) ~ ${NEVER_LEFT_PATTERN})))`;
+const UNCONFIRMED_FAILURE = sql`(${crmMarketingRecipients.status} = 'failed' AND NOT ${RETRYABLE_FAILURE})`;
+
+/** How the ledger stands, by what is known about each message. */
+async function ledgerCounts(campaignId: number): Promise<{
+  sent: number; pending: number; notDelivered: number; unconfirmed: number;
+}> {
+  const [row] = await db.select({
+    sent: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'sent')::int`,
+    pending: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'pending')::int`,
+    notDelivered: sql<number>`count(*) filter (where ${RETRYABLE_FAILURE})::int`,
+    unconfirmed: sql<number>`count(*) filter (where ${UNCONFIRMED_FAILURE})::int`,
+  }).from(crmMarketingRecipients).where(eq(crmMarketingRecipients.campaignId, campaignId));
+  return {
+    sent: Number(row?.sent ?? 0),
+    pending: Number(row?.pending ?? 0),
+    notDelivered: Number(row?.notDelivered ?? 0),
+    unconfirmed: Number(row?.unconfirmed ?? 0),
+  };
+}
+
+/**
+ * What a row says while its attempt is in flight.
+ *
+ * Written BEFORE the provider is asked, by a conditional update that is also the
+ * claim, and replaced by the real answer when one comes back. So:
+ *
+ *   - two drivers of one send (two tabs, or a tab and the scheduler) cannot
+ *     both attempt one person — the second claim matches nothing;
+ *   - a process that dies mid-attempt leaves this behind: a visible "unknown"
+ *     that nothing sends again by itself, instead of a `pending` row that the
+ *     next resume would mail a second time.
+ *
+ * It reads as unknown because, until the provider answers, it is.
+ */
+function inFlightNote(): string {
+  return `uncertain: attempt ${randomUUID().slice(0, 8)} started ${new Date().toISOString()} and no answer from the mail provider was recorded, so whether it arrived is unknown. It is never sent again automatically.`;
+}
+
+type AttemptResult = { claimed: false } | { claimed: true; outcome: "sent" | RecipientOutcome };
+
+/**
+ * One attempt at one person: claim, ask the provider, record the answer.
+ *
+ * `from` is the state the row must still be in for this caller to take it — a
+ * `pending` row for a send, or a `failed` row carrying exactly the outcome the
+ * caller read, for a retry.
+ */
+async function attemptDelivery(
+  campaign: CrmMarketingCampaign,
+  row: { recipient: CrmMarketingRecipient; lead: CrmLead },
+  from: { status: "pending" } | { status: "failed"; lastError: string },
+): Promise<AttemptResult> {
+  const values = mergeValuesFor(row.lead);
+  const rendered = renderEmail(campaign, values);
+  const text = renderText(campaign, values);
+  const address = row.recipient.address ?? normalizeEmail(row.lead.email);
+  const note = inFlightNote();
+
+  const claimed = await db.update(crmMarketingRecipients).set({
+    status: "failed", lastError: note, sentAt: null, providerMessageId: null,
+    renderedSubject: rendered.subject, renderedHtml: rendered.html, fallbacksUsed: rendered.fallbacks,
+  }).where(and(
+    eq(crmMarketingRecipients.id, row.recipient.id),
+    from.status === "pending"
+      ? eq(crmMarketingRecipients.status, "pending")
+      : and(eq(crmMarketingRecipients.status, "failed"), eq(crmMarketingRecipients.lastError, from.lastError)),
+  )).returning({ id: crmMarketingRecipients.id });
+  if (claimed.length === 0) return { claimed: false };
+
+  const outcome = await trySendStaffMail({
+    to: address ?? "",
+    subject: rendered.subject,
+    text,
+    html: rendered.html,
+    // Stable per campaign+contact, and the SAME on a retry: inside Resend's
+    // 24-hour window a repeat is collapsed into the original rather than
+    // delivered twice.
+    idempotencyKey: `crm-marketing-${campaign.id}-${row.recipient.leadId}`,
+  });
+
+  // Settled only while the row still carries THIS attempt's note, so a late
+  // answer can never overwrite a different attempt's verdict.
+  const stillThisAttempt = and(
+    eq(crmMarketingRecipients.id, row.recipient.id),
+    eq(crmMarketingRecipients.status, "failed"),
+    eq(crmMarketingRecipients.lastError, note),
+  );
+  if (outcome.sent) {
+    await db.update(crmMarketingRecipients).set({
+      status: "sent", sentAt: new Date(), providerMessageId: outcome.providerId, lastError: null,
+    }).where(stillThisAttempt);
+    return { claimed: true, outcome: "sent" };
+  }
+  // Stored under the class the answer actually supports: a `failed` that cannot
+  // prove the request never left is written as the unknown it is, so the row
+  // says what `outcomeOf` reads rather than relying on the read to correct it.
+  const failure = outcome.failure === "failed" && !reasonProvesNeverLeft(outcome.reason) ? "uncertain" : outcome.failure;
+  const recorded = `${failure}: ${outcome.reason}`.slice(0, 500);
+  await db.update(crmMarketingRecipients).set({ lastError: recorded }).where(stillThisAttempt);
+  return { claimed: true, outcome: outcomeOf(recorded) };
+}
+
 interface SendProgress {
   attempted: number;
   sent: number;
+  /** Every attempt that did not end accepted: `notDelivered` plus `unconfirmed`. */
   failed: number;
+  /** Refused, never handed over, or the connection never opened — nothing arrived. */
+  notDelivered: number;
+  /** No answer — it may have arrived. Never sent again by itself. */
+  unconfirmed: number;
   remaining: number;
   stoppedBecause: string | null;
+}
+
+const emptyProgress = (): SendProgress => ({
+  attempted: 0, sent: 0, failed: 0, notDelivered: 0, unconfirmed: 0, remaining: 0, stoppedBecause: null,
+});
+
+function tally(progress: SendProgress, outcome: "sent" | RecipientOutcome): void {
+  progress.attempted += 1;
+  if (outcome === "sent") { progress.sent += 1; return; }
+  progress.failed += 1;
+  if (RECIPIENT_OUTCOMES[outcome].arrived === "unknown") progress.unconfirmed += 1;
+  else progress.notDelivered += 1;
 }
 
 /**
@@ -961,8 +1204,7 @@ interface SendProgress {
  * somebody deliberately tried to stop.
  */
 async function sendBatch(campaignId: number, batchSize: number): Promise<SendProgress> {
-  let attempted = 0, sent = 0, failed = 0;
-  let stoppedBecause: string | null = null;
+  const progress = emptyProgress();
 
   const pending = await db.select({ recipient: crmMarketingRecipients, lead: crmLeads })
     .from(crmMarketingRecipients)
@@ -975,50 +1217,73 @@ async function sendBatch(campaignId: number, batchSize: number): Promise<SendPro
     const [live] = await db.select().from(crmMarketingCampaigns)
       .where(eq(crmMarketingCampaigns.id, campaignId)).limit(1);
     if (!live || live.status !== "sending") {
-      stoppedBecause = live
+      progress.stoppedBecause = live
         ? `The campaign moved to "${live.status}" part-way through, so the remaining contacts were not attempted.`
         : "The campaign no longer exists.";
       break;
     }
-
-    const values = mergeValuesFor(row.lead);
-    const rendered = renderEmail(live, values);
-    const text = renderText(live, values);
-    const address = row.recipient.address ?? normalizeEmail(row.lead.email);
-
-    attempted += 1;
-    const outcome = await trySendStaffMail({
-      to: address ?? "",
-      subject: rendered.subject,
-      text,
-      html: rendered.html,
-      // Stable per campaign+contact, so a retried batch cannot mail the same
-      // person twice inside Resend's 24-hour idempotency window.
-      idempotencyKey: `crm-marketing-${campaignId}-${row.recipient.leadId}`,
-    });
-
-    if (outcome.sent) {
-      sent += 1;
-      await db.update(crmMarketingRecipients).set({
-        status: "sent", sentAt: new Date(), providerMessageId: outcome.providerId,
-        renderedSubject: rendered.subject, renderedHtml: rendered.html,
-        fallbacksUsed: rendered.fallbacks, lastError: null,
-      }).where(eq(crmMarketingRecipients.id, row.recipient.id));
-    } else {
-      failed += 1;
-      await db.update(crmMarketingRecipients).set({
-        status: "failed", lastError: `${outcome.failure}: ${outcome.reason}`.slice(0, 500),
-        renderedSubject: rendered.subject, renderedHtml: rendered.html,
-        fallbacksUsed: rendered.fallbacks,
-      }).where(eq(crmMarketingRecipients.id, row.recipient.id));
-    }
+    const attempt = await attemptDelivery(live, row, { status: "pending" });
+    // Taken a moment ago by another driver of the same send. Not ours to count.
+    if (!attempt.claimed) continue;
+    tally(progress, attempt.outcome);
   }
 
   const [{ remaining }] = await db.select({ remaining: sql<number>`count(*)::int` })
     .from(crmMarketingRecipients)
     .where(and(eq(crmMarketingRecipients.campaignId, campaignId), eq(crmMarketingRecipients.status, "pending")));
+  progress.remaining = Number(remaining ?? 0);
+  return progress;
+}
 
-  return { attempted, sent, failed, remaining: Number(remaining ?? 0), stoppedBecause };
+/**
+ * One pass over the people who provably never received a copy, oldest first,
+ * starting after `afterId`. The retry route says what this is and is not.
+ */
+async function retryBatch(
+  campaignId: number, afterId: number, batchSize: number,
+): Promise<SendProgress & { nextAfterId: number }> {
+  const progress = emptyProgress();
+  let nextAfterId = afterId;
+
+  const rows = await db.select({ recipient: crmMarketingRecipients, lead: crmLeads })
+    .from(crmMarketingRecipients)
+    .innerJoin(crmLeads, eq(crmMarketingRecipients.leadId, crmLeads.id))
+    .where(and(
+      eq(crmMarketingRecipients.campaignId, campaignId),
+      gt(crmMarketingRecipients.id, afterId),
+      RETRYABLE_FAILURE,
+    ))
+    .orderBy(asc(crmMarketingRecipients.id))
+    .limit(batchSize);
+
+  for (const row of rows) {
+    const [live] = await db.select().from(crmMarketingCampaigns)
+      .where(eq(crmMarketingCampaigns.id, campaignId)).limit(1);
+    if (!live || (live.status !== "sent" && live.status !== "sending")) {
+      progress.stoppedBecause = live
+        ? `The campaign moved to "${live.status}" part-way through, so nobody else was tried again.`
+        : "The campaign no longer exists.";
+      break;
+    }
+    nextAfterId = row.recipient.id;
+    // Checked here as well as in the query: this class is the whole reason the
+    // row may be tried at all, and an unknown outcome never is.
+    const recorded = row.recipient.lastError ?? "";
+    if (!RECIPIENT_OUTCOMES[outcomeOf(recorded)].retryable) continue;
+    const attempt = await attemptDelivery(live, row, { status: "failed", lastError: recorded });
+    if (!attempt.claimed) continue;
+    tally(progress, attempt.outcome);
+  }
+
+  const [{ remaining }] = await db.select({ remaining: sql<number>`count(*)::int` })
+    .from(crmMarketingRecipients)
+    .where(and(
+      eq(crmMarketingRecipients.campaignId, campaignId),
+      gt(crmMarketingRecipients.id, nextAfterId),
+      RETRYABLE_FAILURE,
+    ));
+  progress.remaining = Number(remaining ?? 0);
+  return { ...progress, nextAfterId };
 }
 
 // ── Segments ────────────────────────────────────────────────────────────────
@@ -1172,7 +1437,7 @@ router.get("/crm/marketing/contacts", requireCrmAuth("campaigns.read"), async (r
 
   res.json({
     contacts: rows.map((lead) => {
-      const verdict = verdictFor(lead, new Set<number>(), new Map(), suppressions);
+      const verdict = verdictFor(lead, { excluded: new Map(), suppressions });
       return {
         id: lead.id, name: lead.name, email: lead.email, company: lead.company,
         status: lead.status, source: lead.source,
@@ -1216,31 +1481,12 @@ router.post("/crm/marketing/audience/preview", requireCrmAuth("campaigns.read"),
   // otherwise a person who deliberately left somebody out would see them back
   // in the eligible list the next time they opened the step.
   const campaignId = num(body["campaignId"]);
-  const exclusionRows = campaignId
-    ? await db.select().from(crmMarketingExclusions).where(eq(crmMarketingExclusions.campaignId, campaignId))
-    : [];
-  const excludedIds = new Set(exclusionRows.map((r) => r.leadId));
-  const excludedDetail = new Map(exclusionRows.map((r) => [r.leadId, r.reason]));
-  const suppressions = await liveSuppressions();
+  const judged = judgeAudience(resolved.leads, await eligibilityInputs(campaignId ?? null));
 
-  const eligible: { id: number; name: string; email: string | null; company: string | null }[] = [];
-  const buckets = new Map<string, { id: number; name: string; email: string | null; detail: string | null }[]>();
-  const duplicateLosers = duplicateAddressLosers(resolved.leads);
-
-  for (const lead of resolved.leads) {
-    const verdict = verdictFor(lead, excludedIds, excludedDetail, suppressions, duplicateLosers);
-    if (verdict.reason) {
-      const list = buckets.get(verdict.reason) ?? [];
-      list.push({ id: lead.id, name: lead.name, email: lead.email, detail: verdict.detail });
-      buckets.set(verdict.reason, list);
-      continue;
-    }
-    eligible.push({ id: lead.id, name: lead.name, email: lead.email, company: lead.company });
-  }
-
-  const excludedByReason = [...buckets.entries()].map(([reason, contacts]) => ({
-    reason, label: EXCLUSION_LABELS[reason] ?? reason, count: contacts.length, contacts,
-  })).sort((a, b) => b.count - a.count);
+  const eligible = judged
+    .filter(({ verdict }) => verdict.reason === null)
+    .map(({ lead }) => ({ id: lead.id, name: lead.name, email: lead.email, company: lead.company }));
+  const excludedByReason = exclusionBuckets(judged);
 
   res.json({
     mode: rawMode,
@@ -1534,6 +1780,14 @@ router.post("/crm/marketing/campaigns/:id/duplicate", requireCrmAuth("campaigns.
     audienceMode: source.audienceMode,
     audienceDefinition: source.audienceDefinition,
     audienceLeadIds: source.audienceLeadIds,
+    // AI-written copy travels with the copy, and so does the fact that a model
+    // wrote it. Nobody's approval travels. Copying a campaign that carried AI
+    // copy used to produce one marked "none" — "nothing here came from a
+    // model" — so the copied text reached the send path without anybody having
+    // approved it in the campaign that sends it.
+    aiContentState: source.aiContentState === "none" ? "none" : "draft",
+    aiDraftedAt: source.aiContentState === "none" ? null : source.aiDraftedAt,
+    aiGrounding: source.aiContentState === "none" ? null : source.aiGrounding,
     // Deliberately not carried over: status, every timestamp, and the whole AI
     // approval record.
     createdByStaffId: me.id, createdByLabel: me.label,
@@ -1971,17 +2225,19 @@ router.post("/crm/marketing/campaigns/:id/pause", requireCrmAuth("campaigns.send
     return;
   }
 
-  const [counts] = await db.select({
-    sent: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'sent')::int`,
-    pending: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'pending')::int`,
-  }).from(crmMarketingRecipients).where(eq(crmMarketingRecipients.campaignId, id));
+  const counts = await ledgerCounts(id);
 
   await auditAction(req, "marketing.campaign_paused", `campaign:${id}`);
   res.json({
     campaign: paused[0],
-    alreadyDelivered: Number(counts?.sent ?? 0),
-    notYetAttempted: Number(counts?.pending ?? 0),
-    note: `Sending has stopped. ${Number(counts?.sent ?? 0)} messages were already handed to the mail provider and cannot be recalled; ${Number(counts?.pending ?? 0)} contacts have not been attempted.`,
+    alreadyDelivered: counts.sent,
+    notYetAttempted: counts.pending,
+    unconfirmed: counts.unconfirmed,
+    note: `Sending has stopped. ${counts.sent} messages were already handed to the mail provider and cannot be recalled; `
+      + (counts.unconfirmed > 0
+        ? `${counts.unconfirmed} more may or may not have arrived, because the provider never answered for them; `
+        : "")
+      + `${counts.pending} contacts have not been attempted.`,
   });
 });
 
@@ -2008,6 +2264,74 @@ router.post("/crm/marketing/campaigns/:id/resume", requireCrmAuth("campaigns.sen
 });
 
 /**
+ * Tries again, once each, for the people the mail provider provably did not
+ * take — and for nobody else.
+ *
+ * It is not a restart. A finished campaign stays `sent`, nobody the provider
+ * accepted is attempted again, and a message whose outcome is unknown is never
+ * included: it may already be in that person's inbox, and only somebody who has
+ * asked them can decide to send it again.
+ *
+ * Who is included is `lib/staffMail.ts`'s own classification of the earlier
+ * attempt: `not_configured` (never handed over), `rejected` (refused — fix the
+ * cause first, or the retry is refused the same way) and `failed` (the connection never opened).
+ * Each retry carries the SAME idempotency key as the first attempt, so a
+ * provider that did quietly take a message inside the last 24 hours collapses
+ * the repeat into the original.
+ *
+ * One pass: `afterId` walks the list forward, so somebody who fails again is not
+ * tried a second time in the same pass however many calls the pass takes. Each
+ * row is claimed by a conditional update before the provider is asked, so two
+ * people pressing it at once still send each message once.
+ */
+router.post("/crm/marketing/campaigns/:id/retry", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
+  const id = num(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "Invalid campaign." }); return; }
+  const [campaign] = await db.select().from(crmMarketingCampaigns)
+    .where(eq(crmMarketingCampaigns.id, id)).limit(1);
+  if (!campaign) { res.status(404).json({ error: "Not found." }); return; }
+
+  if (campaign.status === "paused") {
+    res.status(409).json({ error: "This campaign is paused. Trying again is still sending, and a pause means stop — resume it first. Nothing was sent." });
+    return;
+  }
+  if (campaign.status === "cancelled") {
+    res.status(409).json({ error: "This campaign was cancelled, and cancelling means stop. Nothing was tried again." });
+    return;
+  }
+  if (campaign.status !== "sent" && campaign.status !== "sending") {
+    res.status(409).json({ error: "Nothing has been sent from this campaign yet, so there is nothing to try again." });
+    return;
+  }
+
+  const body = (req.body ?? {}) as { afterId?: unknown; batchSize?: unknown };
+  const afterId = Math.max(num(body.afterId) ?? 0, 0);
+  const batchSize = Math.min(Math.max(num(body.batchSize) ?? DEFAULT_BATCH, 1), MAX_BATCH);
+
+  const progress = await retryBatch(id, afterId, batchSize);
+  if (progress.attempted > 0) {
+    await auditAction(req, "marketing.recipients_retried", `campaign:${id} attempted:${progress.attempted}`);
+  }
+
+  const [after] = await db.select().from(crmMarketingCampaigns).where(eq(crmMarketingCampaigns.id, id)).limit(1);
+  const { unconfirmed: leftOut } = await ledgerCounts(id);
+
+  res.json({
+    campaign: after,
+    ...progress,
+    finished: progress.remaining === 0 || progress.stoppedBecause !== null,
+    unconfirmedLeftOut: leftOut,
+    note: progress.stoppedBecause
+      ?? (progress.remaining > 0
+        ? `${progress.remaining} more have not been tried again yet. Call this again with afterId ${progress.nextAfterId} to carry on.`
+        : "Everybody whose message provably did not arrive has been tried again once."
+          + (leftOut > 0
+            ? ` ${leftOut} whose outcome is unknown ${leftOut === 1 ? "was" : "were"} left out — ask them whether it arrived before sending anything again.`
+            : "")),
+  });
+});
+
+/**
  * Stops a campaign for good.
  *
  * Cancelling is not an undo, and the response says so with a number rather than
@@ -2029,25 +2353,36 @@ router.post("/crm/marketing/campaigns/:id/cancel", requireCrmAuth("campaigns.sen
     .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
     .where(eq(crmMarketingCampaigns.id, id));
 
-  const [counts] = await db.select({
-    sent: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'sent')::int`,
-    pending: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'pending')::int`,
-    failed: sql<number>`count(*) filter (where ${crmMarketingRecipients.status} = 'failed')::int`,
-  }).from(crmMarketingRecipients).where(eq(crmMarketingRecipients.campaignId, id));
-
-  const delivered = Number(counts?.sent ?? 0);
+  const counts = await ledgerCounts(id);
   const [after] = await db.select().from(crmMarketingCampaigns).where(eq(crmMarketingCampaigns.id, id)).limit(1);
+
+  // "Nobody received this" may only be said when it is KNOWN. A message the
+  // provider never answered for may be in somebody's inbox, and cancelling
+  // changes nothing about it.
+  const parts: string[] = [];
+  if (counts.sent > 0) {
+    parts.push(`${counts.sent} messages were already handed to the mail provider and are in people's inboxes — cancelling does not and cannot recall them.`);
+  }
+  if (counts.unconfirmed > 0) {
+    parts.push(`${counts.unconfirmed} ${counts.unconfirmed === 1 ? "message" : "messages"} may or may not have arrived: the provider never answered, and cancelling cannot recall ${counts.unconfirmed === 1 ? "it" : "them"} either.`);
+  }
+  if (counts.sent === 0 && counts.unconfirmed === 0) {
+    parts.push(counts.notDelivered > 0
+      ? `Nothing was accepted by the mail provider — ${counts.notDelivered} ${counts.notDelivered === 1 ? "attempt was" : "attempts were"} refused or never handed over — so nobody received this campaign.`
+      : "Nothing was handed to the mail provider, so nobody received this campaign.");
+  }
+  if (counts.pending > 0) parts.push(`${counts.pending} contacts were never attempted.`);
 
   await auditAction(req, "marketing.campaign_cancelled", `campaign:${id}`);
   res.json({
     campaign: after,
-    alreadyDelivered: delivered,
-    neverAttempted: Number(counts?.pending ?? 0),
-    failed: Number(counts?.failed ?? 0),
+    alreadyDelivered: counts.sent,
+    neverAttempted: counts.pending,
+    failed: counts.notDelivered + counts.unconfirmed,
+    notDelivered: counts.notDelivered,
+    unconfirmed: counts.unconfirmed,
     unsent: false,
-    note: delivered > 0
-      ? `Cancelled. ${delivered} messages were already handed to the mail provider and are in people's inboxes — cancelling does not and cannot recall them. ${Number(counts?.pending ?? 0)} contacts were never attempted.`
-      : "Cancelled before anything was handed to the mail provider, so nobody received this campaign.",
+    note: `Cancelled. ${parts.join(" ")}`,
   });
 });
 
@@ -2089,6 +2424,25 @@ router.get("/crm/marketing/campaigns/:id/results", requireCrmAuth("campaigns.rea
   const of = (status: string) => rows.filter((r) => r.status === status);
   const excludedRows = of("excluded");
 
+  // `failed`, split by what is actually known. Every row lands in exactly one
+  // bucket, so the buckets add up to `counts.failed` by construction.
+  const failedRows = of("failed");
+  const failedByOutcome = (Object.keys(RECIPIENT_OUTCOMES) as RecipientOutcome[]).map((outcome) => {
+    const contacts = failedRows.filter((r) => outcomeOf(r.lastError) === outcome);
+    return {
+      outcome,
+      label: RECIPIENT_OUTCOMES[outcome].label as string,
+      arrived: RECIPIENT_OUTCOMES[outcome].arrived as "no" | "unknown",
+      retryable: RECIPIENT_OUTCOMES[outcome].retryable as boolean,
+      count: contacts.length,
+      contacts: contacts.map((r) => ({
+        id: r.id, leadId: r.leadId, name: r.name, address: r.address, lastError: r.lastError,
+      })),
+    };
+  }).filter((b) => b.count > 0);
+  const unconfirmed = failedByOutcome.filter((b) => b.arrived === "unknown").reduce((s, b) => s + b.count, 0);
+  const retryable = failedByOutcome.filter((b) => b.retryable).reduce((s, b) => s + b.count, 0);
+
   const byReason = [...new Set(excludedRows.map((r) => r.exclusionReason ?? "unknown"))].map((reason) => {
     const contacts = excludedRows.filter((r) => (r.exclusionReason ?? "unknown") === reason);
     return { reason, label: EXCLUSION_LABELS[reason] ?? reason, count: contacts.length, contacts };
@@ -2105,6 +2459,7 @@ router.get("/crm/marketing/campaigns/:id/results", requireCrmAuth("campaigns.rea
       testSends: of("test").length,
     },
     excludedByReason: byReason,
+    failedByOutcome,
     recipients: rows,
     engagement: {
       tracked: false,
@@ -2112,15 +2467,24 @@ router.get("/crm/marketing/campaigns/:id/results", requireCrmAuth("campaigns.rea
       clicks: null,
       openRate: null,
       clickRate: null,
-      why: "Opens and clicks are not tracked for these campaigns. There is no tracking pixel and no link rewriting, and nothing writes an open or a click event. A 0% here would be a claim about your customers that we have no evidence for, so the figures are absent instead.",
+      unavailableReason: "No custom tracking domain is configured, so nothing records an open or a click.",
+      why: "Opens and clicks are not tracked for these campaigns. No custom tracking domain is configured, so there is no tracking pixel and no link rewriting, and nothing writes an open or a click event. A 0% here would be a claim about your customers that we have no evidence for, so the figures are absent instead. Even where opens are tracked, an open only means an image was loaded — privacy features and security scanners load images automatically — so it is never proof that a person read the email.",
     },
     deliverySignal: {
       meaning: "\"Sent\" means the mail provider accepted the message and returned an id. It is not a delivery confirmation and not a read receipt.",
       providerIdsRecorded: rows.filter((r) => r.providerMessageId).length,
+      notDelivered: failedRows.length - unconfirmed,
+      unconfirmed,
+      retryable,
+      unconfirmedNote: unconfirmed > 0
+        ? "An attempt was made for each of these and no answer from the mail provider was recorded, so whether it arrived is unknown. None of them is sent again automatically, and trying again leaves them out. Ask the person whether it arrived before sending anything again."
+        : null,
     },
     definitions: {
       audience: "Everybody the segment matched when this send started, including the ones that were excluded.",
       excluded: "Matched the segment but was never mailed. Every one has a reason and appears in the list above.",
+      failed: "Attempted and not accepted, split by what is known: refused or never handed over (it did not arrive), or not confirmed — no answer, or an error after the provider received it (it may have).",
+      unconfirmed: "The mail provider never answered, so it may or may not have arrived. Never sent again automatically.",
       neverAttempted: "Resolved into the audience but the send was paused or cancelled before reaching them. They were not excluded — nothing was decided about them.",
       testSends: "Copies sent to a staff address. Never counted as a delivery, never sent to a customer.",
     },
@@ -2344,6 +2708,8 @@ export interface DueCampaignResult {
   reason?: string;
   sent?: number;
   failed?: number;
+  /** Of `failed`: the provider never answered, so it may have arrived. Never re-sent by this worker. */
+  unconfirmed?: number;
   remaining?: number;
 }
 
@@ -2427,6 +2793,7 @@ export async function startDueCampaigns(
       started: true,
       sent: progress.sent,
       failed: progress.failed,
+      unconfirmed: progress.unconfirmed,
       remaining: progress.remaining,
     });
   }

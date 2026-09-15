@@ -28,10 +28,21 @@
 --   be carried here by hand or a virgin install silently starts life a column
 --   short. Each such edit is listed, newest first:
 --     * crm_tasks.due_kind + ck_crm_tasks_due_kind (see M5-task-due-kind.sql)
---   NOT yet carried here: everything in M5-automation-sweep.sql — the
---   crm_automation_events table and crm_automation_rules.inactivity_days. A
---   first install must still run that file. Until it is folded in, this
---   artifact is 60 tables and the schema is 61.
+--   NOT yet carried here, so a first install must still run these files after
+--   this one. Re-measured 2026-09-15 by comparing every pgTable name in
+--   lib/db/src/schema/*.ts with the CREATE TABLEs below. That is a TABLE-level
+--   measurement: the files that add no table (M5-marketing-flow,
+--   M5-support-delivery, M6-calendar-invitations) were not re-measured.
+--     * M5-automation-sweep.sql     crm_automation_events, and
+--                                   crm_automation_rules.inactivity_days
+--     * M5-billing.sql              crm_quotes, crm_quote_line_items,
+--                                   crm_invoices, crm_invoice_line_items, and
+--                                   crm_transactions.invoice_id
+--     * M6-contact-dedupe.sql       crm_contact_merges, crm_duplicate_dismissals
+--     * M6-automation-recovery.sql  crm_automation_recovery_actions
+--     * M6-lead-assignee.sql        crm_lead_owner_mappings, and
+--                                   crm_leads.assigned_to_staff_id
+--   Until they are folded in, this artifact is 60 tables and the schema is 69.
 --
 -- WHEN TO USE THIS FILE
 --   * First installation → this file alone. It already contains every column

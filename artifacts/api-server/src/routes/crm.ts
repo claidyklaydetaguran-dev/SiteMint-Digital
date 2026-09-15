@@ -6,6 +6,8 @@ import type { CrmLead, DiscoverySubmission } from "@workspace/db";
 import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray, type SQL } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
+import { loadOwnerCandidates, resolveAssignmentFields } from "../lib/leadAssignee.js";
+import { explainOwnerMatch, matchOwner, ownerKey, trimOwnerValue } from "../lib/leadOwnerRules.js";
 import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
@@ -70,7 +72,14 @@ router.get("/crm/settings/status", requireAdmin, (_req: Request, res: Response) 
 // permanently fail a job after 5 attempts, and until now nothing surfaced
 // that: a firm whose CRM link failed simply never appeared in the CRM. This
 // route only SELECTs — retrying/fixing jobs stays with the pipeline owner.
-router.get("/crm/receptionist-signup-jobs", requireAdmin, async (req: Request, res: Response) => {
+//
+// Permission: `settings.read`, not this file's bare signed-in check. It is a
+// job queue's health (attempts, retry state, last error) — the same class of
+// operational read as `/crm/operations/jobs` — and it renders on the
+// Receptionist Accounts page beside `/admin/receptionist-accounts`, which asks
+// for the same grant, so the two halves of one page cannot disagree about who
+// may see them. Every role holds it; the legacy bearer is unaffected.
+router.get("/crm/receptionist-signup-jobs", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
   try {
     const rows = await db
       .select({
@@ -256,6 +265,11 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
     const data = req.body as Record<string, unknown>;
     if (!data.name || !data.email) { res.status(400).json({ error: "Name and email are required" }); return; }
 
+    // M6: the owner is written as both columns, decided in one place — the
+    // picker's staff id, or a name resolved once through the matching rules.
+    const owner = await resolveAssignmentFields(data);
+    if (owner.kind === "error") { res.status(400).json({ error: owner.error }); return; }
+
     const [lead] = await db.insert(crmLeads).values({
       name: String(data.name),
       email: String(data.email),
@@ -266,7 +280,8 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
       serviceInterest: data.serviceInterest ? String(data.serviceInterest) : undefined,
       status: data.status ? String(data.status) : "New Inquiry",
       priority: data.priority ? String(data.priority) : "Medium",
-      assignedTo: data.assignedTo ? String(data.assignedTo) : undefined,
+      assignedTo: owner.kind === "set" ? owner.assignedTo : undefined,
+      assignedToStaffId: owner.kind === "set" ? owner.assignedToStaffId : undefined,
       tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
       notes: data.notes ? String(data.notes) : undefined,
       estimatedValue: data.estimatedValue ? String(data.estimatedValue) : undefined,
@@ -322,10 +337,20 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
     const data = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     const fields = ["name","company","email","website","source","serviceInterest",
-      "priority","assignedTo","notes","estimatedValue","packageType",
+      "priority","notes","estimatedValue","packageType",
       "discoveryFormStatus","proposalStatus","sowStatus"];
     for (const f of fields) {
       if (data[f] !== undefined) updates[f] = data[f];
+    }
+    // M6: the owner is never copied from the body as a bare column. Both owner
+    // columns come from one decision — the picker's staff id, or a name resolved
+    // through the matching rules — so they cannot drift apart, and a new name
+    // never leaves the previous owner's id behind.
+    const owner = await resolveAssignmentFields(data, existing);
+    if (owner.kind === "error") { res.status(400).json({ error: owner.error }); return; }
+    if (owner.kind === "set") {
+      updates["assignedTo"] = owner.assignedTo;
+      updates["assignedToStaffId"] = owner.assignedToStaffId;
     }
     // Normalize phone to E.164 before storing; preserve null/empty as-is
     if (data.phone !== undefined) {
@@ -1735,6 +1760,14 @@ router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, r
     let created = 0, skippedDuplicates = 0, invalid = 0;
     const errors: { rowIndex: number; message: string }[] = [];
 
+    // M6: owner names resolve through the same rules as every other write
+    // (lib/leadOwnerRules.ts) — staff read once, each name decided once — and a
+    // name that resolves to nobody is REPORTED in the response, never guessed.
+    const ownerCandidates = await loadOwnerCandidates();
+    const unresolvedOwners = new Map<string, {
+      value: string; rows: number; reason: "no_match" | "ambiguous"; explanation: string;
+    }>();
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const name = (row.name || row.Name || "").trim();
@@ -1754,6 +1787,8 @@ router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, r
       const estimatedValue = rawEv && !isNaN(parseFloat(rawEv)) ? String(parseFloat(rawEv)) : null;
       const rawTags = (row.tags || row.Tags || "").trim();
       const tags = rawTags ? rawTags.split(",").map((t: string) => t.trim()).filter(Boolean) : [];
+      const ownerText = trimOwnerValue(row.assignedTo || row.assigned_to || row["Assigned To"] || "");
+      const ownerMatch = ownerText ? matchOwner(ownerText, ownerCandidates) : null;
 
       try {
         const [lead] = await db.insert(crmLeads).values({
@@ -1766,20 +1801,37 @@ router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, r
           serviceInterest: (row.serviceInterest || row.service_interest || row["Service Interest"] || "").trim() || undefined,
           status: normSt(row.status || row.Status),
           priority: normPr(row.priority || row.Priority),
-          assignedTo: (row.assignedTo || row.assigned_to || row["Assigned To"] || "").trim() || undefined,
+          assignedTo: ownerText || undefined,
+          assignedToStaffId: ownerMatch?.outcome === "matched" ? ownerMatch.staffId : undefined,
           notes: (row.notes || row.Notes || "").trim() || undefined,
           tags,
           estimatedValue,
         }).returning();
         await logActivity(req, lead.id, "lead_imported", `Imported from CSV: ${lead.name}`, "Lead imported through CRM Import page.");
         created++;
+        if (ownerMatch && ownerMatch.outcome !== "matched") {
+          const key = ownerKey(ownerText);
+          const seen = unresolvedOwners.get(key);
+          if (seen) seen.rows += 1;
+          else unresolvedOwners.set(key, {
+            value: ownerText, rows: 1,
+            reason: ownerMatch.outcome === "ambiguous" ? "ambiguous" : "no_match",
+            explanation: explainOwnerMatch(ownerText, ownerMatch, ownerCandidates),
+          });
+        }
       } catch (e) {
         invalid++;
         errors.push({ rowIndex: i, message: `Insert failed: ${String(e).slice(0, 80)}` });
       }
     }
 
-    res.json({ created, skippedDuplicates, invalid, errors: errors.slice(0, 20) });
+    res.json({
+      created, skippedDuplicates, invalid, errors: errors.slice(0, 20),
+      // Contacts created carrying an owner name that matched nobody, or more
+      // than one person. They have no person as owner until somebody decides,
+      // on Admin → Unmapped lead owners.
+      unresolvedOwners: [...unresolvedOwners.values()],
+    });
   } catch (err) {
     req.log.error({ err }, "Error importing CSV");
     res.status(500).json({ error: "Failed to import" });

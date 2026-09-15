@@ -117,7 +117,8 @@ export const TARGET_FIELDS: readonly TargetField[] = [
     aliases: ["priority", "rating", "temperature"],
     note: `One of: ${CRM_PRIORITIES.join(" · ")}.` },
   { key: "assignedTo", label: "Assigned to", required: false,
-    aliases: ["assignedto", "assigned to", "owner", "assigned", "rep"], note: "Free text today." },
+    aliases: ["assignedto", "assigned to", "owner", "assigned", "rep"],
+    note: "Matched to a member of staff by display name, then a legacy name recorded on their account, then email address — exactly, ignoring edge spaces and the case of A-Z. A name that matches nobody, or more than one person, is imported without an owner and listed under Admin → Unmapped lead owners. It is never guessed." },
   { key: "serviceInterest", label: "Service interest", required: false,
     aliases: ["serviceinterest", "service interest", "service", "interest", "product"], note: "" },
   { key: "packageType", label: "Package", required: false,
@@ -349,6 +350,33 @@ export interface PlanOptions {
 
 export const DEFAULT_PLAN_OPTIONS: PlanOptions = { updateExisting: false, updateMode: "fill_blanks" };
 
+/**
+ * M6: what the owner-matching rules decided about one owner name in the file.
+ *
+ * Supplied by the caller — the route builds it from lib/leadOwnerRules.ts and
+ * the staff table — which keeps this module pure and free of the database.
+ */
+export interface PlanOwnerResolution {
+  /** The comparison key: two spellings with one key are one owner. */
+  key: string;
+  /** The name as written in the file, edge whitespace removed. */
+  value: string;
+  outcome: "matched" | "ambiguous" | "none";
+  staffId: number | null;
+  staffName: string | null;
+  rule: string | null;
+  /** The people an ambiguous name could be. */
+  candidates: Array<{ id: number; displayName: string; email: string; status: string }>;
+  explanation: string;
+}
+
+export type OwnerResolver = (value: string) => PlanOwnerResolution;
+
+/** One owner name in the file, and how many planned writes carry it. */
+export interface PlanOwner extends PlanOwnerResolution {
+  rows: number;
+}
+
 export interface Plan {
   headers: string[];
   mapping: Mapping;
@@ -356,6 +384,13 @@ export interface Plan {
   ignoredColumns: string[];
   rows: PlannedRow[];
   totals: Record<RowAction, number>;
+  /**
+   * Every owner name a create or update in this plan would write, with what
+   * the rules decided about it. Derived from `rows`, whose values carry the
+   * resolved `assignedToStaffId` — so a resolution that changes between preview
+   * and commit changes the hash, and the commit is refused.
+   */
+  owners: PlanOwner[];
   /** Stable over the same file + mapping + options + matched state. */
   hash: string;
 }
@@ -380,6 +415,12 @@ export function buildPlan(args: {
   options: PlanOptions;
   existingByEmail: Map<string, ExistingContact>;
   existingByPhone: Map<string, ExistingContact>;
+  /**
+   * M6: how an owner name becomes a person. When omitted, owner names are
+   * planned as text only and no staff reference is written. The import route
+   * always supplies it; a pure test of the other columns need not.
+   */
+  resolveOwner?: OwnerResolver;
 }): Plan {
   const { rows, mapping, options, existingByEmail, existingByPhone } = args;
   const headers = (rows[0] ?? []).map((h) => h.trim());
@@ -579,6 +620,34 @@ export function buildPlan(args: {
     });
   }
 
+  // ── M6: owners ───────────────────────────────────────────────────────────
+  // Decided after the per-row verdicts, so a name is resolved and reported only
+  // where the plan would actually write it: a created contact, or an update
+  // whose owner changes. The resolved id goes into the row's values — and so
+  // into the hash — and a name the rules could not decide is written with no
+  // person and said so on the row, rather than guessed.
+  const owners = new Map<string, PlanOwner>();
+  if (args.resolveOwner) {
+    for (const row of planned) {
+      const writesOwner = row.action === "create"
+        ? typeof row.values["assignedTo"] === "string"
+        : row.action === "update" && "assignedTo" in row.changes;
+      if (!writesOwner) continue;
+
+      const resolution = args.resolveOwner(String(row.values["assignedTo"]));
+      row.values["assignedToStaffId"] = resolution.outcome === "matched" ? resolution.staffId : null;
+      if (resolution.outcome !== "matched") {
+        row.notices.push(
+          `${resolution.explanation} The contact is ${row.action === "create" ? "imported" : "updated"} with no `
+          + "person as its owner; the name is kept and listed under Admin → Unmapped lead owners.",
+        );
+      }
+      const tally = owners.get(resolution.key);
+      if (tally) tally.rows += 1;
+      else owners.set(resolution.key, { ...resolution, rows: 1 });
+    }
+  }
+
   const totals: Record<RowAction, number> = { create: 0, update: 0, skip: 0, error: 0 };
   for (const r of planned) totals[r.action]++;
 
@@ -589,6 +658,8 @@ export function buildPlan(args: {
     ignoredColumns: unmappedHeaders(headers, mapping),
     rows: planned,
     totals,
+    owners: [...owners.values()].sort((a, b) =>
+      b.rows - a.rows || (a.value < b.value ? -1 : a.value > b.value ? 1 : 0)),
   };
   return { ...plan, hash: hashPlan(plan) };
 }

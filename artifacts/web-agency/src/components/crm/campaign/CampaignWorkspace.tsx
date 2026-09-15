@@ -10,10 +10,14 @@ import StepReview from "./StepReview";
 import StepSend from "./StepSend";
 import {
   btnGhost, btnQuiet, call, failureText, filterIsSavable, formatWhen, patchJson, postJson,
-  type AiAvailability, type AudienceMode, type AudiencePreview, type Campaign,
-  type Design, type EmailBlock, type MarketingSettings, type Preflight,
-  type SegmentDefinition, type Segment,
+  stateAfterSave,
+  type AiAvailability, type AudiencePreview, type Campaign,
+  type Design, type MarketingSettings, type Preflight, type Segment,
 } from "./shared";
+import {
+  adoptServerCopy, draftFrom, forgetUnsaved, preserveUnsaved, recoverableDraft, sameDraft, saveAgainst, saveIndicator,
+  type CampaignDraft, type RecoverableDraft, type SaveState,
+} from "./campaignDraft";
 
 // ── One campaign, four steps ─────────────────────────────────────────────────
 //
@@ -25,6 +29,8 @@ import {
 //
 //   Autosave that says what it is doing. "Saving…", "Saved at 14:32", or the
 //   actual reason it could not — never a silent failure that looks like a save.
+//   Until the server has a change, this browser keeps it (campaignDraft.ts),
+//   and opening the campaign again offers it back. Nothing is re-sent by itself.
 //
 //   A refusal to overwrite somebody else. Every save carries the version it was
 //   based on; if a colleague has moved the campaign since, the save is refused
@@ -45,34 +51,12 @@ interface Props {
   onDesignsChanged: () => void;
 }
 
-interface Draft {
-  name: string;
-  subject: string;
-  preheader: string;
-  blocks: EmailBlock[];
-  audienceMode: AudienceMode;
-  segmentId: number | null;
-  audienceDefinition: SegmentDefinition | null;
-  audienceLeadIds: number[];
-}
-
 const STEPS = [
   { id: 1, label: "Audience", hint: "Who gets this" },
   { id: 2, label: "Email", hint: "What it says" },
   { id: 3, label: "Preview & test", hint: "Check it" },
   { id: 4, label: "Send", hint: "Or schedule it" },
 ] as const;
-
-const draftFrom = (c: Campaign): Draft => ({
-  name: c.name,
-  subject: c.subject ?? "",
-  preheader: c.preheader ?? "",
-  blocks: c.blocks ?? [],
-  audienceMode: c.audienceMode ?? "segment",
-  segmentId: c.segmentId ?? null,
-  audienceDefinition: c.audienceDefinition ?? null,
-  audienceLeadIds: c.audienceLeadIds ?? [],
-});
 
 export default function CampaignWorkspace(props: Props) {
   const {
@@ -81,10 +65,14 @@ export default function CampaignWorkspace(props: Props) {
   } = props;
 
   const [campaign, setCampaign] = useState<Campaign>(props.campaign);
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(props.campaign));
+  const [draft, setDraft] = useState<CampaignDraft>(() => draftFrom(props.campaign));
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  const [saveState, setSaveState] = useState<"clean" | "pending" | "saving" | "saved" | "error">("clean");
+  const [saveState, setSaveState] = useState<SaveState>("clean");
+  /** Set once this browser is holding changes the server does not have. */
+  const [keptAt, setKeptAt] = useState<number | null>(null);
+  /** Changes an earlier visit kept and never saved, waiting for a person's decision. */
+  const [recovery, setRecovery] = useState<RecoverableDraft | null>(() => recoverableDraft(props.campaign));
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ by: string | null; at: string; theirs: Campaign } | null>(null);
@@ -110,11 +98,20 @@ export default function CampaignWorkspace(props: Props) {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<{ sent: number; failed: number; remaining: number } | null>(null);
+  const [progress, setProgress] = useState<
+    { sent: number; failed: number; unconfirmed: number; notDelivered: number; remaining: number } | null
+  >(null);
 
   const readOnly = campaign.status === "sending" || campaign.status === "sent" || campaign.status === "cancelled";
   const versionRef = useRef(campaign.updatedAt);
   versionRef.current = campaign.updatedAt;
+  // The draft as it is NOW, readable from inside an in-flight save.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  // The version unsaved changes were made on top of, when that is not simply
+  // the version on screen: restored changes keep the version they came from, so
+  // saving them can still be refused in a colleague's favour.
+  const baseRef = useRef<string | null>(null);
 
   const adopt = useCallback((next: Campaign) => {
     setCampaign(next);
@@ -123,7 +120,7 @@ export default function CampaignWorkspace(props: Props) {
 
   // ── Autosave ───────────────────────────────────────────────────────────────
 
-  const save = useCallback(async (state: Draft, expected: string): Promise<void> => {
+  const save = useCallback(async (state: CampaignDraft, expected: string): Promise<void> => {
     setSaveState("saving");
     setSaveMessage(null);
 
@@ -160,20 +157,58 @@ export default function CampaignWorkspace(props: Props) {
       return;
     }
     adopt(r.data.campaign);
-    setSaveState("saved");
+    baseRef.current = null;
     setSavedAt(new Date().toISOString());
+    // Anything typed while this request was in flight is NOT on the server.
+    // Saying "Saved" would be untrue and would also stop the autosave, because
+    // it only re-arms from `pending`.
+    const next = stateAfterSave(state, draftRef.current);
+    setSaveState(next);
+    if (next === "saved") {
+      // The server holds exactly what the editor holds; the kept copy is done.
+      forgetUnsaved(campaign.id);
+      setKeptAt(null);
+    }
   }, [adopt, campaign.id]);
 
-  const patchDraft = useCallback((patch: Partial<Draft>) => {
+  const patchDraft = useCallback((patch: Partial<CampaignDraft>) => {
     setDraft((d) => ({ ...d, ...patch }));
     setSaveState("pending");
   }, []);
 
   useEffect(() => {
-    if (saveState !== "pending" || readOnly || conflict) return;
-    const t = setTimeout(() => { void save(draft, versionRef.current); }, 1100);
+    if (saveState !== "pending" || readOnly || conflict || recovery) return;
+    const t = setTimeout(() => { void save(draft, saveAgainst(baseRef.current, versionRef.current)); }, 1100);
     return () => clearTimeout(t);
-  }, [draft, saveState, readOnly, conflict, save]);
+  }, [draft, saveState, readOnly, conflict, recovery, save]);
+
+  // While a change is waiting, in flight, or refused, the server does not have
+  // it — so this browser keeps it, against the version it was made on, until the
+  // server does. A scratch copy for a person to restore; never replayed.
+  useEffect(() => {
+    if (readOnly || recovery) return;
+    if (saveState !== "pending" && saveState !== "saving" && saveState !== "error") return;
+    const stamp = preserveUnsaved(campaign.id, draft, saveAgainst(baseRef.current, versionRef.current));
+    setKeptAt((k) => k ?? stamp);
+  }, [draft, saveState, readOnly, recovery, campaign.id]);
+
+  const restoreKept = () => {
+    if (!recovery) return;
+    const kept = recovery;
+    setRecovery(null);
+    setDraft(kept.draft);
+    setKeptAt(kept.preservedAt);
+    baseRef.current = kept.baseUpdatedAt;
+    // Saved against the version the changes were made on. If anybody has saved
+    // since, the server refuses and names them, and the conflict panel puts both
+    // versions in front of the person — nothing is overwritten quietly.
+    void save(kept.draft, kept.baseUpdatedAt);
+  };
+
+  const discardKept = () => {
+    forgetUnsaved(campaign.id);
+    setRecovery(null);
+  };
 
   // ── Preflight, audience and preview ────────────────────────────────────────
 
@@ -235,9 +270,21 @@ export default function CampaignWorkspace(props: Props) {
     setAiBusy(false);
     if (!r.ok) { setAiError(failureText(r, "A draft could not be written.")); return; }
     adopt(r.data.campaign);
-    setDraft(draftFrom(r.data.campaign));
-    setSaveState("saved");
-    setSavedAt(new Date().toISOString());
+    baseRef.current = null;
+    const server = draftFrom(r.data.campaign);
+    // The rewritten copy is the server's. A name or audience changed here and
+    // not saved yet is not what the AI was asked for, so it stays — and stays
+    // unsaved, which re-arms the autosave for it.
+    const next = adoptServerCopy(draftRef.current, server);
+    setDraft(next);
+    if (sameDraft(next, server)) {
+      setSaveState("saved");
+      setSavedAt(new Date().toISOString());
+      forgetUnsaved(campaign.id);
+      setKeptAt(null);
+    } else {
+      setSaveState("pending");
+    }
   };
 
   const approveAi = async () => {
@@ -282,18 +329,30 @@ export default function CampaignWorkspace(props: Props) {
   const drive = async () => {
     setBusy("send");
     setActionError(null);
+    let underway = false;
     try {
       for (let i = 0; i < 200; i += 1) {
         const r = await call<{
-          campaign: Campaign; sent: number; failed: number; remaining: number; finished: boolean;
+          campaign: Campaign; sent: number; failed: number; unconfirmed?: number;
+          remaining: number; finished: boolean;
         }>(`/api/crm/marketing/campaigns/${campaign.id}/send`, postJson({ batchSize: 25 }));
-        if (!r.ok) { setActionError(failureText(r, "The send could not be started.")); break; }
+        if (!r.ok) {
+          setActionError(failureText(r, underway
+            ? "The send stopped part-way. Nobody who was already sent to will be sent to again — press Send to carry on with the rest."
+            : "The send could not be started."));
+          break;
+        }
+        underway = true;
         adopt(r.data.campaign);
-        setProgress((p) => ({
-          sent: (p?.sent ?? 0) + r.data.sent,
-          failed: (p?.failed ?? 0) + r.data.failed,
-          remaining: r.data.remaining,
-        }));
+        setProgress((p) => {
+          const failed = (p?.failed ?? 0) + r.data.failed;
+          // An older backend does not split these out. Reading a missing field
+          // as zero would silently re-assert "all of them definitely failed",
+          // so the unknown half stays folded into `failed` rather than being
+          // claimed as a non-delivery.
+          const unconfirmed = (p?.unconfirmed ?? 0) + (r.data.unconfirmed ?? 0);
+          return { sent: (p?.sent ?? 0) + r.data.sent, failed, unconfirmed, notDelivered: failed - unconfirmed, remaining: r.data.remaining };
+        });
         if (r.data.finished || r.data.campaign.status !== "sending") break;
       }
       void loadPreflight();
@@ -334,6 +393,10 @@ export default function CampaignWorkspace(props: Props) {
     setConflict(null);
     setSaveState("clean");
     setSaveMessage(null);
+    // Taking their version is choosing to let these changes go.
+    baseRef.current = null;
+    forgetUnsaved(campaign.id);
+    setKeptAt(null);
   };
 
   const keepMine = () => {
@@ -341,21 +404,21 @@ export default function CampaignWorkspace(props: Props) {
     const expected = conflict.theirs.updatedAt;
     setCampaign(conflict.theirs);
     setConflict(null);
+    baseRef.current = null;
     void save(draft, expected);
   };
 
   const audienceLabel = audience?.label ?? campaign.audienceLabel ?? "No audience yet";
 
-  const saveLabel = useMemo(() => {
-    if (readOnly) return "This campaign can no longer be edited";
-    switch (saveState) {
-      case "saving": return "Saving…";
-      case "pending": return "Unsaved changes";
-      case "saved": return `Saved ${formatWhen(savedAt)}`;
-      case "error": return saveMessage ?? "Not saved";
-      default: return `Last saved ${formatWhen(campaign.updatedAt)}`;
-    }
-  }, [readOnly, saveState, savedAt, saveMessage, campaign.updatedAt]);
+  const saveLabel = useMemo(() => saveIndicator({
+    state: saveState,
+    readOnly,
+    savedAt,
+    lastSavedAt: campaign.updatedAt,
+    message: saveMessage,
+    keptInBrowser: keptAt !== null,
+    format: (iso) => formatWhen(iso),
+  }), [readOnly, saveState, savedAt, saveMessage, campaign.updatedAt, keptAt]);
 
   return (
     <div className="space-y-4">
@@ -368,7 +431,7 @@ export default function CampaignWorkspace(props: Props) {
           <input
             className="mt-1 w-full bg-transparent border-0 border-b border-transparent hover:border-border focus:border-teal-600 text-xl sm:text-2xl font-bold text-foreground px-0 py-1 focus:outline-none disabled:opacity-70"
             value={draft.name}
-            disabled={readOnly}
+            disabled={readOnly || !!recovery}
             aria-label="Campaign name"
             onChange={(e) => patchDraft({ name: e.target.value })}
           />
@@ -380,7 +443,7 @@ export default function CampaignWorkspace(props: Props) {
             {saveState === "error" && <CloudOff className="w-3 h-3" />}
             {saveLabel}
             {saveState === "error" && !conflict && (
-              <button type="button" className="underline font-semibold" onClick={() => void save(draft, versionRef.current)}>
+              <button type="button" className="underline font-semibold" onClick={() => void save(draft, saveAgainst(baseRef.current, versionRef.current))}>
                 Try again
               </button>
             )}
@@ -392,6 +455,34 @@ export default function CampaignWorkspace(props: Props) {
           )}
         </div>
       </div>
+
+      {/* ══ Changes an earlier visit kept and never saved ══ */}
+      {recovery && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5">
+          <p className="text-sm font-semibold text-amber-900 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="min-w-0">This browser kept changes to this campaign that were never saved.</span>
+          </p>
+          <p className="text-sm text-amber-900/80 mt-1 break-words">
+            Kept {formatWhen(new Date(recovery.preservedAt).toISOString())}. Their subject line is “{recovery.draft.subject || "(none)"}”.
+            {readOnly
+              ? " This campaign has already started sending, so they can no longer be applied to it."
+              : recovery.changedSince
+                ? " The campaign has been saved since, so restoring them will ask whose version to keep."
+                : " Restore them to carry on where you left off."}
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2.5">
+            {!readOnly && (
+              <button type="button" className={btnGhost} onClick={restoreKept}>
+                <RefreshCw className="w-4 h-4" /> Restore my changes
+              </button>
+            )}
+            <button type="button" className={btnGhost} onClick={discardKept}>
+              Discard them
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ══ Somebody else got there first ══ */}
       {conflict && (
@@ -415,6 +506,9 @@ export default function CampaignWorkspace(props: Props) {
         </div>
       )}
 
+      {/* Nothing can be edited until kept changes are restored or discarded, so
+          new typing can never land on top of them and be lost along with them. */}
+      {!recovery && (<>
       {/* ══ Steps ══ */}
       <ol className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Campaign steps">
         {STEPS.map((s) => (
@@ -555,6 +649,7 @@ export default function CampaignWorkspace(props: Props) {
           Next <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+      </>)}
     </div>
   );
 }

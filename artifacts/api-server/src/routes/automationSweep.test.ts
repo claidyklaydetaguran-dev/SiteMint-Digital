@@ -526,6 +526,48 @@ suite("automation sweep and durable events (real DB)", () => {
       "a contact quiet for ten days is not an occurrence for a thirty-day rule").toHaveLength(0);
   }, 120_000);
 
+  it("measures a contact's silence in its owner's zone, read from the staff reference and not the name beside it", async () => {
+    // M6. At 17:00Z on the 12th it is already the 13th in Manila — seven
+    // calendar days after the 6th — and still the 12th in California, six.
+    // Each contact RECORDS the other person's display name as its owner text,
+    // so a sweep still looking the name up would swap the two answers.
+    clockMs = Date.parse("2026-09-12T17:00:00.000Z");
+    const rule = await makeRule({
+      name: `[CRM-TEST] quiet in the owner's zone ${STAMP}`,
+      trigger: "no_activity_for_days",
+      actions: [{ type: "add_note", config: { body: "quiet where the owner is" } }],
+    });
+    await db.update(schema.crmAutomationRules).set({ inactivityDays: 7 })
+      .where(eq(schema.crmAutomationRules.id, rule["id"]));
+    await enableOnly(rule["id"]);
+
+    const lastTouch = new Date(Date.parse("2026-09-06T10:00:00.000Z"));
+    const manilaOwned = await makeLead({
+      createdAt: lastTouch, assignedToStaffId: staffIds[MANILA.email], assignedTo: PACIFIC.name,
+    });
+    const pacificOwned = await makeLead({
+      createdAt: lastTouch, assignedToStaffId: staffIds[PACIFIC.email], assignedTo: MANILA.name,
+    });
+
+    try {
+      await sweep.runAutomationSweep(deps());
+
+      const sevenDay = (rows: Array<{ payload: unknown }>) =>
+        rows.filter((e) => Number((e.payload as { days?: unknown } | null)?.days) === 7);
+      expect(sevenDay(await eventsFor("lead", manilaOwned)), "seven days have passed in Manila").toHaveLength(1);
+      expect(sevenDay(await eventsFor("lead", pacificOwned)), "only six in California").toHaveLength(0);
+    } finally {
+      // Leave no quiet contact behind. The California one is never announced at
+      // this clock, so a later no_activity rule running on the real clock would
+      // find it silent and run on it — inside some other test's count.
+      await db.delete(schema.crmAutomationEvents).where(and(
+        eq(schema.crmAutomationEvents.recordType, "lead"),
+        inArray(schema.crmAutomationEvents.recordId, [manilaOwned, pacificOwned]),
+      ));
+      await db.delete(schema.crmLeads).where(inArray(schema.crmLeads.id, [manilaOwned, pacificOwned]));
+    }
+  }, 120_000);
+
   it("lets activity on a contact call off a silence that was already noticed", async () => {
     clockMs = Date.now();
     const rule = await makeRule({

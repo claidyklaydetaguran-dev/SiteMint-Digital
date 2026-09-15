@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { adminFetch, adminProbe, adminLogout, getAdminToken, bindDraftOwner } from "@/lib/adminFetch";
 import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
+import { OwnerPicker } from "@/components/crm/OwnerPicker";
+import { useCrmAssignees } from "@/lib/crmAssignees";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CrmLead {
@@ -606,7 +608,9 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
 function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClose: () => void; onCreated: () => void }) {
   const [step, setStep] = useState<"search" | "form">("search");
   const [q, setQ] = useState("");
-  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedTo:"", notes:"" });
+  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedToStaffId: null as number | null, notes:"" });
+  // M6: a picker over real staff accounts, not three names typed into the source.
+  const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
   const [dupWarning, setDupWarning] = useState("");
 
@@ -688,7 +692,7 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                 <input type={type} placeholder={ph}
                   className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  value={(form as Record<string, string>)[key]}
+                  value={String(form[key as keyof typeof form] ?? "")}
                   onChange={e => {
                     const v = e.target.value;
                     setForm(f => ({ ...f, [key]: v }));
@@ -714,14 +718,16 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-              <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
-                value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                <option value="">Unassigned</option>
-                <option>Claidy Taguran</option>
-                <option>Shasta Greene</option>
-                <option>Saisa Lorraigne</option>
-              </select>
+              <label htmlFor="quick-add-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+              <OwnerPicker
+                id="quick-add-owner"
+                value={form.assignedToStaffId}
+                onChange={next => setForm(f => ({ ...f, assignedToStaffId: typeof next === "number" ? next : null }))}
+                assignees={people.assignees}
+                loading={people.loading}
+                error={people.error}
+                onRetry={people.reload}
+              />
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setStep("search")} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Back</button>

@@ -6,6 +6,8 @@ import {
   FileText, Users, GitBranch, RefreshCw, Download, X, Copy, Info,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { useCrmAssignees } from "@/lib/crmAssignees";
+import { OwnerMapControl, type OwnerMapResult } from "@/components/crm/UnmappedOwnersPanel";
 
 // ── Types mirroring the server's plan ────────────────────────────────────────
 
@@ -28,6 +30,19 @@ interface TargetField {
   key: string; label: string; required: boolean; note: string;
 }
 
+/** M6: one owner name in the file, and what the server's matching rules decided about it. */
+interface ImportOwner {
+  key: string;
+  value: string;
+  rows: number;
+  outcome: "matched" | "ambiguous" | "none";
+  staffId: number | null;
+  staffName: string | null;
+  rule: "display_name" | "legacy_name" | "email" | null;
+  candidates: { id: number; displayName: string; email: string; status: string }[];
+  explanation: string;
+}
+
 interface Preview {
   headers: string[];
   mapping: Record<string, string | null>;
@@ -36,8 +51,16 @@ interface Preview {
   options: { updateExisting: boolean; updateMode: "fill_blanks" | "overwrite" };
   totals: Record<RowAction, number>;
   rows: PlannedRow[];
+  owners?: ImportOwner[];
+  canMapOwners?: boolean;
   planHash: string;
 }
+
+const OWNER_RULE_WORDS: Record<NonNullable<ImportOwner["rule"]>, string> = {
+  display_name: "their display name",
+  legacy_name: "a legacy name recorded on their account",
+  email: "their email address",
+};
 
 interface CommitResult {
   created: number; updated: number; skipped: number; failed: number;
@@ -70,6 +93,9 @@ function downloadSample() {
 
 export default function CrmImport() {
   const fileRef = useRef<HTMLInputElement>(null);
+  // M6: the people an unmatched owner name in the file can be mapped to.
+  const people = useCrmAssignees();
+  const [ownerNotice, setOwnerNotice] = useState<string | null>(null);
 
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -397,6 +423,69 @@ export default function CrmImport() {
                 </div>
               )}
             </div>
+
+            {/* Owners — M6: names resolved by the server's rules; unresolved ones reported, never guessed */}
+            {preview && (preview.owners?.length ?? 0) > 0 && (
+              <div className="px-4 sm:px-5 py-3 border-b border-border/60 space-y-2 min-w-0">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Owners in this file</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Each name is matched to a member of staff by display name, then a legacy name on their account,
+                    then email address. A name that matches nobody, or more than one person, is imported with no
+                    person as its owner — it is never guessed.
+                  </p>
+                </div>
+                {ownerNotice && (
+                  <p role="status" className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 break-words">
+                    {ownerNotice}
+                  </p>
+                )}
+                <ul className="space-y-2">
+                  {(preview.owners ?? []).map((o, i) => (
+                    <li key={o.key} className={`rounded-lg border px-3 py-2 min-w-0 ${o.outcome === "matched" ? "border-border bg-background" : "border-amber-200 bg-amber-50"}`}>
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+                        <span className="text-sm font-medium text-foreground break-all">“{o.value}”</span>
+                        <span className="text-xs text-muted-foreground">{o.rows} row{o.rows === 1 ? "" : "s"}</span>
+                      </div>
+                      {o.outcome === "matched" ? (
+                        <p className="text-xs text-foreground mt-0.5 break-words">
+                          Belongs to {o.staffName}{" "}
+                          <span className="text-muted-foreground">(matches {o.rule ? OWNER_RULE_WORDS[o.rule] : "a matching rule"})</span>
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-amber-900 mt-0.5 leading-relaxed break-words">{o.explanation}</p>
+                          {o.outcome === "none" && preview.canMapOwners && (
+                            <div className="mt-2">
+                              <OwnerMapControl
+                                value={o.value}
+                                people={people.assignees.map(a => ({ ...a, status: "active" }))}
+                                idSuffix={`import-${i}`}
+                                onMapped={(result: OwnerMapResult) => {
+                                  setOwnerNotice(`“${result.value}” is now recorded as ${result.staff.displayName}. The file was checked again with that decision.`);
+                                  void runPreview(csv, mapping, options);
+                                }}
+                              />
+                            </div>
+                          )}
+                          {o.outcome === "none" && !preview.canMapOwners && (
+                            <p className="text-xs text-amber-900 mt-1 break-words">
+                              An owner or a technical administrator can say who this is — here, or on Admin → Unmapped lead owners.
+                            </p>
+                          )}
+                          {o.outcome === "ambiguous" && (
+                            <p className="text-xs text-amber-900 mt-1 break-words">
+                              These contacts are imported with no person as their owner. Decide who it is after importing, on{" "}
+                              <Link href="/admin/crm/admin#unmapped-owners" className="underline">Admin → Unmapped lead owners</Link>.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Column mapping */}
             {preview && (

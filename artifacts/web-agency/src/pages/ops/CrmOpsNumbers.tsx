@@ -24,13 +24,14 @@ export default function CrmOpsNumbers() {
   const [numbers, setNumbers] = useState<OpsNumber[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [denied, setDenied] = useState(false);
+  // The refusal itself, so the page can name the permission that is missing.
+  const [denied, setDenied] = useState<AdminApiError | null>(null);
   const [notProvided, setNotProvided] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setDenied(false);
+    setDenied(null);
     setNotProvided(false);
     try {
       const data = await adminGet<NumbersResponse>("/api/admin/voice/numbers");
@@ -39,7 +40,7 @@ export default function CrmOpsNumbers() {
       if (isNotProvided(err)) {
         setNotProvided(true);
       } else if (isDenied(err)) {
-        setDenied(true);
+        setDenied(err as AdminApiError);
       } else if (err instanceof AdminApiError) {
         setError(err.message);
       } else {
@@ -77,7 +78,7 @@ export default function CrmOpsNumbers() {
         </div>
 
         {loading && <OpsSpinner />}
-        {!loading && denied && <OpsDenied />}
+        {!loading && denied && <OpsDenied error={denied} />}
         {!loading && !denied && notProvided && <OpsNotProvided thing="numbers" />}
         {!loading && !denied && !notProvided && error && (
           <OpsError message={error} onRetry={() => void load()} />

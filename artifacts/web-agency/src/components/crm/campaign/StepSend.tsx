@@ -26,7 +26,7 @@ interface Props {
   audienceLabel: string;
   busy: string | null;
   error: string | null;
-  progress: { sent: number; failed: number; remaining: number } | null;
+  progress: { sent: number; failed: number; unconfirmed: number; notDelivered: number; remaining: number } | null;
   readOnly?: boolean;
   onSendNow: () => void;
   onSchedule: (isoWhen: string, timezone: string) => void;
@@ -232,11 +232,24 @@ export default function StepSend(props: Props) {
       {/* ══ Progress ══ */}
       {progress && (
         <div className="rounded-xl border border-teal-200 bg-teal-50 p-3.5">
-          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Users className="w-4 h-4 text-teal-700" />
-            {progress.sent} sent{progress.failed > 0 ? `, ${progress.failed} failed` : ""}
-            {progress.remaining > 0 ? `, ${progress.remaining} still to go` : ""}
+          <p className="text-sm font-semibold text-foreground flex items-start gap-2">
+            <Users className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+            <span className="min-w-0">
+              {progress.sent} sent
+              {/* Not folded into "failed": the provider may have taken these
+                  and did not confirm them, so they may have arrived. Saying
+                  "failed" here is what makes somebody send a second copy. */}
+              {progress.notDelivered > 0 ? `, ${progress.notDelivered} not delivered` : ""}
+              {progress.unconfirmed > 0 ? `, ${progress.unconfirmed} unconfirmed` : ""}
+              {progress.remaining > 0 ? `, ${progress.remaining} still to go` : ""}
+            </span>
           </p>
+          {progress.unconfirmed > 0 && (
+            <p className="text-xs text-amber-800 mt-0.5">
+              Unconfirmed means the mail provider did not confirm them — it never answered, or answered with an error after receiving them. Those may have arrived and may not —
+              open the results to see who, and ask them before sending anything again.
+            </p>
+          )}
           {progress.remaining > 0 && (
             <p className="text-xs text-muted-foreground mt-0.5">Still working through the list. You can pause it from the campaign list.</p>
           )}

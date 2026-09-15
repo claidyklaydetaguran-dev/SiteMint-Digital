@@ -73,6 +73,21 @@ export function setDraftOwner(staffId: number | string | null): void {
   }
 }
 
+/**
+ * Whose drafts these are right now, as last bound by `setDraftOwner` — the id
+ * every key is scoped to. Null when nobody is bound yet or storage is blocked,
+ * which `saveDraft` and `readDraft` treat as the anonymous owner, consistently.
+ */
+export function currentDraftOwner(): string | null {
+  const store = safeLocal();
+  if (!store) return null;
+  try {
+    return store.getItem(OWNER_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function saveDraft<T>(staffId: number | string | null, id: string, value: T): void {
   const store = safeLocal();
   if (!store) return;

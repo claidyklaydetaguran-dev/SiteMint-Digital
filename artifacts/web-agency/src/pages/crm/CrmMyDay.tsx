@@ -63,7 +63,11 @@ interface FollowUp {
   company?: string | null;
   status?: string | null;
   nextFollowUpAt?: string | null;
+  /** The owner name as recorded. */
   assignedTo?: string | null;
+  /** M6: the staff reference, and the name of the person it points at. */
+  assignedToStaffId?: number | null;
+  ownerName?: string | null;
 }
 
 type Scope = "mine" | "team";
@@ -633,8 +637,15 @@ export default function CrmMyDay() {
                         {f.status && <p className="text-[11px] text-muted-foreground">{f.status}</p>}
                       </div>
                     </div>
-                    {scope === "team" && f.assignedTo && (
-                      <p className="text-[11px] text-muted-foreground mt-1.5">Owner: {f.assignedTo}</p>
+                    {scope === "team" && (f.ownerName || f.assignedTo) && (
+                      <p className="text-[11px] text-muted-foreground mt-1.5 break-words">
+                        Owner:{" "}
+                        {f.ownerName ?? (
+                          <span className="italic" title="Recorded under this name, which does not match a person yet">
+                            {f.assignedTo} (not matched to a person)
+                          </span>
+                        )}
+                      </p>
                     )}
                   </div>
                 ))}

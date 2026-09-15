@@ -191,17 +191,30 @@ const INITIALIZED_DATABASE = {
 //   automation(1): crm_automation_recovery_actions — the recovery trail beside
 //                 the durable event log.
 //
+// 82: one more, additive, with no existing table altered.
+//
+//   contacts  (1): crm_lead_owner_mappings — the record of every decision that
+//                 pointed contacts carrying a free-text owner name at a member
+//                 of staff: which matching rule or which person decided, when,
+//                 and how many contacts it moved. It is what makes the mapping
+//                 of the existing owner names reviewable rather than something
+//                 that silently happened (Admin → "Unmapped lead owners").
+//                 Reviewed DDL, and the backfill that writes its first rows:
+//                 docs/crm-ops/schema/M6-lead-assignee.sql.
+//                 Its companion `crm_leads.assigned_to_staff_id` is a COLUMN on
+//                 an existing table and is not in this count.
+//
 // This number is a guard, not bookkeeping: it is what makes a table added
 // without review visible. Raise it only alongside the list above, so the
 // arithmetic can be checked rather than taken on trust.
-check("the shared barrel derives 81 base tables", BARREL.length === 81, `${BARREL.length}`);
+check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 check("the committed migrations derive 30 domain tables", DOMAIN.length === 30, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 111 public tables", // 30 domain + 81 barrel
-  APPLICATION.length === 111,
+  "the application owns exactly 112 public tables", // 30 domain + 82 barrel
+  APPLICATION.length === 112,
   `${APPLICATION.length}`,
 );
 check(

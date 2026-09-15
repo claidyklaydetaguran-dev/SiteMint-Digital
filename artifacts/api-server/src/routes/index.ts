@@ -6,6 +6,7 @@ import adminRouter from "./admin";
 import contactRouter from "./contact";
 import crmRouter from "./crm";
 import crmContactsRouter from "./crmContacts";
+import crmLeadAssignmentRouter from "./crmLeadAssignment";
 import crmProjectsRouter from "./crmProjects";
 import crmDiscoveryRouter from "./crmDiscovery";
 import crmStaffRouter from "./crmStaff";
@@ -93,6 +94,9 @@ router.use(crmAutomationRouter);
 // `/crm/contacts/export.csv` registered after it would be resolved as one of
 // those routes' `:id` and answered 400 instead of reaching its own handler.
 router.use(crmContactsRouter);
+// Before crmRouter for the same reason: /crm/lead-assignment/* is a literal
+// prefix and must reach its own handlers, not a parameterised /crm/:something.
+router.use(crmLeadAssignmentRouter);
 router.use(crmRouter);
 router.use(crmProjectsRouter);
 router.use(crmDiscoveryRouter);

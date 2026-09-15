@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { CrmLayout } from "./CrmLayout";
 import { Building2, ArrowUpDown, ArrowUp, ArrowDown, Users, Zap } from "lucide-react";
-import { adminFetch } from "@/lib/adminFetch";
+import { adminFetch, adminGet, AdminApiError, describeRefusal, type RefusalCopy } from "@/lib/adminFetch";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -67,6 +67,10 @@ export default function CrmReceptionistAccounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
+  // A 401/403 is not a failure to load; it is an answer about who is asking.
+  // Kept apart from `error` so the page can name the permission that is
+  // missing instead of "Failed to load accounts: Error: HTTP 403".
+  const [refusal,  setRefusal]  = useState<RefusalCopy | null>(null);
   const [sortKey,  setSortKey]  = useState<SortKey>("createdAt");
   const [sortDir,  setSortDir]  = useState<SortDir>("desc");
 
@@ -74,13 +78,14 @@ export default function CrmReceptionistAccounts() {
   const [signupJobs, setSignupJobs] = useState<SignupJobsResponse | null>(null);
 
   useEffect(() => {
-    adminFetch("/api/admin/receptionist-accounts")
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ accounts: Account[] }>;
+    adminGet<{ accounts?: Account[] }>("/api/admin/receptionist-accounts")
+      .then((d) => setAccounts(d?.accounts ?? []))
+      .catch((e: unknown) => {
+        const refused = describeRefusal(e);
+        if (refused) setRefusal(refused);
+        else if (e instanceof AdminApiError) setError(e.message);
+        else setError("Could not reach the server. Check your connection and try again.");
       })
-      .then((d) => setAccounts(d.accounts))
-      .catch((e: unknown) => setError(String(e)))
       .finally(() => setLoading(false));
 
     adminFetch("/api/crm/receptionist-signup-jobs")
@@ -167,8 +172,9 @@ export default function CrmReceptionistAccounts() {
           </div>
         </div>
 
-        {/* Summary tiles */}
-        {!loading && (
+        {/* Summary tiles — not beside a refusal or a failure, where "0 signups"
+            would be a false statement rather than a count. */}
+        {!loading && !error && !refusal && (
           <div style={{ display: "flex", gap: 12 }}>
             {[
               { label: "Total signups", value: accounts.length, icon: Users, color: "var(--sm-teal-900)" },
@@ -225,6 +231,16 @@ export default function CrmReceptionistAccounts() {
           </div>
         )}
 
+        {refusal && (
+          <div role="status" style={{
+            background: "var(--sm-mist-100)", border: "1px solid color-mix(in oklab, var(--sm-teal-900) 12%, transparent)",
+            borderRadius: 10, padding: "16px 20px", fontSize: 13, minWidth: 0, overflowWrap: "anywhere",
+          }}>
+            <p style={{ margin: 0, fontWeight: 700, color: "var(--sm-teal-900)" }}>{refusal.title}</p>
+            <p style={{ margin: "4px 0 0", color: "var(--sm-slate-600)" }}>{refusal.detail}</p>
+          </div>
+        )}
+
         {error && (
           <div style={{
             background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.20)",
@@ -234,7 +250,7 @@ export default function CrmReceptionistAccounts() {
           </div>
         )}
 
-        {!loading && !error && accounts.length === 0 && (
+        {!loading && !error && !refusal && accounts.length === 0 && (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             color: "var(--sm-slate-600)",

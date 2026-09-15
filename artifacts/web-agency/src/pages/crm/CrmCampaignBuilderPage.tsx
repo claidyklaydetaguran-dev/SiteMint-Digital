@@ -13,6 +13,10 @@ import {
   inputClass, postJson,
   type AiAvailability, type Campaign, type Design, type MarketingSettings, type Segment,
 } from "@/components/crm/campaign/shared";
+import {
+  displayState, resultsLine, type StateFilter,
+} from "@/components/crm/campaign/campaignListState";
+import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
 
 // ── M5: Marketing ────────────────────────────────────────────────────────────
 //
@@ -46,60 +50,9 @@ import {
 //   the list as equals.
 
 type Tab = "campaigns" | "templates" | "audiences" | "settings";
-type StateFilter = "all" | "draft" | "scheduled" | "sending" | "completed" | "attention" | "cancelled";
-
-interface DisplayState {
-  key: Exclude<StateFilter, "all">;
-  label: string;
-  className: string;
-  /** Shown under the name when something is not as it looks. */
-  note: string | null;
-}
-
-/**
- * What state a campaign is really in, from the operator's point of view.
- *
- * The stored status is not enough on its own. "Scheduled" is a promise, and on
- * a server where nothing starts a scheduled send it is a promise nobody will
- * keep — so it is reported as needing attention, with the reason, rather than
- * as a quiet success.
- */
-export function displayState(c: Campaign, autosend: boolean): DisplayState {
-  const failed = c.counts?.["failed"] ?? 0;
-  const attention = "bg-amber-50 text-amber-900 border border-amber-300";
-
-  if (c.status === "paused") {
-    return { key: "attention", label: "Needs attention", className: attention, note: "Paused part-way through a send." };
-  }
-  if (c.status === "scheduled" && !autosend) {
-    return {
-      key: "attention", label: "Needs attention", className: attention,
-      note: `Scheduled for ${formatWhen(c.scheduledAt, c.scheduledTimezone)}, but nothing on this server will start it — somebody has to press Send.`,
-    };
-  }
-  if (failed > 0 && (c.status === "sent" || c.status === "cancelled")) {
-    return {
-      key: "attention", label: "Needs attention", className: attention,
-      note: `${failed} ${failed === 1 ? "message was" : "messages were"} refused by the mail provider.`,
-    };
-  }
-  if (c.status === "scheduled") {
-    return {
-      key: "scheduled", label: "Scheduled", className: "bg-teal-50 text-teal-900 border border-teal-200",
-      note: `Starts on its own at ${formatWhen(c.scheduledAt, c.scheduledTimezone)}.`,
-    };
-  }
-  if (c.status === "sending") {
-    return { key: "sending", label: "Sending", className: "bg-teal-700 text-white", note: null };
-  }
-  if (c.status === "sent") {
-    return { key: "completed", label: "Completed", className: "bg-emerald-50 text-emerald-900 border border-emerald-200", note: null };
-  }
-  if (c.status === "cancelled") {
-    return { key: "cancelled", label: "Cancelled", className: "bg-muted text-muted-foreground border border-border", note: null };
-  }
-  return { key: "draft", label: "Draft", className: "bg-muted text-muted-foreground border border-border", note: null };
-}
+// What a campaign's state and results line say on the list — "Needs attention"
+// for a schedule nothing will start, "not confirmed" rather than "refused" —
+// lives in campaignListState.ts, where it is tested.
 
 const FILTERS: { id: StateFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -331,7 +284,7 @@ export default function CrmCampaignBuilderPage() {
               <Mail className="w-5 h-5 text-teal-700" /> Marketing
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              One email, sent once, to a list of people.
+              {MESSAGING_CONCEPTS.campaign.summary}
             </p>
           </div>
           <button type="button" className={btnPrimary} disabled={creating} onClick={() => void createCampaign()}>
@@ -346,8 +299,8 @@ export default function CrmCampaignBuilderPage() {
             <Workflow className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
             <span>
               <strong className="font-semibold">Looking for multi-step follow-up?</strong>{" "}
-              A <em>sequence</em> is the other thing — several messages over days, with contacts
-              enrolled into it. It lives in its own screens and is not affected by anything here.
+              That is a <em>sequence</em>, not a campaign. {MESSAGING_CONCEPTS.sequence.summary}{" "}
+              Sequences live in their own screens, and nothing here changes them.
             </span>
           </p>
           <div className="flex flex-wrap gap-2 mt-2 pl-6">
@@ -355,7 +308,7 @@ export default function CrmCampaignBuilderPage() {
               Open sequences <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
             <button type="button" className={btnQuiet} onClick={() => navigate("/admin/crm/campaign-queue")}>
-              Sequence message queue <ArrowUpRight className="w-3.5 h-3.5" />
+              {MESSAGING_CONCEPTS.queue.name} <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -451,9 +404,6 @@ export default function CrmCampaignBuilderPage() {
               <ul className="space-y-2">
                 {visible.map((c) => {
                   const state = displayState(c, autosend);
-                  const sent = c.counts?.["sent"] ?? 0;
-                  const failedCount = c.counts?.["failed"] ?? 0;
-                  const excluded = c.counts?.["excluded"] ?? 0;
                   const editable = c.status === "draft" || c.status === "scheduled";
                   return (
                     <li key={c.id} className={`${cardClass} p-3.5`}>
@@ -487,11 +437,7 @@ export default function CrmCampaignBuilderPage() {
                             </div>
                             <div>
                               <dt className="sr-only">Results</dt>
-                              <dd>
-                                {c.status === "draft" || c.status === "scheduled"
-                                  ? "Not sent yet"
-                                  : `${sent} delivered${failedCount ? `, ${failedCount} failed` : ""}${excluded ? `, ${excluded} left out` : ""}`}
-                              </dd>
+                              <dd>{resultsLine(c)}</dd>
                             </div>
                             <div>
                               <dt className="sr-only">Last edited</dt>

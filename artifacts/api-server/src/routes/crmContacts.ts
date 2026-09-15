@@ -21,11 +21,14 @@ import {
   CRM_STATUSES, CRM_PRIORITIES, CRM_SOURCES,
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
+import { canMapLeadOwners, loadOwnerCandidates } from "../lib/leadAssignee.js";
+import { explainOwnerMatch, matchOwner, ownerKey, toOwnerPerson, trimOwnerValue } from "../lib/leadOwnerRules.js";
 import {
   MAX_CSV_BYTES, MAX_CSV_ROWS, TARGET_FIELDS, DEFAULT_PLAN_OPTIONS,
   buildPlan, hashPlan, normaliseEmail, normalisePhoneKey, parseCsv,
   suggestMapping, unmappedHeaders, validateMapping,
-  type ExistingContact, type Mapping, type Plan, type PlanOptions, type PlannedRow,
+  type ExistingContact, type Mapping, type OwnerResolver, type Plan, type PlanOptions,
+  type PlanOwnerResolution, type PlannedRow,
 } from "../lib/contactImport.js";
 import {
   MERGEABLE_FIELDS, REPOINTS, canonicalPair, findDuplicateCandidates,
@@ -202,7 +205,38 @@ async function planFromRequest(req: Request, res: Response): Promise<Plan | null
 
   const options = readOptions(body.options);
   const { byEmail, byPhone } = await loadExisting(rows, mapping);
-  return buildPlan({ rows, mapping, options, existingByEmail: byEmail, existingByPhone: byPhone });
+  const resolveOwner = await ownerResolver();
+  return buildPlan({ rows, mapping, options, existingByEmail: byEmail, existingByPhone: byPhone, resolveOwner });
+}
+
+/**
+ * M6: the file's owner names, resolved through exactly the rules every other
+ * write uses (lib/leadOwnerRules.ts). The staff table is read once per request
+ * and each distinct name is decided once, so a 5,000-row file asks one
+ * question, not 5,000 — and an unresolved name is reported, never guessed.
+ */
+async function ownerResolver(): Promise<OwnerResolver> {
+  const staff = await loadOwnerCandidates();
+  const decided = new Map<string, PlanOwnerResolution>();
+  return (raw: string) => {
+    const key = ownerKey(raw);
+    const known = decided.get(key);
+    if (known) return known;
+    const match = matchOwner(key, staff);
+    const who = match.outcome === "matched" ? staff.find((s) => s.id === match.staffId) : undefined;
+    const resolution: PlanOwnerResolution = {
+      key,
+      value: trimOwnerValue(raw),
+      outcome: match.outcome,
+      staffId: match.outcome === "matched" ? match.staffId : null,
+      staffName: who?.displayName ?? null,
+      rule: match.outcome === "none" ? null : match.rule,
+      candidates: match.outcome === "ambiguous" ? match.candidates : who ? [toOwnerPerson(who)] : [],
+      explanation: explainOwnerMatch(raw, match, staff),
+    };
+    decided.set(key, resolution);
+    return resolution;
+  };
 }
 
 /**
@@ -225,6 +259,11 @@ router.post("/crm/contacts/import/preview", requireCrmAuth("leads.write"), async
       options: plan.options,
       totals: plan.totals,
       rows: plan.rows,
+      // M6: every owner name the import would write and what the matching
+      // rules decided about it — so an unresolved name is seen before commit
+      // and can be mapped by somebody allowed to, instead of being guessed.
+      owners: plan.owners,
+      canMapOwners: canMapLeadOwners(req),
       planHash: plan.hash,
       note: "Nothing has been written. Send this planHash back to /import/commit to apply exactly this plan.",
     });
@@ -340,6 +379,10 @@ async function applyCreate(req: Request, row: PlannedRow): Promise<number> {
     status: typeof v["status"] === "string" ? v["status"] : "New Inquiry",
     priority: typeof v["priority"] === "string" ? v["priority"] : "Medium",
     assignedTo: typeof v["assignedTo"] === "string" ? v["assignedTo"] : undefined,
+    // M6: the id the PLAN resolved, not a fresh lookup. The plan hash covers it,
+    // so if who the name resolves to changed after the preview, the commit was
+    // already refused with the new plan.
+    assignedToStaffId: typeof v["assignedToStaffId"] === "number" ? v["assignedToStaffId"] : undefined,
     tags: Array.isArray(v["tags"]) ? (v["tags"] as unknown[]).map(String) : [],
     notes: notesForCreate(row),
     estimatedValue: typeof v["estimatedValue"] === "number" ? String(v["estimatedValue"]) : undefined,
@@ -367,6 +410,17 @@ async function applyUpdate(req: Request, row: PlannedRow): Promise<void> {
     if (field === "nextFollowUpAt") { updates["nextFollowUpAt"] = new Date(String(change.to)); continue; }
     if (field === "estimatedValue") { updates["estimatedValue"] = String(change.to); continue; }
     updates[field] = change.to;
+  }
+
+  // M6: a CSV may rewrite the owner NAME on an existing contact. The staff
+  // reference moves with it — an id left pointing at the previous owner would
+  // attribute the contact to somebody who was never given it. The id is the one
+  // the PLAN resolved (and hashed) through the rules every write uses; a name
+  // that matched nobody, or more than one person, writes NULL and appears under
+  // Admin → Unmapped lead owners.
+  if (row.changes["assignedTo"]) {
+    const planned = row.values["assignedToStaffId"];
+    updates["assignedToStaffId"] = typeof planned === "number" ? planned : null;
   }
 
   if (row.changes["notes"]) {
@@ -649,6 +703,14 @@ router.post("/crm/contacts/duplicates/merge", requireCrmAuth("leads.write"), asy
       actorLabel: actorLabel(req), when,
     });
     const updates: Record<string, unknown> = { ...resolution.updates, updatedAt: when };
+    // M6: a merge can hand the survivor the duplicate's owner NAME. The two
+    // owner columns move together or not at all, so the duplicate's staff
+    // reference comes with it. Carried, not re-resolved: the duplicate's id may
+    // record a person's decision about an ambiguous name, which the rules alone
+    // would drop.
+    if ("assignedTo" in resolution.updates) {
+      updates["assignedToStaffId"] = duplicate.assignedToStaffId ?? null;
+    }
     updates["notes"] = primary.notes ? `${primary.notes}\n\n${noteBlock}` : noteBlock;
     await db.update(crmLeads).set(updates).where(eq(crmLeads.id, primaryId));
 

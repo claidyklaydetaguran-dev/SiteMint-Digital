@@ -150,11 +150,19 @@ router.get("/crm/my-day", requireCrmAuth(), async (req: Request, res: Response) 
     lt(crmLeads.nextFollowUpAt, end),
     sql`${crmLeads.nextFollowUpAt} IS NOT NULL`,
   ];
+  // M6: the owner is read from the staff reference, so a rename shows here and
+  // a name nobody has matched to a person is not dressed up as one.
+  // `assignedTo` is still returned — it is what was recorded, and the screen
+  // shows it, marked as unmatched, when no person is resolved.
   const followUps = await db.select({
     id: crmLeads.id, name: crmLeads.name, company: crmLeads.company,
     status: crmLeads.status, nextFollowUpAt: crmLeads.nextFollowUpAt,
     assignedTo: crmLeads.assignedTo,
-  }).from(crmLeads).where(and(...followUpWhere)).orderBy(asc(crmLeads.nextFollowUpAt)).limit(50);
+    assignedToStaffId: crmLeads.assignedToStaffId,
+    ownerName: crmStaff.displayName,
+  }).from(crmLeads)
+    .leftJoin(crmStaff, eq(crmStaff.id, crmLeads.assignedToStaffId))
+    .where(and(...followUpWhere)).orderBy(asc(crmLeads.nextFollowUpAt)).limit(50);
   buckets.followUps = followUps;
 
   res.json({

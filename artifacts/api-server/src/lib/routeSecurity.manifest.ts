@@ -228,6 +228,10 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/marketing/campaigns/:id/pause": "admin",
   "POST /api/crm/marketing/campaigns/:id/resume": "admin",
   "POST /api/crm/marketing/campaigns/:id/cancel": "admin",
+  // `retry` re-attempts, once each, only recipients the mail provider refused or
+  // did not take — never one whose outcome is unknown — under the original
+  // idempotency key. It puts mail in customers' inboxes, so campaigns.send.
+  "POST /api/crm/marketing/campaigns/:id/retry": "admin",
   "POST /api/crm/marketing/campaigns/:id/ai-draft": "admin",
   "POST /api/crm/marketing/campaigns/:id/ai-draft/approve": "admin",
   "POST /api/crm/marketing/unsubscribe": "admin",
@@ -332,6 +336,19 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "PATCH /api/crm/staff/:id": "staff",
   "POST /api/crm/staff/:id/password-reset": "staff",
 
+  // ── M6: lead owners resolved to staff (routes/crmLeadAssignment.ts) ───────
+  // "staff", not "admin": the route is requireStaff("staff.read") — the gate
+  // PATCH /crm/staff/:id uses, because it appends the mapped name to a staff
+  // record's legacy_names — and asserts leads.write in the handler for the
+  // other half of what it does, a bulk update of contacts. The legacy shared
+  // bearer is refused on purpose: every decision is recorded against the
+  // person who made it (crm_lead_owner_mappings.decided_by_staff_id, and the
+  // audit log).
+  //
+  // Not listed, because this contract covers mutating routes only:
+  // `GET /api/crm/lead-assignment/unresolved` is a leads.read read.
+  "POST /api/crm/lead-assignment/map": "staff",
+
   // ── M6: contact import and duplicate review (routes/crmContacts.ts) ───────
   // All behind requireCrmAuth with a named permission.
   //
@@ -397,6 +414,10 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/admin/submissions/:id/sow": "admin",
   "POST /api/admin/voice/invites": "admin",
   "PATCH /api/admin/voice/beta-requests/:id": "admin",
+  // Receptionist Ops (adminVoiceIssues.ts): requireCrmAuth("settings.write") —
+  // the grant for acknowledging any operational failure — behind the
+  // admin_session-cookie fallback this route already accepted, which a live
+  // staff session never reaches. "admin" while the legacy bearer stands.
   "POST /api/admin/voice/issues/:id/resolve": "admin",
   "POST /api/ai-toolkit/checkout": "feature-flag",
   "POST /api/contact/submit": "feature-flag",
@@ -488,6 +509,11 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/voice/sms/inbound": "signature",
   "POST /api/voice/sms/status": "signature",
   "POST /api/voice/webhooks/vapi": "signature",
+  // Receptionist Ops (adminVoiceDiagnostics.ts): requireCrmAuth("billing.manage").
+  // It sets a firm's plan, subscription state and the firm↔Stripe mapping that
+  // billing events attach by, so it is OWNER_ONLY — no per-person grant can hand
+  // it to anyone else. Bearer-only before; the admin_session cookie still does
+  // not reach it. "admin" while the legacy bearer stands.
   "PUT /api/admin/voice/firms/:id/subscription": "admin",
   "PUT /api/crm/email-templates/:id": "admin",
   "PUT /api/receptionist/availability/config": "session",

@@ -6,6 +6,7 @@ import {
   Settings, TestTube, ChevronRight, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { UnmappedOwnersPanel } from "@/components/crm/UnmappedOwnersPanel";
 
 // Honest admin hub (2026-09-11): every card links to a screen that actually
 // exists. Capabilities that are not built yet are listed as plain text in the
@@ -109,6 +110,9 @@ export default function CrmAdminSettings() {
               {HUB_CARDS.map(c => <AdminCard key={c.title} {...c} />)}
             </div>
           </div>
+
+          {/* M6: owner names on contacts that do not yet belong to a person */}
+          <UnmappedOwnersPanel />
 
           {/* Quick settings link */}
           <div className="border border-border rounded-xl p-4 bg-white flex items-center justify-between">

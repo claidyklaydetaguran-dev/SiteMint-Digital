@@ -109,10 +109,13 @@ const WORKER_ID = `${process.pid}-automation-events-${Math.random().toString(36)
 // The zone of the staff member who OWNS the record:
 //
 //   task_overdue          the task's assignee (`crm_tasks.assigned_to_staff_id`)
-//   no_activity_for_days  the contact's owner (`crm_leads.assigned_to`, which
-//                         is the staff member's display name — that is how the
-//                         CRM links the two today, including when an automation
-//                         assigns one)
+//   no_activity_for_days  the contact's owner (`crm_leads.assigned_to_staff_id`,
+//                         M6). Never the free-text `assigned_to`: a name looked
+//                         up at read time picks a zone for whichever of two
+//                         same-named people the map happened to keep, and
+//                         changes answer when somebody is renamed. A contact
+//                         whose owner is not resolved to a person gets the
+//                         fallback zone, like an unassigned one.
 //
 // and `UTC` when there is no owner, the account is gone or inactive, or the
 // zone string is not one `Intl` recognises.
@@ -213,22 +216,21 @@ export function isOverdueInZone(
   return localCalendarDay(zone, dueAt) < localCalendarDay(zone, now);
 }
 
-/** Active staff timezones, by id and by display name. */
-async function staffZones(): Promise<{ byId: Map<number, string>; byName: Map<string, string> }> {
+/**
+ * Active staff timezones, by id. An owner is named only by id now — M6 retired
+ * the display-name lookup a contact's free-text owner used to need.
+ */
+async function staffZones(): Promise<{ byId: Map<number, string> }> {
   const rows = await db.select({
-    id: crmStaff.id, displayName: crmStaff.displayName,
-    timezone: crmStaff.timezone, status: crmStaff.status,
+    id: crmStaff.id, timezone: crmStaff.timezone, status: crmStaff.status,
   }).from(crmStaff);
 
   const byId = new Map<number, string>();
-  const byName = new Map<string, string>();
   for (const row of rows) {
     if (row.status !== "active") continue;
-    const zone = row.timezone || AUTOMATION_FALLBACK_TIMEZONE;
-    byId.set(row.id, zone);
-    if (row.displayName) byName.set(row.displayName.trim().toLowerCase(), zone);
+    byId.set(row.id, row.timezone || AUTOMATION_FALLBACK_TIMEZONE);
   }
-  return { byId, byName };
+  return { byId };
 }
 
 // ── What counts as activity on a contact ────────────────────────────────────
@@ -824,9 +826,9 @@ async function sweepNoActivity(now: Date): Promise<number> {
   if (lastActivity.size === 0) return 0;
 
   const leadRows = await db.select({
-    id: crmLeads.id, assignedTo: crmLeads.assignedTo,
+    id: crmLeads.id, ownerStaffId: crmLeads.assignedToStaffId,
   }).from(crmLeads).where(inArray(crmLeads.id, [...lastActivity.keys()]));
-  const { byName } = await staffZones();
+  const { byId } = await staffZones();
 
   const today = new Map<string, string>();
   const dayIn = (zone: string) => {
@@ -843,7 +845,7 @@ async function sweepNoActivity(now: Date): Promise<number> {
     const last = lastActivity.get(lead.id);
     if (!last) continue;
 
-    const zone = (lead.assignedTo ? byName.get(lead.assignedTo.trim().toLowerCase()) : undefined)
+    const zone = (lead.ownerStaffId != null ? byId.get(lead.ownerStaffId) : undefined)
       ?? AUTOMATION_FALLBACK_TIMEZONE;
     const silentDays = calendarDaysBetween(localCalendarDay(zone, last), dayIn(zone));
 

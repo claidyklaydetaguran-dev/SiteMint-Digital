@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { CrmLayout } from "@/pages/crm/CrmLayout";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { adminGet, adminPost, isDenied, isNotProvided, AdminApiError } from "@/lib/adminFetch";
+import { adminGet, adminPost, isDenied, isNotProvided, AdminApiError, describeRefusal } from "@/lib/adminFetch";
 import { OpsSpinner, OpsEmpty, OpsError, OpsDenied, OpsNotProvided, levelBadge, formatDate } from "./opsShared";
 
 // GET /api/admin/voice/issues — a NEW route. Fields optional/nullable.
@@ -28,9 +28,13 @@ export default function CrmOpsIssues() {
   const [issues, setIssues] = useState<OpsIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [denied, setDenied] = useState(false);
+  // The refusal itself, so the page can name the permission that is missing.
+  const [denied, setDenied] = useState<AdminApiError | null>(null);
   const [notProvided, setNotProvided] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  // Why the last Resolve did not happen. A button that silently does nothing
+  // reads as broken, and a missing permission is not something a retry fixes.
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // ?firmId= client-side pre-filter, e.g. arriving from the firm detail page's
   // "Open issues" link.
@@ -42,7 +46,7 @@ export default function CrmOpsIssues() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setDenied(false);
+    setDenied(null);
     setNotProvided(false);
     try {
       const data = await adminGet<IssuesResponse>("/api/admin/voice/issues");
@@ -51,7 +55,7 @@ export default function CrmOpsIssues() {
       if (isNotProvided(err)) {
         setNotProvided(true);
       } else if (isDenied(err)) {
-        setDenied(true);
+        setDenied(err as AdminApiError);
       } else if (err instanceof AdminApiError) {
         setError(err.message);
       } else {
@@ -70,14 +74,24 @@ export default function CrmOpsIssues() {
 
   const resolveIssue = async (id: number | string) => {
     setResolvingId(String(id));
+    setActionNotice(null);
     try {
       await adminPost(`/api/admin/voice/issues/${id}/resolve`);
       setIssues((prev) =>
         prev.map((i) => (String(i.id) === String(id) ? { ...i, resolvedAt: new Date().toISOString() } : i)),
       );
-    } catch {
-      // Leave the row as-is on failure; the Resolve button stays visible so
-      // staff can retry.
+    } catch (err) {
+      // Leave the row as-is so staff can retry, but say why it did not
+      // resolve: somebody without settings.write otherwise just watches the
+      // button come back.
+      const refusal = describeRefusal(err);
+      if (refusal) {
+        setActionNotice(`Couldn't resolve that issue. ${refusal.title} ${refusal.detail}`);
+      } else if (err instanceof AdminApiError) {
+        setActionNotice(`Couldn't resolve that issue: ${err.message}`);
+      } else {
+        setActionNotice("Couldn't resolve that issue — the server could not be reached. Try again.");
+      }
     } finally {
       setResolvingId(null);
     }
@@ -116,8 +130,20 @@ export default function CrmOpsIssues() {
           </div>
         )}
 
+        {actionNotice && (
+          <div role="alert" className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 flex items-start justify-between gap-3 min-w-0">
+            <span className="min-w-0 break-words">{actionNotice}</span>
+            <button
+              onClick={() => setActionNotice(null)}
+              className="shrink-0 text-xs font-medium text-amber-800 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {loading && <OpsSpinner />}
-        {!loading && denied && <OpsDenied />}
+        {!loading && denied && <OpsDenied error={denied} />}
         {!loading && !denied && notProvided && <OpsNotProvided thing="issues" />}
         {!loading && !denied && !notProvided && error && (
           <OpsError message={error} onRetry={() => void load()} />

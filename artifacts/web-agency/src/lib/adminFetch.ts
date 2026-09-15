@@ -77,6 +77,59 @@ export function isDenied(err: unknown): boolean {
   return err instanceof AdminApiError && (err.status === 401 || err.status === 403);
 }
 
+/**
+ * The permission a 403 names, or null.
+ *
+ * The CRM gate answers a signed-in person who lacks a grant with
+ * `{ error, permission }`. A 403 without that field is a different refusal —
+ * in this CRM usually the CSRF check — and must not be presented as a missing
+ * permission.
+ */
+export function missingPermission(err: unknown): string | null {
+  if (!(err instanceof AdminApiError) || err.status !== 403) return null;
+  const body = err.body;
+  if (!body || typeof body !== "object") return null;
+  const permission = (body as { permission?: unknown }).permission;
+  return typeof permission === "string" && permission.length > 0 ? permission : null;
+}
+
+/** Plain-language copy for a refusal. */
+export interface RefusalCopy {
+  title: string;
+  detail: string;
+  /** The grant the server named, when it named one. */
+  permission: string | null;
+}
+
+/**
+ * Words for a 401/403, or null when the error is not a refusal.
+ *
+ * Several different answers share those two codes and need different words: a
+ * person missing a named grant, a request the server could not verify, an
+ * unfinished multi-factor step, and a session that has ended. "You don't have
+ * access" for all of them sends people to ask an owner for a permission they
+ * may already hold.
+ */
+export function describeRefusal(err: unknown): RefusalCopy | null {
+  if (!(err instanceof AdminApiError) || (err.status !== 401 && err.status !== 403)) return null;
+  const permission = missingPermission(err);
+  if (permission) {
+    return {
+      title: "Your account doesn't have permission for this.",
+      detail: `It needs the ${permission} permission — ask an owner if you need it.`,
+      permission,
+    };
+  }
+  if (err.status === 401) {
+    const body = err.body;
+    const mfa = !!body && typeof body === "object" && (body as { mfaRequired?: unknown }).mfaRequired === true;
+    return mfa
+      ? { title: "Multi-factor verification is required.", detail: "Sign in again and complete the verification step.", permission: null }
+      : { title: "Your session has ended.", detail: "Sign in again to continue.", permission: null };
+  }
+  return { title: "This request was refused.", detail: err.message, permission: null };
+}
+
 // ── Token storage ─────────────────────────────────────────────────────────────
 
 function storage(): Storage | null {
@@ -138,8 +191,13 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  *
  * Two groups, and neither is this workstream's to change:
  *
- *  - Receptionist-owned admin routes (`/api/admin/receptionist-accounts`,
- *    `/api/admin/voice/*`), which still accept only the legacy shared bearer.
+ *  - Receptionist-owned admin routes that still accept only the shared admin
+ *    credential: the invite and beta-request queues under `/api/admin/voice/`
+ *    (lib/admin-session.ts's own `requireAdmin`). The Receptionist Ops
+ *    console's routes — `/api/admin/receptionist-accounts` and
+ *    `/api/admin/voice/{firms,issues,usage,numbers}` — accept staff sessions
+ *    now, so a 401 from them means the session really ended, and they are no
+ *    longer listed.
  *  - CLAUDE.md-protected files: `routes/phone.ts` serves the CRM's SMS and
  *    call reads (`/crm/conversations`, `/crm/phone/*`, a lead's messages and
  *    send paths) and `routes/intakeAgent.ts` serves `/api/intake/*`. Both keep
@@ -154,8 +212,7 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  * files need an owner-named authorization first; see docs/crm-ops/.
  */
 const TRANSITIONAL_FOREIGN_AUTH: RegExp[] = [
-  /^\/api\/admin\/receptionist-accounts/,
-  /^\/api\/admin\/voice\//,
+  /^\/api\/admin\/voice\/(invites|beta-requests)(\/|\?|$)/,
   /^\/api\/crm\/conversations/,
   /^\/api\/crm\/phone\//,
   /^\/api\/crm\/leads\/\d+\/(messages|sms|call|sms-consent)/,

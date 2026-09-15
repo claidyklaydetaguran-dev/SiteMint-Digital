@@ -103,12 +103,46 @@ export interface Preflight {
   delivery: { configured: boolean; note: string };
 }
 
+/** `failed` rows split by what actually happened to the message. */
+export interface FailureBucket {
+  outcome: string;
+  label: string;
+  count: number;
+  /** "no" — nothing arrived. "unknown" — it may have. Never "yes". */
+  arrived: "no" | "unknown";
+  /** Whether "Try again" may include these. Never true for an unknown outcome. */
+  retryable?: boolean;
+  contacts: { id: number; leadId: number; name: string; address?: string | null; lastError?: string | null }[];
+}
+
 export interface Results {
   counts: { audience: number; sent: number; failed: number; excluded: number; neverAttempted: number; testSends: number };
   excludedByReason: ExclusionBucket[];
+  failedByOutcome?: FailureBucket[];
   recipients: { id: number; leadId: number; name: string; address: string | null; status: string; lastError?: string | null; sentAt?: string | null }[];
-  engagement: { tracked: boolean; why: string };
-  deliverySignal: { meaning: string; providerIdsRecorded: number };
+  /**
+   * Typed with the nulls the server actually sends, so nothing can read
+   * `opens` as a number and render a zero we have no evidence for.
+   */
+  engagement: {
+    tracked: boolean;
+    opens: number | null;
+    clicks: number | null;
+    openRate: number | null;
+    clickRate: number | null;
+    /** The short reason they are absent, when they are. */
+    unavailableReason?: string | null;
+    why: string;
+  };
+  deliverySignal: {
+    meaning: string;
+    providerIdsRecorded: number;
+    unconfirmed?: number;
+    notDelivered?: number;
+    /** How many "Try again" would reach — not delivered, and never an unknown outcome. */
+    retryable?: number;
+    unconfirmedNote?: string | null;
+  };
   definitions: Record<string, string>;
 }
 
@@ -167,8 +201,29 @@ export interface ApiResult<T> {
   data: T & Record<string, any>;
 }
 
+/**
+ * A request that answers instead of throwing.
+ *
+ * `adminFetch` deliberately RE-THROWS a rejected fetch, so that a dropped
+ * connection cannot be mistaken for a server response. Every caller in this
+ * directory awaits `call` inside an autosave, a send loop or a preview — none
+ * of them wrapped in a try/catch — so a thrown rejection left the workspace
+ * stuck on "Saving…" for ever: no error, no Try again, and an operator with no
+ * reason to think their work had not been stored.
+ *
+ * Status 0 is the shape the rest of this module already expects for it;
+ * `failureText` has worded it since before anything could produce it.
+ *
+ * This is NOT a retry and NOT a queue. The request did not happen, the caller
+ * is told so, and a person decides what to do — the online-first rule.
+ */
 export async function call<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
-  const res = await adminFetch(path, init);
+  let res: Response;
+  try {
+    res = await adminFetch(path, init);
+  } catch {
+    return { ok: false, status: 0, data: {} as T & Record<string, any> };
+  }
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data: data as T & Record<string, any> };
 }
@@ -179,6 +234,22 @@ export const postJson = (body: unknown): RequestInit => ({
 export const patchJson = (body: unknown): RequestInit => ({
   method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
+
+/**
+ * What the save indicator may claim once a save has come back successful.
+ *
+ * A save takes the draft as it was when the timer fired. If the operator kept
+ * typing while it was in flight, the server now holds a version that is behind
+ * the editor — so "Saved" would be untrue, and it is also terminal: the autosave
+ * only re-arms from `pending`, so those keystrokes would sit unsaved behind a
+ * tick until something else happened to touch the draft, and be gone if the tab
+ * closed first.
+ *
+ * Identity comparison is exact here: every edit replaces the draft object.
+ */
+export function stateAfterSave<T>(sent: T, current: T): "saved" | "pending" {
+  return sent === current ? "saved" : "pending";
+}
 
 /** The message an operator should see when a request fails. */
 export function failureText(r: ApiResult<unknown>, fallback: string): string {

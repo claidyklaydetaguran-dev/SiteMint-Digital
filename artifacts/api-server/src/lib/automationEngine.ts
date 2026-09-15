@@ -66,6 +66,7 @@ import {
   type CrmAutomationTriggerEvent, type CrmAutomationChain,
   type CrmScheduledJob,
 } from "@workspace/db";
+import { resolveOwnerStaffId } from "./leadAssignee.js";
 
 /** The `crm_scheduled_jobs.kind` every automation execution rides on. */
 export const AUTOMATION_JOB_KIND = "crm_automation";
@@ -934,7 +935,11 @@ const assignOwner: AutomationActionExecutor = async (ctx) => {
 
   return writeOrUnknown("The assignment", async () => {
     if (ctx.recordType === "lead") {
-      await db.update(crmLeads).set({ assignedTo: staff.displayName, updatedAt: ctx.now })
+      // M6: both columns, always. This is the one place that already HAD the
+      // staff row in hand and still wrote only a name, so the id is free here
+      // and the contact never lands in the unmapped-owners panel.
+      await db.update(crmLeads)
+        .set({ assignedTo: staff.displayName, assignedToStaffId: staff.id, updatedAt: ctx.now })
         .where(eq(crmLeads.id, ctx.recordId));
     } else if (ctx.recordType === "deal") {
       await db.update(crmDeals).set({ ownerStaffId: staff.id, updatedAt: ctx.now })
@@ -1045,6 +1050,17 @@ const setField: AutomationActionExecutor = async (ctx) => {
   const written = await writeOrUnknown("The field change", async () => {
     const table = RECORD_TABLES[ctx.recordType];
     const patch: Record<string, unknown> = { [field]: value, updatedAt: ctx.now };
+    // M6: a rule may set a lead's `assignedTo` to any string it likes. The
+    // staff reference beside it must not survive that — an id left pointing at
+    // the PREVIOUS owner is worse than no id, because it attributes a contact
+    // to somebody who was never given it. It is re-resolved through the same
+    // mapping rules the pickers use; no match leaves NULL, and the value shows
+    // up in the unmapped-owners panel rather than being guessed at.
+    if (ctx.recordType === "lead" && field === "assignedTo") {
+      patch["assignedToStaffId"] = await resolveOwnerStaffId(
+        typeof value === "string" ? value : null,
+      );
+    }
     await db.update(table).set(patch as never).where(eq(table.id, ctx.recordId));
     return {
       result: "succeeded",

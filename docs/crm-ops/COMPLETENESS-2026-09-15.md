@@ -1,5 +1,13 @@
 # Verified completeness — 2026-09-15
 
+> **Superseded by `COMPLETENESS.md`**, which is generated from
+> `completeness/criteria.json` and `completeness/pages.json` so that every
+> total is computed from rows. This hand-tallied version is kept as history,
+> and its tallies do not add up: its Table 2 lists 47 routes where the router
+> registers 50 (`/admin/dashboard`, `/admin/submissions/:id` and
+> `/admin/activate` are missing), and its summary line claims 11 walked and 22
+> rendered pages where its own rows show 12 and 25.
+
 Supersedes `COMPLETENESS-2026-09-14.md`. Read the method before the numbers.
 
 ## Method

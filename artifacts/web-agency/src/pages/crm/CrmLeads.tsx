@@ -6,6 +6,8 @@ import { Search, Plus, RefreshCw, Download, FileDown, Users, Phone, MessageSquar
 import { scoreLeadFromFields } from "@/lib/leadScore";
 import { LEAD_STATUSES, PROJECT_TYPES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { ownerLabel, useCrmAssignees } from "@/lib/crmAssignees";
+import { OwnerPicker } from "@/components/crm/OwnerPicker";
 
 const STATUSES = [...LEAD_STATUSES];
 const SERVICE_TYPES = [...PROJECT_TYPES];
@@ -39,6 +41,8 @@ interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
   status: string; priority: string; source: string; serviceInterest?: string;
   assignedTo?: string; nextFollowUpAt?: string | null; lastContactedAt?: string | null;
+  /** M6: the staff reference the product reads; `assignedTo` is the name as recorded. */
+  assignedToStaffId?: number | null;
   createdAt: string; updatedAt: string; tags: string[];
   estimatedValue?: string | null;
   proposalStatus?: string;
@@ -48,13 +52,14 @@ interface Lead {
 interface NewLeadForm {
   name: string; email: string; company: string; phone: string; website: string;
   source: string; serviceInterest: string; status: string; priority: string;
-  assignedTo: string; notes: string;
+  /** M6: a staff id from the picker — the server records that person's name beside it. */
+  assignedToStaffId: number | null; notes: string;
 }
 
 const emptyForm: NewLeadForm = {
   name:"", email:"", company:"", phone:"", website:"",
   source:"Manual Entry", serviceInterest:"", status:"New Inquiry", priority:"Medium",
-  assignedTo:"", notes:"",
+  assignedToStaffId: null, notes:"",
 };
 
 const DAY = 86_400_000;
@@ -150,6 +155,9 @@ export default function CrmLeads() {
   const [activeList, setActiveList] = useState<SmartList>(STAGE_LISTS[0]);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<NewLeadForm>(emptyForm);
+  // M6: who a contact can be handed to — and whose name to show for a
+  // contact's staff reference in the list.
+  const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [importingDiscovery, setImportingDiscovery] = useState(false);
@@ -650,18 +658,27 @@ export default function CrmLeads() {
                         <td className="px-4 py-2.5">
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>{normalizeLeadStatus(lead.status)}</span>
                         </td>
-                        {/* Assigned */}
+                        {/* Assigned — M6: the staff reference decides; a recorded name that matches nobody is shown as exactly that */}
                         <td className="px-4 py-2.5">
-                          {lead.assignedTo ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-5 h-5 rounded-full ${avatarColor(lead.assignedTo)} flex items-center justify-center shrink-0`}>
-                                <span className="text-white text-[8px] font-bold">{initials(lead.assignedTo)}</span>
+                          {(() => {
+                            const owner = ownerLabel(lead, people.assignees);
+                            if (!owner.label) return <span className="text-xs text-muted-foreground/40">—</span>;
+                            return owner.resolved ? (
+                              <div className="flex items-center gap-1.5 min-w-0" title={owner.label}>
+                                <div className={`w-5 h-5 rounded-full ${avatarColor(owner.label)} flex items-center justify-center shrink-0`}>
+                                  <span className="text-white text-[8px] font-bold">{initials(owner.label)}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground truncate max-w-[70px]">{owner.label.split(" ")[0]}</span>
                               </div>
-                              <span className="text-xs text-muted-foreground truncate max-w-[70px]">{lead.assignedTo.split(" ")[0]}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground/40">—</span>
-                          )}
+                            ) : (
+                              <div className="flex items-center gap-1.5 min-w-0" title={`Recorded as “${owner.label}”, which does not match a person yet`}>
+                                <div className="w-5 h-5 rounded-full border border-dashed border-border flex items-center justify-center shrink-0">
+                                  <span className="text-muted-foreground text-[9px] font-bold">?</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground italic truncate max-w-[70px]">{owner.label.split(" ")[0]}</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         {/* Phone */}
                         <td className="px-4 py-2.5">
@@ -743,14 +760,17 @@ export default function CrmLeads() {
                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                    <option value="">Unassigned</option>
-                    <option>Claidy Taguran</option>
-                    <option>Shasta Greene</option>
-                    <option>Saisa Lorraigne</option>
-                  </select>
+                <div className="min-w-0">
+                  <label htmlFor="new-lead-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+                  <OwnerPicker
+                    id="new-lead-owner"
+                    value={form.assignedToStaffId}
+                    onChange={next => setForm(f => ({ ...f, assignedToStaffId: typeof next === "number" ? next : null }))}
+                    assignees={people.assignees}
+                    loading={people.loading}
+                    error={people.error}
+                    onRetry={people.reload}
+                  />
                 </div>
               </div>
               <div>

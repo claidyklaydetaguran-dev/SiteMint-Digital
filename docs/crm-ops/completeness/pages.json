@@ -1,0 +1,605 @@
+{
+  "asOf": "2026-09-15",
+  "pages": [
+    {
+      "route": "/admin",
+      "title": "Sign-in and first-run setup",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Rendered 2026-09-15 with zero console errors" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "M1 (2026-09-11): first-run bootstrap driven end to end in a browser; not repeated on the current build" },
+        "persist": { "status": "unverified", "env": [], "evidence": "A signed-in session surviving a reload is tested at the API (crmStaffAuth.test.ts), not recorded in a browser" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Wrong passwords refused and sign-in throttled in the database (crmStaffAuth.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "No 375px measurement recorded" }
+      }
+    },
+    {
+      "route": "/admin/activate",
+      "title": "Staff invitation and password-reset landing",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "The owner's own account was activated through this page on 2026-09-14" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Activation completed: account Active and mailbox verified" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "The activated account signs in afterwards and keeps a live session" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Invitations expire and are consumed atomically; a replayed token answers 404 (crmStaffAuth.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "No 375px measurement recorded" }
+      }
+    },
+    {
+      "route": "/admin/dashboard",
+      "title": "Legacy admin dashboard",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Never opened in a recorded sweep: the 2026-09-15 table listed 47 routes and missed this one" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/submissions/:id",
+      "title": "Legacy submission detail",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Never opened in a recorded sweep: missing from the 2026-09-15 table" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/crm/dashboard",
+      "title": "Command Center",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session and preview data, zero console errors (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Money panel cross-checked against the forecast and transactions: $16,000 across 4 transactions agreed" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Filters and figures after a reload not recorded" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Mine/Team scoping not exercised with a restricted user" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15, but that table marks 30 pages clean against 26 measured with the clipped-content metric, so which were measured cannot be told. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/leads/:id/dna",
+      "title": "Lead DNA",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened for a named contact with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Read-only page; nothing on it was used beyond viewing" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/leads/:id",
+      "title": "Contact record",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session; Full History tab populated (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "Portal invitation issued and delivered to the controlled mailbox, redeemed, then revoked: /api/portal/me went 200 → 401" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The revocation was checked by API response, not by reloading the page" },
+        "permission": { "status": "pass", "env": ["L", "T"], "evidence": "An operations manager was refused deleting a lead, in a test and in the browser (M1)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Clipped 220 elements at 375px; re-measured after the fix with the clipped-content metric: 0" }
+      }
+    },
+    {
+      "route": "/admin/crm/leads",
+      "title": "Contacts",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session and 16 preview contacts (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Export sent exactly the 16 visible ids, and 9 when filtered to Client" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Export requires data.export; a user without it is refused (crmContacts.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/communications",
+      "title": "Communications",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/intelligence/behavioral",
+      "title": "Behavioral intelligence",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/crm/intelligence/automation-queue",
+      "title": "Automation queue",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/inbox",
+      "title": "Inbox",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Read, assign and resolve each changed only their own fact" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "An unsent draft survived a full reload" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/tasks",
+      "title": "All tasks",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated, deadline labels kind-aware (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised on this page (tasks were created on My Day)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/calendar",
+      "title": "Calendar",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "M3 (2026-09-12): create, reschedule, mark held, cancel and .ics export in a browser; not repeated since invitations were added" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not recorded after a reload" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/deals",
+      "title": "Deals",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "The edit dialog was opened but no change was saved in the browser" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "At 375px on a touch device the edit control was tapped and every dialog field was reachable" }
+      }
+    },
+    {
+      "route": "/admin/crm/transactions",
+      "title": "Transactions",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 4 real rows (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Total $16,000 and the count matched the list" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/projects",
+      "title": "Projects",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a populated project pipeline (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/documents",
+      "title": "Documents",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with the billing panel present (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised in the browser (quotes were created by script)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/support",
+      "title": "Support",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Ticket created; an internal note and a customer reply posted" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
+        "permission": { "status": "pass", "env": ["L", "T"], "evidence": "The internal note was absent from the customer view; barred by a database CHECK and a route test" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/pipeline",
+      "title": "Pipeline",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a populated pipeline (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/reporting",
+      "title": "Reporting",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 39 figures and their definitions (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Drill-down not exercised in the browser (proven by crmReports.test.ts only)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/admin",
+      "title": "Staff administration",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/workspace",
+      "title": "Sales workspace",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/campaigns",
+      "title": "Sequences",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/campaign-builder",
+      "title": "Marketing",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 13 real contacts listed and nobody pre-ticked (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Autosave not checked across a reload in the browser" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used, and the page has changed since. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/campaign-queue",
+      "title": "Sequence queue",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/discovery",
+      "title": "Discovery submissions",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Rendered populated and measured at 375px after the 10-column table fix" }
+      }
+    },
+    {
+      "route": "/admin/crm/intake-cases",
+      "title": "Intake cases",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/crm/receptionist-accounts",
+      "title": "Receptionist accounts",
+      "checks": {
+        "open": { "status": "fail", "env": [], "evidence": "Its data call answered 401 to a staff session on 2026-09-15. A staff-session fix is written but not yet committed or re-opened" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Permission tests are written (receptionistOpsAuth.test.ts) but not yet on the committed candidate" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/crm/email-templates",
+      "title": "Email templates",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session but it showed an empty state, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/import",
+      "title": "Import contacts",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Upload → preview (2 to create, 2 errors with reasons, 1 ignored column) → mapping → commit: 2 created, 2 failed" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The created contacts were not checked after a reload" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "At 375px the plan table scrolls inside its own 342px container" }
+      }
+    },
+    {
+      "route": "/admin/crm/duplicates",
+      "title": "Duplicate review",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 10 real duplicate pairs (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "T"], "evidence": "A merge kept history from both sides and deleted nothing" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded after the merge" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/settings",
+      "title": "Settings",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "One unbreakable Twilio SID was clipped at 375px; re-measured after the fix with the clipped-content metric: 0" }
+      }
+    },
+    {
+      "route": "/admin/crm/people",
+      "title": "People",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised on the current build" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Self-escalation, unauthorised role changes and removing the last owner are refused (crmStaffAuth.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/account",
+      "title": "My account",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real staff session (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Timezone set to Asia/Manila; an invented zone was refused with 400" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "The Asia/Manila timezone persisted" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/operations",
+      "title": "Operations",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Opened with a real session; its tabs showed empty states, so it has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Retry and acknowledge on the Automation tab are proven by tests only" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "The Automation tab was checked at 375px against a stubbed API only. Re-measure" }
+      }
+    },
+    {
+      "route": "/admin/crm/my-day",
+      "title": "My Day",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated across all five buckets (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Two tasks created, one due on a day and one at a time" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a reload, the day-only task read Today with no 00:00 and the timed one read Today 09:00" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
+        "recovery": { "status": "pass", "env": ["L"], "evidence": "A forced 500 showed an error state and Retry recovered" },
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Measured at a real 375×812 viewport: nothing clipped" }
+      }
+    },
+    {
+      "route": "/admin/ops/firms/:id",
+      "title": "Receptionist firm detail",
+      "checks": {
+        "open": { "status": "fail", "env": [], "evidence": "Its diagnostics call answered 401 to a staff session on 2026-09-15. Fix and corrected fields are written but not committed or re-opened" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/ops/firms",
+      "title": "Receptionist firms",
+      "checks": {
+        "open": { "status": "fail", "env": [], "evidence": "Its data call answered 401 to a staff session on 2026-09-15. Fix written, not committed or re-opened" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable until the data call works" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/ops/issues",
+      "title": "Receptionist issues",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Rendered with a real session on 2026-09-15, but whether it showed data was not recorded" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Tests written (receptionistOpsAuth.test.ts), not yet on the committed candidate" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/ops/usage",
+      "title": "Receptionist usage",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Rendered with a real session on 2026-09-15, but whether it showed data was not recorded" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/admin/ops/numbers",
+      "title": "Receptionist numbers",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Rendered with a real session on 2026-09-15, but whether it showed data was not recorded" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+      }
+    },
+    {
+      "route": "/portal/sign-in",
+      "title": "Portal sign-in",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Rendered with customer chrome and no staff chrome (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "The test customer entered through the invitation link, not this form" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "unverified", "env": [], "evidence": "Portal sign-in throttling not exercised" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal/accept",
+      "title": "Portal invitation landing",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Rendered from a real emailed invitation (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "Invitation delivered by the provider, password set, account became Active" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Session checked by API response, not by reloading the page" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "An invitation redeems exactly once (crmPortal.test.ts, 'redeem it once')" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal",
+      "title": "Portal home",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session; 'Review and accept' shown for the waiting quote (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "The next-action link was shown pointing at the quotes page; following it was not recorded" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Every portal read is scoped to the session's own contact; another customer's records answer 404 (crmPortal.test.ts, 12/12 isolation mutations caught)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal/projects",
+      "title": "Portal projects",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session showing that customer's own project (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "Viewing only" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Scoped to the session's contact; cross-customer access answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal/documents",
+      "title": "Portal documents",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session; only granted files listed (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L"], "evidence": "Downloaded Quote-QUO-00001.txt: 200, attachment disposition, nosniff, exact bytes" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Documents are default-deny through explicit grants; cross-customer access answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal/proposals",
+      "title": "Portal quotes and proposals",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session and an itemised $4,200 quote (2026-09-15)" },
+        "action": { "status": "pass", "env": ["L", "T"], "evidence": "The quote was accepted in writing; the same work offered as a deal could not be accepted a second time (409)" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The accepted state after a reload was proven in crmBilling.test.ts, not in the browser" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Scoped to the session's contact; another customer's quote answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal/invoices",
+      "title": "Portal invoices",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "No invoice has been issued to the test customer, so the page has not been seen with data" },
+        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Scoped to the session's contact; cross-customer access answers 404 (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    },
+    {
+      "route": "/portal/support",
+      "title": "Portal support",
+      "checks": {
+        "open": { "status": "pass", "env": ["L"], "evidence": "Opened with a real customer session listing SUP-00002 (2026-09-15)" },
+        "action": { "status": "unverified", "env": [], "evidence": "No message has been sent from the portal yet" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Tickets are scoped to the session's contact and internal notes never reach it (crmPortal.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Portal pages were checked only with the page-scroll metric, which is not sufficient" }
+      }
+    }
+  ]
+}

@@ -71,9 +71,14 @@ async function newLeads(since: Date, limit: number): Promise<Panel> {
   const items = await db.select({
     id: crmLeads.id, name: crmLeads.name, company: crmLeads.company,
     email: crmLeads.email, source: crmLeads.source, status: crmLeads.status,
-    assignedTo: crmLeads.assignedTo, createdAt: crmLeads.createdAt,
+    // M6: `owner` is the person the staff reference points at; `assignedTo`
+    // is the name as recorded, which is all an unresolved contact has.
+    owner: crmStaff.displayName, assignedTo: crmLeads.assignedTo,
+    createdAt: crmLeads.createdAt,
     lastContactedAt: crmLeads.lastContactedAt,
-  }).from(crmLeads).where(gte(crmLeads.createdAt, since))
+  }).from(crmLeads)
+    .leftJoin(crmStaff, eq(crmStaff.id, crmLeads.assignedToStaffId))
+    .where(gte(crmLeads.createdAt, since))
     .orderBy(desc(crmLeads.createdAt)).limit(limit);
   const [c] = await db.select({ count: sql<number>`count(*)` }).from(crmLeads)
     .where(gte(crmLeads.createdAt, since));

@@ -32,6 +32,7 @@ import {
   getCampaignStrategyHints,
 } from "@/lib/campaignTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1888,9 +1889,9 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
           {/* ── Page header ── */}
           <div className="px-6 py-4 border-b border-border/60 bg-white flex items-center justify-between shrink-0">
             <div>
-              <h1 className="text-lg font-bold font-serif text-foreground">Campaigns</h1>
+              <h1 className="text-lg font-bold font-serif text-foreground">Sequences</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Build sequences, enroll contacts, and automate follow-up.
+                {MESSAGING_CONCEPTS.sequence.summary} To send one email once, use Marketing.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1908,13 +1909,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                 onClick={() => navigate("/admin/crm/campaign-queue")}
                 className="flex items-center gap-2 px-3 py-2 border border-border text-sm font-semibold rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               >
-                <Calendar className="w-4 h-4" /> Queue
+                <Calendar className="w-4 h-4" /> {MESSAGING_CONCEPTS.queue.name}
               </button>
               <button
                 onClick={newCampaign}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
               >
-                <Plus className="w-4 h-4" /> New Campaign
+                <Plus className="w-4 h-4" /> New sequence
               </button>
             </div>
           </div>
@@ -1999,7 +2000,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                         onClick={newCampaign}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white text-sm font-semibold rounded-lg hover:bg-[#2d3e53] transition-colors"
                       >
-                        <Plus className="w-4 h-4" /> New Campaign
+                        <Plus className="w-4 h-4" /> New sequence
                       </button>
                     )}
                   </div>
