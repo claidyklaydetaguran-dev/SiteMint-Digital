@@ -30,16 +30,24 @@ import { Link, useParams } from "wouter";
 import { useCallback, useState, type ReactNode } from "react";
 import { useSession } from "@/hooks/useSession";
 import { useRealCallDetail } from "@/hooks/useVoiceCalls";
+import { useInquiriesForCall } from "@/hooks/useInquiries";
+import { useContactForCall } from "@/hooks/useContacts";
+import { ROUTES } from "@/lib/routes";
 import type { RealCallDetail, StructuredOutcome } from "@/lib/voiceCallsApi";
 import {
   ANALYSIS_UNAVAILABLE,
+  CONTROLS,
   DETAIL,
+  LINKED,
   LIST_PATH,
   NOT_PROVIDED,
   PAGE,
+  TRANSFER,
   analysisIsAvailable,
   callCategory,
   callCategoryLabel,
+  callerNumberText,
+  channelLabel,
   consent,
   dispositionLabel,
   formatDuration,
@@ -48,10 +56,15 @@ import {
   listOrMissing,
   machineTime,
   requestStatusLabel,
+  retentionDetail,
   stateAccessibleName,
   stateLabel,
   stateTone,
   textOrMissing,
+  transcriptIsShown,
+  transferBadge,
+  transferDetail,
+  transferStateLabel,
   urgencyLabel,
   yesNo,
 } from "@/pages/call-logs/callLogsContract";
@@ -135,6 +148,93 @@ function Analysis({ outcome }: { outcome: StructuredOutcome }) {
   );
 }
 
+/**
+ * What is known about handing this caller to a person — levels of evidence,
+ * not steps in a progress bar. The wording never upgrades an acknowledgement
+ * into someone answering, and a blind handover says plainly that nothing
+ * after it is observable rather than leaving a business wondering.
+ */
+function TransferSection({ call }: { call: RealCallDetail }) {
+  const state = call.transfer?.state;
+  // `transferBadge` returns null only for "none", which is exactly the case
+  // the plain "No transfer" label covers.
+  const label = transferBadge(state) ?? transferStateLabel("none");
+
+  return (
+    <section className="sc-doc" aria-labelledby="sc-transfer">
+      <h2 className="sc-doc__heading" id="sc-transfer">
+        {TRANSFER.heading}
+      </h2>
+      <dl className="sc-facts">
+        <Fact label={TRANSFER.evidenceLabel}>{label}</Fact>
+        <Fact label={TRANSFER.destinationLabel}>{textOrMissing(call.transfer?.destinationMasked)}</Fact>
+      </dl>
+      <p className="sc-note">{transferDetail(state)}</p>
+      {call.transfer?.connectionKnowable === false && <p className="sc-note">{TRANSFER.blindNote}</p>}
+    </section>
+  );
+}
+
+/**
+ * The records this call actually produced, reached by real foreign keys the
+ * server resolves — a saved message on (firm, call id), a contact through the
+ * call-link row. Nothing here matches on a caller's name.
+ *
+ * Appointment requests are named and deliberately not listed: the request row
+ * carries no key back to the call that produced it, so any list would be a
+ * guess. Saying that is more useful than an empty heading.
+ */
+function LinkedRecords({ callId }: { callId: string }) {
+  const inquiries = useInquiriesForCall(callId);
+  const contact = useContactForCall(callId);
+  const messages = inquiries.data?.items ?? [];
+  const linked = contact.data;
+
+  return (
+    <section className="sc-doc" aria-labelledby="sc-linked">
+      <h2 className="sc-doc__heading" id="sc-linked">
+        {LINKED.heading}
+      </h2>
+
+      <h3 className="sc-group__heading">{LINKED.messagesHeading}</h3>
+      {inquiries.isLoading ? (
+        <p className="sc-note">{LINKED.messagesLoading}</p>
+      ) : inquiries.isError ? (
+        <p className="sc-absent">{LINKED.messagesFailed}</p>
+      ) : messages.length === 0 ? (
+        <p className="sc-absent">{LINKED.messagesEmpty}</p>
+      ) : (
+        <ul className="sd-list">
+          {messages.map((message) => (
+            <li className="sd-list__item" key={message.id}>
+              <Link href={ROUTES.inquiries} className="sc-link">
+                <span className="sc-link__text">{message.topic}</span>
+                <span className="sd-sr"> — {LINKED.openMessages}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h3 className="sc-group__heading">{LINKED.contactHeading}</h3>
+      {contact.isLoading ? (
+        <p className="sc-note">{LINKED.contactLoading}</p>
+      ) : contact.isError ? (
+        <p className="sc-absent">{LINKED.contactFailed}</p>
+      ) : !linked ? (
+        <p className="sc-absent">{LINKED.contactEmpty}</p>
+      ) : (
+        <Link href={ROUTES.contactDetail.replace(":id", encodeURIComponent(linked.id))} className="sc-link">
+          <span className="sc-link__text">{linked.name ?? linked.phone}</span>
+          <span className="sd-sr"> — {LINKED.openContact}</span>
+        </Link>
+      )}
+
+      <p className="sc-note">{LINKED.appointmentsNote}</p>
+    </section>
+  );
+}
+
 function Record({ call }: { call: RealCallDetail }) {
   const label = stateLabel(call);
   const outcome = analysisIsAvailable(call.analysisAvailability) ? call.structuredOutcome : null;
@@ -151,7 +251,7 @@ function Record({ call }: { call: RealCallDetail }) {
         <div className="sc-record__head">
           <div className="sc-record__id">
             <span className="sd-eyebrow">{DETAIL.factsHeading}</span>
-            <h1 className="sc-record__title">{call.callerNumberDisplay}</h1>
+            <h1 className="sc-record__title">{callerNumberText(call)}</h1>
           </div>
           <span className="sc-state sc-state--lg">
             <span className="sc-state__text">{label}</span>
@@ -159,6 +259,9 @@ function Record({ call }: { call: RealCallDetail }) {
           </span>
         </div>
         <span className="sd-chip">{callCategoryLabel(callCategory(call))}</span>
+        {/* How the call arrived. A browser test and a customer call were
+            previously indistinguishable on this page. */}
+        <span className="sd-chip">{channelLabel(call)}</span>
 
         <dl className="sc-facts sc-facts--record">
           <Fact label={DETAIL.started}>
@@ -189,19 +292,27 @@ function Record({ call }: { call: RealCallDetail }) {
         <h2 className="sc-doc__heading" id="sc-retention">
           {DETAIL.retentionHeading}
         </h2>
-        <p className="sc-note">{DETAIL.retentionDetail}</p>
+        {/* The account's CONFIGURED policy, carried on this record by the
+            server — not a retention claim this page makes on its own. */}
+        <p className="sc-note">{retentionDetail(call.artifactPolicy)}</p>
       </section>
 
-      <section className="sc-doc" aria-labelledby="sc-transcript">
-        <h2 className="sc-doc__heading" id="sc-transcript">
-          {DETAIL.transcriptHeading}
-        </h2>
-        {call.transcript && call.transcript.trim() !== "" ? (
-          <p className="sc-prose">{call.transcript}</p>
-        ) : (
-          <p className="sc-absent">{NOT_PROVIDED}</p>
-        )}
-      </section>
+      {/* Stored words are shown only under a policy that actually keeps them.
+          Under the approved policy nothing is retained, so this section is not
+          rendered at all rather than rendered empty. The server withholds the
+          field under the same policy, so this is the second of two locks. */}
+      {transcriptIsShown(call.artifactPolicy) && (
+        <section className="sc-doc" aria-labelledby="sc-transcript">
+          <h2 className="sc-doc__heading" id="sc-transcript">
+            {DETAIL.transcriptHeading}
+          </h2>
+          {call.transcript && call.transcript.trim() !== "" ? (
+            <p className="sc-prose">{call.transcript}</p>
+          ) : (
+            <p className="sc-absent">{NOT_PROVIDED}</p>
+          )}
+        </section>
+      )}
 
       <section className="sc-doc" aria-labelledby="sc-summary">
         <h2 className="sc-doc__heading" id="sc-summary">
@@ -220,6 +331,10 @@ function Record({ call }: { call: RealCallDetail }) {
         </h2>
         {outcome ? <Analysis outcome={outcome} /> : <p className="sc-absent">{ANALYSIS_UNAVAILABLE}</p>}
       </section>
+
+      <TransferSection call={call} />
+
+      <LinkedRecords callId={call.callId} />
     </div>
   );
 }
